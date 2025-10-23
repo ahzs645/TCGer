@@ -47,14 +47,9 @@ export const useCollectionsStore = create<CollectionsState>()(
         return id;
       },
       removeCollection: (id) => {
-        set((state) => {
-          if (state.collections.length <= 1) {
-            return state;
-          }
-          return {
-            collections: state.collections.filter((collection) => collection.id !== id)
-          };
-        });
+        set((state) => ({
+          collections: state.collections.filter((collection) => collection.id !== id)
+        }));
       },
       updateCollectionCards: (id, cards) => {
         const now = new Date().toISOString();
