@@ -32,7 +32,6 @@ struct RootView: View {
                     MainContentView()
                 }
             }
-            .navigationTitle("TCGer")
         }
         .alert("Oops", isPresented: Binding(
             get: { errorMessage != nil },

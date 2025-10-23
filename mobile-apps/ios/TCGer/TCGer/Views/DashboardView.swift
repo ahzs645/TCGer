@@ -1,0 +1,233 @@
+import SwiftUI
+
+struct DashboardView: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @State private var collections: [Collection] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    private let apiService = APIService()
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    if isLoading {
+                        ProgressView("Loading your collection...")
+                            .padding()
+                    } else if let error = errorMessage {
+                        ErrorView(message: error) {
+                            Task { await loadData() }
+                        }
+                    } else {
+                        // Stats Section
+                        StatsSection(collections: collections)
+
+                        // Recent Collections
+                        if !collections.isEmpty {
+                            RecentCollectionsSection(collections: Array(collections.prefix(3)))
+                        } else {
+                            EmptyStateView()
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Dashboard")
+            .refreshable {
+                await loadData()
+            }
+        }
+        .task {
+            await loadData()
+        }
+    }
+
+    @MainActor
+    private func loadData() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            collections = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            isLoading = false
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+        }
+    }
+}
+
+// MARK: - Stats Section
+private struct StatsSection: View {
+    let collections: [Collection]
+
+    var totalCards: Int {
+        collections.reduce(0) { $0 + $1.uniqueCards }
+    }
+
+    var totalCopies: Int {
+        collections.reduce(0) { $0 + $1.totalCopies }
+    }
+
+    var totalValue: Double {
+        collections.reduce(0) { $0 + $1.totalValue }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Overview")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                StatCard(title: "Binders", value: "\(collections.count)", icon: "folder.fill")
+                StatCard(title: "Unique Cards", value: "\(totalCards)", icon: "rectangle.stack.fill")
+            }
+
+            HStack(spacing: 12) {
+                StatCard(title: "Total Copies", value: "\(totalCopies)", icon: "square.on.square")
+                StatCard(title: "Est. Value", value: "$\(String(format: "%.2f", totalValue))", icon: "dollarsign.circle.fill")
+            }
+        }
+    }
+}
+
+private struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(.accentColor)
+                Spacer()
+            }
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Recent Collections
+private struct RecentCollectionsSection: View {
+    let collections: [Collection]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Binders")
+                .font(.headline)
+
+            ForEach(collections) { collection in
+                CollectionRowView(collection: collection)
+            }
+        }
+    }
+}
+
+private struct CollectionRowView: View {
+    let collection: Collection
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(collection.name)
+                        .font(.headline)
+                    if let description = collection.description {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                Label("\(collection.uniqueCards) cards", systemImage: "rectangle.stack")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Label("\(collection.totalCopies) copies", systemImage: "square.on.square")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text("$\(String(format: "%.2f", collection.totalValue))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.accentColor)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Empty State
+private struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            Text("No Binders Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            Text("Create your first binder to start organizing your TCG collection.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding(.vertical, 40)
+    }
+}
+
+// MARK: - Error View
+private struct ErrorView: View {
+    let message: String
+    let retryAction: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+            Text("Error Loading Data")
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Button("Try Again", action: retryAction)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+}
