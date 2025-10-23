@@ -6,6 +6,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var credentials: LoginCredentials
     @Published var isAuthenticated: Bool
     @Published var authToken: String?
+    @Published var isServerVerified: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -15,6 +16,7 @@ final class EnvironmentStore: ObservableObject {
         static let credentials = "tcg.manager.credentials"
         static let authenticated = "tcg.manager.authenticated"
         static let token = "tcg.manager.auth.token"
+        static let verified = "tcg.manager.server.verified"
     }
 
     init() {
@@ -34,6 +36,7 @@ final class EnvironmentStore: ObservableObject {
 
         isAuthenticated = storage.bool(forKey: Keys.authenticated)
         authToken = storage.string(forKey: Keys.token)
+        isServerVerified = storage.bool(forKey: Keys.verified)
 
         $serverConfiguration
             .dropFirst()
@@ -42,6 +45,8 @@ final class EnvironmentStore: ObservableObject {
                 if let data = try? JSONEncoder().encode(configuration) {
                     storage.set(data, forKey: Keys.server)
                 }
+                storage.set(false, forKey: Keys.verified)
+                self.isServerVerified = false
             }
             .store(in: &cancellables)
 
@@ -65,6 +70,13 @@ final class EnvironmentStore: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        $isServerVerified
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.verified)
+            }
+            .store(in: &cancellables)
     }
 
     func storeToken(_ token: String) {
@@ -77,9 +89,11 @@ final class EnvironmentStore: ObservableObject {
         credentials = .empty
         authToken = nil
         isAuthenticated = false
+        isServerVerified = false
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
         storage.set(false, forKey: Keys.authenticated)
+        storage.set(false, forKey: Keys.verified)
     }
 }

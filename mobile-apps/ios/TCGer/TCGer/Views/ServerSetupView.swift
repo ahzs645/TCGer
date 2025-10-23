@@ -45,5 +45,6 @@ struct ServerSetupView: View {
     private func saveConfiguration() {
         environmentStore.serverConfiguration = ServerConfiguration(baseURL: sanitizedInput)
         environmentStore.isAuthenticated = false
+        environmentStore.isServerVerified = false
     }
 }

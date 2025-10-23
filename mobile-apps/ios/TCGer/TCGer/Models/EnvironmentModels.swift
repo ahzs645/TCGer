@@ -36,6 +36,40 @@ struct ServerConfiguration: Codable, Equatable {
         return base.appendingPathComponent(path)
     }
 
+    var backendCandidates: [ServerConfiguration] {
+        guard var baseComponents = URLComponents(string: baseURL) else { return [self] }
+
+        func appendCandidate(from components: URLComponents, to list: inout [ServerConfiguration]) {
+            guard let urlString = components.url?.absoluteString else { return }
+            let sanitized = ServerConfiguration.sanitized(urlString)
+            if !list.contains(where: { $0.baseURL == sanitized }) {
+                list.append(ServerConfiguration(baseURL: sanitized))
+            }
+        }
+
+        var candidates: [ServerConfiguration] = []
+        appendCandidate(from: baseComponents, to: &candidates)
+
+        if baseComponents.port == 3001 {
+            var apiComponents = baseComponents
+            apiComponents.port = 3000
+            appendCandidate(from: apiComponents, to: &candidates)
+        }
+
+        if baseComponents.path.isEmpty || baseComponents.path == "/" {
+            var apiComponents = baseComponents
+            apiComponents.path = "/api"
+            appendCandidate(from: apiComponents, to: &candidates)
+
+            if baseComponents.port == 3001 {
+                apiComponents.port = 3000
+                appendCandidate(from: apiComponents, to: &candidates)
+            }
+        }
+
+        return candidates
+    }
+
     static func sanitized(_ value: String) -> String {
         var trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }

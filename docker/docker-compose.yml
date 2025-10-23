@@ -68,6 +68,7 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
+      BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
     volumes:

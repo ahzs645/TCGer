@@ -754,17 +754,25 @@ function CollectionSelector({
                   {uniqueGames.size} games
                 </Badge>
                 {collections.length > 1 && (
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
                       onRemove(collection.id);
                     }}
-                    className="rounded-full border border-transparent p-1 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onRemove(collection.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-full border border-transparent p-1 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
                     aria-label={`Delete ${collection.name}`}
                   >
                     <Trash className="h-3.5 w-3.5" />
-                  </button>
+                  </div>
                 )}
               </div>
             </div>

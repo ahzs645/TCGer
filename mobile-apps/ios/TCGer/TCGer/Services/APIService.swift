@@ -53,4 +53,22 @@ actor APIService {
             throw APIError.serverError(status: httpResponse.statusCode)
         }
     }
+
+    func verifyServer(config: ServerConfiguration) async -> Bool {
+        guard let url = config.endpoint(path: "health") ?? config.normalizedURL else {
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            return (200..<400).contains(httpResponse.statusCode)
+        } catch {
+            return false
+        }
+    }
 }
