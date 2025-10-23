@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Filter, Loader2, RefreshCcw, TrendingUp } from 'lucide-react';
 
 import { CollectionSummary } from '@/components/collections/collection-summary';
@@ -17,23 +17,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
+import { SAMPLE_COLLECTIONS, type SampleCollection } from '@/lib/data/sample-collections';
+import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
-import type { CollectionCard } from '@/types/card';
+import type { CollectionCard, TcgCode } from '@/types/card';
 
 export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const enabledGames = useModuleStore((state) => state.enabledGames);
+  const { enabledGames, showPricing } = useModuleStore((state) => ({
+    enabledGames: state.enabledGames,
+    showPricing: state.showPricing
+  }));
+  const [activeCollectionId, setActiveCollectionId] = useState<string>(SAMPLE_COLLECTIONS[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'rarity' | 'price'>('name');
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [rarityFilter, setRarityFilter] = useState<string>('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
+  const previousCollectionId = useRef<string | null>(null);
 
-  const { items, isLoading, maxPrice, totalQuantity, totalValue } = useCollectionData({
+  useEffect(() => {
+    if (!showPricing && sortBy === 'price') {
+      setSortBy('name');
+    }
+  }, [showPricing, sortBy]);
+
+  useEffect(() => {
+    setSelection({});
+    setSearchTerm('');
+    setRarityFilter('all');
+  }, [activeCollectionId]);
+
+  const { collection, items, isLoading, maxPrice, totalQuantity, totalValue } = useCollectionData({
+    collectionId: activeCollectionId,
     query: searchTerm,
     game: selectedGame as SupportedGame | 'all',
     enabledGames
@@ -46,8 +65,18 @@ export function CollectionTable() {
 
   useEffect(() => {
     const upperBound = defaultMaxPrice;
-    setPriceRange(([min]) => [min > upperBound ? 0 : min, upperBound]);
-  }, [defaultMaxPrice]);
+    setPriceRange((prev) => {
+      const isNewCollection = previousCollectionId.current !== collection?.id;
+      previousCollectionId.current = collection?.id ?? null;
+
+      if (!showPricing) {
+        return [0, upperBound];
+      }
+
+      const nextMin = isNewCollection ? 0 : Math.min(prev[0], upperBound);
+      return [nextMin, upperBound];
+    });
+  }, [collection?.id, defaultMaxPrice, showPricing]);
 
   const rarityOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -58,67 +87,70 @@ export function CollectionTable() {
   const filtered = useMemo(() => {
     return items.filter((card) => {
       if (rarityFilter !== 'all' && card.rarity !== rarityFilter) return false;
-      const cardPrice = card.price ?? 0;
-      if (cardPrice < priceRange[0] || cardPrice > priceRange[1]) return false;
+      if (showPricing) {
+        const cardPrice = card.price ?? 0;
+        if (cardPrice < priceRange[0] || cardPrice > priceRange[1]) return false;
+      }
       return true;
     });
-  }, [items, priceRange, rarityFilter]);
+  }, [items, priceRange, rarityFilter, showPricing]);
 
   const sortedCards = useMemo(() => {
-    return [...filtered].sort((a, b) => compareCards(a, b, sortBy));
-  }, [filtered, sortBy]);
+    return [...filtered].sort((a, b) => compareCards(a, b, sortBy, showPricing));
+  }, [filtered, sortBy, showPricing]);
 
-  const allSelected = useMemo(
-    () => sortedCards.length > 0 && sortedCards.every((card) => selection[card.id]),
-    [sortedCards, selection]
-  );
   const selectedIds = useMemo(
     () => Object.entries(selection).filter(([, checked]) => checked).map(([id]) => id),
     [selection]
   );
 
+  const groupedByGame = useMemo(() => {
+    const map = new Map<TcgCode, CollectionCard[]>();
+    sortedCards.forEach((card) => {
+      if (!map.has(card.tcg)) {
+        map.set(card.tcg, []);
+      }
+      map.get(card.tcg)!.push(card);
+    });
+    return Array.from(map.entries());
+  }, [sortedCards]);
+
   const toggleRow = (id: string) => {
     setSelection((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const toggleAll = () => {
-    setSelection((prev) => {
-      if (allSelected) {
-        const next = { ...prev };
-        sortedCards.forEach((card) => {
-          delete next[card.id];
-        });
-        return next;
-      }
-      const next = { ...prev };
-      sortedCards.forEach((card) => {
-        next[card.id] = true;
-      });
-      return next;
-    });
-  };
-
   const handleExport = () => {
     const exportRows = (selectedIds.length ? sortedCards.filter((card) => selection[card.id]) : sortedCards).map(
-      (card) => ({
-        Name: card.name,
-        Game: GAME_LABELS[card.tcg],
-        Set: card.setName ?? card.setCode ?? 'Unknown',
-        Rarity: card.rarity ?? 'N/A',
-        Quantity: card.quantity,
-        Condition: card.condition ?? 'Unknown',
-        EstimatedPrice: card.price ?? 0
-      })
+      (card) => {
+        const base = {
+          Name: card.name,
+          Game: GAME_LABELS[card.tcg],
+          Set: card.setName ?? card.setCode ?? 'Unknown',
+          Rarity: card.rarity ?? 'N/A',
+          Quantity: card.quantity,
+          Condition: card.condition ?? 'Unknown'
+        } as Record<string, unknown>;
+
+        if (showPricing) {
+          base['EstimatedPrice'] = card.price ?? 0;
+        }
+
+        return base;
+      }
     );
 
-    const header = Object.keys(exportRows[0] ?? { Name: '', Game: '', Set: '', Rarity: '', Quantity: 0, Condition: '', EstimatedPrice: 0 });
+    const fallbackHeader = showPricing
+      ? { Name: '', Game: '', Set: '', Rarity: '', Quantity: 0, Condition: '', EstimatedPrice: 0 }
+      : { Name: '', Game: '', Set: '', Rarity: '', Quantity: 0, Condition: '' };
+    const header = Object.keys(exportRows[0] ?? fallbackHeader);
     const csvLines = [header.join(','), ...exportRows.map((row) => header.map((key) => formatCsvValue(row[key as keyof typeof row])).join(','))];
     const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
+    const exportName = (collection?.name ?? 'collection').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `tcg-collection-export-${Date.now()}.csv`);
+    link.setAttribute('download', `${exportName || 'collection'}-export-${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -127,14 +159,32 @@ export function CollectionTable() {
 
   return (
     <div className="space-y-6">
-      <CollectionSummary items={items} selectedIds={selectedIds} totalQuantity={totalQuantity} totalValue={totalValue} />
+      <CollectionSelector
+        collections={SAMPLE_COLLECTIONS}
+        activeId={activeCollectionId}
+        onSelect={setActiveCollectionId}
+        showPricing={showPricing}
+      />
+
+      <CollectionSummary
+        items={items}
+        selectedIds={selectedIds}
+        totalQuantity={totalQuantity}
+        totalValue={totalValue}
+        showPricing={showPricing}
+      />
 
       <Card>
         <CardHeader className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle>Collection Manager</CardTitle>
+            <CardTitle>{collection?.name ?? 'Collection Manager'}</CardTitle>
             <CardDescription>
-              Manage quantities, review price trends, and prepare CSV exports for grading or trading.
+              {collection?.description ?? 'Manage quantities, review price trends, and prepare CSV exports for grading or trading.'}
+              {collection && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {collection.cards.length} unique cards • Updated {new Date(collection.updatedAt).toLocaleDateString()}
+                </span>
+              )}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -151,7 +201,7 @@ export function CollectionTable() {
               <SelectContent>
                 <SelectItem value="name">Name</SelectItem>
                 <SelectItem value="rarity">Rarity</SelectItem>
-                <SelectItem value="price">Estimated price</SelectItem>
+                {showPricing && <SelectItem value="price">Estimated price</SelectItem>}
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setFilterOpen(true)}>
@@ -168,59 +218,97 @@ export function CollectionTable() {
           <ActiveFilters
             rarity={rarityFilter}
             priceRange={priceRange}
+            showPricing={showPricing}
             defaultMax={defaultMaxPrice}
             onClear={() => resetFilters(setRarityFilter, setPriceRange, defaultMaxPrice)}
           />
 
           <div className="relative">
             <ScrollArea className="h-[620px] rounded-md border">
-              <Table>
-                <TableHeader className="bg-muted/40">
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
-                    </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Game</TableHead>
-                    <TableHead>Set</TableHead>
-                    <TableHead>Rarity</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Condition</TableHead>
-                    <TableHead className="text-right">Estimated Price</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-40 text-center text-sm text-muted-foreground">
-                        <div className="flex items-center justify-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading collection data...
+              {isLoading ? (
+                <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading collection data...
+                  </div>
+                </div>
+              ) : groupedByGame.length === 0 ? (
+                <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
+                  {noGamesEnabled
+                    ? 'All modules are disabled. Re-enable them in settings to view your catalog.'
+                    : selectedGameDisabled
+                      ? 'Selected game is disabled. Enable it from module preferences to manage its collection.'
+                      : 'No cards matched your filters.'}
+                </div>
+              ) : (
+                <div className="space-y-8 p-4">
+                  {groupedByGame.map(([tcg, cardsForGame]) => {
+                    const gameValue = cardsForGame.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
+                    const gameQuantity = cardsForGame.reduce((sum, card) => sum + card.quantity, 0);
+
+                    return (
+                      <div key={tcg} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-sm font-semibold">{GAME_LABELS[tcg as keyof typeof GAME_LABELS]}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {cardsForGame.length} card(s), {gameQuantity} copies
+                              {showPricing ? ` • $${gameValue.toFixed(2)}` : ''}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="uppercase">
+                            {GAME_LABELS[tcg as keyof typeof GAME_LABELS] ?? tcg}
+                          </Badge>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {!isLoading && (sortedCards.length === 0 || selectedGameDisabled || noGamesEnabled) && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-40 text-center text-sm text-muted-foreground">
-                        {noGamesEnabled
-                          ? 'All modules are disabled. Re-enable them in settings to view your catalog.'
-                          : selectedGameDisabled
-                            ? 'Selected game is disabled. Enable it from module preferences to manage its collection.'
-                            : 'No cards matched your filters.'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {sortedCards.map((card) => (
-                    <CollectionRow
-                      key={card.id}
-                      card={card}
-                      selected={!!selection[card.id]}
-                      onToggle={() => toggleRow(card.id)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+
+                        <Table>
+                          <TableHeader className="bg-muted/30">
+                            <TableRow>
+                              <TableHead className="w-10">
+                                <Checkbox
+                                  checked={cardsForGame.every((card) => selection[card.id])}
+                                  onCheckedChange={(checked) =>
+                                    setSelection((prev) => {
+                                      const next = { ...prev };
+                                      if (checked) {
+                                        cardsForGame.forEach((card) => {
+                                          next[card.id] = true;
+                                        });
+                                      } else {
+                                        cardsForGame.forEach((card) => {
+                                          delete next[card.id];
+                                        });
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                  aria-label={`Select all ${GAME_LABELS[tcg as keyof typeof GAME_LABELS]} cards`}
+                                />
+                              </TableHead>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Set</TableHead>
+                              <TableHead>Rarity</TableHead>
+                              <TableHead className="text-right">Quantity</TableHead>
+                              <TableHead className="text-right">Condition</TableHead>
+                              {showPricing && <TableHead className="text-right">Est. Price</TableHead>}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {cardsForGame.map((card) => (
+                              <CollectionRow
+                                key={card.id}
+                                card={card}
+                                selected={!!selection[card.id]}
+                                onToggle={() => toggleRow(card.id)}
+                                showPricing={showPricing}
+                              />
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </ScrollArea>
           </div>
         </CardContent>
@@ -233,6 +321,7 @@ export function CollectionTable() {
         rarities={rarityOptions}
         priceRange={priceRange}
         maxPrice={defaultMaxPrice}
+        showPricing={showPricing}
         onApply={(rarity, range) => {
           setRarityFilter(rarity);
           setPriceRange(range);
@@ -242,7 +331,17 @@ export function CollectionTable() {
   );
 }
 
-function CollectionRow({ card, selected, onToggle }: { card: CollectionCard; selected: boolean; onToggle: () => void }) {
+function CollectionRow({
+  card,
+  selected,
+  onToggle,
+  showPricing
+}: {
+  card: CollectionCard;
+  selected: boolean;
+  onToggle: () => void;
+  showPricing: boolean;
+}) {
   const price = card.price ?? 0;
   const previousPrice =
     card.priceHistory && card.priceHistory.length > 1 ? card.priceHistory[card.priceHistory.length - 2] : price;
@@ -265,28 +364,29 @@ function CollectionRow({ card, selected, onToggle }: { card: CollectionCard; sel
           </div>
         </div>
       </TableCell>
-      <TableCell>
-        <Badge variant="outline">{GAME_LABELS[card.tcg]}</Badge>
-      </TableCell>
       <TableCell>{card.setName ?? card.setCode ?? 'Unknown'}</TableCell>
       <TableCell>{card.rarity ?? 'N/A'}</TableCell>
       <TableCell className="text-right">{card.quantity}</TableCell>
       <TableCell className="text-right">{card.condition ?? 'Unknown'}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex flex-col items-end gap-1">
-          <span className="font-medium">${price.toFixed(2)}</span>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger className={`flex items-center gap-1 text-xs ${positive ? 'text-emerald-500' : 'text-red-500'}`}>
-                <TrendingUp className="h-3 w-3" />
-                {positive ? '+' : ''}
-                {delta.toFixed(1)}%
-              </TooltipTrigger>
-              <TooltipContent>Change versus previous sync snapshot.</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </TableCell>
+      {showPricing && (
+        <TableCell className="text-right">
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-medium">${price.toFixed(2)}</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  className={`flex items-center gap-1 text-xs ${positive ? 'text-emerald-500' : 'text-red-500'}`}
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  {positive ? '+' : ''}
+                  {delta.toFixed(1)}%
+                </TooltipTrigger>
+                <TooltipContent>Change versus previous sync snapshot.</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </TableCell>
+      )}
     </TableRow>
   );
 }
@@ -328,6 +428,7 @@ function FilterDialog({
   rarities,
   priceRange,
   maxPrice,
+  showPricing,
   onApply
 }: {
   open: boolean;
@@ -336,6 +437,7 @@ function FilterDialog({
   rarities: string[];
   priceRange: [number, number];
   maxPrice: number;
+  showPricing: boolean;
   onApply: (rarity: string, range: [number, number]) => void;
 }) {
   const [pendingRarity, setPendingRarity] = useState(rarity);
@@ -353,7 +455,11 @@ function FilterDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Filter collection</DialogTitle>
-          <DialogDescription>Narrow down your collection by rarity and price range.</DialogDescription>
+          <DialogDescription>
+            {showPricing
+              ? 'Narrow down your collection by rarity and price range.'
+              : 'Filter your collection by rarity.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -374,21 +480,23 @@ function FilterDialog({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Price range</Label>
-              <span className="text-xs text-muted-foreground">
-                ${pendingRange[0].toFixed(2)} – ${pendingRange[1].toFixed(2)}
-              </span>
+          {showPricing && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Price range</Label>
+                <span className="text-xs text-muted-foreground">
+                  ${pendingRange[0].toFixed(2)} – ${pendingRange[1].toFixed(2)}
+                </span>
+              </div>
+              <Slider
+                value={pendingRange}
+                min={0}
+                max={maxPrice}
+                step={1}
+                onValueChange={(value) => setPendingRange(value as [number, number])}
+              />
             </div>
-            <Slider
-              value={pendingRange}
-              min={0}
-              max={maxPrice}
-              step={1}
-              onValueChange={(value) => setPendingRange(value as [number, number])}
-            />
-          </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -421,16 +529,18 @@ function FilterDialog({
 function ActiveFilters({
   rarity,
   priceRange,
+  showPricing,
   defaultMax,
   onClear
 }: {
   rarity: string;
   priceRange: [number, number];
+  showPricing: boolean;
   defaultMax: number;
   onClear: () => void;
 }) {
   const hasRarity = rarity !== 'all';
-  const hasPrice = priceRange[0] !== 0 || priceRange[1] !== defaultMax;
+  const hasPrice = showPricing && (priceRange[0] !== 0 || priceRange[1] !== defaultMax);
 
   if (!hasRarity && !hasPrice) {
     return null;
@@ -448,8 +558,8 @@ function ActiveFilters({
   );
 }
 
-function compareCards(a: CollectionCard, b: CollectionCard, sortBy: 'name' | 'rarity' | 'price') {
-  if (sortBy === 'price') {
+function compareCards(a: CollectionCard, b: CollectionCard, sortBy: 'name' | 'rarity' | 'price', showPricing: boolean) {
+  if (sortBy === 'price' && showPricing) {
     const priceA = a.price ?? 0;
     const priceB = b.price ?? 0;
     return priceB - priceA;
@@ -473,4 +583,71 @@ function resetFilters(
 ) {
   setRarity('all');
   setRange([0, maxPrice]);
+}
+
+function CollectionSelector({
+  collections,
+  activeId,
+  onSelect,
+  showPricing
+}: {
+  collections: SampleCollection[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  showPricing: boolean;
+}) {
+  if (!collections.length) {
+    return (
+      <div className="rounded-xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+        No collections yet. Start by importing cards or creating a binder from the account menu.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {collections.map((collection) => {
+        const isActive = collection.id === activeId;
+        const uniqueGames = new Set(collection.cards.map((card) => card.tcg));
+        const uniqueCards = collection.cards.length;
+        const totalCopies = collection.cards.reduce((sum, card) => sum + card.quantity, 0);
+        const totalValue = collection.cards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
+
+        return (
+          <button
+            key={collection.id}
+            type="button"
+            onClick={() => onSelect(collection.id)}
+            aria-pressed={isActive}
+            className={cn(
+              'group rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+              isActive ? 'border-primary bg-primary/5 shadow-md' : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40'
+            )}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{collection.name}</h3>
+                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{collection.description}</p>
+              </div>
+              <Badge variant="outline" className="uppercase text-[10px]">
+                {uniqueGames.size} games
+              </Badge>
+            </div>
+            <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{uniqueCards} unique cards</span>
+              <span>{totalCopies} copies</span>
+            </div>
+            {showPricing && (
+              <div className="mt-2 text-sm font-semibold text-foreground">
+                ${totalValue.toFixed(2)}
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Updated {new Date(collection.updatedAt).toLocaleDateString()}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
 }

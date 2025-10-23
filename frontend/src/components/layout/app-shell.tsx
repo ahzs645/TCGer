@@ -33,7 +33,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
               <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary shadow p-1">
-                <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-full w-full" />
+                <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-full w-full dark:invert" />
               </span>
               TCG Manager
             </Link>
