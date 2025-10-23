@@ -16,7 +16,10 @@ const DEFAULT_DASHBOARD_QUERY = 'dragon';
 
 export function DashboardContent() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const enabledGames = useModuleStore((state) => state.enabledGames);
+  const { enabledGames, showPricing } = useModuleStore((state) => ({
+    enabledGames: state.enabledGames,
+    showPricing: state.showPricing
+  }));
   const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', { selectedGame }],
@@ -69,8 +72,8 @@ export function DashboardContent() {
         />
         <StatCard
           title="Estimated Value"
-          value={`$${stats.totalValue.toFixed(2)}`}
-          description="Based on latest price snapshots"
+          value={showPricing ? `$${stats.totalValue.toFixed(2)}` : 'Hidden'}
+          description={showPricing ? 'Based on latest price snapshots' : 'Enable pricing in preferences'}
           icon={<Coins className="h-5 w-5" />}
         />
         <StatCard

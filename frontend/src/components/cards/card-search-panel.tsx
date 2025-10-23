@@ -29,9 +29,10 @@ export function CardSearchPanel() {
     setGame: state.setGame
   }));
   const enabledGames = useModuleStore((state) => state.enabledGames);
-  const [query, setQuery] = useState('dark magician');
+  const [inputValue, setInputValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isFetching, refetch } = useCardSearch(query, selectedGame === 'all' ? undefined : selectedGame);
+  const { data, isFetching, refetch } = useCardSearch(searchQuery, selectedGame === 'all' ? undefined : selectedGame);
   const filteredCards = (data ?? []).filter((card) => enabledGames[card.tcg as keyof typeof enabledGames]);
   const cards = filteredCards;
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
@@ -39,8 +40,20 @@ export function CardSearchPanel() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!query.trim()) return;
-    refetch();
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    setSearchQuery(trimmed);
+    if (trimmed === searchQuery) {
+      void refetch();
+    }
+  };
+
+  const handlePreset = (value: string) => {
+    setInputValue(value);
+    setSearchQuery(value);
+    if (value === searchQuery) {
+      void refetch();
+    }
   };
 
   return (
@@ -55,7 +68,11 @@ export function CardSearchPanel() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Keyword</label>
               <div className="flex gap-2">
-                <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cards..." />
+                <Input
+                  value={inputValue}
+                  onChange={(event) => setInputValue(event.target.value)}
+                  placeholder="Search cards by name, set, or archetype..."
+                />
                 <Button type="submit" disabled={isFetching}>
                   {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
                 </Button>
@@ -87,7 +104,13 @@ export function CardSearchPanel() {
               <label className="text-sm font-medium">Quick presets</label>
               <div className="flex flex-wrap gap-2">
                 {presetQueries.map((preset) => (
-                  <Button key={preset.value} variant="secondary" size="sm" onClick={() => setQuery(preset.value)} type="button">
+                  <Button
+                    key={preset.value}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handlePreset(preset.value)}
+                    type="button"
+                  >
                     {preset.label}
                   </Button>
                 ))}
@@ -104,9 +127,15 @@ export function CardSearchPanel() {
                 >
                   {GAME_LABELS[selectedGame] ?? 'All Games'}
                 </Badge>
-                {selectedGameDisabled && (
+                {selectedGameDisabled ? (
                   <p className="mt-2 text-xs text-destructive">
                     This game is currently disabled. Enable it from account settings to include its results.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {searchQuery
+                      ? `Showing results for "${searchQuery}".`
+                      : 'Select a TCG and enter a query to begin searching.'}
                   </p>
                 )}
               </div>
@@ -119,7 +148,11 @@ export function CardSearchPanel() {
           <div>
             <CardTitle>Results</CardTitle>
             <CardDescription>
-              {noGamesEnabled ? 'Enable at least one module to resume cross-game search.' : `${cards.length} cards matched your search.`}
+              {noGamesEnabled
+                ? 'Enable at least one module to resume cross-game search.'
+                : searchQuery
+                  ? `${cards.length} cards matched "${searchQuery}".`
+                  : 'Enter a keyword and run a search to see results.'}
             </CardDescription>
           </div>
           {isFetching && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}

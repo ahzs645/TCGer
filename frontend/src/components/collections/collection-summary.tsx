@@ -9,13 +9,15 @@ interface CollectionSummaryProps {
   selectedIds: string[];
   totalQuantity: number;
   totalValue: number;
+  showPricing: boolean;
 }
 
-export function CollectionSummary({ items, selectedIds, totalQuantity, totalValue }: CollectionSummaryProps) {
+export function CollectionSummary({ items, selectedIds, totalQuantity, totalValue, showPricing }: CollectionSummaryProps) {
   const selectedCards = items.filter((card) => selectedIds.includes(card.id));
   const selectedValue = selectedCards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
+  const selectedQuantity = selectedCards.reduce((sum, card) => sum + card.quantity, 0);
   const avgPrice = items.length ? totalValue / totalQuantity : 0;
-  const delta = computeDelta(items);
+  const delta = showPricing ? computeDelta(items) : undefined;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -25,26 +27,52 @@ export function CollectionSummary({ items, selectedIds, totalQuantity, totalValu
         value={`${totalQuantity} copies`}
         icon={<Layers className="h-5 w-5" />}
       />
-      <SummaryCard
-        title="Portfolio value"
-        description="live estimates"
-        value={`$${totalValue.toFixed(2)}`}
-        icon={<Wallet className="h-5 w-5" />}
-        delta={delta}
-      />
-      <SummaryCard
-        title="Avg. price"
-        description="per copy"
-        value={`$${avgPrice.toFixed(2)}`}
-        icon={<PieChart className="h-5 w-5" />}
-      />
-      <SummaryCard
-        title="Selected for export"
-        description={`${selectedCards.length} card(s)`}
-        value={`$${selectedValue.toFixed(2)}`}
-        icon={<ArrowUpRight className="h-5 w-5" />}
-        variant="muted"
-      />
+      {showPricing ? (
+        <>
+          <SummaryCard
+            title="Portfolio value"
+            description="Live estimates"
+            value={`$${totalValue.toFixed(2)}`}
+            icon={<Wallet className="h-5 w-5" />}
+            delta={delta}
+          />
+          <SummaryCard
+            title="Avg. price"
+            description="Per copy"
+            value={`$${avgPrice.toFixed(2)}`}
+            icon={<PieChart className="h-5 w-5" />}
+          />
+          <SummaryCard
+            title="Selected for export"
+            description={`${selectedCards.length} card(s), ${selectedQuantity} copies`}
+            value={`$${selectedValue.toFixed(2)}`}
+            icon={<ArrowUpRight className="h-5 w-5" />}
+            variant="muted"
+          />
+        </>
+      ) : (
+        <>
+          <SummaryCard
+            title="Pricing hidden"
+            description="Enable pricing to see totals"
+            value="—"
+            icon={<Wallet className="h-5 w-5" />}
+          />
+          <SummaryCard
+            title="Selected cards"
+            description="Count of items picked"
+            value={`${selectedCards.length} titles (${selectedQuantity} copies)`}
+            icon={<ArrowUpRight className="h-5 w-5" />}
+            variant="muted"
+          />
+          <SummaryCard
+            title="Average value"
+            description="Pricing disabled"
+            value="—"
+            icon={<PieChart className="h-5 w-5" />}
+          />
+        </>
+      )}
     </div>
   );
 }

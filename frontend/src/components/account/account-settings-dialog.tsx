@@ -23,18 +23,21 @@ interface AccountSettingsDialogProps {
 }
 
 export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDialogProps) {
-  const { enabledGames, toggleGame, showCardNumbers, setShowCardNumbers } = useModuleStore((state) => ({
-    enabledGames: state.enabledGames,
-    toggleGame: state.toggleGame,
-    showCardNumbers: state.showCardNumbers,
-    setShowCardNumbers: state.setShowCardNumbers
-  }));
+  const { enabledGames, toggleGame, showCardNumbers, setShowCardNumbers, showPricing, setShowPricing } =
+    useModuleStore((state) => ({
+      enabledGames: state.enabledGames,
+      toggleGame: state.toggleGame,
+      showCardNumbers: state.showCardNumbers,
+      setShowCardNumbers: state.setShowCardNumbers,
+      showPricing: state.showPricing,
+      setShowPricing: state.setShowPricing
+    }));
 
   const activeCount = useMemo(() => Object.values(enabledGames).filter(Boolean).length, [enabledGames]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Account & Preferences</DialogTitle>
           <DialogDescription>Configure your profile, notifications, and which TCG modules are active.</DialogDescription>
@@ -92,7 +95,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                 <div key={game} className="flex items-center justify-between rounded-lg border bg-background p-3">
                   <div className="flex items-center gap-3">
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
-                      <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="h-4 w-4" />
+                      <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="h-4 w-4 dark:invert" />
                     </span>
                     <div>
                       <p className="text-sm font-medium">{GAME_LABELS[game]}</p>
@@ -127,6 +130,20 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
               checked={showCardNumbers}
               onCheckedChange={setShowCardNumbers}
               aria-label="Toggle card numbers"
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+            <div>
+              <p className="text-sm font-medium">Show Pricing</p>
+              <p className="text-xs text-muted-foreground">
+                Toggle pricing summaries and estimated values across the dashboard and collection views.
+              </p>
+            </div>
+            <Switch
+              checked={showPricing}
+              onCheckedChange={setShowPricing}
+              aria-label="Toggle pricing display"
             />
           </div>
         </section>

@@ -10,6 +10,8 @@ interface ModuleState {
   setGameEnabled: (game: ManageableGame, enabled: boolean) => void;
   showCardNumbers: boolean;
   setShowCardNumbers: (show: boolean) => void;
+  showPricing: boolean;
+  setShowPricing: (show: boolean) => void;
 }
 
 const initialState: Record<ManageableGame, boolean> = {
@@ -29,7 +31,9 @@ export const useModuleStore = create<ModuleState>((set) => ({
       enabledGames: { ...state.enabledGames, [game]: enabled }
     })),
   showCardNumbers: true,
-  setShowCardNumbers: (show) => set({ showCardNumbers: show })
+  setShowCardNumbers: (show) => set({ showCardNumbers: show }),
+  showPricing: true,
+  setShowPricing: (show) => set({ showPricing: show })
 }));
 
 export function getActiveGames(enabledGames: Record<ManageableGame, boolean>): ManageableGame[] {
