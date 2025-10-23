@@ -30,3 +30,4 @@ backend/prisma/dev.db
 **/*.swp
 **/*.swo
 Reference frontend
+.env

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Search, Table } from 'lucide-react';
@@ -31,8 +32,8 @@ export function AppShell({ children }: AppShellProps) {
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow">
-                T
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary shadow p-1">
+                <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-full w-full" />
               </span>
               TCG Manager
             </Link>

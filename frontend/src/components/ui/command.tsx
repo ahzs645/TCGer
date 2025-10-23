@@ -9,7 +9,10 @@ import { cn } from '@/lib/utils';
 
 import {
   Dialog,
-  DialogContent
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
 } from './dialog';
 
 const Command = React.forwardRef<
@@ -31,10 +34,15 @@ const CommandDialog = ({ children, ...props }: DialogProps) => {
   return (
     <Dialog {...props}>
       <DialogContent className="overflow-hidden p-0 shadow-lg">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Command palette</DialogTitle>
+          <DialogDescription>Access quick navigation and actions.</DialogDescription>
+        </DialogHeader>
         <Command className="bg-background">
-          <CommandPrimitive.Input
-            className="flex h-12 w-full items-center gap-2 border-b bg-transparent px-4 text-sm outline-none placeholder:text-muted-foreground"
-          />
+          <div className="relative border-b">
+            <CommandInput placeholder="Search for pages, actions, or games..." className="pl-10" />
+            <CommandSearchIcon />
+          </div>
           {children}
         </Command>
       </DialogContent>

@@ -9,6 +9,7 @@ export interface CardDTO {
   rarity?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
+  setSymbolUrl?: string;
   attributes?: Record<string, unknown>;
 }
 

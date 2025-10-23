@@ -1,28 +1,7 @@
-import { CardDTO, TcgAdapter, TcgCode } from './types';
-
-class StaticAdapter implements TcgAdapter {
-  readonly game: TcgCode;
-
-  constructor(game: TcgCode) {
-    this.game = game;
-  }
-
-  async searchCards(query: string): Promise<CardDTO[]> {
-    // Placeholder implementation until real adapters are introduced.
-    return [
-      {
-        id: `${this.game}-stub-${Buffer.from(query).toString('hex').slice(0, 8)}`,
-        tcg: this.game,
-        name: `Sample ${this.game} card for "${query}"`,
-        attributes: { source: 'stub' }
-      }
-    ];
-  }
-
-  async fetchCardById(_externalId: string): Promise<CardDTO | null> {
-    return null;
-  }
-}
+import { MagicAdapter } from './magic-adapter';
+import { PokemonAdapter } from './pokemon-adapter';
+import { TcgAdapter, TcgCode } from './types';
+import { YugiohAdapter } from './yugioh-adapter';
 
 class AdapterRegistry {
   private readonly adapters = new Map<TcgCode, TcgAdapter>();
@@ -46,8 +25,6 @@ class AdapterRegistry {
   }
 }
 
-const defaultAdapters = (['yugioh', 'magic', 'pokemon'] as const).map(
-  (game) => new StaticAdapter(game)
-);
+const defaultAdapters: TcgAdapter[] = [new YugiohAdapter(), new MagicAdapter(), new PokemonAdapter()];
 
 export const adapterRegistry = new AdapterRegistry(defaultAdapters);
