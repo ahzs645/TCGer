@@ -7,6 +7,7 @@ import { LayoutDashboard, Search, Table } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { CommandMenu } from '../navigation/command-menu';
 import { GameSwitcher } from '../navigation/game-switcher';
 import { ThemeToggle } from '../navigation/theme-toggle';
 import { UserMenu } from '../navigation/user-menu';
@@ -57,6 +58,7 @@ export function AppShell({ children }: AppShellProps) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            <CommandMenu />
             <GameSwitcher />
             <ThemeToggle />
             <UserMenu />
