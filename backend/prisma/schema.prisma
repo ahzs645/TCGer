@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  username    String?
+  passwordHash String
+  collections Collection[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model TcgGame {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  displayName  String
+  apiEndpoint  String?
+  schemaVersion String?
+  enabled      Boolean  @default(true)
+  cards        Card[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Card {
+  id            String          @id @default(uuid())
+  tcgGameId     Int
+  externalId    String
+  name          String
+  setCode       String?
+  setName       String?
+  rarity        String?
+  imageUrl      String?
+  imageUrlSmall String?
+  tcgSpecific   Json?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  tcgGame    TcgGame    @relation(fields: [tcgGameId], references: [id])
+  collections Collection[]
+  priceHistory PriceHistory[]
+  yugiohCard  YugiohCard?
+  magicCard   MagicCard?
+  pokemonCard PokemonCard?
+
+  @@unique([tcgGameId, externalId])
+}
+
+model Collection {
+  id               String @id @default(uuid())
+  userId           String
+  cardId           String
+  quantity         Int    @default(1)
+  condition        String?
+  language         String?
+  notes            String?
+  customAttributes Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId, condition, language])
+}
+
+model PriceHistory {
+  id         BigInt   @id @default(autoincrement())
+  cardId     String
+  price      Decimal? @db.Decimal(10, 2)
+  currency   String   @default("USD")
+  source     String?
+  recordedAt DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model YugiohCard {
+  cardId      String @id
+  cardType    String?
+  monsterType String?
+  attribute   String?
+  level       Int?
+  atk         Int?
+  def         Int?
+  description String?
+  archetype   String?
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model MagicCard {
+  cardId      String   @id
+  manaCost    String?
+  cmc         Int?
+  cardType    String?
+  colors      String[]
+  oracleText  String?
+  power       String?
+  toughness   String?
+  loyalty     Int?
+  artist      String?
+  foil        Boolean? @default(false)
+  edition     String?
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model PokemonCard {
+  cardId          String  @id
+  pokemonType     String?
+  hp              Int?
+  evolutionStage  String?
+  retreatCost     Int?
+  weakness        String?
+  resistance      String?
+  attacks         Json?
+  ability         Json?
+  isEx            Boolean? @default(false)
+  isGx            Boolean? @default(false)
+  isV             Boolean? @default(false)
+  firstEdition    Boolean? @default(false)
+  holo            Boolean? @default(false)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}

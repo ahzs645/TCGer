@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tcg_collection}
+      POSTGRES_USER: ${POSTGRES_USER:-tcguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tcgpassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tcg-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - tcg-net
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+      target: production
+    environment:
+      NODE_ENV: production
+      PORT: ${BACKEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?err}
+      POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - tcg-net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: production
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - tcg-net
+
+volumes:
+  postgres_data:
+
+networks:
+  tcg-net:
+    driver: bridge

@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tcg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tcg_collection}
+      POSTGRES_USER: ${POSTGRES_USER:-tcguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tcgpassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tcguser} -d ${POSTGRES_DB:-tcg_collection}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    networks:
+      - tcg-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: tcg-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - tcg-net
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+      target: dev
+    container_name: tcg-backend
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NODE_ENV: development
+      PORT: ${BACKEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-changemeplease}
+      POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ../backend:/app/backend
+      - /app/backend/node_modules
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - tcg-net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: dev
+    container_name: tcg-frontend
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    volumes:
+      - ../frontend:/app/frontend
+      - /app/frontend/node_modules
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - tcg-net
+
+volumes:
+  postgres_data:
+
+networks:
+  tcg-net:
+    driver: bridge

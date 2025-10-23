@@ -1,0 +1,25 @@
+export type TcgCode = 'yugioh' | 'magic' | 'pokemon';
+
+export interface Card {
+  id: string;
+  tcg: TcgCode;
+  name: string;
+  setCode?: string;
+  setName?: string;
+  rarity?: string;
+  imageUrl?: string;
+  imageUrlSmall?: string;
+  attributes?: Record<string, unknown>;
+}
+
+export interface CollectionCard extends Card {
+  quantity: number;
+  condition?: string;
+  language?: string;
+  notes?: string;
+  price?: number;
+}
+
+export interface SearchCardsResponse {
+  cards: Card[];
+}
