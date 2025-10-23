@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+build
+.next
+coverage
+tmp
+.env
+.env.local
+.env.docker
+.DS_Store
+*.log
