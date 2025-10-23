@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { useCardSearch } from '@/lib/hooks/use-card-search';
 import { useGameFilterStore } from '@/stores/game-filter';
+import { useModuleStore } from '@/stores/preferences';
 import type { Card as CardType } from '@/types/card';
 
 import { CardPreview } from './card-preview';
@@ -23,12 +24,18 @@ const presetQueries = [
 ];
 
 export function CardSearchPanel() {
-  const globalGame = useGameFilterStore((state) => state.selectedGame);
+  const { selectedGame, setGame } = useGameFilterStore((state) => ({
+    selectedGame: state.selectedGame,
+    setGame: state.setGame
+  }));
+  const enabledGames = useModuleStore((state) => state.enabledGames);
   const [query, setQuery] = useState('dark magician');
-  const [selectedGame, setSelectedGame] = useState<SupportedGame | 'all'>(globalGame ?? 'all');
 
   const { data, isFetching, refetch } = useCardSearch(query, selectedGame === 'all' ? undefined : selectedGame);
-  const cards = data ?? [];
+  const filteredCards = (data ?? []).filter((card) => enabledGames[card.tcg as keyof typeof enabledGames]);
+  const cards = filteredCards;
+  const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
+  const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,15 +64,21 @@ export function CardSearchPanel() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">TCG Filter</label>
-              <Select value={selectedGame} onValueChange={(value) => setSelectedGame(value as SupportedGame | 'all')}>
+              <Select value={selectedGame} onValueChange={(value) => setGame(value as SupportedGame)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All games" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Games</SelectItem>
-                  <SelectItem value="yugioh">Yu-Gi-Oh!</SelectItem>
-                  <SelectItem value="magic">Magic: The Gathering</SelectItem>
-                  <SelectItem value="pokemon">Pokémon</SelectItem>
+                  <SelectItem value="yugioh" disabled={!enabledGames.yugioh}>
+                    Yu-Gi-Oh! {!enabledGames.yugioh && '(disabled)'}
+                  </SelectItem>
+                  <SelectItem value="magic" disabled={!enabledGames.magic}>
+                    Magic: The Gathering {!enabledGames.magic && '(disabled)'}
+                  </SelectItem>
+                  <SelectItem value="pokemon" disabled={!enabledGames.pokemon}>
+                    Pokémon {!enabledGames.pokemon && '(disabled)'}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -84,7 +97,18 @@ export function CardSearchPanel() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Active adapter</label>
               <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                Searching <Badge variant="outline">{GAME_LABELS[selectedGame] ?? 'All Games'}</Badge>
+                Searching{' '}
+                <Badge
+                  variant="outline"
+                  className={selectedGameDisabled ? 'border-destructive text-destructive' : ''}
+                >
+                  {GAME_LABELS[selectedGame] ?? 'All Games'}
+                </Badge>
+                {selectedGameDisabled && (
+                  <p className="mt-2 text-xs text-destructive">
+                    This game is currently disabled. Enable it from account settings to include its results.
+                  </p>
+                )}
               </div>
             </div>
           </form>
@@ -94,20 +118,48 @@ export function CardSearchPanel() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b">
           <div>
             <CardTitle>Results</CardTitle>
-            <CardDescription>{cards.length} cards matched your search.</CardDescription>
+            <CardDescription>
+              {noGamesEnabled ? 'Enable at least one module to resume cross-game search.' : `${cards.length} cards matched your search.`}
+            </CardDescription>
           </div>
           {isFetching && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         </CardHeader>
         <CardContent className="p-0">
           <ScrollArea className="h-[600px]">
-            <div className="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-3">
-              {cards.map((card) => (
-                <CardPreview key={card.id} card={card as CardType} />
-              ))}
-              {cards.length === 0 && !isFetching && (
-                <div className="col-span-full flex h-40 items-center justify-center text-sm text-muted-foreground">
-                  No results yet. Try adjusting your query or game filter.
+            <div className="p-6 space-y-8">
+              {cards.length === 0 && !isFetching ? (
+                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                  {noGamesEnabled
+                    ? 'All modules are disabled. Re-enable at least one trading card game in settings.'
+                    : selectedGameDisabled
+                      ? 'Selected game is disabled. Toggle it on in module preferences to continue.'
+                      : 'No results yet. Try adjusting your query or game filter.'}
                 </div>
+              ) : (
+                (() => {
+                  // Group cards by TCG
+                  const groupedCards = cards.reduce((acc, card) => {
+                    const tcg = card.tcg;
+                    if (!acc[tcg]) {
+                      acc[tcg] = [];
+                    }
+                    acc[tcg].push(card);
+                    return acc;
+                  }, {} as Record<string, typeof cards>);
+
+                  return Object.entries(groupedCards).map(([tcg, tcgCards]) => (
+                    <div key={tcg}>
+                      <h3 className="text-lg font-semibold mb-4 capitalize">
+                        {GAME_LABELS[tcg as keyof typeof GAME_LABELS] || tcg}
+                      </h3>
+                      <div className="flex flex-wrap gap-4">
+                        {tcgCards.map((card) => (
+                          <CardPreview key={card.id} card={card as CardType} />
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()
               )}
             </div>
           </ScrollArea>

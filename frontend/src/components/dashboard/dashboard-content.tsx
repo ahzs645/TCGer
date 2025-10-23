@@ -9,18 +9,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GAME_LABELS } from '@/lib/utils';
 import { calculateDashboardStats, searchCardsApi } from '@/lib/api-client';
 import { useGameFilterStore } from '@/stores/game-filter';
+import { useModuleStore } from '@/stores/preferences';
 import type { Card as CardType } from '@/types/card';
 
 const DEFAULT_DASHBOARD_QUERY = 'dragon';
 
 export function DashboardContent() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
+  const enabledGames = useModuleStore((state) => state.enabledGames);
+  const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', { selectedGame }],
     queryFn: () => searchCardsApi({ query: DEFAULT_DASHBOARD_QUERY, tcg: selectedGame })
   });
 
-  const cards = data ?? [];
+  const cards = (data ?? []).filter((card) => enabledGames[card.tcg as keyof typeof enabledGames]);
+  const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
   const stats = useMemo(() => calculateDashboardStats(cards), [cards]);
 
   if (isLoading) {
@@ -43,6 +47,19 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
+      {noGamesEnabled && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          All modules are disabled. Enable at least one trading card game in account settings to view analytics.
+        </div>
+      )}
+
+      {selectedGameDisabled && !noGamesEnabled && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          {GAME_LABELS[selectedGame]} is disabled in your module preferences. Enable it from the account menu to bring back
+          its analytics.
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Cards"

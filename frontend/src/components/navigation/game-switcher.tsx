@@ -1,15 +1,15 @@
 'use client';
 
-import { Sparkles, Swords, Wand2 } from 'lucide-react';
+import Image from 'next/image';
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { supportedGames, useGameFilterStore } from '@/stores/game-filter';
 
-const icons: Record<Exclude<SupportedGame, 'all'>, React.ComponentType<{ className?: string }>> = {
-  yugioh: Swords,
-  magic: Wand2,
-  pokemon: Sparkles
+const iconPaths: Record<Exclude<SupportedGame, 'all'>, string> = {
+  yugioh: '/icons/Yugioh.svg',
+  magic: '/icons/MTG.svg',
+  pokemon: '/icons/Pokemon.svg'
 };
 
 export function GameSwitcher() {
@@ -33,10 +33,10 @@ export function GameSwitcher() {
             </ToggleGroupItem>
           );
         }
-        const Icon = icons[game];
+        const iconPath = iconPaths[game];
         return (
           <ToggleGroupItem key={game} value={game} className="flex min-w-[3rem] items-center gap-2">
-            <Icon className="h-4 w-4" />
+            <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="h-4 w-4" />
             <span className="hidden xl:inline">{GAME_LABELS[game]}</span>
           </ToggleGroupItem>
         );

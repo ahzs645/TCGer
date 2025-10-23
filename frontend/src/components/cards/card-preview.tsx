@@ -1,10 +1,12 @@
+'use client';
+
+import { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { Sparkles } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card as UiCard, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { GAME_LABELS } from '@/lib/utils';
+import { useModuleStore } from '@/stores/preferences';
 import type { Card } from '@/types/card';
 
 interface CardPreviewProps {
@@ -12,62 +14,175 @@ interface CardPreviewProps {
 }
 
 export function CardPreview({ card }: CardPreviewProps) {
+  const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [throttledPos, setThrottledPos] = useState({ x: 0, y: 0 });
+  const [isHovering, setIsHovering] = useState(false);
+  const [amountOwned, setAmountOwned] = useState(0);
+
+  const throttledSetPos = useRef(
+    throttle<[{ x: number; y: number }]>((position) => setThrottledPos(position), 50)
+  );
+
+  const updateMousePos = (e: MouseEvent) => {
+    throttledSetPos.current({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovering(true);
+    window.addEventListener('mousemove', updateMousePos);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false);
+    window.removeEventListener('mousemove', updateMousePos);
+  }, []);
+
+  let centeredX = 0;
+  let centeredY = 0;
+
+  if (cardRef.current && isHovering) {
+    const rect = cardRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    centeredX = throttledPos.x - centerX;
+    centeredY = throttledPos.y - centerY;
+  }
+
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+  const rotateY = isHovering ? clamp(centeredX / 4, -10, 10) : 0;
+  const rotateX = isHovering ? clamp(-centeredY / 4, -10, 10) : 0;
+
+  const cardStyle = {
+    transform: `perspective(1000px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(${isHovering ? 1.04 : 1})`,
+    transition: 'transform 0.3s cubic-bezier(0.17, 0.67, 0.5, 1.03)',
+    transformStyle: 'preserve-3d' as const,
+    opacity: amountOwned > 0 ? 1 : 0.5,
+    width: '100%',
+    height: 'auto'
+  };
+
   return (
-    <UiCard className="flex h-full flex-col">
-      <CardHeader className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{GAME_LABELS[card.tcg]}</span>
-          {card.rarity && <Badge variant="outline">{card.rarity}</Badge>}
+    <div className="group flex flex-col items-center rounded-lg basis-1/5 min-w-0 px-1 sm:px-2">
+      <button type="button" className="cursor-pointer w-full">
+        <div
+          style={{
+            flex: '1 0 20%',
+            perspective: '1000px',
+            transformStyle: 'preserve-3d',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: isHovering ? 10 : 0
+          }}
+        >
+          <div
+            ref={cardRef}
+            style={{ width: '100%', height: 'auto' }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            {card.imageUrlSmall ? (
+              <img
+                draggable={false}
+                loading="lazy"
+                className="card-test"
+                alt={card.name}
+                src={card.imageUrlSmall}
+                style={cardStyle}
+              />
+            ) : (
+              <img
+                draggable={false}
+                loading="lazy"
+                className="card-test"
+                alt={card.name}
+                src={card.imageUrl}
+                style={cardStyle}
+              />
+            )}
+          </div>
         </div>
-        <CardTitle className="text-base font-semibold leading-tight">{card.name}</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {card.setName ?? 'Unknown Set'} {card.setCode ? `• ${card.setCode}` : ''}
+      </button>
+      <div className="w-full min-w-0 pt-2 space-y-1">
+        <p className="text-[12px] text-center font-semibold leading-tight break-words">
+          {showCardNumbers && (card.setCode || card.id) && (
+            <>
+              <span className="block md:inline">{card.setCode || card.id}</span>
+              <span className="hidden md:inline"> – </span>
+            </>
+          )}
+          <span className="block md:inline break-words">{card.name}</span>
         </p>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="relative h-48 w-full overflow-hidden rounded-md border bg-muted/20">
-          {card.imageUrlSmall ? (
-            <Image
-              src={card.imageUrlSmall}
-              alt={card.name}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              <Sparkles className="h-10 w-10" />
-            </div>
-          )}
-        </div>
-        <div className="space-y-2 text-xs text-muted-foreground">
-          {card.attributes && Object.keys(card.attributes).length > 0 ? (
-            <div className="grid gap-1">
-              {Object.entries(card.attributes)
-                .slice(0, 4)
-                .map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="font-medium capitalize">{formatKey(key)}</span>
-                    <span>{String(value)}</span>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <p>No additional attributes recorded.</p>
-          )}
-        </div>
-        <Button variant="outline" size="sm" className="mt-auto">
-          Add to collection
+        {card.rarity && (
+          <div className="flex justify-center">
+            <Badge variant="outline" className="text-[10px] h-5">
+              {card.rarity}
+            </Badge>
+          </div>
+        )}
+        {card.setName && (
+          <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-x-1 mt-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setAmountOwned(Math.max(0, amountOwned - 1))}
+          className="rounded-full h-9 w-9"
+          tabIndex={-1}
+        >
+          <Minus className="h-4 w-4" />
         </Button>
-      </CardContent>
-    </UiCard>
+        <input
+          min="0"
+          max="99"
+          className="w-7 text-center border-none rounded"
+          type="text"
+          value={amountOwned}
+          onChange={(e) => {
+            const val = parseInt(e.target.value, 10);
+            if (!isNaN(val) && val >= 0 && val <= 99) {
+              setAmountOwned(val);
+            }
+          }}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full h-9 w-9"
+          onClick={() => setAmountOwned(Math.min(99, amountOwned + 1))}
+          tabIndex={-1}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }
 
-function formatKey(key: string) {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+function throttle<T extends unknown[]>(fn: (...args: T) => void, delay: number): (...args: T) => void {
+  let lastCall = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: T): void => {
+    const now = performance.now();
+    const timeSinceLastCall = now - lastCall;
+
+    if (timeSinceLastCall < delay) {
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          lastCall = performance.now();
+          timeoutId = null;
+          fn(...args);
+        }, delay - timeSinceLastCall);
+      }
+      return;
+    }
+
+    lastCall = now;
+    fn(...args);
+  };
 }

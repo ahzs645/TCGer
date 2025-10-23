@@ -9,6 +9,7 @@ export interface Card {
   rarity?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
+  setSymbolUrl?: string;
   attributes?: Record<string, unknown>;
 }
 
@@ -18,6 +19,8 @@ export interface CollectionCard extends Card {
   language?: string;
   notes?: string;
   price?: number;
+  acquisitionPrice?: number;
+  priceHistory?: number[];
 }
 
 export interface SearchCardsResponse {
