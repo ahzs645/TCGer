@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct TCGerApp: App {
+    @StateObject private var environmentStore = EnvironmentStore()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environmentObject(environmentStore)
         }
     }
 }

@@ -701,8 +701,15 @@ function CollectionSelector({
 }) {
   if (!collections.length) {
     return (
-      <div className="rounded-xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
-        No collections yet. Start by importing cards or creating a binder from the account menu.
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+        <p>No collections yet. Create your first binder to get started.</p>
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-background px-4 py-2 text-primary shadow hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" /> New binder
+        </button>
       </div>
     );
   }
