@@ -6,8 +6,6 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject private var environmentStore: EnvironmentStore
-
     var body: some View {
         TabView {
             HomePlaceholderView()

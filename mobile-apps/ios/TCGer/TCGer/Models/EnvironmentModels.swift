@@ -1,23 +1,57 @@
 import Foundation
 
 struct ServerConfiguration: Codable, Equatable {
-    var scheme: String = "http"
-    var host: String = ""
-    var port: String = ""
+    var baseURL: String
 
-    var baseURLString: String {
-        var components = URLComponents()
-        components.scheme = scheme
-        components.host = host.isEmpty ? nil : host
-        components.port = Int(port)
-        return components.string ?? ""
+    init(baseURL: String) {
+        self.baseURL = ServerConfiguration.sanitized(baseURL)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case baseURL
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let raw = try container.decode(String.self, forKey: .baseURL)
+        self.baseURL = ServerConfiguration.sanitized(raw)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(baseURL, forKey: .baseURL)
+    }
+
+    var normalizedURL: URL? {
+        guard !baseURL.isEmpty else { return nil }
+        return URL(string: baseURL)
     }
 
     var isValid: Bool {
-        !host.isEmpty && Int(port) != nil && URL(string: baseURLString) != nil
+        normalizedURL != nil
     }
 
-    static let empty = ServerConfiguration()
+    func endpoint(path: String) -> URL? {
+        guard let base = normalizedURL else { return nil }
+        return base.appendingPathComponent(path)
+    }
+
+    static func sanitized(_ value: String) -> String {
+        var trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        if !trimmed.contains("://") {
+            trimmed = "http://" + trimmed
+        }
+
+        if trimmed.last == "/" {
+            trimmed.removeLast()
+        }
+
+        return trimmed
+    }
+
+    static let empty = ServerConfiguration(baseURL: "")
 }
 
 struct LoginCredentials: Codable, Equatable {

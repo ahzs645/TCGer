@@ -34,9 +34,20 @@ export function GameSwitcher() {
           );
         }
         const iconPath = iconPaths[game];
+        const isSelected = selectedGame === game;
         return (
           <ToggleGroupItem key={game} value={game} className="flex min-w-[3rem] items-center gap-2">
-            <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="h-4 w-4 dark:invert" />
+            <Image
+              src={iconPath}
+              alt={GAME_LABELS[game]}
+              width={16}
+              height={16}
+              className={`h-4 w-4 transition-all ${
+                isSelected
+                  ? 'brightness-0 invert'
+                  : 'dark:brightness-0 dark:invert'
+              }`}
+            />
             <span className="hidden xl:inline">{GAME_LABELS[game]}</span>
           </ToggleGroupItem>
         );

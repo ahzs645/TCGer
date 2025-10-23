@@ -1,14 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Bell, Moon, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Bell, Globe, Moon, ShieldCheck, User as UserIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { getSettings, updateSettings, type AppSettings } from '@/lib/api/settings';
 import { GAME_LABELS } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth';
 import { useModuleStore } from '@/stores/preferences';
 
 const iconPaths = {
@@ -33,7 +35,36 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
       setShowPricing: state.setShowPricing
     }));
 
+  const { user, token } = useAuthStore();
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
   const activeCount = useMemo(() => Object.values(enabledGames).filter(Boolean).length, [enabledGames]);
+  const isAdmin = user?.isAdmin ?? false;
+
+  useEffect(() => {
+    if (open && isAdmin) {
+      setLoadingSettings(true);
+      getSettings()
+        .then(setAppSettings)
+        .catch((error) => console.error('Failed to load settings:', error))
+        .finally(() => setLoadingSettings(false));
+    }
+  }, [open, isAdmin]);
+
+  const handleSettingChange = async (key: keyof AppSettings, value: boolean) => {
+    if (!token || !appSettings) return;
+
+    const updatedSettings = { ...appSettings, [key]: value };
+    setAppSettings(updatedSettings);
+
+    try {
+      await updateSettings({ [key]: value }, token);
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      setAppSettings(appSettings);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,6 +178,73 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
             />
           </div>
         </section>
+
+        {isAdmin && (
+          <>
+            <Separator />
+            <section className="space-y-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <Globe className="h-4 w-4" />
+                  Admin Settings
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Control public access and authentication requirements.
+                </p>
+              </div>
+
+              {loadingSettings ? (
+                <div className="flex justify-center p-4">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : appSettings ? (
+                <>
+                  <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+                    <div>
+                      <p className="text-sm font-medium">Public Dashboard</p>
+                      <p className="text-xs text-muted-foreground">
+                        Allow dashboard to be viewed without authentication.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={appSettings.publicDashboard}
+                      onCheckedChange={(checked) => handleSettingChange('publicDashboard', checked)}
+                      aria-label="Toggle public dashboard"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+                    <div>
+                      <p className="text-sm font-medium">Public Collections</p>
+                      <p className="text-xs text-muted-foreground">
+                        Allow collections to be viewed without authentication.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={appSettings.publicCollections}
+                      onCheckedChange={(checked) => handleSettingChange('publicCollections', checked)}
+                      aria-label="Toggle public collections"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+                    <div>
+                      <p className="text-sm font-medium">Require Authentication</p>
+                      <p className="text-xs text-muted-foreground">
+                        Require login for all features. When disabled, search remains authenticated-only.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={appSettings.requireAuth}
+                      onCheckedChange={(checked) => handleSettingChange('requireAuth', checked)}
+                      aria-label="Toggle require authentication"
+                    />
+                  </div>
+                </>
+              ) : null}
+            </section>
+          </>
+        )}
 
         <DialogFooter className="justify-between sm:justify-between">
           <p className="text-xs text-muted-foreground">

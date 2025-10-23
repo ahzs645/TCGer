@@ -16,7 +16,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Base URL")
                         Spacer()
-                        Text(environmentStore.serverConfiguration.baseURLString.isEmpty ? "Not set" : environmentStore.serverConfiguration.baseURLString)
+                        Text(environmentStore.serverConfiguration.baseURL.isEmpty ? "Not set" : environmentStore.serverConfiguration.baseURL)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.trailing)
                     }
