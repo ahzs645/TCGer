@@ -4,6 +4,7 @@ import './globals.css';
 
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { SetupGuard } from '@/components/auth/setup-guard';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       >
         <ThemeProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <SetupGuard>{children}</SetupGuard>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

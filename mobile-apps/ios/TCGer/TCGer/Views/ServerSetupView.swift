@@ -2,38 +2,35 @@ import SwiftUI
 
 struct ServerSetupView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
-    @State private var scheme: String = "http"
-    @State private var host: String = ""
-    @State private var port: String = "3000"
+    @State private var input: String = "http://"
 
-    private let schemes = ["http", "https"]
+    private var sanitizedInput: String {
+        ServerConfiguration.sanitized(input)
+    }
+
+    private var isValid: Bool {
+        guard !sanitizedInput.isEmpty else { return false }
+        return URL(string: sanitizedInput) != nil
+    }
 
     var body: some View {
         Form {
-            Section(header: Text("Server Address"), footer: Text("Enter the base address of your TCG Manager server.")) {
-                Picker("Scheme", selection: $scheme) {
-                    ForEach(schemes, id: \.self) { scheme in
-                        Text(scheme.uppercased()).tag(scheme)
-                    }
-                }
-                TextField("IP address or hostname", text: $host)
-                #if os(iOS) || os(tvOS) || os(visionOS)
+            Section(
+                header: Text("Server Address"),
+                footer: Text("Example: http://localhost:3001 or http://10.1.15.216:3001")
+            ) {
+                TextField("Server URL", text: $input)
                     .keyboardType(.URL)
                     .textContentType(.URL)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
-                #endif
-                TextField("Port", text: $port)
-                #if os(iOS) || os(tvOS) || os(visionOS)
-                    .keyboardType(.numberPad)
-                #endif
             }
 
             Section {
                 Button(action: saveConfiguration) {
                     Label("Save and Continue", systemImage: "checkmark.circle.fill")
                 }
-                .disabled(host.isEmpty || port.isEmpty)
+                .disabled(!isValid)
             }
         }
         .navigationTitle("Server Setup")
@@ -41,15 +38,12 @@ struct ServerSetupView: View {
     }
 
     private func populateFromStore() {
-        let config = environmentStore.serverConfiguration
-        if !config.host.isEmpty {
-            scheme = config.scheme
-            host = config.host
-            port = config.port
-        }
+        let stored = environmentStore.serverConfiguration.baseURL
+        input = stored.isEmpty ? "http://" : stored
     }
 
     private func saveConfiguration() {
-        environmentStore.serverConfiguration = ServerConfiguration(scheme: scheme, host: host, port: port)
+        environmentStore.serverConfiguration = ServerConfiguration(baseURL: sanitizedInput)
+        environmentStore.isAuthenticated = false
     }
 }

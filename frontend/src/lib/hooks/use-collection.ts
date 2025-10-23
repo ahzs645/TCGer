@@ -12,7 +12,7 @@ interface UseCollectionOptions {
 
 export function useCollectionData({ collectionId, query, game, enabledGames }: UseCollectionOptions) {
   const collections = useCollectionsStore((state) => state.collections);
-  const collection = collections.find((entry) => entry.id === collectionId) ?? collections[0];
+  const collection = collections.find((entry) => entry.id === collectionId) ?? (collections.length > 0 ? collections[0] : undefined);
   const normalizedQuery = query.trim().toLowerCase();
 
   const items = useMemo<CollectionCard[]>(() => {

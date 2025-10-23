@@ -22,13 +22,7 @@ actor APIService {
     }
 
     func authenticate(config: ServerConfiguration, credentials: LoginCredentials) async throws -> String {
-        var components = URLComponents()
-        components.scheme = config.scheme
-        components.host = config.host
-        components.port = Int(config.port)
-        components.path = "/auth/login"
-
-        guard let url = components.url else {
+        guard let url = config.endpoint(path: "auth/login") else {
             throw APIError.invalidURL
         }
 
