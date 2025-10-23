@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Filter, Loader2, RefreshCcw, TrendingUp } from 'lucide-react';
+import { Download, Filter, Loader2, Plus, RefreshCcw, Trash, TrendingUp } from 'lucide-react';
 
 import { CollectionSummary } from '@/components/collections/collection-summary';
 import { Badge } from '@/components/ui/badge';
@@ -17,20 +17,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { SAMPLE_COLLECTIONS, type SampleCollection } from '@/lib/data/sample-collections';
 import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
+import type { SampleCollection } from '@/lib/data/sample-collections';
 import { useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
 import type { CollectionCard, TcgCode } from '@/types/card';
+import { useCollectionsStore } from '@/stores/collections';
 
 export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
+  const { collections, addCollection, removeCollection } = useCollectionsStore((state) => ({
+    collections: state.collections,
+    addCollection: state.addCollection,
+    removeCollection: state.removeCollection
+  }));
   const { enabledGames, showPricing } = useModuleStore((state) => ({
     enabledGames: state.enabledGames,
     showPricing: state.showPricing
   }));
-  const [activeCollectionId, setActiveCollectionId] = useState<string>(SAMPLE_COLLECTIONS[0]?.id ?? '');
+  const [activeCollectionId, setActiveCollectionId] = useState<string>(collections[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'rarity' | 'price'>('name');
   const [isFilterOpen, setFilterOpen] = useState(false);
@@ -38,12 +44,19 @@ export function CollectionTable() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const previousCollectionId = useRef<string | null>(null);
+  const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!showPricing && sortBy === 'price') {
       setSortBy('name');
     }
   }, [showPricing, sortBy]);
+
+  useEffect(() => {
+    if (!collections.some((collection) => collection.id === activeCollectionId)) {
+      setActiveCollectionId(collections[0]?.id ?? '');
+    }
+  }, [collections, activeCollectionId]);
 
   useEffect(() => {
     setSelection({});
@@ -160,9 +173,15 @@ export function CollectionTable() {
   return (
     <div className="space-y-6">
       <CollectionSelector
-        collections={SAMPLE_COLLECTIONS}
+        collections={collections}
         activeId={activeCollectionId}
-        onSelect={setActiveCollectionId}
+        onSelect={(id) => setActiveCollectionId(id)}
+        onCreate={() => setCreateDialogOpen(true)}
+        onRemove={(id) => {
+          if (confirm('Remove this binder? Cards in the binder will not be recoverable unless re-imported.')) {
+            removeCollection(id);
+          }
+        }}
         showPricing={showPricing}
       />
 
@@ -327,6 +346,15 @@ export function CollectionTable() {
           setPriceRange(range);
         }}
       />
+
+      <CreateCollectionDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreate={({ name, description }) => {
+          const id = addCollection({ name, description });
+          setActiveCollectionId(id);
+        }}
+      />
     </div>
   );
 }
@@ -388,6 +416,77 @@ function CollectionRow({
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+function CreateCollectionDialog({
+  open,
+  onOpenChange,
+  onCreate
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (input: { name: string; description: string }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (!open) {
+      setName('');
+      setDescription('');
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      return;
+    }
+    onCreate({ name: trimmedName, description: description.trim() });
+    setName('');
+    setDescription('');
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create new binder</DialogTitle>
+          <DialogDescription>Organize cards by creating dedicated binders for decks, sets, or trades.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="collection-name">Name</Label>
+            <Input
+              id="collection-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g., Commander Staples"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="collection-description">Description</Label>
+            <Input
+              id="collection-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Optional summary"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSubmit} disabled={!name.trim()}>
+            Create binder
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -589,11 +688,15 @@ function CollectionSelector({
   collections,
   activeId,
   onSelect,
+  onCreate,
+  onRemove,
   showPricing
 }: {
   collections: SampleCollection[];
   activeId: string;
   onSelect: (id: string) => void;
+  onCreate: () => void;
+  onRemove: (id: string) => void;
   showPricing: boolean;
 }) {
   if (!collections.length) {
@@ -606,6 +709,16 @@ function CollectionSelector({
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <button
+        type="button"
+        onClick={onCreate}
+        className="flex h-full min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/40 p-6 text-sm font-medium text-muted-foreground transition hover:border-primary/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-current">
+          <Plus className="h-4 w-4" />
+        </span>
+        New binder
+      </button>
       {collections.map((collection) => {
         const isActive = collection.id === activeId;
         const uniqueGames = new Set(collection.cards.map((card) => card.tcg));
@@ -629,9 +742,24 @@ function CollectionSelector({
                 <h3 className="text-sm font-semibold text-foreground">{collection.name}</h3>
                 <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{collection.description}</p>
               </div>
-              <Badge variant="outline" className="uppercase text-[10px]">
-                {uniqueGames.size} games
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="uppercase text-[10px]">
+                  {uniqueGames.size} games
+                </Badge>
+                {collections.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemove(collection.id);
+                    }}
+                    className="rounded-full border border-transparent p-1 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
+                    aria-label={`Delete ${collection.name}`}
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>{uniqueCards} unique cards</span>

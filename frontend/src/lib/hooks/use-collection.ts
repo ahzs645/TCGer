@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { SAMPLE_COLLECTIONS } from '@/lib/data/sample-collections';
+import { useCollectionsStore } from '@/stores/collections';
 import type { CollectionCard, TcgCode } from '@/types/card';
 
 interface UseCollectionOptions {
@@ -11,7 +11,8 @@ interface UseCollectionOptions {
 }
 
 export function useCollectionData({ collectionId, query, game, enabledGames }: UseCollectionOptions) {
-  const collection = SAMPLE_COLLECTIONS.find((entry) => entry.id === collectionId) ?? SAMPLE_COLLECTIONS[0];
+  const collections = useCollectionsStore((state) => state.collections);
+  const collection = collections.find((entry) => entry.id === collectionId) ?? collections[0];
   const normalizedQuery = query.trim().toLowerCase();
 
   const items = useMemo<CollectionCard[]>(() => {
