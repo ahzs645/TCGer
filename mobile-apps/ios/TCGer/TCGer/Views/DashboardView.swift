@@ -5,6 +5,7 @@ struct DashboardView: View {
     @State private var collections: [Collection] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var selectedCollection: Collection?
 
     private let apiService = APIService()
 
@@ -25,7 +26,10 @@ struct DashboardView: View {
 
                         // Recent Collections
                         if !collections.isEmpty {
-                            RecentCollectionsSection(collections: Array(collections.prefix(3)))
+                            RecentCollectionsSection(
+                                collections: Array(collections.prefix(3)),
+                                selectedCollection: $selectedCollection
+                            )
                         } else {
                             EmptyStateView()
                         }
@@ -36,6 +40,14 @@ struct DashboardView: View {
             .navigationTitle("Dashboard")
             .refreshable {
                 await loadData()
+            }
+            .sheet(isPresented: Binding(
+                get: { selectedCollection != nil },
+                set: { if !$0 { selectedCollection = nil } }
+            )) {
+                if let collection = selectedCollection {
+                    CollectionDetailView(collection: collection)
+                }
             }
         }
         .task {
@@ -131,6 +143,7 @@ private struct StatCard: View {
 // MARK: - Recent Collections
 private struct RecentCollectionsSection: View {
     let collections: [Collection]
+    @Binding var selectedCollection: Collection?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,6 +152,9 @@ private struct RecentCollectionsSection: View {
 
             ForEach(collections) { collection in
                 CollectionRowView(collection: collection)
+                    .onTapGesture {
+                        selectedCollection = collection
+                    }
             }
         }
     }

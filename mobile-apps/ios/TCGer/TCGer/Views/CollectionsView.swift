@@ -181,7 +181,7 @@ private struct CreateCollectionSheet: View {
 }
 
 // MARK: - Collection Detail View
-private struct CollectionDetailView: View {
+struct CollectionDetailView: View {
     let collection: Collection
     @Environment(\.dismiss) private var dismiss
 

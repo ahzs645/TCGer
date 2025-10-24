@@ -56,6 +56,29 @@ services:
     networks:
       - tcg-net
 
+  pokemon-cache:
+    build:
+      context: ..
+      dockerfile: services/pokemon-cache/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      POKEMON_SOURCE_BASE_URL: ${POKEMON_SOURCE_BASE_URL:-https://api.pokemontcg.io/v2}
+      POKEMON_SOURCE_API_KEY: ${POKEMON_SOURCE_API_KEY:-}
+      POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
+      POKEMON_CACHE_REFRESH_MS: ${POKEMON_CACHE_REFRESH_MS:-43200000}
+      POKEMON_CACHE_PAGE_SIZE: ${POKEMON_CACHE_PAGE_SIZE:-20}
+      POKEMON_CACHE_MAX_PAGE_SIZE: ${POKEMON_CACHE_MAX_PAGE_SIZE:-200}
+      POKEMON_CACHE_FETCH_PAGE_SIZE: ${POKEMON_CACHE_FETCH_PAGE_SIZE:-250}
+      POKEMON_CACHE_FETCH_DELAY_MS: ${POKEMON_CACHE_FETCH_DELAY_MS:-200}
+      PORT: 4030
+    volumes:
+      - pokemon_cache_data:/data
+    profiles:
+      - bulk
+    networks:
+      - tcg-net
+
   backend:
     build:
       context: ..
@@ -70,6 +93,7 @@ services:
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-https://api.scryfall.com}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-https://db.ygoprodeck.com/api/v7}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-https://api.pokemontcg.io/v2}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     depends_on:
@@ -100,6 +124,7 @@ volumes:
   postgres_data:
   scryfall_bulk_data:
   ygo_cache_data:
+  pokemon_cache_data:
 
 networks:
   tcg-net:

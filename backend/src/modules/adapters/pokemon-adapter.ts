@@ -1,7 +1,45 @@
 import { env } from '../../config/env';
 import { CardDTO, TcgAdapter } from './types';
 
-const BASE_URL = 'https://api.pokemontcg.io/v2/cards';
+const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
+const CARDS_ENDPOINT = `${API_ROOT}/cards`;
+const isRemotePokemon = /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
+const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
+const DEFAULT_REQUEST_DELAY_MS = isRemotePokemon ? 200 : 0;
+const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
+const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POKEMON_REQUEST_TIMEOUT_MS ?? '8000', 10);
+
+let rateLimitChain: Promise<void> = Promise.resolve();
+let nextAllowedRequestTime = 0;
+
+function sleep(duration: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+}
+
+async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Response> {
+  const waitPromise = rateLimitChain.then(async () => {
+    const now = Date.now();
+    const wait = Math.max(0, nextAllowedRequestTime - now);
+    if (wait > 0) {
+      await sleep(wait);
+    }
+    nextAllowedRequestTime = Date.now() + MIN_REQUEST_DELAY_MS;
+  });
+
+  rateLimitChain = waitPromise.catch(() => {});
+  await waitPromise;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 interface PokemonSearchResponse {
   data: PokemonCard[];
@@ -42,12 +80,12 @@ export class PokemonAdapter implements TcgAdapter {
   async searchCards(query: string): Promise<CardDTO[]> {
     const trimmedQuery = query.trim();
     const q = trimmedQuery ? this.buildNameQuery(trimmedQuery) : 'supertype:"Pokémon"';
-    const url = new URL(BASE_URL);
+    const url = new URL(CARDS_ENDPOINT);
     url.searchParams.set('q', q);
     url.searchParams.set('pageSize', '20');
 
     try {
-      const response = await fetch(url.toString(), {
+      const response = await rateLimitedFetch(url.toString(), {
         headers: this.buildHeaders()
       });
       if (!response.ok) {
@@ -71,7 +109,7 @@ export class PokemonAdapter implements TcgAdapter {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/${trimmedId}`, {
+      const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`, {
         headers: this.buildHeaders()
       });
       if (!response.ok) {
