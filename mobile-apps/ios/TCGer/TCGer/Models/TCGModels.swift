@@ -147,7 +147,16 @@ enum TCGGame: String, CaseIterable, Identifiable {
         }
     }
 
-    var iconName: String {
+    var iconName: String? {
+        switch self {
+        case .all: return nil
+        case .yugioh: return "YugiohIcon"
+        case .magic: return "MTGIcon"
+        case .pokemon: return "PokemonIcon"
+        }
+    }
+
+    var systemIconName: String {
         switch self {
         case .all: return "square.grid.2x2"
         case .yugioh: return "suit.club.fill"

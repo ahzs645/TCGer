@@ -235,6 +235,54 @@ actor APIService {
         }
     }
 
+    struct AddCardToBinderRequest: Encodable {
+        let cardId: String
+        let quantity: Int
+        let condition: String?
+        let language: String?
+        let notes: String?
+        let price: Double?
+        let acquisitionPrice: Double?
+    }
+
+    func addCardToBinder(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        cardId: String,
+        quantity: Int = 1,
+        condition: String? = nil,
+        language: String? = nil,
+        notes: String? = nil,
+        price: Double? = nil,
+        acquisitionPrice: Double? = nil
+    ) async throws {
+        let body = AddCardToBinderRequest(
+            cardId: cardId,
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes,
+            price: price,
+            acquisitionPrice: acquisitionPrice
+        )
+
+        let (_, httpResponse) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/cards",
+            method: "POST",
+            token: token,
+            body: body
+        )
+
+        guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+    }
+
     // MARK: - Settings API
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
         let (data, httpResponse) = try await makeRequest(config: config, path: "settings")

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserPlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((state) => state.setAuth);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +46,14 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
     try {
       const result = await signup({ email, password, username: username || undefined });
       setAuth(result.user, result.token);
-      onOpenChange(false);
       setEmail('');
       setUsername('');
       setPassword('');
       setConfirmPassword('');
+      onOpenChange(false);
+
+      // Refresh the page to re-evaluate authentication requirements
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {

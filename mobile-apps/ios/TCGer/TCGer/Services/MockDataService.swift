@@ -100,7 +100,8 @@ actor MockDataService {
                     )
                 ],
                 createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400 * 30)),
-                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400))
+                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400)),
+                colorHex: "90CAF9"
             ),
             Collection(
                 id: "2",
@@ -139,7 +140,8 @@ actor MockDataService {
                     )
                 ],
                 createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400 * 15)),
-                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))
+                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)),
+                colorHex: "CE93D8"
             ),
             Collection(
                 id: "3",
@@ -178,7 +180,8 @@ actor MockDataService {
                     )
                 ],
                 createdAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400 * 7)),
-                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7200))
+                updatedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7200)),
+                colorHex: "FFE082"
             )
         ]
     }

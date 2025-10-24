@@ -186,3 +186,70 @@ export async function updateUserPreferences(userId: string, input: UpdateUserPre
 
   return user;
 }
+
+export interface UpdateUserProfileInput {
+  username?: string;
+  email?: string;
+}
+
+export async function updateUserProfile(userId: string, input: UpdateUserProfileInput) {
+  // If email is being changed, check if it's already taken
+  if (input.email) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: input.email }
+    });
+    if (existingUser && existingUser.id !== userId) {
+      throw new Error('Email is already in use');
+    }
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: input,
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      isAdmin: true,
+      showCardNumbers: true,
+      showPricing: true
+    }
+  });
+
+  return user;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const { currentPassword, newPassword } = input;
+
+  // Get user with password hash
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Verify current password
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new Error('Current password is incorrect');
+  }
+
+  // Hash new password
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  // Update password
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash }
+  });
+
+  return { success: true };
+}
