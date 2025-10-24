@@ -9,6 +9,9 @@ struct DashboardView: View {
     @State private var selectedCollection: Collection?
 
     private let apiService = APIService()
+    private var recentCollections: [Collection] {
+        Array(collections.filter { !$0.isUnsortedBinder }.prefix(3))
+    }
 
     var body: some View {
         NavigationView {
@@ -29,14 +32,14 @@ struct DashboardView: View {
                         )
 
                         // Recent Collections
-                        if !collections.isEmpty {
+                        if recentCollections.isEmpty {
+                            EmptyStateView()
+                        } else {
                             RecentCollectionsSection(
-                                collections: Array(collections.prefix(3)),
+                                collections: recentCollections,
                                 selectedCollection: $selectedCollection,
                                 showPricing: environmentStore.showPricing
                             )
-                        } else {
-                            EmptyStateView()
                         }
                     }
                 }

@@ -7,9 +7,16 @@ struct CollectionsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingCreateSheet = false
-    @State private var selectedCollection: Collection?
+   @State private var selectedCollection: Collection?
 
     private let apiService = APIService()
+    private var displayCollections: [Collection] {
+        var visible = collections.filter { !$0.isUnsortedBinder }
+        if let unsorted = collections.first(where: { $0.isUnsortedBinder }), !unsorted.cards.isEmpty {
+            visible.append(unsorted)
+        }
+        return visible
+    }
 
     var body: some View {
         NavigationView {
@@ -20,13 +27,13 @@ struct CollectionsView: View {
                     ErrorView(message: error) {
                         Task { await loadCollections() }
                     }
-                } else if collections.isEmpty {
+                } else if displayCollections.isEmpty {
                     EmptyCollectionsView(onCreate: {
                         showingCreateSheet = true
                     })
                 } else {
                     CollectionsList(
-                        collections: collections,
+                        collections: displayCollections,
                         selectedCollection: $selectedCollection,
                         showPricing: environmentStore.showPricing
                     )

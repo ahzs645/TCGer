@@ -45,6 +45,12 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     let updatedAt: String
     let colorHex: String?
 
+    static let unsortedBinderId = "__library__"
+
+    var isUnsortedBinder: Bool {
+        id == Collection.unsortedBinderId
+    }
+
     var uniqueCards: Int {
         cards.count
     }
