@@ -12,6 +12,8 @@ final class EnvironmentStore: ObservableObject {
     @Published var enabledPokemon: Bool
     @Published var showCardNumbers: Bool
     @Published var showPricing: Bool
+    @Published var offlineModeEnabled: Bool
+    @Published var autoSyncEnabled: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -27,6 +29,8 @@ final class EnvironmentStore: ObservableObject {
         static let enabledPokemon = "enabledPokemon"
         static let showCardNumbers = "showCardNumbers"
         static let showPricing = "showPricing"
+        static let offlineModeEnabled = "offlineModeEnabled"
+        static let autoSyncEnabled = "autoSyncEnabled"
     }
 
     init() {
@@ -77,6 +81,16 @@ final class EnvironmentStore: ObservableObject {
             showPricing = true
         } else {
             showPricing = storage.bool(forKey: Keys.showPricing)
+        }
+
+        // Offline mode defaults to false
+        offlineModeEnabled = storage.bool(forKey: Keys.offlineModeEnabled)
+
+        // Auto sync defaults to true
+        if storage.object(forKey: Keys.autoSyncEnabled) == nil {
+            autoSyncEnabled = true
+        } else {
+            autoSyncEnabled = storage.bool(forKey: Keys.autoSyncEnabled)
         }
 
         $serverConfiguration
@@ -153,6 +167,20 @@ final class EnvironmentStore: ObservableObject {
                 self?.storage.set(flag, forKey: Keys.showPricing)
             }
             .store(in: &cancellables)
+
+        $offlineModeEnabled
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.offlineModeEnabled)
+            }
+            .store(in: &cancellables)
+
+        $autoSyncEnabled
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.autoSyncEnabled)
+            }
+            .store(in: &cancellables)
     }
 
     var enabledGames: [TCGGame] {
@@ -188,6 +216,8 @@ final class EnvironmentStore: ObservableObject {
         enabledPokemon = true
         showCardNumbers = true
         showPricing = true
+        offlineModeEnabled = false
+        autoSyncEnabled = true
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
@@ -195,6 +225,8 @@ final class EnvironmentStore: ObservableObject {
         storage.set(false, forKey: Keys.verified)
         storage.removeObject(forKey: Keys.showCardNumbers)
         storage.removeObject(forKey: Keys.showPricing)
+        storage.removeObject(forKey: Keys.offlineModeEnabled)
+        storage.removeObject(forKey: Keys.autoSyncEnabled)
     }
 
     func applyUserPreferences(_ preferences: APIService.UserPreferences) {

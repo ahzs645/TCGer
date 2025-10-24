@@ -89,7 +89,8 @@ struct DashboardView: View {
         do {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
-                token: token
+                token: token,
+                useCache: environmentStore.offlineModeEnabled
             )
             isLoading = false
         } catch {

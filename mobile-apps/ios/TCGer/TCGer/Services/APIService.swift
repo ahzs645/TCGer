@@ -140,22 +140,48 @@ final class APIService {
     // MARK: - Collections API
     func getCollections(
         config: ServerConfiguration,
-        token: String
+        token: String,
+        useCache: Bool = false
     ) async throws -> [Collection] {
-        let (data, httpResponse) = try await makeRequest(config: config, path: "collections", token: token)
-
-        guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 401 {
-                throw APIError.unauthorized
+        // Try to load from cache if offline mode or requested
+        if useCache || !NetworkMonitor.shared.isConnected {
+            if let cached: [Collection] = try? CacheManager.shared.load([Collection].self, forKey: CacheManager.CacheKey.collections) {
+                return cached
             }
-            throw APIError.serverError(status: httpResponse.statusCode)
+
+            // If no cache and offline, throw error
+            if !NetworkMonitor.shared.isConnected {
+                throw APIError.networkError(NSError(domain: "TCGer", code: -1, userInfo: [NSLocalizedDescriptionKey: "No internet connection and no cached data available"]))
+            }
         }
 
-        guard let collections = try? JSONDecoder().decode([Collection].self, from: data) else {
-            throw APIError.decodingError
-        }
+        // Fetch from network
+        do {
+            let (data, httpResponse) = try await makeRequest(config: config, path: "collections", token: token)
 
-        return collections
+            guard httpResponse.statusCode == 200 else {
+                if httpResponse.statusCode == 401 {
+                    throw APIError.unauthorized
+                }
+                throw APIError.serverError(status: httpResponse.statusCode)
+            }
+
+            guard let collections = try? JSONDecoder().decode([Collection].self, from: data) else {
+                throw APIError.decodingError
+            }
+
+            // Save to cache for offline use
+            try? CacheManager.shared.save(collections, forKey: CacheManager.CacheKey.collections)
+            CacheManager.shared.updateLastSyncDate()
+
+            return collections
+        } catch {
+            // On network error, try to return cached data as fallback
+            if let cached: [Collection] = try? CacheManager.shared.load([Collection].self, forKey: CacheManager.CacheKey.collections) {
+                return cached
+            }
+            throw error
+        }
     }
 
     func getCollection(

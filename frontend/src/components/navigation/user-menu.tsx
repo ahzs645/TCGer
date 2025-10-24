@@ -91,11 +91,7 @@ export function UserMenu() {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            Account settings
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
-            <Waypoints className="mr-2 h-4 w-4" />
-            Module preferences
+            Account & preferences
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={handleLogout}>
