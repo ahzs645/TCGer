@@ -1,14 +1,18 @@
 import AVFoundation
 import Combine
+import CoreMedia
 import SwiftUI
 
 final class CardScannerCameraController: NSObject, ObservableObject {
     let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "card.scanner.session.queue")
     private let photoOutput = AVCapturePhotoOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let videoOutputQueue = DispatchQueue(label: "card.scanner.video.queue")
     private var isConfigured = false
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
+    var onSampleBuffer: ((CMSampleBuffer) -> Void)?
 
     override init() {
         super.init()
@@ -30,6 +34,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         defer { session.commitConfiguration() }
 
         session.inputs.forEach { session.removeInput($0) }
+        session.outputs.forEach { session.removeOutput($0) }
 
         guard
             let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
@@ -43,6 +48,19 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
+        }
+
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
+        videoOutput.setSampleBufferDelegate(self, queue: videoOutputQueue)
+        if session.canAddOutput(videoOutput) {
+            session.addOutput(videoOutput)
+        }
+
+        if let connection = videoOutput.connection(with: .video), connection.isVideoOrientationSupported {
+            connection.videoOrientation = .portrait
         }
     }
 
@@ -79,6 +97,16 @@ extension CardScannerCameraController: AVCapturePhotoCaptureDelegate {
     ) {
         guard error == nil else { return }
         onPhotoCapture?(photo)
+    }
+}
+
+extension CardScannerCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        onSampleBuffer?(sampleBuffer)
     }
 }
 

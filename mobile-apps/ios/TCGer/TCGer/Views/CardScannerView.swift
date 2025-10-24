@@ -102,6 +102,17 @@ struct CardScannerView: View {
                     .padding(12)
                     .background(Color.black.opacity(0.6))
                     .cornerRadius(12)
+            } else if viewModel.isAnalyzingFrame {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text("Scanning...")
+                        .font(.callout)
+                        .foregroundColor(.white)
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.6))
+                .cornerRadius(12)
             } else {
                 EmptyView()
             }
@@ -149,7 +160,7 @@ struct CardScannerView: View {
                     Circle()
                         .fill(accentColor(for: viewModel.selectedMode))
                         .frame(width: 68, height: 68)
-                    if isProcessing {
+                    if isProcessingPhoto {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
@@ -160,7 +171,7 @@ struct CardScannerView: View {
                 }
             }
             .disabled(
-                isProcessing ||
+                isProcessingPhoto ||
                 isUnauthorized ||
                 isErrorState ||
                 viewModel.latestResult != nil ||
@@ -235,7 +246,7 @@ private extension CardScannerView {
         viewModel.selectedMode == .pokemon
     }
 
-    var isProcessing: Bool {
+    var isProcessingPhoto: Bool {
         if case .processing = viewModel.state {
             return true
         }
