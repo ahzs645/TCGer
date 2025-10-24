@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import Foundation
 
 struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
@@ -106,8 +105,8 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!environmentStore.isAuthenticated)
-                    .onChange(of: environmentStore.showCardNumbers) { newValue in
-                        Task { await updatePreferences(showCardNumbers: newValue) }
+                    .onChange(of: environmentStore.showCardNumbers) {
+                        Task { await updatePreferences(showCardNumbers: environmentStore.showCardNumbers) }
                     }
 
                     Toggle(isOn: $environmentStore.showPricing) {
@@ -119,8 +118,8 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!environmentStore.isAuthenticated)
-                    .onChange(of: environmentStore.showPricing) { newValue in
-                        Task { await updatePreferences(showPricing: newValue) }
+                    .onChange(of: environmentStore.showPricing) {
+                        Task { await updatePreferences(showPricing: environmentStore.showPricing) }
                     }
                 } header: {
                     Text("Display Preferences")

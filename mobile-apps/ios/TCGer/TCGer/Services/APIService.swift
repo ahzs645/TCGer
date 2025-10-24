@@ -1,6 +1,6 @@
 import Foundation
 
-actor APIService {
+final class APIService {
     enum APIError: Error, LocalizedError {
         case invalidURL
         case unauthorized

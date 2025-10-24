@@ -11,7 +11,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters long').optional(),
   POKEMON_TCG_API_KEY: z.string().optional(),
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
-  YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7')
+  YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7'),
+  POKEMON_API_BASE_URL: z.string().url().default('https://api.pokemontcg.io/v2')
 });
 
 const parsed = envSchema.safeParse(process.env);

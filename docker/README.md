@@ -13,6 +13,7 @@ This starts:
 - `frontend` running Next.js dev server (ports map to `${FRONTEND_PORT}`)
 - Optional: `scryfall-bulk` lightweight cache for Magic queries. Enable with `docker compose --profile bulk up` and set `SCRYFALL_API_BASE_URL=http://scryfall-bulk:4010`.
 - Optional: `ygo-cache` local Yu-Gi-Oh! dataset mirror. Enable with the same `bulk` profile and set `YGO_API_BASE_URL=http://ygo-cache:4020`.
+- Optional: `pokemon-cache` bulk Pokémon mirror. Enable via the `bulk` profile and set `POKEMON_API_BASE_URL=http://pokemon-cache:4030`.
 
 ### Notes
 - Node modules live inside the container; each start runs `npm install` to sync dependencies.
@@ -20,6 +21,7 @@ This starts:
 - Frontend listens on `http://localhost:${FRONTEND_PORT:-3001}`. Update `NEXT_PUBLIC_API_BASE_URL` if you expose the API elsewhere.
 - Set `SCRYFALL_API_BASE_URL` to `http://scryfall-bulk:4010` to have the backend use the local bulk data cache; otherwise it defaults to the public Scryfall API.
 - Set `YGO_API_BASE_URL` to `http://ygo-cache:4020` when the Yu-Gi-Oh! cache is running; otherwise the backend uses the public YGOPRODeck API directly.
+- Set `POKEMON_API_BASE_URL` to `http://pokemon-cache:4030` when the Pokémon cache is running; otherwise the backend uses the public Pokémon TCG API.
 - Database accessible on `localhost:5432` with credentials from `.env.docker`.
 
 ## Production Build
@@ -28,7 +30,7 @@ docker compose -f docker-compose.prod.yml --env-file ../.env.docker up --build -
 ```
 
 This uses the `production` stages of the backend and frontend images, runs compiled TypeScript/Next.js output, and omits development volumes.
-Add `--profile bulk` to the command if you want the cache services in production and point `SCRYFALL_API_BASE_URL`/`YGO_API_BASE_URL` at `http://scryfall-bulk:4010` and `http://ygo-cache:4020` respectively.
+Add `--profile bulk` to the command if you want the cache services in production and point `SCRYFALL_API_BASE_URL`, `YGO_API_BASE_URL`, and `POKEMON_API_BASE_URL` at `http://scryfall-bulk:4010`, `http://ygo-cache:4020`, and `http://pokemon-cache:4030` respectively.
 
 ## Common Commands
 - `docker compose down` — stop and remove containers.
