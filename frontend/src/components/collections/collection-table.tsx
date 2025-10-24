@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { hexToRgba, normalizeHexColor } from '@/lib/color';
 import type { Collection as CollectionEntity } from '@/lib/api/collections';
+import { LIBRARY_COLLECTION_ID } from '@/lib/api/collections';
 import { ALL_COLLECTION_ID, useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
@@ -874,12 +875,13 @@ function CollectionSelector({
           const totalCopies = collection.cards.reduce((sum, card) => sum + card.quantity, 0);
           const totalValue = collection.cards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
           const accentColor = normalizeHexColor(collection.colorHex);
+          const isLibrary = collection.id === LIBRARY_COLLECTION_ID;
 
           return (
             <SelectorRow
               key={collection.id}
               title={collection.name}
-              description={collection.description}
+              description={collection.description || (isLibrary ? 'Cards not yet assigned to a binder' : undefined)}
               badgeText={`${uniqueGames} game${uniqueGames === 1 ? '' : 's'}`}
               stats={[`${uniqueCards} unique`, `${totalCopies} copies`]}
               value={showPricing ? `$${totalValue.toFixed(2)}` : undefined}

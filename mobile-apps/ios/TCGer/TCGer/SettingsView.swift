@@ -87,6 +87,10 @@ struct SettingsView: View {
                             Text("Yu-Gi-Oh!")
                         }
                     }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledYugioh) {
+                        Task { await updatePreferences(enabledYugioh: environmentStore.enabledYugioh) }
+                    }
 
                     Toggle(isOn: $environmentStore.enabledMagic) {
                         HStack {
@@ -98,6 +102,10 @@ struct SettingsView: View {
                             Text("Magic: The Gathering")
                         }
                     }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledMagic) {
+                        Task { await updatePreferences(enabledMagic: environmentStore.enabledMagic) }
+                    }
 
                     Toggle(isOn: $environmentStore.enabledPokemon) {
                         HStack {
@@ -108,6 +116,10 @@ struct SettingsView: View {
                                 .foregroundColor(.accentColor)
                             Text("Pokémon")
                         }
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledPokemon) {
+                        Task { await updatePreferences(enabledPokemon: environmentStore.enabledPokemon) }
                     }
                 } header: {
                     Text("TCG Modules")
@@ -347,7 +359,10 @@ private extension SettingsView {
 
     func updatePreferences(
         showCardNumbers: Bool? = nil,
-        showPricing: Bool? = nil
+        showPricing: Bool? = nil,
+        enabledYugioh: Bool? = nil,
+        enabledMagic: Bool? = nil,
+        enabledPokemon: Bool? = nil
     ) async {
         guard !isApplyingRemotePreferences,
               environmentStore.isAuthenticated,
@@ -362,7 +377,10 @@ private extension SettingsView {
                 config: environmentStore.serverConfiguration,
                 token: token,
                 showCardNumbers: showCardNumbers,
-                showPricing: showPricing
+                showPricing: showPricing,
+                enabledYugioh: enabledYugioh,
+                enabledMagic: enabledMagic,
+                enabledPokemon: enabledPokemon
             )
 
             await MainActor.run {

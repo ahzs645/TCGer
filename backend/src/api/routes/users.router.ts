@@ -31,7 +31,10 @@ usersRouter.get(
 const updatePreferencesSchema = z
   .object({
     showCardNumbers: z.boolean().optional(),
-    showPricing: z.boolean().optional()
+    showPricing: z.boolean().optional(),
+    enabledYugioh: z.boolean().optional(),
+    enabledMagic: z.boolean().optional(),
+    enabledPokemon: z.boolean().optional()
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one preference must be provided'

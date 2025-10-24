@@ -360,9 +360,11 @@ final class APIService {
             cardData: cardData
         )
 
+        let path = binderId == "__library__" ? "collections/cards" : "collections/\(binderId)/cards"
+
         let (_, httpResponse) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/cards",
+            path: path,
             method: "POST",
             token: token,
             body: body
@@ -394,6 +396,9 @@ final class APIService {
     struct UserPreferences: Codable {
         let showCardNumbers: Bool
         let showPricing: Bool
+        let enabledYugioh: Bool
+        let enabledMagic: Bool
+        let enabledPokemon: Bool
     }
 
     func getUserPreferences(
@@ -423,17 +428,26 @@ final class APIService {
     struct UpdatePreferencesRequest: Codable {
         let showCardNumbers: Bool?
         let showPricing: Bool?
+        let enabledYugioh: Bool?
+        let enabledMagic: Bool?
+        let enabledPokemon: Bool?
     }
 
     func updateUserPreferences(
         config: ServerConfiguration,
         token: String,
         showCardNumbers: Bool? = nil,
-        showPricing: Bool? = nil
+        showPricing: Bool? = nil,
+        enabledYugioh: Bool? = nil,
+        enabledMagic: Bool? = nil,
+        enabledPokemon: Bool? = nil
     ) async throws -> UserPreferences {
         let body = UpdatePreferencesRequest(
             showCardNumbers: showCardNumbers,
-            showPricing: showPricing
+            showPricing: showPricing,
+            enabledYugioh: enabledYugioh,
+            enabledMagic: enabledMagic,
+            enabledPokemon: enabledPokemon
         )
 
         let (data, httpResponse) = try await makeRequest(

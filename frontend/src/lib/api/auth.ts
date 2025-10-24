@@ -18,6 +18,9 @@ export interface AuthUser {
   isAdmin: boolean;
   showCardNumbers: boolean;
   showPricing: boolean;
+  enabledYugioh: boolean;
+  enabledMagic: boolean;
+  enabledPokemon: boolean;
 }
 
 export interface AuthResponse {

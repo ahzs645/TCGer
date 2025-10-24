@@ -184,8 +184,13 @@ struct AddCardToBinderSheet: View {
                 config: environmentStore.serverConfiguration,
                 token: token
             )
+            collections.sort { lhs, rhs in
+                if lhs.id == "__library__" { return true }
+                if rhs.id == "__library__" { return false }
+                return lhs.updatedAt > rhs.updatedAt
+            }
             // Auto-select first binder if only one exists
-            if collections.count == 1 {
+            if selectedBinderId == nil {
                 selectedBinderId = collections.first?.id
             }
             isLoading = false

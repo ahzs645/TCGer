@@ -49,6 +49,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [updatingPreference, setUpdatingPreference] = useState<'showCardNumbers' | 'showPricing' | null>(null);
+  const [updatingGame, setUpdatingGame] = useState<string | null>(null);
 
   const activeCount = useMemo(() => Object.values(enabledGames).filter(Boolean).length, [enabledGames]);
   const isAdmin = user?.isAdmin ?? false;
@@ -117,6 +118,35 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
       }
     } finally {
       setUpdatingPreference(null);
+    }
+  };
+
+  const handleGameToggle = async (game: ManageableGame) => {
+    if (!token) {
+      toggleGame(game);
+      return;
+    }
+
+    const previousValue = enabledGames[game];
+    const newValue = !previousValue;
+
+    setUpdatingGame(game);
+    toggleGame(game);
+
+    const gameKeyMap = {
+      yugioh: 'enabledYugioh',
+      magic: 'enabledMagic',
+      pokemon: 'enabledPokemon'
+    } as const;
+
+    try {
+      await updateUserPreferences({ [gameKeyMap[game]]: newValue }, token);
+      updateStoredPreferences({ [gameKeyMap[game]]: newValue } as any);
+    } catch (error) {
+      console.error('Failed to update enabled game:', error);
+      toggleGame(game);
+    } finally {
+      setUpdatingGame(null);
     }
   };
 
@@ -189,7 +219,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                   </div>
                   <Switch
                     checked={enabled}
-                    onCheckedChange={() => toggleGame(game)}
+                    disabled={updatingGame === game}
+                    onCheckedChange={() => handleGameToggle(game)}
                     aria-label={`Toggle ${GAME_LABELS[game]}`}
                   />
                 </div>

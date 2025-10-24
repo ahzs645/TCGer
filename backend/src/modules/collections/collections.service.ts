@@ -32,86 +32,128 @@ export interface AddCardToBinderInput {
   };
 }
 
+export const UNSORTED_BINDER_ID = '__library__';
+
+type PrismaCollectionWithCard = Awaited<ReturnType<typeof prisma.collection.findMany>>[0];
+
+function mapCollectionCard(collection: PrismaCollectionWithCard) {
+  const card = collection.card;
+  const tcgGame = card.tcgGame;
+
+  let attributes: Record<string, unknown> = {};
+  if (card.yugiohCard) {
+    attributes = {
+      type: card.yugiohCard.cardType,
+      attribute: card.yugiohCard.attribute,
+      level: card.yugiohCard.level,
+      atk: card.yugiohCard.atk,
+      def: card.yugiohCard.def
+    };
+  } else if (card.magicCard) {
+    attributes = {
+      mana_cost: card.magicCard.manaCost,
+      type_line: card.magicCard.cardType,
+      oracle_text: card.magicCard.oracleText,
+      power: card.magicCard.power,
+      toughness: card.magicCard.toughness
+    };
+  } else if (card.pokemonCard) {
+    attributes = {
+      hp: card.pokemonCard.hp,
+      types: [card.pokemonCard.pokemonType],
+      attacks: card.pokemonCard.attacks
+    };
+  }
+
+  return {
+    id: collection.id,
+    cardId: card.id,
+    tcg: tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
+    name: card.name,
+    setCode: card.setCode ?? undefined,
+    setName: card.setName ?? undefined,
+    rarity: card.rarity ?? undefined,
+    imageUrl: card.imageUrl ?? undefined,
+    imageUrlSmall: card.imageUrlSmall ?? undefined,
+    quantity: collection.quantity,
+    condition: collection.condition ?? undefined,
+    language: collection.language ?? undefined,
+    notes: collection.notes ?? undefined,
+    price: collection.price ? parseFloat(collection.price.toString()) : undefined
+  };
+}
+
 export async function getUserBinders(userId: string) {
-  const binders = await prisma.binder.findMany({
-    where: { userId },
-    include: {
-      collections: {
-        include: {
-          card: {
-            include: {
-              tcgGame: true,
-              yugiohCard: true,
-              magicCard: true,
-              pokemonCard: true,
-              priceHistory: {
-                orderBy: { recordedAt: 'desc' },
-                take: 10
+  const [binders, looseCollections] = await Promise.all([
+    prisma.binder.findMany({
+      where: { userId },
+      include: {
+        collections: {
+          include: {
+            card: {
+              include: {
+                tcgGame: true,
+                yugiohCard: true,
+                magicCard: true,
+                pokemonCard: true,
+                priceHistory: {
+                  orderBy: { recordedAt: 'desc' },
+                  take: 10
+                }
               }
             }
           }
         }
-      }
-    },
-    orderBy: { updatedAt: 'desc' }
-  });
+      },
+      orderBy: { updatedAt: 'desc' }
+    }),
+    prisma.collection.findMany({
+      where: { userId, binderId: null },
+      include: {
+        card: {
+          include: {
+            tcgGame: true,
+            yugiohCard: true,
+            magicCard: true,
+            pokemonCard: true,
+            priceHistory: {
+              orderBy: { recordedAt: 'desc' },
+              take: 10
+            }
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    })
+  ]);
 
-  // Transform to match frontend expected format
-  return binders.map((binder) => ({
+  const formattedBinders = binders.map((binder) => ({
     id: binder.id,
     name: binder.name,
     description: binder.description ?? '',
     colorHex: binder.colorHex,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
-    cards: binder.collections.map((collection) => {
-      const card = collection.card;
-      const tcgGame = card.tcgGame;
-
-      // Build attributes based on TCG type
-      let attributes: Record<string, unknown> = {};
-      if (card.yugiohCard) {
-        attributes = {
-          type: card.yugiohCard.cardType,
-          attribute: card.yugiohCard.attribute,
-          level: card.yugiohCard.level,
-          atk: card.yugiohCard.atk,
-          def: card.yugiohCard.def
-        };
-      } else if (card.magicCard) {
-        attributes = {
-          mana_cost: card.magicCard.manaCost,
-          type_line: card.magicCard.cardType,
-          oracle_text: card.magicCard.oracleText,
-          power: card.magicCard.power,
-          toughness: card.magicCard.toughness
-        };
-      } else if (card.pokemonCard) {
-        attributes = {
-          hp: card.pokemonCard.hp,
-          types: [card.pokemonCard.pokemonType],
-          attacks: card.pokemonCard.attacks
-        };
-      }
-
-      return {
-        id: collection.id,
-        cardId: card.id,
-        tcg: tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
-        name: card.name,
-        setCode: card.setCode ?? undefined,
-        setName: card.setName ?? undefined,
-        rarity: card.rarity ?? undefined,
-        imageUrl: card.imageUrl ?? undefined,
-        imageUrlSmall: card.imageUrlSmall ?? undefined,
-        quantity: collection.quantity,
-        condition: collection.condition ?? undefined,
-        language: collection.language ?? undefined,
-        notes: collection.notes ?? undefined,
-        price: collection.price ? parseFloat(collection.price.toString()) : undefined
-      };
-    })
+    cards: binder.collections.map(mapCollectionCard)
   }));
+
+  const fallbackDate = new Date();
+  const latestUpdated = looseCollections.reduce<Date>(
+    (latest, entry) => (entry.updatedAt > latest ? entry.updatedAt : latest),
+    looseCollections[0]?.updatedAt ?? fallbackDate
+  );
+
+  formattedBinders.unshift({
+    id: UNSORTED_BINDER_ID,
+    name: 'Unsorted',
+    description: 'Cards not yet assigned to a binder',
+    colorHex: '9AA0A6',
+    createdAt: (looseCollections[0]?.createdAt ?? fallbackDate).toISOString(),
+    updatedAt: latestUpdated.toISOString(),
+    cards: looseCollections.map(mapCollectionCard)
+  });
+
+  return formattedBinders;
 }
 
 export async function createBinder(userId: string, input: CreateBinderInput) {
@@ -281,6 +323,56 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
   await prisma.binder.update({
     where: { id: binderId },
     data: { updatedAt: new Date() }
+  });
+
+  return collection;
+}
+
+export async function addCardToLibrary(userId: string, input: AddCardToBinderInput) {
+  // Ensure card exists, create if not (reuse logic)
+  let cardId = input.cardId;
+  const existingCard = await prisma.card.findUnique({
+    where: { id: cardId }
+  });
+
+  if (!existingCard && input.cardData) {
+    const tcgGame = await prisma.tcgGame.findFirst({
+      where: { code: input.cardData.tcg }
+    });
+
+    if (!tcgGame) {
+      throw new Error(`TCG game '${input.cardData.tcg}' not found`);
+    }
+
+    await prisma.card.create({
+      data: {
+        id: cardId,
+        tcgGameId: tcgGame.id,
+        externalId: input.cardData.externalId,
+        name: input.cardData.name,
+        setCode: input.cardData.setCode,
+        setName: input.cardData.setName,
+        rarity: input.cardData.rarity,
+        imageUrl: input.cardData.imageUrl,
+        imageUrlSmall: input.cardData.imageUrlSmall
+      }
+    });
+  } else if (!existingCard) {
+    throw new Error('Card not found and no card data provided');
+  }
+
+  const collection = await prisma.collection.create({
+    data: {
+      userId,
+      cardId,
+      binderId: null,
+      quantity: input.quantity,
+      condition: input.condition,
+      language: input.language,
+      notes: input.notes,
+      price: input.price,
+      acquisitionPrice: input.acquisitionPrice
+    }
   });
 
   return collection;

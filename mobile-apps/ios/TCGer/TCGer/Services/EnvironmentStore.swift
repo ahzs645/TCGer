@@ -232,5 +232,8 @@ final class EnvironmentStore: ObservableObject {
     func applyUserPreferences(_ preferences: APIService.UserPreferences) {
         showCardNumbers = preferences.showCardNumbers
         showPricing = preferences.showPricing
+        enabledYugioh = preferences.enabledYugioh
+        enabledMagic = preferences.enabledMagic
+        enabledPokemon = preferences.enabledPokemon
     }
 }

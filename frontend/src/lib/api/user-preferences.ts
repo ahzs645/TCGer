@@ -3,6 +3,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3
 export interface UserPreferences {
   showCardNumbers: boolean;
   showPricing: boolean;
+  enabledYugioh: boolean;
+  enabledMagic: boolean;
+  enabledPokemon: boolean;
 }
 
 export async function getUserPreferences(token: string): Promise<UserPreferences> {
