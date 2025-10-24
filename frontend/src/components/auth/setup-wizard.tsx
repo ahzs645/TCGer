@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { setupAdmin } from '@/lib/api/auth';
+import { setupAdmin, login } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,14 +11,31 @@ import { Label } from '@/components/ui/label';
 import { AlertCircle } from 'lucide-react';
 
 export function SetupWizard() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(false);
 
   const setAuth = useAuthStore((state) => state.setAuth);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const result = await login({ email, password });
+      setAuth(result.user, result.token);
+      router.push('/collections');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +61,7 @@ export function SetupWizard() {
       });
 
       setAuth(result.user, result.token);
+      router.push('/collections');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
       setLoading(false);
@@ -62,11 +81,11 @@ export function SetupWizard() {
           />
           <h1 className="text-2xl font-bold">Welcome to TCG Manager</h1>
           <p className="text-center text-sm text-muted-foreground">
-            Let's get started by creating your admin account
+            {isLoginMode ? 'Sign in to your account' : "Let's get started by creating your admin account"}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={isLoginMode ? handleLogin : handleSubmit} className="space-y-4">
           {error && (
             <div className="flex items-center gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4" />
@@ -87,17 +106,19 @@ export function SetupWizard() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="username">Username (optional)</Label>
-            <Input
-              id="username"
-              type="text"
-              placeholder="Admin"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          {!isLoginMode && (
+            <div className="space-y-2">
+              <Label htmlFor="username">Username (optional)</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -109,29 +130,49 @@ export function SetupWizard() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
-              minLength={8}
+              minLength={isLoginMode ? undefined : 8}
             />
-            <p className="text-xs text-muted-foreground">
-              Must be at least 8 characters
-            </p>
+            {!isLoginMode && (
+              <p className="text-xs text-muted-foreground">
+                Must be at least 8 characters
+              </p>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
+          {!isLoginMode && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating Admin Account...' : 'Create Admin Account'}
+            {loading
+              ? (isLoginMode ? 'Signing in...' : 'Creating Admin Account...')
+              : (isLoginMode ? 'Sign In' : 'Create Admin Account')}
           </Button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoginMode(!isLoginMode);
+                setError('');
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+              disabled={loading}
+            >
+              {isLoginMode ? 'Need to create an admin account?' : 'Already have an account? Sign in'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -43,6 +43,7 @@ struct Collection: Identifiable, Codable, Hashable {
     let cards: [CollectionCard]
     let createdAt: String
     let updatedAt: String
+    let colorHex: String?
 
     var uniqueCards: Int {
         cards.count
@@ -58,6 +59,13 @@ struct Collection: Identifiable, Codable, Hashable {
 
     var uniqueGames: Set<String> {
         Set(cards.map { $0.tcg })
+    }
+
+    var color: Color {
+        if let hex = colorHex {
+            return Color(hex: hex)
+        }
+        return .blue // Default color
     }
 }
 

@@ -1,0 +1,135 @@
+import SwiftUI
+
+struct CardPreviewStrip: View {
+    let cards: [CollectionCard]
+    let maxPreview: Int = 5
+
+    var body: some View {
+        if cards.isEmpty {
+            EmptyPreviewPlaceholder()
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(cards.prefix(maxPreview))) { card in
+                        CardPreviewImage(imageUrl: card.imageUrlSmall)
+                    }
+
+                    if cards.count > maxPreview {
+                        MoreCardsIndicator(count: cards.count - maxPreview)
+                    }
+                }
+            }
+            .frame(height: 80)
+        }
+    }
+}
+
+struct CardPreviewImage: View {
+    let imageUrl: String?
+
+    var body: some View {
+        AsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+            switch phase {
+            case .empty:
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: cardWidth, height: 80)
+                    .overlay(
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    )
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(2.5/3.5, contentMode: .fit)
+                    .frame(height: 80)
+                    .cornerRadius(4)
+                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+            case .failure:
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: cardWidth, height: 80)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    )
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .cornerRadius(4)
+    }
+
+    private var cardWidth: CGFloat {
+        80 * (2.5 / 3.5)
+    }
+}
+
+struct EmptyPreviewPlaceholder: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3) { _ in
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 80 * (2.5/3.5), height: 80)
+                    .cornerRadius(4)
+                    .overlay(
+                        Image(systemName: "rectangle.stack")
+                            .foregroundColor(.gray.opacity(0.5))
+                            .font(.caption)
+                    )
+            }
+        }
+        .frame(height: 80)
+    }
+}
+
+struct MoreCardsIndicator: View {
+    let count: Int
+
+    var body: some View {
+        VStack {
+            Image(systemName: "plus.circle.fill")
+                .font(.title2)
+                .foregroundColor(.blue)
+
+            Text("+\(count)")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+        }
+        .frame(width: 80 * (2.5/3.5), height: 80)
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+#Preview {
+    VStack(spacing: 20) {
+        // With cards
+        CardPreviewStrip(cards: [
+            CollectionCard(
+                id: "1", cardId: "1", name: "Test", tcg: "yugioh",
+                setCode: nil, rarity: nil,
+                imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
+                imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
+                quantity: 1, price: nil, condition: nil, language: nil, notes: nil
+            ),
+            CollectionCard(
+                id: "2", cardId: "2", name: "Test 2", tcg: "yugioh",
+                setCode: nil, rarity: nil,
+                imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
+                imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
+                quantity: 1, price: nil, condition: nil, language: nil, notes: nil
+            )
+        ])
+
+        // Empty
+        CardPreviewStrip(cards: [])
+    }
+    .padding()
+}

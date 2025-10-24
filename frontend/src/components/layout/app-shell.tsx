@@ -32,9 +32,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary shadow p-1">
-                <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-full w-full dark:invert" />
-              </span>
+              <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-8 w-8 dark:invert" />
               TCG Manager
             </Link>
             <nav className="hidden items-center gap-1 md:flex">

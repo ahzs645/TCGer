@@ -63,7 +63,10 @@ struct SettingsView: View {
                 Section {
                     Toggle(isOn: $enabledYugioh) {
                         HStack {
-                            Image(systemName: "suit.club.fill")
+                            Image("YugiohIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
                                 .foregroundColor(.accentColor)
                             Text("Yu-Gi-Oh!")
                         }
@@ -71,7 +74,10 @@ struct SettingsView: View {
 
                     Toggle(isOn: $enabledMagic) {
                         HStack {
-                            Image(systemName: "sparkles")
+                            Image("MTGIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
                                 .foregroundColor(.accentColor)
                             Text("Magic: The Gathering")
                         }
@@ -79,7 +85,10 @@ struct SettingsView: View {
 
                     Toggle(isOn: $enabledPokemon) {
                         HStack {
-                            Image(systemName: "bolt.fill")
+                            Image("PokemonIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
                                 .foregroundColor(.accentColor)
                             Text("Pokémon")
                         }
