@@ -2,6 +2,8 @@ import SwiftUI
 
 struct CollectionsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.showingSearch) private var showingSearch
+    @Environment(\.scrollOffset) private var scrollOffset
     @State private var collections: [Collection] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -27,17 +29,26 @@ struct CollectionsView: View {
                     CollectionsList(
                         collections: collections,
                         selectedCollection: $selectedCollection,
-                        showPricing: environmentStore.showPricing
+                        showPricing: environmentStore.showPricing,
+                        scrollOffset: scrollOffset
                     )
                 }
             }
             .navigationTitle("Binders")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingCreateSheet = true
-                    } label: {
-                        Image(systemName: "plus")
+                    HStack(spacing: 16) {
+                        Button {
+                            showingSearch.wrappedValue = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+
+                        Button {
+                            showingCreateSheet = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
@@ -114,9 +125,18 @@ private struct CollectionsList: View {
     let collections: [Collection]
     @Binding var selectedCollection: Collection?
     let showPricing: Bool
+    let scrollOffset: Binding<CGFloat>
 
     var body: some View {
         ScrollView {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: ScrollOffsetPreferenceKey.self,
+                    value: geometry.frame(in: .named("scroll")).minY
+                )
+            }
+            .frame(height: 0)
+
             LazyVStack(spacing: 16) {
                 ForEach(collections) { collection in
                     CollectionCardView(collection: collection, showPricing: showPricing)
@@ -126,6 +146,10 @@ private struct CollectionsList: View {
                 }
             }
             .padding()
+        }
+        .coordinateSpace(name: "scroll")
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            scrollOffset.wrappedValue = value
         }
     }
 }
@@ -190,46 +214,111 @@ struct CollectionDetailView: View {
     let collection: Collection
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @State private var isEditing = false
+    @State private var editedName: String
+    @State private var editedDescription: String
+    @State private var showingAddCard = false
+
+    init(collection: Collection) {
+        self.collection = collection
+        _editedName = State(initialValue: collection.name)
+        _editedDescription = State(initialValue: collection.description ?? "")
+    }
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(collection.name)
-                            .font(.title)
-                            .fontWeight(.bold)
-                        if let description = collection.description {
-                            Text(description)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding()
+            ZStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Header
+                        VStack(alignment: .leading, spacing: 8) {
+                            if isEditing {
+                                TextField("Binder Name", text: $editedName)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .textFieldStyle(.roundedBorder)
 
-                    // Stats Card
-                    CollectionStatsCard(
-                        collection: collection,
-                        showPricing: environmentStore.showPricing
-                    )
-                        .padding(.horizontal)
-
-                    // Cards List
-                    if !collection.cards.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Cards")
-                                .font(.headline)
-                                .padding(.horizontal)
-
-                            ForEach(collection.cards) { card in
-                                CollectionCardRow(
-                                    card: card,
-                                    showPricing: environmentStore.showPricing
-                                )
-                                    .padding(.horizontal)
+                                TextField("Description (optional)", text: $editedDescription, axis: .vertical)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(3...6)
+                            } else {
+                                Text(collection.name)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                if let description = collection.description, !description.isEmpty {
+                                    Text(description)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
+                        .padding()
+
+                        // Stats Card
+                        CollectionStatsCard(
+                            collection: collection,
+                            showPricing: environmentStore.showPricing
+                        )
+                            .padding(.horizontal)
+
+                        // Cards List
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Cards")
+                                    .font(.headline)
+                                Spacer()
+                                Button(action: { showingAddCard = true }) {
+                                    Label("Add Card", systemImage: "plus.circle.fill")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .padding(.horizontal)
+
+                            if collection.cards.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "rectangle.stack.badge.plus")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.secondary)
+                                    Text("No cards in this binder yet")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                            } else {
+                                ForEach(collection.cards) { card in
+                                    CollectionCardRow(
+                                        card: card,
+                                        showPricing: environmentStore.showPricing
+                                    )
+                                        .padding(.horizontal)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 80) // Space for FAB
+                    }
+                }
+
+                // Floating Add Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: { showingAddCard = true }) {
+                            Image(systemName: "plus")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(Color.accentColor)
+                                .clipShape(Circle())
+                                .shadow(radius: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
                     }
                 }
             }
@@ -240,6 +329,22 @@ struct CollectionDetailView: View {
                         dismiss()
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    if isEditing {
+                        Button("Save") {
+                            // TODO: Save changes
+                            isEditing = false
+                        }
+                        .disabled(editedName.isEmpty)
+                    } else {
+                        Button("Edit") {
+                            isEditing = true
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddCard) {
+                AddCardToBinderFromSearchView(binderId: collection.id)
             }
         }
     }
