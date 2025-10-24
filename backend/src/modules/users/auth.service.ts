@@ -24,6 +24,8 @@ export interface AuthResponse {
     email: string;
     username: string | null;
     isAdmin: boolean;
+    showCardNumbers: boolean;
+    showPricing: boolean;
   };
   token: string;
 }
@@ -62,7 +64,9 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       id: user.id,
       email: user.email,
       username: user.username,
-      isAdmin: user.isAdmin
+      isAdmin: user.isAdmin,
+      showCardNumbers: user.showCardNumbers,
+      showPricing: user.showPricing
     },
     token
   };
@@ -95,7 +99,9 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
       id: user.id,
       email: user.email,
       username: user.username,
-      isAdmin: user.isAdmin
+      isAdmin: user.isAdmin,
+      showCardNumbers: user.showCardNumbers,
+      showPricing: user.showPricing
     },
     token
   };
@@ -133,6 +139,9 @@ export async function getUserById(userId: string) {
       id: true,
       email: true,
       username: true,
+      isAdmin: true,
+      showCardNumbers: true,
+      showPricing: true,
       createdAt: true
     }
   });
@@ -140,6 +149,40 @@ export async function getUserById(userId: string) {
   if (!user) {
     throw new Error('User not found');
   }
+
+  return user;
+}
+
+export interface UpdateUserPreferencesInput {
+  showCardNumbers?: boolean;
+  showPricing?: boolean;
+}
+
+export async function getUserPreferences(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      showCardNumbers: true,
+      showPricing: true
+    }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return user;
+}
+
+export async function updateUserPreferences(userId: string, input: UpdateUserPreferencesInput) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: input,
+    select: {
+      showCardNumbers: true,
+      showPricing: true
+    }
+  });
 
   return user;
 }

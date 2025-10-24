@@ -1,74 +1,85 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import * as collectionsApi from '@/lib/api/collections';
 
-import type { CollectionCard } from '@/types/card';
-import { SAMPLE_COLLECTIONS, type SampleCollection } from '@/lib/data/sample-collections';
+export type { Collection, CollectionCard } from '@/lib/api/collections';
 
 export interface CollectionsState {
-  collections: SampleCollection[];
-  addCollection: (input: { name: string; description?: string }) => string;
-  removeCollection: (id: string) => void;
-  updateCollectionCards: (id: string, cards: CollectionCard[]) => void;
+  collections: collectionsApi.Collection[];
+  isLoading: boolean;
+  error: string | null;
+  fetchCollections: (token: string) => Promise<void>;
+  addCollection: (token: string, input: { name: string; description?: string }) => Promise<string>;
+  removeCollection: (token: string, id: string) => Promise<void>;
+  updateCollection: (token: string, id: string, input: { name?: string; description?: string }) => Promise<void>;
 }
 
-const freshCollections = (): SampleCollection[] => {
-  return SAMPLE_COLLECTIONS.map((collection) => ({
-    ...collection,
-    cards: collection.cards.map((card) => ({ ...card }))
-  }));
-};
+export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
+  collections: [],
+  isLoading: false,
+  error: null,
 
-const createId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `collection-${Math.random().toString(36).slice(2, 10)}`;
-};
-
-export const useCollectionsStore = create<CollectionsState>()(
-  persist(
-    (set, get) => ({
-      collections: freshCollections(),
-      addCollection: ({ name, description }) => {
-        const id = createId();
-        const now = new Date().toISOString();
-        set((state) => ({
-          collections: [
-            ...state.collections,
-            {
-              id,
-              name: name.trim() || 'Untitled Binder',
-              description: description?.trim() || 'Custom binder',
-              updatedAt: now,
-              cards: []
-            }
-          ]
-        }));
-        return id;
-      },
-      removeCollection: (id) => {
-        set((state) => ({
-          collections: state.collections.filter((collection) => collection.id !== id)
-        }));
-      },
-      updateCollectionCards: (id, cards) => {
-        const now = new Date().toISOString();
-        set((state) => ({
-          collections: state.collections.map((collection) =>
-            collection.id === id
-              ? {
-                  ...collection,
-                  cards,
-                  updatedAt: now
-                }
-              : collection
-          )
-        }));
-      }
-    }),
-    {
-      name: 'tcg-collections-store',
-      version: 1
+  fetchCollections: async (token: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const collections = await collectionsApi.getCollections(token);
+      set({ collections, isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to fetch collections',
+        isLoading: false
+      });
     }
-  )
-);
+  },
+
+  addCollection: async (token: string, input: { name: string; description?: string }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const newCollection = await collectionsApi.createCollection(token, input);
+      set((state) => ({
+        collections: [...state.collections, newCollection],
+        isLoading: false
+      }));
+      return newCollection.id;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to create collection',
+        isLoading: false
+      });
+      throw error;
+    }
+  },
+
+  removeCollection: async (token: string, id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await collectionsApi.deleteCollection(token, id);
+      set((state) => ({
+        collections: state.collections.filter((c) => c.id !== id),
+        isLoading: false
+      }));
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to delete collection',
+        isLoading: false
+      });
+      throw error;
+    }
+  },
+
+  updateCollection: async (token: string, id: string, input: { name?: string; description?: string }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await collectionsApi.updateCollection(token, id, input);
+      set((state) => ({
+        collections: state.collections.map((c) => (c.id === id ? updated : c)),
+        isLoading: false
+      }));
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to update collection',
+        isLoading: false
+      });
+      throw error;
+    }
+  }
+}));

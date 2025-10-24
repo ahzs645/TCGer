@@ -11,13 +11,17 @@ export interface LoginInput {
   password: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string | null;
+  isAdmin: boolean;
+  showCardNumbers: boolean;
+  showPricing: boolean;
+}
+
 export interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    username: string | null;
-    isAdmin: boolean;
-  };
+  user: AuthUser;
   token: string;
 }
 
@@ -68,7 +72,7 @@ export async function logout(token: string): Promise<void> {
   });
 }
 
-export async function getCurrentUser(token: string) {
+export async function getCurrentUser(token: string): Promise<{ user: AuthUser }> {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     headers: {
       Authorization: `Bearer ${token}`

@@ -1,21 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export interface User {
-  id: string;
-  email: string;
-  username: string | null;
-  isAdmin: boolean;
-}
+import type { AuthUser } from '@/lib/api/auth';
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
-  setupRequired: boolean | null;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: AuthUser, token: string) => void;
   clearAuth: () => void;
-  setSetupRequired: (required: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -24,27 +16,22 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      setupRequired: null,
       setAuth: (user, token) =>
         set({
           user,
           token,
-          isAuthenticated: true,
-          setupRequired: false
+          isAuthenticated: true
         }),
       clearAuth: () =>
         set({
           user: null,
           token: null,
           isAuthenticated: false
-        }),
-      setSetupRequired: (required) =>
-        set({
-          setupRequired: required
         })
     }),
     {
-      name: 'auth-storage'
+      name: 'tcg-auth-store',
+      version: 1
     }
   )
 );

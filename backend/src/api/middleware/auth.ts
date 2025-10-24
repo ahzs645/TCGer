@@ -8,6 +8,8 @@ export interface AuthRequest extends Request {
     email: string;
     username?: string | null;
     isAdmin: boolean;
+    showCardNumbers: boolean;
+    showPricing: boolean;
   };
 }
 

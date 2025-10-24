@@ -1,6 +1,34 @@
 import { CardDTO, TcgAdapter } from './types';
 
 const BASE_URL = 'https://api.scryfall.com/cards';
+const DEFAULT_REQUEST_DELAY_MS = 120;
+const configuredDelay = Number.parseInt(process.env.SCRYFALL_MIN_DELAY_MS ?? `${DEFAULT_REQUEST_DELAY_MS}`, 10);
+const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
+
+let rateLimitChain: Promise<void> = Promise.resolve();
+let nextAllowedRequestTime = 0;
+
+function sleep(duration: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+}
+
+async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Response> {
+  const waitPromise = rateLimitChain.then(async () => {
+    const now = Date.now();
+    const wait = Math.max(0, nextAllowedRequestTime - now);
+    if (wait > 0) {
+      await sleep(wait);
+    }
+    nextAllowedRequestTime = Date.now() + MIN_REQUEST_DELAY_MS;
+  });
+
+  rateLimitChain = waitPromise.catch(() => {});
+  await waitPromise;
+
+  return fetch(input, init);
+}
 
 interface ScryfallSearchResponse {
   data: ScryfallCard[];
@@ -54,7 +82,7 @@ export class MagicAdapter implements TcgAdapter {
     url.searchParams.set('dir', 'asc');
 
     try {
-      const response = await fetch(url.toString());
+      const response = await rateLimitedFetch(url.toString());
       if (!response.ok) {
         throw new Error(`Scryfall search failed: ${response.status}`);
       }
@@ -76,7 +104,7 @@ export class MagicAdapter implements TcgAdapter {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/${trimmedId}`);
+      const response = await rateLimitedFetch(`${BASE_URL}/${trimmedId}`);
       if (!response.ok) {
         return null;
       }
@@ -119,14 +147,14 @@ export class MagicAdapter implements TcgAdapter {
 
   private buildFallback(query: string): CardDTO {
     return {
-      id: '9f292732-5b25-41bd-8c4c-5dd744b501f5',
+      id: 'b0faa7f2-b547-42c4-a810-839da50dadfe',
       tcg: this.game,
       name: query ? `Black Lotus (${query})` : 'Black Lotus',
       setCode: 'lea',
       setName: 'Limited Edition Alpha',
       rarity: 'Rare',
-      imageUrl: 'https://c1.scryfall.com/file/scryfall-cards/large/front/9/f/9f292732-5b25-41bd-8c4c-5dd744b501f5.jpg',
-      imageUrlSmall: 'https://c1.scryfall.com/file/scryfall-cards/small/front/9/f/9f292732-5b25-41bd-8c4c-5dd744b501f5.jpg',
+      imageUrl: 'https://cards.scryfall.io/large/front/b/0/b0faa7f2-b547-42c4-a810-839da50dadfe.jpg?1559591477',
+      imageUrlSmall: 'https://cards.scryfall.io/small/front/b/0/b0faa7f2-b547-42c4-a810-839da50dadfe.jpg?1559591477',
       setSymbolUrl: 'https://svgs.scryfall.io/sets/lea.svg',
       attributes: {
         mana_cost: '{0}',

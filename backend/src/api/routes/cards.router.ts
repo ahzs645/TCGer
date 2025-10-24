@@ -17,7 +17,7 @@ cardsRouter.get(
   asyncHandler(async (req, res) => {
     const { query, tcg } = searchQuerySchema.parse(req.query);
     const cards = await searchCards({ query, tcg });
-    res.json({ cards });
+    res.json({ cards, total: cards.length });
   })
 );
 

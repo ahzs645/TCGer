@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { getSettings, updateSettings, type AppSettings } from '@/lib/api/settings';
+import { getUserPreferences, updateUserPreferences } from '@/lib/api/user-preferences';
 import { GAME_LABELS } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useModuleStore } from '@/stores/preferences';
@@ -38,6 +39,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const { user, token } = useAuthStore();
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
+  const [loadingPreferences, setLoadingPreferences] = useState(false);
+  const [updatingPreference, setUpdatingPreference] = useState<'showCardNumbers' | 'showPricing' | null>(null);
 
   const activeCount = useMemo(() => Object.values(enabledGames).filter(Boolean).length, [enabledGames]);
   const isAdmin = user?.isAdmin ?? false;
@@ -52,6 +55,21 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
     }
   }, [open, isAdmin]);
 
+  useEffect(() => {
+    if (!open || !token) {
+      return;
+    }
+
+    setLoadingPreferences(true);
+    getUserPreferences(token)
+      .then((preferences) => {
+        setShowCardNumbers(preferences.showCardNumbers);
+        setShowPricing(preferences.showPricing);
+      })
+      .catch((error) => console.error('Failed to load user preferences:', error))
+      .finally(() => setLoadingPreferences(false));
+  }, [open, token, setShowCardNumbers, setShowPricing]);
+
   const handleSettingChange = async (key: keyof AppSettings, value: boolean) => {
     if (!token || !appSettings) return;
 
@@ -63,6 +81,34 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
     } catch (error) {
       console.error('Failed to update settings:', error);
       setAppSettings(appSettings);
+    }
+  };
+
+  const handlePreferenceToggle = async (preference: 'showCardNumbers' | 'showPricing', value: boolean) => {
+    if (!token) return;
+
+    const previousValue = preference === 'showCardNumbers' ? showCardNumbers : showPricing;
+    if (previousValue === value) return;
+
+    setUpdatingPreference(preference);
+
+    if (preference === 'showCardNumbers') {
+      setShowCardNumbers(value);
+    } else {
+      setShowPricing(value);
+    }
+
+    try {
+      await updateUserPreferences({ [preference]: value }, token);
+    } catch (error) {
+      console.error('Failed to update user preference:', error);
+      if (preference === 'showCardNumbers') {
+        setShowCardNumbers(previousValue);
+      } else {
+        setShowPricing(previousValue);
+      }
+    } finally {
+      setUpdatingPreference(null);
     }
   };
 
@@ -159,7 +205,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
             </div>
             <Switch
               checked={showCardNumbers}
-              onCheckedChange={setShowCardNumbers}
+              disabled={!token || loadingPreferences || updatingPreference === 'showCardNumbers'}
+              onCheckedChange={(checked) => handlePreferenceToggle('showCardNumbers', checked)}
               aria-label="Toggle card numbers"
             />
           </div>
@@ -173,7 +220,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
             </div>
             <Switch
               checked={showPricing}
-              onCheckedChange={setShowPricing}
+              disabled={!token || loadingPreferences || updatingPreference === 'showPricing'}
+              onCheckedChange={(checked) => handlePreferenceToggle('showPricing', checked)}
               aria-label="Toggle pricing display"
             />
           </div>
