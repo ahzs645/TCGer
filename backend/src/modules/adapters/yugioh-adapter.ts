@@ -71,12 +71,12 @@ export class YugiohAdapter implements TcgAdapter {
       }
       const payload = (await response.json()) as YgoApiResponse;
       if (!payload?.data?.length) {
-        return [this.buildFallback(trimmedQuery)];
+        return [];
       }
       return payload.data.map((card) => this.mapCard(card));
     } catch (error) {
       console.error('YugiohAdapter.searchCards error', error);
-      return [this.buildFallback(trimmedQuery)];
+      return [];
     }
   }
 

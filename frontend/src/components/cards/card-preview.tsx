@@ -21,7 +21,8 @@ export function CardPreview({ card }: CardPreviewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [throttledPos, setThrottledPos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
-  const [amountOwned, setAmountOwned] = useState(1);
+  const [amountOwned, setAmountOwned] = useState(0);
+  const [showQuantityControls, setShowQuantityControls] = useState(false);
   const { token, isAuthenticated } = useAuthStore();
   const { collections, addCardToBinder, isLoading: collectionsLoading, hasFetched } = useCollectionsStore((state) => ({
     collections: state.collections,
@@ -90,6 +91,20 @@ export function CardPreview({ card }: CardPreviewProps) {
     }
   }, [collections, selectedBinderId]);
 
+  const handleBinderChange = (binderId: string) => {
+    setSelectedBinderId(binderId);
+    // Reset quantity controls when changing binders
+    setShowQuantityControls(false);
+    setAmountOwned(0);
+    setStatus('idle');
+    setStatusMessage(null);
+  };
+
+  const handleShowQuantityControls = () => {
+    setShowQuantityControls(true);
+    setAmountOwned(1); // Start with 1 copy
+  };
+
   const handleAddToBinder = async () => {
     if (!isSignedIn) {
       setStatus('error');
@@ -103,7 +118,12 @@ export function CardPreview({ card }: CardPreviewProps) {
       return;
     }
 
-    const quantity = Math.max(1, Number.isFinite(amountOwned) ? amountOwned : 1);
+    const quantity = Math.max(0, Number.isFinite(amountOwned) ? amountOwned : 0);
+    if (quantity === 0) {
+      setStatus('error');
+      setStatusMessage('Choose a quantity above zero.');
+      return;
+    }
     setStatus('pending');
     setStatusMessage(null);
 
@@ -122,7 +142,8 @@ export function CardPreview({ card }: CardPreviewProps) {
           imageUrlSmall: card.imageUrlSmall
         }
       });
-      setAmountOwned(1);
+      setAmountOwned(0);
+      setShowQuantityControls(false); // Hide controls after successful add
       setStatus('success');
       setTimeout(() => {
         setStatus('idle');
@@ -133,7 +154,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     }
   };
 
-  const addDisabled = !selectedBinderId || status === 'pending' || collectionsLoading;
+  const addDisabled = !selectedBinderId || status === 'pending' || collectionsLoading || amountOwned === 0;
   const showEmptyBindersMessage = hasFetched && collections.length === 0;
 
   return (
@@ -199,46 +220,14 @@ export function CardPreview({ card }: CardPreviewProps) {
           <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setAmountOwned(Math.max(1, amountOwned - 1))}
-          className="rounded-full h-9 w-9"
-          tabIndex={-1}
-        >
-          <Minus className="h-4 w-4" />
-        </Button>
-        <input
-          min="1"
-          max="99"
-          className="w-9 text-center border-none rounded"
-          type="text"
-          value={amountOwned}
-          onChange={(e) => {
-            const val = parseInt(e.target.value, 10);
-            if (!Number.isNaN(val) && val >= 1 && val <= 99) {
-              setAmountOwned(val);
-            }
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full h-9 w-9"
-          onClick={() => setAmountOwned(Math.min(99, amountOwned + 1))}
-          tabIndex={-1}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="mt-3 w-full space-y-1 text-xs">
+      <div className="mt-3 w-full space-y-3 text-xs">
         {collections.length ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">Binder</p>
               <Select
                 value={selectedBinderId || undefined}
-                onValueChange={setSelectedBinderId}
+                onValueChange={handleBinderChange}
                 disabled={collectionsLoading || status === 'pending'}
               >
                 <SelectTrigger className="h-8 flex-1 justify-between gap-2 text-left text-xs">
@@ -273,17 +262,59 @@ export function CardPreview({ card }: CardPreviewProps) {
                   })}
                 </SelectContent>
               </Select>
-              <Button className="shrink-0 gap-1" size="sm" onClick={handleAddToBinder} disabled={addDisabled}>
-                {status === 'pending' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : status === 'success' ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                <span>{status === 'success' ? 'Added' : 'Add'}</span>
-              </Button>
             </div>
+            {!showQuantityControls ? (
+              <Button className="w-full gap-2" size="sm" onClick={handleShowQuantityControls} disabled={!selectedBinderId}>
+                <Plus className="h-4 w-4" />
+                <span>Add to Binder</span>
+              </Button>
+            ) : (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-1 rounded-lg border px-2 py-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAmountOwned(Math.max(0, amountOwned - 1))}
+                    className="h-8 w-8 rounded-full"
+                    tabIndex={-1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <input
+                    min="0"
+                    max="99"
+                    className="w-10 border-none bg-transparent text-center text-sm font-semibold"
+                    type="text"
+                    value={amountOwned}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!Number.isNaN(val) && val >= 0 && val <= 99) {
+                        setAmountOwned(val);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => setAmountOwned(Math.min(99, amountOwned + 1))}
+                    tabIndex={-1}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button className="shrink-0 gap-2" size="sm" onClick={handleAddToBinder} disabled={addDisabled || amountOwned === 0}>
+                  {status === 'pending' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : status === 'success' ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  <span>{status === 'success' ? 'Added' : 'Add'}</span>
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-center text-muted-foreground">

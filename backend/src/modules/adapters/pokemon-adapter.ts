@@ -180,7 +180,22 @@ export class PokemonAdapter implements TcgAdapter {
       if (!payload?.data?.length) {
         return [];
       }
-      return payload.data.map((card) => this.mapTCGdexCard(card));
+
+      // Fetch full details for each card to get set name and rarity
+      const detailPromises = payload.data.map(async (card) => {
+        try {
+          const detailResponse = await rateLimitedFetch(`${CARDS_ENDPOINT}/${card.id}`);
+          if (detailResponse.ok) {
+            const detailPayload = (await detailResponse.json()) as { data: TCGdexCardDetail };
+            return detailPayload.data ? this.mapTCGdexDetailCard(detailPayload.data) : this.mapTCGdexCard(card);
+          }
+        } catch (err) {
+          console.error(`Failed to fetch details for card ${card.id}`, err);
+        }
+        return this.mapTCGdexCard(card);
+      });
+
+      return await Promise.all(detailPromises);
     } catch (error) {
       console.error('PokemonAdapter.searchTCGdex error', error);
       return [];
@@ -235,13 +250,16 @@ export class PokemonAdapter implements TcgAdapter {
     const imageUrl = card.image ? `${card.image}/high.webp` : undefined;
     const imageUrlSmall = card.image ? `${card.image}/low.webp` : undefined;
 
+    // TCGdex returns "None" for promo cards, convert to "Promo"
+    const rarity = card.rarity === 'None' ? 'Promo' : card.rarity;
+
     return {
       id: card.id,
       tcg: this.game,
       name: card.name,
       setCode: card.set?.id,
       setName: card.set?.name,
-      rarity: card.rarity,
+      rarity,
       imageUrl,
       imageUrlSmall,
       setSymbolUrl: card.set?.symbol ?? card.set?.logo,
