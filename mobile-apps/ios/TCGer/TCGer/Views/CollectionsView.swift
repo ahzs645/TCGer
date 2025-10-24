@@ -65,6 +65,10 @@ struct CollectionsView: View {
                 if let collection = selectedCollection {
                     CollectionDetailView(collection: collection)
                 }
+            } onDismiss: {
+                Task {
+                    await loadCollections()
+                }
             }
         }
         .task {
