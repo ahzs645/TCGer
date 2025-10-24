@@ -440,6 +440,12 @@ function CollectionRow({
   const delta = previousPrice ? ((price - previousPrice) / previousPrice) * 100 : 0;
   const positive = delta >= 0;
   const binderAccent = normalizeHexColor(card.binderColorHex);
+  const binderChipStyle: CSSProperties | undefined = binderAccent
+    ? {
+        backgroundColor: hexToRgba(binderAccent, 0.18),
+        color: binderAccent
+      }
+    : undefined;
 
   return (
     <TableRow data-state={selected ? 'selected' : undefined}>
@@ -457,7 +463,10 @@ function CollectionRow({
             {showBinderName && card.binderName ? (
               <p className="text-[11px] text-muted-foreground">
                 Binder{' '}
-                <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground"
+                  style={binderChipStyle}
+                >
                   {binderAccent ? (
                     <span
                       className="inline-flex h-2.5 w-2.5 rounded-full"

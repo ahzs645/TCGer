@@ -202,12 +202,14 @@ struct CollectionDetailView: View {
     @State private var isEditing = false
     @State private var editedName: String
     @State private var editedDescription: String
+    @State private var selectedColor: Color
     @State private var showingAddCard = false
 
     init(collection: Collection) {
         self.collection = collection
         _editedName = State(initialValue: collection.name)
         _editedDescription = State(initialValue: collection.description ?? "")
+        _selectedColor = State(initialValue: Color.fromHex(collection.colorHex))
     }
 
     var body: some View {
@@ -227,6 +229,9 @@ struct CollectionDetailView: View {
                                 .foregroundColor(.secondary)
                                 .textFieldStyle(.roundedBorder)
                                 .lineLimit(3...6)
+
+                            ColorPickerGrid(selectedColor: $selectedColor)
+                                .padding(.top, 12)
                         } else {
                             Text(collection.name)
                                 .font(.title)
