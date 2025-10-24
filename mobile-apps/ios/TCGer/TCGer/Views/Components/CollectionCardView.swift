@@ -9,9 +9,9 @@ struct CollectionCardView: View {
             // Header with color dot and name
             HStack(spacing: 12) {
                 Circle()
-                    .fill(collection.color)
+                    .fill(Color.fromHex(collection.colorHex))
                     .frame(width: 12, height: 12)
-                    .shadow(color: collection.color.opacity(0.4), radius: 4, x: 0, y: 2)
+                    .shadow(color: Color.fromHex(collection.colorHex).opacity(0.4), radius: 4, x: 0, y: 2)
 
                 Text(collection.name)
                     .font(.headline)

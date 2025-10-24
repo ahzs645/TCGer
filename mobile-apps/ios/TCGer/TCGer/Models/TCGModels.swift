@@ -1,8 +1,7 @@
 import Foundation
-import SwiftUI
 
 // MARK: - Card Models
-struct Card: Identifiable, Codable, Hashable {
+struct Card: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let tcg: String // "yugioh", "magic", "pokemon"
@@ -31,13 +30,13 @@ struct Card: Identifiable, Codable, Hashable {
 }
 
 // MARK: - Search Response
-struct CardSearchResponse: Codable {
+struct CardSearchResponse: Codable, Sendable {
     let cards: [Card]
     let total: Int
 }
 
 // MARK: - Collection Models
-struct Collection: Identifiable, Codable, Hashable {
+struct Collection: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let description: String?
@@ -61,16 +60,9 @@ struct Collection: Identifiable, Codable, Hashable {
     var uniqueGames: Set<String> {
         Set(cards.map { $0.tcg })
     }
-
-    var color: Color {
-        if let hex = colorHex {
-            return Color(hex: hex)
-        }
-        return .blue // Default color
-    }
 }
 
-struct CollectionCard: Identifiable, Codable, Hashable {
+struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let cardId: String
     let name: String
@@ -87,7 +79,7 @@ struct CollectionCard: Identifiable, Codable, Hashable {
 }
 
 // MARK: - App Settings
-struct AppSettings: Codable {
+struct AppSettings: Codable, Sendable {
     let id: Int
     let publicDashboard: Bool
     let publicCollections: Bool
@@ -97,20 +89,20 @@ struct AppSettings: Codable {
 }
 
 // MARK: - User
-struct User: Codable {
+struct User: Codable, Sendable {
     let id: String
     let email: String
     let username: String?
     let isAdmin: Bool
 }
 
-struct AuthResponse: Codable {
+struct AuthResponse: Codable, Sendable {
     let user: User
     let token: String
 }
 
 // MARK: - Dashboard Stats
-struct DashboardStats: Codable {
+struct DashboardStats: Codable, Sendable {
     let totalCards: Int
     let totalCollections: Int
     let totalValue: Double
@@ -118,7 +110,7 @@ struct DashboardStats: Codable {
     let topSets: [SetStats]
 }
 
-struct SetStats: Codable, Identifiable {
+struct SetStats: Codable, Identifiable, Sendable {
     let id = UUID()
     let setName: String
     let cardCount: Int
