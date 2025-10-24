@@ -9,35 +9,42 @@ struct CardSearchView: View {
     @State private var errorMessage: String?
     @State private var hasSearched = false
     @State private var selectedCard: Card?
-    @State private var showingAddToBinder = false
     @State private var addCardSuccessMessage: String?
 
     private let apiService = APIService()
 
+    var availableGames: [TCGGame] {
+        var games: [TCGGame] = [.all]
+        games.append(contentsOf: environmentStore.enabledGames)
+        return games
+    }
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Game Filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(TCGGame.allCases) { game in
-                            GameFilterChip(
-                                game: game,
-                                isSelected: selectedGame == game
-                            ) {
-                                selectedGame = game
-                                if hasSearched && !searchText.isEmpty {
-                                    Task { await performSearch() }
+                // Game Filter - Only show if more than one game is enabled
+                if environmentStore.enabledGames.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(availableGames) { game in
+                                GameFilterChip(
+                                    game: game,
+                                    isSelected: selectedGame == game
+                                ) {
+                                    selectedGame = game
+                                    if hasSearched && !searchText.isEmpty {
+                                        Task { await performSearch() }
+                                    }
                                 }
                             }
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                }
-                .background(Color(.systemBackground))
+                    .background(Color(.systemBackground))
 
-                Divider()
+                    Divider()
+                }
 
                 // Search Results
                 if isSearching {
@@ -55,9 +62,9 @@ struct CardSearchView: View {
                     SearchResultsList(
                         cards: searchResults,
                         selectedGame: selectedGame,
+                        enabledGames: environmentStore.enabledGames,
                         onCardTap: { card in
                             selectedCard = card
-                            showingAddToBinder = true
                         }
                     )
                 }
@@ -67,18 +74,16 @@ struct CardSearchView: View {
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
-            .sheet(isPresented: $showingAddToBinder) {
-                if let card = selectedCard {
-                    AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
-                        await addCardToBinder(
-                            cardId: card.id,
-                            binderId: binderId,
-                            quantity: quantity,
-                            condition: condition,
-                            language: language,
-                            notes: notes
-                        )
-                    }
+            .sheet(item: $selectedCard) { card in
+                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                    await addCardToBinder(
+                        cardId: card.id,
+                        binderId: binderId,
+                        quantity: quantity,
+                        condition: condition,
+                        language: language,
+                        notes: notes
+                    )
                 }
             }
             .alert("Success", isPresented: Binding(
@@ -91,6 +96,15 @@ struct CardSearchView: View {
             } message: {
                 Text(addCardSuccessMessage ?? "")
             }
+            .onChange(of: environmentStore.enabledYugioh) { _ in validateSelectedGame() }
+            .onChange(of: environmentStore.enabledMagic) { _ in validateSelectedGame() }
+            .onChange(of: environmentStore.enabledPokemon) { _ in validateSelectedGame() }
+        }
+    }
+
+    private func validateSelectedGame() {
+        if !environmentStore.isGameEnabled(selectedGame) {
+            selectedGame = .all
         }
     }
 
@@ -108,6 +122,9 @@ struct CardSearchView: View {
             return
         }
 
+        // Find the card from search results to pass full data
+        let card = searchResults.first { $0.id == cardId }
+
         do {
             try await apiService.addCardToBinder(
                 config: environmentStore.serverConfiguration,
@@ -119,7 +136,8 @@ struct CardSearchView: View {
                 language: language,
                 notes: notes,
                 price: nil,
-                acquisitionPrice: nil
+                acquisitionPrice: nil,
+                card: card
             )
             addCardSuccessMessage = "Card added to binder successfully!"
         } catch {
@@ -197,6 +215,7 @@ private struct GameFilterChip: View {
 private struct SearchResultsList: View {
     let cards: [Card]
     let selectedGame: TCGGame
+    let enabledGames: [TCGGame]
     let onCardTap: (Card) -> Void
 
     // Group cards by TCG
@@ -205,7 +224,13 @@ private struct SearchResultsList: View {
             return [(selectedGame.rawValue, cards)]
         }
 
-        let groups = Dictionary(grouping: cards, by: { $0.tcg })
+        // Filter cards to only include enabled games
+        let enabledGameRawValues = Set(enabledGames.map { $0.rawValue })
+        let filteredCards = cards.filter { card in
+            enabledGameRawValues.contains(card.tcg)
+        }
+
+        let groups = Dictionary(grouping: filteredCards, by: { $0.tcg })
         return groups.sorted { $0.key < $1.key }
     }
 

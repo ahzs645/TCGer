@@ -243,6 +243,18 @@ actor APIService {
         let notes: String?
         let price: Double?
         let acquisitionPrice: Double?
+        let cardData: CardData?
+
+        struct CardData: Encodable {
+            let name: String
+            let tcg: String
+            let externalId: String
+            let setCode: String?
+            let setName: String?
+            let rarity: String?
+            let imageUrl: String?
+            let imageUrlSmall: String?
+        }
     }
 
     func addCardToBinder(
@@ -255,8 +267,25 @@ actor APIService {
         language: String? = nil,
         notes: String? = nil,
         price: Double? = nil,
-        acquisitionPrice: Double? = nil
+        acquisitionPrice: Double? = nil,
+        card: Card? = nil
     ) async throws {
+        let cardData: AddCardToBinderRequest.CardData?
+        if let card = card {
+            cardData = AddCardToBinderRequest.CardData(
+                name: card.name,
+                tcg: card.tcg,
+                externalId: card.id,
+                setCode: card.setCode,
+                setName: card.setName,
+                rarity: card.rarity,
+                imageUrl: card.imageUrl,
+                imageUrlSmall: card.imageUrlSmall
+            )
+        } else {
+            cardData = nil
+        }
+
         let body = AddCardToBinderRequest(
             cardId: cardId,
             quantity: quantity,
@@ -264,7 +293,8 @@ actor APIService {
             language: language,
             notes: notes,
             price: price,
-            acquisitionPrice: acquisitionPrice
+            acquisitionPrice: acquisitionPrice,
+            cardData: cardData
         )
 
         let (_, httpResponse) = try await makeRequest(
