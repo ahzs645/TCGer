@@ -67,20 +67,26 @@ struct CardPreviewImage: View {
 
 struct EmptyPreviewPlaceholder: View {
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<3) { _ in
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .frame(width: 80 * (2.5/3.5), height: 80)
-                    .cornerRadius(4)
-                    .overlay(
-                        Image(systemName: "rectangle.stack")
-                            .foregroundColor(.gray.opacity(0.5))
-                            .font(.caption)
-                    )
+        HStack(spacing: 12) {
+            Image(systemName: "rectangle.stack.badge.plus")
+                .font(.title3)
+                .foregroundColor(.accentColor)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No cards in this binder yet")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Text("Add cards to see quick previews here.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
+
+            Spacer()
         }
-        .frame(height: 80)
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
     }
 }
 

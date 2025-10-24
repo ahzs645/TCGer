@@ -371,11 +371,13 @@ const server = http.createServer(async (request, response) => {
 
 async function start() {
   await loadLatestFromDisk();
-  await refreshData(cards.length === 0).catch((error) => {
-    console.error('Initial Pokémon cache refresh failed', error);
-  });
+  // Start server first so it's responsive even if sync fails
   server.listen(config.port, config.host, () => {
     console.log(`Pokémon cache service listening on http://${config.host}:${config.port}`);
+  });
+  // Then attempt refresh in background (don't block server startup)
+  refreshData(cards.length === 0).catch((error) => {
+    console.error('Initial Pokémon cache refresh failed', error);
   });
 }
 
