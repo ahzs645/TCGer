@@ -8,6 +8,9 @@ struct CardSearchView: View {
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var hasSearched = false
+    @State private var selectedCard: Card?
+    @State private var showingAddToBinder = false
+    @State private var addCardSuccessMessage: String?
 
     private let apiService = APIService()
 
@@ -49,7 +52,14 @@ struct CardSearchView: View {
                 } else if !hasSearched {
                     InitialSearchView()
                 } else {
-                    SearchResultsList(cards: searchResults, selectedGame: selectedGame)
+                    SearchResultsList(
+                        cards: searchResults,
+                        selectedGame: selectedGame,
+                        onCardTap: { card in
+                            selectedCard = card
+                            showingAddToBinder = true
+                        }
+                    )
                 }
             }
             .navigationTitle("Search Cards")
@@ -57,6 +67,63 @@ struct CardSearchView: View {
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
+            .sheet(isPresented: $showingAddToBinder) {
+                if let card = selectedCard {
+                    AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                        await addCardToBinder(
+                            cardId: card.id,
+                            binderId: binderId,
+                            quantity: quantity,
+                            condition: condition,
+                            language: language,
+                            notes: notes
+                        )
+                    }
+                }
+            }
+            .alert("Success", isPresented: Binding(
+                get: { addCardSuccessMessage != nil },
+                set: { if !$0 { addCardSuccessMessage = nil } }
+            )) {
+                Button("OK") {
+                    addCardSuccessMessage = nil
+                }
+            } message: {
+                Text(addCardSuccessMessage ?? "")
+            }
+        }
+    }
+
+    @MainActor
+    private func addCardToBinder(
+        cardId: String,
+        binderId: String,
+        quantity: Int,
+        condition: String?,
+        language: String?,
+        notes: String?
+    ) async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        do {
+            try await apiService.addCardToBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: binderId,
+                cardId: cardId,
+                quantity: quantity,
+                condition: condition,
+                language: language,
+                notes: notes,
+                price: nil,
+                acquisitionPrice: nil
+            )
+            addCardSuccessMessage = "Card added to binder successfully!"
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -102,8 +169,17 @@ private struct GameFilterChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: game.iconName)
-                    .font(.caption)
+                if let customIcon = game.iconName {
+                    Image(customIcon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+                        .foregroundColor(isSelected ? .white : .accentColor)
+                } else {
+                    Image(systemName: game.systemIconName)
+                        .font(.caption)
+                        .foregroundColor(isSelected ? .white : .primary)
+                }
                 Text(game.displayName)
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -121,6 +197,7 @@ private struct GameFilterChip: View {
 private struct SearchResultsList: View {
     let cards: [Card]
     let selectedGame: TCGGame
+    let onCardTap: (Card) -> Void
 
     // Group cards by TCG
     var groupedCards: [(String, [Card])] {
@@ -143,6 +220,9 @@ private struct SearchResultsList: View {
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
                                 CardCell(card: card)
+                                    .onTapGesture {
+                                        onCardTap(card)
+                                    }
                             }
                         }
                     } header: {

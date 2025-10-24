@@ -4,6 +4,7 @@ import { LogIn, LogOut, Settings, Sparkles, User, UserPlus, Waypoints } from 'lu
 import { useState } from 'react';
 
 import { AccountSettingsDialog } from '@/components/account/account-settings-dialog';
+import { ProfileDialog } from '@/components/account/profile-dialog';
 import { LoginDialog } from '@/components/auth/login-dialog';
 import { SignupDialog } from '@/components/auth/signup-dialog';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { useAuthStore } from '@/stores/auth';
 
 export function UserMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const { user, token, isAuthenticated, clearAuth } = useAuthStore();
@@ -83,7 +85,7 @@ export function UserMenu() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
             <Sparkles className="mr-2 h-4 w-4" />
             Profile
           </DropdownMenuItem>
@@ -102,6 +104,7 @@ export function UserMenu() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       <AccountSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );

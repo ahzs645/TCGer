@@ -139,8 +139,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
               </p>
             </div>
             <div className="text-right text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Ash Player</p>
-              <p>ash.player@example.com</p>
+              <p className="font-medium text-foreground">{user?.username || 'User'}</p>
+              <p>{user?.email}</p>
             </div>
           </div>
 
