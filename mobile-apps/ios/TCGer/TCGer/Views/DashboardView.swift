@@ -55,14 +55,20 @@ struct DashboardView: View {
             .refreshable {
                 await loadData()
             }
-            .sheet(isPresented: Binding(
-                get: { selectedCollection != nil },
-                set: { if !$0 { selectedCollection = nil } }
-            )) {
-                if let collection = selectedCollection {
-                    CollectionDetailView(collection: collection)
+            .sheet(
+                isPresented: Binding(
+                    get: { selectedCollection != nil },
+                    set: { if !$0 { selectedCollection = nil } }
+                ),
+                onDismiss: {
+                    Task { await loadData() }
+                },
+                content: {
+                    if let collection = selectedCollection {
+                        CollectionDetailView(collection: collection)
+                    }
                 }
-            }
+            )
         }
         .task {
             await loadData()
