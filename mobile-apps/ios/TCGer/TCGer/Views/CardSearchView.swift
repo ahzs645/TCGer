@@ -96,9 +96,9 @@ struct CardSearchView: View {
             } message: {
                 Text(addCardSuccessMessage ?? "")
             }
-            .onChange(of: environmentStore.enabledYugioh) { _ in validateSelectedGame() }
-            .onChange(of: environmentStore.enabledMagic) { _ in validateSelectedGame() }
-            .onChange(of: environmentStore.enabledPokemon) { _ in validateSelectedGame() }
+            .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
         }
     }
 

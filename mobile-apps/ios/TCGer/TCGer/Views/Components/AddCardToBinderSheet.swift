@@ -56,7 +56,7 @@ struct AddCardToBinderSheet: View {
                             ForEach(collections) { collection in
                                 HStack {
                                     Circle()
-                                        .fill(collection.color)
+                                        .fill(Color.fromHex(collection.colorHex))
                                         .frame(width: 12, height: 12)
                                     Text(collection.name)
                                 }

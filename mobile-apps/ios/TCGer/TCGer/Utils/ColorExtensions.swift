@@ -67,4 +67,12 @@ extension Color {
         Color(hex: "26A69A"),
         Color(hex: "78909C"),
     ]
+
+    // Helper function to get color from hex string with fallback
+    static func fromHex(_ hex: String?) -> Color {
+        if let hex = hex {
+            return Color(hex: hex)
+        }
+        return .blue // Default color
+    }
 }
