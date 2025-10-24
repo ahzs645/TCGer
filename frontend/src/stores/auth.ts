@@ -9,7 +9,14 @@ const DEFAULT_DISPLAY_PREFERENCES = {
   showPricing: true
 };
 
+const DEFAULT_ENABLED_GAMES = {
+  enabledYugioh: true,
+  enabledMagic: true,
+  enabledPokemon: true
+};
+
 type DisplayPreferenceKeys = 'showCardNumbers' | 'showPricing';
+type EnabledGamesKeys = 'enabledYugioh' | 'enabledMagic' | 'enabledPokemon';
 
 interface AuthState {
   user: AuthUser | null;
@@ -30,15 +37,24 @@ function withDisplayDefaults(user: AuthUser | null): AuthUser | null {
   return {
     ...user,
     showCardNumbers: user.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
-    showPricing: user.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing
+    showPricing: user.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
+    enabledYugioh: user.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
+    enabledMagic: user.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
+    enabledPokemon: user.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
   };
 }
 
-function syncDisplayPreferences(preferences?: Partial<Pick<AuthUser, DisplayPreferenceKeys>>) {
-  const { setShowCardNumbers, setShowPricing } = useModuleStore.getState();
+function syncDisplayPreferences(
+  preferences?: Partial<Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>>
+) {
+  const { setShowCardNumbers, setShowPricing, setGameEnabled } = useModuleStore.getState();
 
   setShowCardNumbers(preferences?.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers);
   setShowPricing(preferences?.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing);
+
+  setGameEnabled('yugioh', preferences?.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh);
+  setGameEnabled('magic', preferences?.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic);
+  setGameEnabled('pokemon', preferences?.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon);
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -86,7 +102,13 @@ export const useAuthStore = create<AuthState>()(
           showCardNumbers:
             preferences.showCardNumbers ?? currentUser.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
           showPricing:
-            preferences.showPricing ?? currentUser.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing
+            preferences.showPricing ?? currentUser.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
+          enabledYugioh:
+            (preferences as any).enabledYugioh ?? currentUser.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
+          enabledMagic:
+            (preferences as any).enabledMagic ?? currentUser.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
+          enabledPokemon:
+            (preferences as any).enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
         };
 
         set({ user: updatedUser });

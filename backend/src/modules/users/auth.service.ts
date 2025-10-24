@@ -26,6 +26,9 @@ export interface AuthResponse {
     isAdmin: boolean;
     showCardNumbers: boolean;
     showPricing: boolean;
+    enabledYugioh: boolean;
+    enabledMagic: boolean;
+    enabledPokemon: boolean;
   };
   token: string;
 }
@@ -66,7 +69,10 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
       username: user.username,
       isAdmin: user.isAdmin,
       showCardNumbers: user.showCardNumbers,
-      showPricing: user.showPricing
+      showPricing: user.showPricing,
+      enabledYugioh: user.enabledYugioh,
+      enabledMagic: user.enabledMagic,
+      enabledPokemon: user.enabledPokemon
     },
     token
   };
@@ -101,7 +107,10 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
       username: user.username,
       isAdmin: user.isAdmin,
       showCardNumbers: user.showCardNumbers,
-      showPricing: user.showPricing
+      showPricing: user.showPricing,
+      enabledYugioh: user.enabledYugioh,
+      enabledMagic: user.enabledMagic,
+      enabledPokemon: user.enabledPokemon
     },
     token
   };
@@ -142,6 +151,9 @@ export async function getUserById(userId: string) {
       isAdmin: true,
       showCardNumbers: true,
       showPricing: true,
+      enabledYugioh: true,
+      enabledMagic: true,
+      enabledPokemon: true,
       createdAt: true
     }
   });
@@ -156,6 +168,9 @@ export async function getUserById(userId: string) {
 export interface UpdateUserPreferencesInput {
   showCardNumbers?: boolean;
   showPricing?: boolean;
+  enabledYugioh?: boolean;
+  enabledMagic?: boolean;
+  enabledPokemon?: boolean;
 }
 
 export async function getUserPreferences(userId: string) {
@@ -163,7 +178,10 @@ export async function getUserPreferences(userId: string) {
     where: { id: userId },
     select: {
       showCardNumbers: true,
-      showPricing: true
+      showPricing: true,
+      enabledYugioh: true,
+      enabledMagic: true,
+      enabledPokemon: true
     }
   });
 
@@ -180,7 +198,10 @@ export async function updateUserPreferences(userId: string, input: UpdateUserPre
     data: input,
     select: {
       showCardNumbers: true,
-      showPricing: true
+      showPricing: true,
+      enabledYugioh: true,
+      enabledMagic: true,
+      enabledPokemon: true
     }
   });
 
@@ -212,7 +233,10 @@ export async function updateUserProfile(userId: string, input: UpdateUserProfile
       username: true,
       isAdmin: true,
       showCardNumbers: true,
-      showPricing: true
+      showPricing: true,
+      enabledYugioh: true,
+      enabledMagic: true,
+      enabledPokemon: true
     }
   });
 

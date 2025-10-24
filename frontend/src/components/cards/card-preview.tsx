@@ -203,21 +203,21 @@ export function CardPreview({ card }: CardPreviewProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setAmountOwned(Math.max(0, amountOwned - 1))}
+          onClick={() => setAmountOwned(Math.max(1, amountOwned - 1))}
           className="rounded-full h-9 w-9"
           tabIndex={-1}
         >
           <Minus className="h-4 w-4" />
         </Button>
         <input
-          min="0"
+          min="1"
           max="99"
           className="w-9 text-center border-none rounded"
           type="text"
           value={amountOwned}
           onChange={(e) => {
             const val = parseInt(e.target.value, 10);
-            if (!Number.isNaN(val) && val >= 0 && val <= 99) {
+            if (!Number.isNaN(val) && val >= 1 && val <= 99) {
               setAmountOwned(val);
             }
           }}

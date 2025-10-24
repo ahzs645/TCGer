@@ -73,6 +73,6 @@ extension Color {
         if let hex = hex {
             return Color(hex: hex)
         }
-        return .blue // Default color
+        return Color(.systemGray4)
     }
 }

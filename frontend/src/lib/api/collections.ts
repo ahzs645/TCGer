@@ -1,5 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
+export const LIBRARY_COLLECTION_ID = '__library__';
+
 export interface CollectionCard {
   id: string;
   cardId: string;
@@ -139,6 +141,24 @@ export async function addCardToCollection(
   collectionId: string,
   data: AddCardToCollectionInput
 ): Promise<void> {
+  if (collectionId === LIBRARY_COLLECTION_ID) {
+    const response = await fetch(`${API_BASE_URL}/collections/cards`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to add card to collection');
+    }
+    await response.json().catch(() => null);
+    return;
+  }
+
   const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/cards`, {
     method: 'POST',
     headers: {

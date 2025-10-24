@@ -8,6 +8,7 @@ import {
   updateBinder,
   deleteBinder,
   addCardToBinder,
+  addCardToLibrary,
   removeCardFromBinder
 } from '../../modules/collections/collections.service';
 import { asyncHandler } from '../../utils/async-handler';
@@ -47,6 +48,10 @@ const addCardSchema = z.object({
     imageUrl: z.string().optional(),
     imageUrlSmall: z.string().optional()
   }).optional()
+});
+
+const addLibraryCardSchema = addCardSchema.extend({
+  binderId: z.string().optional()
 });
 
 // Get all binders for the authenticated user
@@ -108,6 +113,23 @@ collectionsRouter.delete(
       if (error instanceof Error && error.message === 'Binder not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Binder not found' });
       }
+      throw error;
+    }
+  })
+);
+
+// Add a card to library (no binder)
+collectionsRouter.post(
+  '/cards',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const data = addLibraryCardSchema.parse(req.body);
+
+    try {
+      const collection = await addCardToLibrary(userId, data);
+      res.status(201).json(collection);
+    } catch (error) {
       throw error;
     }
   })

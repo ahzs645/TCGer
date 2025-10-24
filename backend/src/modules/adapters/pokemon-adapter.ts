@@ -3,6 +3,7 @@ import { CardDTO, TcgAdapter } from './types';
 
 const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
 const CARDS_ENDPOINT = `${API_ROOT}/cards`;
+const isTCGdex = /tcgdex-cache/i.test(API_ROOT) || /tcgdex\.net/i.test(new URL(API_ROOT).hostname);
 const isRemotePokemon = /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
 const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
 const DEFAULT_REQUEST_DELAY_MS = isRemotePokemon ? 200 : 0;
@@ -45,6 +46,62 @@ interface PokemonSearchResponse {
   data: PokemonCard[];
 }
 
+interface TCGdexSearchResponse {
+  data: TCGdexCardSummary[];
+  page: number;
+  pageSize: number;
+  count: number;
+  totalCount: number;
+}
+
+interface TCGdexCardSummary {
+  id: string;
+  localId?: string;
+  name: string;
+  image?: string;
+}
+
+interface TCGdexCardDetail {
+  id: string;
+  localId?: string;
+  name: string;
+  image?: string;
+  hp?: number;
+  types?: string[];  // Available on some cards
+  stage?: string;
+  evolveFrom?: string;
+  description?: string;
+  rarity?: string;
+  category?: string;
+  illustrator?: string;
+  dexId?: number[];
+  set?: {
+    id?: string;
+    name?: string;
+    logo?: string;
+    symbol?: string;
+  };
+  attacks?: Array<{
+    name: string;
+    cost?: string[];
+    damage?: string | number;
+    effect?: string;
+  }>;
+  abilities?: Array<{
+    name: string;
+    effect?: string;
+    type?: string;
+  }>;
+  weaknesses?: Array<{ type: string; value?: string }>;
+  resistances?: Array<{ type: string; value?: string }>;
+  retreat?: number;
+  regulationMark?: string;
+  legal?: {
+    standard?: boolean;
+    expanded?: boolean;
+  };
+}
+
 interface PokemonCard {
   id: string;
   name: string;
@@ -79,6 +136,11 @@ export class PokemonAdapter implements TcgAdapter {
 
   async searchCards(query: string): Promise<CardDTO[]> {
     const trimmedQuery = query.trim();
+
+    if (isTCGdex) {
+      return this.searchTCGdex(trimmedQuery);
+    }
+
     const q = trimmedQuery ? this.buildNameQuery(trimmedQuery) : 'supertype:"Pokémon"';
     const url = new URL(CARDS_ENDPOINT);
     url.searchParams.set('q', q);
@@ -102,6 +164,29 @@ export class PokemonAdapter implements TcgAdapter {
     }
   }
 
+  private async searchTCGdex(query: string): Promise<CardDTO[]> {
+    const url = new URL(CARDS_ENDPOINT);
+    if (query) {
+      url.searchParams.set('q', query);
+    }
+    url.searchParams.set('pageSize', '20');
+
+    try {
+      const response = await rateLimitedFetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`TCGdex search failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as TCGdexSearchResponse;
+      if (!payload?.data?.length) {
+        return [];
+      }
+      return payload.data.map((card) => this.mapTCGdexCard(card));
+    } catch (error) {
+      console.error('PokemonAdapter.searchTCGdex error', error);
+      return [];
+    }
+  }
+
   async fetchCardById(externalId: string): Promise<CardDTO | null> {
     const trimmedId = externalId.trim();
     if (!trimmedId) {
@@ -115,12 +200,62 @@ export class PokemonAdapter implements TcgAdapter {
       if (!response.ok) {
         return null;
       }
+
+      if (isTCGdex) {
+        const payload = (await response.json()) as { data: TCGdexCardDetail };
+        return payload?.data ? this.mapTCGdexDetailCard(payload.data) : null;
+      }
+
       const payload = (await response.json()) as { data: PokemonCard };
       return payload?.data ? this.mapCard(payload.data) : null;
     } catch (error) {
       console.error('PokemonAdapter.fetchCardById error', error);
       return null;
     }
+  }
+
+  private mapTCGdexCard(card: TCGdexCardSummary): CardDTO {
+    // For search results, we only have summary data
+    // TCGdex image URLs need /high.webp or /low.webp suffix
+    const imageUrl = card.image ? `${card.image}/high.webp` : undefined;
+    const imageUrlSmall = card.image ? `${card.image}/low.webp` : undefined;
+
+    return {
+      id: card.id,
+      tcg: this.game,
+      name: card.name,
+      imageUrl,
+      imageUrlSmall,
+      attributes: {}
+    };
+  }
+
+  private mapTCGdexDetailCard(card: TCGdexCardDetail): CardDTO {
+    // TCGdex image URLs need /high.webp or /low.webp suffix
+    const imageUrl = card.image ? `${card.image}/high.webp` : undefined;
+    const imageUrlSmall = card.image ? `${card.image}/low.webp` : undefined;
+
+    return {
+      id: card.id,
+      tcg: this.game,
+      name: card.name,
+      setCode: card.set?.id,
+      setName: card.set?.name,
+      rarity: card.rarity,
+      imageUrl,
+      imageUrlSmall,
+      setSymbolUrl: card.set?.symbol ?? card.set?.logo,
+      attributes: {
+        hp: card.hp,
+        types: card.types,
+        evolvesFrom: card.evolveFrom,
+        attacks: card.attacks?.map((attack) => attack.name),
+        weaknesses: card.weaknesses,
+        resistances: card.resistances,
+        retreatCost: card.retreat,
+        flavorText: card.description
+      }
+    };
   }
 
   private mapCard(card: PokemonCard): CardDTO {

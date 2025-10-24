@@ -20,6 +20,14 @@ export function GameSwitcher() {
   }));
   const enabledGames = useModuleStore((state) => state.enabledGames);
 
+  // Count how many games are enabled
+  const activeCount = Object.values(enabledGames).filter(Boolean).length;
+
+  // Hide switcher if only one or no games are enabled
+  if (activeCount <= 1) {
+    return null;
+  }
+
   return (
     <ToggleGroup
       type="single"
