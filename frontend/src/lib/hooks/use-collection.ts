@@ -25,7 +25,8 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
       entry.cards.map((card) => ({
         ...card,
         binderId: card.binderId ?? entry.id,
-        binderName: card.binderName ?? entry.name
+        binderName: card.binderName ?? entry.name,
+        binderColorHex: card.binderColorHex ?? entry.colorHex
       }))
     );
 
@@ -77,7 +78,8 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
         return {
           ...card,
           binderId: collection.id,
-          binderName: collection.name
+          binderName: collection.name,
+          binderColorHex: collection.colorHex ?? card.binderColorHex
         };
       });
   }, [collection, enabledGames, game, isAllCollections, normalizedQuery]);

@@ -10,6 +10,7 @@ import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
 import type { Card } from '@/types/card';
+import { hexToRgba, normalizeHexColor } from '@/lib/color';
 
 interface CardPreviewProps {
   card: Card;
@@ -32,6 +33,10 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [selectedBinderId, setSelectedBinderId] = useState<string>(collections[0]?.id ?? '');
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const selectedBinder = collections.find((binder) => binder.id === selectedBinderId);
+  const selectedAccent = normalizeHexColor(selectedBinder?.colorHex);
+  const selectAccentFill = selectedAccent ? hexToRgba(selectedAccent, 0.12) : undefined;
+  const addButtonBackground = selectedAccent ? hexToRgba(selectedAccent, status === 'success' ? 0.22 : 0.12) : undefined;
 
   const throttledSetPos = useRef(
     throttle<[{ x: number; y: number }]>((position) => setThrottledPos(position), 50)
@@ -237,15 +242,30 @@ export function CardPreview({ card }: CardPreviewProps) {
               onValueChange={setSelectedBinderId}
               disabled={collectionsLoading || status === 'pending'}
             >
-              <SelectTrigger className="h-8 w-full text-left text-xs">
+              <SelectTrigger
+                className="h-8 w-full text-left text-xs"
+                style={selectedAccent ? { backgroundColor: selectAccentFill, borderColor: selectedAccent } : undefined}
+              >
                 <SelectValue placeholder="Select a binder" />
               </SelectTrigger>
               <SelectContent>
-                {collections.map((binder) => (
-                  <SelectItem key={binder.id} value={binder.id}>
-                    {binder.name}
-                  </SelectItem>
-                ))}
+                {collections.map((binder) => {
+                  const accent = normalizeHexColor(binder.colorHex);
+                  return (
+                    <SelectItem key={binder.id} value={binder.id}>
+                      <span className="flex items-center gap-2">
+                        {accent ? (
+                          <span
+                            className="inline-flex h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: accent }}
+                            aria-hidden="true"
+                          />
+                        ) : null}
+                        {binder.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Button
@@ -253,6 +273,7 @@ export function CardPreview({ card }: CardPreviewProps) {
               size="sm"
               onClick={handleAddToBinder}
               disabled={addDisabled}
+              style={selectedAccent ? { borderColor: selectedAccent, backgroundColor: addButtonBackground } : undefined}
             >
               {status === 'pending' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -261,6 +282,13 @@ export function CardPreview({ card }: CardPreviewProps) {
               ) : (
                 <Plus className="h-4 w-4" />
               )}
+              {selectedAccent ? (
+                <span
+                  className="inline-flex h-2 w-2 rounded-full"
+                  style={{ backgroundColor: selectedAccent }}
+                  aria-hidden="true"
+                />
+              ) : null}
               <span>{status === 'success' ? 'Added to binder' : 'Add to binder'}</span>
             </Button>
           </>

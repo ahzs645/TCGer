@@ -3,7 +3,6 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
-    @Environment(\.scrollOffset) private var scrollOffset
     @State private var collections: [Collection] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -14,14 +13,6 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                GeometryReader { geometry in
-                    Color.clear.preference(
-                        key: ScrollOffsetPreferenceKey.self,
-                        value: geometry.frame(in: .named("scroll")).minY
-                    )
-                }
-                .frame(height: 0)
-
                 VStack(spacing: 20) {
                     if isLoading {
                         ProgressView("Loading your collection...")
@@ -50,10 +41,6 @@ struct DashboardView: View {
                     }
                 }
                 .padding()
-            }
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset.wrappedValue = value
             }
             .navigationTitle("Dashboard")
             .toolbar {
