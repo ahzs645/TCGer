@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { ArrowUpRight, Coins, Library, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +28,7 @@ interface DashboardStats {
     tcg: TcgCode;
     quantity: number;
     binderName?: string;
+    binderId?: string;
     timestamp: string;
   }>;
 }
@@ -72,6 +74,7 @@ function buildDashboardStats(cards: DashboardCard[], showPricing: boolean): Dash
       tcg: card.tcg,
       quantity: Math.max(card.quantity ?? 0, 0),
       binderName: card.binderName,
+      binderId: card.binderId,
       timestamp: card.updatedAt ?? new Date().toISOString()
     });
     if (stats.recentActivity.length >= 5) break;
@@ -184,12 +187,14 @@ export function DashboardContent() {
             description="Across all tracked TCGs"
             icon={<Library className="h-5 w-5" />}
           />
-          <StatCard
-            title="Estimated Value"
-            value={showPricing ? `$${stats.totalValue.toFixed(2)}` : 'Hidden'}
-            description={showPricing ? 'Based on collection pricing' : 'Enable pricing in preferences'}
-            icon={<Coins className="h-5 w-5" />}
-          />
+          {showPricing ? (
+            <StatCard
+              title="Estimated Value"
+              value={`$${stats.totalValue.toFixed(2)}`}
+              description="Based on collection pricing"
+              icon={<Coins className="h-5 w-5" />}
+            />
+          ) : null}
           <StatCard
             title="Active Games"
             value={Object.values(stats.byGame).filter((info) => info.copies > 0).length}
@@ -281,6 +286,7 @@ function RecentActivity({
     tcg: TcgCode;
     quantity: number;
     binderName?: string;
+    binderId?: string;
     timestamp: string;
   }>;
 }) {
@@ -294,7 +300,11 @@ function RecentActivity({
         <div className="space-y-4">
           {items.length === 0 && <p className="text-sm text-muted-foreground">No activity yet.</p>}
           {items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
+            <Link
+              key={item.id}
+              href={item.binderId ? `/collections?binder=${encodeURIComponent(item.binderId)}` : '/collections'}
+              className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4 transition hover:border-primary/50 hover:bg-muted/40"
+            >
               <div>
                 <p className="text-sm font-semibold leading-none">{item.name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -309,7 +319,7 @@ function RecentActivity({
                   day: 'numeric'
                 })}
               </time>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

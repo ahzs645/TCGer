@@ -65,12 +65,8 @@ async function downloadBulk(entry) {
 
   const tempPath = `${targetPath}.tmp`;
   const writer = createWriteStream(tempPath);
-  if ((entry.content_encoding || '').toLowerCase() === 'gzip') {
-    const gunzip = createGunzip();
-    await pipeline(response.body, gunzip, writer);
-  } else {
-    await pipeline(response.body, writer);
-  }
+  // fetch() automatically decompresses gzip, so we don't need to decompress again
+  await pipeline(response.body, writer);
   await rename(tempPath, targetPath);
 
   const files = await readdir(config.dataDir);
