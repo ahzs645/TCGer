@@ -95,45 +95,12 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'tcg-auth-store',
-      version: 2,
       partialize: (state) => ({
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
         setupRequired: state.setupRequired
-      }),
-      merge: (persistedState, currentState) => {
-        const persisted =
-          (persistedState as { state?: Partial<AuthState> })?.state ??
-          ((persistedState ?? {}) as Partial<AuthState>);
-
-        const merged = {
-          ...currentState,
-          ...persisted,
-          user: withDisplayDefaults(persisted.user ?? null)
-        };
-
-        merged.setAuth = currentState.setAuth;
-        merged.clearAuth = currentState.clearAuth;
-        merged.setSetupRequired = currentState.setSetupRequired;
-        merged.updateStoredPreferences = currentState.updateStoredPreferences;
-
-        return merged;
-      },
-      migrate: (persistedState, version) => {
-        if (version >= 2) {
-          return persistedState;
-        }
-
-        const state =
-          (persistedState as { state?: Partial<AuthState> })?.state ??
-          ((persistedState ?? {}) as Partial<AuthState>);
-
-        return {
-          ...state,
-          user: withDisplayDefaults(state.user ?? null)
-        };
-      }
+      })
     }
   )
 );
@@ -146,6 +113,16 @@ useAuthStore.subscribe((state, previousState) => {
   }
 
   if (state.user) {
+    const normalized = withDisplayDefaults(state.user);
+    if (
+      normalized?.showCardNumbers !== state.user.showCardNumbers ||
+      normalized?.showPricing !== state.user.showPricing
+    ) {
+      useAuthStore.setState({ user: normalized });
+      syncDisplayPreferences(normalized ?? undefined);
+      return;
+    }
+
     syncDisplayPreferences(state.user);
   } else {
     syncDisplayPreferences();

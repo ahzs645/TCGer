@@ -3,11 +3,13 @@ import { prisma } from '../../lib/prisma';
 export interface CreateBinderInput {
   name: string;
   description?: string;
+  colorHex?: string;
 }
 
 export interface UpdateBinderInput {
   name?: string;
   description?: string;
+  colorHex?: string;
 }
 
 export interface AddCardToBinderInput {
@@ -49,6 +51,7 @@ export async function getUserBinders(userId: string) {
     id: binder.id,
     name: binder.name,
     description: binder.description ?? '',
+    colorHex: binder.colorHex,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: binder.collections.map((collection) => {
@@ -106,7 +109,8 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     data: {
       userId,
       name: input.name,
-      description: input.description
+      description: input.description,
+      colorHex: input.colorHex
     }
   });
 
@@ -114,6 +118,7 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     id: binder.id,
     name: binder.name,
     description: binder.description ?? '',
+    colorHex: binder.colorHex,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: []
@@ -134,7 +139,8 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     where: { id: binderId },
     data: {
       name: input.name ?? binder.name,
-      description: input.description ?? binder.description
+      description: input.description ?? binder.description,
+      colorHex: input.colorHex ?? binder.colorHex
     }
   });
 
@@ -142,6 +148,7 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     id: updated.id,
     name: updated.name,
     description: updated.description ?? '',
+    colorHex: updated.colorHex,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString()
   };

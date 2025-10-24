@@ -182,15 +182,17 @@ actor APIService {
     struct CreateCollectionRequest: Encodable {
         let name: String
         let description: String?
+        let colorHex: String?
     }
 
     func createCollection(
         config: ServerConfiguration,
         token: String,
         name: String,
-        description: String?
+        description: String?,
+        colorHex: String? = nil
     ) async throws -> Collection {
-        let body = CreateCollectionRequest(name: name, description: description)
+        let body = CreateCollectionRequest(name: name, description: description, colorHex: colorHex)
         let (data, httpResponse) = try await makeRequest(
             config: config,
             path: "collections",

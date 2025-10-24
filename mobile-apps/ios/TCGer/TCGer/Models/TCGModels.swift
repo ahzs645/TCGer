@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Card Models
 struct Card: Identifiable, Codable, Hashable {

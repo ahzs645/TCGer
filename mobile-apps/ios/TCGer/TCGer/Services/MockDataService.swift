@@ -32,7 +32,8 @@ actor MockDataService {
             description: description,
             cards: [],
             createdAt: ISO8601DateFormatter().string(from: Date()),
-            updatedAt: ISO8601DateFormatter().string(from: Date())
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            colorHex: nil
         )
 
         collections.append(newCollection)

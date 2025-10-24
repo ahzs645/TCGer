@@ -21,6 +21,8 @@ export interface CollectionCard extends Card {
   price?: number;
   acquisitionPrice?: number;
   priceHistory?: number[];
+  binderId?: string;
+  binderName?: string;
 }
 
 export interface SearchCardsResponse {
