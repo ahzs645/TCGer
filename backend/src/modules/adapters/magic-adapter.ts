@@ -91,12 +91,12 @@ export class MagicAdapter implements TcgAdapter {
       }
       const payload = (await response.json()) as ScryfallSearchResponse;
       if (!payload?.data?.length) {
-        return [this.buildFallback(trimmedQuery)];
+        return [];
       }
       return payload.data.slice(0, 20).map((card) => this.mapCard(card));
     } catch (error) {
       console.error('MagicAdapter.searchCards error', error);
-      return [this.buildFallback(trimmedQuery)];
+      return [];
     }
   }
 

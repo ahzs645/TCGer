@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { LogIn } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,6 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((state) => state.setAuth);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +35,8 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
       setPassword('');
       onOpenChange(false);
 
-      // Refresh the page to re-evaluate authentication requirements
-      router.refresh();
+      // The SetupGuard will automatically re-render when isAuthenticated changes
+      // No need for router.refresh() which can cause race conditions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

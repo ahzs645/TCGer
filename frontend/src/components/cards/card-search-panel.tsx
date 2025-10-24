@@ -74,7 +74,7 @@ export function CardSearchPanel() {
   }, [fetchCollections, hasFetched, isAuthenticated, token]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
       <Card className="h-fit border-dashed">
         <CardHeader>
           <CardTitle>Search Parameters</CardTitle>
@@ -175,7 +175,7 @@ export function CardSearchPanel() {
           {isFetching && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[600px]">
+          <ScrollArea className="h-[calc(100vh-280px)]">
             <div className="p-6 space-y-8">
               {cards.length === 0 && !isFetching ? (
                 <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
