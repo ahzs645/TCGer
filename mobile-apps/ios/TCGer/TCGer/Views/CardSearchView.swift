@@ -63,6 +63,7 @@ struct CardSearchView: View {
                         cards: searchResults,
                         selectedGame: selectedGame,
                         enabledGames: environmentStore.enabledGames,
+                        showPricing: environmentStore.showPricing,
                         onCardTap: { card in
                             selectedCard = card
                         }
@@ -216,6 +217,7 @@ private struct SearchResultsList: View {
     let cards: [Card]
     let selectedGame: TCGGame
     let enabledGames: [TCGGame]
+    let showPricing: Bool
     let onCardTap: (Card) -> Void
 
     // Group cards by TCG
@@ -244,7 +246,7 @@ private struct SearchResultsList: View {
                             GridItem(.flexible())
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
-                                CardCell(card: card)
+                                CardCell(card: card, showPricing: showPricing)
                                     .onTapGesture {
                                         onCardTap(card)
                                     }
@@ -274,6 +276,7 @@ private struct SearchResultsList: View {
 // MARK: - Card Cell
 private struct CardCell: View {
     let card: Card
+    let showPricing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -336,7 +339,7 @@ private struct CardCell: View {
                         .lineLimit(1)
                 }
 
-                if let price = card.price {
+                if showPricing, let price = card.price {
                     Text("$\(String(format: "%.2f", price))")
                         .font(.caption2)
                         .fontWeight(.semibold)

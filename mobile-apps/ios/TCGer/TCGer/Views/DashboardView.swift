@@ -22,13 +22,17 @@ struct DashboardView: View {
                         }
                     } else {
                         // Stats Section
-                        StatsSection(collections: collections)
+                        StatsSection(
+                            collections: collections,
+                            showPricing: environmentStore.showPricing
+                        )
 
                         // Recent Collections
                         if !collections.isEmpty {
                             RecentCollectionsSection(
                                 collections: Array(collections.prefix(3)),
-                                selectedCollection: $selectedCollection
+                                selectedCollection: $selectedCollection,
+                                showPricing: environmentStore.showPricing
                             )
                         } else {
                             EmptyStateView()
@@ -82,6 +86,7 @@ struct DashboardView: View {
 // MARK: - Stats Section
 private struct StatsSection: View {
     let collections: [Collection]
+    let showPricing: Bool
 
     var totalCards: Int {
         collections.reduce(0) { $0 + $1.uniqueCards }
@@ -107,7 +112,13 @@ private struct StatsSection: View {
 
             HStack(spacing: 12) {
                 StatCard(title: "Total Copies", value: "\(totalCopies)", icon: "square.on.square")
-                StatCard(title: "Est. Value", value: "$\(String(format: "%.2f", totalValue))", icon: "dollarsign.circle.fill")
+                if showPricing {
+                    StatCard(
+                        title: "Est. Value",
+                        value: "$\(String(format: "%.2f", totalValue))",
+                        icon: "dollarsign.circle.fill"
+                    )
+                }
             }
         }
     }
@@ -144,6 +155,7 @@ private struct StatCard: View {
 private struct RecentCollectionsSection: View {
     let collections: [Collection]
     @Binding var selectedCollection: Collection?
+    let showPricing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -151,7 +163,7 @@ private struct RecentCollectionsSection: View {
                 .font(.headline)
 
             ForEach(collections) { collection in
-                CollectionRowView(collection: collection)
+                CollectionRowView(collection: collection, showPricing: showPricing)
                     .onTapGesture {
                         selectedCollection = collection
                     }
@@ -162,21 +174,22 @@ private struct RecentCollectionsSection: View {
 
 private struct CollectionRowView: View {
     let collection: Collection
+    let showPricing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(collection.name)
-                        .font(.headline)
-                    if let description = collection.description {
-                        Text(description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
-                }
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color.fromHex(collection.colorHex))
+                    .frame(width: 14, height: 14)
+                    .shadow(color: Color.fromHex(collection.colorHex).opacity(0.4), radius: 4, x: 0, y: 2)
+
+                Text(collection.name)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+
                 Spacer()
+
                 Image(systemName: "chevron.right")
                     .foregroundColor(.secondary)
             }
@@ -192,10 +205,12 @@ private struct CollectionRowView: View {
 
                 Spacer()
 
-                Text("$\(String(format: "%.2f", collection.totalValue))")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.accentColor)
+                if showPricing {
+                    Text("$\(String(format: "%.2f", collection.totalValue))")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
             }
         }
         .padding()

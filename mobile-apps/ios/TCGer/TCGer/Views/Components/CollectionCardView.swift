@@ -2,15 +2,16 @@ import SwiftUI
 
 struct CollectionCardView: View {
     let collection: Collection
+    let showPricing: Bool
     @Namespace private var namespace
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             // Header with color dot and name
             HStack(spacing: 12) {
                 Circle()
                     .fill(Color.fromHex(collection.colorHex))
-                    .frame(width: 12, height: 12)
+                    .frame(width: 14, height: 14)
                     .shadow(color: Color.fromHex(collection.colorHex).opacity(0.4), radius: 4, x: 0, y: 2)
 
                 Text(collection.name)
@@ -25,18 +26,8 @@ struct CollectionCardView: View {
                     .foregroundColor(.secondary)
             }
 
-            // Description (if available)
-            if let description = collection.description, !description.isEmpty {
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-
             // Card Preview Strip
             CardPreviewStrip(cards: collection.cards)
-
-            Divider()
 
             // Stats Row
             HStack(spacing: 16) {
@@ -56,13 +47,15 @@ struct CollectionCardView: View {
 
                 Spacer()
 
-                Text("$\(collection.totalValue, specifier: "%.2f")")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.green)
+                if showPricing {
+                    Text("$\(collection.totalValue, specifier: "%.2f")")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
             }
 
-            // Updated timestamp
+            // Updated timestamp and game badges
             HStack {
                 Text("Updated \(formatRelativeDate(collection.updatedAt))")
                     .font(.caption2)
@@ -172,7 +165,8 @@ struct GameBadge: View {
                     createdAt: "2025-10-12T09:00:00Z",
                     updatedAt: "2025-10-23T09:00:00Z",
                     colorHex: "90CAF9"
-                )
+                ),
+                showPricing: true
             )
 
             CollectionCardView(
@@ -184,7 +178,8 @@ struct GameBadge: View {
                     createdAt: "2025-10-23T09:00:00Z",
                     updatedAt: "2025-10-23T09:00:00Z",
                     colorHex: "E57373"
-                )
+                ),
+                showPricing: true
             )
         }
         .padding()

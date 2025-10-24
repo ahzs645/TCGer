@@ -9,6 +9,8 @@ struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
+    @State private var showingProfile = false
+
     var body: some View {
         NavigationView {
             Form {
@@ -30,6 +32,20 @@ struct SettingsView: View {
                             .foregroundColor(.accentColor)
                     }
                     .padding(.vertical, 4)
+
+                    if environmentStore.isAuthenticated {
+                        Button(action: { showingProfile = true }) {
+                            HStack {
+                                Image(systemName: "person.text.rectangle")
+                                    .foregroundColor(.accentColor)
+                                Text("View Profile")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Account")
                 }
@@ -160,6 +176,10 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("This will remove your server address, login credentials, and authentication token.")
+            }
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
+                    .environmentObject(environmentStore)
             }
         }
     }
