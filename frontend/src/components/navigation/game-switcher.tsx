@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { supportedGames, useGameFilterStore } from '@/stores/game-filter';
+import { useModuleStore } from '@/stores/preferences';
 
 const iconPaths: Record<Exclude<SupportedGame, 'all'>, string> = {
   yugioh: '/icons/Yugioh.svg',
@@ -17,6 +18,7 @@ export function GameSwitcher() {
     selectedGame: state.selectedGame,
     setGame: state.setGame
   }));
+  const enabledGames = useModuleStore((state) => state.enabledGames);
 
   return (
     <ToggleGroup
@@ -32,6 +34,9 @@ export function GameSwitcher() {
               All
             </ToggleGroupItem>
           );
+        }
+        if (!enabledGames[game]) {
+          return null;
         }
         const iconPath = iconPaths[game];
         const isSelected = selectedGame === game;

@@ -51,19 +51,56 @@ struct AddCardToBinderSheet: View {
                         }
                         .padding(.vertical, 8)
                     } else {
-                        Picker("Select Binder", selection: $selectedBinderId) {
-                            Text("Select a binder...").tag(nil as String?)
-                            ForEach(collections) { collection in
-                                HStack {
-                                    Circle()
-                                        .fill(Color.fromHex(collection.colorHex))
-                                        .frame(width: 12, height: 12)
-                                    Text(collection.name)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Menu {
+                                ForEach(collections) { collection in
+                                    Button {
+                                        selectedBinderId = collection.id
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            Circle()
+                                                .fill(Color.fromHex(collection.colorHex))
+                                                .frame(width: 14, height: 14)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(collection.name)
+                                                if let description = collection.description, !description.isEmpty {
+                                                    Text(description)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                                .tag(collection.id as String?)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
+                                        .frame(width: 14, height: 14)
+                                    Text(collection(for: selectedBinderId)?.name ?? "Select a binder...")
+                                        .foregroundColor(selectedBinderId == nil ? .secondary : .primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(.systemGray6))
+                                )
+                            }
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
+                                    .frame(width: 10, height: 10)
+                                Text(collection(for: selectedBinderId)?.name ?? "No binder selected")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                        .pickerStyle(.menu)
                     }
                 } header: {
                     Text("Binder")
@@ -178,6 +215,11 @@ struct AddCardToBinderSheet: View {
 
         isAdding = false
         dismiss()
+    }
+
+    private func collection(for id: String?) -> Collection? {
+        guard let id else { return nil }
+        return collections.first { $0.id == id }
     }
 }
 
