@@ -33,7 +33,12 @@ struct ServerConfiguration: Codable, Equatable {
 
     func endpoint(path: String) -> URL? {
         guard let base = normalizedURL else { return nil }
-        return base.appendingPathComponent(path)
+        // Don't use appendingPathComponent as it URL-encodes query strings
+        var baseString = base.absoluteString
+        if !baseString.hasSuffix("/") {
+            baseString += "/"
+        }
+        return URL(string: baseString + path)
     }
 
     var backendCandidates: [ServerConfiguration] {

@@ -49,6 +49,7 @@ export async function getUserBinders(userId: string) {
     id: binder.id,
     name: binder.name,
     description: binder.description ?? '',
+    createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: binder.collections.map((collection) => {
       const card = collection.card;
@@ -81,7 +82,8 @@ export async function getUserBinders(userId: string) {
       }
 
       return {
-        id: card.id,
+        id: collection.id,
+        cardId: card.id,
         tcg: tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
         name: card.name,
         setCode: card.setCode ?? undefined,
@@ -89,15 +91,11 @@ export async function getUserBinders(userId: string) {
         rarity: card.rarity ?? undefined,
         imageUrl: card.imageUrl ?? undefined,
         imageUrlSmall: card.imageUrlSmall ?? undefined,
-        setSymbolUrl: undefined, // TODO: Add to schema if needed
-        attributes,
         quantity: collection.quantity,
         condition: collection.condition ?? undefined,
         language: collection.language ?? undefined,
         notes: collection.notes ?? undefined,
-        price: collection.price ? parseFloat(collection.price.toString()) : undefined,
-        acquisitionPrice: collection.acquisitionPrice ? parseFloat(collection.acquisitionPrice.toString()) : undefined,
-        priceHistory: card.priceHistory.map(ph => parseFloat(ph.price?.toString() ?? '0'))
+        price: collection.price ? parseFloat(collection.price.toString()) : undefined
       };
     })
   }));
@@ -116,6 +114,7 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     id: binder.id,
     name: binder.name,
     description: binder.description ?? '',
+    createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: []
   };
@@ -143,6 +142,7 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     id: updated.id,
     name: updated.name,
     description: updated.description ?? '',
+    createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString()
   };
 }
