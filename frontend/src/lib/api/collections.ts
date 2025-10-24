@@ -6,6 +6,7 @@ export interface CollectionCard {
   name: string;
   tcg: string;
   setCode?: string;
+  setName?: string;
   rarity?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
@@ -22,6 +23,7 @@ export interface Collection {
   id: string;
   name: string;
   description?: string;
+  colorHex?: string;
   cards: CollectionCard[];
   createdAt: string;
   updatedAt: string;
@@ -44,6 +46,16 @@ export interface AddCardToCollectionInput {
   language?: string;
   notes?: string;
   price?: number;
+  cardData?: {
+    name: string;
+    tcg: string;
+    externalId: string;
+    setCode?: string;
+    setName?: string;
+    rarity?: string;
+    imageUrl?: string;
+    imageUrlSmall?: string;
+  };
 }
 
 export async function getCollections(token: string): Promise<Collection[]> {
@@ -126,7 +138,7 @@ export async function addCardToCollection(
   token: string,
   collectionId: string,
   data: AddCardToCollectionInput
-): Promise<Collection> {
+): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/cards`, {
     method: 'POST',
     headers: {
@@ -140,8 +152,7 @@ export async function addCardToCollection(
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Failed to add card to collection');
   }
-
-  return response.json();
+  await response.json().catch(() => null);
 }
 
 export async function removeCardFromCollection(

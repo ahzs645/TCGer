@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import Image from 'next/image';
-import { Minus, Plus } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Check, Loader2, Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useModuleStore } from '@/stores/preferences';
+import { useCollectionsStore } from '@/stores/collections';
+import { useAuthStore } from '@/stores/auth';
 import type { Card } from '@/types/card';
 
 interface CardPreviewProps {
@@ -19,6 +21,17 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [throttledPos, setThrottledPos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [amountOwned, setAmountOwned] = useState(0);
+  const { token, isAuthenticated } = useAuthStore();
+  const { collections, addCardToBinder, isLoading: collectionsLoading, hasFetched } = useCollectionsStore((state) => ({
+    collections: state.collections,
+    addCardToBinder: state.addCardToBinder,
+    isLoading: state.isLoading,
+    hasFetched: state.hasFetched
+  }));
+  const isSignedIn = isAuthenticated && Boolean(token);
+  const [selectedBinderId, setSelectedBinderId] = useState<string>(collections[0]?.id ?? '');
+  const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const throttledSetPos = useRef(
     throttle<[{ x: number; y: number }]>((position) => setThrottledPos(position), 50)
@@ -63,8 +76,65 @@ export function CardPreview({ card }: CardPreviewProps) {
     height: 'auto'
   };
 
+  useEffect(() => {
+    if (!collections.length) {
+      setSelectedBinderId('');
+      return;
+    }
+
+    if (!selectedBinderId || !collections.some((binder) => binder.id === selectedBinderId)) {
+      setSelectedBinderId(collections[0].id);
+    }
+  }, [collections, selectedBinderId]);
+
+  const handleAddToBinder = async () => {
+    if (!isSignedIn) {
+      setStatus('error');
+      setStatusMessage('Sign in to add cards to a binder.');
+      return;
+    }
+
+    if (!selectedBinderId) {
+      setStatus('error');
+      setStatusMessage('Create a binder first.');
+      return;
+    }
+
+    const quantity = Math.max(1, Number.isFinite(amountOwned) ? amountOwned : 1);
+    setStatus('pending');
+    setStatusMessage(null);
+
+    try {
+      await addCardToBinder(token, selectedBinderId, {
+        cardId: card.id,
+        quantity,
+        cardData: {
+          name: card.name,
+          tcg: card.tcg,
+          externalId: card.id,
+          setCode: card.setCode,
+          setName: card.setName,
+          rarity: card.rarity,
+          imageUrl: card.imageUrl,
+          imageUrlSmall: card.imageUrlSmall
+        }
+      });
+      setAmountOwned(0);
+      setStatus('success');
+      setTimeout(() => {
+        setStatus('idle');
+      }, 2000);
+    } catch (error) {
+      setStatus('error');
+      setStatusMessage(error instanceof Error ? error.message : 'Unable to add card to binder.');
+    }
+  };
+
+  const addDisabled = !selectedBinderId || status === 'pending' || collectionsLoading;
+  const showEmptyBindersMessage = hasFetched && collections.length === 0;
+
   return (
-    <div className="group flex flex-col items-center rounded-lg basis-1/5 min-w-0 px-1 sm:px-2">
+    <div className="group flex min-w-0 basis-1/5 flex-col items-center rounded-lg px-1 sm:px-2">
       <button type="button" className="cursor-pointer w-full">
         <div
           style={{
@@ -126,7 +196,7 @@ export function CardPreview({ card }: CardPreviewProps) {
           <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
         )}
       </div>
-      <div className="flex items-center gap-x-1 mt-2">
+      <div className="mt-2 flex items-center gap-x-1">
         <Button
           variant="ghost"
           size="icon"
@@ -158,6 +228,57 @@ export function CardPreview({ card }: CardPreviewProps) {
         >
           <Plus className="h-4 w-4" />
         </Button>
+      </div>
+      <div className="mt-3 w-full space-y-2 text-xs">
+        {collections.length ? (
+          <>
+            <Select
+              value={selectedBinderId || undefined}
+              onValueChange={setSelectedBinderId}
+              disabled={collectionsLoading || status === 'pending'}
+            >
+              <SelectTrigger className="h-8 w-full text-left text-xs">
+                <SelectValue placeholder="Select a binder" />
+              </SelectTrigger>
+              <SelectContent>
+                {collections.map((binder) => (
+                  <SelectItem key={binder.id} value={binder.id}>
+                    {binder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              className="w-full justify-center gap-2 text-xs"
+              size="sm"
+              onClick={handleAddToBinder}
+              disabled={addDisabled}
+            >
+              {status === 'pending' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : status === 'success' ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              <span>{status === 'success' ? 'Added to binder' : 'Add to binder'}</span>
+            </Button>
+          </>
+        ) : (
+          <p className="text-center text-muted-foreground">
+            {!isSignedIn
+              ? 'Sign in to add cards to your binders.'
+              : showEmptyBindersMessage
+                ? 'Create a binder from the collection page to start adding cards.'
+                : 'Loading binders...'}
+          </p>
+        )}
+        {status === 'error' && statusMessage ? (
+          <p className="text-center text-destructive">{statusMessage}</p>
+        ) : null}
+        {status === 'success' && !statusMessage ? (
+          <p className="text-center text-emerald-600">Card added!</p>
+        ) : null}
       </div>
     </div>
   );

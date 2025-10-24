@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Search as SearchIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,8 @@ import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { useCardSearch } from '@/lib/hooks/use-card-search';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
+import { useCollectionsStore } from '@/stores/collections';
+import { useAuthStore } from '@/stores/auth';
 import type { Card as CardType } from '@/types/card';
 
 import { CardPreview } from './card-preview';
@@ -29,6 +31,11 @@ export function CardSearchPanel() {
     setGame: state.setGame
   }));
   const enabledGames = useModuleStore((state) => state.enabledGames);
+  const { token, isAuthenticated } = useAuthStore();
+  const { fetchCollections, hasFetched } = useCollectionsStore((state) => ({
+    fetchCollections: state.fetchCollections,
+    hasFetched: state.hasFetched
+  }));
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,6 +62,16 @@ export function CardSearchPanel() {
       void refetch();
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      return;
+    }
+
+    if (!hasFetched) {
+      fetchCollections(token);
+    }
+  }, [fetchCollections, hasFetched, isAuthenticated, token]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">

@@ -10,9 +10,6 @@ struct SettingsView: View {
     @State private var showingResetAlert = false
     @State private var showCardNumbers = false
     @State private var showPricing = true
-    @AppStorage("enabledYugioh") private var enabledYugioh = true
-    @AppStorage("enabledMagic") private var enabledMagic = true
-    @AppStorage("enabledPokemon") private var enabledPokemon = true
 
     var body: some View {
         NavigationView {
@@ -61,7 +58,7 @@ struct SettingsView: View {
 
                 // TCG Modules Section
                 Section {
-                    Toggle(isOn: $enabledYugioh) {
+                    Toggle(isOn: $environmentStore.enabledYugioh) {
                         HStack {
                             Image("YugiohIcon")
                                 .resizable()
@@ -72,7 +69,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Toggle(isOn: $enabledMagic) {
+                    Toggle(isOn: $environmentStore.enabledMagic) {
                         HStack {
                             Image("MTGIcon")
                                 .resizable()
@@ -83,7 +80,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Toggle(isOn: $enabledPokemon) {
+                    Toggle(isOn: $environmentStore.enabledPokemon) {
                         HStack {
                             Image("PokemonIcon")
                                 .resizable()

@@ -1,6 +1,6 @@
 import Foundation
 
-struct ServerConfiguration: Codable, Equatable {
+struct ServerConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
 
     init(baseURL: String) {
@@ -42,7 +42,7 @@ struct ServerConfiguration: Codable, Equatable {
     }
 
     var backendCandidates: [ServerConfiguration] {
-        guard var baseComponents = URLComponents(string: baseURL) else { return [self] }
+        guard let baseComponents = URLComponents(string: baseURL) else { return [self] }
 
         func appendCandidate(from components: URLComponents, to list: inout [ServerConfiguration]) {
             guard let urlString = components.url?.absoluteString else { return }
@@ -93,7 +93,7 @@ struct ServerConfiguration: Codable, Equatable {
     static let empty = ServerConfiguration(baseURL: "")
 }
 
-struct LoginCredentials: Codable, Equatable {
+struct LoginCredentials: Codable, Equatable, Sendable {
     var email: String = ""
     var password: String = ""
 

@@ -7,6 +7,9 @@ final class EnvironmentStore: ObservableObject {
     @Published var isAuthenticated: Bool
     @Published var authToken: String?
     @Published var isServerVerified: Bool
+    @Published var enabledYugioh: Bool
+    @Published var enabledMagic: Bool
+    @Published var enabledPokemon: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -17,6 +20,9 @@ final class EnvironmentStore: ObservableObject {
         static let authenticated = "tcg.manager.authenticated"
         static let token = "tcg.manager.auth.token"
         static let verified = "tcg.manager.server.verified"
+        static let enabledYugioh = "enabledYugioh"
+        static let enabledMagic = "enabledMagic"
+        static let enabledPokemon = "enabledPokemon"
     }
 
     init() {
@@ -37,6 +43,25 @@ final class EnvironmentStore: ObservableObject {
         isAuthenticated = storage.bool(forKey: Keys.authenticated)
         authToken = storage.string(forKey: Keys.token)
         isServerVerified = storage.bool(forKey: Keys.verified)
+
+        // Load enabled games, defaulting to true if not set
+        if storage.object(forKey: Keys.enabledYugioh) == nil {
+            enabledYugioh = true
+        } else {
+            enabledYugioh = storage.bool(forKey: Keys.enabledYugioh)
+        }
+
+        if storage.object(forKey: Keys.enabledMagic) == nil {
+            enabledMagic = true
+        } else {
+            enabledMagic = storage.bool(forKey: Keys.enabledMagic)
+        }
+
+        if storage.object(forKey: Keys.enabledPokemon) == nil {
+            enabledPokemon = true
+        } else {
+            enabledPokemon = storage.bool(forKey: Keys.enabledPokemon)
+        }
 
         $serverConfiguration
             .dropFirst()
@@ -77,6 +102,44 @@ final class EnvironmentStore: ObservableObject {
                 self?.storage.set(flag, forKey: Keys.verified)
             }
             .store(in: &cancellables)
+
+        $enabledYugioh
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledYugioh)
+            }
+            .store(in: &cancellables)
+
+        $enabledMagic
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledMagic)
+            }
+            .store(in: &cancellables)
+
+        $enabledPokemon
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledPokemon)
+            }
+            .store(in: &cancellables)
+    }
+
+    var enabledGames: [TCGGame] {
+        var games: [TCGGame] = []
+        if enabledYugioh { games.append(.yugioh) }
+        if enabledMagic { games.append(.magic) }
+        if enabledPokemon { games.append(.pokemon) }
+        return games
+    }
+
+    func isGameEnabled(_ game: TCGGame) -> Bool {
+        switch game {
+        case .all: return true
+        case .yugioh: return enabledYugioh
+        case .magic: return enabledMagic
+        case .pokemon: return enabledPokemon
+        }
     }
 
     func storeToken(_ token: String) {

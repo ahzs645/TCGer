@@ -31,7 +31,18 @@ const addCardSchema = z.object({
   language: z.string().optional(),
   notes: z.string().optional(),
   price: z.number().optional(),
-  acquisitionPrice: z.number().optional()
+  acquisitionPrice: z.number().optional(),
+  // Card data for creating card if it doesn't exist
+  cardData: z.object({
+    name: z.string(),
+    tcg: z.string(),
+    externalId: z.string(),
+    setCode: z.string().optional(),
+    setName: z.string().optional(),
+    rarity: z.string().optional(),
+    imageUrl: z.string().optional(),
+    imageUrlSmall: z.string().optional()
+  }).optional()
 });
 
 // Get all binders for the authenticated user

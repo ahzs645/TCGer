@@ -20,6 +20,16 @@ export interface AddCardToBinderInput {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  cardData?: {
+    name: string;
+    tcg: string;
+    externalId: string;
+    setCode?: string;
+    setName?: string;
+    rarity?: string;
+    imageUrl?: string;
+    imageUrlSmall?: string;
+  };
 }
 
 export async function getUserBinders(userId: string) {
@@ -179,11 +189,45 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
     throw new Error('Binder not found');
   }
 
+  // Check if card exists, create if not
+  let cardId = input.cardId;
+  const existingCard = await prisma.card.findUnique({
+    where: { id: cardId }
+  });
+
+  if (!existingCard && input.cardData) {
+    // Get TCG game ID
+    const tcgGame = await prisma.tcgGame.findFirst({
+      where: { code: input.cardData.tcg }
+    });
+
+    if (!tcgGame) {
+      throw new Error(`TCG game '${input.cardData.tcg}' not found`);
+    }
+
+    // Create the card
+    const newCard = await prisma.card.create({
+      data: {
+        id: cardId,
+        tcgGameId: tcgGame.id,
+        externalId: input.cardData.externalId,
+        name: input.cardData.name,
+        setCode: input.cardData.setCode,
+        setName: input.cardData.setName,
+        rarity: input.cardData.rarity,
+        imageUrl: input.cardData.imageUrl,
+        imageUrlSmall: input.cardData.imageUrlSmall
+      }
+    });
+  } else if (!existingCard) {
+    throw new Error('Card not found and no card data provided');
+  }
+
   // Create collection entry
   const collection = await prisma.collection.create({
     data: {
       userId,
-      cardId: input.cardId,
+      cardId,
       binderId,
       quantity: input.quantity,
       condition: input.condition,
