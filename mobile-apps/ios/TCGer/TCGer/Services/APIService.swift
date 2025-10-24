@@ -215,6 +215,43 @@ final class APIService {
         return collection
     }
 
+    struct UpdateCollectionRequest: Encodable {
+        let name: String?
+        let description: String?
+        let colorHex: String?
+    }
+
+    func updateCollection(
+        config: ServerConfiguration,
+        token: String,
+        id: String,
+        name: String? = nil,
+        description: String? = nil,
+        colorHex: String? = nil
+    ) async throws -> Collection {
+        let body = UpdateCollectionRequest(name: name, description: description, colorHex: colorHex)
+        let (data, httpResponse) = try await makeRequest(
+            config: config,
+            path: "collections/\(id)",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+
+        guard let collection = try? JSONDecoder().decode(Collection.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return collection
+    }
+
     func deleteCollection(
         config: ServerConfiguration,
         token: String,

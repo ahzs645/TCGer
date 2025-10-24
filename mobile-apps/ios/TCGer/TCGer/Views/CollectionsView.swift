@@ -204,6 +204,10 @@ struct CollectionDetailView: View {
     @State private var editedDescription: String
     @State private var selectedColor: Color
     @State private var showingAddCard = false
+    @State private var errorMessage: String?
+    @State private var isSaving = false
+
+    private let apiService = APIService()
 
     init(collection: Collection) {
         self.collection = collection
@@ -307,11 +311,12 @@ struct CollectionDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
                         if isEditing {
-                            Button("Save") {
-                                // TODO: Save changes
-                                isEditing = false
+                            Button(isSaving ? "Saving..." : "Save") {
+                                Task {
+                                    await saveChanges()
+                                }
                             }
-                            .disabled(editedName.isEmpty)
+                            .disabled(editedName.isEmpty || isSaving)
                             .foregroundColor(.green)
                             .fontWeight(.semibold)
                         } else {
@@ -329,6 +334,49 @@ struct CollectionDetailView: View {
             .sheet(isPresented: $showingAddCard) {
                 AddCardToBinderFromSearchView(binderId: collection.id)
             }
+            .alert("Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                if let error = errorMessage {
+                    Text(error)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func saveChanges() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+
+        do {
+            _ = try await apiService.updateCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                id: collection.id,
+                name: editedName,
+                description: editedDescription.isEmpty ? nil : editedDescription,
+                colorHex: selectedColor.toHex()
+            )
+
+            isEditing = false
+            isSaving = false
+
+            // Dismiss to let parent views refresh their data
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isSaving = false
         }
     }
 }
