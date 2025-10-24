@@ -24,7 +24,11 @@ struct CollectionsView: View {
                         showingCreateSheet = true
                     })
                 } else {
-                    CollectionsList(collections: collections, selectedCollection: $selectedCollection)
+                    CollectionsList(
+                        collections: collections,
+                        selectedCollection: $selectedCollection,
+                        showPricing: environmentStore.showPricing
+                    )
                 }
             }
             .navigationTitle("Binders")
@@ -109,12 +113,13 @@ struct CollectionsView: View {
 private struct CollectionsList: View {
     let collections: [Collection]
     @Binding var selectedCollection: Collection?
+    let showPricing: Bool
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 ForEach(collections) { collection in
-                    CollectionCardView(collection: collection)
+                    CollectionCardView(collection: collection, showPricing: showPricing)
                         .onTapGesture {
                             selectedCollection = collection
                         }
@@ -183,6 +188,7 @@ private struct CreateCollectionSheet: View {
 // MARK: - Collection Detail View
 struct CollectionDetailView: View {
     let collection: Collection
+    @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -203,7 +209,10 @@ struct CollectionDetailView: View {
                     .padding()
 
                     // Stats Card
-                    CollectionStatsCard(collection: collection)
+                    CollectionStatsCard(
+                        collection: collection,
+                        showPricing: environmentStore.showPricing
+                    )
                         .padding(.horizontal)
 
                     // Cards List
@@ -214,7 +223,10 @@ struct CollectionDetailView: View {
                                 .padding(.horizontal)
 
                             ForEach(collection.cards) { card in
-                                CollectionCardRow(card: card)
+                                CollectionCardRow(
+                                    card: card,
+                                    showPricing: environmentStore.showPricing
+                                )
                                     .padding(.horizontal)
                             }
                         }
@@ -235,6 +247,7 @@ struct CollectionDetailView: View {
 
 private struct CollectionCardRow: View {
     let card: CollectionCard
+    let showPricing: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -277,7 +290,7 @@ private struct CollectionCardRow: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.accentColor)
-                    if let price = card.price {
+                    if showPricing, let price = card.price {
                         Text("$\(String(format: "%.2f", price * Double(card.quantity)))")
                             .font(.caption)
                             .foregroundColor(.green)

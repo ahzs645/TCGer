@@ -2,36 +2,55 @@ import SwiftUI
 
 struct CollectionStatsCard: View {
     let collection: Collection
+    let showPricing: Bool
+
+    private var statItems: [(title: String, value: String, color: Color, icon: String)] {
+        var items: [(String, String, Color, String)] = [
+            (
+                "Cards",
+                "\(collection.uniqueCards)",
+                .blue,
+                "square.stack.3d.up.fill"
+            ),
+            (
+                "Games",
+                "\(collection.uniqueGames.count)",
+                .purple,
+                "gamecontroller.fill"
+            )
+        ]
+
+        if showPricing {
+            items.insert(
+                (
+                    "Total Value",
+                    String(format: "$%.2f", collection.totalValue),
+                    .green,
+                    "dollarsign.circle.fill"
+                ),
+                at: 0
+            )
+        }
+
+        return items
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 0) {
-                StatItem(
-                    title: "Total Value",
-                    value: String(format: "$%.2f", collection.totalValue),
-                    color: .green,
-                    icon: "dollarsign.circle.fill"
-                )
+                ForEach(Array(statItems.enumerated()), id: \.offset) { index, item in
+                    StatItem(
+                        title: item.title,
+                        value: item.value,
+                        color: item.color,
+                        icon: item.icon
+                    )
 
-                Divider()
-                    .frame(height: 40)
-
-                StatItem(
-                    title: "Cards",
-                    value: "\(collection.uniqueCards)",
-                    color: .blue,
-                    icon: "square.stack.3d.up.fill"
-                )
-
-                Divider()
-                    .frame(height: 40)
-
-                StatItem(
-                    title: "Games",
-                    value: "\(collection.uniqueGames.count)",
-                    color: .purple,
-                    icon: "gamecontroller.fill"
-                )
+                    if index < statItems.count - 1 {
+                        Divider()
+                            .frame(height: 40)
+                    }
+                }
             }
         }
         .padding()
@@ -91,7 +110,8 @@ struct StatItem: View {
             createdAt: "",
             updatedAt: "",
             colorHex: nil
-        )
+        ),
+        showPricing: true
     )
     .padding()
 }
