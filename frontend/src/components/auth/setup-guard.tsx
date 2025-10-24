@@ -14,7 +14,8 @@ import { SignupDialog } from '@/components/auth/signup-dialog';
 export function SetupGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, setSetupRequired } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(true);
   const [shouldBlock, setShouldBlock] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);

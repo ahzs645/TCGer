@@ -26,17 +26,25 @@ interface AccountSettingsDialogProps {
 }
 
 export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDialogProps) {
-  const { enabledGames, toggleGame, showCardNumbers, setShowCardNumbers, showPricing, setShowPricing } =
-    useModuleStore((state) => ({
-      enabledGames: state.enabledGames,
-      toggleGame: state.toggleGame,
-      showCardNumbers: state.showCardNumbers,
-      setShowCardNumbers: state.setShowCardNumbers,
-      showPricing: state.showPricing,
-      setShowPricing: state.setShowPricing
-    }));
+  const {
+    enabledGames,
+    toggleGame,
+    showCardNumbers,
+    setShowCardNumbers,
+    showPricing,
+    setShowPricing
+  } = useModuleStore((state) => ({
+    enabledGames: state.enabledGames,
+    toggleGame: state.toggleGame,
+    showCardNumbers: state.showCardNumbers,
+    setShowCardNumbers: state.setShowCardNumbers,
+    showPricing: state.showPricing,
+    setShowPricing: state.setShowPricing
+  }));
 
-  const { user, token } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const updateStoredPreferences = useAuthStore((state) => state.updateStoredPreferences);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
@@ -63,12 +71,11 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
     setLoadingPreferences(true);
     getUserPreferences(token)
       .then((preferences) => {
-        setShowCardNumbers(preferences.showCardNumbers);
-        setShowPricing(preferences.showPricing);
+        updateStoredPreferences(preferences);
       })
       .catch((error) => console.error('Failed to load user preferences:', error))
       .finally(() => setLoadingPreferences(false));
-  }, [open, token, setShowCardNumbers, setShowPricing]);
+  }, [open, token, updateStoredPreferences]);
 
   const handleSettingChange = async (key: keyof AppSettings, value: boolean) => {
     if (!token || !appSettings) return;
@@ -100,6 +107,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
 
     try {
       await updateUserPreferences({ [preference]: value }, token);
+      updateStoredPreferences({ [preference]: value });
     } catch (error) {
       console.error('Failed to update user preference:', error);
       if (preference === 'showCardNumbers') {

@@ -24,9 +24,11 @@ import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
 import type { CollectionCard, TcgCode } from '@/types/card';
 import { useCollectionsStore } from '@/stores/collections';
+import { useAuthStore } from '@/stores/auth';
 
 export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
+  const token = useAuthStore((state) => state.token);
   const { collections, addCollection, removeCollection } = useCollectionsStore((state) => ({
     collections: state.collections,
     addCollection: state.addCollection,
@@ -179,7 +181,9 @@ export function CollectionTable() {
         onCreate={() => setCreateDialogOpen(true)}
         onRemove={(id) => {
           if (confirm('Remove this binder? Cards in the binder will not be recoverable unless re-imported.')) {
-            removeCollection(id);
+            if (token) {
+              removeCollection(token, id);
+            }
           }
         }}
         showPricing={showPricing}
@@ -350,9 +354,11 @@ export function CollectionTable() {
       <CreateCollectionDialog
         open={isCreateDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onCreate={({ name, description }) => {
-          const id = addCollection({ name, description });
-          setActiveCollectionId(id);
+        onCreate={async ({ name, description }) => {
+          if (token) {
+            const id = await addCollection(token, { name, description });
+            setActiveCollectionId(id);
+          }
         }}
       />
     </div>
