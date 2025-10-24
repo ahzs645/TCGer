@@ -1,18 +1,86 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
 import { ArrowUpRight, Coins, Library, Sparkles } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GAME_LABELS } from '@/lib/utils';
-import { calculateDashboardStats, searchCardsApi } from '@/lib/api-client';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
-import type { Card as CardType } from '@/types/card';
+import { useCollectionsStore } from '@/stores/collections';
+import { useAuthStore } from '@/stores/auth';
+import type { CollectionCard, TcgCode } from '@/types/card';
 
-const DEFAULT_DASHBOARD_QUERY = 'dragon';
+type DashboardCard = CollectionCard & {
+  updatedAt?: string;
+  binderName?: string;
+};
+
+interface DashboardStats {
+  totalCopies: number;
+  totalValue: number;
+  byGame: Record<TcgCode, { copies: number; value: number }>;
+  recentActivity: Array<{
+    id: string;
+    name: string;
+    tcg: TcgCode;
+    quantity: number;
+    binderName?: string;
+    timestamp: string;
+  }>;
+}
+
+function buildDashboardStats(cards: DashboardCard[], showPricing: boolean): DashboardStats {
+  const stats: DashboardStats = {
+    totalCopies: 0,
+    totalValue: 0,
+    byGame: {
+      yugioh: { copies: 0, value: 0 },
+      magic: { copies: 0, value: 0 },
+      pokemon: { copies: 0, value: 0 }
+    },
+    recentActivity: []
+  };
+
+  cards.forEach((card) => {
+    const copies = Math.max(card.quantity ?? 0, 0);
+    const breakdown = stats.byGame[card.tcg];
+    breakdown.copies += copies;
+    stats.totalCopies += copies;
+
+    if (showPricing) {
+      const value = (card.price ?? 0) * copies;
+      breakdown.value += value;
+      stats.totalValue += value;
+    }
+  });
+
+  const sorted = [...cards].sort((a, b) => {
+    const getTime = (value?: string) => (value ? new Date(value).getTime() : 0);
+    return getTime(b.updatedAt) - getTime(a.updatedAt);
+  });
+
+  const seen = new Set<string>();
+  for (const card of sorted) {
+    const key = `${card.binderId ?? 'global'}:${card.cardId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    stats.recentActivity.push({
+      id: key,
+      name: card.name,
+      tcg: card.tcg,
+      quantity: Math.max(card.quantity ?? 0, 0),
+      binderName: card.binderName,
+      timestamp: card.updatedAt ?? new Date().toISOString()
+    });
+    if (stats.recentActivity.length >= 5) break;
+  }
+
+  stats.totalValue = Number(stats.totalValue.toFixed(2));
+
+  return stats;
+}
 
 export function DashboardContent() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
@@ -20,17 +88,53 @@ export function DashboardContent() {
     enabledGames: state.enabledGames,
     showPricing: state.showPricing
   }));
+  const { collections, fetchCollections, isLoading, hasFetched } = useCollectionsStore((state) => ({
+    collections: state.collections,
+    fetchCollections: state.fetchCollections,
+    isLoading: state.isLoading,
+    hasFetched: state.hasFetched
+  }));
+  const { token, isAuthenticated } = useAuthStore();
+
   const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', { selectedGame }],
-    queryFn: () => searchCardsApi({ query: DEFAULT_DASHBOARD_QUERY, tcg: selectedGame })
-  });
-
-  const cards = (data ?? []).filter((card) => enabledGames[card.tcg as keyof typeof enabledGames]);
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
-  const stats = useMemo(() => calculateDashboardStats(cards), [cards]);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      return;
+    }
+    if (!hasFetched && !isLoading) {
+      void fetchCollections(token);
+    }
+  }, [fetchCollections, hasFetched, isAuthenticated, isLoading, token]);
+
+  const aggregatedCards = useMemo<DashboardCard[]>(
+    () =>
+      collections.flatMap((binder) =>
+        binder.cards.map((card) => ({
+          ...card,
+          binderId: card.binderId ?? binder.id,
+          binderName: card.binderName ?? binder.name,
+          binderColorHex: card.binderColorHex ?? binder.colorHex,
+          updatedAt: binder.updatedAt
+        }))
+      ),
+    [collections]
+  );
+
+  const filteredCards = useMemo(() => {
+    return aggregatedCards.filter((card) => {
+      if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
+      if (selectedGame !== 'all' && card.tcg !== selectedGame) return false;
+      return true;
+    });
+  }, [aggregatedCards, enabledGames, selectedGame]);
+
+  const stats = useMemo(() => buildDashboardStats(filteredCards, showPricing), [filteredCards, showPricing]);
+  const loading = isAuthenticated && !hasFetched;
+  const hasNoCards = !loading && stats.totalCopies === 0;
+
+  if (loading) {
     return (
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, idx) => (
@@ -63,36 +167,47 @@ export function DashboardContent() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Cards"
-          value={stats.totalCards.toLocaleString()}
-          description="Across all tracked TCGs"
-          icon={<Library className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Estimated Value"
-          value={showPricing ? `$${stats.totalValue.toFixed(2)}` : 'Hidden'}
-          description={showPricing ? 'Based on latest price snapshots' : 'Enable pricing in preferences'}
-          icon={<Coins className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active Games"
-          value={Object.entries(stats.byGame).filter(([, info]) => info.count > 0).length}
-          description="Games with cards in your library"
-          icon={<Sparkles className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Recent Additions"
-          value={`${Math.min(stats.recentActivity.length, 5)} cards`}
-          description="Latest cards synced from adapters"
-          icon={<ArrowUpRight className="h-5 w-5" />}
-        />
-      </div>
+      {hasNoCards && !noGamesEnabled ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome to your dashboard</CardTitle>
+            <CardDescription>
+              Start by adding cards to a binder. Your collection analytics will appear here once cards are tracked.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Cards"
+            value={stats.totalCopies.toLocaleString()}
+            description="Across all tracked TCGs"
+            icon={<Library className="h-5 w-5" />}
+          />
+          <StatCard
+            title="Estimated Value"
+            value={showPricing ? `$${stats.totalValue.toFixed(2)}` : 'Hidden'}
+            description={showPricing ? 'Based on collection pricing' : 'Enable pricing in preferences'}
+            icon={<Coins className="h-5 w-5" />}
+          />
+          <StatCard
+            title="Active Games"
+            value={Object.values(stats.byGame).filter((info) => info.copies > 0).length}
+            description="Games with cards in your library"
+            icon={<Sparkles className="h-5 w-5" />}
+          />
+          <StatCard
+            title="Recent Additions"
+            value={`${stats.recentActivity.length} card${stats.recentActivity.length === 1 ? '' : 's'}`}
+            description="Latest cards you've logged"
+            icon={<ArrowUpRight className="h-5 w-5" />}
+          />
+        </div>
+      )}
 
-      <GameBreakdown cards={cards} />
+      {!hasNoCards && <GameBreakdown byGame={stats.byGame} totalCopies={stats.totalCopies} />}
 
-      <RecentActivity items={stats.recentActivity} />
+      {!hasNoCards && <RecentActivity items={stats.recentActivity} />}
     </div>
   );
 }
@@ -119,18 +234,14 @@ function StatCard({ title, value, description, icon }: StatCardProps) {
   );
 }
 
-function GameBreakdown({ cards }: { cards: CardType[] }) {
-  const byGame = useMemo(() => {
-    return cards.reduce(
-      (acc, card) => {
-        acc[card.tcg] = (acc[card.tcg] ?? 0) + 1;
-        return acc;
-      },
-      { yugioh: 0, magic: 0, pokemon: 0 } as Record<'yugioh' | 'magic' | 'pokemon', number>
-    );
-  }, [cards]);
-
-  const total = cards.length || 1;
+function GameBreakdown({
+  byGame,
+  totalCopies
+}: {
+  byGame: Record<TcgCode, { copies: number; value: number }>;
+  totalCopies: number;
+}) {
+  const total = totalCopies || 1;
 
   return (
     <Card>
@@ -140,13 +251,13 @@ function GameBreakdown({ cards }: { cards: CardType[] }) {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-3">
-          {Object.entries(byGame).map(([game, count]) => {
-            const percentage = Math.round((count / total) * 100);
+          {Object.entries(byGame).map(([game, info]) => {
+            const percentage = Math.round((info.copies / total) * 100);
             return (
               <div key={game} className="space-y-2 rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{GAME_LABELS[game]}</span>
-                  <span className="text-muted-foreground">{count}</span>
+                  <span className="font-medium">{GAME_LABELS[game as TcgCode]}</span>
+                  <span className="text-muted-foreground">{info.copies}</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
@@ -164,13 +275,20 @@ function GameBreakdown({ cards }: { cards: CardType[] }) {
 function RecentActivity({
   items
 }: {
-  items: Array<{ id: string; name: string; tcg: 'yugioh' | 'magic' | 'pokemon'; timestamp: string }>;
+  items: Array<{
+    id: string;
+    name: string;
+    tcg: TcgCode;
+    quantity: number;
+    binderName?: string;
+    timestamp: string;
+  }>;
 }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
-        <CardDescription>Latest cards ingested from external APIs.</CardDescription>
+        <CardDescription>Latest updates across your binders.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -179,7 +297,11 @@ function RecentActivity({
             <div key={item.id} className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
               <div>
                 <p className="text-sm font-semibold leading-none">{item.name}</p>
-                <p className="text-xs text-muted-foreground">{GAME_LABELS[item.tcg]}</p>
+                <p className="text-xs text-muted-foreground">
+                  {GAME_LABELS[item.tcg]}
+                  {item.binderName ? ` • ${item.binderName}` : ''}
+                  {item.quantity > 1 ? ` • ${item.quantity} copies` : ''}
+                </p>
               </div>
               <time className="text-xs text-muted-foreground">
                 {new Date(item.timestamp).toLocaleDateString(undefined, {

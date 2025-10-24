@@ -1,8 +1,8 @@
 FROM node:20-slim
 
 WORKDIR /app
-COPY package.json ./package.json
-COPY src ./src
+COPY services/pokemon-cache/package.json ./package.json
+COPY services/pokemon-cache/src ./src
 
 ENV NODE_ENV=production
 ENV POKEMON_CACHE_DATA_DIR=/data
