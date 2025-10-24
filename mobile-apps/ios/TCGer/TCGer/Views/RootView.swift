@@ -86,6 +86,7 @@ struct RootView: View {
             )
             environmentStore.storeToken(token)
             environmentStore.isAuthenticated = true
+            await fetchPreferences()
         } catch {
             if let apiError = error as? APIService.APIError {
                 errorMessage = apiError.localizedDescription
@@ -93,6 +94,27 @@ struct RootView: View {
                 errorMessage = error.localizedDescription
             }
             environmentStore.isAuthenticated = false
+        }
+    }
+
+    @MainActor
+    private func fetchPreferences() async {
+        guard environmentStore.serverConfiguration.isValid,
+              let token = environmentStore.authToken else { return }
+
+        do {
+            let prefs = try await apiService.getUserPreferences(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            environmentStore.applyUserPreferences(prefs)
+        } catch {
+            // Non-fatal; preferences fall back to persisted defaults
+            if let apiError = error as? APIService.APIError {
+                print("Failed to load preferences: \(apiError.localizedDescription)")
+            } else {
+                print("Failed to load preferences: \(error.localizedDescription)")
+            }
         }
     }
 }

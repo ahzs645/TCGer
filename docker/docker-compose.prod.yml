@@ -19,6 +19,43 @@ services:
     networks:
       - tcg-net
 
+  scryfall-bulk:
+    build:
+      context: ..
+      dockerfile: services/scryfall-bulk/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SCRYFALL_BULK_TYPE: ${SCRYFALL_BULK_TYPE:-oracle_cards}
+      SCRYFALL_BULK_REFRESH_MS: ${SCRYFALL_BULK_REFRESH_MS:-43200000}
+      SCRYFALL_BULK_MAX_RESULTS: ${SCRYFALL_BULK_MAX_RESULTS:-50}
+      PORT: 4010
+    volumes:
+      - scryfall_bulk_data:/data
+    profiles:
+      - bulk
+    networks:
+      - tcg-net
+
+  ygo-cache:
+    build:
+      context: ..
+      dockerfile: services/ygo-cache/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      YGO_SOURCE_BASE_URL: ${YGO_SOURCE_BASE_URL:-https://db.ygoprodeck.com/api/v7}
+      YGO_CACHE_REFRESH_MS: ${YGO_CACHE_REFRESH_MS:-43200000}
+      YGO_CACHE_PAGE_SIZE: ${YGO_CACHE_PAGE_SIZE:-20}
+      YGO_CACHE_MAX_PAGE_SIZE: ${YGO_CACHE_MAX_PAGE_SIZE:-200}
+      PORT: 4020
+    volumes:
+      - ygo_cache_data:/data
+    profiles:
+      - bulk
+    networks:
+      - tcg-net
+
   backend:
     build:
       context: ..
@@ -31,6 +68,8 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?err}
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
+      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-https://api.scryfall.com}
+      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-https://db.ygoprodeck.com/api/v7}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     depends_on:
@@ -59,6 +98,8 @@ services:
 
 volumes:
   postgres_data:
+  scryfall_bulk_data:
+  ygo_cache_data:
 
 networks:
   tcg-net:

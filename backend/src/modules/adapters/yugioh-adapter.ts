@@ -1,6 +1,37 @@
+import { env } from '../../config/env';
 import { CardDTO, TcgAdapter } from './types';
 
-const BASE_URL = 'https://db.ygoprodeck.com/api/v7';
+const API_ROOT = env.YGO_API_BASE_URL.replace(/\/+$/, '');
+const CARDINFO_URL = `${API_ROOT}/cardinfo.php`;
+const isRemoteYgo = /ygoprodeck\.com$/i.test(new URL(API_ROOT).hostname);
+const configuredDelay = Number.parseInt(process.env.YGO_MIN_DELAY_MS ?? '', 10);
+const DEFAULT_REQUEST_DELAY_MS = isRemoteYgo ? 75 : 0;
+const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
+
+let rateLimitChain: Promise<void> = Promise.resolve();
+let nextAllowedRequestTime = 0;
+
+function sleep(duration: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+}
+
+async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Response> {
+  const waitPromise = rateLimitChain.then(async () => {
+    const now = Date.now();
+    const wait = Math.max(0, nextAllowedRequestTime - now);
+    if (wait > 0) {
+      await sleep(wait);
+    }
+    nextAllowedRequestTime = Date.now() + MIN_REQUEST_DELAY_MS;
+  });
+
+  rateLimitChain = waitPromise.catch(() => {});
+  await waitPromise;
+
+  return fetch(input, init);
+}
 
 interface YgoApiResponse {
   data: YgoCard[];
@@ -26,7 +57,7 @@ export class YugiohAdapter implements TcgAdapter {
 
   async searchCards(query: string): Promise<CardDTO[]> {
     const trimmedQuery = query.trim();
-    const url = new URL(`${BASE_URL}/cardinfo.php`);
+    const url = new URL(CARDINFO_URL);
     if (trimmedQuery) {
       url.searchParams.set('fname', trimmedQuery);
     }
@@ -34,7 +65,7 @@ export class YugiohAdapter implements TcgAdapter {
     url.searchParams.set('offset', '0');
 
     try {
-      const response = await fetch(url.toString());
+      const response = await rateLimitedFetch(url.toString());
       if (!response.ok) {
         throw new Error(`YGO search failed: ${response.status}`);
       }
@@ -55,11 +86,11 @@ export class YugiohAdapter implements TcgAdapter {
       return null;
     }
 
-    const url = new URL(`${BASE_URL}/cardinfo.php`);
+    const url = new URL(CARDINFO_URL);
     url.searchParams.set('id', trimmedId);
 
     try {
-      const response = await fetch(url.toString());
+      const response = await rateLimitedFetch(url.toString());
       if (!response.ok) {
         return null;
       }
