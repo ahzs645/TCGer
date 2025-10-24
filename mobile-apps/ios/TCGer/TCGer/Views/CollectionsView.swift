@@ -58,18 +58,20 @@ struct CollectionsView: View {
                     await createCollection(name: name, description: description, colorHex: colorHex)
                 }
             }
-            .sheet(isPresented: Binding(
-                get: { selectedCollection != nil },
-                set: { if !$0 { selectedCollection = nil } }
-            )) {
-                if let collection = selectedCollection {
-                    CollectionDetailView(collection: collection)
+            .sheet(
+                isPresented: Binding(
+                    get: { selectedCollection != nil },
+                    set: { if !$0 { selectedCollection = nil } }
+                ),
+                onDismiss: {
+                    Task { await loadCollections() }
+                },
+                content: {
+                    if let collection = selectedCollection {
+                        CollectionDetailView(collection: collection)
+                    }
                 }
-            } onDismiss: {
-                Task {
-                    await loadCollections()
-                }
-            }
+            )
         }
         .task {
             await loadCollections()
@@ -90,7 +92,8 @@ struct CollectionsView: View {
         do {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
-                token: token
+                token: token,
+                useCache: environmentStore.offlineModeEnabled
             )
             isLoading = false
         } catch {
