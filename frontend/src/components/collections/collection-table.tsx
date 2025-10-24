@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, Filter, Loader2, Plus, RefreshCcw, Trash, TrendingUp } from 'lucide-react';
 
 import { CollectionSummary } from '@/components/collections/collection-summary';
@@ -48,6 +49,17 @@ export function CollectionTable() {
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const previousCollectionId = useRef<string | null>(null);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const changeActiveCollection = (id: string, updateUrl = true) => {
+    setActiveCollectionId(id);
+    if (!updateUrl) return;
+    const search = id
+      ? `?binder=${id === ALL_COLLECTION_ID ? 'all' : encodeURIComponent(id)}`
+      : '';
+    router.replace(`/collections${search}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (!showPricing && sortBy === 'price') {
@@ -58,18 +70,31 @@ export function CollectionTable() {
   useEffect(() => {
     if (!collections.length) {
       if (activeCollectionId !== '') {
-        setActiveCollectionId('');
+        changeActiveCollection('', false);
+        router.replace('/collections', { scroll: false });
       }
       return;
+    }
+
+    const binderFromQuery = searchParams.get('binder');
+    const normalizedQueryId = binderFromQuery === 'all' ? ALL_COLLECTION_ID : binderFromQuery;
+
+    if (normalizedQueryId) {
+      const available =
+        normalizedQueryId === ALL_COLLECTION_ID || collections.some((collection) => collection.id === normalizedQueryId);
+      if (available && normalizedQueryId !== activeCollectionId) {
+        changeActiveCollection(normalizedQueryId, false);
+        return;
+      }
     }
 
     const isValidActive =
       activeCollectionId === ALL_COLLECTION_ID || collections.some((collection) => collection.id === activeCollectionId);
 
     if (!isValidActive) {
-      setActiveCollectionId(ALL_COLLECTION_ID);
+      changeActiveCollection(ALL_COLLECTION_ID);
     }
-  }, [collections, activeCollectionId]);
+  }, [collections, activeCollectionId, searchParams, router]);
 
   useEffect(() => {
     setSelection({});
@@ -195,7 +220,7 @@ export function CollectionTable() {
       <CollectionSelector
         collections={collections}
         activeId={activeCollectionId}
-        onSelect={(id) => setActiveCollectionId(id)}
+        onSelect={(id) => changeActiveCollection(id)}
         onCreate={() => setCreateDialogOpen(true)}
         onRemove={(id) => {
           if (confirm('Remove this binder? Cards in the binder will not be recoverable unless re-imported.')) {
@@ -388,7 +413,7 @@ export function CollectionTable() {
         onCreate={async ({ name, description }) => {
           if (token) {
             const id = await addCollection(token, { name, description });
-            setActiveCollectionId(id);
+            changeActiveCollection(id);
           }
         }}
       />

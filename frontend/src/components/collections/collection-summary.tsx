@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Layers, PieChart, Wallet } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Layers, Library, PieChart, Wallet } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -17,6 +17,7 @@ export function CollectionSummary({ items, selectedIds, totalQuantity, totalValu
   const selectedValue = selectedCards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
   const selectedQuantity = selectedCards.reduce((sum, card) => sum + card.quantity, 0);
   const uniqueCount = new Set(items.map((card) => card.cardId ?? card.id)).size;
+  const binderCount = new Set(items.map((card) => card.binderId ?? 'default')).size;
   const avgPrice = totalQuantity > 0 ? totalValue / totalQuantity : 0;
   const delta = showPricing ? computeDelta(items) : undefined;
 
@@ -54,23 +55,17 @@ export function CollectionSummary({ items, selectedIds, totalQuantity, totalValu
       ) : (
         <>
           <SummaryCard
-            title="Pricing hidden"
-            description="Enable pricing to see totals"
-            value="—"
-            icon={<Wallet className="h-5 w-5" />}
+            title="Active binders"
+            description="Binders containing cards"
+            value={binderCount.toString()}
+            icon={<Library className="h-5 w-5" />}
           />
           <SummaryCard
             title="Selected cards"
-            description="Count of items picked"
-            value={`${selectedCards.length} titles (${selectedQuantity} copies)`}
+            description={`You picked ${selectedQuantity} copies`}
+            value={`${selectedCards.length} titles`}
             icon={<ArrowUpRight className="h-5 w-5" />}
             variant="muted"
-          />
-          <SummaryCard
-            title="Average value"
-            description="Pricing disabled"
-            value="—"
-            icon={<PieChart className="h-5 w-5" />}
           />
         </>
       )}

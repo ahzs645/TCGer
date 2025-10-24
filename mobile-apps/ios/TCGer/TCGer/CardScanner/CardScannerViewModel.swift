@@ -229,7 +229,7 @@ final class CardScannerViewModel: ObservableObject {
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
-    private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {
+    nonisolated(unsafe) private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
         var cgImage: CGImage?
         let status = VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &cgImage)
