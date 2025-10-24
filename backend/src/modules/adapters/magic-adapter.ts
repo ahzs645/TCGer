@@ -1,8 +1,11 @@
+import { env } from '../../config/env';
 import { CardDTO, TcgAdapter } from './types';
 
-const BASE_URL = 'https://api.scryfall.com/cards';
-const DEFAULT_REQUEST_DELAY_MS = 120;
-const configuredDelay = Number.parseInt(process.env.SCRYFALL_MIN_DELAY_MS ?? `${DEFAULT_REQUEST_DELAY_MS}`, 10);
+const API_ROOT = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
+const BASE_URL = `${API_ROOT}/cards`;
+const isRemoteScryfall = /scryfall\.(io|com)$/i.test(new URL(API_ROOT).hostname);
+const DEFAULT_REQUEST_DELAY_MS = isRemoteScryfall ? 120 : 0;
+const configuredDelay = Number.parseInt(process.env.SCRYFALL_MIN_DELAY_MS ?? '', 10);
 const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
 
 let rateLimitChain: Promise<void> = Promise.resolve();

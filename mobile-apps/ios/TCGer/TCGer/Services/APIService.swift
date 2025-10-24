@@ -327,4 +327,71 @@ actor APIService {
 
         return settings
     }
+
+    struct UserPreferences: Codable {
+        let showCardNumbers: Bool
+        let showPricing: Bool
+    }
+
+    func getUserPreferences(
+        config: ServerConfiguration,
+        token: String
+    ) async throws -> UserPreferences {
+        let (data, httpResponse) = try await makeRequest(
+            config: config,
+            path: "users/me/preferences",
+            token: token
+        )
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+
+        guard let preferences = try? JSONDecoder().decode(UserPreferences.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return preferences
+    }
+
+    struct UpdatePreferencesRequest: Codable {
+        let showCardNumbers: Bool?
+        let showPricing: Bool?
+    }
+
+    func updateUserPreferences(
+        config: ServerConfiguration,
+        token: String,
+        showCardNumbers: Bool? = nil,
+        showPricing: Bool? = nil
+    ) async throws -> UserPreferences {
+        let body = UpdatePreferencesRequest(
+            showCardNumbers: showCardNumbers,
+            showPricing: showPricing
+        )
+
+        let (data, httpResponse) = try await makeRequest(
+            config: config,
+            path: "users/me/preferences",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+
+        guard let preferences = try? JSONDecoder().decode(UserPreferences.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return preferences
+    }
 }

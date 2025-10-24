@@ -4,13 +4,12 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var showingResetAlert = false
-    @State private var showCardNumbers = false
-    @State private var showPricing = true
-
+    @State private var isApplyingRemotePreferences = false
     var body: some View {
         NavigationView {
             Form {
@@ -98,7 +97,7 @@ struct SettingsView: View {
 
                 // Display Preferences Section
                 Section {
-                    Toggle(isOn: $showCardNumbers) {
+                    Toggle(isOn: $environmentStore.showCardNumbers) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Show Card Numbers")
                             Text("Display set codes with card names")
@@ -106,14 +105,22 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.showCardNumbers) { newValue in
+                        Task { await updatePreferences(showCardNumbers: newValue) }
+                    }
 
-                    Toggle(isOn: $showPricing) {
+                    Toggle(isOn: $environmentStore.showPricing) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Show Pricing")
                             Text("Display estimated card values")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.showPricing) { newValue in
+                        Task { await updatePreferences(showPricing: newValue) }
                     }
                 } header: {
                     Text("Display Preferences")
@@ -144,6 +151,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .task {
+                await refreshPreferencesIfNeeded()
+            }
             .alert("Reset Configuration?", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Reset", role: .destructive) {
@@ -152,6 +162,66 @@ struct SettingsView: View {
             } message: {
                 Text("This will remove your server address, login credentials, and authentication token.")
             }
+        }
+    }
+}
+
+private extension SettingsView {
+    func refreshPreferencesIfNeeded() async {
+        guard environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        let api = APIService()
+
+        do {
+            let prefs = try await api.getUserPreferences(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            await MainActor.run {
+                isApplyingRemotePreferences = true
+                environmentStore.applyUserPreferences(prefs)
+                DispatchQueue.main.async {
+                    isApplyingRemotePreferences = false
+                }
+            }
+        } catch {
+            print("Failed to refresh preferences: \(error)")
+        }
+    }
+
+    func updatePreferences(
+        showCardNumbers: Bool? = nil,
+        showPricing: Bool? = nil
+    ) async {
+        guard !isApplyingRemotePreferences,
+              environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        let api = APIService()
+
+        do {
+            let prefs = try await api.updateUserPreferences(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                showCardNumbers: showCardNumbers,
+                showPricing: showPricing
+            )
+
+            await MainActor.run {
+                isApplyingRemotePreferences = true
+                environmentStore.applyUserPreferences(prefs)
+                DispatchQueue.main.async {
+                    isApplyingRemotePreferences = false
+                }
+            }
+        } catch {
+            print("Failed to update preferences: \(error)")
+            await refreshPreferencesIfNeeded()
         }
     }
 }

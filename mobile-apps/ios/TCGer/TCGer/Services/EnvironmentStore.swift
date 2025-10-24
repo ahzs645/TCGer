@@ -10,6 +10,8 @@ final class EnvironmentStore: ObservableObject {
     @Published var enabledYugioh: Bool
     @Published var enabledMagic: Bool
     @Published var enabledPokemon: Bool
+    @Published var showCardNumbers: Bool
+    @Published var showPricing: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -23,6 +25,8 @@ final class EnvironmentStore: ObservableObject {
         static let enabledYugioh = "enabledYugioh"
         static let enabledMagic = "enabledMagic"
         static let enabledPokemon = "enabledPokemon"
+        static let showCardNumbers = "showCardNumbers"
+        static let showPricing = "showPricing"
     }
 
     init() {
@@ -61,6 +65,18 @@ final class EnvironmentStore: ObservableObject {
             enabledPokemon = true
         } else {
             enabledPokemon = storage.bool(forKey: Keys.enabledPokemon)
+        }
+
+        if storage.object(forKey: Keys.showCardNumbers) == nil {
+            showCardNumbers = true
+        } else {
+            showCardNumbers = storage.bool(forKey: Keys.showCardNumbers)
+        }
+
+        if storage.object(forKey: Keys.showPricing) == nil {
+            showPricing = true
+        } else {
+            showPricing = storage.bool(forKey: Keys.showPricing)
         }
 
         $serverConfiguration
@@ -123,6 +139,20 @@ final class EnvironmentStore: ObservableObject {
                 self?.storage.set(flag, forKey: Keys.enabledPokemon)
             }
             .store(in: &cancellables)
+
+        $showCardNumbers
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.showCardNumbers)
+            }
+            .store(in: &cancellables)
+
+        $showPricing
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.showPricing)
+            }
+            .store(in: &cancellables)
     }
 
     var enabledGames: [TCGGame] {
@@ -153,10 +183,22 @@ final class EnvironmentStore: ObservableObject {
         authToken = nil
         isAuthenticated = false
         isServerVerified = false
+        enabledYugioh = true
+        enabledMagic = true
+        enabledPokemon = true
+        showCardNumbers = true
+        showPricing = true
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
         storage.set(false, forKey: Keys.authenticated)
         storage.set(false, forKey: Keys.verified)
+        storage.removeObject(forKey: Keys.showCardNumbers)
+        storage.removeObject(forKey: Keys.showPricing)
+    }
+
+    func applyUserPreferences(_ preferences: APIService.UserPreferences) {
+        showCardNumbers = preferences.showCardNumbers
+        showPricing = preferences.showPricing
     }
 }
