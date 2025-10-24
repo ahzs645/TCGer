@@ -3,7 +3,6 @@ import SwiftUI
 struct CollectionsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
-    @Environment(\.scrollOffset) private var scrollOffset
     @State private var collections: [Collection] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -29,8 +28,7 @@ struct CollectionsView: View {
                     CollectionsList(
                         collections: collections,
                         selectedCollection: $selectedCollection,
-                        showPricing: environmentStore.showPricing,
-                        scrollOffset: scrollOffset
+                        showPricing: environmentStore.showPricing
                     )
                 }
             }
@@ -125,18 +123,9 @@ private struct CollectionsList: View {
     let collections: [Collection]
     @Binding var selectedCollection: Collection?
     let showPricing: Bool
-    let scrollOffset: Binding<CGFloat>
 
     var body: some View {
         ScrollView {
-            GeometryReader { geometry in
-                Color.clear.preference(
-                    key: ScrollOffsetPreferenceKey.self,
-                    value: geometry.frame(in: .named("scroll")).minY
-                )
-            }
-            .frame(height: 0)
-
             LazyVStack(spacing: 16) {
                 ForEach(collections) { collection in
                     CollectionCardView(collection: collection, showPricing: showPricing)
@@ -146,10 +135,6 @@ private struct CollectionsList: View {
                 }
             }
             .padding()
-        }
-        .coordinateSpace(name: "scroll")
-        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            scrollOffset.wrappedValue = value
         }
     }
 }
@@ -227,98 +212,77 @@ struct CollectionDetailView: View {
 
     var body: some View {
         NavigationView {
-            ZStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 8) {
-                            if isEditing {
-                                TextField("Binder Name", text: $editedName)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .textFieldStyle(.roundedBorder)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        if isEditing {
+                            TextField("Binder Name", text: $editedName)
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .textFieldStyle(.roundedBorder)
 
-                                TextField("Description (optional)", text: $editedDescription, axis: .vertical)
+                            TextField("Description (optional)", text: $editedDescription, axis: .vertical)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .textFieldStyle(.roundedBorder)
+                                .lineLimit(3...6)
+                        } else {
+                            Text(collection.name)
+                                .font(.title)
+                                .fontWeight(.bold)
+                            if let description = collection.description, !description.isEmpty {
+                                Text(description)
                                     .font(.body)
                                     .foregroundColor(.secondary)
-                                    .textFieldStyle(.roundedBorder)
-                                    .lineLimit(3...6)
-                            } else {
-                                Text(collection.name)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                if let description = collection.description, !description.isEmpty {
-                                    Text(description)
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                }
                             }
                         }
-                        .padding()
-
-                        // Stats Card
-                        CollectionStatsCard(
-                            collection: collection,
-                            showPricing: environmentStore.showPricing
-                        )
-                            .padding(.horizontal)
-
-                        // Cards List
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Cards")
-                                    .font(.headline)
-                                Spacer()
-                                Button(action: { showingAddCard = true }) {
-                                    Label("Add Card", systemImage: "plus.circle.fill")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                            .padding(.horizontal)
-
-                            if collection.cards.isEmpty {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "rectangle.stack.badge.plus")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.secondary)
-                                    Text("No cards in this binder yet")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                            } else {
-                                ForEach(collection.cards) { card in
-                                    CollectionCardRow(
-                                        card: card,
-                                        showPricing: environmentStore.showPricing
-                                    )
-                                        .padding(.horizontal)
-                                }
-                            }
-                        }
-                        .padding(.bottom, 80) // Space for FAB
                     }
-                }
+                    .padding()
 
-                // Floating Add Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: { showingAddCard = true }) {
-                            Image(systemName: "plus")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(Color.accentColor)
-                                .clipShape(Circle())
-                                .shadow(radius: 4)
+                    // Stats Card
+                    CollectionStatsCard(
+                        collection: collection,
+                        showPricing: environmentStore.showPricing
+                    )
+                        .padding(.horizontal)
+
+                    // Cards List
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Cards")
+                                .font(.headline)
+                            Spacer()
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
+                        .padding(.horizontal)
+
+                        if collection.cards.isEmpty {
+                            VStack(spacing: 16) {
+                                Image(systemName: "rectangle.stack.badge.plus")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.secondary)
+                                Text("No cards in this binder yet")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+
+                                Button(action: { showingAddCard = true }) {
+                                    Label("Add Your First Card", systemImage: "plus.circle.fill")
+                                        .font(.headline)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                        } else {
+                            ForEach(collection.cards) { card in
+                                CollectionCardRow(
+                                    card: card,
+                                    showPricing: environmentStore.showPricing
+                                )
+                                    .padding(.horizontal)
+                            }
+                        }
                     }
                 }
             }
@@ -329,16 +293,30 @@ struct CollectionDetailView: View {
                         dismiss()
                     }
                 }
+
+                ToolbarItem(placement: .principal) {
+                    Text(collection.name)
+                        .font(.headline)
+                }
+
                 ToolbarItem(placement: .primaryAction) {
-                    if isEditing {
-                        Button("Save") {
-                            // TODO: Save changes
-                            isEditing = false
-                        }
-                        .disabled(editedName.isEmpty)
-                    } else {
-                        Button("Edit") {
-                            isEditing = true
+                    HStack(spacing: 12) {
+                        if isEditing {
+                            Button("Save") {
+                                // TODO: Save changes
+                                isEditing = false
+                            }
+                            .disabled(editedName.isEmpty)
+                            .foregroundColor(.green)
+                            .fontWeight(.semibold)
+                        } else {
+                            Button(action: { isEditing = true }) {
+                                Text("Edit")
+                            }
+
+                            Button(action: { showingAddCard = true }) {
+                                Image(systemName: "plus")
+                            }
                         }
                     }
                 }

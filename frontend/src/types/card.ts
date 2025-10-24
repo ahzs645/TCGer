@@ -23,6 +23,7 @@ export interface CollectionCard extends Card {
   priceHistory?: number[];
   binderId?: string;
   binderName?: string;
+  binderColorHex?: string;
 }
 
 export interface SearchCardsResponse {

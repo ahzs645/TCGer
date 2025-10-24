@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Download, Filter, Loader2, Plus, RefreshCcw, Trash, TrendingUp } from 'lucide-react';
 
 import { CollectionSummary } from '@/components/collections/collection-summary';
@@ -18,6 +18,7 @@ import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
+import { hexToRgba, normalizeHexColor } from '@/lib/color';
 import type { Collection as CollectionEntity } from '@/lib/api/collections';
 import { ALL_COLLECTION_ID, useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
@@ -82,6 +83,8 @@ export function CollectionTable() {
     game: selectedGame as SupportedGame | 'all',
     enabledGames
   });
+  const activeAccent = normalizeHexColor(collection?.colorHex);
+  const activeCardGlow = activeAccent ? hexToRgba(activeAccent, 0.22) : undefined;
 
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
   const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
@@ -212,10 +215,19 @@ export function CollectionTable() {
         showPricing={showPricing}
       />
 
-      <Card>
+      <Card style={activeAccent ? { borderColor: activeAccent, boxShadow: activeCardGlow ? `0 20px 32px -24px ${activeCardGlow}` : undefined } : undefined}>
         <CardHeader className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle>{collection?.name ?? 'Collection Manager'}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              {activeAccent ? (
+                <span
+                  className="inline-flex h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: activeAccent }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              <span>{collection?.name ?? 'Collection Manager'}</span>
+            </CardTitle>
             <CardDescription>
               {collection?.description ?? 'Manage quantities, review price trends, and prepare CSV exports for grading or trading.'}
               {collection && (
@@ -402,6 +414,7 @@ function CollectionRow({
     card.priceHistory && card.priceHistory.length > 1 ? card.priceHistory[card.priceHistory.length - 2] : price;
   const delta = previousPrice ? ((price - previousPrice) / previousPrice) * 100 : 0;
   const positive = delta >= 0;
+  const binderAccent = normalizeHexColor(card.binderColorHex);
 
   return (
     <TableRow data-state={selected ? 'selected' : undefined}>
@@ -417,7 +430,19 @@ function CollectionRow({
               {card.setName ?? card.setCode ?? 'Unknown set'} · #{card.setCode ?? '—'}
             </p>
             {showBinderName && card.binderName ? (
-              <p className="text-[11px] text-muted-foreground">Binder: {card.binderName}</p>
+              <p className="text-[11px] text-muted-foreground">
+                Binder{' '}
+                <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                  {binderAccent ? (
+                    <span
+                      className="inline-flex h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: binderAccent }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span style={{ color: binderAccent ?? undefined }}>{card.binderName}</span>
+                </span>
+              </p>
             ) : null}
           </div>
         </div>
@@ -799,6 +824,7 @@ function CollectionSelector({
           const uniqueCards = new Set(collection.cards.map((card) => card.cardId ?? card.id)).size;
           const totalCopies = collection.cards.reduce((sum, card) => sum + card.quantity, 0);
           const totalValue = collection.cards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
+          const accentColor = normalizeHexColor(collection.colorHex);
 
           return (
             <SelectorRow
@@ -812,6 +838,7 @@ function CollectionSelector({
               active={collection.id === activeId}
               onClick={() => onSelect(collection.id)}
               onRemove={collections.length > 1 ? () => onRemove(collection.id) : undefined}
+              accentColor={accentColor}
             />
           );
         })}
@@ -829,7 +856,8 @@ function SelectorRow({
   updatedLabel,
   active,
   onClick,
-  onRemove
+  onRemove,
+  accentColor
 }: {
   title: string;
   description?: string;
@@ -840,7 +868,22 @@ function SelectorRow({
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
+  accentColor?: string;
 }) {
+  const accent = normalizeHexColor(accentColor);
+  const baseGlow = accent ? hexToRgba(accent, active ? 0.28 : 0.18) : undefined;
+  const softFill = accent ? hexToRgba(accent, active ? 0.22 : 0.12) : undefined;
+  const rowStyle: CSSProperties = {};
+  if (accent) {
+    rowStyle.borderLeftColor = accent;
+    if (softFill) {
+      rowStyle.backgroundColor = softFill;
+    }
+    if (baseGlow) {
+      rowStyle.boxShadow = `0 12px 22px -14px ${baseGlow}`;
+    }
+  }
+
   return (
     <div
       role="button"
@@ -853,12 +896,24 @@ function SelectorRow({
         }
       }}
       className={cn(
-        'flex flex-col gap-3 px-4 py-3 transition hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:flex-row sm:items-center sm:justify-between',
-        active ? 'bg-primary/5 ring-1 ring-primary/40' : ''
+        'flex flex-col gap-3 border-l-4 border-l-transparent px-4 py-3 transition hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:flex-row sm:items-center sm:justify-between',
+        active
+          ? accent
+            ? 'ring-1 ring-offset-2'
+            : 'bg-primary/5 ring-1 ring-primary/40'
+          : ''
       )}
+      style={rowStyle}
     >
       <div className="flex-1 space-y-1">
         <div className="flex items-center gap-2">
+          {accent ? (
+            <span
+              className="inline-flex h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: accent }}
+              aria-hidden="true"
+            />
+          ) : null}
           <span className="text-sm font-semibold text-foreground">{title}</span>
           {badgeText ? (
             <Badge variant="outline" className="uppercase text-[10px]">
@@ -877,7 +932,14 @@ function SelectorRow({
       </div>
       <div className="flex items-start gap-3">
         <div className="flex flex-col items-end text-[11px] text-muted-foreground">
-          {value ? <span className="text-sm font-semibold text-foreground">{value}</span> : null}
+          {value ? (
+            <span
+              className="text-sm font-semibold"
+              style={{ color: accent && !active ? accent : undefined }}
+            >
+              {value}
+            </span>
+          ) : null}
           {updatedLabel ? <span>Updated {updatedLabel}</span> : null}
         </div>
         {onRemove ? (
