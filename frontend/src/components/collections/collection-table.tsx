@@ -110,6 +110,8 @@ export function CollectionTable() {
   });
   const activeAccent = normalizeHexColor(collection?.colorHex);
   const activeCardGlow = activeAccent ? hexToRgba(activeAccent, 0.22) : undefined;
+  const activeCardFill = activeAccent ? hexToRgba(activeAccent, 0.12) : undefined;
+  const activeCardSoft = activeAccent ? hexToRgba(activeAccent, 0.05) : undefined;
 
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
   const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
@@ -240,7 +242,20 @@ export function CollectionTable() {
         showPricing={showPricing}
       />
 
-      <Card style={activeAccent ? { borderColor: activeAccent, boxShadow: activeCardGlow ? `0 20px 32px -24px ${activeCardGlow}` : undefined } : undefined}>
+      <Card
+        style={
+          activeAccent
+            ? {
+                borderColor: activeAccent,
+                boxShadow: activeCardGlow ? `0 20px 32px -24px ${activeCardGlow}` : undefined,
+                backgroundImage:
+                  activeCardFill && activeCardSoft
+                    ? `linear-gradient(135deg, ${activeCardFill} 0%, ${activeCardSoft} 100%)`
+                    : undefined
+              }
+            : undefined
+        }
+      >
         <CardHeader className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -905,16 +920,19 @@ function SelectorRow({
   accentColor?: string;
 }) {
   const accent = normalizeHexColor(accentColor);
-  const baseGlow = accent ? hexToRgba(accent, active ? 0.28 : 0.18) : undefined;
-  const softFill = accent ? hexToRgba(accent, active ? 0.22 : 0.12) : undefined;
+  const baseGlow = accent ? hexToRgba(accent, active ? 0.32 : 0.18) : undefined;
+  const softFill = accent ? hexToRgba(accent, active ? 0.24 : 0.14) : undefined;
+  const lighterFill = accent ? hexToRgba(accent, 0.06) : undefined;
   const rowStyle: CSSProperties = {};
   if (accent) {
     rowStyle.borderLeftColor = accent;
     if (softFill) {
-      rowStyle.backgroundColor = softFill;
+      rowStyle.backgroundImage = lighterFill
+        ? `linear-gradient(135deg, ${softFill} 0%, ${lighterFill} 100%)`
+        : undefined;
     }
     if (baseGlow) {
-      rowStyle.boxShadow = `0 12px 22px -14px ${baseGlow}`;
+      rowStyle.boxShadow = `0 16px 26px -18px ${baseGlow}`;
     }
   }
 
@@ -948,7 +966,9 @@ function SelectorRow({
               aria-hidden="true"
             />
           ) : null}
-          <span className="text-sm font-semibold text-foreground">{title}</span>
+          <span className="text-sm font-semibold" style={{ color: accent && active ? accent : undefined }}>
+            {title}
+          </span>
           {badgeText ? (
             <Badge variant="outline" className="uppercase text-[10px]">
               {badgeText}

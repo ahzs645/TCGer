@@ -79,6 +79,23 @@ services:
     networks:
       - tcg-net
 
+  tcgdex-cache:
+    build:
+      context: ..
+      dockerfile: services/tcgdex-cache/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      TCGDEX_CACHE_REFRESH_MS: ${TCGDEX_CACHE_REFRESH_MS:-86400000}
+      TCGDEX_CACHE_PAGE_SIZE: ${TCGDEX_CACHE_PAGE_SIZE:-20}
+      PORT: 4040
+    volumes:
+      - tcgdex_cache_data:/data
+    profiles:
+      - bulk
+    networks:
+      - tcg-net
+
   backend:
     build:
       context: ..
@@ -125,6 +142,7 @@ volumes:
   scryfall_bulk_data:
   ygo_cache_data:
   pokemon_cache_data:
+  tcgdex_cache_data:
 
 networks:
   tcg-net:

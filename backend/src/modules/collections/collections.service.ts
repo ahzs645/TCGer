@@ -151,6 +151,24 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
       name: input.name ?? binder.name,
       description: input.description ?? binder.description,
       colorHex: input.colorHex ?? binder.colorHex
+    },
+    include: {
+      collections: {
+        include: {
+          card: {
+            include: {
+              tcgGame: true,
+              yugiohCard: true,
+              magicCard: true,
+              pokemonCard: true,
+              priceHistory: {
+                orderBy: { recordedAt: 'desc' },
+                take: 10
+              }
+            }
+          }
+        }
+      }
     }
   });
 
@@ -160,7 +178,28 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     description: updated.description ?? '',
     colorHex: updated.colorHex,
     createdAt: updated.createdAt.toISOString(),
-    updatedAt: updated.updatedAt.toISOString()
+    updatedAt: updated.updatedAt.toISOString(),
+    cards: updated.collections.map((collection) => {
+      const card = collection.card;
+      const tcgGame = card.tcgGame;
+
+      return {
+        id: collection.id,
+        cardId: card.id,
+        tcg: tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
+        name: card.name,
+        setCode: card.setCode ?? undefined,
+        setName: card.setName ?? undefined,
+        rarity: card.rarity ?? undefined,
+        imageUrl: card.imageUrl ?? undefined,
+        imageUrlSmall: card.imageUrlSmall ?? undefined,
+        quantity: collection.quantity,
+        condition: collection.condition ?? undefined,
+        language: collection.language ?? undefined,
+        notes: collection.notes ?? undefined,
+        price: collection.price ? parseFloat(collection.price.toString()) : undefined
+      };
+    })
   };
 }
 

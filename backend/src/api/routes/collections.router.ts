@@ -14,14 +14,18 @@ import { asyncHandler } from '../../utils/async-handler';
 
 export const collectionsRouter = Router();
 
+const hexColorRegex = /^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+
 const createBinderSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  description: z.string().optional()
+  description: z.string().optional(),
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
 });
 
 const updateBinderSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional()
+  description: z.string().optional(),
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
 });
 
 const addCardSchema = z.object({
