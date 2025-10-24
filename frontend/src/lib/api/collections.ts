@@ -14,6 +14,8 @@ export interface CollectionCard {
   language?: string;
   notes?: string;
   price?: number;
+  binderId?: string;
+  binderName?: string;
 }
 
 export interface Collection {

@@ -25,7 +25,11 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
       try {
         // First check if setup is required
         const { setupRequired: required } = await checkSetupRequired();
-        setSetupRequired(required);
+        if (typeof setSetupRequired === 'function') {
+          setSetupRequired(required);
+        } else {
+          console.warn('Auth store missing setSetupRequired; skipping setup flag update');
+        }
 
         // If setup is required and we're not on the setup page, redirect
         if (required && pathname !== '/setup') {

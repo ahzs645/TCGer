@@ -18,8 +18,8 @@ import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
-import type { SampleCollection } from '@/lib/data/sample-collections';
-import { useCollectionData } from '@/lib/hooks/use-collection';
+import type { Collection as CollectionEntity } from '@/lib/api/collections';
+import { ALL_COLLECTION_ID, useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
 import type { CollectionCard, TcgCode } from '@/types/card';
@@ -38,7 +38,7 @@ export function CollectionTable() {
     enabledGames: state.enabledGames,
     showPricing: state.showPricing
   }));
-  const [activeCollectionId, setActiveCollectionId] = useState<string>(collections[0]?.id ?? '');
+  const [activeCollectionId, setActiveCollectionId] = useState<string>(collections.length ? ALL_COLLECTION_ID : '');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'rarity' | 'price'>('name');
   const [isFilterOpen, setFilterOpen] = useState(false);
@@ -55,8 +55,18 @@ export function CollectionTable() {
   }, [showPricing, sortBy]);
 
   useEffect(() => {
-    if (!collections.some((collection) => collection.id === activeCollectionId)) {
-      setActiveCollectionId(collections[0]?.id ?? '');
+    if (!collections.length) {
+      if (activeCollectionId !== '') {
+        setActiveCollectionId('');
+      }
+      return;
+    }
+
+    const isValidActive =
+      activeCollectionId === ALL_COLLECTION_ID || collections.some((collection) => collection.id === activeCollectionId);
+
+    if (!isValidActive) {
+      setActiveCollectionId(ALL_COLLECTION_ID);
     }
   }, [collections, activeCollectionId]);
 
@@ -129,6 +139,11 @@ export function CollectionTable() {
     });
     return Array.from(map.entries());
   }, [sortedCards]);
+
+  const uniqueCardCount = useMemo(() => {
+    if (!collection?.cards) return 0;
+    return new Set(collection.cards.map((card) => card.cardId ?? card.id)).size;
+  }, [collection]);
 
   const toggleRow = (id: string) => {
     setSelection((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -205,7 +220,10 @@ export function CollectionTable() {
               {collection?.description ?? 'Manage quantities, review price trends, and prepare CSV exports for grading or trading.'}
               {collection && (
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  {collection.cards.length} unique cards • Updated {new Date(collection.updatedAt).toLocaleDateString()}
+                  {uniqueCardCount} unique cards
+                  {collection.id === ALL_COLLECTION_ID ? ` across ${collections.length} binder(s)` : ''} • Updated
+                  {' '}
+                  {new Date(collection.updatedAt).toLocaleDateString()}
                 </span>
               )}
             </CardDescription>
@@ -317,14 +335,15 @@ export function CollectionTable() {
                           </TableHeader>
                           <TableBody>
                             {cardsForGame.map((card) => (
-                              <CollectionRow
-                                key={card.id}
-                                card={card}
-                                selected={!!selection[card.id]}
-                                onToggle={() => toggleRow(card.id)}
-                                showPricing={showPricing}
-                              />
-                            ))}
+                            <CollectionRow
+                              key={card.id}
+                              card={card}
+                              selected={!!selection[card.id]}
+                              onToggle={() => toggleRow(card.id)}
+                              showPricing={showPricing}
+                              showBinderName={collection?.id === ALL_COLLECTION_ID}
+                            />
+                          ))}
                           </TableBody>
                         </Table>
                       </div>
@@ -369,12 +388,14 @@ function CollectionRow({
   card,
   selected,
   onToggle,
-  showPricing
+  showPricing,
+  showBinderName
 }: {
   card: CollectionCard;
   selected: boolean;
   onToggle: () => void;
   showPricing: boolean;
+  showBinderName: boolean;
 }) {
   const price = card.price ?? 0;
   const previousPrice =
@@ -395,6 +416,9 @@ function CollectionRow({
             <p className="text-xs text-muted-foreground">
               {card.setName ?? card.setCode ?? 'Unknown set'} · #{card.setCode ?? '—'}
             </p>
+            {showBinderName && card.binderName ? (
+              <p className="text-[11px] text-muted-foreground">Binder: {card.binderName}</p>
+            ) : null}
           </div>
         </div>
       </TableCell>
@@ -698,7 +722,7 @@ function CollectionSelector({
   onRemove,
   showPricing
 }: {
-  collections: SampleCollection[];
+  collections: CollectionEntity[];
   activeId: string;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -720,22 +744,84 @@ function CollectionSelector({
     );
   }
 
+  const aggregateStats = collections.reduce(
+    (acc, binder) => {
+      binder.cards.forEach((card) => {
+        acc.uniqueGames.add(card.tcg);
+        acc.uniqueCardIds.add(card.cardId ?? card.id);
+        acc.totalCopies += card.quantity;
+        acc.totalValue += (card.price ?? 0) * card.quantity;
+      });
+      const updatedAt = new Date(binder.updatedAt).getTime();
+      if (Number.isFinite(updatedAt) && updatedAt > acc.latestUpdated) {
+        acc.latestUpdated = updatedAt;
+      }
+      return acc;
+    },
+    {
+      uniqueGames: new Set<string>(),
+      uniqueCardIds: new Set<string>(),
+      totalCopies: 0,
+      totalValue: 0,
+      latestUpdated: 0
+    }
+  );
+
+  const aggregateUpdatedLabel = aggregateStats.latestUpdated
+    ? new Date(aggregateStats.latestUpdated).toLocaleDateString()
+    : '—';
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <button
         type="button"
-        onClick={onCreate}
-        className="flex h-full min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/40 p-6 text-sm font-medium text-muted-foreground transition hover:border-primary/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        onClick={() => onSelect(ALL_COLLECTION_ID)}
+        aria-pressed={activeId === ALL_COLLECTION_ID}
+        className={cn(
+          'rounded-lg border bg-card p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+          activeId === ALL_COLLECTION_ID
+            ? 'border-primary bg-primary/5 shadow-sm'
+            : 'border-border hover:border-primary/40 hover:bg-muted/40'
+        )}
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-current">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-foreground">All cards</h3>
+            <p className="text-xs text-muted-foreground">Review every binder at once.</p>
+          </div>
+          <Badge variant="outline" className="uppercase text-[10px]">
+            {collections.length} binder{collections.length === 1 ? '' : 's'}
+          </Badge>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            {aggregateStats.uniqueGames.size} game{aggregateStats.uniqueGames.size === 1 ? '' : 's'}
+          </span>
+          <span>{aggregateStats.uniqueCardIds.size} unique</span>
+          <span>{aggregateStats.totalCopies} copies</span>
+          {showPricing && (
+            <span className="font-semibold text-foreground">${aggregateStats.totalValue.toFixed(2)}</span>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] text-muted-foreground">Updated {aggregateUpdatedLabel}</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={onCreate}
+        className="flex h-full min-h-[120px] flex-col justify-center gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-background p-4 text-left text-sm transition hover:border-primary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-current">
           <Plus className="h-4 w-4" />
         </span>
-        New binder
+        <span className="font-semibold text-foreground">New binder</span>
+        <span className="text-xs text-muted-foreground">Create a dedicated space for a deck or set.</span>
       </button>
+
       {collections.map((collection) => {
         const isActive = collection.id === activeId;
         const uniqueGames = new Set(collection.cards.map((card) => card.tcg));
-        const uniqueCards = collection.cards.length;
+        const uniqueCards = new Set(collection.cards.map((card) => card.cardId ?? card.id)).size;
         const totalCopies = collection.cards.reduce((sum, card) => sum + card.quantity, 0);
         const totalValue = collection.cards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
 
@@ -746,51 +832,43 @@ function CollectionSelector({
             onClick={() => onSelect(collection.id)}
             aria-pressed={isActive}
             className={cn(
-              'group rounded-xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-              isActive ? 'border-primary bg-primary/5 shadow-md' : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40'
+              'rounded-lg border bg-card p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+              isActive ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/40 hover:bg-muted/40'
             )}
           >
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-foreground">{collection.name}</h3>
-                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{collection.description}</p>
+                {collection.description ? (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{collection.description}</p>
+                ) : null}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <Badge variant="outline" className="uppercase text-[10px]">
-                  {uniqueGames.size} games
+                  {uniqueGames.size} game{uniqueGames.size === 1 ? '' : 's'}
                 </Badge>
                 {collections.length > 1 && (
-                  <div
-                    role="button"
-                    tabIndex={0}
+                  <button
+                    type="button"
                     onClick={(event) => {
                       event.stopPropagation();
                       onRemove(collection.id);
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onRemove(collection.id);
-                      }
-                    }}
-                    className="cursor-pointer rounded-full border border-transparent p-1 text-muted-foreground transition hover:border-destructive/40 hover:text-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
+                    className="rounded-full p-1 text-muted-foreground transition hover:text-destructive focus:outline-none focus-visible:ring-1 focus-visible:ring-destructive"
                     aria-label={`Delete ${collection.name}`}
                   >
                     <Trash className="h-3.5 w-3.5" />
-                  </div>
+                  </button>
                 )}
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{uniqueCards} unique cards</span>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>{uniqueCards} unique</span>
               <span>{totalCopies} copies</span>
+              {showPricing && (
+                <span className="font-semibold text-foreground">${totalValue.toFixed(2)}</span>
+              )}
             </div>
-            {showPricing && (
-              <div className="mt-2 text-sm font-semibold text-foreground">
-                ${totalValue.toFixed(2)}
-              </div>
-            )}
             <p className="mt-2 text-[10px] text-muted-foreground">
               Updated {new Date(collection.updatedAt).toLocaleDateString()}
             </p>

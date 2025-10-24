@@ -16,14 +16,15 @@ export function CollectionSummary({ items, selectedIds, totalQuantity, totalValu
   const selectedCards = items.filter((card) => selectedIds.includes(card.id));
   const selectedValue = selectedCards.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
   const selectedQuantity = selectedCards.reduce((sum, card) => sum + card.quantity, 0);
-  const avgPrice = items.length ? totalValue / totalQuantity : 0;
+  const uniqueCount = new Set(items.map((card) => card.cardId ?? card.id)).size;
+  const avgPrice = totalQuantity > 0 ? totalValue / totalQuantity : 0;
   const delta = showPricing ? computeDelta(items) : undefined;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <SummaryCard
         title="Total inventory"
-        description={`${items.length} unique cards`}
+        description={`${uniqueCount} unique cards`}
         value={`${totalQuantity} copies`}
         icon={<Layers className="h-5 w-5" />}
       />
