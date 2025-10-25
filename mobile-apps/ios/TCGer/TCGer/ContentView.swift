@@ -14,7 +14,7 @@ struct ContentView: View {
                 DashboardView()
             }
 
-            Tab("Binders", systemImage: "folder.fill") {
+            Tab("Collections", systemImage: "folder.fill") {
                 CollectionsView()
             }
 
