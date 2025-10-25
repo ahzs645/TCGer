@@ -250,113 +250,117 @@ struct CollectionDetailView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if isEditing {
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+
+                List {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if isEditing {
                             TextField("Binder Name", text: $editedName)
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .textFieldStyle(.roundedBorder)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .textFieldStyle(.roundedBorder)
 
-                            TextField("Description (optional)", text: $editedDescription, axis: .vertical)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...6)
-
-                            ColorPickerGrid(selectedColor: $selectedColor)
-                                .padding(.top, 12)
-                        } else {
-                            Text(collection.name)
-                                .font(.title)
-                                .fontWeight(.bold)
-                            if let description = collection.description, !description.isEmpty {
-                                Text(description)
+                                TextField("Description (optional)", text: $editedDescription, axis: .vertical)
                                     .font(.body)
                                     .foregroundColor(.secondary)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(3...6)
+
+                                ColorPickerGrid(selectedColor: $selectedColor)
+                                    .padding(.top, 12)
+                            } else {
+                                Text(collection.name)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                if let description = collection.description, !description.isEmpty {
+                                    Text(description)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
-                    }
-                    .padding()
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
-
-                Section {
-                    CollectionStatsCard(
-                        collection: workingCollectionSnapshot,
-                        showPricing: environmentStore.showPricing
-                    )
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
-
-                Section {
-                    if cards.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "rectangle.stack.badge.plus")
-                                .font(.system(size: 50))
-                                .foregroundColor(.secondary)
-                            Text("No cards in this binder yet")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            Button(action: { showingAddCard = true }) {
-                                Label("Add Your First Card", systemImage: "plus.circle.fill")
-                                    .font(.headline)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.capsule)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        .padding()
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    } else {
-                        ForEach(cards) { card in
-                            CollectionCardRow(
-                                card: card,
-                                showPricing: environmentStore.showPricing,
-                                onTap: {
-                                    previewingCard = card
+                        .listRowBackground(Color(.systemBackground))
+                    }
+
+                    Section {
+                        CollectionStatsCard(
+                            collection: workingCollectionSnapshot,
+                            showPricing: environmentStore.showPricing
+                        )
+                        .padding(.horizontal)
+                        .padding(.vertical, 4)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color(.systemBackground))
+                    }
+
+                    Section {
+                        if cards.isEmpty {
+                            VStack(spacing: 16) {
+                                Image(systemName: "rectangle.stack.badge.plus")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.secondary)
+                                Text("No cards in this binder yet")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+
+                                Button(action: { showingAddCard = true }) {
+                                    Label("Add Your First Card", systemImage: "plus.circle.fill")
+                                        .font(.headline)
                                 }
-                            )
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    cardBeingEdited = card
-                                } label: {
-                                    Label("Edit", systemImage: "square.and.pencil")
-                                }
-                                .tint(.blue)
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    cardPendingDeletion = card
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color(.systemBackground))
+                        } else {
+                            ForEach(cards) { card in
+                                CollectionCardRow(
+                                    card: card,
+                                    showPricing: environmentStore.showPricing,
+                                    onTap: {
+                                        previewingCard = card
+                                    }
+                                )
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color(.systemBackground))
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        cardBeingEdited = card
+                                    } label: {
+                                        Label("Edit", systemImage: "square.and.pencil")
+                                    }
+                                    .tint(.blue)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        cardPendingDeletion = card
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
+                    } header: {
+                        Text("Cards")
+                            .font(.headline)
+                            .textCase(nil)
+                            .padding(.leading, 4)
                     }
-                } header: {
-                    Text("Cards")
-                        .font(.headline)
-                        .textCase(nil)
-                        .padding(.leading, 4)
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

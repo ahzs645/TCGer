@@ -17,10 +17,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
 import { hexToRgba, normalizeHexColor } from '@/lib/color';
-import type { Collection as CollectionEntity } from '@/lib/api/collections';
+import type { Collection as CollectionEntity, UpdateCollectionCardInput } from '@/lib/api/collections';
 import { LIBRARY_COLLECTION_ID } from '@/lib/api/collections';
 import { ALL_COLLECTION_ID, useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
@@ -29,13 +30,20 @@ import type { CollectionCard, TcgCode } from '@/types/card';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
 
+type CardUpdateArgs = {
+  cardId: string;
+  binderId: string;
+  updates: UpdateCollectionCardInput;
+};
+
 export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const token = useAuthStore((state) => state.token);
-  const { collections, addCollection, removeCollection } = useCollectionsStore((state) => ({
+  const { collections, addCollection, removeCollection, updateCollectionCard } = useCollectionsStore((state) => ({
     collections: state.collections,
     addCollection: state.addCollection,
-    removeCollection: state.removeCollection
+    removeCollection: state.removeCollection,
+    updateCollectionCard: state.updateCollectionCard
   }));
   const { enabledGames, showPricing } = useModuleStore((state) => ({
     enabledGames: state.enabledGames,
@@ -50,8 +58,15 @@ export function CollectionTable() {
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const previousCollectionId = useRef<string | null>(null);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const handleCardUpdate = async ({ cardId, binderId, updates }: CardUpdateArgs) => {
+    if (!token) {
+      throw new Error('You must be signed in to update cards.');
+    }
+    await updateCollectionCard(token, binderId, cardId, updates);
+  };
 
   const changeActiveCollection = (id: string, updateUrl = true) => {
     setActiveCollectionId(id);
@@ -154,6 +169,33 @@ export function CollectionTable() {
   const sortedCards = useMemo(() => {
     return [...filtered].sort((a, b) => compareCards(a, b, sortBy, showPricing));
   }, [filtered, sortBy, showPricing]);
+
+  useEffect(() => {
+    if (!sortedCards.length) {
+      setActiveCardId(null);
+      return;
+    }
+
+    setActiveCardId((current) => {
+      const stillVisible = current && sortedCards.some((card) => card.id === current);
+      if (stillVisible) {
+        return current;
+      }
+      return sortedCards[0]?.id ?? null;
+    });
+  }, [sortedCards]);
+
+  const activeCard = useMemo(
+    () => sortedCards.find((card) => card.id === activeCardId) ?? null,
+    [sortedCards, activeCardId]
+  );
+  const fallbackBinderContext =
+    collection && collection.id !== ALL_COLLECTION_ID
+      ? { id: collection.id, name: collection.name, colorHex: collection.colorHex }
+      : undefined;
+  const activeBinderId = activeCard?.binderId ?? fallbackBinderContext?.id;
+  const activeBinderName = activeCard?.binderName ?? fallbackBinderContext?.name;
+  const activeBinderColor = activeCard?.binderColorHex ?? fallbackBinderContext?.colorHex;
 
   const selectedIds = useMemo(
     () => Object.entries(selection).filter(([, checked]) => checked).map(([id]) => id),
@@ -317,94 +359,107 @@ export function CollectionTable() {
             onClear={() => resetFilters(setRarityFilter, setPriceRange, defaultMaxPrice)}
           />
 
-          <div className="relative">
-            <ScrollArea className="h-[620px] rounded-md border">
-              {isLoading ? (
-                <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading collection data...
+          <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
+            <CardDetailsPanel
+              card={activeCard}
+              binderId={activeBinderId}
+              binderName={activeBinderName}
+              binderColor={activeBinderColor}
+              showPricing={showPricing}
+              parentCollectionName={collection?.name}
+              onUpdate={handleCardUpdate}
+            />
+            <div className="relative">
+              <ScrollArea className="h-[620px] rounded-md border">
+                {isLoading ? (
+                  <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading collection data...
+                    </div>
                   </div>
-                </div>
-              ) : groupedByGame.length === 0 ? (
-                <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
-                  {noGamesEnabled
-                    ? 'All modules are disabled. Re-enable them in settings to view your catalog.'
-                    : selectedGameDisabled
-                      ? 'Selected game is disabled. Enable it from module preferences to manage its collection.'
-                      : 'No cards matched your filters.'}
-                </div>
-              ) : (
-                <div className="space-y-8 p-4">
-                  {groupedByGame.map(([tcg, cardsForGame]) => {
-                    const gameValue = cardsForGame.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
-                    const gameQuantity = cardsForGame.reduce((sum, card) => sum + card.quantity, 0);
+                ) : groupedByGame.length === 0 ? (
+                  <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-muted-foreground">
+                    {noGamesEnabled
+                      ? 'All modules are disabled. Re-enable them in settings to view your catalog.'
+                      : selectedGameDisabled
+                        ? 'Selected game is disabled. Enable it from module preferences to manage its collection.'
+                        : 'No cards matched your filters.'}
+                  </div>
+                ) : (
+                  <div className="space-y-8 p-4">
+                    {groupedByGame.map(([tcg, cardsForGame]) => {
+                      const gameValue = cardsForGame.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0);
+                      const gameQuantity = cardsForGame.reduce((sum, card) => sum + card.quantity, 0);
 
-                    return (
-                      <div key={tcg} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-semibold">{GAME_LABELS[tcg as keyof typeof GAME_LABELS]}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              {cardsForGame.length} card(s), {gameQuantity} copies
-                              {showPricing ? ` • $${gameValue.toFixed(2)}` : ''}
-                            </p>
+                      return (
+                        <div key={tcg} className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-sm font-semibold">{GAME_LABELS[tcg as keyof typeof GAME_LABELS]}</h3>
+                              <p className="text-xs text-muted-foreground">
+                                {cardsForGame.length} card(s), {gameQuantity} copies
+                                {showPricing ? ` • $${gameValue.toFixed(2)}` : ''}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="uppercase">
+                              {GAME_LABELS[tcg as keyof typeof GAME_LABELS] ?? tcg}
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="uppercase">
-                            {GAME_LABELS[tcg as keyof typeof GAME_LABELS] ?? tcg}
-                          </Badge>
-                        </div>
 
-                        <Table>
-                          <TableHeader className="bg-muted/30">
-                            <TableRow>
-                              <TableHead className="w-10">
-                                <Checkbox
-                                  checked={cardsForGame.every((card) => selection[card.id])}
-                                  onCheckedChange={(checked) =>
-                                    setSelection((prev) => {
-                                      const next = { ...prev };
-                                      if (checked) {
-                                        cardsForGame.forEach((card) => {
-                                          next[card.id] = true;
-                                        });
-                                      } else {
-                                        cardsForGame.forEach((card) => {
-                                          delete next[card.id];
-                                        });
-                                      }
-                                      return next;
-                                    })
-                                  }
-                                  aria-label={`Select all ${GAME_LABELS[tcg as keyof typeof GAME_LABELS]} cards`}
+                          <Table>
+                            <TableHeader className="bg-muted/30">
+                              <TableRow>
+                                <TableHead className="w-10">
+                                  <Checkbox
+                                    checked={cardsForGame.every((card) => selection[card.id])}
+                                    onCheckedChange={(checked) =>
+                                      setSelection((prev) => {
+                                        const next = { ...prev };
+                                        if (checked) {
+                                          cardsForGame.forEach((card) => {
+                                            next[card.id] = true;
+                                          });
+                                        } else {
+                                          cardsForGame.forEach((card) => {
+                                            delete next[card.id];
+                                          });
+                                        }
+                                        return next;
+                                      })
+                                    }
+                                    aria-label={`Select all ${GAME_LABELS[tcg as keyof typeof GAME_LABELS]} cards`}
+                                  />
+                                </TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Set</TableHead>
+                                <TableHead>Rarity</TableHead>
+                                <TableHead className="text-right">Quantity</TableHead>
+                                <TableHead className="text-right">Condition</TableHead>
+                                {showPricing && <TableHead className="text-right">Est. Price</TableHead>}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {cardsForGame.map((card) => (
+                                <CollectionRow
+                                  key={card.id}
+                                  card={card}
+                                  selected={!!selection[card.id]}
+                                  onToggle={() => toggleRow(card.id)}
+                                  showPricing={showPricing}
+                                  showBinderName={collection?.id === ALL_COLLECTION_ID}
+                                  isActive={card.id === activeCard?.id}
+                                  onSelectCard={() => setActiveCardId(card.id)}
                                 />
-                              </TableHead>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Set</TableHead>
-                              <TableHead>Rarity</TableHead>
-                              <TableHead className="text-right">Quantity</TableHead>
-                              <TableHead className="text-right">Condition</TableHead>
-                              {showPricing && <TableHead className="text-right">Est. Price</TableHead>}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {cardsForGame.map((card) => (
-                            <CollectionRow
-                              key={card.id}
-                              card={card}
-                              selected={!!selection[card.id]}
-                              onToggle={() => toggleRow(card.id)}
-                              showPricing={showPricing}
-                              showBinderName={collection?.id === ALL_COLLECTION_ID}
-                            />
-                          ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -437,18 +492,295 @@ export function CollectionTable() {
   );
 }
 
+const CONDITION_OPTIONS = ['Mint', 'Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
+const EMPTY_CONDITION_VALUE = '__condition-empty__';
+
+function CardDetailsPanel({
+  card,
+  binderId,
+  binderName,
+  binderColor,
+  showPricing,
+  parentCollectionName,
+  onUpdate
+}: {
+  card: CollectionCard | null;
+  binderId?: string;
+  binderName?: string;
+  binderColor?: string | null;
+  showPricing: boolean;
+  parentCollectionName?: string;
+  onUpdate: (args: CardUpdateArgs) => Promise<void>;
+}) {
+  const [condition, setCondition] = useState<string | null>(card?.condition ?? null);
+  const [notes, setNotes] = useState(card?.notes ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCondition(card?.condition ?? null);
+    setNotes(card?.notes ?? '');
+    setStatus('idle');
+    setErrorMessage(null);
+  }, [card?.id, card?.condition, card?.notes]);
+
+  useEffect(() => {
+    if (status !== 'success') {
+      return;
+    }
+
+    const timer = setTimeout(() => setStatus('idle'), 2500);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  const conditionChoices = useMemo(() => {
+    if (!card?.condition) {
+      return CONDITION_OPTIONS;
+    }
+    if (CONDITION_OPTIONS.includes(card.condition)) {
+      return CONDITION_OPTIONS;
+    }
+    return [card.condition, ...CONDITION_OPTIONS];
+  }, [card?.condition]);
+
+  const pendingPayload = useMemo<UpdateCollectionCardInput | null>(() => {
+    if (!card) {
+      return null;
+    }
+
+    const updates: UpdateCollectionCardInput = {};
+    if ((condition ?? null) !== (card.condition ?? null)) {
+      updates.condition = condition;
+    }
+
+    if (notes !== (card.notes ?? '')) {
+      const trimmed = notes.trim();
+      updates.notes = trimmed.length ? notes : null;
+    }
+
+    return Object.keys(updates).length ? updates : null;
+  }, [card, condition, notes]);
+
+  const hasChanges = Boolean(pendingPayload);
+  const canEdit = Boolean(card && binderId);
+  const binderAccent = normalizeHexColor(binderColor ?? undefined);
+  const binderChipStyle: CSSProperties | undefined = binderAccent
+    ? {
+        backgroundColor: hexToRgba(binderAccent, 0.18),
+        color: binderAccent
+      }
+    : undefined;
+
+  const handleSave = async () => {
+    if (!card || !binderId || !pendingPayload) {
+      return;
+    }
+
+    setIsSaving(true);
+    setStatus('idle');
+    setErrorMessage(null);
+    try {
+      await onUpdate({ cardId: card.id, binderId, updates: pendingPayload });
+      setStatus('success');
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update card.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    setCondition(card?.condition ?? null);
+    setNotes(card?.notes ?? '');
+    setStatus('idle');
+    setErrorMessage(null);
+  };
+
+  const cardImageUrl = card?.imageUrl ?? card?.imageUrlSmall ?? null;
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-4 lg:h-[620px]">
+      {!card ? (
+        <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
+          <p>Select a card from the table to view its details and artwork.</p>
+        </div>
+      ) : (
+        <div className="flex h-full flex-col gap-4">
+          <div className="space-y-3">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted">
+              {cardImageUrl ? (
+                <Image
+                  src={cardImageUrl}
+                  alt={card.name}
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 320px, 100vw"
+                />
+              ) : card.setSymbolUrl ? (
+                <div className="flex h-full items-center justify-center bg-background">
+                  <Image
+                    src={card.setSymbolUrl}
+                    alt={`${card.setName ?? card.setCode ?? 'Set'} symbol`}
+                    width={72}
+                    height={72}
+                  />
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image available</div>
+              )}
+            </div>
+            {cardImageUrl && (
+              <Button asChild variant="secondary" size="sm">
+                <a href={cardImageUrl} target="_blank" rel="noopener noreferrer">
+                  Open image in new tab
+                </a>
+              </Button>
+            )}
+            <div>
+              <h3 className="text-lg font-semibold leading-tight">{card.name}</h3>
+              <p className="text-xs text-muted-foreground">
+                {card.setName ?? card.setCode ?? 'Unknown set'}
+                {card.setCode ? ` · #${card.setCode}` : ''}
+              </p>
+              {(binderName || parentCollectionName) && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Binder{' '}
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground" style={binderChipStyle}>
+                    {binderAccent ? (
+                      <span
+                        className="inline-flex h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: binderAccent }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    <span style={{ color: binderAccent ?? undefined }}>{binderName ?? parentCollectionName ?? 'Unknown binder'}</span>
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-md border bg-background/40 p-3 text-xs text-muted-foreground">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="uppercase tracking-wide">Game</p>
+                <p className="text-sm font-semibold text-foreground">{GAME_LABELS[card.tcg as keyof typeof GAME_LABELS]}</p>
+              </div>
+              <div>
+                <p className="uppercase tracking-wide">Rarity</p>
+                <p className="text-sm font-semibold text-foreground">{card.rarity ?? 'N/A'}</p>
+              </div>
+              <div>
+                <p className="uppercase tracking-wide">Quantity</p>
+                <p className="text-sm font-semibold text-foreground">{card.quantity}</p>
+              </div>
+              <div>
+                <p className="uppercase tracking-wide">Condition</p>
+                <p className="text-sm font-semibold text-foreground">{card.condition ?? 'Not specified'}</p>
+              </div>
+              {showPricing ? (
+                <div>
+                  <p className="uppercase tracking-wide">Est. value</p>
+                  <p className="text-sm font-semibold text-foreground">${(card.price ?? 0).toFixed(2)}</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="card-condition">Condition</Label>
+              <Select
+                value={condition ?? EMPTY_CONDITION_VALUE}
+                onValueChange={(value) => setCondition(value === EMPTY_CONDITION_VALUE ? null : value)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger id="card-condition">
+                  <SelectValue placeholder="Select condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_CONDITION_VALUE}>Not specified</SelectItem>
+                  {conditionChoices.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="card-notes">Notes</Label>
+              <Textarea
+                id="card-notes"
+                placeholder="Add personal notes (sleeves, grading plans, etc.)"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={4}
+                disabled={!canEdit}
+              />
+            </div>
+          </div>
+
+          <div className="mt-auto space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={!hasChanges || !canEdit || isSaving}
+              >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save changes
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleReset}
+                disabled={!canEdit || isSaving || !hasChanges}
+              >
+                Reset
+              </Button>
+            </div>
+            {status === 'success' && (
+              <p className="text-xs text-emerald-600" aria-live="polite">
+                Card updated successfully.
+              </p>
+            )}
+            {status === 'error' && (
+              <p className="text-xs text-destructive" aria-live="assertive">
+                {errorMessage ?? 'Failed to update card.'}
+              </p>
+            )}
+            {!canEdit && (
+              <p className="text-xs text-muted-foreground">Editing is unavailable for this card right now.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CollectionRow({
   card,
   selected,
   onToggle,
   showPricing,
-  showBinderName
+  showBinderName,
+  isActive,
+  onSelectCard
 }: {
   card: CollectionCard;
   selected: boolean;
   onToggle: () => void;
   showPricing: boolean;
   showBinderName: boolean;
+  isActive: boolean;
+  onSelectCard: () => void;
 }) {
   const price = card.price ?? 0;
   const previousPrice =
@@ -464,37 +796,44 @@ function CollectionRow({
     : undefined;
 
   return (
-    <TableRow data-state={selected ? 'selected' : undefined}>
+    <TableRow
+      data-state={selected ? 'selected' : undefined}
+      className={cn('cursor-pointer transition-colors', isActive && 'bg-primary/5')}
+      onClick={onSelectCard}
+      aria-selected={isActive}
+    >
       <TableCell className="align-top">
-        <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Select ${card.name}`} />
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onToggle}
+          aria-label={`Select ${card.name}`}
+          onClick={(event) => event.stopPropagation()}
+        />
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-3">
-          <CardAvatar card={card} />
-          <div>
-            <p className="font-medium leading-tight">{card.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {card.setName ?? card.setCode ?? 'Unknown set'} · #{card.setCode ?? '—'}
+        <div className="space-y-1">
+          <p className="font-medium leading-tight">{card.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {card.setName ?? card.setCode ?? 'Unknown set'} · #{card.setCode ?? '—'}
+          </p>
+          {showBinderName && card.binderName ? (
+            <p className="text-[11px] text-muted-foreground">
+              Binder{' '}
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground"
+                style={binderChipStyle}
+              >
+                {binderAccent ? (
+                  <span
+                    className="inline-flex h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: binderAccent }}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                <span style={{ color: binderAccent ?? undefined }}>{card.binderName}</span>
+              </span>
             </p>
-            {showBinderName && card.binderName ? (
-              <p className="text-[11px] text-muted-foreground">
-                Binder{' '}
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground"
-                  style={binderChipStyle}
-                >
-                  {binderAccent ? (
-                    <span
-                      className="inline-flex h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: binderAccent }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  <span style={{ color: binderAccent ?? undefined }}>{card.binderName}</span>
-                </span>
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </TableCell>
       <TableCell>{card.setName ?? card.setCode ?? 'Unknown'}</TableCell>
@@ -592,36 +931,6 @@ function CreateCollectionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CardAvatar({ card }: { card: CollectionCard }) {
-  if (card.imageUrlSmall) {
-    return (
-      <div className="relative h-12 w-9 overflow-hidden rounded-md border bg-muted/30">
-        <Image
-          src={card.imageUrlSmall}
-          alt={card.name}
-          fill
-          className="object-cover"
-          sizes="40px"
-        />
-      </div>
-    );
-  }
-
-  if (card.setSymbolUrl) {
-    return (
-      <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-muted/30 p-2">
-        <Image src={card.setSymbolUrl} alt={`${card.setName ?? card.setCode} symbol`} width={32} height={32} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-12 w-9 items-center justify-center rounded-md border bg-muted/30 text-xs text-muted-foreground">
-      No image
-    </div>
   );
 }
 
