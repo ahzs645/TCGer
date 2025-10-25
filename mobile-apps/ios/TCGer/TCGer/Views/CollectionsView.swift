@@ -315,8 +315,13 @@ struct CollectionDetailView: View {
                                     .foregroundColor(.secondary)
 
                                 Button(action: { showingAddCard = true }) {
-                                    Label("Add Your First Card", systemImage: "plus.circle.fill")
-                                        .font(.headline)
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title3)
+                                        Text("Add Your First Card")
+                                            .font(.headline)
+                                    }
+                                    .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .buttonBorderShape(.capsule)
@@ -365,7 +370,7 @@ struct CollectionDetailView: View {
                         }
                     }
 
-                    if !collection.isUnsortedBinder {
+                    if !collection.isUnsortedBinder, isEditing {
                         Section {
                             Button(role: .destructive) {
                                 showingDeleteBinderConfirmation = true
