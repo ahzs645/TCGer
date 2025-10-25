@@ -220,6 +220,11 @@ struct CollectionDetailView: View {
     @State private var showingAddCard = false
     @State private var errorMessage: String?
     @State private var isSaving = false
+    @State private var cards: [CollectionCard]
+    @State private var cardPendingDeletion: CollectionCard?
+    @State private var cardBeingEdited: CollectionCard?
+    @State private var editingCardId: String?
+    @State private var previewingCard: CollectionCard?
 
     private let apiService = APIService()
 
@@ -228,13 +233,25 @@ struct CollectionDetailView: View {
         _editedName = State(initialValue: collection.name)
         _editedDescription = State(initialValue: collection.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(collection.colorHex))
+        _cards = State(initialValue: collection.cards)
+    }
+
+    private var workingCollectionSnapshot: Collection {
+        Collection(
+            id: collection.id,
+            name: isEditing ? editedName : collection.name,
+            description: isEditing ? (editedDescription.isEmpty ? nil : editedDescription) : collection.description,
+            cards: cards,
+            createdAt: collection.createdAt,
+            updatedAt: collection.updatedAt,
+            colorHex: isEditing ? selectedColor.toHex() : collection.colorHex
+        )
     }
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header
+            List {
+                Section {
                     VStack(alignment: .leading, spacing: 8) {
                         if isEditing {
                             TextField("Binder Name", text: $editedName)
@@ -262,53 +279,84 @@ struct CollectionDetailView: View {
                         }
                     }
                     .padding()
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
 
-                    // Stats Card
+                Section {
                     CollectionStatsCard(
-                        collection: collection,
+                        collection: workingCollectionSnapshot,
                         showPricing: environmentStore.showPricing
                     )
-                        .padding(.horizontal)
+                    .padding(.horizontal)
+                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
 
-                    // Cards List
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Cards")
-                                .font(.headline)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
+                Section {
+                    if cards.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "rectangle.stack.badge.plus")
+                                .font(.system(size: 50))
+                                .foregroundColor(.secondary)
+                            Text("No cards in this binder yet")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
 
-                        if collection.cards.isEmpty {
-                            VStack(spacing: 16) {
-                                Image(systemName: "rectangle.stack.badge.plus")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.secondary)
-                                Text("No cards in this binder yet")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-
-                                Button(action: { showingAddCard = true }) {
-                                    Label("Add Your First Card", systemImage: "plus.circle.fill")
-                                        .font(.headline)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .buttonBorderShape(.capsule)
+                            Button(action: { showingAddCard = true }) {
+                                Label("Add Your First Card", systemImage: "plus.circle.fill")
+                                    .font(.headline)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                        } else {
-                            ForEach(collection.cards) { card in
-                                CollectionCardRow(
-                                    card: card,
-                                    showPricing: environmentStore.showPricing
-                                )
-                                    .padding(.horizontal)
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.capsule)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    } else {
+                        ForEach(cards) { card in
+                            CollectionCardRow(
+                                card: card,
+                                showPricing: environmentStore.showPricing,
+                                onTap: {
+                                    previewingCard = card
+                                }
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    cardBeingEdited = card
+                                } label: {
+                                    Label("Edit", systemImage: "square.and.pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    cardPendingDeletion = card
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
                     }
+                } header: {
+                    Text("Cards")
+                        .font(.headline)
+                        .textCase(nil)
+                        .padding(.leading, 4)
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -348,6 +396,23 @@ struct CollectionDetailView: View {
             .sheet(isPresented: $showingAddCard) {
                 AddCardToBinderFromSearchView(binderId: collection.id)
             }
+            .sheet(item: $cardBeingEdited) { card in
+                EditCollectionCardSheet(
+                    card: card,
+                    isSaving: editingCardId == card.id
+                ) { quantity, condition, language, notes in
+                    await updateCard(
+                        card: card,
+                        quantity: quantity,
+                        condition: condition,
+                        language: language,
+                        notes: notes
+                    )
+                }
+            }
+            .fullScreenCover(item: $previewingCard) { card in
+                CardImagePreviewView(card: card)
+            }
             .alert("Error", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -359,6 +424,25 @@ struct CollectionDetailView: View {
                 if let error = errorMessage {
                     Text(error)
                 }
+            }
+            .confirmationDialog(
+                "Remove Card?",
+                isPresented: Binding(
+                    get: { cardPendingDeletion != nil },
+                    set: { if !$0 { cardPendingDeletion = nil } }
+                ),
+                presenting: cardPendingDeletion
+            ) { card in
+                Button("Delete \"\(card.name)\"", role: .destructive) {
+                    Task {
+                        await deleteCard(card)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    cardPendingDeletion = nil
+                }
+            } message: { card in
+                Text("This will remove all copies of \(card.name) from this binder.")
             }
         }
     }
@@ -393,11 +477,92 @@ struct CollectionDetailView: View {
             isSaving = false
         }
     }
+
+    @MainActor
+    private func deleteCard(_ card: CollectionCard) async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            cardPendingDeletion = nil
+            return
+        }
+
+        defer {
+            cardPendingDeletion = nil
+        }
+
+        do {
+            try await apiService.deleteCardFromBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: collection.id,
+                collectionCardId: card.id
+            )
+            cards.removeAll { $0.id == card.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func updateCard(
+        card: CollectionCard,
+        quantity: Int,
+        condition: String?,
+        language: String?,
+        notes: String?
+    ) async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        editingCardId = card.id
+
+        do {
+            let updated = try await apiService.updateCardInBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: collection.id,
+                collectionCardId: card.id,
+                quantity: quantity,
+                condition: condition,
+                language: language,
+                notes: notes
+            )
+
+            if let index = cards.firstIndex(where: { $0.id == card.id }) {
+                cards[index] = updated
+            }
+
+            cardBeingEdited = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        editingCardId = nil
+    }
 }
 
 private struct CollectionCardRow: View {
     let card: CollectionCard
     let showPricing: Bool
+    let onTap: (() -> Void)?
+
+    init(card: CollectionCard, showPricing: Bool, onTap: (() -> Void)? = nil) {
+        self.card = card
+        self.showPricing = showPricing
+        self.onTap = onTap
+    }
+
+    private var conditionText: String? {
+        guard let condition = card.condition, !condition.isEmpty else { return nil }
+        return condition
+    }
+
+    private var languageText: String? {
+        guard let language = card.language, !language.isEmpty else { return nil }
+        return language
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -426,7 +591,7 @@ private struct CollectionCardRow: View {
             .frame(width: 50, height: 70)
             .cornerRadius(4)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(card.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -446,12 +611,36 @@ private struct CollectionCardRow: View {
                             .foregroundColor(.green)
                     }
                 }
+                if conditionText != nil || languageText != nil {
+                    HStack(spacing: 8) {
+                        if let condition = conditionText {
+                            Label(condition, systemImage: "wand.and.stars")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        if let language = languageText {
+                            Label(language, systemImage: "globe")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                if let notes = card.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                }
             }
             Spacer()
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap?()
+        }
     }
 }
 

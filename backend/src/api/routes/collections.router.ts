@@ -9,7 +9,8 @@ import {
   deleteBinder,
   addCardToBinder,
   addCardToLibrary,
-  removeCardFromBinder
+  removeCardFromBinder,
+  updateCardInBinder
 } from '../../modules/collections/collections.service';
 import { asyncHandler } from '../../utils/async-handler';
 
@@ -53,6 +54,24 @@ const addCardSchema = z.object({
 const addLibraryCardSchema = addCardSchema.extend({
   binderId: z.string().optional()
 });
+
+const updateCardSchema = z
+  .object({
+    quantity: z.number().int().positive().optional(),
+    condition: z.string().nullable().optional(),
+    language: z.string().nullable().optional(),
+    notes: z.string().nullable().optional()
+  })
+  .refine(
+    (data) =>
+      data.quantity !== undefined ||
+      data.condition !== undefined ||
+      data.language !== undefined ||
+      data.notes !== undefined,
+    {
+      message: 'At least one field must be provided'
+    }
+  );
 
 // Get all binders for the authenticated user
 collectionsRouter.get(
@@ -167,6 +186,27 @@ collectionsRouter.delete(
     try {
       await removeCardFromBinder(userId, binderId, collectionId);
       res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Collection entry not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Collection entry not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Update a card inside a binder
+collectionsRouter.patch(
+  '/:binderId/cards/:collectionId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { binderId, collectionId } = req.params;
+    const data = updateCardSchema.parse(req.body);
+
+    try {
+      const card = await updateCardInBinder(userId, binderId, collectionId, data);
+      res.json(card);
     } catch (error) {
       if (error instanceof Error && error.message === 'Collection entry not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Collection entry not found' });
