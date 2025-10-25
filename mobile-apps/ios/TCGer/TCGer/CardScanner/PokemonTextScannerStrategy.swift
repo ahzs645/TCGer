@@ -9,6 +9,7 @@ final class PokemonTextScannerStrategy: ScanStrategy {
     }
 
     let kind: ScanStrategyKind = .textOCR
+    let supportsLiveScanning: Bool = true
 
     func supports(_ mode: ScanMode) -> Bool {
         mode == .pokemon

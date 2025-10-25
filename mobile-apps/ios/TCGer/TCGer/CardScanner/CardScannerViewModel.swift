@@ -104,6 +104,10 @@ final class CardScannerViewModel: ObservableObject {
         }
 
         guard case .ready = state else { return }
+        guard isModeSupported(selectedMode) else {
+            state = .error("\(selectedMode.displayName) scanning is not available yet.")
+            return
+        }
         guard context?.authToken != nil else {
             state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
             return
@@ -180,7 +184,7 @@ final class CardScannerViewModel: ObservableObject {
         guard !isProcessingPhoto else { return }
         guard latestResult == nil else { return }
         guard let context, context.authToken != nil else { return }
-        guard context.mode == .pokemon else { return }
+        guard coordinator.supportsLiveScanning(for: context.mode) else { return }
 
         let now = Date()
         guard now.timeIntervalSince(lastAnalysisDate) >= analysisInterval else { return }
@@ -221,6 +225,14 @@ final class CardScannerViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func isModeSupported(_ mode: ScanMode) -> Bool {
+        coordinator.canScan(mode: mode)
+    }
+
+    func supportsLivePreview(_ mode: ScanMode) -> Bool {
+        coordinator.supportsLiveScanning(for: mode)
     }
 
     private func makeCGImage(from photo: AVCapturePhoto) -> CGImage? {

@@ -28,7 +28,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+      <header className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 backdrop-blur">
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
@@ -64,7 +64,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </div>
       </header>
-      <main className="flex-1 bg-muted/20">
+      <main className="flex-1 bg-muted/20 pt-20">
         <div className="container space-y-6 py-8">{children}</div>
       </main>
     </div>
