@@ -224,6 +224,10 @@ struct CollectionDetailView: View {
     @State private var cardPendingDeletion: CollectionCard?
     @State private var cardBeingEdited: CollectionCard?
     @State private var editingCardId: String?
+    @State private var cardBeingMoved: CollectionCard?
+    @State private var movingCardId: String?
+    @State private var showingDeleteBinderConfirmation = false
+    @State private var isDeletingBinder = false
     @State private var previewingCard: CollectionCard?
 
     private let apiService = APIService()
@@ -288,11 +292,11 @@ struct CollectionDetailView: View {
                         .listRowBackground(Color(.systemBackground))
                     }
 
-                    Section {
-                        CollectionStatsCard(
-                            collection: workingCollectionSnapshot,
-                            showPricing: environmentStore.showPricing
-                        )
+                Section {
+                    CollectionStatsCard(
+                        collection: workingCollectionSnapshot,
+                        showPricing: environmentStore.showPricing
+                    )
                         .padding(.horizontal)
                         .padding(.vertical, 4)
                         .listRowInsets(EdgeInsets())
@@ -333,29 +337,54 @@ struct CollectionDetailView: View {
                                 )
                                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                 .listRowSeparator(.hidden)
-                                .listRowBackground(Color(.systemBackground))
-                                .swipeActions(edge: .leading) {
-                                    Button {
-                                        cardBeingEdited = card
-                                    } label: {
-                                        Label("Edit", systemImage: "square.and.pencil")
-                                    }
-                                    .tint(.blue)
+                            .listRowBackground(Color(.systemBackground))
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    cardBeingEdited = card
+                                } label: {
+                                    Label("Edit", systemImage: "square.and.pencil")
                                 }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        cardPendingDeletion = card
+                                .tint(.blue)
+                                if collection.isUnsortedBinder {
+                                    Button {
+                                        cardBeingMoved = card
                                     } label: {
+                                        Label("Move", systemImage: "arrowshape.turn.up.right")
+                                    }
+                                    .tint(.purple)
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    cardPendingDeletion = card
+                                } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
                             }
                         }
-                    } header: {
-                        Text("Cards")
-                            .font(.headline)
-                            .textCase(nil)
-                            .padding(.leading, 4)
+                    }
+
+                    if !collection.isUnsortedBinder {
+                        Section {
+                            Button(role: .destructive) {
+                                showingDeleteBinderConfirmation = true
+                            } label: {
+                                HStack {
+                                    if isDeletingBinder {
+                                        ProgressView()
+                                    } else {
+                                        Image(systemName: "trash")
+                                    }
+                                    Text(isDeletingBinder ? "Deleting..." : "Delete Binder")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .disabled(isDeletingBinder)
+                        }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color(.systemBackground))
                     }
                 }
                 .listStyle(.plain)
@@ -414,6 +443,19 @@ struct CollectionDetailView: View {
                     )
                 }
             }
+            .sheet(item: $cardBeingMoved) { card in
+                MoveCardToBinderSheet(
+                    card: card,
+                    maxQuantity: card.quantity,
+                    isProcessing: movingCardId == card.id
+                ) { binderId, quantity in
+                    await moveCard(
+                        card: card,
+                        destinationBinderId: binderId,
+                        quantity: quantity
+                    )
+                }
+            }
             .fullScreenCover(item: $previewingCard) { card in
                 CardImagePreviewView(card: card)
             }
@@ -447,6 +489,18 @@ struct CollectionDetailView: View {
                 }
             } message: { card in
                 Text("This will remove all copies of \(card.name) from this binder.")
+            }
+            .alert("Delete Binder?", isPresented: $showingDeleteBinderConfirmation) {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        await deleteBinder()
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    showingDeleteBinderConfirmation = false
+                }
+            } message: {
+                Text("This action permanently removes the binder and its cards.")
             }
         }
     }
@@ -544,6 +598,102 @@ struct CollectionDetailView: View {
         }
 
         editingCardId = nil
+    }
+
+    @MainActor
+    private func moveCard(
+        card: CollectionCard,
+        destinationBinderId: String,
+        quantity: Int
+    ) async {
+        guard collection.isUnsortedBinder else {
+            cardBeingMoved = nil
+            return
+        }
+
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        movingCardId = card.id
+        errorMessage = nil
+
+        do {
+            try await apiService.addCardToBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: destinationBinderId,
+                cardId: card.cardId,
+                quantity: quantity,
+                condition: card.condition,
+                language: card.language,
+                notes: card.notes
+            )
+
+            if quantity >= card.quantity {
+                try await apiService.deleteCardFromBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: card.id
+                )
+                cards.removeAll { $0.id == card.id }
+            } else {
+                let updated = try await apiService.updateCardInBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: card.id,
+                    quantity: card.quantity - quantity,
+                    condition: card.condition,
+                    language: card.language,
+                    notes: card.notes
+                )
+
+                if let index = cards.firstIndex(where: { $0.id == card.id }) {
+                    cards[index] = updated
+                }
+            }
+
+            cardBeingMoved = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        movingCardId = nil
+    }
+
+    @MainActor
+    private func deleteBinder() async {
+        guard !collection.isUnsortedBinder else {
+            showingDeleteBinderConfirmation = false
+            return
+        }
+
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            showingDeleteBinderConfirmation = false
+            return
+        }
+
+        isDeletingBinder = true
+        errorMessage = nil
+
+        do {
+            try await apiService.deleteCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                id: collection.id
+            )
+            isDeletingBinder = false
+            showingDeleteBinderConfirmation = false
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isDeletingBinder = false
+            showingDeleteBinderConfirmation = false
+        }
     }
 }
 

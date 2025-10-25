@@ -21,9 +21,19 @@ struct CardScannerView: View {
         }
         .onAppear {
             viewModel.updateEnvironment(environmentStore)
+            syncSelectedModeWithModules()
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
+        }
+        .onChange(of: environmentStore.enabledYugioh, initial: false) { _, _ in
+            syncSelectedModeWithModules()
+        }
+        .onChange(of: environmentStore.enabledMagic, initial: false) { _, _ in
+            syncSelectedModeWithModules()
+        }
+        .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
+            syncSelectedModeWithModules()
         }
         .sheet(item: $viewModel.latestResult, onDismiss: {
             viewModel.clearResult()
@@ -95,7 +105,14 @@ struct CardScannerView: View {
                 .background(Color.red.opacity(0.7))
                 .cornerRadius(12)
         default:
-            if !isModeSupported {
+            if !hasEnabledScanModes {
+                Text("Enable at least one TCG module in Settings to scan cards.")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(Color.black.opacity(0.6))
+                    .cornerRadius(12)
+            } else if !isModeSupported {
                 Text("\(viewModel.selectedMode.displayName) scanning is coming soon.")
                     .font(.subheadline)
                     .foregroundColor(.white)
@@ -142,13 +159,21 @@ struct CardScannerView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 16) {
-            Picker("Mode", selection: $viewModel.selectedMode) {
-                ForEach(ScanMode.allCases) { mode in
-                    Text(mode.displayName).tag(mode)
+            if hasEnabledScanModes {
+                Picker("Mode", selection: $viewModel.selectedMode) {
+                    ForEach(availableScanModes) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+            } else {
+                Text("Turn on at least one game module in Settings to access scanning.")
+                    .font(.footnote)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
 
             Button(action: {
                 viewModel.capturePhoto()
@@ -175,7 +200,8 @@ struct CardScannerView: View {
                 isUnauthorized ||
                 isErrorState ||
                 viewModel.latestResult != nil ||
-                !isModeSupported
+                !isModeSupported ||
+                !hasEnabledScanModes
             )
             .buttonStyle(.plain)
             .padding(.bottom, 12)
@@ -242,6 +268,22 @@ struct CardScannerView: View {
 }
 
 private extension CardScannerView {
+    var availableScanModes: [ScanMode] {
+        ScanMode.allCases.filter { environmentStore.isGameEnabled($0.tcgGame) }
+    }
+
+    var hasEnabledScanModes: Bool {
+        !availableScanModes.isEmpty
+    }
+
+    func syncSelectedModeWithModules() {
+        let modes = availableScanModes
+        guard !modes.isEmpty else { return }
+        if !modes.contains(viewModel.selectedMode) {
+            viewModel.selectedMode = modes[0]
+        }
+    }
+
     var isModeSupported: Bool {
         viewModel.selectedMode == .pokemon
     }

@@ -45,11 +45,6 @@ struct CollectionStatsCard: View {
                         color: item.color,
                         icon: item.icon
                     )
-
-                    if index < statItems.count - 1 {
-                        Divider()
-                            .frame(height: 40)
-                    }
                 }
             }
         }
@@ -67,20 +62,29 @@ struct StatItem: View {
     let icon: String
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(color)
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 34, height: 34)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(color)
+            }
 
-            Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title.uppercased())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
 
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+            }
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
