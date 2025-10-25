@@ -119,6 +119,13 @@ struct CardScannerView: View {
                     .padding(12)
                     .background(Color.black.opacity(0.6))
                     .cornerRadius(12)
+            } else if !viewModel.supportsLivePreview(viewModel.selectedMode) {
+                Text("Tap the shutter to scan \(viewModel.selectedMode.displayName) cards.")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(Color.black.opacity(0.6))
+                    .cornerRadius(12)
             } else if viewModel.isAnalyzingFrame {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -285,7 +292,7 @@ private extension CardScannerView {
     }
 
     var isModeSupported: Bool {
-        viewModel.selectedMode == .pokemon
+        viewModel.isModeSupported(viewModel.selectedMode)
     }
 
     var isProcessingPhoto: Bool {

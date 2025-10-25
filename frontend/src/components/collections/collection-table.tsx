@@ -223,6 +223,17 @@ export function CollectionTable() {
     () => Object.entries(selection).filter(([, checked]) => checked).map(([id]) => id),
     [selection]
   );
+  const selectedSnapshot = useMemo(() => {
+    if (!selectedIds.length) {
+      return null;
+    }
+    const selectedCards = items.filter((card) => selection[card.id]);
+    const copies = selectedCards.reduce((sum, card) => sum + card.quantity, 0);
+    return {
+      cards: selectedCards.length,
+      copies
+    };
+  }, [items, selectedIds, selection]);
 
   const groupedByGame = useMemo(() => {
     const map = new Map<TcgCode, CollectionCard[]>();
@@ -242,6 +253,9 @@ export function CollectionTable() {
 
   const toggleRow = (id: string) => {
     setSelection((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+  const clearSelection = () => {
+    setSelection({});
   };
 
   const handleExport = () => {
@@ -380,6 +394,23 @@ export function CollectionTable() {
             defaultMax={defaultMaxPrice}
             onClear={() => resetFilters(setRarityFilter, setPriceRange, defaultMaxPrice)}
           />
+          {selectedSnapshot ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <p>
+                {selectedSnapshot.cards} card{selectedSnapshot.cards === 1 ? '' : 's'} selected · {selectedSnapshot.copies}{' '}
+                copy{selectedSnapshot.copies === 1 ? '' : 'ies'}.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={clearSelection}
+              >
+                Clear selection
+              </Button>
+            </div>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
             <CardDetailsPanel
@@ -788,8 +819,7 @@ function CardDetailsPanel({
                   </SelectTrigger>
                   <SelectContent>
                     {binderOptions.map((option) => {
-                      const optionLabel =
-                        option.id === LIBRARY_COLLECTION_ID ? `${option.name} (Unsorted)` : option.name;
+                      const optionLabel = option.name || (option.id === LIBRARY_COLLECTION_ID ? 'Unsorted' : 'Untitled binder');
                       const accent = normalizeHexColor(option.colorHex ?? undefined);
                       return (
                         <SelectItem key={option.id} value={option.id}>

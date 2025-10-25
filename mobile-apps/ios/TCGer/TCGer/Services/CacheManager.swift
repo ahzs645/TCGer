@@ -102,6 +102,7 @@ extension CacheManager {
         static let searchResults = "searchResults"
         static let userPreferences = "userPreferences"
         static let appSettings = "appSettings"
+        static let magicCardHashes = "magic_card_hashes"
 
         static func collection(id: String) -> String {
             return "collection_\(id)"
