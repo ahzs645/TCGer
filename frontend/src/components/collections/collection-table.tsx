@@ -36,6 +36,12 @@ type CardUpdateArgs = {
   updates: UpdateCollectionCardInput;
 };
 
+type CardMoveArgs = {
+  cardId: string;
+  fromBinderId: string;
+  toBinderId: string;
+};
+
 export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const token = useAuthStore((state) => state.token);
@@ -45,9 +51,10 @@ export function CollectionTable() {
     removeCollection: state.removeCollection,
     updateCollectionCard: state.updateCollectionCard
   }));
-  const { enabledGames, showPricing } = useModuleStore((state) => ({
+  const { enabledGames, showPricing, showCardNumbers } = useModuleStore((state) => ({
     enabledGames: state.enabledGames,
-    showPricing: state.showPricing
+    showPricing: state.showPricing,
+    showCardNumbers: state.showCardNumbers
   }));
   const [activeCollectionId, setActiveCollectionId] = useState<string>(collections.length ? ALL_COLLECTION_ID : '');
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +73,12 @@ export function CollectionTable() {
       throw new Error('You must be signed in to update cards.');
     }
     await updateCollectionCard(token, binderId, cardId, updates);
+  };
+  const handleCardMove = async ({ cardId, fromBinderId, toBinderId }: CardMoveArgs) => {
+    if (!token) {
+      throw new Error('You must be signed in to move cards.');
+    }
+    await updateCollectionCard(token, fromBinderId, cardId, { targetBinderId: toBinderId });
   };
 
   const changeActiveCollection = (id: string, updateUrl = true) => {
@@ -196,6 +209,15 @@ export function CollectionTable() {
   const activeBinderId = activeCard?.binderId ?? fallbackBinderContext?.id;
   const activeBinderName = activeCard?.binderName ?? fallbackBinderContext?.name;
   const activeBinderColor = activeCard?.binderColorHex ?? fallbackBinderContext?.colorHex;
+  const binderOptions = useMemo(
+    () =>
+      collections.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        colorHex: entry.colorHex
+      })),
+    [collections]
+  );
 
   const selectedIds = useMemo(
     () => Object.entries(selection).filter(([, checked]) => checked).map(([id]) => id),
@@ -366,8 +388,11 @@ export function CollectionTable() {
               binderName={activeBinderName}
               binderColor={activeBinderColor}
               showPricing={showPricing}
+              showCardNumbers={showCardNumbers}
               parentCollectionName={collection?.name}
               onUpdate={handleCardUpdate}
+              binderOptions={binderOptions}
+              onMove={handleCardMove}
             />
             <div className="relative">
               <ScrollArea className="h-[620px] rounded-md border">
@@ -446,6 +471,7 @@ export function CollectionTable() {
                                   selected={!!selection[card.id]}
                                   onToggle={() => toggleRow(card.id)}
                                   showPricing={showPricing}
+                                  showCardNumbers={showCardNumbers}
                                   showBinderName={collection?.id === ALL_COLLECTION_ID}
                                   isActive={card.id === activeCard?.id}
                                   onSelectCard={() => setActiveCardId(card.id)}
@@ -501,22 +527,31 @@ function CardDetailsPanel({
   binderName,
   binderColor,
   showPricing,
+  showCardNumbers,
   parentCollectionName,
-  onUpdate
+  onUpdate,
+  binderOptions,
+  onMove
 }: {
   card: CollectionCard | null;
   binderId?: string;
   binderName?: string;
   binderColor?: string | null;
   showPricing: boolean;
+  showCardNumbers: boolean;
   parentCollectionName?: string;
   onUpdate: (args: CardUpdateArgs) => Promise<void>;
+  binderOptions: { id: string; name: string; colorHex?: string | null }[];
+  onMove: (args: CardMoveArgs) => Promise<void>;
 }) {
   const [condition, setCondition] = useState<string | null>(card?.condition ?? null);
   const [notes, setNotes] = useState(card?.notes ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingBinderId, setPendingBinderId] = useState<string>(() => binderId ?? binderOptions[0]?.id ?? '');
+  const [moveStatus, setMoveStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   useEffect(() => {
     setCondition(card?.condition ?? null);
@@ -524,6 +559,22 @@ function CardDetailsPanel({
     setStatus('idle');
     setErrorMessage(null);
   }, [card?.id, card?.condition, card?.notes]);
+  useEffect(() => {
+    if (binderId) {
+      setPendingBinderId(binderId);
+      return;
+    }
+    if (binderOptions.length) {
+      setPendingBinderId((current) => {
+        if (current && binderOptions.some((option) => option.id === current)) {
+          return current;
+        }
+        return binderOptions[0].id;
+      });
+    } else {
+      setPendingBinderId('');
+    }
+  }, [binderId, binderOptions]);
 
   useEffect(() => {
     if (status !== 'success') {
@@ -533,6 +584,17 @@ function CardDetailsPanel({
     const timer = setTimeout(() => setStatus('idle'), 2500);
     return () => clearTimeout(timer);
   }, [status]);
+  useEffect(() => {
+    if (moveStatus !== 'success') {
+      return;
+    }
+    const timer = setTimeout(() => setMoveStatus('idle'), 2500);
+    return () => clearTimeout(timer);
+  }, [moveStatus]);
+  useEffect(() => {
+    setMoveStatus('idle');
+    setMoveError(null);
+  }, [card?.id]);
 
   const conditionChoices = useMemo(() => {
     if (!card?.condition) {
@@ -564,6 +626,7 @@ function CardDetailsPanel({
 
   const hasChanges = Boolean(pendingPayload);
   const canEdit = Boolean(card && binderId);
+  const canMove = Boolean(card && binderId && pendingBinderId && pendingBinderId !== binderId);
   const binderAccent = normalizeHexColor(binderColor ?? undefined);
   const binderChipStyle: CSSProperties | undefined = binderAccent
     ? {
@@ -597,39 +660,57 @@ function CardDetailsPanel({
     setStatus('idle');
     setErrorMessage(null);
   };
+  const handleMove = async () => {
+    if (!card || !binderId || !pendingBinderId || pendingBinderId === binderId) {
+      return;
+    }
+    setMoveStatus('pending');
+    setMoveError(null);
+    try {
+      await onMove({ cardId: card.id, fromBinderId: binderId, toBinderId: pendingBinderId });
+      setMoveStatus('success');
+    } catch (error) {
+      setMoveStatus('error');
+      setMoveError(error instanceof Error ? error.message : 'Failed to move card.');
+    }
+  };
 
   const cardImageUrl = card?.imageUrl ?? card?.imageUrlSmall ?? null;
 
   return (
-    <div className="rounded-md border bg-muted/30 p-4 lg:h-[620px]">
+    <div className="rounded-md border bg-muted/30 p-4 max-h-[80vh] overflow-y-auto lg:max-h-[620px] lg:min-h-[620px]">
       {!card ? (
-        <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
+        <div className="flex min-h-[280px] flex-col items-center justify-center text-center text-sm text-muted-foreground">
           <p>Select a card from the table to view its details and artwork.</p>
         </div>
       ) : (
-        <div className="flex h-full flex-col gap-4">
+        <div className="flex min-h-full flex-col gap-4">
           <div className="space-y-3">
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted">
-              {cardImageUrl ? (
-                <Image
-                  src={cardImageUrl}
-                  alt={card.name}
-                  fill
-                  className="object-cover"
-                  sizes="(min-width: 1024px) 320px, 100vw"
-                />
-              ) : card.setSymbolUrl ? (
-                <div className="flex h-full items-center justify-center bg-background">
+            <div className="flex justify-center">
+              <div className="relative aspect-[63/88] w-full max-w-[220px] overflow-hidden rounded-lg border bg-muted">
+                {cardImageUrl ? (
                   <Image
-                    src={card.setSymbolUrl}
-                    alt={`${card.setName ?? card.setCode ?? 'Set'} symbol`}
-                    width={72}
-                    height={72}
+                    src={cardImageUrl}
+                    alt={card.name}
+                    fill
+                    className="object-contain"
+                    sizes="(min-width: 1024px) 220px, 70vw"
                   />
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image available</div>
-              )}
+                ) : card.setSymbolUrl ? (
+                  <div className="flex h-full items-center justify-center bg-background">
+                    <Image
+                      src={card.setSymbolUrl}
+                      alt={`${card.setName ?? card.setCode ?? 'Set'} symbol`}
+                      width={72}
+                      height={72}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    No image available
+                  </div>
+                )}
+              </div>
             </div>
             {cardImageUrl && (
               <Button asChild variant="secondary" size="sm">
@@ -641,8 +722,8 @@ function CardDetailsPanel({
             <div>
               <h3 className="text-lg font-semibold leading-tight">{card.name}</h3>
               <p className="text-xs text-muted-foreground">
-                {card.setName ?? card.setCode ?? 'Unknown set'}
-                {card.setCode ? ` · #${card.setCode}` : ''}
+                {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
+                {showCardNumbers && card.setCode ? ` · #${card.setCode}` : ''}
               </p>
               {(binderName || parentCollectionName) && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -689,7 +770,72 @@ function CardDetailsPanel({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="binder-assignment">Binder assignment</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select
+                  value={pendingBinderId || undefined}
+                  onValueChange={(value) => {
+                    setPendingBinderId(value);
+                    setMoveStatus('idle');
+                    setMoveError(null);
+                  }}
+                  disabled={!card || !binderOptions.length || moveStatus === 'pending'}
+                >
+                  <SelectTrigger id="binder-assignment" className="w-full sm:flex-1">
+                    <SelectValue placeholder="Choose a binder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {binderOptions.map((option) => {
+                      const optionLabel =
+                        option.id === LIBRARY_COLLECTION_ID ? `${option.name} (Unsorted)` : option.name;
+                      const accent = normalizeHexColor(option.colorHex ?? undefined);
+                      return (
+                        <SelectItem key={option.id} value={option.id}>
+                          <span className="flex items-center gap-2">
+                            {accent ? (
+                              <span
+                                className="inline-flex h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: accent }}
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                            {optionLabel}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={handleMove}
+                  disabled={!canMove || moveStatus === 'pending'}
+                >
+                  {moveStatus === 'pending' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Move card
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {binderOptions.length
+                  ? 'Move cards between binders or back into the Unsorted library.'
+                  : 'Binders will appear once your account data has loaded.'}
+              </p>
+              {moveStatus === 'success' && (
+                <p className="text-xs text-emerald-600" aria-live="polite">
+                  Card reassigned successfully.
+                </p>
+              )}
+              {moveStatus === 'error' && (
+                <p className="text-xs text-destructive" aria-live="assertive">
+                  {moveError ?? 'Unable to move card.'}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="card-condition">Condition</Label>
               <Select
@@ -770,6 +916,7 @@ function CollectionRow({
   selected,
   onToggle,
   showPricing,
+  showCardNumbers,
   showBinderName,
   isActive,
   onSelectCard
@@ -778,6 +925,7 @@ function CollectionRow({
   selected: boolean;
   onToggle: () => void;
   showPricing: boolean;
+  showCardNumbers: boolean;
   showBinderName: boolean;
   isActive: boolean;
   onSelectCard: () => void;
@@ -814,7 +962,8 @@ function CollectionRow({
         <div className="space-y-1">
           <p className="font-medium leading-tight">{card.name}</p>
           <p className="text-xs text-muted-foreground">
-            {card.setName ?? card.setCode ?? 'Unknown set'} · #{card.setCode ?? '—'}
+            {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
+            {showCardNumbers ? ` · #${card.setCode ?? '—'}` : ''}
           </p>
           {showBinderName && card.binderName ? (
             <p className="text-[11px] text-muted-foreground">
@@ -836,7 +985,7 @@ function CollectionRow({
           ) : null}
         </div>
       </TableCell>
-      <TableCell>{card.setName ?? card.setCode ?? 'Unknown'}</TableCell>
+      <TableCell>{card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown'}</TableCell>
       <TableCell>{card.rarity ?? 'N/A'}</TableCell>
       <TableCell className="text-right">{card.quantity}</TableCell>
       <TableCell className="text-right">{card.condition ?? 'Unknown'}</TableCell>

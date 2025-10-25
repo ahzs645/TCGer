@@ -23,6 +23,7 @@ export interface CollectionsState {
     cardId: string,
     input: collectionsApi.UpdateCollectionCardInput
   ) => Promise<void>;
+  removeCollectionCard: (token: string, binderId: string, cardId: string) => Promise<void>;
 }
 
 export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
@@ -116,7 +117,57 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
 
   updateCollectionCard: async (token: string, binderId: string, cardId: string, input: collectionsApi.UpdateCollectionCardInput) => {
     try {
+      const destinationBinderId = input.targetBinderId;
+      const isBinderChange = Boolean(destinationBinderId && destinationBinderId !== binderId);
+      const collections = get().collections;
+      const destinationExists = !isBinderChange || collections.some((collection) => collection.id === destinationBinderId);
+
       const updatedCard = await collectionsApi.updateCollectionCard(token, binderId, cardId, input);
+
+      if (!destinationExists) {
+        await get().fetchCollections(token);
+        return;
+      }
+
+      set((state) => {
+        const timestamp = new Date().toISOString();
+        return {
+          collections: state.collections.map((collection) => {
+            if (collection.id === binderId) {
+              const nextCards = isBinderChange
+                ? collection.cards.filter((card) => card.id !== updatedCard.id)
+                : collection.cards.map((card) => (card.id === updatedCard.id ? { ...card, ...updatedCard } : card));
+              return {
+                ...collection,
+                updatedAt: timestamp,
+                cards: nextCards
+              };
+            }
+
+            if (isBinderChange && collection.id === destinationBinderId) {
+              const withoutDuplicate = collection.cards.filter((card) => card.id !== updatedCard.id);
+              return {
+                ...collection,
+                updatedAt: timestamp,
+                cards: [...withoutDuplicate, updatedCard]
+              };
+            }
+
+            return collection;
+          })
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update card in collection';
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+  ,
+
+  removeCollectionCard: async (token: string, binderId: string, cardId: string) => {
+    try {
+      await collectionsApi.removeCardFromCollection(token, binderId, cardId);
       set((state) => ({
         collections: state.collections.map((collection) => {
           if (collection.id !== binderId) {
@@ -126,12 +177,12 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
           return {
             ...collection,
             updatedAt: new Date().toISOString(),
-            cards: collection.cards.map((card) => (card.id === updatedCard.id ? { ...card, ...updatedCard } : card))
+            cards: collection.cards.filter((card) => card.id !== cardId)
           };
         })
       }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update card in collection';
+      const message = error instanceof Error ? error.message : 'Failed to remove card from collection';
       set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }
