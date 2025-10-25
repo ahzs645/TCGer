@@ -60,14 +60,16 @@ const updateCardSchema = z
     quantity: z.number().int().positive().optional(),
     condition: z.string().nullable().optional(),
     language: z.string().nullable().optional(),
-    notes: z.string().nullable().optional()
+    notes: z.string().nullable().optional(),
+    targetBinderId: z.string().min(1).optional()
   })
   .refine(
     (data) =>
       data.quantity !== undefined ||
       data.condition !== undefined ||
       data.language !== undefined ||
-      data.notes !== undefined,
+      data.notes !== undefined ||
+      data.targetBinderId !== undefined,
     {
       message: 'At least one field must be provided'
     }

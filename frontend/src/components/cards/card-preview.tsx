@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Check, Loader2, Minus, Plus } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,12 +21,20 @@ export function CardPreview({ card }: CardPreviewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [throttledPos, setThrottledPos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
-  const [amountOwned, setAmountOwned] = useState(0);
-  const [showQuantityControls, setShowQuantityControls] = useState(false);
+  const [optimisticQuantity, setOptimisticQuantity] = useState<number | null>(null);
   const { token, isAuthenticated } = useAuthStore();
-  const { collections, addCardToBinder, isLoading: collectionsLoading, hasFetched } = useCollectionsStore((state) => ({
+  const {
+    collections,
+    addCardToBinder,
+    updateCollectionCard,
+    removeCollectionCard,
+    isLoading: collectionsLoading,
+    hasFetched
+  } = useCollectionsStore((state) => ({
     collections: state.collections,
     addCardToBinder: state.addCardToBinder,
+    updateCollectionCard: state.updateCollectionCard,
+    removeCollectionCard: state.removeCollectionCard,
     isLoading: state.isLoading,
     hasFetched: state.hasFetched
   }));
@@ -35,7 +43,10 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const selectedBinder = collections.find((binder) => binder.id === selectedBinderId);
-  const selectedAccent = normalizeHexColor(selectedBinder?.colorHex);
+  const existingEntry = selectedBinder?.cards.find((binderCard) => binderCard.cardId === card.id);
+  const serverQuantity = existingEntry?.quantity ?? 0;
+  const quantity = optimisticQuantity ?? serverQuantity;
+  const showQuantityControls = quantity > 0;
 
   const throttledSetPos = useRef(
     throttle<[{ x: number; y: number }]>((position) => setThrottledPos(position), 50)
@@ -75,7 +86,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     transform: `perspective(1000px) rotateY(${rotateY}deg) rotateX(${rotateX}deg) scale(${isHovering ? 1.04 : 1})`,
     transition: 'transform 0.3s cubic-bezier(0.17, 0.67, 0.5, 1.03)',
     transformStyle: 'preserve-3d' as const,
-    opacity: amountOwned > 0 ? 1 : 0.5,
+    opacity: quantity > 0 ? 1 : 0.5,
     width: '100%',
     height: 'auto'
   };
@@ -91,21 +102,20 @@ export function CardPreview({ card }: CardPreviewProps) {
     }
   }, [collections, selectedBinderId]);
 
+  useEffect(() => {
+    if (optimisticQuantity !== null && existingEntry && existingEntry.quantity === optimisticQuantity) {
+      setOptimisticQuantity(null);
+    }
+  }, [existingEntry, optimisticQuantity]);
+
   const handleBinderChange = (binderId: string) => {
     setSelectedBinderId(binderId);
-    // Reset quantity controls when changing binders
-    setShowQuantityControls(false);
-    setAmountOwned(0);
+    setOptimisticQuantity(null);
     setStatus('idle');
     setStatusMessage(null);
   };
 
-  const handleShowQuantityControls = () => {
-    setShowQuantityControls(true);
-    setAmountOwned(1); // Start with 1 copy
-  };
-
-  const handleAddToBinder = async () => {
+  const handleAddInitialQuantity = async () => {
     if (!isSignedIn) {
       setStatus('error');
       setStatusMessage('Sign in to add cards to a binder.');
@@ -118,19 +128,14 @@ export function CardPreview({ card }: CardPreviewProps) {
       return;
     }
 
-    const quantity = Math.max(0, Number.isFinite(amountOwned) ? amountOwned : 0);
-    if (quantity === 0) {
-      setStatus('error');
-      setStatusMessage('Choose a quantity above zero.');
-      return;
-    }
     setStatus('pending');
     setStatusMessage(null);
+    setOptimisticQuantity(1);
 
     try {
       await addCardToBinder(token, selectedBinderId, {
         cardId: card.id,
-        quantity,
+        quantity: 1,
         cardData: {
           name: card.name,
           tcg: card.tcg,
@@ -142,20 +147,69 @@ export function CardPreview({ card }: CardPreviewProps) {
           imageUrlSmall: card.imageUrlSmall
         }
       });
-      setAmountOwned(0);
-      setShowQuantityControls(false); // Hide controls after successful add
       setStatus('success');
+      setStatusMessage('Card added to binder.');
       setTimeout(() => {
         setStatus('idle');
+        setStatusMessage(null);
       }, 2000);
     } catch (error) {
       setStatus('error');
       setStatusMessage(error instanceof Error ? error.message : 'Unable to add card to binder.');
+      setOptimisticQuantity(null);
     }
   };
 
-  const addDisabled = !selectedBinderId || status === 'pending' || collectionsLoading || amountOwned === 0;
+  const handleQuantityChange = async (nextQuantity: number) => {
+    if (!isSignedIn || !token) {
+      setStatus('error');
+      setStatusMessage('Sign in to manage binder quantities.');
+      return;
+    }
+
+    if (!selectedBinderId) {
+      setStatus('error');
+      setStatusMessage('Select a binder first.');
+      return;
+    }
+
+    const entryId = existingEntry?.id;
+    if (!entryId) {
+      setStatusMessage('Syncing new entry... please wait.');
+      return;
+    }
+
+    const safeQuantity = Math.max(0, Math.min(99, nextQuantity));
+    setStatus('pending');
+    setStatusMessage(null);
+    setOptimisticQuantity(safeQuantity);
+
+    try {
+      if (safeQuantity === 0) {
+        await removeCollectionCard(token, selectedBinderId, entryId);
+        setOptimisticQuantity(null);
+        setStatus('success');
+        setStatusMessage('Card removed from binder.');
+      } else {
+        await updateCollectionCard(token, selectedBinderId, entryId, { quantity: safeQuantity });
+        setStatus('success');
+        setStatusMessage('Quantity updated.');
+      }
+      setTimeout(() => {
+        setStatus('idle');
+        setStatusMessage(null);
+      }, 1500);
+    } catch (error) {
+      setStatus('error');
+      setStatusMessage(error instanceof Error ? error.message : 'Unable to update quantity.');
+      setOptimisticQuantity(null);
+    }
+  };
+
+  const addDisabled = !selectedBinderId || status === 'pending' || collectionsLoading || !isSignedIn;
   const showEmptyBindersMessage = hasFetched && collections.length === 0;
+  const quantityControlsDisabled = status === 'pending' || collectionsLoading || !isSignedIn;
+  const entrySyncing = showQuantityControls && !existingEntry;
 
   return (
     <div className="group flex min-w-0 basis-1/5 flex-col items-center rounded-lg px-1 sm:px-2">
@@ -231,16 +285,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                 disabled={collectionsLoading || status === 'pending'}
               >
                 <SelectTrigger className="h-8 flex-1 justify-between gap-2 text-left text-xs">
-                  <div className="flex items-center gap-2">
-                    {selectedAccent ? (
-                      <span
-                        className="inline-flex h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: selectedAccent }}
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                    <SelectValue placeholder="Select a binder" />
-                  </div>
+                  <SelectValue placeholder="Select a binder" />
                 </SelectTrigger>
                 <SelectContent>
                   {collections.map((binder) => {
@@ -264,55 +309,43 @@ export function CardPreview({ card }: CardPreviewProps) {
               </Select>
             </div>
             {!showQuantityControls ? (
-              <Button className="w-full gap-2" size="sm" onClick={handleShowQuantityControls} disabled={!selectedBinderId}>
+              <Button className="w-full gap-2" size="sm" onClick={handleAddInitialQuantity} disabled={!selectedBinderId || addDisabled}>
                 <Plus className="h-4 w-4" />
                 <span>Add to Binder</span>
               </Button>
             ) : (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-1 rounded-lg border px-2 py-1">
+                <div className="flex h-9 w-full max-w-[220px] items-center justify-between gap-1 rounded-lg border px-2 py-1">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setAmountOwned(Math.max(0, amountOwned - 1))}
+                    onClick={() => handleQuantityChange(quantity - 1)}
                     className="h-8 w-8 rounded-full"
                     tabIndex={-1}
+                    disabled={quantityControlsDisabled || entrySyncing}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
                   <input
-                    min="0"
-                    max="99"
+                    readOnly
                     className="w-10 border-none bg-transparent text-center text-sm font-semibold"
                     type="text"
-                    value={amountOwned}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      if (!Number.isNaN(val) && val >= 0 && val <= 99) {
-                        setAmountOwned(val);
-                      }
-                    }}
+                    value={quantity}
                   />
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-full"
-                    onClick={() => setAmountOwned(Math.min(99, amountOwned + 1))}
+                    onClick={() => handleQuantityChange(quantity + 1)}
                     tabIndex={-1}
+                    disabled={quantityControlsDisabled || entrySyncing || quantity >= 99}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button className="shrink-0 gap-2" size="sm" onClick={handleAddToBinder} disabled={addDisabled || amountOwned === 0}>
-                  {status === 'pending' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : status === 'success' ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  <span>{status === 'success' ? 'Added' : 'Add'}</span>
-                </Button>
+                {entrySyncing ? (
+                  <p className="text-[11px] text-muted-foreground">Syncing binder entry...</p>
+                ) : null}
               </div>
             )}
           </>
@@ -325,11 +358,14 @@ export function CardPreview({ card }: CardPreviewProps) {
                 : 'Loading binders...'}
           </p>
         )}
-        {status === 'error' && statusMessage ? (
-          <p className="text-center text-destructive">{statusMessage}</p>
-        ) : null}
-        {status === 'success' && !statusMessage ? (
-          <p className="text-center text-emerald-600">Card added!</p>
+        {statusMessage ? (
+          <p
+            className={`text-center ${
+              status === 'error' ? 'text-destructive' : 'text-emerald-600'
+            }`}
+          >
+            {statusMessage}
+          </p>
         ) : null}
       </div>
     </div>

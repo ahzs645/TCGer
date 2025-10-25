@@ -35,8 +35,16 @@ export interface AddCardToBinderInput {
 }
 
 export const UNSORTED_BINDER_ID = '__library__';
+const UNSORTED_BINDER_COLOR = '9AA0A6';
 
 const collectionInclude = {
+  binder: {
+    select: {
+      id: true,
+      name: true,
+      colorHex: true
+    }
+  },
   card: {
     include: {
       tcgGame: true,
@@ -60,6 +68,7 @@ export interface UpdateCollectionCardInput {
   condition?: string | null;
   language?: string | null;
   notes?: string | null;
+  targetBinderId?: string;
 }
 
 function mapCollectionCard(collection: PrismaCollectionWithCard) {
@@ -91,6 +100,24 @@ function mapCollectionCard(collection: PrismaCollectionWithCard) {
     };
   }
 
+  const binderMeta = collection.binder
+    ? {
+        id: collection.binder.id,
+        name: collection.binder.name ?? undefined,
+        colorHex: collection.binder.colorHex ?? undefined
+      }
+    : collection.binderId
+      ? {
+          id: collection.binderId,
+          name: undefined,
+          colorHex: undefined
+        }
+      : {
+          id: UNSORTED_BINDER_ID,
+          name: 'Unsorted',
+          colorHex: UNSORTED_BINDER_COLOR
+        };
+
   return {
     id: collection.id,
     cardId: card.id,
@@ -105,7 +132,10 @@ function mapCollectionCard(collection: PrismaCollectionWithCard) {
     condition: collection.condition ?? undefined,
     language: collection.language ?? undefined,
     notes: collection.notes ?? undefined,
-    price: collection.price ? parseFloat(collection.price.toString()) : undefined
+    price: collection.price ? parseFloat(collection.price.toString()) : undefined,
+    binderId: binderMeta?.id ?? undefined,
+    binderName: binderMeta?.name,
+    binderColorHex: binderMeta?.colorHex ?? undefined
   };
 }
 
@@ -164,7 +194,7 @@ export async function getUserBinders(userId: string) {
     id: UNSORTED_BINDER_ID,
     name: 'Unsorted',
     description: 'Cards not yet assigned to a binder',
-    colorHex: '9AA0A6',
+    colorHex: UNSORTED_BINDER_COLOR,
     createdAt: (looseCollections[0]?.createdAt ?? fallbackDate).toISOString(),
     updatedAt: latestUpdated.toISOString(),
     cards: looseCollections.map(mapCollectionCard)
@@ -418,6 +448,8 @@ export async function updateCardInBinder(
   input: UpdateCollectionCardInput
 ) {
   const resolvedBinderId = resolveBinderId(binderId);
+  const hasTargetBinder = typeof input.targetBinderId === 'string';
+  const resolvedTargetBinderId = hasTargetBinder ? resolveBinderId(input.targetBinderId as string) : undefined;
 
   const collection = await prisma.collection.findFirst({
     where: {
@@ -448,6 +480,23 @@ export async function updateCardInBinder(
   if (normalizedNotes !== undefined) {
     updatePayload.notes = normalizedNotes;
   }
+  if (hasTargetBinder) {
+    if (resolvedTargetBinderId) {
+      const targetBinder = await prisma.binder.findFirst({
+        where: { id: resolvedTargetBinderId, userId }
+      });
+      if (!targetBinder) {
+        throw new Error('Binder not found');
+      }
+      updatePayload.binder = {
+        connect: { id: targetBinder.id }
+      };
+    } else {
+      updatePayload.binder = {
+        disconnect: true
+      };
+    }
+  }
 
   const updated = await prisma.collection.update({
     where: { id: collectionId },
@@ -458,6 +507,12 @@ export async function updateCardInBinder(
   if (resolvedBinderId) {
     await prisma.binder.update({
       where: { id: resolvedBinderId },
+      data: { updatedAt: new Date() }
+    });
+  }
+  if (hasTargetBinder && resolvedTargetBinderId && resolvedTargetBinderId !== resolvedBinderId) {
+    await prisma.binder.update({
+      where: { id: resolvedTargetBinderId },
       data: { updatedAt: new Date() }
     });
   }

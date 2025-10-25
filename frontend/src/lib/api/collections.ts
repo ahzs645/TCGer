@@ -19,6 +19,7 @@ export interface CollectionCard {
   price?: number;
   binderId?: string;
   binderName?: string;
+  binderColorHex?: string;
 }
 
 export interface Collection {
@@ -65,6 +66,7 @@ export interface UpdateCollectionCardInput {
   condition?: string | null;
   language?: string | null;
   notes?: string | null;
+  targetBinderId?: string;
 }
 
 export async function getCollections(token: string): Promise<Collection[]> {
