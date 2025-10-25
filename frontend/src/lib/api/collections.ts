@@ -60,6 +60,13 @@ export interface AddCardToCollectionInput {
   };
 }
 
+export interface UpdateCollectionCardInput {
+  quantity?: number;
+  condition?: string | null;
+  language?: string | null;
+  notes?: string | null;
+}
+
 export async function getCollections(token: string): Promise<Collection[]> {
   const response = await fetch(`${API_BASE_URL}/collections`, {
     headers: {
@@ -194,4 +201,27 @@ export async function removeCardFromCollection(
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Failed to remove card from collection');
   }
+}
+
+export async function updateCollectionCard(
+  token: string,
+  binderId: string,
+  cardId: string,
+  data: UpdateCollectionCardInput
+): Promise<CollectionCard> {
+  const response = await fetch(`${API_BASE_URL}/collections/${binderId}/cards/${cardId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to update card in collection');
+  }
+
+  return response.json();
 }

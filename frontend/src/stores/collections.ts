@@ -17,6 +17,12 @@ export interface CollectionsState {
     binderId: string,
     input: collectionsApi.AddCardToCollectionInput
   ) => Promise<void>;
+  updateCollectionCard: (
+    token: string,
+    binderId: string,
+    cardId: string,
+    input: collectionsApi.UpdateCollectionCardInput
+  ) => Promise<void>;
 }
 
 export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
@@ -104,6 +110,29 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to add card to collection';
       set({ error: message, isLoading: false, hasFetched: true });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  },
+
+  updateCollectionCard: async (token: string, binderId: string, cardId: string, input: collectionsApi.UpdateCollectionCardInput) => {
+    try {
+      const updatedCard = await collectionsApi.updateCollectionCard(token, binderId, cardId, input);
+      set((state) => ({
+        collections: state.collections.map((collection) => {
+          if (collection.id !== binderId) {
+            return collection;
+          }
+
+          return {
+            ...collection,
+            updatedAt: new Date().toISOString(),
+            cards: collection.cards.map((card) => (card.id === updatedCard.id ? { ...card, ...updatedCard } : card))
+          };
+        })
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update card in collection';
+      set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }
   }

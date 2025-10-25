@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import { prisma } from '../../lib/prisma';
 
 export interface CreateBinderInput {
@@ -34,7 +36,31 @@ export interface AddCardToBinderInput {
 
 export const UNSORTED_BINDER_ID = '__library__';
 
-type PrismaCollectionWithCard = Awaited<ReturnType<typeof prisma.collection.findMany>>[0];
+const collectionInclude = {
+  card: {
+    include: {
+      tcgGame: true,
+      yugiohCard: true,
+      magicCard: true,
+      pokemonCard: true,
+      priceHistory: {
+        orderBy: { recordedAt: 'desc' },
+        take: 10
+      }
+    }
+  }
+} as const;
+
+type PrismaCollectionWithCard = Prisma.CollectionGetPayload<{
+  include: typeof collectionInclude;
+}>;
+
+export interface UpdateCollectionCardInput {
+  quantity?: number;
+  condition?: string | null;
+  language?: string | null;
+  notes?: string | null;
+}
 
 function mapCollectionCard(collection: PrismaCollectionWithCard) {
   const card = collection.card;
@@ -83,46 +109,37 @@ function mapCollectionCard(collection: PrismaCollectionWithCard) {
   };
 }
 
+function resolveBinderId(binderId: string) {
+  return binderId === UNSORTED_BINDER_ID ? null : binderId;
+}
+
+function sanitizeOptionalText(value: string | null | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
 export async function getUserBinders(userId: string) {
   const [binders, looseCollections] = await Promise.all([
     prisma.binder.findMany({
       where: { userId },
       include: {
         collections: {
-          include: {
-            card: {
-              include: {
-                tcgGame: true,
-                yugiohCard: true,
-                magicCard: true,
-                pokemonCard: true,
-                priceHistory: {
-                  orderBy: { recordedAt: 'desc' },
-                  take: 10
-                }
-              }
-            }
-          }
+          include: collectionInclude
         }
       },
       orderBy: { updatedAt: 'desc' }
     }),
     prisma.collection.findMany({
       where: { userId, binderId: null },
-      include: {
-        card: {
-          include: {
-            tcgGame: true,
-            yugiohCard: true,
-            magicCard: true,
-            pokemonCard: true,
-            priceHistory: {
-              orderBy: { recordedAt: 'desc' },
-              take: 10
-            }
-          }
-        }
-      },
+      include: collectionInclude,
       orderBy: { updatedAt: 'desc' }
     })
   ]);
@@ -196,20 +213,7 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     },
     include: {
       collections: {
-        include: {
-          card: {
-            include: {
-              tcgGame: true,
-              yugiohCard: true,
-              magicCard: true,
-              pokemonCard: true,
-              priceHistory: {
-                orderBy: { recordedAt: 'desc' },
-                take: 10
-              }
-            }
-          }
-        }
+        include: collectionInclude
       }
     }
   });
@@ -379,12 +383,14 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
 }
 
 export async function removeCardFromBinder(userId: string, binderId: string, collectionId: string) {
+  const resolvedBinderId = resolveBinderId(binderId);
+
   // Verify ownership
   const collection = await prisma.collection.findFirst({
     where: {
       id: collectionId,
       userId,
-      binderId
+      binderId: resolvedBinderId
     }
   });
 
@@ -397,8 +403,64 @@ export async function removeCardFromBinder(userId: string, binderId: string, col
   });
 
   // Update binder's updatedAt
-  await prisma.binder.update({
-    where: { id: binderId },
-    data: { updatedAt: new Date() }
+  if (resolvedBinderId) {
+    await prisma.binder.update({
+      where: { id: resolvedBinderId },
+      data: { updatedAt: new Date() }
+    });
+  }
+}
+
+export async function updateCardInBinder(
+  userId: string,
+  binderId: string,
+  collectionId: string,
+  input: UpdateCollectionCardInput
+) {
+  const resolvedBinderId = resolveBinderId(binderId);
+
+  const collection = await prisma.collection.findFirst({
+    where: {
+      id: collectionId,
+      userId,
+      binderId: resolvedBinderId
+    }
   });
+
+  if (!collection) {
+    throw new Error('Collection entry not found');
+  }
+
+  const updatePayload: Prisma.CollectionUpdateInput = {};
+
+  if (typeof input.quantity === 'number') {
+    updatePayload.quantity = input.quantity;
+  }
+  const normalizedCondition = sanitizeOptionalText(input.condition);
+  if (normalizedCondition !== undefined) {
+    updatePayload.condition = normalizedCondition;
+  }
+  const normalizedLanguage = sanitizeOptionalText(input.language);
+  if (normalizedLanguage !== undefined) {
+    updatePayload.language = normalizedLanguage;
+  }
+  const normalizedNotes = sanitizeOptionalText(input.notes);
+  if (normalizedNotes !== undefined) {
+    updatePayload.notes = normalizedNotes;
+  }
+
+  const updated = await prisma.collection.update({
+    where: { id: collectionId },
+    data: updatePayload,
+    include: collectionInclude
+  });
+
+  if (resolvedBinderId) {
+    await prisma.binder.update({
+      where: { id: resolvedBinderId },
+      data: { updatedAt: new Date() }
+    });
+  }
+
+  return mapCollectionCard(updated as PrismaCollectionWithCard);
 }

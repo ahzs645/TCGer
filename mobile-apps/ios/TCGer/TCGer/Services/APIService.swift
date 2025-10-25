@@ -320,6 +320,13 @@ final class APIService {
         }
     }
 
+    struct UpdateCollectionCardRequest: Encodable {
+        let quantity: Int?
+        let condition: String?
+        let language: String?
+        let notes: String?
+    }
+
     func addCardToBinder(
         config: ServerConfiguration,
         token: String,
@@ -371,6 +378,66 @@ final class APIService {
         )
 
         guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+    }
+
+    func updateCardInBinder(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        collectionCardId: String,
+        quantity: Int? = nil,
+        condition: String? = nil,
+        language: String? = nil,
+        notes: String? = nil
+    ) async throws -> CollectionCard {
+        let body = UpdateCollectionCardRequest(
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes
+        )
+
+        let (data, httpResponse) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/cards/\(collectionCardId)",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+
+        guard let card = try? JSONDecoder().decode(CollectionCard.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return card
+    }
+
+    func deleteCardFromBinder(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        collectionCardId: String
+    ) async throws {
+        let (_, httpResponse) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/cards/\(collectionCardId)",
+            method: "DELETE",
+            token: token
+        )
+
+        guard httpResponse.statusCode == 204 || httpResponse.statusCode == 200 else {
             if httpResponse.statusCode == 401 {
                 throw APIError.unauthorized
             }
