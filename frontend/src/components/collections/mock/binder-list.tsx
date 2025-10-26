@@ -51,8 +51,10 @@ export function BinderList({ binders, activeBinderId, onSelectBinder, onAddBinde
 
         {binders.map((binder) => {
           const isActive = binder.id === activeBinderId;
-          const borderColor = isActive ? (binder.colorHex || 'var(--primary)') : 'transparent';
-          const displayColor = binder.colorHex || '#9CA3AF';
+          // Ensure color has # prefix
+          const normalizedColor = binder.colorHex ? (binder.colorHex.startsWith('#') ? binder.colorHex : `#${binder.colorHex}`) : '#9CA3AF';
+          const borderColor = isActive ? normalizedColor : 'transparent';
+          const displayColor = normalizedColor;
           return (
             <div
               key={binder.id}

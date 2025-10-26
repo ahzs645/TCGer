@@ -303,7 +303,9 @@ private struct CardPreviewRow: View {
                     rarity: "Ultra Rare",
                     imageUrl: nil,
                     imageUrlSmall: nil,
-                    price: 15.99
+                    price: 15.99,
+                    collectorNumber: nil,
+                    releasedAt: nil
                 ),
                 onAdd: { binderId, quantity, condition, language, notes in
                     print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A")")

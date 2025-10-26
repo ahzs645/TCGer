@@ -97,6 +97,19 @@ export interface UpdateCollectionCardInput {
   tags?: string[];
   newTags?: { label: string; colorHex?: string }[];
   targetBinderId?: string;
+  cardOverride?: {
+    cardId: string;
+    cardData?: {
+      name: string;
+      tcg: string;
+      externalId: string;
+      setCode?: string;
+      setName?: string;
+      rarity?: string;
+      imageUrl?: string;
+      imageUrlSmall?: string;
+    };
+  };
 }
 
 export interface CollectionTagResponse extends CollectionTag {

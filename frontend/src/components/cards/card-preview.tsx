@@ -382,13 +382,13 @@ export function CardPreview({ card }: CardPreviewProps) {
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
-              {card.imageUrlSmall ? (
+              {activeCard.imageUrlSmall ? (
                 <img
                   draggable={false}
                   loading="lazy"
                   className="card-test"
-                  alt={card.name}
-                  src={card.imageUrlSmall}
+                  alt={activeCard.name}
+                  src={activeCard.imageUrlSmall}
                   style={cardStyle}
                 />
               ) : (
@@ -396,8 +396,8 @@ export function CardPreview({ card }: CardPreviewProps) {
                   draggable={false}
                   loading="lazy"
                   className="card-test"
-                  alt={card.name}
-                  src={card.imageUrl}
+                  alt={activeCard.name}
+                  src={activeCard.imageUrl}
                   style={cardStyle}
                 />
               )}
@@ -406,23 +406,23 @@ export function CardPreview({ card }: CardPreviewProps) {
         </button>
         <div className="w-full min-w-0 pt-2 space-y-1">
           <p className="text-[12px] text-center font-semibold leading-tight break-words">
-            {showCardNumbers && (card.setCode || card.id) && (
+            {showCardNumbers && (activeCard.setCode || activeCard.id) && (
               <>
-                <span className="block md:inline">{card.setCode || card.id}</span>
+                <span className="block md:inline">{activeCard.setCode || activeCard.id}</span>
                 <span className="hidden md:inline"> – </span>
               </>
             )}
-            <span className="block md:inline break-words">{card.name}</span>
+            <span className="block md:inline break-words">{activeCard.name}</span>
           </p>
-          {card.rarity && (
+          {activeCard.rarity && (
             <div className="flex justify-center">
               <Badge variant="outline" className="text-[10px] h-5">
-                {card.rarity}
+                {activeCard.rarity}
               </Badge>
             </div>
           )}
-          {card.setName && (
-            <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
+          {activeCard.setName && (
+            <p className="text-[10px] text-center text-muted-foreground break-words px-1">{activeCard.setName}</p>
           )}
         </div>
         <div className="mt-3 w-full space-y-3 text-xs">

@@ -235,7 +235,9 @@ struct CardScannerView: View {
             rarity: details.rarity,
             imageUrl: details.imageURL?.absoluteString,
             imageUrlSmall: details.imageURL?.absoluteString,
-            price: details.price
+            price: details.price,
+            collectorNumber: nil,
+            releasedAt: nil
         )
     }
 
@@ -360,21 +362,24 @@ private struct ScanResultSheet: View {
     }
 
     private var candidateCard: Card? {
-        selectedCandidate.details.sourceCard ?? {
-            let details = selectedCandidate.details
-            guard details.identity.game != .all else { return nil }
-            return Card(
-                id: details.identity.id,
-                name: details.identity.name,
-                tcg: details.identity.game.rawValue,
-                setCode: details.identity.setCode,
-                setName: details.identity.setName,
-                rarity: details.rarity,
-                imageUrl: details.imageURL?.absoluteString,
-                imageUrlSmall: details.imageURL?.absoluteString,
-                price: details.price
-            )
-        }()
+        if let existing = selectedCandidate.details.sourceCard {
+            return existing
+        }
+        let details = selectedCandidate.details
+        guard details.identity.game != .all else { return nil }
+        return Card(
+            id: details.identity.id,
+            name: details.identity.name,
+            tcg: details.identity.game.rawValue,
+            setCode: details.identity.setCode,
+            setName: details.identity.setName,
+            rarity: details.rarity,
+            imageUrl: details.imageURL?.absoluteString,
+            imageUrlSmall: details.imageURL?.absoluteString,
+            price: details.price,
+            collectorNumber: nil,
+            releasedAt: nil
+        )
     }
 
     private var headerSection: some View {

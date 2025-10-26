@@ -37,6 +37,17 @@ const tagPayloadSchema = z.object({
   colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
 });
 
+const cardDataPayloadSchema = z.object({
+  name: z.string(),
+  tcg: z.string(),
+  externalId: z.string(),
+  setCode: z.string().optional(),
+  setName: z.string().optional(),
+  rarity: z.string().optional(),
+  imageUrl: z.string().optional(),
+  imageUrlSmall: z.string().optional()
+});
+
 const addCardSchema = z.object({
   cardId: z.string().min(1, 'Card ID is required'),
   quantity: z.number().int().positive().default(1),
@@ -50,20 +61,16 @@ const addCardSchema = z.object({
   tags: z.array(z.string()).optional(),
   newTags: z.array(tagPayloadSchema).optional(),
   // Card data for creating card if it doesn't exist
-  cardData: z.object({
-    name: z.string(),
-    tcg: z.string(),
-    externalId: z.string(),
-    setCode: z.string().optional(),
-    setName: z.string().optional(),
-    rarity: z.string().optional(),
-    imageUrl: z.string().optional(),
-    imageUrlSmall: z.string().optional()
-  }).optional()
+  cardData: cardDataPayloadSchema.optional()
 });
 
 const addLibraryCardSchema = addCardSchema.extend({
   binderId: z.string().optional()
+});
+
+const cardOverrideSchema = z.object({
+  cardId: z.string().min(1, 'Card ID is required'),
+  cardData: cardDataPayloadSchema.optional()
 });
 
 const updateCardSchema = z
@@ -76,7 +83,8 @@ const updateCardSchema = z
     quantity: z.number().int().min(1).optional(),
     tags: z.array(z.string()).optional(),
     newTags: z.array(tagPayloadSchema).optional(),
-    targetBinderId: z.string().min(1).optional()
+    targetBinderId: z.string().min(1).optional(),
+    cardOverride: cardOverrideSchema.optional()
   })
   .refine(
     (data) =>
@@ -88,7 +96,8 @@ const updateCardSchema = z
       data.quantity !== undefined ||
       data.tags !== undefined ||
       data.newTags !== undefined ||
-      data.targetBinderId !== undefined,
+      data.targetBinderId !== undefined ||
+      data.cardOverride !== undefined,
     {
       message: 'At least one field must be provided'
     }

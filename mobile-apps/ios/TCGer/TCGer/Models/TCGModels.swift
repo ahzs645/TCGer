@@ -11,6 +11,8 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     let imageUrl: String?
     let imageUrlSmall: String?
     let price: Double?
+    let collectorNumber: String?
+    let releasedAt: Date?
 
     var displayName: String {
         if let setCode = setCode {

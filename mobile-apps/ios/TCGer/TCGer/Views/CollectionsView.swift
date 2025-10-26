@@ -253,12 +253,13 @@ struct CollectionDetailView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(.systemBackground)
-                    .ignoresSafeArea()
+        ZStack {
+            NavigationView {
+                ZStack {
+                    Color(.systemBackground)
+                        .ignoresSafeArea()
 
-                List {
+                    List {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
                             if isEditing {
@@ -463,21 +464,6 @@ struct CollectionDetailView: View {
                     )
                 }
             }
-            .overlay {
-                if let card = previewingCard {
-                    CardImagePreviewView(card: card) {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            previewingCard = nil
-                        }
-                    }
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.7).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity)
-                    ))
-                    .zIndex(999)
-                }
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: previewingCard != nil)
             .alert("Error", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -521,7 +507,23 @@ struct CollectionDetailView: View {
             } message: {
                 Text("This action permanently removes the binder and its cards.")
             }
+            }
+
+            // Card preview overlay - placed outside NavigationView to cover everything
+            if let card = previewingCard {
+                CardImagePreviewView(card: card) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        previewingCard = nil
+                    }
+                }
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.7).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
+                .zIndex(999)
+            }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: previewingCard != nil)
     }
 
     @MainActor

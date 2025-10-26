@@ -1,15 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import { ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogPortal, DialogOverlay, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { CONDITION_COPY, CONDITION_ORDER, conditionRangeLabel, formatCurrency } from './mock-helpers';
 import type { Collection, CollectionCard, CollectionCardCopy, CollectionTag } from '@/lib/api/collections';
 import { TagCombobox } from './tag-combobox';
+import { useModuleStore } from '@/stores/preferences';
 
 const GAME_LABELS: Record<string, string> = {
   magic: 'Magic: The Gathering',
@@ -38,6 +43,9 @@ interface MockDetailPanelProps {
   moveError: string | null;
   status: 'idle' | 'saving' | 'success' | 'error';
   errorMessage: string | null;
+  onSelectPrint?: () => void;
+  printSelectionLabel?: string;
+  printSelectionDisabled?: boolean;
 }
 
 export function MockDetailPanel({
@@ -60,8 +68,16 @@ export function MockDetailPanel({
   moveStatus,
   moveError,
   status,
-  errorMessage
+  errorMessage,
+  onSelectPrint,
+  printSelectionLabel,
+  printSelectionDisabled
 }: MockDetailPanelProps) {
+  const [isImageOpen, setIsImageOpen] = useState(false);
+  const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
+  const showPricing = useModuleStore((state) => state.showPricing);
+  const supportsPrintSelection = card?.tcg === 'magic';
+
   if (!card) {
     return (
       <Card className="sticky top-4 h-fit">
@@ -81,14 +97,9 @@ export function MockDetailPanel({
             {card.imageUrl ? (
               <Button
                 variant="ghost"
-                className="w-full overflow-hidden rounded-lg border-2 bg-muted p-0 h-auto"
-                style={{ borderColor: card.binderColorHex || 'var(--border)' }}
-                onClick={() => {
-                  const overlay = window.open('', '_blank');
-                  if (overlay) {
-                    overlay.document.write(`<img src=\"${card.imageUrl}\" style=\"width:100%;height:100%;object-fit:contain\" />`);
-                  }
-                }}
+                className="w-full overflow-hidden rounded-lg border-2 bg-muted p-0 h-auto cursor-zoom-in"
+                style={{ borderColor: card.binderColorHex ? (card.binderColorHex.startsWith('#') ? card.binderColorHex : `#${card.binderColorHex}`) : 'var(--border)' }}
+                onClick={() => setIsImageOpen(true)}
               >
                 <Image
                   src={card.imageUrl}
@@ -107,9 +118,11 @@ export function MockDetailPanel({
           </div>
           <div className="space-y-2">
             <CardTitle>{card.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {card.setName ?? card.setCode} · #{card.cardId}
-            </p>
+            {showCardNumbers && (
+              <p className="text-sm text-muted-foreground">
+                {card.setName ?? card.setCode} · #{card.cardId}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div>
                 <p className="uppercase">Binder</p>
@@ -131,13 +144,36 @@ export function MockDetailPanel({
                 <p className="uppercase">Condition</p>
                 <p className="text-sm font-medium text-foreground">{conditionRangeLabel(card.copies)}</p>
               </div>
-              <div>
-                <p className="uppercase">Est. value</p>
-                <p className="text-sm font-medium text-foreground">{formatCurrency(card.price)}</p>
-              </div>
+              {showPricing && (
+                <div>
+                  <p className="uppercase">Est. value</p>
+                  <p className="text-sm font-medium text-foreground">{formatCurrency(card.price)}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
+        {supportsPrintSelection && onSelectPrint ? (
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-muted-foreground">Print</Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-between"
+              onClick={onSelectPrint}
+              disabled={printSelectionDisabled || !selectedCopy}
+            >
+              <span className="truncate">{printSelectionLabel || 'Select a print'}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Updates the printing for every copy of this card in the current binder.
+            </p>
+            {!selectedCopy && (
+              <p className="text-[10px] text-muted-foreground">Select a specific copy to enable print changes.</p>
+            )}
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {selectedCopy ? (
@@ -214,6 +250,37 @@ export function MockDetailPanel({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
+        <DialogPortal>
+          <DialogOverlay className="backdrop-blur-lg bg-transparent" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+            <VisuallyHidden>
+              <DialogTitle>{card.name} - Card Image</DialogTitle>
+              <DialogDescription>Full size view of {card.name}</DialogDescription>
+            </VisuallyHidden>
+            <div className="relative inline-block">
+              {card.imageUrl && (
+                <Image
+                  src={card.imageUrl}
+                  alt={card.name}
+                  width={600}
+                  height={840}
+                  className="max-h-[85vh] w-auto object-contain rounded-lg shadow-2xl"
+                  priority
+                />
+              )}
+              <button
+                onClick={() => setIsImageOpen(false)}
+                className="absolute right-2 top-2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors z-10"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPortal>
+      </Dialog>
     </Card>
   );
 }
