@@ -22,6 +22,7 @@ This starts:
 - Set `SCRYFALL_API_BASE_URL` to `http://scryfall-bulk:4010` to have the backend use the local bulk data cache; otherwise it defaults to the public Scryfall API.
 - Set `YGO_API_BASE_URL` to `http://ygo-cache:4020` when the Yu-Gi-Oh! cache is running; otherwise the backend uses the public YGOPRODeck API directly.
 - Set `POKEMON_API_BASE_URL` to `http://pokemon-cache:4030` when the Pokémon cache is running; otherwise the backend uses the public Pokémon TCG API.
+- Set `TCGDEX_API_BASE_URL` to `http://tcgdex-cache:4040` to serve print variant metadata locally; otherwise it defaults to the public TCGdex API.
 - Database accessible on `localhost:5432` with credentials from `.env.docker`.
 
 ## Production Build
@@ -30,7 +31,7 @@ docker compose -f docker-compose.prod.yml --env-file ../.env.docker up --build -
 ```
 
 This uses the `production` stages of the backend and frontend images, runs compiled TypeScript/Next.js output, and omits development volumes.
-Add `--profile bulk` to the command if you want the cache services in production and point `SCRYFALL_API_BASE_URL`, `YGO_API_BASE_URL`, and `POKEMON_API_BASE_URL` at `http://scryfall-bulk:4010`, `http://ygo-cache:4020`, and `http://pokemon-cache:4030` respectively.
+Add `--profile bulk` to the command if you want the cache services in production and point `SCRYFALL_API_BASE_URL`, `YGO_API_BASE_URL`, `POKEMON_API_BASE_URL`, and `TCGDEX_API_BASE_URL` at `http://scryfall-bulk:4010`, `http://ygo-cache:4020`, `http://pokemon-cache:4030`, and `http://tcgdex-cache:4040` respectively.
 
 ## Common Commands
 - `docker compose down` — stop and remove containers.

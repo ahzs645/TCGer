@@ -11,7 +11,7 @@ import { fetchCardPrintsApi } from '@/lib/api-client';
 import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
-import type { Card } from '@/types/card';
+import type { Card, CardPrintsResponse, PokemonFinishType, PokemonFunctionalGroup } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
 
 const PRINT_SUPPORTED_GAMES: Card['tcg'][] = ['magic', 'pokemon'];
@@ -20,6 +20,8 @@ const GAME_LABELS: Record<Card['tcg'], string> = {
   pokemon: 'Pokémon',
   yugioh: 'Yu-Gi-Oh!'
 };
+
+const CARD_PLACEHOLDER_IMAGE = '/images/card-placeholder.jpg';
 
 interface CardPreviewProps {
   card: Card;
@@ -53,16 +55,23 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const supportsPrintSelection = PRINT_SUPPORTED_GAMES.includes(card.tcg);
   const [selectedPrintCard, setSelectedPrintCard] = useState<Card>(card);
-  const [printOptions, setPrintOptions] = useState<Card[] | null>(null);
+  const [printData, setPrintData] = useState<CardPrintsResponse | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isLoadingPrints, setIsLoadingPrints] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const selectedBinder = collections.find((binder) => binder.id === selectedBinderId);
   const activeCard = supportsPrintSelection ? selectedPrintCard : card;
+  const [cardImageSrc, setCardImageSrc] = useState(
+    activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE
+  );
   const existingEntry = selectedBinder?.cards.find((binderCard) => binderCard.cardId === activeCard.id);
   const serverQuantity = existingEntry?.quantity ?? 0;
   const quantity = optimisticQuantity ?? serverQuantity;
   const showQuantityControls = quantity > 0;
+  const printOptions = printData?.prints ?? null;
+  const pokemonFunctionalGroup: PokemonFunctionalGroup | null =
+    printData?.mode === 'pokemon-functional' ? printData.functionalGroup : null;
+
   const selectedPrintLabel = supportsPrintSelection
     ? `${selectedPrintCard.setName ?? selectedPrintCard.setCode ?? 'Select a print'}${
         selectedPrintCard.collectorNumber ? ` · #${selectedPrintCard.collectorNumber}` : ''
@@ -78,6 +87,9 @@ export function CardPreview({ card }: CardPreviewProps) {
     if (print.rarity) {
       parts.push(print.rarity);
     }
+    if (print.regulationMark) {
+      parts.push(`Reg ${print.regulationMark}`);
+    }
     if (print.releasedAt) {
       const year = new Date(print.releasedAt).getFullYear();
       if (!Number.isNaN(year)) {
@@ -85,6 +97,22 @@ export function CardPreview({ card }: CardPreviewProps) {
       }
     }
     return parts.join(' • ');
+  };
+
+  const getFinishBadges = (print: Card): PokemonFinishType[] => {
+    if (print.pokemonPrint?.finishes?.length) {
+      return print.pokemonPrint.finishes;
+    }
+    const variants = print.pokemonPrint?.variants;
+    if (!variants) {
+      return [];
+    }
+    const finishes: PokemonFinishType[] = [];
+    if (variants.normal) finishes.push('normal');
+    if (variants.reverse) finishes.push('reverse');
+    if (variants.holo) finishes.push('holo');
+    if (variants.firstEdition) finishes.push('firstEdition');
+    return finishes;
   };
 
   const throttledSetPos = useRef(
@@ -149,11 +177,15 @@ export function CardPreview({ card }: CardPreviewProps) {
 
   useEffect(() => {
     setSelectedPrintCard(card);
-    setPrintOptions(null);
+    setPrintData(null);
     setPrintError(null);
     setIsPrintDialogOpen(false);
     setIsLoadingPrints(false);
   }, [card.id]);
+
+  useEffect(() => {
+    setCardImageSrc(activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE);
+  }, [activeCard.id, activeCard.imageUrlSmall, activeCard.imageUrl]);
 
   useEffect(() => {
     if (!supportsPrintSelection || !isPrintDialogOpen || printOptions) {
@@ -165,9 +197,10 @@ export function CardPreview({ card }: CardPreviewProps) {
     setPrintError(null);
 
     fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id })
-      .then((prints) => {
+      .then((data) => {
         if (cancelled) return;
-        setPrintOptions(prints);
+        setPrintData(data);
+        const prints = data.prints ?? [];
         if (prints.length) {
           const matching = prints.find((entry) => entry.id === selectedPrintCard.id);
           setSelectedPrintCard(matching ?? prints[0]);
@@ -186,6 +219,18 @@ export function CardPreview({ card }: CardPreviewProps) {
       cancelled = true;
     };
   }, [supportsPrintSelection, isPrintDialogOpen, printOptions, card.tcg, card.id, selectedPrintCard.id]);
+
+  const handleCardImageError = useCallback(() => {
+    setCardImageSrc((currentSrc) => {
+      if (currentSrc === activeCard.imageUrlSmall && activeCard.imageUrl && activeCard.imageUrl !== currentSrc) {
+        return activeCard.imageUrl;
+      }
+      if (currentSrc === CARD_PLACEHOLDER_IMAGE) {
+        return currentSrc;
+      }
+      return CARD_PLACEHOLDER_IMAGE;
+    });
+  }, [activeCard.imageUrl, activeCard.imageUrlSmall]);
 
   const handleBinderChange = (binderId: string) => {
     setSelectedBinderId(binderId);
@@ -321,41 +366,93 @@ export function CardPreview({ card }: CardPreviewProps) {
                 <p className="mt-1 text-xs text-muted-foreground">You can continue with the default print.</p>
               </div>
             ) : (
-              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                {(printOptions && printOptions.length > 0 ? printOptions : [card]).map((print) => {
-                  const isSelected = selectedPrintCard.id === print.id;
-                  return (
-                    <button
-                      type="button"
-                      key={print.id}
-                      onClick={() => setSelectedPrintCard(print)}
-                      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
-                        isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
-                      }`}
-                    >
-                      {print.imageUrlSmall ? (
+              <>
+                {pokemonFunctionalGroup ? (
+                  <div className="mb-3 space-y-2 rounded-lg border bg-muted/40 p-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                      <span>{pokemonFunctionalGroup.name}</span>
+                      {pokemonFunctionalGroup.hp ? <span className="text-muted-foreground">HP {pokemonFunctionalGroup.hp}</span> : null}
+                      {pokemonFunctionalGroup.regulationMark ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          Reg {pokemonFunctionalGroup.regulationMark}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {pokemonFunctionalGroup.attacks?.length ? (
+                      <div className="space-y-1">
+                        {pokemonFunctionalGroup.attacks.map((attack) => (
+                          <div key={`${attack.name}-${attack.damage ?? 'na'}`}>
+                            <p className="font-medium">{attack.name}</p>
+                            <p className="text-muted-foreground">
+                              {[attack.cost?.join(', '), attack.damage].filter(Boolean).join(' • ')}
+                            </p>
+                            {attack.text ? <p className="text-muted-foreground">{attack.text}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {pokemonFunctionalGroup.rules?.length ? (
+                      <p className="text-muted-foreground">{pokemonFunctionalGroup.rules.join(' ')}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                  {(printOptions && printOptions.length > 0 ? printOptions : [card]).map((print) => {
+                    const isSelected = selectedPrintCard.id === print.id;
+                    const finishes = getFinishBadges(print);
+                    return (
+                      <button
+                        type="button"
+                        key={print.id}
+                        onClick={() => setSelectedPrintCard(print)}
+                        className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
+                          isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
+                        }`}
+                      >
                         <img
-                          src={print.imageUrlSmall}
+                          src={print.imageUrlSmall ?? CARD_PLACEHOLDER_IMAGE}
                           alt={print.name}
                           className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
                           loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = CARD_PLACEHOLDER_IMAGE;
+                          }}
                         />
-                      ) : null}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{print.setName ?? print.setCode ?? 'Unknown set'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatPrintDetails(print) || 'No additional details'}
-                        </p>
-                      </div>
-                      {isSelected ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Selected
-                        </Badge>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{print.setName ?? print.setCode ?? 'Unknown set'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatPrintDetails(print) || 'No additional details'}
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                            {print.regulationMark ? <span>Reg {print.regulationMark}</span> : null}
+                            {print.language ? <span className="uppercase">{print.language}</span> : null}
+                          </div>
+                          {finishes.length ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {finishes.map((finish) => (
+                                <Badge key={finish} variant="outline" className="text-[10px] capitalize">
+                                  {finish === 'firstEdition' ? '1st Ed' : finish}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        {isSelected ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Selected
+                          </Badge>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  {!printOptions?.length && (
+                    <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                      No alternate printings were returned for this card.
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <DialogFooter>
               <Button
@@ -392,25 +489,15 @@ export function CardPreview({ card }: CardPreviewProps) {
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
-              {activeCard.imageUrlSmall ? (
-                <img
-                  draggable={false}
-                  loading="lazy"
-                  className="card-test"
-                  alt={activeCard.name}
-                  src={activeCard.imageUrlSmall}
-                  style={cardStyle}
-                />
-              ) : (
-                <img
-                  draggable={false}
-                  loading="lazy"
-                  className="card-test"
-                  alt={activeCard.name}
-                  src={activeCard.imageUrl}
-                  style={cardStyle}
-                />
-              )}
+              <img
+                draggable={false}
+                loading="lazy"
+                className="card-test"
+                alt={activeCard.name}
+                src={cardImageSrc}
+                style={cardStyle}
+                onError={handleCardImageError}
+              />
             </div>
           </div>
         </button>
@@ -445,7 +532,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                   onValueChange={handleBinderChange}
                   disabled={collectionsLoading || status === 'pending'}
                 >
-                  <SelectTrigger className="h-8 flex-1 justify-between gap-2 text-left text-xs">
+                  <SelectTrigger className="h-9 w-full justify-between gap-2 text-left text-xs">
                     <SelectValue placeholder="Select a binder" />
                   </SelectTrigger>
                   <SelectContent>
@@ -475,16 +562,15 @@ export function CardPreview({ card }: CardPreviewProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    className="w-full justify-between"
+                    className="h-9 w-full justify-between gap-2 text-left text-xs"
                     onClick={handleOpenPrintDialog}
                   >
                     <span className="truncate">{selectedPrintLabel || 'Select a print'}</span>
                     <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </Button>
-                  <p className="text-[10px] text-muted-foreground">
-                    {printOptions ? 'Using your selected printing.' : 'Choose a print before adding the card.'}
-                  </p>
+                  {!printOptions && (
+                    <p className="text-[10px] text-muted-foreground">Choose a print before adding the card.</p>
+                  )}
                 </div>
               ) : null}
               {!showQuantityControls ? (

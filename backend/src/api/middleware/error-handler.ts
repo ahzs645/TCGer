@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 type HttpError = Error & { status?: number; details?: unknown };
 
 // Centralized error handler returning normalized payloads
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: HttpError, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
     return res.status(400).json({

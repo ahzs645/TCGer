@@ -5,6 +5,8 @@ struct EditCollectionCardSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: CollectionCard
+    let isIndividualCopy: Bool
+    let copyDetails: CollectionCardCopy?
     let isSaving: Bool
     let onSave: (Int, String?, String?, String?, Card?) async -> Void
 
@@ -22,15 +24,46 @@ struct EditCollectionCardSheet: View {
         card.supportsPrintSelection
     }
 
-    init(card: CollectionCard, isSaving: Bool, onSave: @escaping (Int, String?, String?, String?, Card?) async -> Void) {
+    private var copyTitle: String? {
+        guard let copy = copyDetails else { return nil }
+        if let serial = copy.serialNumber, !serial.isEmpty {
+            return serial
+        }
+        if let index = card.copies.firstIndex(where: { $0.id == copy.id }) {
+            return "Copy #\(index + 1)"
+        }
+        return "Copy"
+    }
+
+    private var copyDetailsLine: String? {
+        guard let copy = copyDetails else { return nil }
+        var parts: [String] = []
+        if let condition = copy.condition, !condition.isEmpty {
+            parts.append(condition)
+        }
+        if let language = copy.language, !language.isEmpty {
+            parts.append(language)
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    init(
+        card: CollectionCard,
+        isIndividualCopy: Bool = false,
+        copyDetails: CollectionCardCopy? = nil,
+        isSaving: Bool,
+        onSave: @escaping (Int, String?, String?, String?, Card?) async -> Void
+    ) {
         self.card = card
+        self.isIndividualCopy = isIndividualCopy
+        self.copyDetails = copyDetails
         self.isSaving = isSaving
         self.onSave = onSave
 
         _quantity = State(initialValue: max(1, card.quantity))
-        _conditionSelection = State(initialValue: card.condition ?? "")
-        _languageSelection = State(initialValue: card.language ?? "")
-        _notes = State(initialValue: card.notes ?? "")
+        _conditionSelection = State(initialValue: copyDetails?.condition ?? card.condition ?? "")
+        _languageSelection = State(initialValue: copyDetails?.language ?? card.language ?? "")
+        _notes = State(initialValue: copyDetails?.notes ?? card.notes ?? "")
     }
 
     var body: some View {
@@ -63,9 +96,20 @@ struct EditCollectionCardSheet: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
-                            Text("Currently ×\(card.quantity)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            if let copyTitle {
+                                Text(copyTitle)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            if let copyDetailsLine {
+                                Text(copyDetailsLine)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("Currently ×\(card.quantity)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         Spacer()
                     }
@@ -73,12 +117,14 @@ struct EditCollectionCardSheet: View {
                     Text("Card")
                 }
 
-                Section {
-                    Stepper(value: $quantity, in: 1...999) {
-                        Text("Quantity: \(quantity)")
+                if !isIndividualCopy {
+                    Section {
+                        Stepper(value: $quantity, in: 1...999) {
+                            Text("Quantity: \(quantity)")
+                        }
+                    } header: {
+                        Text("Quantity")
                     }
-                } header: {
-                    Text("Quantity")
                 }
 
                 // Print selection for games that support multiple printings
@@ -171,13 +217,19 @@ struct EditCollectionCardSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving..." : "Save") {
+                        let quantityToSave = quantity
+                        let conditionToSave = conditionSelection.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let languageToSave = languageSelection.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let notesToSave = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let selectedPrintToSave = selectedPrint
+
                         Task {
                             await onSave(
-                                quantity,
-                                conditionSelection.isEmpty ? nil : conditionSelection,
-                                languageSelection.isEmpty ? nil : languageSelection,
-                                notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
-                                selectedPrint
+                                quantityToSave,
+                                conditionToSave.isEmpty ? nil : conditionToSave,
+                                languageToSave.isEmpty ? nil : languageToSave,
+                                notesToSave.isEmpty ? nil : notesToSave,
+                                selectedPrintToSave
                             )
                         }
                     }

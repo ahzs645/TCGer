@@ -134,7 +134,8 @@ struct MoreCardsIndicator: View {
                 condition: nil,
                 language: nil,
                 notes: nil,
-                collectorNumber: nil
+                collectorNumber: nil,
+                copies: []
             ),
             CollectionCard(
                 id: "2",
@@ -152,7 +153,8 @@ struct MoreCardsIndicator: View {
                 condition: nil,
                 language: nil,
                 notes: nil,
-                collectorNumber: nil
+                collectorNumber: nil,
+                copies: []
             )
         ])
 

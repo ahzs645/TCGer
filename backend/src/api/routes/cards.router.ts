@@ -29,8 +29,8 @@ cardsRouter.get(
   '/:tcg/:cardId/prints',
   asyncHandler(async (req, res) => {
     const { tcg, cardId } = cardParamsSchema.parse(req.params);
-    const prints = await getCardPrints({ tcg, cardId });
-    res.json({ prints, total: prints.length });
+    const result = await getCardPrints({ tcg, cardId });
+    res.json(result);
   })
 );
 

@@ -94,6 +94,7 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let language: String?
     let notes: String?
     let collectorNumber: String?
+    let copies: [CollectionCardCopy]
 
     var supportsPrintSelection: Bool {
         switch tcg.lowercased() {
@@ -101,6 +102,24 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
         default: return false
         }
     }
+}
+
+struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let condition: String?
+    let language: String?
+    let notes: String?
+    let price: Double?
+    let acquisitionPrice: Double?
+    let serialNumber: String?
+    let acquiredAt: String?
+    let tags: [CollectionCardTag]
+}
+
+struct CollectionCardTag: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let colorHex: String
 }
 
 // MARK: - App Settings

@@ -111,7 +111,8 @@ struct StatItem: View {
                     condition: nil,
                     language: nil,
                     notes: nil,
-                    collectorNumber: nil
+                    collectorNumber: nil,
+                    copies: []
                 )
             ],
             createdAt: "",

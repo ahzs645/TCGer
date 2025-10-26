@@ -1,5 +1,5 @@
 import { DEFAULT_API_BASE_URL } from '@/lib/utils';
-import type { Card, SearchCardsResponse, TcgCode } from '@/types/card';
+import type { Card, CardPrintsResponse, SearchCardsResponse, TcgCode } from '@/types/card';
 
 const API_BASE_URL = DEFAULT_API_BASE_URL.replace(/\/$/, '');
 
@@ -26,14 +26,12 @@ export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'a
   return data.cards ?? [];
 }
 
-export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string }): Promise<Card[]> {
+export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string }): Promise<CardPrintsResponse> {
   const { tcg, cardId } = params;
   const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
     next: { revalidate: 30 }
   });
-
-  const data = await handleResponse<{ prints: Card[] }>(res);
-  return data.prints ?? [];
+  return handleResponse<CardPrintsResponse>(res);
 }
 
 export interface DashboardStats {

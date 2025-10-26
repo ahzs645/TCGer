@@ -12,7 +12,8 @@ const envSchema = z.object({
   POKEMON_TCG_API_KEY: z.string().optional(),
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
   YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7'),
-  POKEMON_API_BASE_URL: z.string().url().default('https://api.pokemontcg.io/v2')
+  POKEMON_API_BASE_URL: z.string().url().default('https://api.pokemontcg.io/v2'),
+  TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en')
 });
 
 const parsed = envSchema.safeParse(process.env);

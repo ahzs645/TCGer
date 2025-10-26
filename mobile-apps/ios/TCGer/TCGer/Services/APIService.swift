@@ -418,6 +418,7 @@ final class APIService {
         let language: String?
         let notes: String?
         let cardOverride: CardOverride?
+        let targetBinderId: String?
     }
 
     func addCardToBinder(
@@ -487,7 +488,8 @@ final class APIService {
         condition: String? = nil,
         language: String? = nil,
         notes: String? = nil,
-        newPrint: Card? = nil
+        newPrint: Card? = nil,
+        targetBinderId: String? = nil
     ) async throws -> CollectionCard {
         let cardOverride: CardOverride?
         if let print = newPrint {
@@ -513,7 +515,8 @@ final class APIService {
             condition: condition,
             language: language,
             notes: notes,
-            cardOverride: cardOverride
+            cardOverride: cardOverride,
+            targetBinderId: targetBinderId
         )
 
         let (data, httpResponse) = try await makeRequest(
