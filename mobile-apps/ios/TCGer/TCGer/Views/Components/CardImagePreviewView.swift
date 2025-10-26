@@ -3,6 +3,7 @@ import SwiftUI
 struct CardImagePreviewView: View {
     let card: CollectionCard
     let onDismiss: () -> Void
+    @EnvironmentObject private var environmentStore: EnvironmentStore
 
     private var imageURL: URL? {
         if let primary = card.imageUrl, let url = URL(string: primary) {
@@ -18,8 +19,8 @@ struct CardImagePreviewView: View {
         ZStack {
             // Dimmed background - tap to dismiss
             Color.black
-                .opacity(0.85)
                 .ignoresSafeArea()
+                .opacity(0.85)
                 .onTapGesture {
                     onDismiss()
                 }
@@ -59,7 +60,7 @@ struct CardImagePreviewView: View {
                         .font(.title3.weight(.semibold))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
-                    if let setCode = card.setCode {
+                    if environmentStore.showCardNumbers, let setCode = card.setCode {
                         Text(setCode)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.7))

@@ -171,6 +171,19 @@ export interface UpdateCollectionCardInput {
   tags?: string[];
   newTags?: { label: string; colorHex?: string }[];
   targetBinderId?: string;
+  cardOverride?: {
+    cardId: string;
+    cardData?: {
+      name: string;
+      tcg: string;
+      externalId: string;
+      setCode?: string;
+      setName?: string;
+      rarity?: string;
+      imageUrl?: string;
+      imageUrlSmall?: string;
+    };
+  };
 }
 
 function getBinderSnapshot(collection: PrismaCollectionWithCard, fallback?: BinderSnapshot): BinderSnapshot {
@@ -803,6 +816,9 @@ export async function updateCardInBinder(
     throw new Error('Collection entry not found');
   }
 
+  const desiredCardId = input.cardOverride?.cardId?.trim();
+  const wantsCardOverride = Boolean(desiredCardId && desiredCardId !== collection.cardId);
+
   const updatePayload: Prisma.CollectionUpdateInput = {};
 
   const normalizedCondition = sanitizeOptionalText(input.condition);
@@ -846,11 +862,58 @@ export async function updateCardInBinder(
   const shouldSyncTags = input.tags !== undefined || Boolean(input.newTags?.length);
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updatedCollection = await tx.collection.update({
-      where: { id: collectionId },
-      data: updatePayload,
-      include: collectionInclude
-    });
+    const hasFieldUpdates = Object.keys(updatePayload).length > 0;
+
+    if (wantsCardOverride && desiredCardId) {
+      let targetCard = await tx.card.findUnique({ where: { id: desiredCardId } });
+      if (!targetCard) {
+        const payload = input.cardOverride?.cardData;
+        if (!payload) {
+          throw new Error('Card data is required when selecting a new print.');
+        }
+        const tcgGame = await tx.tcgGame.findFirst({
+          where: { code: payload.tcg }
+        });
+        if (!tcgGame) {
+          throw new Error(`TCG game '${payload.tcg}' not found`);
+        }
+        targetCard = await tx.card.create({
+          data: {
+            id: desiredCardId,
+            tcgGameId: tcgGame.id,
+            externalId: payload.externalId,
+            name: payload.name,
+            setCode: payload.setCode,
+            setName: payload.setName,
+            rarity: payload.rarity,
+            imageUrl: payload.imageUrl,
+            imageUrlSmall: payload.imageUrlSmall
+          }
+        });
+      }
+
+      await tx.collection.updateMany({
+        where: {
+          userId,
+          binderId: resolvedBinderId,
+          cardId: collection.cardId
+        },
+        data: {
+          cardId: desiredCardId
+        }
+      });
+    }
+
+    const updatedCollection = hasFieldUpdates
+      ? await tx.collection.update({
+          where: { id: collectionId },
+          data: updatePayload,
+          include: collectionInclude
+        })
+      : await tx.collection.findUniqueOrThrow({
+          where: { id: collectionId },
+          include: collectionInclude
+        });
 
     let workingCollection = updatedCollection as PrismaCollectionWithCard;
 

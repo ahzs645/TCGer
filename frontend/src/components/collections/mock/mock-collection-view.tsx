@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Filter, Search, Sparkles } from 'lucide-react';
+import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 
 import { LIBRARY_COLLECTION_ID, type Collection, type CollectionCard, type CollectionCardCopy, type CollectionTag, type UpdateCollectionCardInput } from '@/lib/api/collections';
+import { fetchCardPrintsApi } from '@/lib/api-client';
 import { conditionRangeLabel, formatCurrency, CONDITION_ORDER } from './mock-helpers';
 import { FilterDialog } from './filter-dialog';
 import { BinderList } from './binder-list';
@@ -22,7 +23,9 @@ import { MockDetailPanel } from './detail-panel';
 import { useCollectionsStore } from '@/stores/collections';
 import { useTagsStore } from '@/stores/tags';
 import { useAuthStore } from '@/stores/auth';
+import { useModuleStore } from '@/stores/preferences';
 import { cn } from '@/lib/utils';
+import type { Card as TcgCard, TcgCode } from '@/types/card';
 
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
 const DEFAULT_BINDER_COLORS = [
@@ -81,6 +84,23 @@ function summarizeTags(cards: CollectionCard[]) {
     .slice(0, 3);
 }
 
+function formatPrintDetails(print: TcgCard) {
+  const parts: string[] = [];
+  if (print.collectorNumber) {
+    parts.push(`#${print.collectorNumber}`);
+  }
+  if (print.rarity) {
+    parts.push(print.rarity);
+  }
+  if (print.releasedAt) {
+    const year = new Date(print.releasedAt).getFullYear();
+    if (!Number.isNaN(year)) {
+      parts.push(String(year));
+    }
+  }
+  return parts.join(' • ');
+}
+
 export function MockCollectionView() {
   const token = useAuthStore((state) => state.token);
   const router = useRouter();
@@ -95,6 +115,8 @@ export function MockCollectionView() {
     isLoading: state.isLoading
   }));
   const { tags, fetchTags, addTag } = useTagsStore();
+  const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
+  const showPricing = useModuleStore((state) => state.showPricing);
 
   const [binderFilter, setBinderFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -127,6 +149,12 @@ export function MockCollectionView() {
   const [editBinderColor, setEditBinderColor] = useState<string>('');
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [printOptions, setPrintOptions] = useState<TcgCard[] | null>(null);
+  const [selectedPrintCard, setSelectedPrintCard] = useState<TcgCard | null>(null);
+  const [isLoadingPrints, setIsLoadingPrints] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [isSavingPrintSelection, setIsSavingPrintSelection] = useState(false);
 
   useEffect(() => {
     const binderParam = searchParams.get('binder');
@@ -211,6 +239,16 @@ export function MockCollectionView() {
   }, [sortedCards]);
 
   const selectedCard = useMemo(() => sortedCards.find((card) => card.id === selectedCardId) ?? null, [sortedCards, selectedCardId]);
+  const supportsPrintSelection = selectedCard?.tcg === 'magic';
+
+  useEffect(() => {
+    setIsPrintDialogOpen(false);
+    setPrintOptions(null);
+    setSelectedPrintCard(null);
+    setIsLoadingPrints(false);
+    setPrintError(null);
+    setIsSavingPrintSelection(false);
+  }, [selectedCard?.cardId]);
 
   useEffect(() => {
     if (selectedCard) {
@@ -254,6 +292,46 @@ export function MockCollectionView() {
     setMoveError(null);
   }, [selectedCopy]);
 
+  useEffect(() => {
+    if (!supportsPrintSelection || !isPrintDialogOpen || printOptions || !selectedCard) {
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingPrints(true);
+    setPrintError(null);
+    fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: selectedCard.cardId })
+      .then((prints) => {
+        if (cancelled) {
+          return;
+        }
+        setPrintOptions(prints);
+        const matching = prints.find((print) => print.id === selectedCard.cardId);
+        setSelectedPrintCard(matching ?? prints[0] ?? null);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setPrintError(error instanceof Error ? error.message : 'Unable to load prints.');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingPrints(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supportsPrintSelection, isPrintDialogOpen, printOptions, selectedCard]);
+
+  useEffect(() => {
+    if (!isPrintDialogOpen || !printOptions || !selectedCard) {
+      return;
+    }
+    const matching = printOptions.find((print) => print.id === selectedCard.cardId);
+    setSelectedPrintCard(matching ?? printOptions[0] ?? null);
+  }, [isPrintDialogOpen, printOptions, selectedCard]);
+
   const summary = useMemo(() => {
     const rows = sortedCards.length;
     const copies = sortedCards.reduce((sum, card) => sum + (card.copies?.length ?? card.quantity ?? 0), 0);
@@ -273,6 +351,16 @@ export function MockCollectionView() {
       })),
     [binders]
   );
+  const printSelectionLabel = useMemo(() => {
+    if (!selectedCard) {
+      return 'Select a print';
+    }
+    const base = selectedCard.setName ?? selectedCard.setCode ?? selectedCard.name;
+    return `${base}${selectedCard.cardId ? ` · #${selectedCard.cardId}` : ''}`;
+  }, [selectedCard]);
+  const printSelectionDisabled = !selectedCopy || isLoadingPrints || isSavingPrintSelection || moveStatus === 'pending';
+  const isPrintSaveDisabled =
+    !selectedPrintCard || !selectedCard || selectedPrintCard.id === selectedCard.cardId || isSavingPrintSelection;
 
   const toggleRowExpansion = (cardId: string) => {
     setExpandedRows((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
@@ -293,6 +381,13 @@ export function MockCollectionView() {
 
   const handleTagToggle = (tagId: string) => {
     setDraftCopyTags((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
+  };
+
+  const handlePrintButtonClick = () => {
+    if (!supportsPrintSelection || !selectedCopy) {
+      return;
+    }
+    setIsPrintDialogOpen(true);
   };
 
   const handleCreateTag = useCallback(
@@ -361,6 +456,40 @@ export function MockCollectionView() {
     }
   };
 
+  const handleConfirmPrintSelection = async () => {
+    if (!token || !selectedCard || !selectedCopy || !selectedPrintCard) {
+      return;
+    }
+    if (selectedPrintCard.id === selectedCard.cardId) {
+      setIsPrintDialogOpen(false);
+      return;
+    }
+    setIsSavingPrintSelection(true);
+    setPrintError(null);
+    try {
+      await updateCollectionCard(token, selectedCard.binderId ?? LIBRARY_COLLECTION_ID, selectedCopy.id, {
+        cardOverride: {
+          cardId: selectedPrintCard.id,
+          cardData: {
+            name: selectedPrintCard.name,
+            tcg: selectedPrintCard.tcg,
+            externalId: selectedPrintCard.id,
+            setCode: selectedPrintCard.setCode,
+            setName: selectedPrintCard.setName,
+            rarity: selectedPrintCard.rarity,
+            imageUrl: selectedPrintCard.imageUrl,
+            imageUrlSmall: selectedPrintCard.imageUrlSmall
+          }
+        }
+      });
+      setIsPrintDialogOpen(false);
+    } catch (error) {
+      setPrintError(error instanceof Error ? error.message : 'Failed to update print.');
+    } finally {
+      setIsSavingPrintSelection(false);
+    }
+  };
+
   const closeCreateBinderDialog = () => {
     setIsCreateBinderOpen(false);
     setNewBinderName('');
@@ -389,7 +518,8 @@ export function MockCollectionView() {
         setCreateBinderError('Enter a valid 6-digit hex color (e.g., #1F2937).');
         return;
       }
-      colorHex = normalizedColor.toUpperCase();
+      // Remove the # symbol for backend validation
+      colorHex = normalizedColor.replace('#', '').toUpperCase();
     }
     setIsCreatingBinder(true);
     setCreateBinderError(null);
@@ -433,7 +563,11 @@ export function MockCollectionView() {
     const binder = binders.find((b) => b.id === binderId);
     if (!binder) return;
     setEditBinderId(binderId);
-    setEditBinderColor(binder.colorHex ?? DEFAULT_BINDER_COLORS[0]);
+    // Add # prefix if not present
+    const colorWithHash = binder.colorHex
+      ? (binder.colorHex.startsWith('#') ? binder.colorHex : `#${binder.colorHex}`)
+      : DEFAULT_BINDER_COLORS[0];
+    setEditBinderColor(colorWithHash);
     setEditBinderError(null);
     setIsEditBinderColorOpen(true);
   };
@@ -485,10 +619,12 @@ export function MockCollectionView() {
       setEditBinderError('Enter a valid 6-digit hex color (e.g., #1F2937).');
       return;
     }
+    // Remove the # symbol for backend validation
+    const colorHexWithoutHash = normalizedColor.replace('#', '').toUpperCase();
     setIsEditingBinder(true);
     setEditBinderError(null);
     try {
-      await updateCollection(token, editBinderId, { colorHex: normalizedColor.toUpperCase() });
+      await updateCollection(token, editBinderId, { colorHex: colorHexWithoutHash });
       closeEditBinderDialog();
     } catch (error) {
       setEditBinderError(error instanceof Error ? error.message : 'Failed to update binder color.');
@@ -614,10 +750,12 @@ export function MockCollectionView() {
                             </Button>
                             <div>
                               <p className="font-medium leading-tight">{card.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {card.setName ?? card.setCode ?? 'Unknown set'}
-                                {card.setCode ? ` · #${card.setCode}` : ''}
-                              </p>
+                              {showCardNumbers && (
+                                <p className="text-xs text-muted-foreground">
+                                  {card.setName ?? card.setCode ?? 'Unknown set'}
+                                  {card.setCode ? ` · #${card.setCode}` : ''}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -625,7 +763,7 @@ export function MockCollectionView() {
                         <TableCell>{card.rarity ?? 'N/A'}</TableCell>
                         <TableCell>{card.copies?.length ?? card.quantity}</TableCell>
                         <TableCell>{conditionRangeLabel(card.copies ?? []) ?? 'Unknown'}</TableCell>
-                        <TableCell>{formatCurrency(card.price)}</TableCell>
+                        <TableCell>{showPricing ? formatCurrency(card.price) : '—'}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {aggregatedTags.length
@@ -750,8 +888,88 @@ export function MockCollectionView() {
           moveError={moveError}
           status={status}
           errorMessage={errorMessage}
+          onSelectPrint={supportsPrintSelection ? handlePrintButtonClick : undefined}
+          printSelectionLabel={printSelectionLabel}
+          printSelectionDisabled={printSelectionDisabled}
         />
       </div>
+
+      <Dialog
+        open={isPrintDialogOpen}
+        onOpenChange={(open) => {
+          setIsPrintDialogOpen(open);
+          if (!open) {
+            setPrintError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Select a print</DialogTitle>
+            <DialogDescription>Choose the exact Magic printing to keep your binder entry accurate.</DialogDescription>
+          </DialogHeader>
+          {isLoadingPrints ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : printError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <p>{printError}</p>
+              <p className="mt-1 text-xs text-muted-foreground">You can close the dialog and try again later.</p>
+            </div>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {(printOptions ?? []).map((print) => {
+                const isSelected = selectedPrintCard?.id === print.id;
+                return (
+                  <button
+                    type="button"
+                    key={print.id}
+                    onClick={() => setSelectedPrintCard(print)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition',
+                      isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
+                    )}
+                  >
+                    {print.imageUrlSmall ? (
+                      <img
+                        src={print.imageUrlSmall}
+                        alt={print.name}
+                        className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
+                        loading="lazy"
+                      />
+                    ) : null}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{print.setName ?? print.setCode ?? print.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatPrintDetails(print) || 'No additional details'}
+                      </p>
+                    </div>
+                    {isSelected ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Selected
+                      </Badge>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {!printOptions?.length && (
+                <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                  No alternate printings were returned for this card.
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setIsPrintDialogOpen(false)} disabled={isSavingPrintSelection}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleConfirmPrintSelection} disabled={isPrintSaveDisabled || Boolean(printError)}>
+              {isSavingPrintSelection ? 'Saving…' : 'Use This Print'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCreateBinderOpen} onOpenChange={handleCreateDialogChange}>
         <DialogContent className="sm:max-w-md">

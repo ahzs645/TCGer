@@ -137,6 +137,34 @@ final class APIService {
         return response
     }
 
+    func getCardPrints(
+        config: ServerConfiguration,
+        token: String,
+        tcg: String,
+        cardId: String
+    ) async throws -> [Card] {
+        let path = "cards/\(tcg)/\(cardId)/prints"
+
+        let (data, httpResponse) = try await makeRequest(config: config, path: path, token: token)
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: httpResponse.statusCode)
+        }
+
+        struct PrintsResponse: Decodable {
+            let prints: [Card]
+        }
+
+        guard let response = try? JSONDecoder().decode(PrintsResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return response.prints
+    }
+
     // MARK: - Collections API
     func getCollections(
         config: ServerConfiguration,

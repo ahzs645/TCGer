@@ -35,6 +35,8 @@ async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Resp
 
 interface ScryfallSearchResponse {
   data: ScryfallCard[];
+  has_more?: boolean; // eslint-disable-line camelcase
+  next_page?: string; // eslint-disable-line camelcase
 }
 
 interface ScryfallCard {
@@ -42,6 +44,8 @@ interface ScryfallCard {
   name: string;
   set: string;
   set_name: string; // eslint-disable-line camelcase
+  oracle_id?: string; // eslint-disable-line camelcase
+  prints_search_uri?: string; // eslint-disable-line camelcase
   released_at?: string; // eslint-disable-line camelcase
   collector_number?: string; // eslint-disable-line camelcase
   rarity?: string;
@@ -127,15 +131,37 @@ export class MagicAdapter implements TcgAdapter {
     }
 
     try {
-      const response = await rateLimitedFetch(`${BASE_URL}/${trimmedId}/prints`);
-      if (!response.ok) {
-        throw new Error(`Scryfall prints fetch failed: ${response.status}`);
+      const cardResponse = await rateLimitedFetch(`${BASE_URL}/${trimmedId}`);
+      if (!cardResponse.ok) {
+        throw new Error(`Scryfall card fetch failed: ${cardResponse.status}`);
       }
 
-      const payload = (await response.json()) as ScryfallSearchResponse;
-      const prints = payload?.data ?? [];
+      const cardData = (await cardResponse.json()) as ScryfallCard;
+      const printsSearchUri =
+        cardData.prints_search_uri ??
+        (cardData.oracle_id
+          ? `${BASE_URL}/search?order=released&unique=prints&q=oracleid%3A${cardData.oracle_id}`
+          : undefined);
+
+      if (!printsSearchUri) {
+        return [this.mapCard(cardData)];
+      }
+
+      const prints: ScryfallCard[] = [];
+      let nextPageUrl: string | undefined = printsSearchUri;
+
+      while (nextPageUrl) {
+        const response = await rateLimitedFetch(nextPageUrl);
+        if (!response.ok) {
+          throw new Error(`Scryfall prints fetch failed: ${response.status}`);
+        }
+        const payload = (await response.json()) as ScryfallSearchResponse;
+        prints.push(...(payload.data ?? []));
+        nextPageUrl = payload.has_more && payload.next_page ? payload.next_page : undefined;
+      }
+
       if (!prints.length) {
-        return [];
+        return [this.mapCard(cardData)];
       }
 
       const sorted = [...prints].sort((a, b) => {

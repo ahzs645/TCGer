@@ -11,6 +11,8 @@ struct AddCardToBinderFromSearchView: View {
     @State private var errorMessage: String?
     @State private var hasSearched = false
     @State private var selectedCard: Card?
+    @State private var showingPrintSelection = false
+    @State private var selectedPrint: Card?
 
     private let apiService = APIService()
 
@@ -64,8 +66,15 @@ struct AddCardToBinderFromSearchView: View {
                         cards: searchResults,
                         selectedGame: selectedGame,
                         enabledGames: environmentStore.enabledGames,
+                        showPricing: environmentStore.showPricing,
+                        showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
                             selectedCard = card
+                            // For Magic cards, show print selection first
+                            if card.tcg == "magic" {
+                                selectedPrint = card
+                                showingPrintSelection = true
+                            }
                         }
                     )
                 }
@@ -83,16 +92,55 @@ struct AddCardToBinderFromSearchView: View {
                     }
                 }
             }
-            .sheet(item: $selectedCard) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
-                    await addCardToBinder(
-                        cardId: card.id,
-                        binderId: binderId,
-                        quantity: quantity,
-                        condition: condition,
-                        language: language,
-                        notes: notes
-                    )
+            .sheet(isPresented: $showingPrintSelection) {
+                if let card = selectedCard, let print = selectedPrint {
+                    SelectPrintSheet(card: card, selectedPrint: Binding(
+                        get: { print },
+                        set: { selectedPrint = $0 }
+                    ))
+                    .environmentObject(environmentStore)
+                }
+            }
+            .onChange(of: showingPrintSelection) { oldValue, newValue in
+                // When print selection sheet is dismissed and we have a selected print,
+                // keep selectedCard set so the add-to-binder sheet shows
+                if !newValue && selectedPrint != nil && selectedCard?.tcg == "magic" {
+                    // Sheet will automatically show because selectedCard is still set
+                }
+            }
+            .sheet(item: $selectedCard, onDismiss: {
+                // Clean up state when sheet is dismissed
+                selectedPrint = nil
+            }) { card in
+                // For non-Magic cards, show add-to-binder sheet directly
+                // For Magic cards, only show this after print selection is complete
+                let shouldShowForMagic = card.tcg == "magic" && !showingPrintSelection && selectedPrint != nil
+                let shouldShowForOthers = card.tcg != "magic"
+
+                if shouldShowForMagic {
+                    if let print = selectedPrint {
+                        AddCardToBinderSheet(card: print) { binderId, quantity, condition, language, notes in
+                            await addCardToBinder(
+                                cardId: print.id,
+                                binderId: binderId,
+                                quantity: quantity,
+                                condition: condition,
+                                language: language,
+                                notes: notes
+                            )
+                        }
+                    }
+                } else if shouldShowForOthers {
+                    AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                        await addCardToBinder(
+                            cardId: card.id,
+                            binderId: binderId,
+                            quantity: quantity,
+                            condition: condition,
+                            language: language,
+                            notes: notes
+                        )
+                    }
                 }
             }
         }
@@ -205,6 +253,8 @@ private struct SearchResultsList: View {
     let cards: [Card]
     let selectedGame: TCGGame
     let enabledGames: [TCGGame]
+    let showPricing: Bool
+    let showCardNumbers: Bool
     let onCardTap: (Card) -> Void
 
     var groupedCards: [(String, [Card])] {
@@ -231,7 +281,7 @@ private struct SearchResultsList: View {
                             GridItem(.flexible())
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
-                                CardCell(card: card)
+                                CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
                                     .onTapGesture {
                                         onCardTap(card)
                                     }
@@ -261,10 +311,17 @@ private struct SearchResultsList: View {
 // MARK: - Card Cell
 private struct CardCell: View {
     let card: Card
+    let showPricing: Bool
+    let showCardNumbers: Bool
+
+    private var supportsPrintSelection: Bool {
+        card.tcg == "magic"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+            ZStack(alignment: .topTrailing) {
+                AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()
@@ -297,6 +354,18 @@ private struct CardCell: View {
             }
             .cornerRadius(8)
 
+            // Print selection indicator for Magic cards
+            if supportsPrintSelection {
+                Image(systemName: "doc.on.doc.fill")
+                    .font(.caption2)
+                    .foregroundColor(.white)
+                    .padding(4)
+                    .background(Color.accentColor)
+                    .cornerRadius(6)
+                    .padding(6)
+            }
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 if let rarity = card.rarity {
                     Text(rarity)
@@ -314,14 +383,14 @@ private struct CardCell: View {
                     .fontWeight(.medium)
                     .lineLimit(2)
 
-                if let setName = card.setName {
+                if showCardNumbers, let setName = card.setName {
                     Text(setName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
 
-                if let price = card.price {
+                if showPricing, let price = card.price {
                     Text("$\(String(format: "%.2f", price))")
                         .font(.caption2)
                         .fontWeight(.semibold)
