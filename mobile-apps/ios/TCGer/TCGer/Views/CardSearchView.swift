@@ -10,6 +10,8 @@ struct CardSearchView: View {
     @State private var hasSearched = false
     @State private var selectedCard: Card?
     @State private var addCardSuccessMessage: String?
+    @State private var showingPrintSelection = false
+    @State private var selectedPrint: Card?
 
     private let apiService = APIService()
 
@@ -67,6 +69,11 @@ struct CardSearchView: View {
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
                             selectedCard = card
+                            // Cards with multiple printings (e.g., Magic, Pokémon) open the selector first
+                            if card.supportsPrintSelection {
+                                selectedPrint = card
+                                showingPrintSelection = true
+                            }
                         }
                     )
                 }
@@ -76,16 +83,55 @@ struct CardSearchView: View {
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
-            .sheet(item: $selectedCard) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
-                    await addCardToBinder(
-                        cardId: card.id,
-                        binderId: binderId,
-                        quantity: quantity,
-                        condition: condition,
-                        language: language,
-                        notes: notes
-                    )
+            .sheet(isPresented: $showingPrintSelection) {
+                if let card = selectedCard, let print = selectedPrint {
+                    SelectPrintSheet(card: card, selectedPrint: Binding(
+                        get: { print },
+                        set: { selectedPrint = $0 }
+                    ))
+                    .environmentObject(environmentStore)
+                }
+            }
+            .onChange(of: showingPrintSelection) { oldValue, newValue in
+                // When print selection sheet is dismissed and we have a selected print,
+                // keep selectedCard set so the add-to-binder sheet shows
+                if !newValue && selectedPrint != nil && selectedCard?.supportsPrintSelection == true {
+                    // Sheet will automatically show because selectedCard is still set
+                }
+            }
+            .sheet(item: $selectedCard, onDismiss: {
+                // Clean up state when sheet is dismissed
+                selectedPrint = nil
+            }) { card in
+                // Cards that support print selection only proceed once the picker is complete
+                let requiresPrintSelection = card.supportsPrintSelection
+                let shouldShowForPrintSupported = requiresPrintSelection && !showingPrintSelection && selectedPrint != nil
+                let shouldShowForOthers = !requiresPrintSelection
+
+                if shouldShowForPrintSupported {
+                    if let print = selectedPrint {
+                        AddCardToBinderSheet(card: print) { binderId, quantity, condition, language, notes in
+                            await addCardToBinder(
+                                cardId: print.id,
+                                binderId: binderId,
+                                quantity: quantity,
+                                condition: condition,
+                                language: language,
+                                notes: notes
+                            )
+                        }
+                    }
+                } else if shouldShowForOthers {
+                    AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                        await addCardToBinder(
+                            cardId: card.id,
+                            binderId: binderId,
+                            quantity: quantity,
+                            condition: condition,
+                            language: language,
+                            notes: notes
+                        )
+                    }
                 }
             }
             .alert("Success", isPresented: Binding(

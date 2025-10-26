@@ -70,8 +70,8 @@ struct AddCardToBinderFromSearchView: View {
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
                             selectedCard = card
-                            // For Magic cards, show print selection first
-                            if card.tcg == "magic" {
+                            // Cards with multiple printings (e.g., Magic, Pokémon) open the selector first
+                            if card.supportsPrintSelection {
                                 selectedPrint = card
                                 showingPrintSelection = true
                             }
@@ -104,7 +104,7 @@ struct AddCardToBinderFromSearchView: View {
             .onChange(of: showingPrintSelection) { oldValue, newValue in
                 // When print selection sheet is dismissed and we have a selected print,
                 // keep selectedCard set so the add-to-binder sheet shows
-                if !newValue && selectedPrint != nil && selectedCard?.tcg == "magic" {
+                if !newValue && selectedPrint != nil && selectedCard?.supportsPrintSelection == true {
                     // Sheet will automatically show because selectedCard is still set
                 }
             }
@@ -112,12 +112,12 @@ struct AddCardToBinderFromSearchView: View {
                 // Clean up state when sheet is dismissed
                 selectedPrint = nil
             }) { card in
-                // For non-Magic cards, show add-to-binder sheet directly
-                // For Magic cards, only show this after print selection is complete
-                let shouldShowForMagic = card.tcg == "magic" && !showingPrintSelection && selectedPrint != nil
-                let shouldShowForOthers = card.tcg != "magic"
+                // Cards that support print selection only proceed once the picker is complete
+                let requiresPrintSelection = card.supportsPrintSelection
+                let shouldShowForPrintSupported = requiresPrintSelection && !showingPrintSelection && selectedPrint != nil
+                let shouldShowForOthers = !requiresPrintSelection
 
-                if shouldShowForMagic {
+                if shouldShowForPrintSupported {
                     if let print = selectedPrint {
                         AddCardToBinderSheet(card: print) { binderId, quantity, condition, language, notes in
                             await addCardToBinder(
@@ -315,7 +315,7 @@ private struct CardCell: View {
     let showCardNumbers: Bool
 
     private var supportsPrintSelection: Bool {
-        card.tcg == "magic"
+        card.supportsPrintSelection
     }
 
     var body: some View {
@@ -354,7 +354,7 @@ private struct CardCell: View {
             }
             .cornerRadius(8)
 
-            // Print selection indicator for Magic cards
+            // Print selection indicator for games that support multiple printings
             if supportsPrintSelection {
                 Image(systemName: "doc.on.doc.fill")
                     .font(.caption2)
