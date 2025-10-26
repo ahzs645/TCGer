@@ -1,14 +1,39 @@
 import { env } from '../../config/env';
-import { CardDTO, TcgAdapter } from './types';
+import type {
+  CardDTO,
+  CardPrintsResult,
+  PokemonFunctionalAbilityDTO,
+  PokemonFunctionalGroupDTO,
+  PokemonFunctionalAttackDTO,
+  PokemonPrintMetadata,
+  PokemonVariantFlags
+} from './types';
 
 const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
 const CARDS_ENDPOINT = `${API_ROOT}/cards`;
+const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
 const isTCGdex = /tcgdex-cache/i.test(API_ROOT) || /tcgdex\.net/i.test(new URL(API_ROOT).hostname);
 const isRemotePokemon = /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
 const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
 const DEFAULT_REQUEST_DELAY_MS = isRemotePokemon ? 200 : 0;
 const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POKEMON_REQUEST_TIMEOUT_MS ?? '8000', 10);
+const configuredVariantConcurrency = Number.parseInt(process.env.POKEMON_VARIANT_FETCH_CONCURRENCY ?? '', 10);
+const VARIANT_FETCH_CONCURRENCY = Number.isFinite(configuredVariantConcurrency) && configuredVariantConcurrency > 0 ? configuredVariantConcurrency : 4;
+
+const ENERGY_SYMBOL_MAP: Record<string, string> = {
+  C: 'colorless',
+  W: 'water',
+  R: 'fire',
+  G: 'grass',
+  L: 'lightning',
+  P: 'psychic',
+  F: 'fighting',
+  D: 'darkness',
+  Y: 'fairy',
+  M: 'metal',
+  N: 'dragon'
+};
 
 let rateLimitChain: Promise<void> = Promise.resolve();
 let nextAllowedRequestTime = 0;
@@ -104,6 +129,22 @@ interface TCGdexCardDetail {
     standard?: boolean;
     expanded?: boolean;
   };
+  variants?: PokemonVariantFlags;
+  language?: string;
+}
+
+interface PokemonAbility {
+  name: string;
+  text?: string;
+  type?: string;
+}
+
+interface PokemonAttack {
+  name: string;
+  cost?: string[];
+  damage?: string;
+  text?: string;
+  convertedEnergyCost?: number;
 }
 
 interface PokemonCard {
@@ -129,15 +170,24 @@ interface PokemonCard {
       symbol?: string;
     };
   };
-  attacks?: Array<{ name: string; convertedEnergyCost?: number }>;
+  attacks?: PokemonAttack[];
+  abilities?: PokemonAbility[];
   weaknesses?: Array<{ type: string; value?: string }>;
   resistances?: Array<{ type: string; value?: string }>;
   retreatCost?: string[];
   flavorText?: string;
+  rules?: string[];
+  regulationMark?: string;
+}
+
+interface FunctionalSignature {
+  key: string;
+  normalizedRules: string | null;
 }
 
 export class PokemonAdapter implements TcgAdapter {
   readonly game = 'pokemon' as const;
+  private readonly tcgdexDetailCache = new Map<string, Promise<TCGdexCardDetail | null>>();
 
   private static readonly MAX_PRINT_PAGE_SIZE = 250;
   private static readonly MAX_PRINT_PAGES = 3;
@@ -237,59 +287,84 @@ export class PokemonAdapter implements TcgAdapter {
     }
   }
 
-  async fetchCardPrints(externalId: string): Promise<CardDTO[]> {
+  async fetchCardPrints(externalId: string): Promise<CardPrintsResult> {
     const trimmedId = externalId.trim();
     if (!trimmedId) {
-      return [];
+      return { mode: 'simple', prints: [], total: 0 };
     }
 
     try {
       if (isTCGdex) {
-        const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`);
-        if (!response.ok) {
-          return [];
-        }
-        const payload = (await response.json()) as { data: TCGdexCardDetail };
-        const detail = payload?.data;
-        if (!detail?.name) {
-          return detail ? [this.mapTCGdexDetailCard(detail)] : [];
-        }
-        const prints = await this.fetchTCGdexPrintsByName(detail.name);
-        if (!prints.length) {
-          return [this.mapTCGdexDetailCard(detail)];
-        }
-        const normalizedName = this.normalizeName(detail.name);
-        const narrowed = this.filterPrintsByName(prints, normalizedName);
-        const dataset = narrowed.length ? narrowed : prints;
-        return this.deduplicateCards(this.sortByReleaseDate(dataset));
+        return this.fetchTcgDexPrintsLegacy(trimmedId);
       }
-
-      const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`, {
-        headers: this.buildHeaders()
-      });
-      if (!response.ok) {
-        return [];
-      }
-      const payload = (await response.json()) as { data: PokemonCard };
-      const detail = payload?.data;
-      if (!detail?.name) {
-        return detail ? [this.mapCard(detail)] : [];
-      }
-      const prints = await this.fetchPokemonPrintsByName(detail.name);
-      if (!prints.length) {
-        return [this.mapCard(detail)];
-      }
-      const ensured = prints.some((entry) => entry.id === detail.id)
-        ? prints
-        : [this.mapCard(detail), ...prints];
-      const normalizedName = this.normalizeName(detail.name);
-      const narrowed = this.filterPrintsByName(ensured, normalizedName);
-      const dataset = narrowed.length ? narrowed : ensured;
-      return this.deduplicateCards(this.sortByReleaseDate(dataset));
+      return this.fetchPokemonFunctionalPrints(trimmedId);
     } catch (error) {
       console.error('PokemonAdapter.fetchCardPrints error', error);
-      return [];
+      return { mode: 'simple', prints: [], total: 0 };
     }
+  }
+
+  private async fetchTcgDexPrintsLegacy(externalId: string): Promise<CardPrintsResult> {
+    const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${externalId}`);
+    if (!response.ok) {
+      return { mode: 'simple', prints: [], total: 0 };
+    }
+    const payload = (await response.json()) as { data: TCGdexCardDetail };
+    const detail = payload?.data;
+    if (!detail?.name) {
+      const fallback = detail ? [this.mapTCGdexDetailCard(detail)] : [];
+      return { mode: 'simple', prints: fallback, total: fallback.length };
+    }
+    const prints = await this.fetchTCGdexPrintsByName(detail.name);
+    if (!prints.length) {
+      const fallback = [this.mapTCGdexDetailCard(detail)];
+      return { mode: 'simple', prints: fallback, total: fallback.length };
+    }
+    const normalizedName = this.normalizeName(detail.name);
+    const narrowed = this.filterEntriesByName(prints, normalizedName);
+    const dataset = narrowed.length ? narrowed : prints;
+    const ordered = this.deduplicateCards(this.sortByReleaseDate(dataset));
+    return { mode: 'simple', prints: ordered, total: ordered.length };
+  }
+
+  private async fetchPokemonFunctionalPrints(externalId: string): Promise<CardPrintsResult> {
+    const detail = await this.fetchPokemonCardDetailRaw(externalId);
+    if (!detail?.name) {
+      const fallback = detail ? [this.mapCard(detail)] : [];
+      return { mode: 'simple', prints: fallback, total: fallback.length };
+    }
+
+    const records = await this.fetchPokemonPrintRecordsByName(detail.name);
+    let dataset = records;
+    if (!dataset.some((entry) => entry.id === detail.id)) {
+      dataset = [detail, ...dataset];
+    }
+
+    const normalizedName = this.normalizeName(detail.name);
+    const narrowed = this.filterEntriesByName(dataset, normalizedName);
+    const pool = narrowed.length ? narrowed : dataset;
+    const deduped = this.deduplicateById(pool);
+
+    const groups = this.groupCardsByFunctionalKey(deduped);
+    const signature = this.buildFunctionalSignature(detail);
+    const targetCards = (signature.key && groups.get(signature.key)) || groups.values().next()?.value || [detail];
+    const sortedGroup = this.sortPokemonCardsByReleaseDate(targetCards);
+    const prints = await this.enrichPokemonPrints(sortedGroup);
+    const functionalGroup = this.buildFunctionalGroupSummary(sortedGroup, signature.key, detail, signature.normalizedRules);
+
+    if (!functionalGroup.category) {
+      const category = prints.find((entry) => entry.pokemonPrint?.category)?.pokemonPrint?.category;
+      if (category) {
+        functionalGroup.category = category;
+      }
+    }
+
+    return {
+      mode: 'pokemon-functional',
+      prints,
+      total: prints.length,
+      functionalGroup
+    };
   }
 
   private mapTCGdexCard(card: TCGdexCardSummary): CardDTO {
@@ -328,6 +403,7 @@ export class PokemonAdapter implements TcgAdapter {
       imageUrl,
       imageUrlSmall,
       setSymbolUrl: card.set?.symbol ?? card.set?.logo,
+      regulationMark: card.regulationMark,
       attributes: {
         hp: card.hp,
         types: card.types,
@@ -357,6 +433,7 @@ export class PokemonAdapter implements TcgAdapter {
       imageUrl: card.images?.large ?? card.images?.small,
       imageUrlSmall: card.images?.small ?? card.images?.large,
       setSymbolUrl: setSymbol,
+      regulationMark: card.regulationMark,
       attributes: {
         supertype: card.supertype,
         subtypes: card.subtypes,
@@ -411,13 +488,29 @@ export class PokemonAdapter implements TcgAdapter {
     };
   }
 
-  private async fetchPokemonPrintsByName(name: string): Promise<CardDTO[]> {
+  private async fetchPokemonCardDetailRaw(externalId: string): Promise<PokemonCard | null> {
+    try {
+      const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${externalId}`, {
+        headers: this.buildHeaders()
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const payload = (await response.json()) as { data: PokemonCard };
+      return payload?.data ?? null;
+    } catch (error) {
+      console.error('PokemonAdapter.fetchPokemonCardDetailRaw error', error);
+      return null;
+    }
+  }
+
+  private async fetchPokemonPrintRecordsByName(name: string): Promise<PokemonCard[]> {
     const safeName = name.trim();
     if (!safeName) {
       return [];
     }
 
-    const prints: CardDTO[] = [];
+    const prints: PokemonCard[] = [];
     const pageSize = PokemonAdapter.MAX_PRINT_PAGE_SIZE;
     let page = 1;
 
@@ -439,7 +532,7 @@ export class PokemonAdapter implements TcgAdapter {
       if (!data.length) {
         break;
       }
-      prints.push(...data.map((entry) => this.mapCard(entry)));
+      prints.push(...data);
 
       const total = payload.totalCount ?? data.length;
       if (prints.length >= total || data.length < pageSize) {
@@ -449,7 +542,7 @@ export class PokemonAdapter implements TcgAdapter {
       page += 1;
     }
 
-    return this.deduplicateCards(prints);
+    return this.deduplicateById(prints);
   }
 
   private async fetchTCGdexPrintsByName(name: string): Promise<CardDTO[]> {
@@ -508,12 +601,17 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   private deduplicateCards(cards: CardDTO[]): CardDTO[] {
+    return this.deduplicateById(cards);
+  }
+
+  private deduplicateById<T extends { id?: string }>(entries: T[]): T[] {
     const seen = new Set<string>();
-    return cards.filter((card) => {
-      if (seen.has(card.id)) {
+    return entries.filter((entry) => {
+      const key = (entry.id ?? '').toLowerCase();
+      if (!key || seen.has(key)) {
         return false;
       }
-      seen.add(card.id);
+      seen.add(key);
       return true;
     });
   }
@@ -526,14 +624,403 @@ export class PokemonAdapter implements TcgAdapter {
     });
   }
 
-  private filterPrintsByName(cards: CardDTO[], normalizedName: string): CardDTO[] {
-    if (!normalizedName) {
-      return cards;
+  private sortPokemonCardsByReleaseDate(cards: PokemonCard[]): PokemonCard[] {
+    return [...cards].sort((a, b) => {
+      const left = a.set?.releaseDate ? Date.parse(a.set.releaseDate) : 0;
+      const right = b.set?.releaseDate ? Date.parse(b.set.releaseDate) : 0;
+      return right - left;
+    });
+  }
+
+  private async enrichPokemonPrints(cards: PokemonCard[]): Promise<CardDTO[]> {
+    if (!cards.length) {
+      return [];
     }
-    return cards.filter((card) => this.normalizeName(card.name) === normalizedName);
+    return this.mapWithConcurrency(cards, VARIANT_FETCH_CONCURRENCY, async (card) => {
+      const dto = this.mapCard(card);
+      dto.regulationMark = dto.regulationMark ?? card.regulationMark;
+      const metadata = await this.fetchPokemonVariantMetadata(card);
+      if (metadata) {
+        dto.pokemonPrint = metadata;
+        if (metadata.regulationMark && !dto.regulationMark) {
+          dto.regulationMark = metadata.regulationMark;
+        }
+        if (metadata.language) {
+          dto.language = metadata.language;
+        }
+        if (metadata.tcgdexImage && !dto.imageUrl) {
+          dto.imageUrl = metadata.tcgdexImage;
+        }
+        if (metadata.tcgdexImage && !dto.imageUrlSmall) {
+          dto.imageUrlSmall = metadata.tcgdexImage;
+        }
+        if (!metadata.finishes && metadata.variants) {
+          metadata.finishes = this.buildFinishList(metadata.variants);
+        }
+        if (metadata.finishes?.length) {
+          dto.pokemonPrint = { ...metadata, finishes: metadata.finishes };
+        }
+      }
+      return dto;
+    });
+  }
+
+  private buildFunctionalGroupSummary(
+    cards: PokemonCard[],
+    functionalKey: string,
+    reference: PokemonCard,
+    normalizedRules: string | null
+  ): PokemonFunctionalGroupDTO {
+    const sample = cards[0] ?? reference;
+    const attackSource = reference.attacks && reference.attacks.length ? reference.attacks : sample?.attacks ?? [];
+    const abilitySource = reference.abilities && reference.abilities.length ? reference.abilities : sample?.abilities ?? [];
+    const attacks = attackSource.map((attack) => this.mapAttackSummary(attack));
+    const abilities = abilitySource.map((ability) => this.mapAbilitySummary(ability));
+
+    return {
+      functionalKey: functionalKey || `name:${this.normalizeName(reference.name)}`,
+      name: reference.name,
+      supertype: reference.supertype ?? sample?.supertype,
+      subtypes: reference.subtypes ?? sample?.subtypes,
+      hp: reference.hp ?? sample?.hp,
+      regulationMark: reference.regulationMark ?? sample?.regulationMark,
+      category: reference.supertype,
+      normalizedRules,
+      attacks: attacks.length ? attacks : undefined,
+      abilities: abilities.length ? abilities : undefined,
+      rules: reference.rules ?? sample?.rules ?? null
+    };
+  }
+
+  private mapAttackSummary(attack?: PokemonAttack): PokemonFunctionalAttackDTO {
+    return {
+      name: attack?.name ?? '',
+      cost: attack?.cost,
+      text: attack?.text,
+      damage: attack?.damage?.toString(),
+      convertedEnergyCost: attack?.convertedEnergyCost
+    };
+  }
+
+  private mapAbilitySummary(ability?: PokemonAbility): PokemonFunctionalAbilityDTO {
+    return {
+      name: ability?.name ?? '',
+      type: ability?.type,
+      text: ability?.text
+    };
+  }
+
+  private filterEntriesByName<T extends { name?: string }>(entries: T[], normalizedName: string): T[] {
+    if (!normalizedName) {
+      return entries;
+    }
+    return entries.filter((entry) => this.normalizeName(entry.name) === normalizedName);
+  }
+
+  private groupCardsByFunctionalKey(cards: PokemonCard[]): Map<string, PokemonCard[]> {
+    const groups = new Map<string, PokemonCard[]>();
+    for (const card of cards) {
+      const signature = this.buildFunctionalSignature(card);
+      const key = signature.key || `name:${this.normalizeName(card.name)}`;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(card);
+    }
+    return groups;
+  }
+
+  private buildFunctionalSignature(card: PokemonCard): FunctionalSignature {
+    const normalizedName = this.normalizeName(card.name);
+    const supertypeRaw = (card.supertype || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    const supertype = this.normalizeName(supertypeRaw);
+
+    if (!normalizedName) {
+      return { key: '', normalizedRules: null };
+    }
+
+    if (supertype === 'pokemon' || supertype === 'pokémon') {
+      const hpValue = this.normalizeHp(card.hp);
+      const stage = this.normalizeStage(card.subtypes) ?? 'unknown';
+      const attacksSignature = this.buildAttacksSignature(card.attacks);
+      const abilitiesSignature = this.buildAbilitiesSignature(card.abilities);
+      const rulesSignature = this.normalizeRulesText(card.rules);
+      const regulation = (card.regulationMark || '').trim().toUpperCase();
+
+      const parts = [
+        'pokemon',
+        normalizedName,
+        `hp:${hpValue}`,
+        `stage:${stage}`,
+        `attacks:${attacksSignature || 'none'}`,
+        `abilities:${abilitiesSignature || 'none'}`
+      ];
+      if (rulesSignature) {
+        parts.push(`rules:${rulesSignature}`);
+      }
+      if (regulation) {
+        parts.push(`reg:${regulation}`);
+      }
+
+      return { key: parts.join('|'), normalizedRules: rulesSignature };
+    }
+
+    if (supertype === 'trainer') {
+      const rulesSignature = this.normalizeRulesText(card.rules);
+      const regulation = (card.regulationMark || '').trim().toUpperCase();
+      const parts = ['trainer', normalizedName];
+      if (rulesSignature) {
+        parts.push(rulesSignature);
+      }
+      if (regulation) {
+        parts.push(`reg:${regulation}`);
+      }
+      return { key: parts.join('|'), normalizedRules: rulesSignature };
+    }
+
+    if (supertype === 'energy') {
+      const isBasic = (card.subtypes || []).some((subtype) => /basic/i.test(subtype));
+      if (isBasic) {
+        return { key: `basic-energy|${normalizedName}`, normalizedRules: null };
+      }
+      const rulesSignature = this.normalizeRulesText(card.rules);
+      const regulation = (card.regulationMark || '').trim().toUpperCase();
+      const parts = ['special-energy', normalizedName];
+      if (rulesSignature) {
+        parts.push(rulesSignature);
+      }
+      if (regulation) {
+        parts.push(`reg:${regulation}`);
+      }
+      return { key: parts.join('|'), normalizedRules: rulesSignature };
+    }
+
+    return { key: `name:${normalizedName}`, normalizedRules: null };
   }
 
   private normalizeName(name?: string): string {
-    return (name ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!name) {
+      return '';
+    }
+    const stripped = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    return stripped.replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  private normalizeHp(value?: string): string {
+    if (!value) {
+      return 'na';
+    }
+    const digits = value.replace(/[^0-9]/g, '');
+    return digits || this.normalizeName(value);
+  }
+
+  private normalizeStage(subtypes?: string[]): string | null {
+    if (!subtypes?.length) {
+      return null;
+    }
+    const map: Record<string, string> = {
+      basic: 'basic',
+      'basicpokemon': 'basic',
+      'basicpokémon': 'basic',
+      stage1: 'stage1',
+      'stage1pokemon': 'stage1',
+      stage2: 'stage2',
+      'stage2pokemon': 'stage2',
+      vmax: 'vmax',
+      vstar: 'vstar',
+      gx: 'gx',
+      ex: 'ex',
+      mega: 'mega'
+    };
+
+    for (const subtype of subtypes) {
+      const key = this.normalizeName(subtype).replace(/\s+/g, '');
+      if (map[key]) {
+        return map[key];
+      }
+    }
+    return null;
+  }
+
+  private buildAttacksSignature(attacks?: PokemonAttack[]): string {
+    if (!attacks?.length) {
+      return '';
+    }
+    return attacks
+      .map((attack) => {
+        const name = this.normalizeName(attack.name);
+        const cost = (attack.cost ?? []).map((symbol) => this.normalizeEnergySymbol(symbol)).join(',');
+        const damage = (attack.damage ?? '').toString().trim().toLowerCase() || 'none';
+        const text = this.normalizeEffectText(attack.text) || 'none';
+        const converted = Number.isFinite(attack.convertedEnergyCost) ? attack.convertedEnergyCost : 0;
+        return `${name}|${cost}|${damage}|${text}|${converted}`;
+      })
+      .join('||');
+  }
+
+  private buildAbilitiesSignature(abilities?: PokemonAbility[]): string {
+    if (!abilities?.length) {
+      return '';
+    }
+    return abilities
+      .map((ability) => {
+        const name = this.normalizeName(ability.name);
+        const text = this.normalizeEffectText(ability.text) || 'none';
+        const type = this.normalizeName(ability.type);
+        return `${name}|${type}|${text}`;
+      })
+      .join('||');
+  }
+
+  private normalizeRulesText(rules?: string[]): string | null {
+    if (!rules?.length) {
+      return null;
+    }
+    const combined = rules.join(' ');
+    const normalized = this.normalizeEffectText(combined);
+    return normalized || null;
+  }
+
+  private normalizeEffectText(text?: string): string {
+    if (!text) {
+      return '';
+    }
+    let normalized = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    normalized = normalized.toLowerCase();
+    normalized = normalized.replace(/pok[eé]mon/g, 'pokemon');
+    normalized = normalized.replace(/\[([a-z])\]/gi, (_, symbol: string) => ` ${ENERGY_SYMBOL_MAP[symbol.toUpperCase()] ?? symbol.toLowerCase()} `);
+    normalized = normalized.replace(/[.,:;!?()[\]{}]/g, ' ');
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    return normalized;
+  }
+
+  private normalizeEnergySymbol(symbol?: string): string {
+    if (!symbol) {
+      return '';
+    }
+    const key = symbol.replace(/[^a-z0-9]/gi, '').toUpperCase();
+    return ENERGY_SYMBOL_MAP[key] ?? symbol.toLowerCase();
+  }
+
+  private buildFinishList(variants: PokemonVariantFlags): PokemonPrintMetadata['finishes'] {
+    const finishes: PokemonPrintMetadata['finishes'] = [];
+    if (variants.normal) {
+      finishes.push('normal');
+    }
+    if (variants.reverse) {
+      finishes.push('reverse');
+    }
+    if (variants.holo) {
+      finishes.push('holo');
+    }
+    if (variants.firstEdition) {
+      finishes.push('firstEdition');
+    }
+    return finishes;
+  }
+
+  private async mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T, index: number) => Promise<R>): Promise<R[]> {
+    if (!items.length) {
+      return [];
+    }
+    const results: R[] = new Array(items.length);
+    let cursor = 0;
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const currentIndex = cursor;
+        cursor += 1;
+        if (currentIndex >= items.length) {
+          break;
+        }
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
+  }
+
+  private async fetchPokemonVariantMetadata(card: PokemonCard): Promise<PokemonPrintMetadata | null> {
+    const detail = await this.lookupTcgDexCard(card);
+    if (!detail) {
+      return null;
+    }
+    const variants = detail.variants ?? {};
+    const metadata: PokemonPrintMetadata = {
+      tcgdexId: detail.id,
+      tcgdexImage: detail.image ? `${detail.image}/high.webp` : undefined,
+      variants,
+      category: detail.category,
+      regulationMark: detail.regulationMark,
+      language: detail.language
+    };
+    const finishes = this.buildFinishList(variants);
+    if (finishes.length) {
+      metadata.finishes = finishes;
+    }
+    return metadata;
+  }
+
+  private async lookupTcgDexCard(card: PokemonCard): Promise<TCGdexCardDetail | null> {
+    if (!VARIANT_API_ROOT || (!card.id && !(card.set?.id && card.number))) {
+      return null;
+    }
+
+    const attempts: Array<{ cacheKey: string; url: string }> = [];
+    if (card.id) {
+      attempts.push({
+        cacheKey: card.id.toLowerCase(),
+        url: `${VARIANT_API_ROOT}/cards/${encodeURIComponent(card.id)}`
+      });
+    }
+    if (card.set?.id && card.number) {
+      attempts.push({
+        cacheKey: `${card.set.id}-${card.number}`.toLowerCase(),
+        url: `${VARIANT_API_ROOT}/sets/${encodeURIComponent(card.set.id)}/cards/${encodeURIComponent(card.number)}`
+      });
+    }
+
+    for (const attempt of attempts) {
+      const detail = await this.getOrFetchTcgDexCard(attempt.cacheKey, attempt.url);
+      if (detail) {
+        const canonicalKey = detail.id?.toLowerCase();
+        if (canonicalKey && !this.tcgdexDetailCache.has(canonicalKey)) {
+          this.tcgdexDetailCache.set(canonicalKey, Promise.resolve(detail));
+        }
+        return detail;
+      }
+    }
+
+    return null;
+  }
+
+  private async getOrFetchTcgDexCard(cacheKey: string, url: string): Promise<TCGdexCardDetail | null> {
+    if (this.tcgdexDetailCache.has(cacheKey)) {
+      return this.tcgdexDetailCache.get(cacheKey)!;
+    }
+    const fetchPromise = this.fetchTcgDexCardDetailByUrl(url);
+    this.tcgdexDetailCache.set(cacheKey, fetchPromise);
+    const detail = await fetchPromise;
+    if (!detail) {
+      this.tcgdexDetailCache.delete(cacheKey);
+    }
+    return detail;
+  }
+
+  private async fetchTcgDexCardDetailByUrl(url: string): Promise<TCGdexCardDetail | null> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        return null;
+      }
+      const payload = await response.json();
+      const data = payload?.data ?? payload;
+      return data?.id ? (data as TCGdexCardDetail) : null;
+    } catch (error) {
+      console.error('PokemonAdapter.fetchTcgDexCardDetailByUrl error', url, error);
+      return null;
+    }
   }
 }

@@ -222,7 +222,8 @@ struct CollectionDetailView: View {
     @State private var isSaving = false
     @State private var cards: [CollectionCard]
     @State private var cardPendingDeletion: CollectionCard?
-    @State private var cardBeingEdited: CollectionCard?
+    @State private var editContext: CardEditContext?
+    @State private var copySelectionCard: CollectionCard?
     @State private var editingCardId: String?
     @State private var cardBeingMoved: CollectionCard?
     @State private var movingCardId: String?
@@ -348,7 +349,7 @@ struct CollectionDetailView: View {
                             .listRowBackground(Color(.systemBackground))
                             .swipeActions(edge: .leading) {
                                 Button {
-                                    cardBeingEdited = card
+                                    beginEditing(card)
                                 } label: {
                                     Label("Edit", systemImage: "square.and.pencil")
                                 }
@@ -437,21 +438,30 @@ struct CollectionDetailView: View {
             .sheet(isPresented: $showingAddCard) {
                 AddCardToBinderFromSearchView(binderId: collection.id)
             }
-            .sheet(item: $cardBeingEdited) { card in
+            .sheet(item: $editContext) { context in
                 EditCollectionCardSheet(
-                    card: card,
-                    isSaving: editingCardId == card.id
+                    card: context.card,
+                    isIndividualCopy: !context.canEditQuantity,
+                    copyDetails: context.copy,
+                    isSaving: editingCardId == context.collectionEntryId
                 ) { quantity, condition, language, notes, newPrint in
                     await updateCard(
-                        card: card,
+                        card: context.card,
+                        collectionEntryId: context.collectionEntryId,
                         quantity: quantity,
                         condition: condition,
                         language: language,
                         notes: notes,
-                        newPrint: newPrint
+                        newPrint: newPrint,
+                        shouldUpdateQuantity: context.canEditQuantity
                     )
                 }
                 .environmentObject(environmentStore)
+            }
+            .sheet(item: $copySelectionCard) { card in
+                CopySelectionSheet(card: card) { copy in
+                    selectCopyForEditing(card: card, copy: copy)
+                }
             }
             .sheet(item: $cardBeingMoved) { card in
                 MoveCardToBinderSheet(
@@ -587,42 +597,72 @@ struct CollectionDetailView: View {
     @MainActor
     private func updateCard(
         card: CollectionCard,
+        collectionEntryId: String,
         quantity: Int,
         condition: String?,
         language: String?,
         notes: String?,
-        newPrint: Card?
+        newPrint: Card?,
+        shouldUpdateQuantity: Bool
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             return
         }
 
-        editingCardId = card.id
+        editingCardId = collectionEntryId
 
         do {
             let updated = try await apiService.updateCardInBinder(
                 config: environmentStore.serverConfiguration,
                 token: token,
                 binderId: collection.id,
-                collectionCardId: card.id,
-                quantity: quantity,
+                collectionCardId: collectionEntryId,
+                quantity: shouldUpdateQuantity ? quantity : nil,
                 condition: condition,
                 language: language,
                 notes: notes,
-                newPrint: newPrint
+                newPrint: newPrint,
+                targetBinderId: nil
             )
 
             if let index = cards.firstIndex(where: { $0.id == card.id }) {
                 cards[index] = updated
             }
 
-            cardBeingEdited = nil
+            editContext = nil
         } catch {
             errorMessage = error.localizedDescription
         }
 
         editingCardId = nil
+    }
+
+    @MainActor
+    private func beginEditing(_ card: CollectionCard) {
+        let copies = card.copies
+        if copies.count > 1 {
+            copySelectionCard = card
+        } else {
+            let copy = copies.first
+            editContext = CardEditContext(
+                card: card,
+                collectionEntryId: copy?.id ?? card.id,
+                copy: copy,
+                canEditQuantity: true
+            )
+        }
+    }
+
+    @MainActor
+    private func selectCopyForEditing(card: CollectionCard, copy: CollectionCardCopy) {
+        copySelectionCard = nil
+        editContext = CardEditContext(
+            card: card,
+            collectionEntryId: copy.id,
+            copy: copy,
+            canEditQuantity: false
+        )
     }
 
     @MainActor
@@ -771,44 +811,60 @@ private struct CollectionCardRow: View {
             .cornerRadius(4)
 
             VStack(alignment: .leading, spacing: 6) {
+                // Card name
                 Text(card.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                if let rarity = card.rarity {
-                    Text(rarity)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                HStack {
+
+                // Quantity, rarity, condition, language all on one line
+                HStack(spacing: 8) {
                     Text("×\(card.quantity)")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.accentColor)
-                    if showPricing, let price = card.price {
-                        Text("$\(String(format: "%.2f", price * Double(card.quantity)))")
-                            .font(.caption)
-                            .foregroundColor(.green)
+
+                    if let rarity = card.rarity {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(rarity)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let condition = conditionText {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(condition)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let language = languageText {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(language)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
                 }
-                if conditionText != nil || languageText != nil {
-                    HStack(spacing: 8) {
-                        if let condition = conditionText {
-                            Label(condition, systemImage: "wand.and.stars")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        if let language = languageText {
-                            Label(language, systemImage: "globe")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
+
+                // Description/notes below
                 if let notes = card.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(3)
+                        .lineLimit(2)
+                }
+
+                // Price on separate line if enabled
+                if showPricing, let price = card.price {
+                    Text("$\(String(format: "%.2f", price * Double(card.quantity)))")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
                 }
             }
             Spacer()
@@ -819,6 +875,118 @@ private struct CollectionCardRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             onTap?()
+        }
+    }
+}
+
+private struct CardEditContext: Identifiable, Equatable {
+    let id = UUID()
+    let card: CollectionCard
+    let collectionEntryId: String
+    let copy: CollectionCardCopy?
+    let canEditQuantity: Bool
+}
+
+private struct CopySelectionSheet: View {
+    let card: CollectionCard
+    let onSelect: (CollectionCardCopy) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var copies: [CollectionCardCopy] {
+        card.copies
+    }
+
+    var body: some View {
+        NavigationView {
+            List {
+                if copies.isEmpty {
+                    Text("No individual copies available for editing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 12)
+                } else {
+                    ForEach(Array(copies.enumerated()), id: \.element.id) { index, copy in
+                        Button {
+                            onSelect(copy)
+                            dismiss()
+                        } label: {
+                            CopyRow(copy: copy, index: index)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Select Copy")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private struct CopyRow: View {
+        let copy: CollectionCardCopy
+        let index: Int
+
+        private var title: String {
+            if let serial = copy.serialNumber, !serial.isEmpty {
+                return serial
+            }
+            return "Copy #\(index + 1)"
+        }
+
+        private var detailLine: String {
+            var parts: [String] = []
+            if let condition = copy.condition, !condition.isEmpty {
+                parts.append(condition)
+            }
+            if let language = copy.language, !language.isEmpty {
+                parts.append(language)
+            }
+            return parts.joined(separator: " • ")
+        }
+
+        private var tagsLine: String? {
+            let labels = copy.tags.map { $0.label }.filter { !$0.isEmpty }
+            guard !labels.isEmpty else { return nil }
+            return "Tags: " + labels.joined(separator: ", ")
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(title)
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                if !detailLine.isEmpty {
+                    Text(detailLine)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                if let notes = copy.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                if let tagsLine {
+                    Text(tagsLine)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 6)
         }
     }
 }

@@ -25,7 +25,13 @@ import { useTagsStore } from '@/stores/tags';
 import { useAuthStore } from '@/stores/auth';
 import { useModuleStore } from '@/stores/preferences';
 import { cn } from '@/lib/utils';
-import type { Card as TcgCard, TcgCode } from '@/types/card';
+import type {
+  Card as TcgCard,
+  CardPrintsResponse,
+  PokemonFinishType,
+  PokemonFunctionalGroup,
+  TcgCode
+} from '@/types/card';
 
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
 const DEFAULT_BINDER_COLORS = [
@@ -98,6 +104,9 @@ function formatPrintDetails(print: TcgCard) {
   if (print.rarity) {
     parts.push(print.rarity);
   }
+  if (print.regulationMark) {
+    parts.push(`Reg ${print.regulationMark}`);
+  }
   if (print.releasedAt) {
     const year = new Date(print.releasedAt).getFullYear();
     if (!Number.isNaN(year)) {
@@ -105,6 +114,22 @@ function formatPrintDetails(print: TcgCard) {
     }
   }
   return parts.join(' • ');
+}
+
+function getFinishBadges(print: TcgCard): PokemonFinishType[] {
+  if (print.pokemonPrint?.finishes?.length) {
+    return print.pokemonPrint.finishes;
+  }
+  const variants = print.pokemonPrint?.variants;
+  if (!variants) {
+    return [];
+  }
+  const finishes: PokemonFinishType[] = [];
+  if (variants.normal) finishes.push('normal');
+  if (variants.reverse) finishes.push('reverse');
+  if (variants.holo) finishes.push('holo');
+  if (variants.firstEdition) finishes.push('firstEdition');
+  return finishes;
 }
 
 export function MockCollectionView() {
@@ -156,7 +181,7 @@ export function MockCollectionView() {
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const [printOptions, setPrintOptions] = useState<TcgCard[] | null>(null);
+  const [printData, setPrintData] = useState<CardPrintsResponse | null>(null);
   const [selectedPrintCard, setSelectedPrintCard] = useState<TcgCard | null>(null);
   const [isLoadingPrints, setIsLoadingPrints] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -247,10 +272,13 @@ export function MockCollectionView() {
   const selectedCard = useMemo(() => sortedCards.find((card) => card.id === selectedCardId) ?? null, [sortedCards, selectedCardId]);
   const currentGameLabel = selectedCard ? GAME_LABELS[selectedCard.tcg as TcgCode] ?? 'this card' : 'this card';
   const supportsPrintSelection = selectedCard ? ['magic', 'pokemon'].includes(selectedCard.tcg) : false;
+  const printOptions = printData?.prints ?? null;
+  const pokemonFunctionalGroup: PokemonFunctionalGroup | null =
+    printData?.mode === 'pokemon-functional' ? printData.functionalGroup : null;
 
   useEffect(() => {
     setIsPrintDialogOpen(false);
-    setPrintOptions(null);
+    setPrintData(null);
     setSelectedPrintCard(null);
     setIsLoadingPrints(false);
     setPrintError(null);
@@ -308,11 +336,12 @@ export function MockCollectionView() {
     setPrintError(null);
     const targetExternalId = selectedCard.externalId ?? selectedCard.cardId;
     fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: targetExternalId })
-      .then((prints) => {
+      .then((data) => {
         if (cancelled) {
           return;
         }
-        setPrintOptions(prints);
+        setPrintData(data);
+        const prints = data.prints ?? [];
         const matching = prints.find((print) => print.id === targetExternalId);
         setSelectedPrintCard(matching ?? prints[0] ?? null);
       })
@@ -928,47 +957,92 @@ export function MockCollectionView() {
               <p className="mt-1 text-xs text-muted-foreground">You can close the dialog and try again later.</p>
             </div>
           ) : (
-            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-              {(printOptions ?? []).map((print) => {
-                const isSelected = selectedPrintCard?.id === print.id;
-                return (
-                  <button
-                    type="button"
-                    key={print.id}
-                    onClick={() => setSelectedPrintCard(print)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition',
-                      isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
-                    )}
-                  >
-                    {print.imageUrlSmall ? (
-                      <img
-                        src={print.imageUrlSmall}
-                        alt={print.name}
-                        className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
-                        loading="lazy"
-                      />
-                    ) : null}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{print.setName ?? print.setCode ?? print.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatPrintDetails(print) || 'No additional details'}
-                      </p>
-                    </div>
-                    {isSelected ? (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Selected
+            <>
+              {pokemonFunctionalGroup ? (
+                <div className="mb-3 space-y-2 rounded-lg border bg-muted/40 p-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                    <span>{pokemonFunctionalGroup.name}</span>
+                    {pokemonFunctionalGroup.hp ? <span className="text-muted-foreground">HP {pokemonFunctionalGroup.hp}</span> : null}
+                    {pokemonFunctionalGroup.regulationMark ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        Reg {pokemonFunctionalGroup.regulationMark}
                       </Badge>
                     ) : null}
-                  </button>
-                );
-              })}
-              {!printOptions?.length && (
-                <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                  No alternate printings were returned for this card.
+                  </div>
+                  {pokemonFunctionalGroup.attacks?.length ? (
+                    <div className="space-y-1">
+                      {pokemonFunctionalGroup.attacks.map((attack) => (
+                        <div key={`${attack.name}-${attack.damage ?? 'na'}`}>
+                          <p className="font-medium">{attack.name}</p>
+                          <p className="text-muted-foreground">
+                            {[attack.cost?.join(', '), attack.damage].filter(Boolean).join(' • ')}
+                          </p>
+                          {attack.text ? <p className="text-muted-foreground">{attack.text}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {pokemonFunctionalGroup.rules?.length ? (
+                    <p className="text-muted-foreground">{pokemonFunctionalGroup.rules.join(' ')}</p>
+                  ) : null}
                 </div>
-              )}
-            </div>
+              ) : null}
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {(printOptions ?? []).map((print) => {
+                  const isSelected = selectedPrintCard?.id === print.id;
+                  const finishes = getFinishBadges(print);
+                  return (
+                    <button
+                      type="button"
+                      key={print.id}
+                      onClick={() => setSelectedPrintCard(print)}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition',
+                        isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
+                      )}
+                    >
+                      {print.imageUrlSmall ? (
+                        <img
+                          src={print.imageUrlSmall}
+                          alt={print.name}
+                          className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{print.setName ?? print.setCode ?? print.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrintDetails(print) || 'No additional details'}
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                          {print.regulationMark ? <span>Reg {print.regulationMark}</span> : null}
+                          {print.language ? <span className="uppercase">{print.language}</span> : null}
+                        </div>
+                        {finishes.length ? (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {finishes.map((finish) => (
+                              <Badge key={finish} variant="outline" className="text-[10px] capitalize">
+                                {finish === 'firstEdition' ? '1st Ed' : finish}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      {isSelected ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Selected
+                        </Badge>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                {!printOptions?.length && (
+                  <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                    No alternate printings were returned for this card.
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setIsPrintDialogOpen(false)} disabled={isSavingPrintSelection}>

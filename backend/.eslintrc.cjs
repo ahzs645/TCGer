@@ -13,7 +13,8 @@ module.exports = {
   ],
   parserOptions: {
     ecmaVersion: "latest",
-    sourceType: "module"
+    sourceType: "module",
+    project: "./tsconfig.json"
   },
   ignorePatterns: ["dist", "node_modules"],
   rules: {

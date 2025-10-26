@@ -153,7 +153,8 @@ struct GameBadge: View {
                             imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
                             imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
                             quantity: 2, price: 89.99, condition: "Near Mint", language: nil, notes: nil,
-                            collectorNumber: nil
+                            collectorNumber: nil,
+                            copies: []
                         ),
                         CollectionCard(
                             id: "2", cardId: "2", externalId: "74677422", name: "Blue-Eyes", tcg: "yugioh",
@@ -161,7 +162,8 @@ struct GameBadge: View {
                             imageUrl: "https://images.ygoprodeck.com/images/cards/74677422.jpg",
                             imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/74677422.jpg",
                             quantity: 3, price: 120.0, condition: "Played", language: nil, notes: nil,
-                            collectorNumber: nil
+                            collectorNumber: nil,
+                            copies: []
                         )
                     ],
                     createdAt: "2025-10-12T09:00:00Z",

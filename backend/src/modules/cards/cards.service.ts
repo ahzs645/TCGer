@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { adapterRegistry } from '../adapters/adapter-registry';
+import type { CardPrintsResult } from '../adapters/types';
 
 const searchSchema = z.object({
   query: z.string().min(1),
@@ -22,11 +23,15 @@ export async function searchCards(input: CardSearchInput) {
   return results.flat();
 }
 
-export async function getCardPrints(params: { tcg: string; cardId: string }) {
+export async function getCardPrints(params: { tcg: string; cardId: string }): Promise<CardPrintsResult> {
   const { tcg, cardId } = params;
   const adapter = adapterRegistry.get(tcg);
   if (!adapter.fetchCardPrints) {
-    return [];
+    return {
+      mode: 'simple',
+      prints: [],
+      total: 0
+    };
   }
   return adapter.fetchCardPrints(cardId);
 }

@@ -622,7 +622,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
   }
 
   // Check if card exists, create if not
-  let cardId = input.cardId;
+  const cardId = input.cardId;
   const existingCard = await prisma.card.findUnique({
     where: { id: cardId }
   });
@@ -638,7 +638,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
     }
 
     // Create the card
-    const newCard = await prisma.card.create({
+    await prisma.card.create({
       data: {
         id: cardId,
         tcgGameId: tcgGame.id,
@@ -698,7 +698,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
 
 export async function addCardToLibrary(userId: string, input: AddCardToBinderInput) {
   // Ensure card exists, create if not (reuse logic)
-  let cardId = input.cardId;
+  const cardId = input.cardId;
   const existingCard = await prisma.card.findUnique({
     where: { id: cardId }
   });

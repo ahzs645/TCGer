@@ -1,5 +1,5 @@
 import { env } from '../../config/env';
-import { CardDTO, TcgAdapter } from './types';
+import { CardDTO, CardPrintsResult, TcgAdapter } from './types';
 
 const API_ROOT = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
 const BASE_URL = `${API_ROOT}/cards`;
@@ -124,10 +124,10 @@ export class MagicAdapter implements TcgAdapter {
     }
   }
 
-  async fetchCardPrints(externalId: string): Promise<CardDTO[]> {
+  async fetchCardPrints(externalId: string): Promise<CardPrintsResult> {
     const trimmedId = externalId.trim();
     if (!trimmedId) {
-      return [];
+      return { mode: 'simple', prints: [], total: 0 };
     }
 
     try {
@@ -144,7 +144,8 @@ export class MagicAdapter implements TcgAdapter {
           : undefined);
 
       if (!printsSearchUri) {
-        return [this.mapCard(cardData)];
+        const single = this.mapCard(cardData);
+        return { mode: 'simple', prints: [single], total: 1 };
       }
 
       const prints: ScryfallCard[] = [];
@@ -161,7 +162,8 @@ export class MagicAdapter implements TcgAdapter {
       }
 
       if (!prints.length) {
-        return [this.mapCard(cardData)];
+        const single = this.mapCard(cardData);
+        return { mode: 'simple', prints: [single], total: 1 };
       }
 
       const sorted = [...prints].sort((a, b) => {
@@ -170,10 +172,11 @@ export class MagicAdapter implements TcgAdapter {
         return right - left;
       });
 
-      return sorted.map((card) => this.mapCard(card));
+      const mapped = sorted.map((card) => this.mapCard(card));
+      return { mode: 'simple', prints: mapped, total: mapped.length };
     } catch (error) {
       console.error('MagicAdapter.fetchCardPrints error', error);
-      return [];
+      return { mode: 'simple', prints: [], total: 0 };
     }
   }
 

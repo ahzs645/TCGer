@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Search as SearchIcon } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,12 +17,6 @@ import { useAuthStore } from '@/stores/auth';
 import type { Card as CardType } from '@/types/card';
 
 import { CardPreview } from './card-preview';
-
-const presetQueries = [
-  { label: 'Top decks', value: 'meta' },
-  { label: 'Dragon', value: 'dragon' },
-  { label: 'Starter', value: 'starter' }
-];
 
 export function CardSearchPanel() {
   const { selectedGame, setGame } = useGameFilterStore((state) => ({
@@ -51,14 +44,6 @@ export function CardSearchPanel() {
     if (!trimmed) return;
     setSearchQuery(trimmed);
     if (trimmed === searchQuery) {
-      void refetch();
-    }
-  };
-
-  const handlePreset = (value: string) => {
-    setInputValue(value);
-    setSearchQuery(value);
-    if (value === searchQuery) {
       void refetch();
     }
   };
@@ -115,47 +100,6 @@ export function CardSearchPanel() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Quick presets</label>
-              <div className="flex flex-wrap gap-2">
-                {presetQueries.map((preset) => (
-                  <Button
-                    key={preset.value}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handlePreset(preset.value)}
-                    type="button"
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Active adapter</label>
-              <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                Searching{' '}
-                <Badge
-                  variant="outline"
-                  className={selectedGameDisabled ? 'border-destructive text-destructive' : ''}
-                >
-                  {GAME_LABELS[selectedGame] ?? 'All Games'}
-                </Badge>
-                {selectedGameDisabled ? (
-                  <p className="mt-2 text-xs text-destructive">
-                    This game is currently disabled. Enable it from account settings to include its results.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {searchQuery
-                      ? `Showing results for "${searchQuery}".`
-                      : 'Select a TCG and enter a query to begin searching.'}
-                  </p>
-                )}
-              </div>
             </div>
           </form>
         </CardContent>

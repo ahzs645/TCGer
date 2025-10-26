@@ -197,12 +197,8 @@ collectionsRouter.post(
     const userId = (req as AuthRequest).user!.id;
     const data = addLibraryCardSchema.parse(req.body);
 
-    try {
-      const collection = await addCardToLibrary(userId, data);
-      res.status(201).json(collection);
-    } catch (error) {
-      throw error;
-    }
+    const collection = await addCardToLibrary(userId, data);
+    res.status(201).json(collection);
   })
 );
 
