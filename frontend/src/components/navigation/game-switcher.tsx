@@ -57,8 +57,8 @@ export function GameSwitcher() {
               height={16}
               className={`h-4 w-4 transition-all ${
                 isSelected
-                  ? 'opacity-100 dark:brightness-0 dark:invert'
-                  : 'opacity-70 dark:opacity-100'
+                  ? 'opacity-100 invert dark:invert-0 dark:brightness-0'
+                  : 'opacity-70 dark:opacity-100 dark:invert'
               }`}
             />
             <span className="hidden xl:inline">{GAME_LABELS[game]}</span>

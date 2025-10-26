@@ -2,6 +2,24 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3
 
 export const LIBRARY_COLLECTION_ID = '__library__';
 
+export interface CollectionTag {
+  id: string;
+  label: string;
+  colorHex: string;
+}
+
+export interface CollectionCardCopy {
+  id: string;
+  condition?: string;
+  language?: string;
+  notes?: string;
+  price?: number;
+  acquisitionPrice?: number;
+  serialNumber?: string;
+  acquiredAt?: string;
+  tags: CollectionTag[];
+}
+
 export interface CollectionCard {
   id: string;
   cardId: string;
@@ -20,6 +38,8 @@ export interface CollectionCard {
   binderId?: string;
   binderName?: string;
   binderColorHex?: string;
+  conditionSummary?: string;
+  copies: CollectionCardCopy[];
 }
 
 export interface Collection {
@@ -40,6 +60,7 @@ export interface CreateCollectionInput {
 export interface UpdateCollectionInput {
   name?: string;
   description?: string;
+  colorHex?: string;
 }
 
 export interface AddCardToCollectionInput {
@@ -49,6 +70,11 @@ export interface AddCardToCollectionInput {
   language?: string;
   notes?: string;
   price?: number;
+  acquisitionPrice?: number;
+  serialNumber?: string;
+  acquiredAt?: string;
+  tags?: string[];
+  newTags?: { label: string; colorHex?: string }[];
   cardData?: {
     name: string;
     tcg: string;
@@ -62,11 +88,20 @@ export interface AddCardToCollectionInput {
 }
 
 export interface UpdateCollectionCardInput {
-  quantity?: number;
   condition?: string | null;
   language?: string | null;
   notes?: string | null;
+  serialNumber?: string | null;
+  acquiredAt?: string | null;
+  quantity?: number;
+  tags?: string[];
+  newTags?: { label: string; colorHex?: string }[];
   targetBinderId?: string;
+}
+
+export interface CollectionTagResponse extends CollectionTag {
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function getCollections(token: string): Promise<Collection[]> {
@@ -223,6 +258,45 @@ export async function updateCollectionCard(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Failed to update card in collection');
+  }
+
+  return response.json();
+}
+
+export async function getTags(token: string): Promise<CollectionTagResponse[]> {
+  const response = await fetch(`${API_BASE_URL}/collections/tags`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to fetch tags');
+  }
+
+  return response.json();
+}
+
+export interface CreateTagInput {
+  label: string;
+  colorHex?: string;
+}
+
+export async function createTag(token: string, data: CreateTagInput): Promise<CollectionTagResponse> {
+  const response = await fetch(`${API_BASE_URL}/collections/tags`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to create tag');
   }
 
   return response.json();

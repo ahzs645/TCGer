@@ -11,7 +11,7 @@ export interface CollectionsState {
   fetchCollections: (token: string) => Promise<void>;
   addCollection: (token: string, input: { name: string; description?: string }) => Promise<string>;
   removeCollection: (token: string, id: string) => Promise<void>;
-  updateCollection: (token: string, id: string, input: { name?: string; description?: string }) => Promise<void>;
+  updateCollection: (token: string, id: string, input: { name?: string; description?: string; colorHex?: string }) => Promise<void>;
   addCardToBinder: (
     token: string,
     binderId: string,
@@ -85,7 +85,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
     }
   },
 
-  updateCollection: async (token: string, id: string, input: { name?: string; description?: string }) => {
+  updateCollection: async (token: string, id: string, input: { name?: string; description?: string; colorHex?: string }) => {
     set({ isLoading: true, error: null });
     try {
       const updated = await collectionsApi.updateCollection(token, id, input);
@@ -117,46 +117,8 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
 
   updateCollectionCard: async (token: string, binderId: string, cardId: string, input: collectionsApi.UpdateCollectionCardInput) => {
     try {
-      const destinationBinderId = input.targetBinderId;
-      const isBinderChange = Boolean(destinationBinderId && destinationBinderId !== binderId);
-      const collections = get().collections;
-      const destinationExists = !isBinderChange || collections.some((collection) => collection.id === destinationBinderId);
-
-      const updatedCard = await collectionsApi.updateCollectionCard(token, binderId, cardId, input);
-
-      if (!destinationExists) {
-        await get().fetchCollections(token);
-        return;
-      }
-
-      set((state) => {
-        const timestamp = new Date().toISOString();
-        return {
-          collections: state.collections.map((collection) => {
-            if (collection.id === binderId) {
-              const nextCards = isBinderChange
-                ? collection.cards.filter((card) => card.id !== updatedCard.id)
-                : collection.cards.map((card) => (card.id === updatedCard.id ? { ...card, ...updatedCard } : card));
-              return {
-                ...collection,
-                updatedAt: timestamp,
-                cards: nextCards
-              };
-            }
-
-            if (isBinderChange && collection.id === destinationBinderId) {
-              const withoutDuplicate = collection.cards.filter((card) => card.id !== updatedCard.id);
-              return {
-                ...collection,
-                updatedAt: timestamp,
-                cards: [...withoutDuplicate, updatedCard]
-              };
-            }
-
-            return collection;
-          })
-        };
-      });
+      await collectionsApi.updateCollectionCard(token, binderId, cardId, input);
+      await get().fetchCollections(token);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update card in collection';
       set({ error: message });
@@ -168,19 +130,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   removeCollectionCard: async (token: string, binderId: string, cardId: string) => {
     try {
       await collectionsApi.removeCardFromCollection(token, binderId, cardId);
-      set((state) => ({
-        collections: state.collections.map((collection) => {
-          if (collection.id !== binderId) {
-            return collection;
-          }
-
-          return {
-            ...collection,
-            updatedAt: new Date().toISOString(),
-            cards: collection.cards.filter((card) => card.id !== cardId)
-          };
-        })
-      }));
+      await get().fetchCollections(token);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove card from collection';
       set({ error: message });

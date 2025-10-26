@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { ChevronDown, Loader2, Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchCardPrintsApi } from '@/lib/api-client';
 import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
@@ -42,11 +44,40 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [selectedBinderId, setSelectedBinderId] = useState<string>(collections[0]?.id ?? '');
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const supportsPrintSelection = card.tcg === 'magic';
+  const [selectedPrintCard, setSelectedPrintCard] = useState<Card>(card);
+  const [printOptions, setPrintOptions] = useState<Card[] | null>(null);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [isLoadingPrints, setIsLoadingPrints] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
   const selectedBinder = collections.find((binder) => binder.id === selectedBinderId);
-  const existingEntry = selectedBinder?.cards.find((binderCard) => binderCard.cardId === card.id);
+  const activeCard = supportsPrintSelection ? selectedPrintCard : card;
+  const existingEntry = selectedBinder?.cards.find((binderCard) => binderCard.cardId === activeCard.id);
   const serverQuantity = existingEntry?.quantity ?? 0;
   const quantity = optimisticQuantity ?? serverQuantity;
   const showQuantityControls = quantity > 0;
+  const selectedPrintLabel = supportsPrintSelection
+    ? `${selectedPrintCard.setName ?? selectedPrintCard.setCode ?? 'Select a print'}${
+        selectedPrintCard.collectorNumber ? ` · #${selectedPrintCard.collectorNumber}` : ''
+      }`
+    : '';
+
+  const formatPrintDetails = (print: Card) => {
+    const parts: string[] = [];
+    if (print.collectorNumber) {
+      parts.push(`#${print.collectorNumber}`);
+    }
+    if (print.rarity) {
+      parts.push(print.rarity);
+    }
+    if (print.releasedAt) {
+      const year = new Date(print.releasedAt).getFullYear();
+      if (!Number.isNaN(year)) {
+        parts.push(String(year));
+      }
+    }
+    return parts.join(' • ');
+  };
 
   const throttledSetPos = useRef(
     throttle<[{ x: number; y: number }]>((position) => setThrottledPos(position), 50)
@@ -108,11 +139,59 @@ export function CardPreview({ card }: CardPreviewProps) {
     }
   }, [existingEntry, optimisticQuantity]);
 
+  useEffect(() => {
+    setSelectedPrintCard(card);
+    setPrintOptions(null);
+    setPrintError(null);
+    setIsPrintDialogOpen(false);
+    setIsLoadingPrints(false);
+  }, [card.id]);
+
+  useEffect(() => {
+    if (!supportsPrintSelection || !isPrintDialogOpen || printOptions) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPrints(true);
+    setPrintError(null);
+
+    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id })
+      .then((prints) => {
+        if (cancelled) return;
+        setPrintOptions(prints);
+        if (prints.length) {
+          const matching = prints.find((entry) => entry.id === selectedPrintCard.id);
+          setSelectedPrintCard(matching ?? prints[0]);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setPrintError(error instanceof Error ? error.message : 'Unable to load prints.');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingPrints(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supportsPrintSelection, isPrintDialogOpen, printOptions, card.tcg, card.id, selectedPrintCard.id]);
+
   const handleBinderChange = (binderId: string) => {
     setSelectedBinderId(binderId);
     setOptimisticQuantity(null);
     setStatus('idle');
     setStatusMessage(null);
+  };
+
+  const handleOpenPrintDialog = () => {
+    if (!printOptions) {
+      setIsLoadingPrints(true);
+      setPrintError(null);
+    }
+    setIsPrintDialogOpen(true);
   };
 
   const handleAddInitialQuantity = async () => {
@@ -128,23 +207,25 @@ export function CardPreview({ card }: CardPreviewProps) {
       return;
     }
 
+    const cardToPersist = supportsPrintSelection ? selectedPrintCard : card;
+
     setStatus('pending');
     setStatusMessage(null);
     setOptimisticQuantity(1);
 
     try {
       await addCardToBinder(token, selectedBinderId, {
-        cardId: card.id,
+        cardId: cardToPersist.id,
         quantity: 1,
         cardData: {
-          name: card.name,
-          tcg: card.tcg,
-          externalId: card.id,
-          setCode: card.setCode,
-          setName: card.setName,
-          rarity: card.rarity,
-          imageUrl: card.imageUrl,
-          imageUrlSmall: card.imageUrlSmall
+          name: cardToPersist.name,
+          tcg: cardToPersist.tcg,
+          externalId: cardToPersist.id,
+          setCode: cardToPersist.setCode,
+          setName: cardToPersist.setName,
+          rarity: cardToPersist.rarity,
+          imageUrl: cardToPersist.imageUrl,
+          imageUrlSmall: cardToPersist.imageUrlSmall
         }
       });
       setStatus('success');
@@ -212,163 +293,253 @@ export function CardPreview({ card }: CardPreviewProps) {
   const entrySyncing = showQuantityControls && !existingEntry;
 
   return (
-    <div className="group flex min-w-0 basis-1/5 flex-col items-center rounded-lg px-1 sm:px-2">
-      <button type="button" className="cursor-pointer w-full">
-        <div
-          style={{
-            flex: '1 0 20%',
-            perspective: '1000px',
-            transformStyle: 'preserve-3d',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: isHovering ? 10 : 0
-          }}
-        >
-          <div
-            ref={cardRef}
-            style={{ width: '100%', height: 'auto' }}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          >
-            {card.imageUrlSmall ? (
-              <img
-                draggable={false}
-                loading="lazy"
-                className="card-test"
-                alt={card.name}
-                src={card.imageUrlSmall}
-                style={cardStyle}
-              />
+    <>
+      {supportsPrintSelection ? (
+        <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select a print</DialogTitle>
+              <DialogDescription>Choose the exact Magic printing to add to your binder.</DialogDescription>
+            </DialogHeader>
+            {isLoadingPrints ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : printError ? (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                <p>{printError}</p>
+                <p className="mt-1 text-xs text-muted-foreground">You can continue with the default print.</p>
+              </div>
             ) : (
-              <img
-                draggable={false}
-                loading="lazy"
-                className="card-test"
-                alt={card.name}
-                src={card.imageUrl}
-                style={cardStyle}
-              />
-            )}
-          </div>
-        </div>
-      </button>
-      <div className="w-full min-w-0 pt-2 space-y-1">
-        <p className="text-[12px] text-center font-semibold leading-tight break-words">
-          {showCardNumbers && (card.setCode || card.id) && (
-            <>
-              <span className="block md:inline">{card.setCode || card.id}</span>
-              <span className="hidden md:inline"> – </span>
-            </>
-          )}
-          <span className="block md:inline break-words">{card.name}</span>
-        </p>
-        {card.rarity && (
-          <div className="flex justify-center">
-            <Badge variant="outline" className="text-[10px] h-5">
-              {card.rarity}
-            </Badge>
-          </div>
-        )}
-        {card.setName && (
-          <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
-        )}
-      </div>
-      <div className="mt-3 w-full space-y-3 text-xs">
-        {collections.length ? (
-          <>
-            <div className="space-y-1">
-              <p className="text-[11px] font-medium text-muted-foreground">Binder</p>
-              <Select
-                value={selectedBinderId || undefined}
-                onValueChange={handleBinderChange}
-                disabled={collectionsLoading || status === 'pending'}
-              >
-                <SelectTrigger className="h-8 flex-1 justify-between gap-2 text-left text-xs">
-                  <SelectValue placeholder="Select a binder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {collections.map((binder) => {
-                    const accent = normalizeHexColor(binder.colorHex);
-                    return (
-                      <SelectItem key={binder.id} value={binder.id}>
-                        <span className="flex items-center gap-2">
-                          {accent ? (
-                            <span
-                              className="inline-flex h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: accent }}
-                              aria-hidden="true"
-                            />
-                          ) : null}
-                          {binder.name}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            {!showQuantityControls ? (
-              <Button className="w-full gap-2" size="sm" onClick={handleAddInitialQuantity} disabled={!selectedBinderId || addDisabled}>
-                <Plus className="h-4 w-4" />
-                <span>Add to Binder</span>
-              </Button>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex h-9 w-full max-w-[220px] items-center justify-between gap-1 rounded-lg border px-2 py-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleQuantityChange(quantity - 1)}
-                    className="h-8 w-8 rounded-full"
-                    tabIndex={-1}
-                    disabled={quantityControlsDisabled || entrySyncing}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <input
-                    readOnly
-                    className="w-10 border-none bg-transparent text-center text-sm font-semibold"
-                    type="text"
-                    value={quantity}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => handleQuantityChange(quantity + 1)}
-                    tabIndex={-1}
-                    disabled={quantityControlsDisabled || entrySyncing || quantity >= 99}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {entrySyncing ? (
-                  <p className="text-[11px] text-muted-foreground">Syncing binder entry...</p>
-                ) : null}
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {(printOptions && printOptions.length > 0 ? printOptions : [card]).map((print) => {
+                  const isSelected = selectedPrintCard.id === print.id;
+                  return (
+                    <button
+                      type="button"
+                      key={print.id}
+                      onClick={() => setSelectedPrintCard(print)}
+                      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
+                        isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
+                      }`}
+                    >
+                      {print.imageUrlSmall ? (
+                        <img
+                          src={print.imageUrlSmall}
+                          alt={print.name}
+                          className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{print.setName ?? print.setCode ?? 'Unknown set'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrintDetails(print) || 'No additional details'}
+                        </p>
+                      </div>
+                      {isSelected ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Selected
+                        </Badge>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
             )}
-          </>
-        ) : (
-          <p className="text-center text-muted-foreground">
-            {!isSignedIn
-              ? 'Sign in to add cards to your binders.'
-              : showEmptyBindersMessage
-                ? 'Create a binder from the collection page to start adding cards.'
-                : 'Loading binders...'}
-          </p>
-        )}
-        {statusMessage ? (
-          <p
-            className={`text-center ${
-              status === 'error' ? 'text-destructive' : 'text-emerald-600'
-            }`}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsPrintDialogOpen(false)}
+                disabled={isLoadingPrints}
+              >
+                Close
+              </Button>
+              <Button type="button" onClick={() => setIsPrintDialogOpen(false)} disabled={isLoadingPrints}>
+                Use This Print
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      <div className="group flex min-w-0 basis-1/5 flex-col items-center rounded-lg px-1 sm:px-2">
+        <button type="button" className="cursor-pointer w-full">
+          <div
+            style={{
+              flex: '1 0 20%',
+              perspective: '1000px',
+              transformStyle: 'preserve-3d',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: isHovering ? 10 : 0
+            }}
           >
-            {statusMessage}
+            <div
+              ref={cardRef}
+              style={{ width: '100%', height: 'auto' }}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              {card.imageUrlSmall ? (
+                <img
+                  draggable={false}
+                  loading="lazy"
+                  className="card-test"
+                  alt={card.name}
+                  src={card.imageUrlSmall}
+                  style={cardStyle}
+                />
+              ) : (
+                <img
+                  draggable={false}
+                  loading="lazy"
+                  className="card-test"
+                  alt={card.name}
+                  src={card.imageUrl}
+                  style={cardStyle}
+                />
+              )}
+            </div>
+          </div>
+        </button>
+        <div className="w-full min-w-0 pt-2 space-y-1">
+          <p className="text-[12px] text-center font-semibold leading-tight break-words">
+            {showCardNumbers && (card.setCode || card.id) && (
+              <>
+                <span className="block md:inline">{card.setCode || card.id}</span>
+                <span className="hidden md:inline"> – </span>
+              </>
+            )}
+            <span className="block md:inline break-words">{card.name}</span>
           </p>
-        ) : null}
+          {card.rarity && (
+            <div className="flex justify-center">
+              <Badge variant="outline" className="text-[10px] h-5">
+                {card.rarity}
+              </Badge>
+            </div>
+          )}
+          {card.setName && (
+            <p className="text-[10px] text-center text-muted-foreground break-words px-1">{card.setName}</p>
+          )}
+        </div>
+        <div className="mt-3 w-full space-y-3 text-xs">
+          {collections.length ? (
+            <>
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium text-muted-foreground">Binder</p>
+                <Select
+                  value={selectedBinderId || undefined}
+                  onValueChange={handleBinderChange}
+                  disabled={collectionsLoading || status === 'pending'}
+                >
+                  <SelectTrigger className="h-8 flex-1 justify-between gap-2 text-left text-xs">
+                    <SelectValue placeholder="Select a binder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {collections.map((binder) => {
+                      const accent = normalizeHexColor(binder.colorHex);
+                      return (
+                        <SelectItem key={binder.id} value={binder.id}>
+                          <span className="flex items-center gap-2">
+                            {accent ? (
+                              <span
+                                className="inline-flex h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: accent }}
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                            {binder.name}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              {supportsPrintSelection ? (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium text-muted-foreground">Print</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-between"
+                    onClick={handleOpenPrintDialog}
+                  >
+                    <span className="truncate">{selectedPrintLabel || 'Select a print'}</span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground">
+                    {printOptions ? 'Using your selected printing.' : 'Choose a print before adding the card.'}
+                  </p>
+                </div>
+              ) : null}
+              {!showQuantityControls ? (
+                <Button
+                  className="w-full gap-2"
+                  size="sm"
+                  onClick={handleAddInitialQuantity}
+                  disabled={!selectedBinderId || addDisabled}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add to Binder</span>
+                </Button>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex h-9 w-full max-w-[220px] items-center justify-between gap-1 rounded-lg border px-2 py-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleQuantityChange(quantity - 1)}
+                      className="h-8 w-8 rounded-full"
+                      tabIndex={-1}
+                      disabled={quantityControlsDisabled || entrySyncing}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <input
+                      readOnly
+                      className="w-10 border-none bg-transparent text-center text-sm font-semibold"
+                      type="text"
+                      value={quantity}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={() => handleQuantityChange(quantity + 1)}
+                      tabIndex={-1}
+                      disabled={quantityControlsDisabled || entrySyncing || quantity >= 99}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {entrySyncing ? (
+                    <p className="text-[11px] text-muted-foreground">Syncing binder entry...</p>
+                  ) : null}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground">
+              {!isSignedIn
+                ? 'Sign in to add cards to your binders.'
+                : showEmptyBindersMessage
+                  ? 'Create a binder from the collection page to start adding cards.'
+                  : 'Loading binders...'}
+            </p>
+          )}
+          {statusMessage ? (
+            <p className={`text-center ${status === 'error' ? 'text-destructive' : 'text-emerald-600'}`}>
+              {statusMessage}
+            </p>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

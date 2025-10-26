@@ -21,3 +21,12 @@ export async function searchCards(input: CardSearchInput) {
   const results = await Promise.all(adapters.map((adapter) => adapter.searchCards(query)));
   return results.flat();
 }
+
+export async function getCardPrints(params: { tcg: string; cardId: string }) {
+  const { tcg, cardId } = params;
+  const adapter = adapterRegistry.get(tcg);
+  if (!adapter.fetchCardPrints) {
+    return [];
+  }
+  return adapter.fetchCardPrints(cardId);
+}

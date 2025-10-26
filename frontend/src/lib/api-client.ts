@@ -26,6 +26,16 @@ export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'a
   return data.cards ?? [];
 }
 
+export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string }): Promise<Card[]> {
+  const { tcg, cardId } = params;
+  const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
+    next: { revalidate: 30 }
+  });
+
+  const data = await handleResponse<{ prints: Card[] }>(res);
+  return data.prints ?? [];
+}
+
 export interface DashboardStats {
   totalCards: number;
   totalValue: number;
