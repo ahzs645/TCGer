@@ -7,6 +7,8 @@ export interface CardDTO {
   setCode?: string;
   setName?: string;
   rarity?: string;
+  collectorNumber?: string;
+  releasedAt?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
   setSymbolUrl?: string;
@@ -17,4 +19,5 @@ export interface TcgAdapter {
   readonly game: TcgCode;
   searchCards(query: string): Promise<CardDTO[]>;
   fetchCardById(externalId: string): Promise<CardDTO | null>;
+  fetchCardPrints?(externalId: string): Promise<CardDTO[]>;
 }

@@ -26,7 +26,7 @@ import { LIBRARY_COLLECTION_ID } from '@/lib/api/collections';
 import { ALL_COLLECTION_ID, useCollectionData } from '@/lib/hooks/use-collection';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
-import type { CollectionCard, TcgCode } from '@/types/card';
+import type { CollectionCard, CollectionCardCopy, TcgCode } from '@/types/card';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
 
@@ -575,21 +575,45 @@ function CardDetailsPanel({
   binderOptions: { id: string; name: string; colorHex?: string | null }[];
   onMove: (args: CardMoveArgs) => Promise<void>;
 }) {
-  const [condition, setCondition] = useState<string | null>(card?.condition ?? null);
-  const [notes, setNotes] = useState(card?.notes ?? '');
+  const copies = (card?.copies ?? []) as CollectionCardCopy[];
+  const [selectedCopyId, setSelectedCopyId] = useState<string | null>(null);
+  const [condition, setCondition] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingBinderId, setPendingBinderId] = useState<string>(() => binderId ?? binderOptions[0]?.id ?? '');
   const [moveStatus, setMoveStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [moveError, setMoveError] = useState<string | null>(null);
+  const selectedCopy = useMemo(() => copies.find((copy) => copy.id === selectedCopyId) ?? null, [copies, selectedCopyId]);
 
   useEffect(() => {
-    setCondition(card?.condition ?? null);
-    setNotes(card?.notes ?? '');
+    if (!card) {
+      setSelectedCopyId(null);
+      return;
+    }
+    setSelectedCopyId((current) => {
+      if (current && copies.some((copy) => copy.id === current)) {
+        return current;
+      }
+      if (copies.length === 1) {
+        return copies[0].id;
+      }
+      return null;
+    });
+  }, [card?.id, copies]);
+
+  useEffect(() => {
+    if (selectedCopy) {
+      setCondition(selectedCopy.condition ?? null);
+      setNotes(selectedCopy.notes ?? '');
+    } else {
+      setCondition(null);
+      setNotes('');
+    }
     setStatus('idle');
     setErrorMessage(null);
-  }, [card?.id, card?.condition, card?.notes]);
+  }, [selectedCopy?.id, selectedCopy?.condition, selectedCopy?.notes]);
   useEffect(() => {
     if (binderId) {
       setPendingBinderId(binderId);
@@ -625,39 +649,39 @@ function CardDetailsPanel({
   useEffect(() => {
     setMoveStatus('idle');
     setMoveError(null);
-  }, [card?.id]);
+  }, [card?.id, selectedCopy?.id]);
 
   const conditionChoices = useMemo(() => {
-    if (!card?.condition) {
+    if (!selectedCopy?.condition) {
       return CONDITION_OPTIONS;
     }
-    if (CONDITION_OPTIONS.includes(card.condition)) {
+    if (CONDITION_OPTIONS.includes(selectedCopy.condition)) {
       return CONDITION_OPTIONS;
     }
-    return [card.condition, ...CONDITION_OPTIONS];
-  }, [card?.condition]);
+    return [selectedCopy.condition, ...CONDITION_OPTIONS];
+  }, [selectedCopy?.condition]);
 
   const pendingPayload = useMemo<UpdateCollectionCardInput | null>(() => {
-    if (!card) {
+    if (!selectedCopy) {
       return null;
     }
 
     const updates: UpdateCollectionCardInput = {};
-    if ((condition ?? null) !== (card.condition ?? null)) {
+    if ((condition ?? null) !== (selectedCopy.condition ?? null)) {
       updates.condition = condition;
     }
 
-    if (notes !== (card.notes ?? '')) {
+    if (notes !== (selectedCopy.notes ?? '')) {
       const trimmed = notes.trim();
       updates.notes = trimmed.length ? notes : null;
     }
 
     return Object.keys(updates).length ? updates : null;
-  }, [card, condition, notes]);
+  }, [selectedCopy, condition, notes]);
 
   const hasChanges = Boolean(pendingPayload);
-  const canEdit = Boolean(card && binderId);
-  const canMove = Boolean(card && binderId && pendingBinderId && pendingBinderId !== binderId);
+  const canEdit = Boolean(card && binderId && selectedCopy);
+  const canMove = Boolean(card && binderId && selectedCopy && pendingBinderId && pendingBinderId !== binderId);
   const binderAccent = normalizeHexColor(binderColor ?? undefined);
   const binderChipStyle: CSSProperties | undefined = binderAccent
     ? {
@@ -667,7 +691,7 @@ function CardDetailsPanel({
     : undefined;
 
   const handleSave = async () => {
-    if (!card || !binderId || !pendingPayload) {
+    if (!card || !binderId || !pendingPayload || !selectedCopy) {
       return;
     }
 
@@ -675,7 +699,7 @@ function CardDetailsPanel({
     setStatus('idle');
     setErrorMessage(null);
     try {
-      await onUpdate({ cardId: card.id, binderId, updates: pendingPayload });
+      await onUpdate({ cardId: selectedCopy.id, binderId, updates: pendingPayload });
       setStatus('success');
     } catch (error) {
       setStatus('error');
@@ -686,19 +710,19 @@ function CardDetailsPanel({
   };
 
   const handleReset = () => {
-    setCondition(card?.condition ?? null);
-    setNotes(card?.notes ?? '');
+    setCondition(selectedCopy?.condition ?? null);
+    setNotes(selectedCopy?.notes ?? '');
     setStatus('idle');
     setErrorMessage(null);
   };
   const handleMove = async () => {
-    if (!card || !binderId || !pendingBinderId || pendingBinderId === binderId) {
+    if (!card || !binderId || !pendingBinderId || pendingBinderId === binderId || !selectedCopy) {
       return;
     }
     setMoveStatus('pending');
     setMoveError(null);
     try {
-      await onMove({ cardId: card.id, fromBinderId: binderId, toBinderId: pendingBinderId });
+      await onMove({ cardId: selectedCopy.id, fromBinderId: binderId, toBinderId: pendingBinderId });
       setMoveStatus('success');
     } catch (error) {
       setMoveStatus('error');
@@ -803,6 +827,59 @@ function CardDetailsPanel({
 
           <div className="space-y-4">
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase text-muted-foreground">Individual copies</p>
+                <Badge variant="outline">{copies.length}</Badge>
+              </div>
+              {copies.length ? (
+                <div className="space-y-2">
+                  {copies.map((copy, index) => {
+                    const isSelected = copy.id === selectedCopyId;
+                    return (
+                      <button
+                        key={copy.id}
+                        type="button"
+                        onClick={() => setSelectedCopyId(copy.id)}
+                        className={cn(
+                          'w-full rounded-lg border px-3 py-2 text-left text-sm transition hover:border-primary/40',
+                          isSelected ? 'border-primary bg-primary/5' : 'border-muted'
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {copy.condition ?? 'Unknown'} <span className="text-muted-foreground">#{index + 1}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {copy.notes?.trim() || 'No notes yet'}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {copy.tags?.length
+                              ? copy.tags.slice(0, 2).map((tag) => (
+                                  <Badge
+                                    key={tag.id}
+                                    variant="secondary"
+                                    style={{ backgroundColor: tag.colorHex, color: '#0B1121' }}
+                                  >
+                                    {tag.label}
+                                  </Badge>
+                                ))
+                              : <Badge variant="outline">No tags</Badge>}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                  No individual copies tracked for this card yet.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="binder-assignment">Binder assignment</Label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select
@@ -846,17 +923,17 @@ function CardDetailsPanel({
                   disabled={!canMove || moveStatus === 'pending'}
                 >
                   {moveStatus === 'pending' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Move card
+                  Move copy
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
                 {binderOptions.length
-                  ? 'Move cards between binders or back into the Unsorted library.'
+                  ? 'Move copies between binders or back into the Unsorted library.'
                   : 'Binders will appear once your account data has loaded.'}
               </p>
               {moveStatus === 'success' && (
                 <p className="text-xs text-emerald-600" aria-live="polite">
-                  Card reassigned successfully.
+                  Copy reassigned successfully.
                 </p>
               )}
               {moveStatus === 'error' && (
@@ -866,73 +943,80 @@ function CardDetailsPanel({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="card-condition">Condition</Label>
-              <Select
-                value={condition ?? EMPTY_CONDITION_VALUE}
-                onValueChange={(value) => setCondition(value === EMPTY_CONDITION_VALUE ? null : value)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger id="card-condition">
-                  <SelectValue placeholder="Select condition" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={EMPTY_CONDITION_VALUE}>Not specified</SelectItem>
-                  {conditionChoices.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {selectedCopy ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="card-condition">Condition</Label>
+                  <Select
+                    value={condition ?? EMPTY_CONDITION_VALUE}
+                    onValueChange={(value) => setCondition(value === EMPTY_CONDITION_VALUE ? null : value)}
+                    disabled={!canEdit}
+                  >
+                    <SelectTrigger id="card-condition">
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={EMPTY_CONDITION_VALUE}>Not specified</SelectItem>
+                      {conditionChoices.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="card-notes">Notes</Label>
-              <Textarea
-                id="card-notes"
-                placeholder="Add personal notes (sleeves, grading plans, etc.)"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={4}
-                disabled={!canEdit}
-              />
-            </div>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="card-notes">Notes</Label>
+                  <Textarea
+                    id="card-notes"
+                    placeholder="Add personal notes (sleeves, grading plans, etc.)"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    rows={4}
+                    disabled={!canEdit}
+                  />
+                </div>
 
-          <div className="mt-auto space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSave}
-                disabled={!hasChanges || !canEdit || isSaving}
-              >
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save changes
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleReset}
-                disabled={!canEdit || isSaving || !hasChanges}
-              >
-                Reset
-              </Button>
-            </div>
-            {status === 'success' && (
-              <p className="text-xs text-emerald-600" aria-live="polite">
-                Card updated successfully.
-              </p>
-            )}
-            {status === 'error' && (
-              <p className="text-xs text-destructive" aria-live="assertive">
-                {errorMessage ?? 'Failed to update card.'}
-              </p>
-            )}
-            {!canEdit && (
-              <p className="text-xs text-muted-foreground">Editing is unavailable for this card right now.</p>
+                <div className="mt-auto space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={!hasChanges || !canEdit || isSaving}
+                    >
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Save changes
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleReset}
+                      disabled={!canEdit || isSaving || !hasChanges}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                  {status === 'success' && (
+                    <p className="text-xs text-emerald-600" aria-live="polite">
+                      Copy updated successfully.
+                    </p>
+                  )}
+                  {status === 'error' && (
+                    <p className="text-xs text-destructive" aria-live="assertive">
+                      {errorMessage ?? 'Failed to update copy.'}
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                {copies.length
+                  ? 'Select a copy above to edit condition, notes, or move it between binders.'
+                  : 'No copies available to edit in this binder.'}
+              </div>
             )}
           </div>
         </div>

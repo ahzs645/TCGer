@@ -139,15 +139,8 @@ actor MagicCardHashLibrary {
 
     func preloadIfNeeded() {
         guard !isLoaded else { return }
-        if let cachedWrapper = try? CacheManager.shared.load(
-            [CardHashEntry].self,
-            forKey: CacheManager.CacheKey.magicCardHashes
-        ), let cached = cachedWrapper, !cached.isEmpty {
-            entries = cached
-            isLoaded = true
-            return
-        }
 
+        // Load from bundle (not from cache to avoid MainActor isolation issues)
         if let url = Bundle.main.url(
             forResource: Configuration.sharedJSONName,
             withExtension: Configuration.fileExtension
@@ -230,7 +223,7 @@ enum PerceptualHash {
         return hash
     }
 
-    static func hammingDistance(_ lhs: UInt64, _ rhs: UInt64) -> Int {
+    nonisolated static func hammingDistance(_ lhs: UInt64, _ rhs: UInt64) -> Int {
         (lhs ^ rhs).nonzeroBitCount
     }
 
@@ -260,17 +253,9 @@ enum PerceptualHash {
 
         for row in 0..<sampleSize {
             let range = row * sampleSize..<(row + 1) * sampleSize
-            var rowInput = Array(input[range])
+            let rowInput = Array(input[range])
             var rowOutput = [Float](repeating: 0, count: sampleSize)
-            rowInput.withUnsafeMutableBufferPointer { inputBuffer in
-                rowOutput.withUnsafeMutableBufferPointer { outputBuffer in
-                    guard
-                        let inputPointer = inputBuffer.baseAddress,
-                        let outputPointer = outputBuffer.baseAddress
-                    else { return }
-                    dctSetup.transform(inputPointer, result: outputPointer)
-                }
-            }
+            dctSetup.transform(rowInput, result: &rowOutput)
             for column in 0..<sampleSize {
                 output[row * sampleSize + column] = rowOutput[column]
             }
@@ -291,15 +276,7 @@ enum PerceptualHash {
             }
 
             var columnOutput = [Float](repeating: 0, count: sampleSize)
-            columnInput.withUnsafeMutableBufferPointer { inputBuffer in
-                columnOutput.withUnsafeMutableBufferPointer { outputBuffer in
-                    guard
-                        let inputPointer = inputBuffer.baseAddress,
-                        let outputPointer = outputBuffer.baseAddress
-                    else { return }
-                    dctSetup.transform(inputPointer, result: outputPointer)
-                }
-            }
+            dctSetup.transform(columnInput, result: &columnOutput)
 
             for row in 0..<sampleSize {
                 output[row * sampleSize + column] = columnOutput[row]

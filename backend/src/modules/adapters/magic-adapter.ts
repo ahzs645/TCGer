@@ -42,6 +42,7 @@ interface ScryfallCard {
   name: string;
   set: string;
   set_name: string; // eslint-disable-line camelcase
+  released_at?: string; // eslint-disable-line camelcase
   collector_number?: string; // eslint-disable-line camelcase
   rarity?: string;
   image_uris?: {
@@ -119,6 +120,37 @@ export class MagicAdapter implements TcgAdapter {
     }
   }
 
+  async fetchCardPrints(externalId: string): Promise<CardDTO[]> {
+    const trimmedId = externalId.trim();
+    if (!trimmedId) {
+      return [];
+    }
+
+    try {
+      const response = await rateLimitedFetch(`${BASE_URL}/${trimmedId}/prints`);
+      if (!response.ok) {
+        throw new Error(`Scryfall prints fetch failed: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as ScryfallSearchResponse;
+      const prints = payload?.data ?? [];
+      if (!prints.length) {
+        return [];
+      }
+
+      const sorted = [...prints].sort((a, b) => {
+        const left = a.released_at ? Date.parse(a.released_at) : 0;
+        const right = b.released_at ? Date.parse(b.released_at) : 0;
+        return right - left;
+      });
+
+      return sorted.map((card) => this.mapCard(card));
+    } catch (error) {
+      console.error('MagicAdapter.fetchCardPrints error', error);
+      return [];
+    }
+  }
+
   private mapCard(card: ScryfallCard): CardDTO {
     const face = card.card_faces?.[0];
     const image = card.image_uris ?? face?.image_uris ?? {};
@@ -132,6 +164,8 @@ export class MagicAdapter implements TcgAdapter {
       setCode: card.set,
       setName: card.set_name,
       rarity: card.rarity,
+      collectorNumber: card.collector_number,
+      releasedAt: card.released_at,
       imageUrl: image.large ?? image.normal ?? image.small,
       imageUrlSmall: image.small ?? image.normal ?? image.large,
       setSymbolUrl: symbolUrl,

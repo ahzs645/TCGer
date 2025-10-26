@@ -1,9 +1,8 @@
 import SwiftUI
 
 struct CardImagePreviewView: View {
-    @Environment(\.dismiss) private var dismiss
-
     let card: CollectionCard
+    let onDismiss: () -> Void
 
     private var imageURL: URL? {
         if let primary = card.imageUrl, let url = URL(string: primary) {
@@ -17,13 +16,18 @@ struct CardImagePreviewView: View {
 
     var body: some View {
         ZStack {
+            // Dimmed background - tap to dismiss
             Color.black
-                .opacity(0.98)
+                .opacity(0.85)
                 .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
 
             VStack(spacing: 24) {
                 Spacer()
 
+                // Card image
                 Group {
                     if let url = imageURL {
                         AsyncImage(url: url) { phase in
@@ -47,8 +51,9 @@ struct CardImagePreviewView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal)
+                .padding(.horizontal, 32)
 
+                // Card info
                 VStack(spacing: 6) {
                     Text(card.name)
                         .font(.title3.weight(.semibold))
@@ -74,7 +79,7 @@ struct CardImagePreviewView: View {
         }
         .overlay(alignment: .topTrailing) {
             Button {
-                dismiss()
+                onDismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 32))

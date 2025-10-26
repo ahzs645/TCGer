@@ -3,7 +3,6 @@ import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { createGunzip } from 'node:zlib';
 import { URL } from 'node:url';
 
 const BULK_INDEX_URL = 'https://api.scryfall.com/bulk-data';
@@ -15,6 +14,29 @@ const config = {
   host: process.env.HOST || '0.0.0.0',
   refreshMs: Math.max(5 * 60 * 1000, Number.parseInt(process.env.SCRYFALL_BULK_REFRESH_MS || `${12 * 60 * 60 * 1000}`, 10)),
   resultLimit: Math.max(1, Number.parseInt(process.env.SCRYFALL_BULK_MAX_RESULTS || `${20}`, 10))
+};
+
+function parseBoolean(value, defaultValue) {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  const normalized = `${value}`.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) {
+    return false;
+  }
+  return defaultValue;
+}
+
+const imageCacheConfig = {
+  enabled: parseBoolean(process.env.SCRYFALL_BULK_CACHE_IMAGES ?? 'true', true),
+  directory: (process.env.SCRYFALL_BULK_IMAGE_DIR || path.join(config.dataDir, 'images')).trim(),
+  preferredField: (process.env.SCRYFALL_BULK_IMAGE_FIELD || 'border_crop').trim(),
+  fallbackFields: (process.env.SCRYFALL_BULK_IMAGE_FALLBACKS || 'art_crop,large,normal,small').split(',').map((entry) => entry.trim()).filter(Boolean),
+  maxDownloadsPerRefresh: Number.parseInt(process.env.SCRYFALL_BULK_IMAGE_MAX_PER_REFRESH || '250', 10),
+  concurrency: Math.max(1, Number.parseInt(process.env.SCRYFALL_BULK_IMAGE_CONCURRENCY || '4', 10))
 };
 
 let cards = [];
@@ -215,6 +237,7 @@ async function refreshData(force = false) {
     if (filePath !== activeFilePath || !cards.length) {
       await loadCardsFromFile(filePath);
     }
+    await cacheCardImages(cards);
     dataState = {
       ...dataState,
       updatedAt: metadata.updated_at,
@@ -311,3 +334,159 @@ async function start() {
 }
 
 start();
+
+function getImageFieldOrder() {
+  const fields = [imageCacheConfig.preferredField, ...imageCacheConfig.fallbackFields];
+  const seen = new Set();
+  const deduped = [];
+  for (const field of fields) {
+    if (!field) {
+      continue;
+    }
+    const lowered = field.toLowerCase();
+    if (!seen.has(lowered)) {
+      seen.add(lowered);
+      deduped.push(lowered);
+    }
+  }
+  return deduped.length ? deduped : ['border_crop', 'art_crop', 'large', 'normal'];
+}
+
+function resolveImageUrl(imageMap, fieldOrder) {
+  if (!imageMap) {
+    return null;
+  }
+  for (const field of fieldOrder) {
+    if (imageMap[field]) {
+      return imageMap[field];
+    }
+  }
+  const values = Object.values(imageMap);
+  return values.length ? values[0] : null;
+}
+
+function extensionFromUrl(urlString) {
+  try {
+    const ext = path.extname(new URL(urlString).pathname);
+    if (ext) {
+      return ext;
+    }
+  } catch {}
+  return '.jpg';
+}
+
+function buildImageTargets(card, fieldOrder) {
+  const targets = [];
+  if (!card?.id) {
+    return targets;
+  }
+
+  if (card.image_uris) {
+    const url = resolveImageUrl(card.image_uris, fieldOrder);
+    if (url) {
+      targets.push({
+        id: card.id,
+        url,
+        extension: extensionFromUrl(url),
+        label: card.name || card.id
+      });
+    }
+  }
+
+  if (Array.isArray(card.card_faces)) {
+    card.card_faces.forEach((face, index) => {
+      if (!face?.image_uris) {
+        return;
+      }
+      const url = resolveImageUrl(face.image_uris, fieldOrder);
+      if (url) {
+        targets.push({
+          id: `${card.id}-face${index}`,
+          url,
+          extension: extensionFromUrl(url),
+          label: (face.name || card.name || card.id)
+        });
+      }
+    });
+  }
+
+  return targets;
+}
+
+async function fileExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function cacheCardImages(cardList) {
+  if (!imageCacheConfig.enabled || !cardList?.length) {
+    return;
+  }
+
+  const fieldOrder = getImageFieldOrder();
+  await ensureDirectory(imageCacheConfig.directory);
+
+  const queue = [];
+  outer: for (const card of cardList) {
+    const targets = buildImageTargets(card, fieldOrder);
+    for (const target of targets) {
+      const filePath = path.join(imageCacheConfig.directory, `${target.id}${target.extension}`);
+      if (await fileExists(filePath)) {
+        continue;
+      }
+      queue.push({ ...target, filePath });
+      if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
+        break outer;
+      }
+    }
+  }
+
+  if (!queue.length) {
+    return;
+  }
+
+  console.log(`Caching ${queue.length} Scryfall images (target dir: ${imageCacheConfig.directory})`);
+  const workers = Math.min(imageCacheConfig.concurrency, queue.length);
+  let index = 0;
+  const errors = [];
+
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      while (true) {
+        const currentIndex = index;
+        index += 1;
+        if (currentIndex >= queue.length) {
+          break;
+        }
+        const job = queue[currentIndex];
+        try {
+          await downloadImage(job);
+        } catch (error) {
+          errors.push({ job, error });
+        }
+      }
+    })
+  );
+
+  if (errors.length) {
+    console.warn(`Failed to cache ${errors.length} Scryfall images`);
+    errors.slice(0, 5).forEach(({ job, error }) => {
+      console.warn(`  - ${job.label} (${job.url}): ${error.message}`);
+    });
+  }
+}
+
+async function downloadImage(job) {
+  const response = await fetch(job.url);
+  if (!response.ok || !response.body) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+  const tempPath = `${job.filePath}.tmp`;
+  const writer = createWriteStream(tempPath);
+  await pipeline(response.body, writer);
+  await rename(tempPath, job.filePath);
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -7,6 +8,8 @@ import { LayoutDashboard, Search, Table } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getUserPreferences } from '@/lib/api/user-preferences';
+import { useAuthStore } from '@/stores/auth';
 
 import { CommandMenu } from '../navigation/command-menu';
 import { GameSwitcher } from '../navigation/game-switcher';
@@ -28,6 +31,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <PreferenceHydrator />
       <header className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 backdrop-blur">
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
@@ -69,4 +73,38 @@ export function AppShell({ children }: AppShellProps) {
       </main>
     </div>
   );
+}
+
+function PreferenceHydrator() {
+  const token = useAuthStore((state) => state.token);
+  const updateStoredPreferences = useAuthStore((state) => state.updateStoredPreferences);
+  const lastSyncedToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      lastSyncedToken.current = null;
+      return;
+    }
+
+    if (lastSyncedToken.current === token) {
+      return;
+    }
+
+    let cancelled = false;
+    getUserPreferences(token)
+      .then((preferences) => {
+        if (cancelled) return;
+        updateStoredPreferences(preferences);
+        lastSyncedToken.current = token;
+      })
+      .catch((error) => {
+        console.error('Failed to refresh user preferences:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, updateStoredPreferences]);
+
+  return null;
 }

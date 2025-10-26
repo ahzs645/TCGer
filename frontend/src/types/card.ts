@@ -7,24 +7,15 @@ export interface Card {
   setCode?: string;
   setName?: string;
   rarity?: string;
+  collectorNumber?: string;
+  releasedAt?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
   setSymbolUrl?: string;
   attributes?: Record<string, unknown>;
 }
 
-export interface CollectionCard extends Card {
-  quantity: number;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  acquisitionPrice?: number;
-  priceHistory?: number[];
-  binderId?: string;
-  binderName?: string;
-  binderColorHex?: string;
-}
+export type { CollectionCardCopy, CollectionCard } from '@/lib/api/collections';
 
 export interface SearchCardsResponse {
   cards: Card[];

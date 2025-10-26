@@ -337,7 +337,9 @@ struct CollectionDetailView: View {
                                     card: card,
                                     showPricing: environmentStore.showPricing,
                                     onTap: {
-                                        previewingCard = card
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            previewingCard = card
+                                        }
                                     }
                                 )
                                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -461,9 +463,21 @@ struct CollectionDetailView: View {
                     )
                 }
             }
-            .fullScreenCover(item: $previewingCard) { card in
-                CardImagePreviewView(card: card)
+            .overlay {
+                if let card = previewingCard {
+                    CardImagePreviewView(card: card) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            previewingCard = nil
+                        }
+                    }
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.7).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
+                    .zIndex(999)
+                }
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: previewingCard != nil)
             .alert("Error", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }

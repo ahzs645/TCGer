@@ -10,7 +10,9 @@ import {
   addCardToBinder,
   addCardToLibrary,
   removeCardFromBinder,
-  updateCardInBinder
+  updateCardInBinder,
+  getUserTags,
+  createUserTag
 } from '../../modules/collections/collections.service';
 import { asyncHandler } from '../../utils/async-handler';
 
@@ -30,6 +32,11 @@ const updateBinderSchema = z.object({
   colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
 });
 
+const tagPayloadSchema = z.object({
+  label: z.string().min(1, 'Label is required'),
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
+});
+
 const addCardSchema = z.object({
   cardId: z.string().min(1, 'Card ID is required'),
   quantity: z.number().int().positive().default(1),
@@ -38,6 +45,10 @@ const addCardSchema = z.object({
   notes: z.string().optional(),
   price: z.number().optional(),
   acquisitionPrice: z.number().optional(),
+  serialNumber: z.string().optional(),
+  acquiredAt: z.string().datetime().optional(),
+  tags: z.array(z.string()).optional(),
+  newTags: z.array(tagPayloadSchema).optional(),
   // Card data for creating card if it doesn't exist
   cardData: z.object({
     name: z.string(),
@@ -57,18 +68,26 @@ const addLibraryCardSchema = addCardSchema.extend({
 
 const updateCardSchema = z
   .object({
-    quantity: z.number().int().positive().optional(),
     condition: z.string().nullable().optional(),
     language: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
+    serialNumber: z.string().nullable().optional(),
+    acquiredAt: z.string().datetime().nullable().optional(),
+    quantity: z.number().int().min(1).optional(),
+    tags: z.array(z.string()).optional(),
+    newTags: z.array(tagPayloadSchema).optional(),
     targetBinderId: z.string().min(1).optional()
   })
   .refine(
     (data) =>
-      data.quantity !== undefined ||
       data.condition !== undefined ||
       data.language !== undefined ||
       data.notes !== undefined ||
+      data.serialNumber !== undefined ||
+      data.acquiredAt !== undefined ||
+      data.quantity !== undefined ||
+      data.tags !== undefined ||
+      data.newTags !== undefined ||
       data.targetBinderId !== undefined,
     {
       message: 'At least one field must be provided'
@@ -116,6 +135,28 @@ collectionsRouter.patch(
       }
       throw error;
     }
+  })
+);
+
+// Tag management
+collectionsRouter.get(
+  '/tags',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const tags = await getUserTags(userId);
+    res.json(tags);
+  })
+);
+
+collectionsRouter.post(
+  '/tags',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const data = tagPayloadSchema.parse(req.body);
+    const tag = await createUserTag(userId, data);
+    res.status(201).json(tag);
   })
 );
 

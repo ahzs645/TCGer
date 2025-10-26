@@ -20,6 +20,7 @@ model User {
   enabledPokemon  Boolean  @default(true)
   binders     Binder[]
   collections Collection[]
+  tags        Tag[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
@@ -94,14 +95,40 @@ model Collection {
   price            Decimal? @db.Decimal(10, 2)
   acquisitionPrice Decimal? @db.Decimal(10, 2)
   customAttributes Json?
+  serialNumber     String?
+  acquiredAt       DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   card   Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
   binder Binder? @relation(fields: [binderId], references: [id], onDelete: SetNull)
+  tags   CollectionTag[]
+}
 
-  @@unique([userId, cardId, binderId, condition, language])
+model Tag {
+  id        String   @id @default(uuid())
+  userId    String
+  label     String
+  colorHex  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments CollectionTag[]
+
+  @@unique([userId, label])
+}
+
+model CollectionTag {
+  collectionId String
+  tagId        String
+  assignedAt   DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, tagId])
 }
 
 model PriceHistory {

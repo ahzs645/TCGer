@@ -59,7 +59,7 @@ struct CardDetails: Hashable, Sendable {
     let price: Double?
     let sourceCard: Card?
 
-    init(identity: CardIdentity, rarity: String?, imageURL: URL?, price: Double?, sourceCard: Card? = nil) {
+    nonisolated init(identity: CardIdentity, rarity: String?, imageURL: URL?, price: Double?, sourceCard: Card? = nil) {
         self.identity = identity
         self.rarity = rarity
         self.imageURL = imageURL

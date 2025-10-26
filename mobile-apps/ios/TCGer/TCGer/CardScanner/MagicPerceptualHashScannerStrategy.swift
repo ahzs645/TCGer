@@ -111,10 +111,10 @@ final class MagicPerceptualHashScannerStrategy: ScanStrategy {
         let ciImage = CIImage(cgImage: image)
         let perspectiveFilter = CIFilter.perspectiveCorrection()
         perspectiveFilter.inputImage = ciImage
-        perspectiveFilter.topLeft = CIVector(cgPoint: convert(observation.topLeft, in: imageSize))
-        perspectiveFilter.topRight = CIVector(cgPoint: convert(observation.topRight, in: imageSize))
-        perspectiveFilter.bottomLeft = CIVector(cgPoint: convert(observation.bottomLeft, in: imageSize))
-        perspectiveFilter.bottomRight = CIVector(cgPoint: convert(observation.bottomRight, in: imageSize))
+        perspectiveFilter.topLeft = convert(observation.topLeft, in: imageSize)
+        perspectiveFilter.topRight = convert(observation.topRight, in: imageSize)
+        perspectiveFilter.bottomLeft = convert(observation.bottomLeft, in: imageSize)
+        perspectiveFilter.bottomRight = convert(observation.bottomRight, in: imageSize)
 
         guard var corrected = perspectiveFilter.outputImage else {
             return nil

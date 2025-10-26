@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
-import { searchCards } from '../../modules/cards/cards.service';
+import { getCardPrints, searchCards } from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
 
 export const cardsRouter = Router();
@@ -10,6 +10,10 @@ export const cardsRouter = Router();
 const searchQuerySchema = z.object({
   query: z.string().min(1, 'query parameter is required'),
   tcg: z.string().optional()
+});
+const cardParamsSchema = z.object({
+  tcg: z.string(),
+  cardId: z.string()
 });
 
 cardsRouter.get(
@@ -22,13 +26,18 @@ cardsRouter.get(
 );
 
 cardsRouter.get(
+  '/:tcg/:cardId/prints',
+  asyncHandler(async (req, res) => {
+    const { tcg, cardId } = cardParamsSchema.parse(req.params);
+    const prints = await getCardPrints({ tcg, cardId });
+    res.json({ prints, total: prints.length });
+  })
+);
+
+cardsRouter.get(
   '/:tcg/:cardId',
   asyncHandler(async (req, res) => {
-    const paramsSchema = z.object({
-      tcg: z.string(),
-      cardId: z.string()
-    });
-    const { tcg, cardId } = paramsSchema.parse(req.params);
+    const { tcg, cardId } = cardParamsSchema.parse(req.params);
     const adapter = adapterRegistry.get(tcg);
     const card =
       (await adapter.fetchCardById(cardId)) ??
