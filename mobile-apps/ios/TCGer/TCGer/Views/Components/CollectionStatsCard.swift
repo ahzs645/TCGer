@@ -98,9 +98,11 @@ struct StatItem: View {
                 CollectionCard(
                     id: "1",
                     cardId: "1",
+                    externalId: "stats-1",
                     name: "Test Card",
                     tcg: "yugioh",
                     setCode: nil,
+                    setName: nil,
                     rarity: nil,
                     imageUrl: nil,
                     imageUrlSmall: nil,
@@ -108,7 +110,8 @@ struct StatItem: View {
                     price: 50.0,
                     condition: nil,
                     language: nil,
-                    notes: nil
+                    notes: nil,
+                    collectorNumber: nil
                 )
             ],
             createdAt: "",

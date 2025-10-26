@@ -80,6 +80,7 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
 struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let cardId: String
+    let externalId: String?
     let name: String
     let tcg: String
     let setCode: String?

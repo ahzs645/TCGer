@@ -148,18 +148,20 @@ struct GameBadge: View {
                     description: "Flagship deck staples, graded highlights, and tournament-ready foils.",
                     cards: [
                         CollectionCard(
-                            id: "1", cardId: "1", name: "Dark Magician", tcg: "yugioh",
-                            setCode: "SDY-006", rarity: "Ultra Rare",
+                            id: "1", cardId: "1", externalId: "46986414", name: "Dark Magician", tcg: "yugioh",
+                            setCode: "SDY-006", setName: "Starter Deck Yugi", rarity: "Ultra Rare",
                             imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
                             imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
-                            quantity: 2, price: 89.99, condition: "Near Mint", language: nil, notes: nil
+                            quantity: 2, price: 89.99, condition: "Near Mint", language: nil, notes: nil,
+                            collectorNumber: nil
                         ),
                         CollectionCard(
-                            id: "2", cardId: "2", name: "Blue-Eyes", tcg: "yugioh",
-                            setCode: "SDK-001", rarity: "Ultra Rare",
+                            id: "2", cardId: "2", externalId: "74677422", name: "Blue-Eyes", tcg: "yugioh",
+                            setCode: "SDK-001", setName: "Starter Deck Kaiba", rarity: "Ultra Rare",
                             imageUrl: "https://images.ygoprodeck.com/images/cards/74677422.jpg",
                             imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/74677422.jpg",
-                            quantity: 3, price: 120.0, condition: "Played", language: nil, notes: nil
+                            quantity: 3, price: 120.0, condition: "Played", language: nil, notes: nil,
+                            collectorNumber: nil
                         )
                     ],
                     createdAt: "2025-10-12T09:00:00Z",

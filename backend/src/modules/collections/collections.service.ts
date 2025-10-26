@@ -99,6 +99,7 @@ type BinderSnapshot = {
 type AggregatedCollectionCard = {
   id: string;
   cardId: string;
+  externalId?: string;
   tcg: 'yugioh' | 'magic' | 'pokemon';
   name: string;
   setCode?: string;
@@ -267,6 +268,7 @@ function aggregateCollectionEntries(
       grouped.set(key, {
         id: copyPayload.id,
         cardId: card.id,
+        externalId: card.externalId ?? undefined,
         tcg: card.tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
         name: card.name,
         setCode: card.setCode ?? undefined,
