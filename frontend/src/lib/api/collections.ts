@@ -23,6 +23,7 @@ export interface CollectionCardCopy {
 export interface CollectionCard {
   id: string;
   cardId: string;
+  externalId?: string;
   name: string;
   tcg: string;
   setCode?: string;

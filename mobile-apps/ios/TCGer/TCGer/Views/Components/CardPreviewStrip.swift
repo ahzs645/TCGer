@@ -119,18 +119,40 @@ struct MoreCardsIndicator: View {
         // With cards
         CardPreviewStrip(cards: [
             CollectionCard(
-                id: "1", cardId: "1", name: "Test", tcg: "yugioh",
-                setCode: nil, rarity: nil,
+                id: "1",
+                cardId: "1",
+                externalId: "preview-1",
+                name: "Test",
+                tcg: "yugioh",
+                setCode: nil,
+                setName: nil,
+                rarity: nil,
                 imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
                 imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
-                quantity: 1, price: nil, condition: nil, language: nil, notes: nil
+                quantity: 1,
+                price: nil,
+                condition: nil,
+                language: nil,
+                notes: nil,
+                collectorNumber: nil
             ),
             CollectionCard(
-                id: "2", cardId: "2", name: "Test 2", tcg: "yugioh",
-                setCode: nil, rarity: nil,
+                id: "2",
+                cardId: "2",
+                externalId: "preview-2",
+                name: "Test 2",
+                tcg: "yugioh",
+                setCode: nil,
+                setName: nil,
+                rarity: nil,
                 imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
                 imageUrlSmall: "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
-                quantity: 1, price: nil, condition: nil, language: nil, notes: nil
+                quantity: 1,
+                price: nil,
+                condition: nil,
+                language: nil,
+                notes: nil,
+                collectorNumber: nil
             )
         ])
 

@@ -86,8 +86,9 @@ struct EditCollectionCardSheet: View {
                     Section {
                         Button {
                             // Create a minimal Card object for print selection
+                            let externalCardId = card.externalId ?? card.cardId
                             selectedPrint = Card(
-                                id: card.cardId,
+                                id: externalCardId,
                                 name: card.name,
                                 tcg: card.tcg,
                                 setCode: card.setCode,

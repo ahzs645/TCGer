@@ -306,13 +306,14 @@ export function MockCollectionView() {
     let cancelled = false;
     setIsLoadingPrints(true);
     setPrintError(null);
-    fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: selectedCard.cardId })
+    const targetExternalId = selectedCard.externalId ?? selectedCard.cardId;
+    fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: targetExternalId })
       .then((prints) => {
         if (cancelled) {
           return;
         }
         setPrintOptions(prints);
-        const matching = prints.find((print) => print.id === selectedCard.cardId);
+        const matching = prints.find((print) => print.id === targetExternalId);
         setSelectedPrintCard(matching ?? prints[0] ?? null);
       })
       .catch((error) => {
@@ -335,7 +336,8 @@ export function MockCollectionView() {
     if (!isPrintDialogOpen || !printOptions || !selectedCard) {
       return;
     }
-    const matching = printOptions.find((print) => print.id === selectedCard.cardId);
+    const externalId = selectedCard.externalId ?? selectedCard.cardId;
+    const matching = printOptions.find((print) => print.id === externalId);
     setSelectedPrintCard(matching ?? printOptions[0] ?? null);
   }, [isPrintDialogOpen, printOptions, selectedCard]);
 
