@@ -76,7 +76,7 @@ export function MockDetailPanel({
   const [isImageOpen, setIsImageOpen] = useState(false);
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
   const showPricing = useModuleStore((state) => state.showPricing);
-  const supportsPrintSelection = card?.tcg === 'magic';
+  const supportsPrintSelection = card ? ['magic', 'pokemon'].includes(card.tcg) : false;
 
   if (!card) {
     return (
@@ -118,9 +118,9 @@ export function MockDetailPanel({
           </div>
           <div className="space-y-2">
             <CardTitle>{card.name}</CardTitle>
-            {showCardNumbers && (
+            {showCardNumbers && (card.setName || card.setCode) && (
               <p className="text-sm text-muted-foreground">
-                {card.setName ?? card.setCode} · #{card.cardId}
+                {card.setName ?? card.setCode}
               </p>
             )}
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
@@ -167,11 +167,8 @@ export function MockDetailPanel({
               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              Updates the printing for every copy of this card in the current binder.
+              {selectedCopy ? 'Updates the printing for this copy only.' : 'Select a copy to change its print.'}
             </p>
-            {!selectedCopy && (
-              <p className="text-[10px] text-muted-foreground">Select a specific copy to enable print changes.</p>
-            )}
           </div>
         ) : null}
       </CardHeader>

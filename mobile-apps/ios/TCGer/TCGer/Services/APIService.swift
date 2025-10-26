@@ -130,7 +130,31 @@ final class APIService {
             throw APIError.serverError(status: httpResponse.statusCode)
         }
 
-        guard let response = try? JSONDecoder().decode(CardSearchResponse.self, from: data) else {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // Try ISO8601 with time first
+            let iso8601Formatter = ISO8601DateFormatter()
+            if let date = iso8601Formatter.date(from: dateString) {
+                return date
+            }
+
+            // Try date-only format (YYYY-MM-DD)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
+        }
+
+        guard let response = try? decoder.decode(CardSearchResponse.self, from: data) else {
             throw APIError.decodingError
         }
 
@@ -158,7 +182,31 @@ final class APIService {
             let prints: [Card]
         }
 
-        guard let response = try? JSONDecoder().decode(PrintsResponse.self, from: data) else {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // Try ISO8601 with time first
+            let iso8601Formatter = ISO8601DateFormatter()
+            if let date = iso8601Formatter.date(from: dateString) {
+                return date
+            }
+
+            // Try date-only format (YYYY-MM-DD)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
+        }
+
+        guard let response = try? decoder.decode(PrintsResponse.self, from: data) else {
             throw APIError.decodingError
         }
 
@@ -348,11 +396,28 @@ final class APIService {
         }
     }
 
+    struct CardOverride: Encodable {
+        let cardId: String
+        let cardData: CardData?
+
+        struct CardData: Encodable {
+            let name: String
+            let tcg: String
+            let externalId: String
+            let setCode: String?
+            let setName: String?
+            let rarity: String?
+            let imageUrl: String?
+            let imageUrlSmall: String?
+        }
+    }
+
     struct UpdateCollectionCardRequest: Encodable {
         let quantity: Int?
         let condition: String?
         let language: String?
         let notes: String?
+        let cardOverride: CardOverride?
     }
 
     func addCardToBinder(
@@ -421,13 +486,34 @@ final class APIService {
         quantity: Int? = nil,
         condition: String? = nil,
         language: String? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        newPrint: Card? = nil
     ) async throws -> CollectionCard {
+        let cardOverride: CardOverride?
+        if let print = newPrint {
+            cardOverride = CardOverride(
+                cardId: print.id,
+                cardData: CardOverride.CardData(
+                    name: print.name,
+                    tcg: print.tcg,
+                    externalId: print.id,
+                    setCode: print.setCode,
+                    setName: print.setName,
+                    rarity: print.rarity,
+                    imageUrl: print.imageUrl,
+                    imageUrlSmall: print.imageUrlSmall
+                )
+            )
+        } else {
+            cardOverride = nil
+        }
+
         let body = UpdateCollectionCardRequest(
             quantity: quantity,
             condition: condition,
             language: language,
-            notes: notes
+            notes: notes,
+            cardOverride: cardOverride
         )
 
         let (data, httpResponse) = try await makeRequest(

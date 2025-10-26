@@ -322,7 +322,7 @@ struct CollectionDetailView: View {
                                         Text("Add Your First Card")
                                             .font(.headline)
                                     }
-                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 20)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .buttonBorderShape(.capsule)
@@ -441,15 +441,17 @@ struct CollectionDetailView: View {
                 EditCollectionCardSheet(
                     card: card,
                     isSaving: editingCardId == card.id
-                ) { quantity, condition, language, notes in
+                ) { quantity, condition, language, notes, newPrint in
                     await updateCard(
                         card: card,
                         quantity: quantity,
                         condition: condition,
                         language: language,
-                        notes: notes
+                        notes: notes,
+                        newPrint: newPrint
                     )
                 }
+                .environmentObject(environmentStore)
             }
             .sheet(item: $cardBeingMoved) { card in
                 MoveCardToBinderSheet(
@@ -588,7 +590,8 @@ struct CollectionDetailView: View {
         quantity: Int,
         condition: String?,
         language: String?,
-        notes: String?
+        notes: String?,
+        newPrint: Card?
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -606,7 +609,8 @@ struct CollectionDetailView: View {
                 quantity: quantity,
                 condition: condition,
                 language: language,
-                notes: notes
+                notes: notes,
+                newPrint: newPrint
             )
 
             if let index = cards.firstIndex(where: { $0.id == card.id }) {

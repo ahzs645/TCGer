@@ -14,6 +14,13 @@ import { useAuthStore } from '@/stores/auth';
 import type { Card } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
 
+const PRINT_SUPPORTED_GAMES: Card['tcg'][] = ['magic', 'pokemon'];
+const GAME_LABELS: Record<Card['tcg'], string> = {
+  magic: 'Magic: The Gathering',
+  pokemon: 'Pokémon',
+  yugioh: 'Yu-Gi-Oh!'
+};
+
 interface CardPreviewProps {
   card: Card;
 }
@@ -44,7 +51,7 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [selectedBinderId, setSelectedBinderId] = useState<string>(collections[0]?.id ?? '');
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const supportsPrintSelection = card.tcg === 'magic';
+  const supportsPrintSelection = PRINT_SUPPORTED_GAMES.includes(card.tcg);
   const [selectedPrintCard, setSelectedPrintCard] = useState<Card>(card);
   const [printOptions, setPrintOptions] = useState<Card[] | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -61,6 +68,7 @@ export function CardPreview({ card }: CardPreviewProps) {
         selectedPrintCard.collectorNumber ? ` · #${selectedPrintCard.collectorNumber}` : ''
       }`
     : '';
+  const currentGameLabel = GAME_LABELS[card.tcg];
 
   const formatPrintDetails = (print: Card) => {
     const parts: string[] = [];
@@ -299,7 +307,9 @@ export function CardPreview({ card }: CardPreviewProps) {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Select a print</DialogTitle>
-              <DialogDescription>Choose the exact Magic printing to add to your binder.</DialogDescription>
+              <DialogDescription>
+                Choose the exact {currentGameLabel} printing to add to your binder.
+              </DialogDescription>
             </DialogHeader>
             {isLoadingPrints ? (
               <div className="flex items-center justify-center py-10">

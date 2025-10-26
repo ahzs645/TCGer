@@ -29,6 +29,13 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         default: return tcg.capitalized
         }
     }
+
+    var supportsPrintSelection: Bool {
+        switch tcg.lowercased() {
+        case "magic", "pokemon": return true
+        default: return false
+        }
+    }
 }
 
 // MARK: - Search Response
@@ -76,6 +83,7 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let name: String
     let tcg: String
     let setCode: String?
+    let setName: String?
     let rarity: String?
     let imageUrl: String?
     let imageUrlSmall: String?
@@ -84,6 +92,14 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let condition: String?
     let language: String?
     let notes: String?
+    let collectorNumber: String?
+
+    var supportsPrintSelection: Bool {
+        switch tcg.lowercased() {
+        case "magic", "pokemon": return true
+        default: return false
+        }
+    }
 }
 
 // MARK: - App Settings

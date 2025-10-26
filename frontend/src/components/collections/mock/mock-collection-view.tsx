@@ -47,6 +47,12 @@ const DEFAULT_BINDER_COLORS = [
   '#A855F7'
 ] as const;
 
+const GAME_LABELS: Record<TcgCode, string> = {
+  magic: 'Magic: The Gathering',
+  pokemon: 'Pokémon',
+  yugioh: 'Yu-Gi-Oh!'
+};
+
 function normalizeHex(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -239,7 +245,8 @@ export function MockCollectionView() {
   }, [sortedCards]);
 
   const selectedCard = useMemo(() => sortedCards.find((card) => card.id === selectedCardId) ?? null, [sortedCards, selectedCardId]);
-  const supportsPrintSelection = selectedCard?.tcg === 'magic';
+  const currentGameLabel = selectedCard ? GAME_LABELS[selectedCard.tcg as TcgCode] ?? 'this card' : 'this card';
+  const supportsPrintSelection = selectedCard ? ['magic', 'pokemon'].includes(selectedCard.tcg) : false;
 
   useEffect(() => {
     setIsPrintDialogOpen(false);
@@ -355,8 +362,7 @@ export function MockCollectionView() {
     if (!selectedCard) {
       return 'Select a print';
     }
-    const base = selectedCard.setName ?? selectedCard.setCode ?? selectedCard.name;
-    return `${base}${selectedCard.cardId ? ` · #${selectedCard.cardId}` : ''}`;
+    return selectedCard.setName ?? selectedCard.setCode ?? selectedCard.name;
   }, [selectedCard]);
   const printSelectionDisabled = !selectedCopy || isLoadingPrints || isSavingPrintSelection || moveStatus === 'pending';
   const isPrintSaveDisabled =
@@ -906,7 +912,9 @@ export function MockCollectionView() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Select a print</DialogTitle>
-            <DialogDescription>Choose the exact Magic printing to keep your binder entry accurate.</DialogDescription>
+            <DialogDescription>
+              Choose the exact {currentGameLabel} printing to keep your binder entry accurate.
+            </DialogDescription>
           </DialogHeader>
           {isLoadingPrints ? (
             <div className="flex items-center justify-center py-10">

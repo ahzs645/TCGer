@@ -44,6 +44,10 @@ async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Resp
 
 interface PokemonSearchResponse {
   data: PokemonCard[];
+  page?: number;
+  pageSize?: number;
+  count?: number;
+  totalCount?: number;
 }
 
 interface TCGdexSearchResponse {
@@ -119,6 +123,7 @@ interface PokemonCard {
   set?: {
     id?: string;
     name?: string;
+    releaseDate?: string;
     images?: {
       logo?: string;
       symbol?: string;
@@ -133,6 +138,9 @@ interface PokemonCard {
 
 export class PokemonAdapter implements TcgAdapter {
   readonly game = 'pokemon' as const;
+
+  private static readonly MAX_PRINT_PAGE_SIZE = 250;
+  private static readonly MAX_PRINT_PAGES = 3;
 
   async searchCards(query: string): Promise<CardDTO[]> {
     const trimmedQuery = query.trim();
@@ -229,6 +237,61 @@ export class PokemonAdapter implements TcgAdapter {
     }
   }
 
+  async fetchCardPrints(externalId: string): Promise<CardDTO[]> {
+    const trimmedId = externalId.trim();
+    if (!trimmedId) {
+      return [];
+    }
+
+    try {
+      if (isTCGdex) {
+        const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`);
+        if (!response.ok) {
+          return [];
+        }
+        const payload = (await response.json()) as { data: TCGdexCardDetail };
+        const detail = payload?.data;
+        if (!detail?.name) {
+          return detail ? [this.mapTCGdexDetailCard(detail)] : [];
+        }
+        const prints = await this.fetchTCGdexPrintsByName(detail.name);
+        if (!prints.length) {
+          return [this.mapTCGdexDetailCard(detail)];
+        }
+        const normalizedName = this.normalizeName(detail.name);
+        const narrowed = this.filterPrintsByName(prints, normalizedName);
+        const dataset = narrowed.length ? narrowed : prints;
+        return this.deduplicateCards(this.sortByReleaseDate(dataset));
+      }
+
+      const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`, {
+        headers: this.buildHeaders()
+      });
+      if (!response.ok) {
+        return [];
+      }
+      const payload = (await response.json()) as { data: PokemonCard };
+      const detail = payload?.data;
+      if (!detail?.name) {
+        return detail ? [this.mapCard(detail)] : [];
+      }
+      const prints = await this.fetchPokemonPrintsByName(detail.name);
+      if (!prints.length) {
+        return [this.mapCard(detail)];
+      }
+      const ensured = prints.some((entry) => entry.id === detail.id)
+        ? prints
+        : [this.mapCard(detail), ...prints];
+      const normalizedName = this.normalizeName(detail.name);
+      const narrowed = this.filterPrintsByName(ensured, normalizedName);
+      const dataset = narrowed.length ? narrowed : ensured;
+      return this.deduplicateCards(this.sortByReleaseDate(dataset));
+    } catch (error) {
+      console.error('PokemonAdapter.fetchCardPrints error', error);
+      return [];
+    }
+  }
+
   private mapTCGdexCard(card: TCGdexCardSummary): CardDTO {
     // For search results, we only have summary data
     // TCGdex image URLs need /high.webp or /low.webp suffix
@@ -239,6 +302,7 @@ export class PokemonAdapter implements TcgAdapter {
       id: card.id,
       tcg: this.game,
       name: card.name,
+      collectorNumber: card.localId,
       imageUrl,
       imageUrlSmall,
       attributes: {}
@@ -260,6 +324,7 @@ export class PokemonAdapter implements TcgAdapter {
       setCode: card.set?.id,
       setName: card.set?.name,
       rarity,
+      collectorNumber: card.localId ?? card.id,
       imageUrl,
       imageUrlSmall,
       setSymbolUrl: card.set?.symbol ?? card.set?.logo,
@@ -287,6 +352,8 @@ export class PokemonAdapter implements TcgAdapter {
       setCode: card.set?.id,
       setName: card.set?.name,
       rarity: card.rarity,
+      collectorNumber: card.number,
+      releasedAt: card.set?.releaseDate,
       imageUrl: card.images?.large ?? card.images?.small,
       imageUrlSmall: card.images?.small ?? card.images?.large,
       setSymbolUrl: setSymbol,
@@ -328,6 +395,8 @@ export class PokemonAdapter implements TcgAdapter {
       setCode: 'xy7',
       setName: 'Ancient Origins',
       rarity: 'Common',
+      collectorNumber: '54',
+      releasedAt: '2015-08-12',
       imageUrl: 'https://images.pokemontcg.io/xy7/54_hires.png',
       imageUrlSmall: 'https://images.pokemontcg.io/xy7/54.png',
       setSymbolUrl: 'https://images.pokemontcg.io/xy7/symbol.png',
@@ -340,5 +409,131 @@ export class PokemonAdapter implements TcgAdapter {
         flavorText: 'It occasionally uses an electric shock to recharge a fellow Pikachu that is in a weakened state.'
       }
     };
+  }
+
+  private async fetchPokemonPrintsByName(name: string): Promise<CardDTO[]> {
+    const safeName = name.trim();
+    if (!safeName) {
+      return [];
+    }
+
+    const prints: CardDTO[] = [];
+    const pageSize = PokemonAdapter.MAX_PRINT_PAGE_SIZE;
+    let page = 1;
+
+    while (page <= PokemonAdapter.MAX_PRINT_PAGES) {
+      const url = new URL(CARDS_ENDPOINT);
+      url.searchParams.set('q', this.buildNameQuery(safeName));
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('pageSize', String(pageSize));
+      url.searchParams.set('orderBy', '-set.releaseDate,-number');
+
+      const response = await rateLimitedFetch(url.toString(), {
+        headers: this.buildHeaders()
+      });
+      if (!response.ok) {
+        break;
+      }
+      const payload = (await response.json()) as PokemonSearchResponse;
+      const data = payload.data ?? [];
+      if (!data.length) {
+        break;
+      }
+      prints.push(...data.map((entry) => this.mapCard(entry)));
+
+      const total = payload.totalCount ?? data.length;
+      if (prints.length >= total || data.length < pageSize) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return this.deduplicateCards(prints);
+  }
+
+  private async fetchTCGdexPrintsByName(name: string): Promise<CardDTO[]> {
+    const safeName = name.trim();
+    if (!safeName) {
+      return [];
+    }
+
+    const prints: CardDTO[] = [];
+    let page = 1;
+    const pageSize = 60;
+
+    while (page <= PokemonAdapter.MAX_PRINT_PAGES) {
+      const url = new URL(CARDS_ENDPOINT);
+      url.searchParams.set('q', safeName);
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('pageSize', String(pageSize));
+
+      const response = await rateLimitedFetch(url.toString());
+      if (!response.ok) {
+        break;
+      }
+      const payload = (await response.json()) as TCGdexSearchResponse;
+      const data = payload.data ?? [];
+      if (!data.length) {
+        break;
+      }
+
+      const detailed = await Promise.all(
+        data.map(async (entry) => {
+          try {
+            const detail = await rateLimitedFetch(`${CARDS_ENDPOINT}/${entry.id}`);
+            if (!detail.ok) {
+              return this.mapTCGdexCard(entry);
+            }
+            const detailPayload = (await detail.json()) as { data: TCGdexCardDetail };
+            return detailPayload?.data ? this.mapTCGdexDetailCard(detailPayload.data) : this.mapTCGdexCard(entry);
+          } catch (error) {
+            console.error(`Failed to fetch TCGdex print ${entry.id}`, error);
+            return this.mapTCGdexCard(entry);
+          }
+        })
+      );
+
+      prints.push(...detailed);
+
+      const total = payload.totalCount ?? data.length;
+      if (prints.length >= total || data.length < pageSize) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return this.deduplicateCards(prints);
+  }
+
+  private deduplicateCards(cards: CardDTO[]): CardDTO[] {
+    const seen = new Set<string>();
+    return cards.filter((card) => {
+      if (seen.has(card.id)) {
+        return false;
+      }
+      seen.add(card.id);
+      return true;
+    });
+  }
+
+  private sortByReleaseDate(cards: CardDTO[]): CardDTO[] {
+    return [...cards].sort((a, b) => {
+      const left = a.releasedAt ? Date.parse(a.releasedAt) : 0;
+      const right = b.releasedAt ? Date.parse(b.releasedAt) : 0;
+      return right - left;
+    });
+  }
+
+  private filterPrintsByName(cards: CardDTO[], normalizedName: string): CardDTO[] {
+    if (!normalizedName) {
+      return cards;
+    }
+    return cards.filter((card) => this.normalizeName(card.name) === normalizedName);
+  }
+
+  private normalizeName(name?: string): string {
+    return (name ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 }
