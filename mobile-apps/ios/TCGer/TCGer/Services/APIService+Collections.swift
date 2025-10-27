@@ -49,6 +49,19 @@ extension APIService {
             try? CacheManager.shared.save(collections, forKey: CacheManager.CacheKey.collections)
             CacheManager.shared.updateLastSyncDate()
 
+            var imageURLs: [String] = []
+            for collection in collections {
+                for card in collection.cards {
+                    if let small = card.imageUrlSmall {
+                        imageURLs.append(small)
+                    }
+                    if let large = card.imageUrl, large != card.imageUrlSmall {
+                        imageURLs.append(large)
+                    }
+                }
+            }
+            ImageCache.shared.prefetch(urlStrings: imageURLs)
+
             return collections
         } catch {
             if let cached: [Collection] = try? CacheManager.shared.load(
@@ -344,11 +357,18 @@ extension APIService {
 
         let (data, response) = try await execute(request)
 
+        if response.statusCode == 401 {
+            throw APIError.unauthorized
+        }
+
         guard response.statusCode == 200 else {
-            if response.statusCode == 401 {
-                throw APIError.unauthorized
+            let serverMessage = parseServerMessage(from: data)
+#if DEBUG
+            if let serverMessage {
+                print("updateCardInBinder failed with status \(response.statusCode): \(serverMessage)")
             }
-            throw APIError.serverError(status: response.statusCode)
+#endif
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
         }
 
         guard let card = try? JSONDecoder().decode(CollectionCard.self, from: data) else {

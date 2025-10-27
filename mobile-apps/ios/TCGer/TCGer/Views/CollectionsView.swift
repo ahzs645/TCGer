@@ -93,8 +93,11 @@ struct CollectionsView: View {
             return
         }
 
-        isLoading = true
-        errorMessage = nil
+        let shouldShowLoading = collections.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+            errorMessage = nil
+        }
 
         do {
             collections = try await apiService.getCollections(
@@ -103,8 +106,11 @@ struct CollectionsView: View {
                 useCache: environmentStore.offlineModeEnabled
             )
             isLoading = false
+            errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if shouldShowLoading {
+                errorMessage = error.localizedDescription
+            }
             isLoading = false
         }
     }

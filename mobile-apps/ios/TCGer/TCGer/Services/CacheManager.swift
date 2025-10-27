@@ -56,6 +56,8 @@ final class CacheManager {
             try fileManager.removeItem(at: fileURL)
         }
 
+        ImageCache.shared.clearAll()
+
         // Clear all cache timestamps
         let keys = UserDefaults.standard.dictionaryRepresentation().keys
         for key in keys where key.hasPrefix("lastCacheUpdate_") {
@@ -66,17 +68,25 @@ final class CacheManager {
     }
 
     func getCacheSize() -> Int64 {
-        var totalSize: Int64 = 0
-
-        guard let contents = try? fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: [.fileSizeKey]) else {
+        guard let enumerator = fileManager.enumerator(
+            at: cacheDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else {
             return 0
         }
 
-        for fileURL in contents {
-            if let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
-               let fileSize = resourceValues.fileSize {
-                totalSize += Int64(fileSize)
+        var totalSize: Int64 = 0
+
+        for case let fileURL as URL in enumerator {
+            guard
+                let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                resourceValues.isRegularFile == true,
+                let fileSize = resourceValues.fileSize
+            else {
+                continue
             }
+            totalSize += Int64(fileSize)
         }
 
         return totalSize

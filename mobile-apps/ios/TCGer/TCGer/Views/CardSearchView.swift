@@ -71,8 +71,10 @@ struct CardSearchView: View {
                             selectedCard = card
                             // Cards with multiple printings (e.g., Magic, Pokémon) open the selector first
                             if card.supportsPrintSelection {
-                                selectedPrint = card
+                                selectedPrint = nil
                                 showingPrintSelection = true
+                            } else {
+                                selectedPrint = nil
                             }
                         }
                     )
@@ -84,11 +86,15 @@ struct CardSearchView: View {
                 Task { await performSearch() }
             }
             .sheet(isPresented: $showingPrintSelection) {
-                if let card = selectedCard, let print = selectedPrint {
-                    SelectPrintSheet(card: card, selectedPrint: Binding(
-                        get: { print },
-                        set: { selectedPrint = $0 }
-                    ))
+                if let card = selectedCard {
+                    SelectPrintSheet(
+                        card: card,
+                        selectedPrint: $selectedPrint,
+                        onCancel: {
+                            selectedPrint = nil
+                            selectedCard = nil
+                        }
+                    )
                     .environmentObject(environmentStore)
                 }
             }
@@ -330,7 +336,7 @@ private struct CardCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Card Image
-            AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+            CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()

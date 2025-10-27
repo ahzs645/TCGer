@@ -4,7 +4,7 @@ final class APIService {
     enum APIError: Error, LocalizedError {
         case invalidURL
         case unauthorized
-        case serverError(status: Int)
+        case serverError(status: Int, message: String? = nil)
         case decodingError
         case networkError(Error)
 
@@ -14,7 +14,10 @@ final class APIService {
                 return "The server address appears to be invalid."
             case .unauthorized:
                 return "The server rejected your credentials."
-            case .serverError(let status):
+            case .serverError(let status, let message):
+                if let message, !message.isEmpty {
+                    return "Server error (\(status)): \(message)"
+                }
                 return "Server responded with status code \(status)."
             case .decodingError:
                 return "Unexpected response from the server."
@@ -61,12 +64,29 @@ final class APIService {
         do {
             let (data, response) = try await session.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.serverError(status: -1)
+                throw APIError.serverError(status: -1, message: nil)
             }
             return (data, httpResponse)
         } catch {
             throw APIError.networkError(error)
         }
+    }
+
+    func parseServerMessage(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        if let json = try? JSONSerialization.jsonObject(with: data, options: []),
+           let dict = json as? [String: Any] {
+            if let message = dict["message"] as? String, !message.isEmpty {
+                return message
+            }
+            if let error = dict["error"] as? String, !error.isEmpty {
+                return error
+            }
+        }
+
+        let fallback = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return fallback?.isEmpty == false ? fallback : nil
     }
 }
 

@@ -213,15 +213,27 @@ struct CollectionDetailView: View {
                         copyDetails: context.copy,
                         isSaving: editingCardId == context.collectionEntryId
                     ) { payload in
-                        await updateCard(
-                            card: context.card,
-                            collectionEntryId: context.collectionEntryId,
-                            quantity: context.canEditQuantity ? payload.quantity : nil,
-                            condition: payload.condition,
-                            language: payload.language,
-                            notes: payload.notes,
-                            newPrint: payload.selectedPrint
+#if DEBUG
+                        print(
+                            "CollectionDetailView.onSave payload -> quantity:\(payload.quantity) " +
+                            "condition:\(payload.condition ?? "nil") " +
+                            "language:\(payload.language ?? "nil") " +
+                            "notes:\(payload.notes ?? "nil") " +
+                            "print:\(payload.selectedPrint?.id ?? "nil") " +
+                            "canEditQuantity:\(context.canEditQuantity)"
                         )
+#endif
+                        Task {
+                            await updateCard(
+                                card: context.card,
+                                collectionEntryId: context.collectionEntryId,
+                                quantity: context.canEditQuantity ? payload.quantity : nil,
+                                condition: payload.condition,
+                                language: payload.language,
+                                notes: payload.notes,
+                                newPrint: payload.selectedPrint
+                            )
+                        }
                     }
                     .environmentObject(environmentStore)
                 }
