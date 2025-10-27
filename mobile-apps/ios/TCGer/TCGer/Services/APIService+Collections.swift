@@ -314,6 +314,10 @@ extension APIService {
             cardOverride = nil
         }
 
+
+#if DEBUG
+        print("UpdateCardInBinder -> binderId:\(binderId) cardId:\(collectionCardId) quantity:\(String(describing: quantity)) condition:\(condition ?? "nil") language:\(language ?? "nil") notes:\(notes ?? "nil") targetBinder:\(targetBinderId ?? "nil")")
+#endif
         let body = UpdateCollectionCardRequest(
             quantity: quantity,
             condition: condition,
@@ -323,13 +327,20 @@ extension APIService {
             targetBinderId: targetBinderId
         )
 
-        let (data, response) = try await makeRequest(
-            config: config,
-            path: "collections/\(binderId)/cards/\(collectionCardId)",
-            method: "PATCH",
-            token: token,
-            body: body
-        )
+        guard let url = config.endpoint(path: "collections/\(binderId)/cards/\(collectionCardId)") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(body)
+
+        let (data, response) = try await execute(request)
 
         guard response.statusCode == 200 else {
             if response.statusCode == 401 {

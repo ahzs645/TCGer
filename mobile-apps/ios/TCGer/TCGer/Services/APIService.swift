@@ -25,11 +25,9 @@ final class APIService {
     }
 
     private let session: URLSession
-    private let encoder: JSONEncoder
 
-    init(session: URLSession = .shared, encoder: JSONEncoder = JSONEncoder()) {
+    init(session: URLSession = .shared) {
         self.session = session
-        self.encoder = encoder
     }
 
     func makeRequest(
@@ -52,6 +50,7 @@ final class APIService {
         }
 
         if let body {
+            let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(AnyEncodable(erasing: body))
         }
 
