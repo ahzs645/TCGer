@@ -81,20 +81,22 @@ final class ImageCache {
 
             for url in unique {
                 if Task.isCancelled { return }
-                if self.hasImage(for: url) { continue }
-                if !NetworkMonitor.shared.isConnected {
-                    return
-                }
+                let alreadyCached = await MainActor.run { self.hasImage(for: url) }
+                if alreadyCached { continue }
+                let connected = await MainActor.run { NetworkMonitor.shared.isConnected }
+                if !connected { return }
 
                 do {
                     let (data, response) = try await URLSession.shared.data(from: url)
                     guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                         continue
                     }
-                    guard let image = UIImage(data: data) else {
+                    guard let image = await MainActor.run(body: { UIImage(data: data) }) else {
                         continue
                     }
-                    self.store(image, data: data, for: url)
+                    await MainActor.run {
+                        self.store(image, data: data, for: url)
+                    }
                 } catch {
                     continue
                 }

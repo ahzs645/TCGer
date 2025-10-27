@@ -16,11 +16,16 @@ struct SelectPrintSheet: View {
     init(
         card: Card,
         selectedPrint: Binding<Card?>,
+        initialPrints: [Card]? = nil,
         onCancel: (() -> Void)? = nil
     ) {
         self.card = card
         self._selectedPrint = selectedPrint
         self.onCancel = onCancel
+        if let initialPrints {
+            self._prints = State(initialValue: initialPrints)
+            self._isLoading = State(initialValue: false)
+        }
     }
 
     var body: some View {
@@ -67,7 +72,14 @@ struct SelectPrintSheet: View {
             }
         }
         .task {
-            await loadPrints()
+            if isLoading {
+                await loadPrints()
+            } else if prints.count <= 1 {
+                if selectedPrint == nil {
+                    selectedPrint = prints.first ?? card
+                }
+                dismiss()
+            }
         }
     }
 

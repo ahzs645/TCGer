@@ -12,6 +12,7 @@ struct CardSearchView: View {
     @State private var addCardSuccessMessage: String?
     @State private var showingPrintSelection = false
     @State private var selectedPrint: Card?
+    @State private var currentPrintOptions: [Card] = []
 
     private let apiService = APIService()
 
@@ -68,14 +69,7 @@ struct CardSearchView: View {
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
-                            selectedCard = card
-                            // Cards with multiple printings (e.g., Magic, Pokémon) open the selector first
-                            if card.supportsPrintSelection {
-                                selectedPrint = nil
-                                showingPrintSelection = true
-                            } else {
-                                selectedPrint = nil
-                            }
+                            Task { await handleCardSelection(card) }
                         }
                     )
                 }
@@ -90,9 +84,11 @@ struct CardSearchView: View {
                     SelectPrintSheet(
                         card: card,
                         selectedPrint: $selectedPrint,
+                        initialPrints: currentPrintOptions,
                         onCancel: {
                             selectedPrint = nil
                             selectedCard = nil
+                            currentPrintOptions = []
                         }
                     )
                     .environmentObject(environmentStore)
@@ -108,6 +104,7 @@ struct CardSearchView: View {
             .sheet(item: $selectedCard, onDismiss: {
                 // Clean up state when sheet is dismissed
                 selectedPrint = nil
+                currentPrintOptions = []
             }) { card in
                 // Cards that support print selection only proceed once the picker is complete
                 let requiresPrintSelection = card.supportsPrintSelection
@@ -153,6 +150,68 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
+        }
+    }
+
+    private func handleCardSelection(_ card: Card) async {
+        if card.supportsPrintSelection {
+            await preparePrintSelection(for: card)
+        } else {
+            await MainActor.run {
+                currentPrintOptions = []
+                selectedPrint = nil
+                selectedCard = card
+                showingPrintSelection = false
+            }
+        }
+    }
+
+    private func preparePrintSelection(for card: Card) async {
+        await MainActor.run {
+            selectedCard = card
+            selectedPrint = nil
+            currentPrintOptions = []
+            showingPrintSelection = false
+        }
+
+        guard let token = environmentStore.authToken else {
+            await MainActor.run {
+                errorMessage = "Not authenticated"
+                selectedCard = nil
+            }
+            return
+        }
+
+        do {
+            let prints = try await apiService.getCardPrints(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                tcg: card.tcg,
+                cardId: card.id
+            )
+
+            await MainActor.run {
+                guard selectedCard?.id == card.id else { return }
+
+                currentPrintOptions = prints
+                selectedPrint = prints.first ?? card
+
+                if prints.count <= 1 {
+                    showingPrintSelection = false
+                } else {
+                    showingPrintSelection = true
+                }
+            }
+        } catch {
+            await MainActor.run {
+                if selectedCard?.id == card.id {
+                    errorMessage = error.localizedDescription
+                    selectedCard = nil
+                    selectedPrint = nil
+                    currentPrintOptions = []
+                    showingPrintSelection = false
+                }
+            }
         }
     }
 
