@@ -1,117 +1,6 @@
 import SwiftUI
 
-/// A reusable container that manages presenting full-screen card artwork previews
-/// triggered from thumbnails within its content. Any view that needs long-press
-/// card previews can wrap its layout in this container and receive the tools it
-/// needs to control the preview state.
-struct CardPreviewContainer<Content: View>: View {
-    private let content: (_ previewedCard: Card?, _ namespace: Namespace.ID, _ setPreview: @escaping (Card?) -> Void) -> Content
-
-    @State private var previewedCard: Card?
-    @Namespace private var namespace
-
-    init(@ViewBuilder content: @escaping (_ previewedCard: Card?, _ namespace: Namespace.ID, _ setPreview: @escaping (Card?) -> Void) -> Content) {
-        self.content = content
-    }
-
-    var body: some View {
-        ZStack {
-            content(previewedCard, namespace) { target in
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    previewedCard = target
-                }
-            }
-            .zIndex(0)
-            .allowsHitTesting(previewedCard == nil)
-
-            if let card = previewedCard {
-                CardPreviewOverlay(card: card, namespace: namespace) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        previewedCard = nil
-                    }
-                }
-                .transition(.opacity)
-                .zIndex(1)
-            }
-        }
-    }
-}
-
-/// Full-screen presentation for an enlarged card image, using matched geometry
-/// so the thumbnail seamlessly expands into place.
-struct CardPreviewOverlay: View {
-    let card: Card
-    let namespace: Namespace.ID
-    let onDismiss: () -> Void
-    @EnvironmentObject private var environmentStore: EnvironmentStore
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Color.black.opacity(0.35))
-                    .ignoresSafeArea()
-                    .onTapGesture { onDismiss() }
-
-                VStack(spacing: 24) {
-                    Spacer(minLength: 32)
-
-                    CardArtworkImage(card: card, useFullResolution: true)
-                        .matchedGeometryEffect(id: card.id, in: namespace)
-                        .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
-                        .frame(maxWidth: min(proxy.size.width - 64, 360))
-
-                    VStack(spacing: 6) {
-                        Text(card.name)
-                            .font(.title3.weight(.semibold))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-
-                        if let set = card.setName ?? card.setCode {
-                            Text(set)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.75))
-                        }
-
-                        if let details = supplementaryDetails, !details.isEmpty {
-                            Text(details)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                                .padding(.top, 6)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    Spacer()
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding()
-                }
-                .accessibilityLabel("Close preview")
-            }
-        }
-    }
-
-    private var supplementaryDetails: String? {
-        var parts: [String] = []
-        if let rarity = card.rarity {
-            parts.append(rarity)
-        }
-        if environmentStore.showCardNumbers, let collectorNumber = card.collectorNumber {
-            parts.append("#\(collectorNumber)")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " • ")
-    }
-}
-
-/// Shared artwork loader with consistent styling used for both thumbnails and previews.
+/// Shared card artwork loader used anywhere we need a consistent card image rendering.
 struct CardArtworkImage: View {
     let card: Card
     let useFullResolution: Bool
@@ -153,5 +42,54 @@ struct CardArtworkImage: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// A reusable preview view shown when the system context menu presents card artwork.
+struct CardPreviewContextView: View {
+    let card: Card
+
+    var body: some View {
+        GeometryReader { proxy in
+            let availableWidth = proxy.size.width
+            let availableHeight = proxy.size.height
+
+            // Provide sensible bounds so the preview feels full-size without exceeding the menu.
+            let maxWidth = min(max(availableWidth - 48, 300), 360)
+            let maxHeight = min(max(availableHeight - 48, 420), 520)
+            let widthFromHeight = maxHeight * 0.72
+            let targetWidth = min(maxWidth, widthFromHeight)
+            let targetHeight = targetWidth / 0.72
+
+            CardArtworkImage(card: card, useFullResolution: true)
+                .aspectRatio(0.72, contentMode: .fit)
+                .frame(width: targetWidth, height: targetHeight)
+                .shadow(color: .black.opacity(0.25), radius: 18, y: 10)
+                .padding(28)
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
+        }
+        .frame(minWidth: 320, idealWidth: 340, maxWidth: 380, minHeight: 420, idealHeight: 460, maxHeight: 520)
+    }
+}
+
+private struct CardPreviewContextMenuModifier: ViewModifier {
+    let card: Card
+    let onSelect: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            if let onSelect {
+                Button("Select this print", action: onSelect)
+            }
+        } preview: {
+            CardPreviewContextView(card: card)
+        }
+    }
+}
+
+extension View {
+    /// Attaches a context menu preview for the given card, using an optional selection action.
+    func cardPreviewContextMenu(card: Card, onSelect: (() -> Void)? = nil) -> some View {
+        modifier(CardPreviewContextMenuModifier(card: card, onSelect: onSelect))
     }
 }

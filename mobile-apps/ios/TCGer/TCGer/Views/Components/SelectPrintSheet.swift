@@ -10,7 +10,6 @@ struct SelectPrintSheet: View {
     @State private var prints: [Card] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var clearPreview: (() -> Void)?
 
     private let apiService = APIService()
 
@@ -30,75 +29,57 @@ struct SelectPrintSheet: View {
     }
 
     var body: some View {
-        CardPreviewContainer { previewedCard, previewNamespace, setPreview in
-            NavigationView {
-                Group {
-                    if isLoading {
-                        ProgressView("Loading prints...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if let error = errorMessage {
-                        ErrorView(message: error)
-                    } else if prints.isEmpty {
-                        EmptyPrintsView()
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(prints) { print in
-                                    PrintRow(
-                                        print: print,
-                                        isSelected: selectedPrint?.id == print.id,
-                                        isPreviewing: previewedCard?.id == print.id,
-                                        namespace: previewNamespace,
-                                        onTap: {
-                                            selectedPrint = print
-                                        },
-                                        onPreview: {
-                                            setPreview(print)
-                                        }
-                                    )
-                                }
-                            }
-                            .padding()
-                        }
-                    }
-                }
-                .navigationTitle("Select a Print")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            clearPreview?()
-                            onCancel?()
-                            dismiss()
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Use This Print") {
-                            clearPreview?()
-                            dismiss()
-                        }
-                        .disabled(isLoading || selectedPrint == nil)
-                    }
-                }
-            }
-            .task {
+        NavigationView {
+            Group {
                 if isLoading {
-                    await loadPrints()
-                } else if prints.count <= 1 {
-                    if selectedPrint == nil {
-                        selectedPrint = prints.first ?? card
+                    ProgressView("Loading prints...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = errorMessage {
+                    ErrorView(message: error)
+                } else if prints.isEmpty {
+                    EmptyPrintsView()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(prints) { print in
+                                PrintRow(
+                                    print: print,
+                                    isSelected: selectedPrint?.id == print.id,
+                                    onTap: {
+                                        selectedPrint = print
+                                    }
+                                )
+                            }
+                        }
+                        .padding()
                     }
-                    clearPreview?()
-                    dismiss()
                 }
             }
-            .onAppear {
-                clearPreview = {
-                    setPreview(nil)
+            .navigationTitle("Select a Print")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel?()
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Use This Print") {
+                        dismiss()
+                    }
+                    .disabled(isLoading || selectedPrint == nil)
                 }
             }
-            .onDisappear {
-                clearPreview = nil
+        }
+        .task {
+            if isLoading {
+                await loadPrints()
+            } else if prints.count <= 1 {
+                if selectedPrint == nil {
+                    selectedPrint = prints.first ?? card
+                }
+                dismiss()
             }
         }
     }
@@ -135,7 +116,6 @@ struct SelectPrintSheet: View {
                 if selectedPrint == nil {
                     selectedPrint = prints.first ?? card
                 }
-                clearPreview?()
                 dismiss()
             }
         } catch {
@@ -149,10 +129,7 @@ struct SelectPrintSheet: View {
 private struct PrintRow: View {
     let print: Card
     let isSelected: Bool
-    let isPreviewing: Bool
-    let namespace: Namespace.ID
     let onTap: () -> Void
-    let onPreview: () -> Void
 
     private var printDetails: String {
         var parts: [String] = []
@@ -178,7 +155,6 @@ private struct PrintRow: View {
     var body: some View {
         HStack(spacing: 12) {
             CardArtworkImage(card: print, useFullResolution: false)
-                .matchedGeometryEffect(id: print.id, in: namespace, isSource: !isPreviewing)
                 .frame(width: 44, height: 64)
 
             // Print info
@@ -212,14 +188,8 @@ private struct PrintRow: View {
                 .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .contentShape(Rectangle())
-        .onTapGesture {
-            if !isPreviewing {
-                onTap()
-            }
-        }
-        .onLongPressGesture(minimumDuration: 0.45) {
-            onPreview()
-        }
+        .onTapGesture(perform: onTap)
+        .cardPreviewContextMenu(card: print, onSelect: onTap)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to choose this print. Long press to preview the artwork.")
