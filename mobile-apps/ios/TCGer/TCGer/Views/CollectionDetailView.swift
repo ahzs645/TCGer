@@ -212,16 +212,15 @@ struct CollectionDetailView: View {
                         isIndividualCopy: !context.canEditQuantity,
                         copyDetails: context.copy,
                         isSaving: editingCardId == context.collectionEntryId
-                    ) { quantity, condition, language, notes, newPrint in
+                    ) { payload in
                         await updateCard(
                             card: context.card,
                             collectionEntryId: context.collectionEntryId,
-                            quantity: context.canEditQuantity ? quantity : nil,
-                            condition: condition,
-                            language: language,
-                            notes: notes,
-                            newPrint: newPrint,
-                            shouldUpdateQuantity: context.canEditQuantity
+                            quantity: context.canEditQuantity ? payload.quantity : nil,
+                            condition: payload.condition,
+                            language: payload.language,
+                            notes: payload.notes,
+                            newPrint: payload.selectedPrint
                         )
                     }
                     .environmentObject(environmentStore)
@@ -393,8 +392,7 @@ struct CollectionDetailView: View {
         condition: String?,
         language: String?,
         notes: String?,
-        newPrint: Card?,
-        shouldUpdateQuantity: Bool
+        newPrint: Card?
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -412,7 +410,7 @@ struct CollectionDetailView: View {
                 token: token,
                 binderId: collection.id,
                 collectionCardId: collectionEntryId,
-                quantity: shouldUpdateQuantity ? quantity : nil,
+                quantity: quantity,
                 condition: condition,
                 language: language,
                 notes: notes,
@@ -480,7 +478,7 @@ struct CollectionDetailView: View {
 
         do {
             for copyId in selectedCopyIds {
-                try await apiService.updateCardInBinder(
+                _ = try await apiService.updateCardInBinder(
                     config: environmentStore.serverConfiguration,
                     token: token,
                     binderId: collection.id,

@@ -4,11 +4,19 @@ struct EditCollectionCardSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
+    struct SavePayload: Sendable {
+        let quantity: Int
+        let condition: String?
+        let language: String?
+        let notes: String?
+        let selectedPrint: Card?
+    }
+
     let card: CollectionCard
     let isIndividualCopy: Bool
     let copyDetails: CollectionCardCopy?
     let isSaving: Bool
-    let onSave: (Int, String?, String?, String?, Card?) async -> Void
+    let onSave: (SavePayload) async -> Void
 
     @State private var quantity: Int
     @State private var conditionSelection: String
@@ -52,7 +60,7 @@ struct EditCollectionCardSheet: View {
         isIndividualCopy: Bool = false,
         copyDetails: CollectionCardCopy? = nil,
         isSaving: Bool,
-        onSave: @escaping (Int, String?, String?, String?, Card?) async -> Void
+        onSave: @escaping (SavePayload) async -> Void
     ) {
         self.card = card
         self.isIndividualCopy = isIndividualCopy
@@ -223,15 +231,19 @@ struct EditCollectionCardSheet: View {
                         let languageToSave = languageSelection.trimmingCharacters(in: .whitespacesAndNewlines)
                         let notesToSave = notes.trimmingCharacters(in: .whitespacesAndNewlines)
                         let selectedPrintToSave = selectedPrint
+                        let payload = SavePayload(
+                            quantity: quantityToSave,
+                            condition: conditionToSave.isEmpty ? nil : conditionToSave,
+                            language: languageToSave.isEmpty ? nil : languageToSave,
+                            notes: notesToSave.isEmpty ? nil : notesToSave,
+                            selectedPrint: selectedPrintToSave
+                        )
+#if DEBUG
+                        print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") print:\(payload.selectedPrint?.id ?? "nil")")
+#endif
 
                         Task {
-                            await onSave(
-                                quantityToSave,
-                                conditionToSave.isEmpty ? nil : conditionToSave,
-                                languageToSave.isEmpty ? nil : languageToSave,
-                                notesToSave.isEmpty ? nil : notesToSave,
-                                selectedPrintToSave
-                            )
+                            await onSave(payload)
                         }
                     }
                     .disabled(isSaving)

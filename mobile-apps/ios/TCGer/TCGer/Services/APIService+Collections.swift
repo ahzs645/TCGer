@@ -41,7 +41,8 @@ extension APIService {
                 throw APIError.serverError(status: response.statusCode)
             }
 
-            guard let collections = try? JSONDecoder().decode([Collection].self, from: data) else {
+            let decoder = JSONDecoder()
+            guard let collections = try? decoder.decode([StableCollection].self, from: data).map({ $0.asModel() }) else {
                 throw APIError.decodingError
             }
 
@@ -78,7 +79,8 @@ extension APIService {
             throw APIError.serverError(status: response.statusCode)
         }
 
-        guard let collection = try? JSONDecoder().decode(Collection.self, from: data) else {
+        let decoder = JSONDecoder()
+        guard let collection = try? decoder.decode(StableCollection.self, from: data).asModel() else {
             throw APIError.decodingError
         }
 
