@@ -336,9 +336,7 @@ private struct SearchResultsList: View {
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
                                 CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
-                                    .onTapGesture {
-                                        onCardTap(card)
-                                    }
+                                    .cardPreviewContextMenu(card: card, onSelect: { onCardTap(card) })
                             }
                         }
                     } header: {

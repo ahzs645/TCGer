@@ -3,17 +3,15 @@ import SwiftUI
 struct CollectionCardRow: View {
     let card: CollectionCard
     let showPricing: Bool
-    let onTap: (() -> Void)?
 
     private let conditionPriority = [
         "GEM MINT", "MINT", "NEAR MINT", "NM", "LIGHTLY PLAYED", "LP",
         "MODERATE PLAY", "MP", "HEAVY PLAY", "HP", "DAMAGED", "DMG", "POOR"
     ]
 
-    init(card: CollectionCard, showPricing: Bool, onTap: (() -> Void)? = nil) {
+    init(card: CollectionCard, showPricing: Bool) {
         self.card = card
         self.showPricing = showPricing
-        self.onTap = onTap
     }
 
     private func normalized(_ value: String?) -> String? {
@@ -179,9 +177,7 @@ struct CollectionCardRow: View {
         .background(Color(.systemGray6))
         .cornerRadius(8)
         .contentShape(Rectangle())
-        .onTapGesture {
-            onTap?()
-        }
+        .cardPreviewContextMenu(card: card.previewCard)
     }
 
     private struct SummaryRow: View {

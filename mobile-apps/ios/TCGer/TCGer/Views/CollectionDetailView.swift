@@ -20,7 +20,6 @@ struct CollectionDetailView: View {
     @State private var movingCardId: String?
     @State private var showingDeleteBinderConfirmation = false
     @State private var isDeletingBinder = false
-    @State private var previewingCard: CollectionCard?
 
     private let apiService = APIService()
 
@@ -104,12 +103,7 @@ struct CollectionDetailView: View {
                                 ForEach(cards) { card in
                                     CollectionCardRow(
                                         card: card,
-                                        showPricing: environmentStore.showPricing,
-                                        onTap: {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                                previewingCard = card
-                                            }
-                                        }
+                                        showPricing: environmentStore.showPricing
                                     )
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                     .listRowSeparator(.hidden)
@@ -299,13 +293,6 @@ struct CollectionDetailView: View {
                 }
             }
 
-            if let card = previewingCard {
-                CardImagePreviewView(card: card) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        previewingCard = nil
-                    }
-                }
-            }
         }
     }
 
