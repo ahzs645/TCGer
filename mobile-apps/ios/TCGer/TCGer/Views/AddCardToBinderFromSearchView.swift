@@ -14,6 +14,7 @@ struct AddCardToBinderFromSearchView: View {
     @State private var showingPrintSelection = false
     @State private var selectedPrint: Card?
     @State private var currentPrintOptions: [Card] = []
+    @State private var addSheetCard: Card?
 
     private let apiService = APIService()
 
@@ -104,46 +105,29 @@ struct AddCardToBinderFromSearchView: View {
                 }
             }
             .onChange(of: showingPrintSelection) { oldValue, newValue in
-                // When print selection sheet is dismissed and we have a selected print,
-                // keep selectedCard set so the add-to-binder sheet shows
-                if !newValue && selectedPrint != nil && selectedCard?.supportsPrintSelection == true {
-                    // Sheet will automatically show because selectedCard is still set
+                if !newValue,
+                   let baseCard = selectedCard,
+                   baseCard.supportsPrintSelection,
+                   let chosenPrint = selectedPrint {
+                    addSheetCard = chosenPrint
+                    selectedCard = nil
                 }
             }
-            .sheet(item: $selectedCard, onDismiss: {
+            .sheet(item: $addSheetCard, onDismiss: {
                 // Clean up state when sheet is dismissed
                 selectedPrint = nil
                 currentPrintOptions = []
+                addSheetCard = nil
             }) { card in
-                // Cards that support print selection only proceed once the picker is complete
-                let requiresPrintSelection = card.supportsPrintSelection
-                let shouldShowForPrintSupported = requiresPrintSelection && !showingPrintSelection && selectedPrint != nil
-                let shouldShowForOthers = !requiresPrintSelection
-
-                if shouldShowForPrintSupported {
-                    if let print = selectedPrint {
-                        AddCardToBinderSheet(card: print) { binderId, quantity, condition, language, notes in
-                            await addCardToBinder(
-                                cardId: print.id,
-                                binderId: binderId,
-                                quantity: quantity,
-                                condition: condition,
-                                language: language,
-                                notes: notes
-                            )
-                        }
-                    }
-                } else if shouldShowForOthers {
-                    AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
-                        await addCardToBinder(
-                            cardId: card.id,
-                            binderId: binderId,
-                            quantity: quantity,
-                            condition: condition,
-                            language: language,
-                            notes: notes
-                        )
-                    }
+                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                    await addCardToBinder(
+                        cardId: card.id,
+                        binderId: binderId,
+                        quantity: quantity,
+                        condition: condition,
+                        language: language,
+                        notes: notes
+                    )
                 }
             }
         }
@@ -156,7 +140,8 @@ struct AddCardToBinderFromSearchView: View {
             await MainActor.run {
                 currentPrintOptions = []
                 selectedPrint = nil
-                selectedCard = card
+                selectedCard = nil
+                addSheetCard = card
                 showingPrintSelection = false
             }
         }
@@ -167,6 +152,7 @@ struct AddCardToBinderFromSearchView: View {
             selectedCard = card
             selectedPrint = nil
             currentPrintOptions = []
+            addSheetCard = nil
             showingPrintSelection = false
         }
 
@@ -193,6 +179,8 @@ struct AddCardToBinderFromSearchView: View {
                 selectedPrint = prints.first ?? card
 
                 if prints.count <= 1 {
+                    addSheetCard = selectedPrint
+                    selectedCard = nil
                     showingPrintSelection = false
                 } else {
                     showingPrintSelection = true
@@ -203,6 +191,7 @@ struct AddCardToBinderFromSearchView: View {
                 if selectedCard?.id == card.id {
                     errorMessage = error.localizedDescription
                     selectedCard = nil
+                    addSheetCard = nil
                     selectedPrint = nil
                     currentPrintOptions = []
                     showingPrintSelection = false
