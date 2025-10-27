@@ -5,29 +5,34 @@ struct MoveCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: CollectionCard
-    let maxQuantity: Int
     let isProcessing: Bool
-    let onMove: (String, Int) async -> Void
+    let onMove: (String, [String]) async -> Void
 
     @State private var availableBinders: [Collection] = []
     @State private var selectedBinderId: String?
-    @State private var quantity: Int
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var selectedCopyIds: Set<String>
 
     private let apiService = APIService()
 
     init(
         card: CollectionCard,
-        maxQuantity: Int,
         isProcessing: Bool,
-        onMove: @escaping (String, Int) async -> Void
+        onMove: @escaping (String, [String]) async -> Void
     ) {
         self.card = card
-        self.maxQuantity = maxQuantity
         self.isProcessing = isProcessing
         self.onMove = onMove
-        _quantity = State(initialValue: max(1, min(maxQuantity, 1)))
+        _selectedCopyIds = State(initialValue: Set(card.copies.map { $0.id }))
+    }
+
+    private var copies: [CollectionCardCopy] {
+        card.copies
+    }
+
+    private var supportsCopySelection: Bool {
+        !copies.isEmpty
     }
 
     var body: some View {
@@ -101,13 +106,40 @@ struct MoveCardToBinderSheet: View {
                     Text("Destination Binder")
                 }
 
-                Section {
-                    Stepper(value: $quantity, in: 1...maxQuantity) {
-                        Text("Quantity: \(quantity)")
+                if supportsCopySelection {
+                    Section {
+                        if copies.isEmpty {
+                            Text("No copies available.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(Array(copies.enumerated()), id: \.element.id) { index, copy in
+                                CopySelectionRow(
+                                    copy: copy,
+                                    index: index,
+                                    isSelected: selectedCopyIds.contains(copy.id)
+                                ) { isSelected in
+                                    if isSelected {
+                                        selectedCopyIds.insert(copy.id)
+                                    } else {
+                                        selectedCopyIds.remove(copy.id)
+                                    }
+                                }
+                            }
+                            if selectedCopyIds.count < copies.count {
+                                Button("Select All Copies") {
+                                    selectedCopyIds = Set(copies.map { $0.id })
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                    } header: {
+                        Text("Copies to Move")
+                    } footer: {
+                        Text("Choose one or more individual copies to move into the selected binder.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    .disabled(maxQuantity == 1)
-                } header: {
-                    Text("Copies to Move")
                 }
 
                 if let errorMessage {
@@ -131,7 +163,7 @@ struct MoveCardToBinderSheet: View {
                     Button(isProcessing ? "Moving..." : "Move") {
                         Task { await performMove() }
                     }
-                    .disabled(isProcessing || selectedBinderId == nil || availableBinders.isEmpty)
+                    .disabled(isProcessing || selectedBinderId == nil || availableBinders.isEmpty || (supportsCopySelection && selectedCopyIds.isEmpty))
                 }
             }
         }
@@ -179,7 +211,97 @@ struct MoveCardToBinderSheet: View {
             return
         }
 
-        await onMove(binderId, quantity)
+        if supportsCopySelection {
+            guard !selectedCopyIds.isEmpty else {
+                errorMessage = "Select at least one copy"
+                return
+            }
+            await onMove(binderId, Array(selectedCopyIds))
+        } else {
+            await onMove(binderId, [card.id])
+        }
+    }
+}
+
+private struct CopySelectionRow: View {
+    let copy: CollectionCardCopy
+    let index: Int
+    let isSelected: Bool
+    let onToggle: (Bool) -> Void
+
+    private func normalized(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private var title: String {
+        if let serial = normalized(copy.serialNumber) {
+            return serial
+        }
+        return "Copy #\(index + 1)"
+    }
+
+    private var detailLine: String? {
+        var parts: [String] = []
+        if let condition = normalized(copy.condition) {
+            parts.append(condition)
+        }
+        if let language = normalized(copy.language) {
+            parts.append(language)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
+    }
+
+    private var tagsLine: String? {
+        let labels = copy.tags.map { $0.label }.filter { !$0.isEmpty }
+        guard !labels.isEmpty else { return nil }
+        return labels.joined(separator: ", ")
+    }
+
+    var body: some View {
+        Button {
+            onToggle(!isSelected)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.title3)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+
+                    if let detailLine {
+                        Text(detailLine)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let notes = normalized(copy.notes) {
+                        Text(notes)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    if let tagsLine {
+                        Text("Tags: \(tagsLine)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("No tags")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
     }
 }
 
