@@ -216,7 +216,7 @@ struct CollectionDetailView: View {
                         await updateCard(
                             card: context.card,
                             collectionEntryId: context.collectionEntryId,
-                            quantity: quantity,
+                            quantity: context.canEditQuantity ? quantity : nil,
                             condition: condition,
                             language: language,
                             notes: notes,
@@ -389,7 +389,7 @@ struct CollectionDetailView: View {
     private func updateCard(
         card: CollectionCard,
         collectionEntryId: String,
-        quantity: Int,
+        quantity: Int?,
         condition: String?,
         language: String?,
         notes: String?,
@@ -404,6 +404,9 @@ struct CollectionDetailView: View {
         editingCardId = collectionEntryId
 
         do {
+#if DEBUG
+            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") newPrint: \(newPrint?.id ?? "nil")")
+#endif
             let updated = try await apiService.updateCardInBinder(
                 config: environmentStore.serverConfiguration,
                 token: token,
