@@ -16,7 +16,7 @@ struct EditCollectionCardSheet: View {
     let isIndividualCopy: Bool
     let copyDetails: CollectionCardCopy?
     let isSaving: Bool
-    let onSave: (SavePayload) async -> Void
+    let onSave: @Sendable (SavePayload) -> Void
 
     @State private var quantity: Int
     @State private var conditionSelection: String
@@ -60,7 +60,7 @@ struct EditCollectionCardSheet: View {
         isIndividualCopy: Bool = false,
         copyDetails: CollectionCardCopy? = nil,
         isSaving: Bool,
-        onSave: @escaping (SavePayload) async -> Void
+        onSave: @escaping @Sendable (SavePayload) -> Void
     ) {
         self.card = card
         self.isIndividualCopy = isIndividualCopy
@@ -242,9 +242,7 @@ struct EditCollectionCardSheet: View {
                         print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") print:\(payload.selectedPrint?.id ?? "nil")")
 #endif
 
-                        Task {
-                            await onSave(payload)
-                        }
+                        onSave(payload)
                     }
                     .disabled(isSaving)
                 }

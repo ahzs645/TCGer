@@ -72,8 +72,10 @@ struct AddCardToBinderFromSearchView: View {
                             selectedCard = card
                             // Cards with multiple printings (e.g., Magic, Pokémon) open the selector first
                             if card.supportsPrintSelection {
-                                selectedPrint = card
+                                selectedPrint = nil
                                 showingPrintSelection = true
+                            } else {
+                                selectedPrint = nil
                             }
                         }
                     )
@@ -93,11 +95,15 @@ struct AddCardToBinderFromSearchView: View {
                 }
             }
             .sheet(isPresented: $showingPrintSelection) {
-                if let card = selectedCard, let print = selectedPrint {
-                    SelectPrintSheet(card: card, selectedPrint: Binding(
-                        get: { print },
-                        set: { selectedPrint = $0 }
-                    ))
+                if let card = selectedCard {
+                    SelectPrintSheet(
+                        card: card,
+                        selectedPrint: $selectedPrint,
+                        onCancel: {
+                            selectedPrint = nil
+                            selectedCard = nil
+                        }
+                    )
                     .environmentObject(environmentStore)
                 }
             }
@@ -321,35 +327,34 @@ private struct CardCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            ProgressView()
-                        )
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
+                CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .overlay(ProgressView())
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    case .failure:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.secondary)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.secondary)
+                            )
+                    }
                 }
             }
             .cornerRadius(8)
@@ -363,7 +368,6 @@ private struct CardCell: View {
                     .background(Color.accentColor)
                     .cornerRadius(6)
                     .padding(6)
-            }
             }
 
             VStack(alignment: .leading, spacing: 4) {

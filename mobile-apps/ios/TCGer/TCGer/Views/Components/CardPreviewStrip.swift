@@ -28,7 +28,7 @@ struct CardPreviewImage: View {
     let imageUrl: String?
 
     var body: some View {
-        AsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+        CachedAsyncImage(url: URL(string: imageUrl ?? "")) { phase in
             switch phase {
             case .empty:
                 Rectangle()

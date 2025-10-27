@@ -4,13 +4,24 @@ struct SelectPrintSheet: View {
     let card: Card
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
-    @Binding var selectedPrint: Card
+    @Binding var selectedPrint: Card?
+    let onCancel: (() -> Void)?
 
     @State private var prints: [Card] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
 
     private let apiService = APIService()
+
+    init(
+        card: Card,
+        selectedPrint: Binding<Card?>,
+        onCancel: (() -> Void)? = nil
+    ) {
+        self.card = card
+        self._selectedPrint = selectedPrint
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         NavigationView {
@@ -28,7 +39,7 @@ struct SelectPrintSheet: View {
                             ForEach(prints) { print in
                                 PrintRow(
                                     print: print,
-                                    isSelected: selectedPrint.id == print.id
+                                    isSelected: selectedPrint?.id == print.id
                                 ) {
                                     selectedPrint = print
                                 }
@@ -43,6 +54,7 @@ struct SelectPrintSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        onCancel?()
                         dismiss()
                     }
                 }
@@ -50,7 +62,7 @@ struct SelectPrintSheet: View {
                     Button("Use This Print") {
                         dismiss()
                     }
-                    .disabled(isLoading)
+                    .disabled(isLoading || selectedPrint == nil)
                 }
             }
         }
@@ -78,13 +90,21 @@ struct SelectPrintSheet: View {
                 cardId: card.id
             )
 
-            // If current selected print is in the list, keep it selected
-            // Otherwise select the first print
-            if !prints.contains(where: { $0.id == selectedPrint.id }) {
+            // If current selected print is in the list, keep it selected;
+            // otherwise select the first available option.
+            if !prints.contains(where: { $0.id == selectedPrint?.id }) {
                 selectedPrint = prints.first ?? card
             }
 
             isLoading = false
+
+            // Automatically skip the picker when one or fewer print options are available.
+            if prints.count <= 1 {
+                if selectedPrint == nil {
+                    selectedPrint = prints.first ?? card
+                }
+                dismiss()
+            }
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
@@ -123,7 +143,7 @@ private struct PrintRow: View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // Card image thumbnail
-                AsyncImage(url: URL(string: print.imageUrlSmall ?? print.imageUrl ?? "")) { phase in
+                CachedAsyncImage(url: URL(string: print.imageUrlSmall ?? print.imageUrl ?? "")) { phase in
                     switch phase {
                     case .success(let image):
                         image
