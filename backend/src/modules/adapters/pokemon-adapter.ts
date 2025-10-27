@@ -12,6 +12,7 @@ import type {
 const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
 const CARDS_ENDPOINT = `${API_ROOT}/cards`;
 const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
+const TCGDEX_CARDS_ENDPOINT = `${VARIANT_API_ROOT}/cards`;
 const isTCGdex = /tcgdex-cache/i.test(API_ROOT) || /tcgdex\.net/i.test(new URL(API_ROOT).hostname);
 const isRemotePokemon = /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
 const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
@@ -213,17 +214,19 @@ export class PokemonAdapter implements TcgAdapter {
       }
       const payload = (await response.json()) as PokemonSearchResponse;
       if (!payload?.data?.length) {
-        return [this.buildFallback(trimmedQuery)];
+        // Fall back to TCGdex if Pokemon API returns no results
+        console.log('Pokemon API returned no results, falling back to TCGdex');
+        return this.searchTCGdex(trimmedQuery);
       }
       return payload.data.map((card) => this.mapCard(card));
     } catch (error) {
-      console.error('PokemonAdapter.searchCards error', error);
-      return [this.buildFallback(trimmedQuery)];
+      console.error('PokemonAdapter.searchCards error, falling back to TCGdex:', error);
+      return this.searchTCGdex(trimmedQuery);
     }
   }
 
   private async searchTCGdex(query: string): Promise<CardDTO[]> {
-    const url = new URL(CARDS_ENDPOINT);
+    const url = new URL(TCGDEX_CARDS_ENDPOINT);
     if (query) {
       url.searchParams.set('q', query);
     }
@@ -242,7 +245,7 @@ export class PokemonAdapter implements TcgAdapter {
       // Fetch full details for each card to get set name and rarity
       const detailPromises = payload.data.map(async (card) => {
         try {
-          const detailResponse = await rateLimitedFetch(`${CARDS_ENDPOINT}/${card.id}`);
+          const detailResponse = await rateLimitedFetch(`${TCGDEX_CARDS_ENDPOINT}/${card.id}`);
           if (detailResponse.ok) {
             const detailPayload = (await detailResponse.json()) as { data: TCGdexCardDetail };
             return detailPayload.data ? this.mapTCGdexDetailCard(detailPayload.data) : this.mapTCGdexCard(card);

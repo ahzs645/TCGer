@@ -137,7 +137,7 @@ services:
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
-      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://pokemon-cache:4030}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
     ports:
       - "${BACKEND_PORT:-3000}:3000"

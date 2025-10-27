@@ -132,7 +132,8 @@ struct EditCollectionCardSheet: View {
                     Section {
                         Button {
                             // Create a minimal Card object for print selection
-                            let externalCardId = card.externalId ?? card.cardId
+                            // Use externalId if available and non-empty, otherwise fall back to cardId
+                            let externalCardId = card.externalId.flatMap { $0.isEmpty ? nil : $0 } ?? card.cardId
                             selectedPrint = Card(
                                 id: externalCardId,
                                 name: card.name,
