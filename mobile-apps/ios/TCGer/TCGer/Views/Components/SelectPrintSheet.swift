@@ -10,6 +10,7 @@ struct SelectPrintSheet: View {
     @State private var prints: [Card] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var clearPreview: (() -> Void)?
 
     private let apiService = APIService()
 
@@ -29,56 +30,75 @@ struct SelectPrintSheet: View {
     }
 
     var body: some View {
-        NavigationView {
-            Group {
-                if isLoading {
-                    ProgressView("Loading prints...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = errorMessage {
-                    ErrorView(message: error)
-                } else if prints.isEmpty {
-                    EmptyPrintsView()
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(prints) { print in
-                                PrintRow(
-                                    print: print,
-                                    isSelected: selectedPrint?.id == print.id
-                                ) {
-                                    selectedPrint = print
+        CardPreviewContainer { previewedCard, previewNamespace, setPreview in
+            NavigationView {
+                Group {
+                    if isLoading {
+                        ProgressView("Loading prints...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let error = errorMessage {
+                        ErrorView(message: error)
+                    } else if prints.isEmpty {
+                        EmptyPrintsView()
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(prints) { print in
+                                    PrintRow(
+                                        print: print,
+                                        isSelected: selectedPrint?.id == print.id,
+                                        isPreviewing: previewedCard?.id == print.id,
+                                        namespace: previewNamespace,
+                                        onTap: {
+                                            selectedPrint = print
+                                        },
+                                        onPreview: {
+                                            setPreview(print)
+                                        }
+                                    )
                                 }
                             }
+                            .padding()
                         }
-                        .padding()
+                    }
+                }
+                .navigationTitle("Select a Print")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            clearPreview?()
+                            onCancel?()
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Use This Print") {
+                            clearPreview?()
+                            dismiss()
+                        }
+                        .disabled(isLoading || selectedPrint == nil)
                     }
                 }
             }
-            .navigationTitle("Select a Print")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onCancel?()
-                        dismiss()
+            .task {
+                if isLoading {
+                    await loadPrints()
+                } else if prints.count <= 1 {
+                    if selectedPrint == nil {
+                        selectedPrint = prints.first ?? card
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Use This Print") {
-                        dismiss()
-                    }
-                    .disabled(isLoading || selectedPrint == nil)
+                    clearPreview?()
+                    dismiss()
                 }
             }
-        }
-        .task {
-            if isLoading {
-                await loadPrints()
-            } else if prints.count <= 1 {
-                if selectedPrint == nil {
-                    selectedPrint = prints.first ?? card
+            .onAppear {
+                clearPreview = {
+                    setPreview(nil)
                 }
-                dismiss()
+            }
+            .onDisappear {
+                clearPreview = nil
             }
         }
     }
@@ -115,6 +135,7 @@ struct SelectPrintSheet: View {
                 if selectedPrint == nil {
                     selectedPrint = prints.first ?? card
                 }
+                clearPreview?()
                 dismiss()
             }
         } catch {
@@ -128,7 +149,10 @@ struct SelectPrintSheet: View {
 private struct PrintRow: View {
     let print: Card
     let isSelected: Bool
+    let isPreviewing: Bool
+    let namespace: Namespace.ID
     let onTap: () -> Void
+    let onPreview: () -> Void
 
     private var printDetails: String {
         var parts: [String] = []
@@ -152,66 +176,53 @@ private struct PrintRow: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Card image thumbnail
-                CachedAsyncImage(url: URL(string: print.imageUrlSmall ?? print.imageUrl ?? "")) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .empty:
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .overlay(ProgressView())
-                    case .failure:
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            )
-                    @unknown default:
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                    }
-                }
-                .frame(width: 40, height: 56)
-                .cornerRadius(4)
+        HStack(spacing: 12) {
+            CardArtworkImage(card: print, useFullResolution: false)
+                .matchedGeometryEffect(id: print.id, in: namespace, isSource: !isPreviewing)
+                .frame(width: 44, height: 64)
 
-                // Print info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(print.setName ?? print.setCode ?? "Unknown set")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+            // Print info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(print.setName ?? print.setCode ?? "Unknown set")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
 
-                    if !printDetails.isEmpty {
-                        Text(printDetails)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                // Selection indicator
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentColor)
-                        .font(.title3)
+                if !printDetails.isEmpty {
+                    Text(printDetails)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .padding()
-            .background(isSelected ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
+
+            Spacer()
+
+            // Selection indicator
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title3)
+            }
         }
-        .buttonStyle(.plain)
+        .padding()
+        .background(isSelected ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isPreviewing {
+                onTap()
+            }
+        }
+        .onLongPressGesture(minimumDuration: 0.45) {
+            onPreview()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to choose this print. Long press to preview the artwork.")
     }
 }
 
