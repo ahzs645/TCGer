@@ -18,27 +18,49 @@ struct CardArtworkImage: View {
         return nil
     }
 
+    private var isLocalAsset: Bool {
+        // Check if the imageUrl is a local asset name (doesn't start with http/https)
+        guard let imageUrl = useFullResolution ? card.imageUrl : (card.imageUrlSmall ?? card.imageUrl) else {
+            return false
+        }
+        return !imageUrl.hasPrefix("http://") && !imageUrl.hasPrefix("https://")
+    }
+
+    private var localAssetName: String? {
+        return useFullResolution ? card.imageUrl : (card.imageUrlSmall ?? card.imageUrl)
+    }
+
     var body: some View {
-        CachedAsyncImage(url: imageURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
+        Group {
+            if isLocalAsset, let assetName = localAssetName {
+                // Load from local Assets.xcassets
+                Image(assetName)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-            case .empty:
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .overlay(ProgressView())
-            case .failure:
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundColor(.secondary)
-                    )
-            @unknown default:
-                Rectangle()
-                    .fill(Color(.systemGray5))
+            } else {
+                // Load from URL
+                CachedAsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    case .empty:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .overlay(ProgressView())
+                    case .failure:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.secondary)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                    }
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))

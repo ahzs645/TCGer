@@ -13,6 +13,42 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     let price: Double?
     let collectorNumber: String?
     let releasedAt: Date?
+    let supertype: String? // "Pokémon", "Trainer", "Energy" (Pokemon TCG)
+    let subtypes: [String]? // ["Basic"], ["Supporter"], ["VMAX"], etc. (Pokemon TCG)
+    let types: [String]? // ["Lightning"], ["Dragon"], etc. (Pokemon TCG)
+
+    // Custom initializer with default values for Pokemon-specific fields
+    init(
+        id: String,
+        name: String,
+        tcg: String,
+        setCode: String?,
+        setName: String?,
+        rarity: String?,
+        imageUrl: String?,
+        imageUrlSmall: String?,
+        price: Double?,
+        collectorNumber: String?,
+        releasedAt: Date?,
+        supertype: String? = nil,
+        subtypes: [String]? = nil,
+        types: [String]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.tcg = tcg
+        self.setCode = setCode
+        self.setName = setName
+        self.rarity = rarity
+        self.imageUrl = imageUrl
+        self.imageUrlSmall = imageUrlSmall
+        self.price = price
+        self.collectorNumber = collectorNumber
+        self.releasedAt = releasedAt
+        self.supertype = supertype
+        self.subtypes = subtypes
+        self.types = types
+    }
 
     var displayName: String {
         if let setCode = setCode {

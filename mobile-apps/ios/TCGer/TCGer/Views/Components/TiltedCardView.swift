@@ -68,6 +68,7 @@ struct TiltedCardView: View {
                 .overlay {
                     if let style = foilStyle {
                         PokemonFoilOverlay(
+                            card: card,
                             style: style,
                             pointer: normalizedPointer,
                             intensity: foilIntensity
