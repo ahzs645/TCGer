@@ -90,6 +90,35 @@ struct FoilTiledTexture: View {
     }
 }
 
+struct PokemonFoilGlareView: View {
+    let config: PokemonFoilGlareConfiguration
+    let uniforms: PokemonFoilUniforms
+
+    var body: some View {
+        GeometryReader { proxy in
+            let minDimension = min(proxy.size.width, proxy.size.height)
+            let maxDimension = max(proxy.size.width, proxy.size.height)
+
+            ZStack {
+                ForEach(config.layers) { layer in
+                    let startRadius = max(minDimension * layer.startRadiusMultiplier, 0)
+                    let endRadius = max(maxDimension * layer.endRadiusMultiplier, startRadius + 0.1)
+
+                    RadialGradient(
+                        gradient: Gradient(colors: layer.colors),
+                        center: layer.center(uniforms),
+                        startRadius: startRadius,
+                        endRadius: endRadius
+                    )
+                    .blendMode(layer.blendMode)
+                    .opacity(layer.opacity(uniforms).clampedToUnit)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 struct PokemonReverseFoilOverlay: View {
     let config: PokemonReverseFoilConfig
     let uniforms: PokemonFoilUniforms
@@ -110,7 +139,7 @@ struct PokemonReverseFoilOverlay: View {
                     .offset(x: offsetX, y: offsetY)
                     .colorMultiply(Color.white.opacity(config.brightness))
                     .blendMode(.colorDodge)
-                    .opacity(strength * 0.7)
+                    .opacity(strength * 0.5)
 
                 RadialGradient(
                     gradient: Gradient(colors: [
@@ -123,7 +152,7 @@ struct PokemonReverseFoilOverlay: View {
                     endRadius: max(size.width, size.height)
                 )
                 .blendMode(.softLight)
-                .opacity(strength * 0.35)
+                .opacity(strength * 0.25)
 
                 LinearGradient(
                     gradient: Gradient(colors: [
@@ -135,7 +164,7 @@ struct PokemonReverseFoilOverlay: View {
                     endPoint: .bottomTrailing
                 )
                 .blendMode(.difference)
-                .opacity(strength * 0.3)
+                .opacity(strength * 0.22)
             }
             .frame(width: size.width, height: size.height)
         }
@@ -200,14 +229,14 @@ struct PokemonRealFoilOverlay: View {
                     )
                 }
                 .blendMode(.hardLight)
-                .brightness(0.4 + strength * 0.4)
-                .contrast(1.4)
-                .saturation(2.25)
+                .brightness(0.18 + strength * 0.25)
+                .contrast(1.25)
+                .saturation(1.8)
                 .opacity(strength)
 
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        Color.white.opacity(1.0),
+                        Color.white.opacity(0.65),
                         Color.black.opacity(0.0)
                     ]),
                     center: uniforms.highlightPoint,
@@ -215,7 +244,7 @@ struct PokemonRealFoilOverlay: View {
                     endRadius: size.width * 0.4
                 )
                 .blendMode(.overlay)
-                .opacity(strength * 0.75)
+                .opacity(strength * 0.45)
 
                 RadialGradient(
                     gradient: Gradient(colors: [
@@ -229,9 +258,9 @@ struct PokemonRealFoilOverlay: View {
                 )
                 .scaleEffect(1.2)
                 .blendMode(.hardLight)
-                .contrast(1.2)
-                .saturation(1.0)
-                .opacity(strength * 0.75)
+                .contrast(1.1)
+                .saturation(0.95)
+                .opacity(strength * 0.55)
             }
             .frame(width: size.width, height: size.height)
             .mask {
@@ -245,6 +274,180 @@ struct PokemonRealFoilOverlay: View {
                 }
             }
         }
+    }
+}
+
+struct PokemonFullArtTrainerFoilOverlay: View {
+    let foilImageName: String
+    let maskImageName: String?
+    let uniforms: PokemonFoilUniforms
+    let configuration: PokemonFoilConfiguration
+    let stripeColors: [Color]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let normalizedBackgroundY = Double(uniforms.background.y)
+            let stripePhase = normalizedBackgroundY
+            let mirrorPhase = -normalizedBackgroundY
+            let metallicPhase = (Double(uniforms.background.x) - 0.5) + (Double(uniforms.background.y) - 0.5) * 0.2
+
+            let baseFoil = ZStack {
+                Image(foilImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .blendMode(.softLight)
+
+                TrainerSunpillarStripesLayer(colors: stripeColors, uniforms: uniforms, phase: stripePhase)
+                    .blendMode(.hue)
+
+                TrainerMetalSheenLayer(uniforms: uniforms, phase: metallicPhase)
+                    .blendMode(.hardLight)
+
+                TrainerPointerRadialLayer(uniforms: uniforms)
+                    .blendMode(.colorDodge)
+                    .opacity(0.65)
+
+                TrainerSunpillarStripesLayer(colors: stripeColors, uniforms: uniforms, phase: mirrorPhase)
+                    .blendMode(.exclusion)
+                    .opacity(0.35)
+
+                TrainerFoilHighlightLayer(uniforms: uniforms)
+                    .blendMode(.screen)
+                    .opacity(0.5)
+            }
+            .frame(width: size.width, height: size.height)
+            .saturation(1.2)
+            .contrast(1.75)
+            .colorMultiply(Color(white: 0.8 + uniforms.pointerFromCenter * 0.05))
+
+            if let maskName = maskImageName {
+                baseFoil
+                    .mask(
+                        Image(maskName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size.width, height: size.height)
+                    )
+            } else {
+                baseFoil
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct TrainerSunpillarStripesLayer: View {
+    let colors: [Color]
+    let uniforms: PokemonFoilUniforms
+    let phase: Double
+    private let spacing: CGFloat = 0.05
+
+    var body: some View {
+        Canvas { context, size in
+            guard !colors.isEmpty else { return }
+
+            let stripeHeight = max(size.height * spacing, 1)
+            let cycleHeight = stripeHeight * CGFloat(colors.count)
+            let fractionalPhase = CGFloat(phase - floor(phase))
+            let wrappedPhase = fractionalPhase * cycleHeight
+
+            var y = -cycleHeight * 2 + wrappedPhase
+            let limit = size.height + cycleHeight * 2
+
+            while y < limit {
+                for color in colors {
+                    let rect = CGRect(x: 0, y: y, width: size.width, height: stripeHeight)
+                    context.fill(Path(rect), with: .color(color))
+                    y += stripeHeight
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct TrainerMetalSheenLayer: View {
+    let uniforms: PokemonFoilUniforms
+    let phase: Double
+
+    var body: some View {
+        Canvas { context, size in
+            let dark = Color(red: 0x0e / 255.0, green: 0x15 / 255.0, blue: 0x2e / 255.0)
+            let lightA = Color(hue: 180.0 / 360.0, saturation: 0.10, brightness: 0.60)
+            let lightB = Color(hue: 180.0 / 360.0, saturation: 0.29, brightness: 0.66)
+            let segments: [(Color, CGFloat)] = [
+                (dark, 3.8),
+                (lightA, 0.7),
+                (lightB, 0.7),
+                (lightA, 4.8),
+                (dark, 2.0)
+            ]
+
+            context.translateBy(x: size.width / 2, y: size.height / 2)
+            context.rotate(by: Angle(degrees: 133))
+            context.translateBy(x: -size.width / 2, y: -size.height / 2)
+
+            let baseLength = max(size.width, size.height) * 0.35
+            let unit = max(baseLength / 12.0, 0.5)
+            let phaseOffset = CGFloat(phase) * baseLength
+
+            var x = -baseLength * 3 + phaseOffset
+            let limit = size.width + baseLength * 3
+
+            while x < limit {
+                for (color, lengthFactor) in segments {
+                    let width = max(unit * lengthFactor, 0.5)
+                    let rect = CGRect(x: x, y: -size.height * 1.5, width: width, height: size.height * 3)
+                    context.fill(Path(rect), with: .color(color))
+                    x += width
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct TrainerPointerRadialLayer: View {
+    let uniforms: PokemonFoilUniforms
+
+    var body: some View {
+        GeometryReader { proxy in
+            let radius = max(proxy.size.width, proxy.size.height) * 1.4
+
+            RadialGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color.black.opacity(0.1), location: 0.12),
+                    .init(color: Color.black.opacity(0.15), location: 0.20),
+                    .init(color: Color.black.opacity(0.25), location: 1.0)
+                ]),
+                center: uniforms.highlightPoint,
+                startRadius: 0,
+                endRadius: radius
+            )
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct TrainerFoilHighlightLayer: View {
+    let uniforms: PokemonFoilUniforms
+
+    var body: some View {
+        GeometryReader { proxy in
+            let radius = max(proxy.size.width, proxy.size.height) * 0.9
+            RadialGradient(
+                gradient: Gradient(colors: [
+                    Color.white.opacity(1.0),
+                    Color.clear
+                ]),
+                center: uniforms.highlightPoint,
+                startRadius: 0,
+                endRadius: radius
+            )
+        }
+        .allowsHitTesting(false)
     }
 }
 
