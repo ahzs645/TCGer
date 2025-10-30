@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @StateObject private var networkMonitor = NetworkMonitor.shared
+    @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
     @State private var showingProfile = false
@@ -160,19 +161,27 @@ struct SettingsView: View {
 
                 // Data & Sync Section
                 Section {
-                    // Network Status
-                    HStack {
-                        Text("Connection Status")
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(networkMonitor.isConnected ? Color.green : Color.red)
-                                .frame(width: 8, height: 8)
-                            Text(networkMonitor.isConnected ? "Online" : "Offline")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
+                    Button(action: { Task { await refreshServerStatus() } }) {
+                        HStack {
+                            Text("Connection Status")
+                            Spacer()
+                            if serverStatus == .checking {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .scaleEffect(0.8)
+                            } else {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(serverStatus.color)
+                                        .frame(width: 8, height: 8)
+                                    Text(serverStatus.label)
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
 
                     Toggle(isOn: $environmentStore.offlineModeEnabled) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -225,7 +234,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated || !networkMonitor.isConnected || isSyncing)
+                    .disabled(!environmentStore.isAuthenticated || serverStatus != .online || isSyncing)
 
                     // Clear Cache Button
                     Button("Clear Cache", role: .destructive) {
@@ -266,6 +275,7 @@ struct SettingsView: View {
             .task {
                 await refreshPreferencesIfNeeded()
                 updateCacheInfo()
+                await refreshServerStatus()
             }
             .alert("Reset Configuration?", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -286,6 +296,19 @@ struct SettingsView: View {
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
                     .environmentObject(environmentStore)
+            }
+            .task(id: networkMonitor.isConnected) {
+                let isConnected = networkMonitor.isConnected
+                if isConnected {
+                    await refreshServerStatus()
+                } else {
+                    await MainActor.run {
+                        serverStatus = .offline
+                    }
+                }
+            }
+            .task(id: environmentStore.serverConfiguration.baseURL) {
+                await refreshServerStatus()
             }
         }
     }
@@ -332,6 +355,28 @@ struct SettingsView: View {
 }
 
 private extension SettingsView {
+    enum ServerStatusState: Equatable {
+        case checking
+        case online
+        case offline
+
+        var label: String {
+            switch self {
+            case .checking: return "Checking..."
+            case .online: return "Online"
+            case .offline: return "Offline"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .checking: return .orange
+            case .online: return .green
+            case .offline: return .red
+            }
+        }
+    }
+
     func refreshPreferencesIfNeeded() async {
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
@@ -393,6 +438,28 @@ private extension SettingsView {
         } catch {
             print("Failed to update preferences: \(error)")
             await refreshPreferencesIfNeeded()
+        }
+    }
+
+    func refreshServerStatus() async {
+        guard networkMonitor.isConnected,
+              environmentStore.serverConfiguration.isValid else {
+            await MainActor.run {
+                serverStatus = .offline
+            }
+            return
+        }
+
+        await MainActor.run {
+            serverStatus = .checking
+        }
+
+        let api = APIService()
+
+        let reachable = await api.verifyServer(config: environmentStore.serverConfiguration)
+
+        await MainActor.run {
+            serverStatus = reachable ? .online : .offline
         }
     }
 }

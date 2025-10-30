@@ -1,6 +1,4 @@
 import SwiftUI
-import CoreMotion
-import Combine
 
 /// Shared card artwork loader used anywhere we need a consistent card image rendering.
 struct CardArtworkImage: View {
@@ -50,72 +48,48 @@ struct CardArtworkImage: View {
 /// A reusable preview view shown when the system context menu presents card artwork.
 struct CardPreviewContextView: View {
     let card: Card
-    @StateObject private var motionManager = CardMotionManager()
-    @State private var manualTilt: CardTilt?
-
-    private let maxTiltDegrees: Double = 18
 
     var body: some View {
         GeometryReader { proxy in
-            let availableWidth = proxy.size.width
-            let availableHeight = proxy.size.height
+            let aspectRatio: CGFloat = 0.72
+            let horizontalPadding: CGFloat = 28
+            let verticalPadding: CGFloat = 28
+            let minCardWidth: CGFloat = 300
+            let maxCardWidth: CGFloat = 360
+            let minCardHeight: CGFloat = 420
+            let maxCardHeight: CGFloat = 520
+
+            let availableWidth = max(proxy.size.width - horizontalPadding * 2, 0)
+            let availableHeight = max(proxy.size.height - verticalPadding * 2, 0)
 
             // Provide sensible bounds so the preview feels full-size without exceeding the menu.
-            let maxWidth = min(max(availableWidth - 48, 300), 360)
-            let maxHeight = min(max(availableHeight - 48, 420), 520)
-            let widthFromHeight = maxHeight * 0.72
-            let targetWidth = min(maxWidth, widthFromHeight)
-            let targetHeight = targetWidth / 0.72
-            let cardSize = CGSize(width: targetWidth, height: targetHeight)
+            let widthCap = min(max(availableWidth, minCardWidth), maxCardWidth)
+            let heightCap = min(max(availableHeight, minCardHeight), maxCardHeight)
+            let widthFromHeight = heightCap * aspectRatio
+            let targetWidth = min(widthCap, widthFromHeight)
+            let targetHeight = targetWidth / aspectRatio
 
-            let currentTilt = manualTilt ?? CardTilt(
-                xRotation: (-motionManager.pitch.toDegrees).clamped(to: -maxTiltDegrees...maxTiltDegrees),
-                yRotation: motionManager.roll.toDegrees.clamped(to: -maxTiltDegrees...maxTiltDegrees)
+            TiltedCardView(
+                card: card,
+                size: CGSize(width: targetWidth, height: targetHeight),
+                useFullResolution: true,
+                maxTiltDegrees: 0,
+                enableMotion: false,
+                enableDrag: false,
+                showsShadow: true
             )
-
-            let xRotation = currentTilt.xRotation
-            let yRotation = currentTilt.yRotation
-
-            let dragGesture = DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    guard cardSize.width > 0, cardSize.height > 0 else { return }
-                    var horizontalRatio = Double(value.translation.width / (cardSize.width / 2))
-                    var verticalRatio = Double(value.translation.height / (cardSize.height / 2))
-                    horizontalRatio = horizontalRatio.clamped(to: -1...1)
-                    verticalRatio = verticalRatio.clamped(to: -1...1)
-
-                    let newTilt = CardTilt(
-                        xRotation: (-verticalRatio * maxTiltDegrees).clamped(to: -maxTiltDegrees...maxTiltDegrees),
-                        yRotation: (horizontalRatio * maxTiltDegrees).clamped(to: -maxTiltDegrees...maxTiltDegrees)
-                    )
-
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        manualTilt = newTilt
-                    }
-                }
-                .onEnded { _ in
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        manualTilt = nil
-                    }
-                }
-
-            CardArtworkImage(card: card, useFullResolution: true)
-                .aspectRatio(0.72, contentMode: .fit)
-                .frame(width: targetWidth, height: targetHeight)
-                .rotation3DEffect(.degrees(xRotation), axis: (x: 1, y: 0, z: 0), perspective: 0.65)
-                .rotation3DEffect(.degrees(yRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
-                .shadow(color: .black.opacity(0.25), radius: 18, x: yRotation * 0.4, y: 12 + abs(xRotation) * 0.3)
-                .padding(28)
+                .padding(.horizontal, horizontalPadding)
+                .padding(.vertical, verticalPadding)
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
-                .gesture(dragGesture)
         }
-        .frame(minWidth: 320, idealWidth: 340, maxWidth: 380, minHeight: 420, idealHeight: 460, maxHeight: 520)
-        .onAppear {
-            motionManager.start()
-        }
-        .onDisappear {
-            motionManager.stop()
-        }
+        .frame(
+            minWidth: 356,
+            idealWidth: 376,
+            maxWidth: 416,
+            minHeight: 476,
+            idealHeight: 516,
+            maxHeight: 576
+        )
     }
 }
 
@@ -164,46 +138,4 @@ extension Card {
 
 extension CollectionCard {
     var previewCard: Card { Card.preview(from: self) }
-}
-
-private final class CardMotionManager: ObservableObject {
-    @Published private(set) var roll: Double = 0
-    @Published private(set) var pitch: Double = 0
-
-    private let motionManager = CMMotionManager()
-
-    init(updateInterval: TimeInterval = 1.0 / 60.0) {
-        motionManager.deviceMotionUpdateInterval = updateInterval
-    }
-
-    func start() {
-        guard motionManager.isDeviceMotionAvailable, !motionManager.isDeviceMotionActive else { return }
-        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
-            guard let self, let motion else { return }
-            self.roll = motion.attitude.roll
-            self.pitch = motion.attitude.pitch
-        }
-    }
-
-    func stop() {
-        guard motionManager.isDeviceMotionActive else { return }
-        motionManager.stopDeviceMotionUpdates()
-        self.roll = 0
-        self.pitch = 0
-    }
-}
-
-private extension Double {
-    var toDegrees: Double { self * 180.0 / .pi }
-}
-
-private extension Comparable {
-    func clamped(to limits: ClosedRange<Self>) -> Self {
-        min(max(self, limits.lowerBound), limits.upperBound)
-    }
-}
-
-private struct CardTilt {
-    var xRotation: Double
-    var yRotation: Double
 }

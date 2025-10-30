@@ -103,7 +103,7 @@ services:
       target: production
     environment:
       NODE_ENV: production
-      PORT: ${BACKEND_PORT:-3000}
+      PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?err}
@@ -112,8 +112,6 @@ services:
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
       POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_started
@@ -129,12 +127,25 @@ services:
       target: production
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000}
-    ports:
-      - "${FRONTEND_PORT:-3001}:3000"
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
+      BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}
     depends_on:
       backend:
         condition: service_started
+    networks:
+      - tcg-net
+
+  gateway:
+    image: nginx:1.25-alpine
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${APP_PORT:-3000}:80"
     networks:
       - tcg-net
 

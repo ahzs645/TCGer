@@ -34,10 +34,24 @@ extension APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 10
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("no-cache", forHTTPHeaderField: "Pragma")
 
         do {
-            let (_, response) = try await execute(request)
-            return (200..<400).contains(response.statusCode)
+            let (data, response) = try await execute(request)
+            guard (200..<400).contains(response.statusCode) else {
+                return false
+            }
+
+            guard
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let status = (json["status"] as? String)?.lowercased()
+            else {
+                return false
+            }
+
+            return status == "ok" || status == "ready"
         } catch {
             return false
         }
