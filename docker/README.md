@@ -10,7 +10,8 @@ This starts:
 - `postgres` (15-alpine) with automatic health checks
 - `redis` (7-alpine)
 - `backend` running `npm run dev` with hot reload (code mounted from your host)
-- `frontend` running Next.js dev server (ports map to `${FRONTEND_PORT}`)
+- `frontend` running Next.js dev server
+- `gateway` (nginx) exposing the stack on `http://localhost:${APP_PORT:-3000}` and proxying `/api` traffic to the backend
 - Optional: `scryfall-bulk` lightweight cache for Magic queries. Enable with `docker compose --profile bulk up` and set `SCRYFALL_API_BASE_URL=http://scryfall-bulk:4010`.
 - Optional: `ygo-cache` local Yu-Gi-Oh! dataset mirror. Enable with the same `bulk` profile and set `YGO_API_BASE_URL=http://ygo-cache:4020`.
 - Optional: `tcgdex-cache` comprehensive Pokémon card database (21,632+ cards). Enable via the `bulk` profile. Used by default for Pokemon searches (`POKEMON_API_BASE_URL=http://tcgdex-cache:4040`).
@@ -18,8 +19,8 @@ This starts:
 
 ### Notes
 - Node modules live inside the container; each start runs `npm install` to sync dependencies.
-- Backend listens on `http://localhost:${BACKEND_PORT:-3000}` (set `BACKEND_PORT` in `.env.docker`). Health check at `/health`.
-- Frontend listens on `http://localhost:${FRONTEND_PORT:-3001}`. Update `NEXT_PUBLIC_API_BASE_URL` if you expose the API elsewhere.
+- Access the frontend at `http://localhost:${APP_PORT:-3000}`. API requests are served from the same origin at `http://localhost:${APP_PORT:-3000}/api`.
+- Update `NEXT_PUBLIC_API_BASE_URL` to the public origin you deploy behind the gateway (include the `/api` suffix). Update `APP_PORT` if you need to expose a different host port locally.
 - Set `SCRYFALL_API_BASE_URL` to `http://scryfall-bulk:4010` to have the backend use the local bulk data cache; otherwise it defaults to the public Scryfall API.
 - Set `YGO_API_BASE_URL` to `http://ygo-cache:4020` when the Yu-Gi-Oh! cache is running; otherwise the backend uses the public YGOPRODeck API directly.
 - Set `POKEMON_API_BASE_URL` to `http://tcgdex-cache:4040` (default) for fast Pokemon card searches using TCGdex's comprehensive database. The pokemon-cache service is deprecated due to upstream Pokemon TCG API instability.

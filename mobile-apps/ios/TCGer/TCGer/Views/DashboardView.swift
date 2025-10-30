@@ -6,7 +6,7 @@ struct DashboardView: View {
     @State private var collections: [Collection] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedCollection: Collection?
+    @State private var activeSheet: ActiveSheet?
 
     private let apiService = APIService()
     private var recentCollections: [Collection] {
@@ -31,14 +31,26 @@ struct DashboardView: View {
                             showPricing: environmentStore.showPricing
                         )
 
+                        Button {
+                            activeSheet = .tiltTester
+                        } label: {
+                            Label("Open Tilt Card Demo", systemImage: "sparkles")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
+
                         // Recent Collections
                         if recentCollections.isEmpty {
                             EmptyStateView()
                         } else {
                             RecentCollectionsSection(
                                 collections: recentCollections,
-                                selectedCollection: $selectedCollection,
-                                showPricing: environmentStore.showPricing
+                                showPricing: environmentStore.showPricing,
+                                onSelect: { collection in
+                                    activeSheet = .collection(collection)
+                                }
                             )
                         }
                     }
@@ -58,20 +70,17 @@ struct DashboardView: View {
             .refreshable {
                 await loadData()
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { selectedCollection != nil },
-                    set: { if !$0 { selectedCollection = nil } }
-                ),
-                onDismiss: {
-                    Task { await loadData() }
-                },
-                content: {
-                    if let collection = selectedCollection {
-                        CollectionDetailView(collection: collection)
-                    }
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .collection(let collection):
+                    CollectionDetailView(collection: collection)
+                        .onDisappear {
+                            Task { await loadData() }
+                        }
+                case .tiltTester:
+                    TiltTesterView(cards: collections.flatMap { $0.cards })
                 }
-            )
+            }
         }
         .task {
             await loadData()
@@ -99,6 +108,20 @@ struct DashboardView: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+}
+
+private enum ActiveSheet: Identifiable {
+    case collection(Collection)
+    case tiltTester
+
+    var id: String {
+        switch self {
+        case .collection(let collection):
+            return "collection-\(collection.id)"
+        case .tiltTester:
+            return "tiltTester"
         }
     }
 }
@@ -174,8 +197,8 @@ private struct StatCard: View {
 // MARK: - Recent Collections
 private struct RecentCollectionsSection: View {
     let collections: [Collection]
-    @Binding var selectedCollection: Collection?
     let showPricing: Bool
+    let onSelect: (Collection) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -185,7 +208,7 @@ private struct RecentCollectionsSection: View {
             ForEach(collections) { collection in
                 CollectionRowView(collection: collection, showPricing: showPricing)
                     .onTapGesture {
-                        selectedCollection = collection
+                        onSelect(collection)
                     }
             }
         }
