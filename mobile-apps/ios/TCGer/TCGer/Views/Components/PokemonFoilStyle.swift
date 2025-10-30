@@ -91,6 +91,17 @@ enum PokemonFoilStyle: CaseIterable {
         }
     }
 
+    var fullArtStripeColors: [Color] {
+        [
+            Color(hue: 2.0 / 360.0, saturation: 1.0, brightness: 0.73),
+            Color(hue: 53.0 / 360.0, saturation: 1.0, brightness: 0.69),
+            Color(hue: 93.0 / 360.0, saturation: 1.0, brightness: 0.69),
+            Color(hue: 176.0 / 360.0, saturation: 1.0, brightness: 0.76),
+            Color(hue: 228.0 / 360.0, saturation: 1.0, brightness: 0.74),
+            Color(hue: 283.0 / 360.0, saturation: 1.0, brightness: 0.73)
+        ]
+    }
+
     func shouldApplyTextureMask(for card: Card) -> Bool {
         switch self {
         case .sunpillar, .sunpillarEtched:
@@ -139,7 +150,8 @@ enum PokemonFoilStyle: CaseIterable {
             cosmosLayers: cosmosLayers,
             reverseFoil: reverseFoilConfig,
             maskImageName: maskImageName,
-            textureLayers: textureLayers(for: card)
+            textureLayers: textureLayers(for: card),
+            glare: glareConfiguration(for: card)
         )
     }
 
@@ -496,6 +508,181 @@ enum PokemonFoilStyle: CaseIterable {
         return layers
     }
 
+    private func glareConfiguration(for card: Card) -> PokemonFoilGlareConfiguration? {
+        let highlightCenter: (PokemonFoilUniforms) -> UnitPoint = { $0.highlightPoint }
+
+        switch self {
+        case .regularHolo:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.52, saturation: 0.55, brightness: 0.97).opacity(0.85),
+                        Color(hue: 0.0, saturation: 0.0, brightness: 0.35).opacity(0.18),
+                        Color.black.opacity(0.35)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.3,
+                    blendMode: .overlay,
+                    opacity: { uniforms in (uniforms.cardOpacity * 0.8).clampedToUnit },
+                    center: highlightCenter
+                ),
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.58, saturation: 0.65, brightness: 0.98),
+                        Color.black.opacity(0.55)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 0.95,
+                    blendMode: .overlay,
+                    opacity: { uniforms in (((1 - uniforms.pointerFromTop * 0.75) * uniforms.cardOpacity) * 0.75).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .cosmos:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.55, saturation: 0.3, brightness: 0.95),
+                        Color(hue: 0.63, saturation: 0.1, brightness: 0.35)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.6,
+                    blendMode: .overlay,
+                    opacity: { uniforms in ((uniforms.cardOpacity * (0.25 + uniforms.pointerFromCenter)) * 0.85).clampedToUnit },
+                    center: highlightCenter
+                ),
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.75, saturation: 0.8, brightness: 0.98),
+                        Color.black.opacity(0.4)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.1,
+                    blendMode: .softLight,
+                    opacity: { uniforms in (((1 - uniforms.pointerFromTop * 0.75) * uniforms.cardOpacity) * 0.9).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .sunpillar, .sunpillarEtched, .fullCard:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color.white.opacity(0.7),
+                        Color(hue: 0.58, saturation: 0.3, brightness: 0.35).opacity(0.65),
+                        Color.black.opacity(0.65)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.4,
+                    blendMode: .hardLight,
+                    opacity: { uniforms in (uniforms.cardOpacity * (0.5 + uniforms.pointerFromCenter * 0.5)).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .rainbow:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.0, saturation: 0.0, brightness: 0.95),
+                        Color(hue: 0.55, saturation: 0.5, brightness: 0.35)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.4,
+                    blendMode: .hardLight,
+                    opacity: { uniforms in (uniforms.cardOpacity * (0.45 + uniforms.pointerFromCenter * 0.55)).clampedToUnit },
+                    center: highlightCenter
+                ),
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.57, saturation: 0.65, brightness: 0.95),
+                        Color.black.opacity(0.55)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 0.9,
+                    blendMode: .colorDodge,
+                    opacity: { uniforms in (((1 - uniforms.pointerFromTop * 0.6) * uniforms.cardOpacity) * 0.6).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .secret:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color(hue: 0.13, saturation: 0.4, brightness: 0.95),
+                        Color(hue: 0.07, saturation: 0.4, brightness: 0.18)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.4,
+                    blendMode: .hardLight,
+                    opacity: { uniforms in (uniforms.cardOpacity * (0.55 + uniforms.pointerFromCenter * 0.45)).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .reverse:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color.white.opacity(0.75),
+                        Color.black.opacity(0.75)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.3,
+                    blendMode: .overlay,
+                    opacity: { uniforms in (uniforms.cardOpacity * 0.9).clampedToUnit },
+                    center: highlightCenter
+                ),
+                PokemonGlareLayer(
+                    colors: [
+                        Color.white.opacity(0.95),
+                        Color.black.opacity(0.6)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.1,
+                    blendMode: .screen,
+                    opacity: { uniforms in (((1 - uniforms.pointerFromTop * 0.5) * uniforms.cardOpacity) * 0.5).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .amazing:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color.white.opacity(0.85),
+                        Color(hue: 0.55, saturation: 0.25, brightness: 0.2)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.35,
+                    blendMode: .overlay,
+                    opacity: { uniforms in (uniforms.cardOpacity * (0.5 + uniforms.pointerFromCenter * 0.5)).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        case .radiant:
+            return PokemonFoilGlareConfiguration(layers: [
+                PokemonGlareLayer(
+                    colors: [
+                        Color.white.opacity(0.7),
+                        Color.black.opacity(0.65)
+                    ],
+                    startRadiusMultiplier: 0.0,
+                    endRadiusMultiplier: 1.4,
+                    blendMode: .hardLight,
+                    opacity: { uniforms in (uniforms.cardOpacity * 0.7).clampedToUnit },
+                    center: highlightCenter
+                )
+            ])
+
+        default:
+            return nil
+        }
+    }
+
     private var baseOpacity: Double {
         switch self {
         case .regularHolo: return 0.75
@@ -600,6 +787,7 @@ struct PokemonFoilConfiguration {
     let reverseFoil: PokemonReverseFoilConfig?
     let maskImageName: String?
     let textureLayers: [PokemonFoilTextureLayer]
+    let glare: PokemonFoilGlareConfiguration?
 }
 
 struct PokemonFoilTextureLayer: Identifiable {
@@ -610,6 +798,20 @@ struct PokemonFoilTextureLayer: Identifiable {
     let opacity: Double
     let blendMode: BlendMode
     let usesSeed: Bool
+}
+
+struct PokemonFoilGlareConfiguration {
+    let layers: [PokemonGlareLayer]
+}
+
+struct PokemonGlareLayer: Identifiable {
+    let id = UUID()
+    let colors: [Color]
+    let startRadiusMultiplier: CGFloat
+    let endRadiusMultiplier: CGFloat
+    let blendMode: BlendMode
+    let opacity: (PokemonFoilUniforms) -> Double
+    let center: (PokemonFoilUniforms) -> UnitPoint
 }
 
 struct PokemonCosmosLayer {

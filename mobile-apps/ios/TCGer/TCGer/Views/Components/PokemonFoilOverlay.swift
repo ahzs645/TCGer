@@ -19,13 +19,23 @@ struct PokemonFoilOverlay: View {
                 Group {
                     if let textures = textures, let foilName = textures.foil {
                         let maskName = style.shouldApplyTextureMask(for: card) ? textures.mask : nil
-                        PokemonRealFoilOverlay(
-                            foilImageName: foilName,
-                            maskImageName: maskName,
-                            style: style,
-                            uniforms: uniforms,
-                            configuration: configuration
-                        )
+                        if style == .fullCard, card.supertype?.lowercased() == "trainer" {
+                            PokemonFullArtTrainerFoilOverlay(
+                                foilImageName: foilName,
+                                maskImageName: maskName,
+                                uniforms: uniforms,
+                                configuration: configuration,
+                                stripeColors: style.fullArtStripeColors
+                            )
+                        } else {
+                            PokemonRealFoilOverlay(
+                                foilImageName: foilName,
+                                maskImageName: maskName,
+                                style: style,
+                                uniforms: uniforms,
+                                configuration: configuration
+                            )
+                        }
                     } else if let reverseFoil = configuration.reverseFoil {
                         PokemonReverseFoilOverlay(
                             config: reverseFoil,
@@ -111,23 +121,19 @@ struct PokemonFoilOverlay: View {
                 .overlay(
                     RadialGradient(
                         gradient: Gradient(colors: [
-                            Color.white.opacity(0.5),
-                            Color.white.opacity(0.25),
-                            Color.black.opacity(0.3)
+                            Color.white.opacity(0.35),
+                            Color.white.opacity(0.18),
+                            Color.black.opacity(0.22)
                         ]),
                         center: uniforms.highlightPoint,
                         startRadius: 0,
                         endRadius: min(size.width, size.height) * configuration.highlightRadiusFactor
                     )
                     .blendMode(.overlay)
-                    .opacity(0.6 * sparkleStrength)
+                    .opacity(0.35 * sparkleStrength)
                 )
 
-            let maskedContent = highlightedContent
-                .opacity(configuration.baseOpacity * uniforms.cardOpacity)
-                .frame(width: size.width, height: size.height)
-
-            let maskView: AnyView = {
+            let maskBuilder: () -> AnyView = {
                 if let maskName = configuration.maskImageName {
                     return AnyView(
                         Image(maskName)
@@ -137,13 +143,21 @@ struct PokemonFoilOverlay: View {
                 } else {
                     return style.maskView(for: card)
                 }
-            }()
+            }
 
-            maskedContent
-                .mask(
-                    maskView
-                        .frame(width: size.width, height: size.height)
-                )
+            ZStack {
+                highlightedContent
+                    .opacity(configuration.baseOpacity * uniforms.cardOpacity)
+
+                if let glareConfig = configuration.glare {
+                    PokemonFoilGlareView(config: glareConfig, uniforms: uniforms)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .mask(
+                maskBuilder()
+                    .frame(width: size.width, height: size.height)
+            )
         }
         .compositingGroup()
         .blendMode(.plusLighter)
