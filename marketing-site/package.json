@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:local": "vite build",
-    "preview": "vite preview"
+    "prepare:openapi": "node scripts/sync-openapi.mjs",
+    "dev": "npm run prepare:openapi && vite",
+    "build": "npm run prepare:openapi && vite build",
+    "build:local": "npm run prepare:openapi && vite build",
+    "preview": "npm run prepare:openapi && vite preview"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
 const THEME_KEY = "tcger-marketing-theme";
-const API_DOCS_HREF = "https://github.com/ahzs645/TCGer/blob/main/docs/api.md";
-const OPENAPI_SPEC_HREF = "https://github.com/ahzs645/TCGer/blob/main/docs/openapi.yaml";
+const BASE_URL = import.meta.env.BASE_URL || "/";
+const API_DOCS_HREF = `${BASE_URL}api/docs/`;
+const OPENAPI_SPEC_HREF = `${BASE_URL}api/openapi.yaml`;
 
 function getInitialTheme() {
   if (typeof window === "undefined") {
