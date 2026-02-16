@@ -10,6 +10,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {
+    "@tcg/api-types": "*",
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
     "@radix-ui/react-checkbox": "^1.0.7",

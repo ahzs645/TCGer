@@ -1,42 +1,19 @@
 import type { Prisma } from '@prisma/client';
+import type {
+  CreateBinderInput,
+  UpdateBinderInput,
+  AddCardInput,
+  UpdateCardInput
+} from '@tcg/api-types';
 
 import { prisma } from '../../lib/prisma';
 
-export interface CreateBinderInput {
-  name: string;
-  description?: string;
-  colorHex?: string;
-}
+// Re-export shared types for existing consumers
+export type { CreateBinderInput, UpdateBinderInput } from '@tcg/api-types';
 
-export interface UpdateBinderInput {
-  name?: string;
-  description?: string;
-  colorHex?: string;
-}
-
-export interface AddCardToBinderInput {
-  cardId: string;
-  quantity: number;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  acquisitionPrice?: number;
-  serialNumber?: string;
-  acquiredAt?: string;
-  tags?: string[];
-  newTags?: { label: string; colorHex?: string }[];
-  cardData?: {
-    name: string;
-    tcg: string;
-    externalId: string;
-    setCode?: string;
-    setName?: string;
-    rarity?: string;
-    imageUrl?: string;
-    imageUrlSmall?: string;
-  };
-}
+// Local + exported aliases matching existing naming convention
+export type AddCardToBinderInput = AddCardInput;
+export type UpdateCollectionCardInput = UpdateCardInput;
 
 export const UNSORTED_BINDER_ID = '__library__';
 const UNSORTED_BINDER_COLOR = '9AA0A6';
@@ -160,31 +137,6 @@ function hashLabel(label: string) {
 function pickTagColor(label: string) {
   const index = hashLabel(label) % DEFAULT_TAG_COLORS.length;
   return DEFAULT_TAG_COLORS[index];
-}
-
-export interface UpdateCollectionCardInput {
-  condition?: string | null;
-  language?: string | null;
-  notes?: string | null;
-  serialNumber?: string | null;
-  acquiredAt?: string | null;
-  quantity?: number;
-  tags?: string[];
-  newTags?: { label: string; colorHex?: string }[];
-  targetBinderId?: string;
-  cardOverride?: {
-    cardId: string;
-    cardData?: {
-      name: string;
-      tcg: string;
-      externalId: string;
-      setCode?: string;
-      setName?: string;
-      rarity?: string;
-      imageUrl?: string;
-      imageUrlSmall?: string;
-    };
-  };
 }
 
 function getBinderSnapshot(collection: PrismaCollectionWithCard, fallback?: BinderSnapshot): BinderSnapshot {

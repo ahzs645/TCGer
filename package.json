@@ -8,15 +8,19 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace backend",
-    "dev:frontend": "npm run dev --workspace frontend",
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "format": "npm run format --workspaces --if-present"
+    "dev": "turbo dev --filter=@tcg/backend",
+    "dev:frontend": "turbo dev --filter=@tcg/frontend",
+    "dev:all": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "format": "turbo format"
   },
   "engines": {
     "node": ">=18.17.0",
     "npm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "turbo": "^2.8.9"
   }
 }
