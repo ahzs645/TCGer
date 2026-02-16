@@ -9,6 +9,7 @@ struct EditCollectionCardSheet: View {
         let condition: String?
         let language: String?
         let notes: String?
+        let tags: [String]
         let selectedPrint: Card?
     }
 
@@ -16,12 +17,18 @@ struct EditCollectionCardSheet: View {
     let isIndividualCopy: Bool
     let copyDetails: CollectionCardCopy?
     let isSaving: Bool
+    let onCreateTag: ((String) async throws -> CollectionCardTag)?
     let onSave: @Sendable (SavePayload) -> Void
 
     @State private var quantity: Int
     @State private var conditionSelection: String
     @State private var languageSelection: String
     @State private var notes: String
+    @State private var selectedTagIds: Set<String>
+    @State private var localTags: [CollectionCardTag]
+    @State private var newTagLabel = ""
+    @State private var isCreatingTag = false
+    @State private var tagError: String?
     @State private var showingPrintSelection = false
     @State private var selectedPrint: Card?
 
@@ -60,18 +67,24 @@ struct EditCollectionCardSheet: View {
         isIndividualCopy: Bool = false,
         copyDetails: CollectionCardCopy? = nil,
         isSaving: Bool,
+        availableTags: [CollectionCardTag] = [],
+        selectedTagIds: [String] = [],
+        onCreateTag: ((String) async throws -> CollectionCardTag)? = nil,
         onSave: @escaping @Sendable (SavePayload) -> Void
     ) {
         self.card = card
         self.isIndividualCopy = isIndividualCopy
         self.copyDetails = copyDetails
         self.isSaving = isSaving
+        self.onCreateTag = onCreateTag
         self.onSave = onSave
 
         _quantity = State(initialValue: max(1, card.quantity))
         _conditionSelection = State(initialValue: copyDetails?.condition ?? card.condition ?? "")
         _languageSelection = State(initialValue: copyDetails?.language ?? card.language ?? "")
         _notes = State(initialValue: copyDetails?.notes ?? card.notes ?? "")
+        _selectedTagIds = State(initialValue: Set(selectedTagIds))
+        _localTags = State(initialValue: availableTags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending })
     }
 
     var body: some View {
@@ -215,6 +228,63 @@ struct EditCollectionCardSheet: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                Section {
+                    if localTags.isEmpty {
+                        Text("No tags yet. Create one below.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(localTags) { tag in
+                            Button {
+                                if selectedTagIds.contains(tag.id) {
+                                    selectedTagIds.remove(tag.id)
+                                } else {
+                                    selectedTagIds.insert(tag.id)
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(Color.fromHex(tag.colorHex))
+                                        .frame(width: 10, height: 10)
+                                    Text(tag.label)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    if selectedTagIds.contains(tag.id) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.accentColor)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if onCreateTag != nil {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                TextField("Create new tag", text: $newTagLabel)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                                Button(isCreatingTag ? "Adding..." : "Add") {
+                                    Task { await createTag() }
+                                }
+                                .disabled(isCreatingTag || newTagLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+
+                            if let tagError {
+                                Text(tagError)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Tags")
+                } footer: {
+                    Text("Assign tags to this copy for filtering and organization.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .navigationTitle("Edit Card")
             .navigationBarTitleDisplayMode(.inline)
@@ -236,10 +306,11 @@ struct EditCollectionCardSheet: View {
                             condition: conditionToSave.isEmpty ? nil : conditionToSave,
                             language: languageToSave.isEmpty ? nil : languageToSave,
                             notes: notesToSave.isEmpty ? nil : notesToSave,
+                            tags: selectedTagIds.sorted(),
                             selectedPrint: selectedPrintToSave
                         )
 #if DEBUG
-                        print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") print:\(payload.selectedPrint?.id ?? "nil")")
+                        print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") tags:\(payload.tags) print:\(payload.selectedPrint?.id ?? "nil")")
 #endif
 
                         onSave(payload)
@@ -256,6 +327,33 @@ struct EditCollectionCardSheet: View {
                     .environmentObject(environmentStore)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func createTag() async {
+        guard let onCreateTag else { return }
+
+        let label = newTagLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty else { return }
+
+        tagError = nil
+        isCreatingTag = true
+
+        defer {
+            isCreatingTag = false
+        }
+
+        do {
+            let tag = try await onCreateTag(label)
+            if !localTags.contains(where: { $0.id == tag.id }) {
+                localTags.append(tag)
+                localTags.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+            }
+            selectedTagIds.insert(tag.id)
+            newTagLabel = ""
+        } catch {
+            tagError = error.localizedDescription
         }
     }
 }

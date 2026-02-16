@@ -135,8 +135,8 @@ function AuthRequiredScreen() {
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-4">
           <Image
-            src="/favicon.svg"
-            alt="TCG Manager"
+            src="/logo.svg"
+            alt="TCGer logo"
             width={64}
             height={64}
             className="dark:invert"

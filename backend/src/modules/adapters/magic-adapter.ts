@@ -64,6 +64,8 @@ interface ScryfallCard {
     mana_cost?: string; // eslint-disable-line camelcase
     type_line?: string; // eslint-disable-line camelcase
     oracle_text?: string; // eslint-disable-line camelcase
+    power?: string;
+    toughness?: string;
   }>;
   mana_cost?: string; // eslint-disable-line camelcase
   type_line?: string; // eslint-disable-line camelcase

@@ -94,8 +94,10 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
       const updatedUser = await updateUserProfile(updates, token);
 
-      // Update auth store with new user data
-      setAuth(updatedUser, token);
+      // Preserve fields that profile endpoint does not return (enabled game flags).
+      if (user) {
+        setAuth({ ...user, ...updatedUser }, token);
+      }
 
       // Update local profile state
       setProfile({ ...profile, ...updatedUser });

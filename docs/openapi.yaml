@@ -5,8 +5,12 @@ info:
   version: 0.1.0
 
 servers:
-  - url: http://localhost:3000
-    description: Local development
+  - url: /api
+    description: Docker gateway / reverse-proxy path
+  - url: /
+    description: Direct backend service (no API prefix)
+  - url: http://localhost:3001
+    description: Local backend example port
 
 security: []
 
@@ -183,6 +187,8 @@ paths:
       tags: [Cards]
       summary: Search cards across all TCGs
       operationId: searchCards
+      security:
+        - bearerAuth: []
       parameters:
         - name: query
           in: query
@@ -217,6 +223,8 @@ paths:
       tags: [Cards]
       summary: Get a single card by TCG and ID
       operationId: getCard
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/tcg"
         - $ref: "#/components/parameters/cardId"
@@ -238,6 +246,8 @@ paths:
       tags: [Cards]
       summary: Get all prints of a card
       operationId: getCardPrints
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/tcg"
         - $ref: "#/components/parameters/cardId"
@@ -293,6 +303,23 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
   /collections/{binderId}:
+    get:
+      tags: [Collections]
+      summary: Get a single binder
+      operationId: getBinder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/binderId"
+      responses:
+        "200":
+          description: Binder detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Binder"
+        "404":
+          $ref: "#/components/responses/NotFound"
     patch:
       tags: [Collections]
       summary: Update a binder

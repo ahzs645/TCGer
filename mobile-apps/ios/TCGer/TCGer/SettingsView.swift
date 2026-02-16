@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var cacheSize: String = "Calculating..."
     @State private var lastSyncDate: Date?
     @State private var isSyncing = false
+    @State private var isLoadingAppSettings = false
+    @State private var isUpdatingAppSettings = false
+    @State private var appSettingsError: String?
 
     var body: some View {
         NavigationView {
@@ -24,10 +27,14 @@ struct SettingsView: View {
                 Section {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(environmentStore.credentials.email.isEmpty ? "Not signed in" : environmentStore.credentials.email)
+                            Text(displayEmail)
                                 .font(.headline)
-                            if !environmentStore.credentials.email.isEmpty {
+                            if environmentStore.isAuthenticated {
                                 Text("Signed in")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("Guest access")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -51,6 +58,12 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+
+                        if environmentStore.isCurrentUserAdmin {
+                            Label("Administrator", systemImage: "checkmark.shield.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
                     }
                 } header: {
                     Text("Account")
@@ -68,7 +81,7 @@ struct SettingsView: View {
                     }
                     Button("Reconfigure Server") {
                         environmentStore.serverConfiguration = .empty
-                        environmentStore.isAuthenticated = false
+                        environmentStore.signOut()
                     }
                 } header: {
                     Text("Server")
@@ -157,6 +170,78 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Display Preferences")
+                }
+
+                if environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin {
+                    // Admin Access Policy Section
+                    Section {
+                        if isLoadingAppSettings {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                        } else if environmentStore.appSettings != nil {
+                            Toggle(isOn: Binding(
+                                get: { environmentStore.appSettings?.publicDashboard ?? false },
+                                set: { value in
+                                    Task { await updateAppSettings(publicDashboard: value) }
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Public Dashboard")
+                                    Text("Allow dashboard access without signing in")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .disabled(isUpdatingAppSettings)
+
+                            Toggle(isOn: Binding(
+                                get: { environmentStore.appSettings?.publicCollections ?? false },
+                                set: { value in
+                                    Task { await updateAppSettings(publicCollections: value) }
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Public Collections")
+                                    Text("Allow collection browsing without signing in")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .disabled(isUpdatingAppSettings)
+
+                            Toggle(isOn: Binding(
+                                get: { environmentStore.appSettings?.requireAuth ?? false },
+                                set: { value in
+                                    Task { await updateAppSettings(requireAuth: value) }
+                                }
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Require Authentication")
+                                    Text("Force sign-in before using app features")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .disabled(isUpdatingAppSettings)
+                        } else {
+                            Text("Unable to load admin settings.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if let appSettingsError {
+                            Text(appSettingsError)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    } header: {
+                        Text("Admin Access Policy")
+                    } footer: {
+                        Text("These settings mirror web access policy options.")
+                    }
                 }
 
                 // Data & Sync Section
@@ -250,9 +335,9 @@ struct SettingsView: View {
                 // Actions Section
                 Section {
                     Button("Sign Out", role: .destructive) {
-                        environmentStore.isAuthenticated = false
-                        environmentStore.authToken = nil
+                        environmentStore.signOut()
                     }
+                    .disabled(!environmentStore.isAuthenticated)
 
                     Button("Reset All Settings", role: .destructive) {
                         showingResetAlert = true
@@ -273,7 +358,9 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .task {
+                await refreshProfileIfNeeded()
                 await refreshPreferencesIfNeeded()
+                await refreshAppSettingsIfNeeded()
                 updateCacheInfo()
                 await refreshServerStatus()
             }
@@ -309,8 +396,19 @@ struct SettingsView: View {
             }
             .task(id: environmentStore.serverConfiguration.baseURL) {
                 await refreshServerStatus()
+                await refreshAppSettingsIfNeeded()
             }
         }
+    }
+
+    private var displayEmail: String {
+        if let email = environmentStore.currentUser?.email, !email.isEmpty {
+            return email
+        }
+        if !environmentStore.credentials.email.isEmpty {
+            return environmentStore.credentials.email
+        }
+        return "Not signed in"
     }
 
     private func updateCacheInfo() {
@@ -399,6 +497,91 @@ private extension SettingsView {
             }
         } catch {
             print("Failed to refresh preferences: \(error)")
+        }
+    }
+
+    func refreshProfileIfNeeded() async {
+        guard environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        let api = APIService()
+
+        do {
+            let profile = try await api.getUserProfile(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            await MainActor.run {
+                environmentStore.applyUserProfile(profile)
+            }
+        } catch {
+            print("Failed to refresh user profile: \(error)")
+        }
+    }
+
+    func refreshAppSettingsIfNeeded() async {
+        guard environmentStore.serverConfiguration.isValid else {
+            return
+        }
+
+        await MainActor.run {
+            isLoadingAppSettings = true
+            appSettingsError = nil
+        }
+
+        let api = APIService()
+
+        do {
+            let settings = try await api.getSettings(config: environmentStore.serverConfiguration)
+            await MainActor.run {
+                environmentStore.applyAppSettings(settings)
+                isLoadingAppSettings = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoadingAppSettings = false
+                appSettingsError = error.localizedDescription
+            }
+        }
+    }
+
+    func updateAppSettings(
+        publicDashboard: Bool? = nil,
+        publicCollections: Bool? = nil,
+        requireAuth: Bool? = nil
+    ) async {
+        guard environmentStore.isCurrentUserAdmin,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        await MainActor.run {
+            isUpdatingAppSettings = true
+            appSettingsError = nil
+        }
+
+        let api = APIService()
+
+        do {
+            let settings = try await api.updateSettings(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                publicDashboard: publicDashboard,
+                publicCollections: publicCollections,
+                requireAuth: requireAuth
+            )
+            await MainActor.run {
+                environmentStore.applyAppSettings(settings)
+                isUpdatingAppSettings = false
+            }
+        } catch {
+            await MainActor.run {
+                isUpdatingAppSettings = false
+                appSettingsError = error.localizedDescription
+            }
+            await refreshAppSettingsIfNeeded()
         }
     }
 

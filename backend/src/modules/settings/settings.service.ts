@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 export async function getAppSettings() {
   let settings = await prisma.appSettings.findUnique({ where: { id: 1 } });

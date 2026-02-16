@@ -71,6 +71,11 @@ Frontend:
 - `BACKEND_API_ORIGIN` (internal API origin for server-side Next.js fetches).
 
 ## API overview
+OpenAPI + Swagger:
+- OpenAPI source: `docs/openapi.yaml`
+- Raw spec endpoint: `GET /openapi.yaml` (gateway: `GET /api/openapi.yaml`)
+- Swagger UI: `GET /docs` (gateway: `GET /api/docs`)
+
 Key routes (see `backend/src/api/routes`):
 - `GET /health` - Liveness and readiness probes.
 - `POST /auth/signup`, `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`
@@ -97,7 +102,32 @@ Key routes (see `backend/src/api/routes`):
 - Android scaffold is in `mobile-apps/android`.
 
 ## Docs and scripts
+- API docs usage: `docs/api.md`
+- OpenAPI spec: `docs/openapi.yaml`
+- Marketing site source (React + Vite): `marketing-site/`
 - Docker setup: `docker/README.md`
 - Cache backup/restore: `docker/CACHE_BACKUP_GUIDE.md`, `docker/backup-caches.sh`, `docker/restore-caches.sh`
 - Roadmap: `plan.md`
 
+## GitHub Pages (product page)
+The product page source lives in `marketing-site/` and builds into `docs/` for GitHub Pages.
+
+Local development:
+
+```bash
+npm --prefix marketing-site install
+npm --prefix marketing-site run dev
+```
+
+Build for GitHub Pages (`/TCGer/` base path):
+
+```bash
+npm run build:marketing
+```
+
+To publish it with GitHub Pages:
+
+1. Go to repository **Settings -> Pages**.
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+3. Choose your main branch and the `/docs` folder, then save.
+4. Wait for Pages to build, then open the published site URL shown in that settings page.

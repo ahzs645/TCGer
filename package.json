@@ -2,6 +2,7 @@
   "name": "tcg-collection-manager",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.7.0",
   "workspaces": [
     "backend",
     "frontend",
@@ -10,8 +11,10 @@
   "scripts": {
     "dev": "turbo dev --filter=@tcg/backend",
     "dev:frontend": "turbo dev --filter=@tcg/frontend",
+    "dev:marketing": "npm --prefix marketing-site run dev",
     "dev:all": "turbo dev",
     "build": "turbo build",
+    "build:marketing": "npm --prefix marketing-site run build",
     "lint": "turbo lint",
     "test": "turbo test",
     "format": "turbo format"

@@ -98,7 +98,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
                 onClick={onSwitchToSignup}
                 className="w-full"
               >
-                Don't have an account? Sign up
+                Don&apos;t have an account? Sign up
               </Button>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { TcgCode } from './cards';
 
 // ---------------------------------------------------------------------------
 // Shared sub-schemas
@@ -125,21 +126,34 @@ export interface CollectionCard {
   cardId: string;
   externalId?: string;
   name: string;
-  tcg: string;
+  tcg: TcgCode;
   setCode?: string;
   setName?: string;
   rarity?: string;
+  collectorNumber?: string;
+  releasedAt?: string;
   imageUrl?: string;
   imageUrlSmall?: string;
+  setSymbolUrl?: string;
+  regulationMark?: string;
+  languageCode?: string;
+  attributes?: Record<string, unknown>;
   quantity: number;
   condition?: string;
   language?: string;
   notes?: string;
   price?: number;
+  acquisitionPrice?: number;
+  serialNumber?: string;
+  acquiredAt?: string;
   binderId?: string;
   binderName?: string;
   binderColorHex?: string;
   conditionSummary?: string;
+  priceHistory?: Array<{
+    price: number;
+    recordedAt: string;
+  } | number>;
   copies: CollectionCardCopy[];
 }
 

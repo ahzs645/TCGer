@@ -6,20 +6,37 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var showingSearch = false
+
+    private var canViewDashboardWithoutAuth: Bool {
+        guard let settings = environmentStore.appSettings else { return false }
+        return settings.publicDashboard || !settings.requireAuth
+    }
+
+    private var canViewCollectionsWithoutAuth: Bool {
+        guard let settings = environmentStore.appSettings else { return false }
+        return settings.publicCollections || !settings.requireAuth
+    }
 
     var body: some View {
         TabView {
-            Tab("Home", systemImage: "house.fill") {
-                DashboardView()
+            if environmentStore.isAuthenticated || canViewDashboardWithoutAuth {
+                Tab("Home", systemImage: "house.fill") {
+                    DashboardView()
+                }
             }
 
-            Tab("Collections", systemImage: "folder.fill") {
-                CollectionsView()
+            if environmentStore.isAuthenticated || canViewCollectionsWithoutAuth {
+                Tab("Collections", systemImage: "folder.fill") {
+                    CollectionsView()
+                }
             }
 
-            Tab("Scan", systemImage: "camera.viewfinder") {
-                CardScannerView()
+            if environmentStore.isAuthenticated {
+                Tab("Scan", systemImage: "camera.viewfinder") {
+                    CardScannerView()
+                }
             }
 
             Tab("Settings", systemImage: "gearshape.fill") {

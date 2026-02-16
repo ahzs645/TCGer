@@ -1,9 +1,14 @@
 import Foundation
 
 extension APIService {
+    struct TagPayload: Codable, Hashable, Sendable {
+        let label: String
+        let colorHex: String?
+    }
+
     func getCollections(
         config: ServerConfiguration,
-        token: String,
+        token: String? = nil,
         useCache: Bool = false
     ) async throws -> [Collection] {
         if useCache || !NetworkMonitor.shared.isConnected {
@@ -76,7 +81,7 @@ extension APIService {
 
     func getCollection(
         config: ServerConfiguration,
-        token: String,
+        token: String? = nil,
         id: String
     ) async throws -> Collection {
         let (data, response) = try await makeRequest(
@@ -193,6 +198,60 @@ extension APIService {
         }
     }
 
+    func getTags(
+        config: ServerConfiguration,
+        token: String
+    ) async throws -> [CollectionCardTag] {
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/tags",
+            token: token
+        )
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        guard let tags = try? JSONDecoder().decode([CollectionCardTag].self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return tags
+    }
+
+    func createTag(
+        config: ServerConfiguration,
+        token: String,
+        label: String,
+        colorHex: String? = nil
+    ) async throws -> CollectionCardTag {
+        let payload = TagPayload(label: label, colorHex: colorHex)
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/tags",
+            method: "POST",
+            token: token,
+            body: payload
+        )
+
+        guard response.statusCode == 201 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            let serverMessage = parseServerMessage(from: data)
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
+        }
+
+        guard let tag = try? JSONDecoder().decode(CollectionCardTag.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return tag
+    }
+
     struct AddCardToBinderRequest: Encodable {
         let cardId: String
         let quantity: Int
@@ -201,6 +260,8 @@ extension APIService {
         let notes: String?
         let price: Double?
         let acquisitionPrice: Double?
+        let tags: [String]?
+        let newTags: [TagPayload]?
         let cardData: CardData?
 
         struct CardData: Encodable {
@@ -236,6 +297,8 @@ extension APIService {
         let condition: String?
         let language: String?
         let notes: String?
+        let tags: [String]?
+        let newTags: [TagPayload]?
         let cardOverride: CardOverride?
         let targetBinderId: String?
     }
@@ -251,6 +314,8 @@ extension APIService {
         notes: String? = nil,
         price: Double? = nil,
         acquisitionPrice: Double? = nil,
+        tags: [String]? = nil,
+        newTags: [TagPayload]? = nil,
         card: Card? = nil
     ) async throws {
         let cardData: AddCardToBinderRequest.CardData?
@@ -277,6 +342,8 @@ extension APIService {
             notes: notes,
             price: price,
             acquisitionPrice: acquisitionPrice,
+            tags: tags,
+            newTags: newTags,
             cardData: cardData
         )
 
@@ -307,6 +374,8 @@ extension APIService {
         condition: String? = nil,
         language: String? = nil,
         notes: String? = nil,
+        tags: [String]? = nil,
+        newTags: [TagPayload]? = nil,
         newPrint: Card? = nil,
         targetBinderId: String? = nil
     ) async throws -> CollectionCard {
@@ -338,6 +407,8 @@ extension APIService {
             condition: condition,
             language: language,
             notes: notes,
+            tags: tags,
+            newTags: newTags,
             cardOverride: cardOverride,
             targetBinderId: targetBinderId
         )

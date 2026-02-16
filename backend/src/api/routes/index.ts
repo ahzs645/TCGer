@@ -3,11 +3,13 @@ import type { Express } from 'express';
 import { authRouter } from './auth.router';
 import { cardsRouter } from './cards.router';
 import { collectionsRouter } from './collections.router';
+import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { settingsRouter } from './settings.router';
 import { usersRouter } from './users.router';
 
 export function registerRoutes(app: Express): void {
+  app.use('/', docsRouter);
   app.use('/health', healthRouter);
   app.use('/auth', authRouter);
   app.use('/settings', settingsRouter);

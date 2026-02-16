@@ -1,11 +1,30 @@
-import type { CollectionCard } from '@/types/card';
+import type { TcgCode } from '@/types/card';
+
+interface SampleCollectionCard {
+  id: string;
+  tcg: TcgCode;
+  name: string;
+  setCode?: string;
+  setName?: string;
+  rarity?: string;
+  imageUrl?: string;
+  imageUrlSmall?: string;
+  setSymbolUrl?: string;
+  attributes?: Record<string, unknown>;
+  quantity: number;
+  condition?: string;
+  notes?: string;
+  price?: number;
+  acquisitionPrice?: number;
+  priceHistory?: number[];
+}
 
 export interface SampleCollection {
   id: string;
   name: string;
   description: string;
   updatedAt: string;
-  cards: CollectionCard[];
+  cards: SampleCollectionCard[];
 }
 
 export const SAMPLE_COLLECTIONS: SampleCollection[] = [
