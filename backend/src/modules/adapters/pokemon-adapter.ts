@@ -6,7 +6,8 @@ import type {
   PokemonFunctionalGroupDTO,
   PokemonFunctionalAttackDTO,
   PokemonPrintMetadata,
-  PokemonVariantFlags
+  PokemonVariantFlags,
+  TcgAdapter
 } from './types';
 
 const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');

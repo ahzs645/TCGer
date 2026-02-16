@@ -1,122 +1,29 @@
+import type {
+  CollectionTag,
+  CollectionCardCopy,
+  CollectionCard,
+  Binder,
+  CreateBinderInput,
+  UpdateBinderInput,
+  AddCardInput,
+  UpdateCardInput,
+  CollectionTagResponse,
+  CreateTagInput
+} from '@tcg/api-types';
+
+// Re-export shared types with frontend naming convention
+export type { CollectionTag, CollectionCardCopy, CollectionCard, CollectionTagResponse, CreateTagInput } from '@tcg/api-types';
+
+// Frontend uses "Collection" terminology; backend uses "Binder"
+export type Collection = Binder;
+export type CreateCollectionInput = CreateBinderInput;
+export type UpdateCollectionInput = UpdateBinderInput;
+export type AddCardToCollectionInput = AddCardInput;
+export type UpdateCollectionCardInput = UpdateCardInput;
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export const LIBRARY_COLLECTION_ID = '__library__';
-
-export interface CollectionTag {
-  id: string;
-  label: string;
-  colorHex: string;
-}
-
-export interface CollectionCardCopy {
-  id: string;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  acquisitionPrice?: number;
-  serialNumber?: string;
-  acquiredAt?: string;
-  tags: CollectionTag[];
-}
-
-export interface CollectionCard {
-  id: string;
-  cardId: string;
-  externalId?: string;
-  name: string;
-  tcg: string;
-  setCode?: string;
-  setName?: string;
-  rarity?: string;
-  imageUrl?: string;
-  imageUrlSmall?: string;
-  quantity: number;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  binderId?: string;
-  binderName?: string;
-  binderColorHex?: string;
-  conditionSummary?: string;
-  copies: CollectionCardCopy[];
-}
-
-export interface Collection {
-  id: string;
-  name: string;
-  description?: string;
-  colorHex?: string;
-  cards: CollectionCard[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateCollectionInput {
-  name: string;
-  description?: string;
-}
-
-export interface UpdateCollectionInput {
-  name?: string;
-  description?: string;
-  colorHex?: string;
-}
-
-export interface AddCardToCollectionInput {
-  cardId: string;
-  quantity?: number;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  acquisitionPrice?: number;
-  serialNumber?: string;
-  acquiredAt?: string;
-  tags?: string[];
-  newTags?: { label: string; colorHex?: string }[];
-  cardData?: {
-    name: string;
-    tcg: string;
-    externalId: string;
-    setCode?: string;
-    setName?: string;
-    rarity?: string;
-    imageUrl?: string;
-    imageUrlSmall?: string;
-  };
-}
-
-export interface UpdateCollectionCardInput {
-  condition?: string | null;
-  language?: string | null;
-  notes?: string | null;
-  serialNumber?: string | null;
-  acquiredAt?: string | null;
-  quantity?: number;
-  tags?: string[];
-  newTags?: { label: string; colorHex?: string }[];
-  targetBinderId?: string;
-  cardOverride?: {
-    cardId: string;
-    cardData?: {
-      name: string;
-      tcg: string;
-      externalId: string;
-      setCode?: string;
-      setName?: string;
-      rarity?: string;
-      imageUrl?: string;
-      imageUrlSmall?: string;
-    };
-  };
-}
-
-export interface CollectionTagResponse extends CollectionTag {
-  createdAt: string;
-  updatedAt: string;
-}
 
 export async function getCollections(token: string): Promise<Collection[]> {
   const response = await fetch(`${API_BASE_URL}/collections`, {
@@ -291,11 +198,6 @@ export async function getTags(token: string): Promise<CollectionTagResponse[]> {
   }
 
   return response.json();
-}
-
-export interface CreateTagInput {
-  label: string;
-  colorHex?: string;
 }
 
 export async function createTag(token: string, data: CreateTagInput): Promise<CollectionTagResponse> {
