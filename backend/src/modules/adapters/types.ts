@@ -1,86 +1,29 @@
-export type TcgCode = 'yugioh' | 'magic' | 'pokemon';
+// Re-export shared API types (canonical source: @tcg/api-types)
+export type {
+  TcgCode,
+  Card,
+  PokemonPrintMetadata,
+  PokemonVariantFlags,
+  PokemonFinishType,
+  PokemonFunctionalAttack,
+  PokemonFunctionalAbility,
+  PokemonFunctionalGroup,
+  CardPrintsResponse
+} from '@tcg/api-types';
 
-export interface CardDTO {
-  id: string;
-  tcg: TcgCode;
-  name: string;
-  setCode?: string;
-  setName?: string;
-  rarity?: string;
-  collectorNumber?: string;
-  releasedAt?: string;
-  imageUrl?: string;
-  imageUrlSmall?: string;
-  setSymbolUrl?: string;
-  regulationMark?: string;
-  language?: string;
-  pokemonPrint?: PokemonPrintMetadata;
-  attributes?: Record<string, unknown>;
-}
+// Backend-specific aliases to preserve existing naming convention
+export type { Card as CardDTO } from '@tcg/api-types';
+export type { PokemonFunctionalAttack as PokemonFunctionalAttackDTO } from '@tcg/api-types';
+export type { PokemonFunctionalAbility as PokemonFunctionalAbilityDTO } from '@tcg/api-types';
+export type { PokemonFunctionalGroup as PokemonFunctionalGroupDTO } from '@tcg/api-types';
+export type { CardPrintsResponse as CardPrintsResult } from '@tcg/api-types';
 
-export interface PokemonPrintMetadata {
-  tcgdexId?: string;
-  tcgdexImage?: string;
-  variants?: PokemonVariantFlags;
-  finishes?: PokemonFinishType[];
-  category?: string;
-  regulationMark?: string;
-  language?: string;
-}
+import type { TcgCode, Card, CardPrintsResponse } from '@tcg/api-types';
 
-export type PokemonFinishType = 'normal' | 'reverse' | 'holo' | 'firstEdition';
-
-export interface PokemonVariantFlags {
-  normal?: boolean;
-  reverse?: boolean;
-  holo?: boolean;
-  firstEdition?: boolean;
-}
-
-export interface PokemonFunctionalAttackDTO {
-  name: string;
-  cost?: string[];
-  text?: string;
-  damage?: string;
-  convertedEnergyCost?: number;
-}
-
-export interface PokemonFunctionalAbilityDTO {
-  name: string;
-  text?: string;
-  type?: string;
-}
-
-export interface PokemonFunctionalGroupDTO {
-  functionalKey: string;
-  name: string;
-  supertype?: string;
-  subtypes?: string[];
-  hp?: string;
-  regulationMark?: string;
-  category?: string;
-  normalizedRules?: string | null;
-  attacks?: PokemonFunctionalAttackDTO[];
-  abilities?: PokemonFunctionalAbilityDTO[];
-  rules?: string[] | null;
-}
-
-export type CardPrintsResult = SimpleCardPrintsResult | PokemonFunctionalCardPrintsResult;
-
-export interface SimpleCardPrintsResult {
-  mode: 'simple';
-  prints: CardDTO[];
-  total: number;
-}
-
-export interface PokemonFunctionalCardPrintsResult extends SimpleCardPrintsResult {
-  mode: 'pokemon-functional';
-  functionalGroup: PokemonFunctionalGroupDTO;
-}
-
+// Backend-only: adapter interface (not part of the API contract)
 export interface TcgAdapter {
   readonly game: TcgCode;
-  searchCards(query: string): Promise<CardDTO[]>;
-  fetchCardById(externalId: string): Promise<CardDTO | null>;
-  fetchCardPrints?(externalId: string): Promise<CardPrintsResult>;
+  searchCards(query: string): Promise<Card[]>;
+  fetchCardById(externalId: string): Promise<Card | null>;
+  fetchCardPrints?(externalId: string): Promise<CardPrintsResponse>;
 }

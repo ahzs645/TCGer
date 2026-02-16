@@ -1,36 +1,8 @@
+import type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckResponse } from '@tcg/api-types';
+
+export type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckResponse } from '@tcg/api-types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-
-export interface SignupInput {
-  email: string;
-  password: string;
-  username?: string;
-}
-
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  username: string | null;
-  isAdmin: boolean;
-  showCardNumbers: boolean;
-  showPricing: boolean;
-  enabledYugioh: boolean;
-  enabledMagic: boolean;
-  enabledPokemon: boolean;
-}
-
-export interface AuthResponse {
-  user: AuthUser;
-  token: string;
-}
-
-export interface SetupCheckResponse {
-  setupRequired: boolean;
-}
 
 export async function signup(data: SignupInput): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/signup`, {

@@ -3,6 +3,10 @@ node_modules/
 dist/
 build/
 .next/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
 
 # Environment files
 .env*

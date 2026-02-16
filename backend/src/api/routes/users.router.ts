@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { z } from 'zod';
+import {
+  updatePreferencesSchema,
+  updateProfileSchema,
+  changePasswordSchema
+} from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
@@ -27,18 +31,6 @@ usersRouter.get(
     res.json(preferences);
   })
 );
-
-const updatePreferencesSchema = z
-  .object({
-    showCardNumbers: z.boolean().optional(),
-    showPricing: z.boolean().optional(),
-    enabledYugioh: z.boolean().optional(),
-    enabledMagic: z.boolean().optional(),
-    enabledPokemon: z.boolean().optional()
-  })
-  .refine((data) => Object.keys(data).length > 0, {
-    message: 'At least one preference must be provided'
-  });
 
 usersRouter.patch(
   '/me/preferences',
@@ -72,16 +64,6 @@ usersRouter.get(
   })
 );
 
-// Update user profile (username, email)
-const updateProfileSchema = z
-  .object({
-    username: z.string().min(1).max(50).optional(),
-    email: z.string().email().optional()
-  })
-  .refine((data) => Object.keys(data).length > 0, {
-    message: 'At least one field must be provided'
-  });
-
 usersRouter.patch(
   '/me',
   requireAuth,
@@ -97,12 +79,6 @@ usersRouter.patch(
     res.json(updatedUser);
   })
 );
-
-// Change password
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8, 'Password must be at least 8 characters')
-});
 
 usersRouter.post(
   '/me/change-password',

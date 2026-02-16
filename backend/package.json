@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
+    "@tcg/api-types": "*",
     "@prisma/client": "^6.18.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",

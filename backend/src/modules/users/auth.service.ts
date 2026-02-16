@@ -1,39 +1,35 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import type {
+  SignupInput,
+  LoginInput,
+  AuthResponse,
+  UpdatePreferencesInput,
+  UpdateProfileInput,
+  ChangePasswordInput
+} from '@tcg/api-types';
 
 import { env } from '../../config/env';
 
 const prisma = new PrismaClient();
 
-export interface SignupInput {
-  email: string;
-  password: string;
-  username?: string;
+// Re-export shared types for existing consumers
+export type {
+  SignupInput,
+  LoginInput,
+  AuthResponse,
+  UpdatePreferencesInput as UpdateUserPreferencesInput,
+  UpdateProfileInput as UpdateUserProfileInput,
+  ChangePasswordInput
+} from '@tcg/api-types';
+
+// Backend-specific extension: signup service also accepts isAdmin flag
+interface SignupServiceInput extends SignupInput {
   isAdmin?: boolean;
 }
 
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    username: string | null;
-    isAdmin: boolean;
-    showCardNumbers: boolean;
-    showPricing: boolean;
-    enabledYugioh: boolean;
-    enabledMagic: boolean;
-    enabledPokemon: boolean;
-  };
-  token: string;
-}
-
-export async function signup(input: SignupInput): Promise<AuthResponse> {
+export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
   const { email, password, username, isAdmin = false } = input;
 
   // Check if user already exists
@@ -121,7 +117,7 @@ export async function hasAdminUser(): Promise<boolean> {
   return adminCount > 0;
 }
 
-export async function setupInitialAdmin(input: SignupInput): Promise<AuthResponse> {
+export async function setupInitialAdmin(input: SignupServiceInput): Promise<AuthResponse> {
   // Check if admin already exists
   const hasAdmin = await hasAdminUser();
   if (hasAdmin) {
@@ -165,14 +161,6 @@ export async function getUserById(userId: string) {
   return user;
 }
 
-export interface UpdateUserPreferencesInput {
-  showCardNumbers?: boolean;
-  showPricing?: boolean;
-  enabledYugioh?: boolean;
-  enabledMagic?: boolean;
-  enabledPokemon?: boolean;
-}
-
 export async function getUserPreferences(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -192,7 +180,7 @@ export async function getUserPreferences(userId: string) {
   return user;
 }
 
-export async function updateUserPreferences(userId: string, input: UpdateUserPreferencesInput) {
+export async function updateUserPreferences(userId: string, input: UpdatePreferencesInput) {
   const user = await prisma.user.update({
     where: { id: userId },
     data: input,
@@ -208,12 +196,7 @@ export async function updateUserPreferences(userId: string, input: UpdateUserPre
   return user;
 }
 
-export interface UpdateUserProfileInput {
-  username?: string;
-  email?: string;
-}
-
-export async function updateUserProfile(userId: string, input: UpdateUserProfileInput) {
+export async function updateUserProfile(userId: string, input: UpdateProfileInput) {
   // If email is being changed, check if it's already taken
   if (input.email) {
     const existingUser = await prisma.user.findUnique({
@@ -241,11 +224,6 @@ export async function updateUserProfile(userId: string, input: UpdateUserProfile
   });
 
   return user;
-}
-
-export interface ChangePasswordInput {
-  currentPassword: string;
-  newPassword: string;
 }
 
 export async function changePassword(userId: string, input: ChangePasswordInput) {
