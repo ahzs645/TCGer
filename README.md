@@ -17,7 +17,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 - `services/` - Optional cache services (scryfall-bulk, ygo-cache, tcgdex-cache, pokemon-cache).
 - `docker/` - Compose files, nginx gateway, cache backup scripts.
 - `mobile-apps/` - iOS SwiftUI client (in progress) and Android placeholder.
-- `docs/` - API and architecture notes (WIP).
+- `docs/` - Starlight documentation site source + OpenAPI spec.
 
 ## Quick start (Docker)
 ```bash
@@ -102,8 +102,13 @@ Key routes (see `backend/src/api/routes`):
 - Android scaffold is in `mobile-apps/android`.
 
 ## Docs and scripts
-- API docs usage: `docs/api.md`
+- Starlight docs source: `docs/src/content/docs/`
 - OpenAPI spec: `docs/openapi.yaml`
+- Run docs locally:
+  - `npm --prefix docs install`
+  - `npm run docs:dev`
+- Build docs:
+  - `npm run docs:build`
 - Marketing site source (React + Vite): `marketing-site/`
 - Docker setup: `docker/README.md`
 - Cache backup/restore: `docker/CACHE_BACKUP_GUIDE.md`, `docker/backup-caches.sh`, `docker/restore-caches.sh`
@@ -130,6 +135,7 @@ Automated deployment workflow:
 - Workflow file: `.github/workflows/pages.yml`
 - Trigger: push to `main` (or manual `workflow_dispatch`)
 - Build output uploaded to Pages: `marketing-site/dist`
+- Starlight docs are published under `/docs` (for example `https://<your-domain>/docs/`)
 
 Setup steps:
 
