@@ -1,20 +1,11 @@
 import { Router } from 'express';
-import { z } from 'zod';
+import { searchQuerySchema, cardParamsSchema } from '@tcg/api-types';
 
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
 import { getCardPrints, searchCards } from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
 
 export const cardsRouter = Router();
-
-const searchQuerySchema = z.object({
-  query: z.string().min(1, 'query parameter is required'),
-  tcg: z.string().optional()
-});
-const cardParamsSchema = z.object({
-  tcg: z.string(),
-  cardId: z.string()
-});
 
 cardsRouter.get(
   '/search',

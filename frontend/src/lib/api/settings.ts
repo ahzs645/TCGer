@@ -1,20 +1,8 @@
+import type { AppSettings, UpdateSettingsInput } from '@tcg/api-types';
+
+export type { AppSettings, UpdateSettingsInput } from '@tcg/api-types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-
-export interface AppSettings {
-  id: number;
-  publicDashboard: boolean;
-  publicCollections: boolean;
-  requireAuth: boolean;
-  appName: string;
-  updatedAt: string;
-}
-
-export interface UpdateSettingsInput {
-  publicDashboard?: boolean;
-  publicCollections?: boolean;
-  requireAuth?: boolean;
-  appName?: string;
-}
 
 export async function getSettings(): Promise<AppSettings> {
   const response = await fetch(`${API_BASE_URL}/settings`);

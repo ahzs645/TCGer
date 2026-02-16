@@ -1,12 +1,8 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+import type { UserPreferences } from '@tcg/api-types';
 
-export interface UserPreferences {
-  showCardNumbers: boolean;
-  showPricing: boolean;
-  enabledYugioh: boolean;
-  enabledMagic: boolean;
-  enabledPokemon: boolean;
-}
+export type { UserPreferences } from '@tcg/api-types';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getUserPreferences(token: string): Promise<UserPreferences> {
   const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {

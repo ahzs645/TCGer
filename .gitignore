@@ -4,6 +4,9 @@ dist/
 build/
 .next/
 
+# Turborepo
+.turbo/
+
 # Environment files
 .env*
 !.env.example

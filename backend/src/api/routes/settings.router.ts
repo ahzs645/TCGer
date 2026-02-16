@@ -1,17 +1,10 @@
 import { Router } from 'express';
-import { z } from 'zod';
+import { updateSettingsSchema } from '@tcg/api-types';
 
 import { getAppSettings, updateAppSettings } from '../../modules/settings/settings.service';
 import { asyncHandler } from '../../utils/async-handler';
 
 export const settingsRouter = Router();
-
-const updateSettingsSchema = z.object({
-  publicDashboard: z.boolean().optional(),
-  publicCollections: z.boolean().optional(),
-  requireAuth: z.boolean().optional(),
-  appName: z.string().optional()
-});
 
 settingsRouter.get(
   '/',

@@ -1,24 +1,8 @@
+import type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/api-types';
+
+export type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/api-types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-
-export interface UserProfile {
-  id: string;
-  email: string;
-  username: string | null;
-  isAdmin: boolean;
-  showCardNumbers: boolean;
-  showPricing: boolean;
-  createdAt: string;
-}
-
-export interface UpdateProfileInput {
-  username?: string;
-  email?: string;
-}
-
-export interface ChangePasswordInput {
-  currentPassword: string;
-  newPassword: string;
-}
 
 export async function getUserProfile(token: string): Promise<UserProfile> {
   const response = await fetch(`${API_BASE_URL}/users/me`, {
