@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
 const THEME_KEY = "tcger-marketing-theme";
-const API_DOCS_HREF = "/api/docs";
-const OPENAPI_SPEC_HREF = "/api/openapi.yaml";
+const API_DOCS_HREF = "https://github.com/ahzs645/TCGer/blob/main/docs/api.md";
+const OPENAPI_SPEC_HREF = "https://github.com/ahzs645/TCGer/blob/main/docs/openapi.yaml";
 
 function getInitialTheme() {
   if (typeof window === "undefined") {
@@ -101,7 +101,7 @@ const FAQS = [
   },
   {
     question: "Is there API documentation for integration?",
-    answer: "Yes. OpenAPI and Swagger docs are part of the backend and available at /api/docs."
+    answer: "Yes. OpenAPI and docs references are included in this project and linked from the page."
   }
 ];
 

@@ -13,9 +13,5 @@ export default defineConfig({
         rewrite: (requestPath) => requestPath.replace(/^\/api/, "")
       }
     }
-  },
-  build: {
-    outDir: "../docs",
-    emptyOutDir: false
   }
 });

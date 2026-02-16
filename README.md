@@ -110,7 +110,7 @@ Key routes (see `backend/src/api/routes`):
 - Roadmap: `plan.md`
 
 ## GitHub Pages (product page)
-The product page source lives in `marketing-site/` and builds into `docs/` for GitHub Pages.
+The product page source lives in `marketing-site/` and is deployed by GitHub Actions.
 
 Local development:
 
@@ -119,15 +119,22 @@ npm --prefix marketing-site install
 npm --prefix marketing-site run dev
 ```
 
-Build for GitHub Pages (`/TCGer/` base path):
+Build locally:
 
 ```bash
 npm run build:marketing
 ```
 
-To publish it with GitHub Pages:
+Automated deployment workflow:
+
+- Workflow file: `.github/workflows/pages.yml`
+- Trigger: push to `main` (or manual `workflow_dispatch`)
+- Build output uploaded to Pages: `marketing-site/dist`
+
+Setup steps:
 
 1. Go to repository **Settings -> Pages**.
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-3. Choose your main branch and the `/docs` folder, then save.
-4. Wait for Pages to build, then open the published site URL shown in that settings page.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Add custom domain: `tcger.ahmadjalil.com` and save.
+4. In DNS, create `CNAME` record: `tcger` -> `ahzs645.github.io`.
+5. After first successful deploy, enable **Enforce HTTPS** in Pages settings.
