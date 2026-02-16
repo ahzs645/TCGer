@@ -28,9 +28,25 @@ struct CollectionsView: View {
                         Task { await loadCollections() }
                     }
                 } else if displayCollections.isEmpty {
-                    EmptyCollectionsView(onCreate: {
-                        showingCreateSheet = true
-                    })
+                    if environmentStore.isAuthenticated {
+                        EmptyCollectionsView(onCreate: {
+                            showingCreateSheet = true
+                        })
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "lock")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            Text("Sign in to manage collections")
+                                .font(.headline)
+                            Text("Public access is currently limited for collections on this server.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     CollectionsList(
                         collections: displayCollections,
@@ -43,10 +59,12 @@ struct CollectionsView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 16) {
-                        Button {
-                            showingSearch.wrappedValue = true
-                        } label: {
-                            Image(systemName: "magnifyingglass")
+                        if environmentStore.isAuthenticated {
+                            Button {
+                                showingSearch.wrappedValue = true
+                            } label: {
+                                Image(systemName: "magnifyingglass")
+                            }
                         }
 
                         Button {
@@ -54,6 +72,7 @@ struct CollectionsView: View {
                         } label: {
                             Image(systemName: "plus")
                         }
+                        .disabled(!environmentStore.isAuthenticated)
                     }
                 }
             }
@@ -87,12 +106,6 @@ struct CollectionsView: View {
 
     @MainActor
     private func loadCollections() async {
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            isLoading = false
-            return
-        }
-
         let shouldShowLoading = collections.isEmpty
         if shouldShowLoading {
             isLoading = true
@@ -102,14 +115,19 @@ struct CollectionsView: View {
         do {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
-                token: token,
-                useCache: environmentStore.offlineModeEnabled
+                token: environmentStore.authToken,
+                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
             isLoading = false
             errorMessage = nil
         } catch {
+            if let apiError = error as? APIService.APIError, case .unauthorized = apiError {
+                errorMessage = "Sign in is required to view collections."
+            }
             if shouldShowLoading {
-                errorMessage = error.localizedDescription
+                if errorMessage == nil {
+                    errorMessage = error.localizedDescription
+                }
             }
             isLoading = false
         }

@@ -174,11 +174,20 @@ struct User: Codable, Sendable {
     let email: String
     let username: String?
     let isAdmin: Bool
+    let showCardNumbers: Bool?
+    let showPricing: Bool?
+    let enabledYugioh: Bool?
+    let enabledMagic: Bool?
+    let enabledPokemon: Bool?
 }
 
 struct AuthResponse: Codable, Sendable {
     let user: User
     let token: String
+}
+
+struct SetupCheckResponse: Codable, Sendable {
+    let setupRequired: Bool
 }
 
 // MARK: - Dashboard Stats

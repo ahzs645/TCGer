@@ -1,11 +1,14 @@
 import Combine
 import Foundation
+import Security
 
 final class EnvironmentStore: ObservableObject {
     @Published var serverConfiguration: ServerConfiguration
     @Published var credentials: LoginCredentials
     @Published var isAuthenticated: Bool
     @Published var authToken: String?
+    @Published var currentUser: User?
+    @Published var appSettings: AppSettings?
     @Published var isServerVerified: Bool
     @Published var enabledYugioh: Bool
     @Published var enabledMagic: Bool
@@ -49,7 +52,13 @@ final class EnvironmentStore: ObservableObject {
         }
 
         isAuthenticated = storage.bool(forKey: Keys.authenticated)
-        authToken = storage.string(forKey: Keys.token)
+        let legacyToken = storage.string(forKey: Keys.token)
+        let keychainToken = KeychainTokenStore.loadToken()
+        authToken = keychainToken ?? legacyToken
+        if keychainToken == nil, let legacyToken {
+            KeychainTokenStore.saveToken(legacyToken)
+            storage.removeObject(forKey: Keys.token)
+        }
         isServerVerified = storage.bool(forKey: Keys.verified)
 
         // Load enabled games, defaulting to true if not set
@@ -121,6 +130,7 @@ final class EnvironmentStore: ObservableObject {
                 self?.storage.set(flag, forKey: Keys.authenticated)
                 if !flag {
                     self?.storage.removeObject(forKey: Keys.token)
+                    KeychainTokenStore.deleteToken()
                     self?.authToken = nil
                 }
             }
@@ -202,7 +212,56 @@ final class EnvironmentStore: ObservableObject {
 
     func storeToken(_ token: String) {
         authToken = token
-        storage.set(token, forKey: Keys.token)
+        KeychainTokenStore.saveToken(token)
+        storage.removeObject(forKey: Keys.token)
+    }
+
+    var isCurrentUserAdmin: Bool {
+        currentUser?.isAdmin ?? false
+    }
+
+    func applyAuthUser(_ user: User) {
+        currentUser = user
+
+        if let showCardNumbers = user.showCardNumbers {
+            self.showCardNumbers = showCardNumbers
+        }
+        if let showPricing = user.showPricing {
+            self.showPricing = showPricing
+        }
+        if let enabledYugioh = user.enabledYugioh {
+            self.enabledYugioh = enabledYugioh
+        }
+        if let enabledMagic = user.enabledMagic {
+            self.enabledMagic = enabledMagic
+        }
+        if let enabledPokemon = user.enabledPokemon {
+            self.enabledPokemon = enabledPokemon
+        }
+    }
+
+    func applyUserProfile(_ profile: APIService.UserProfile) {
+        currentUser = User(
+            id: profile.id,
+            email: profile.email,
+            username: profile.username,
+            isAdmin: profile.isAdmin,
+            showCardNumbers: profile.showCardNumbers,
+            showPricing: profile.showPricing,
+            enabledYugioh: nil,
+            enabledMagic: nil,
+            enabledPokemon: nil
+        )
+    }
+
+    func applyAppSettings(_ settings: AppSettings) {
+        appSettings = settings
+    }
+
+    func signOut() {
+        isAuthenticated = false
+        authToken = nil
+        currentUser = nil
     }
 
     func resetEverything() {
@@ -210,6 +269,8 @@ final class EnvironmentStore: ObservableObject {
         credentials = .empty
         authToken = nil
         isAuthenticated = false
+        currentUser = nil
+        appSettings = nil
         isServerVerified = false
         enabledYugioh = true
         enabledMagic = true
@@ -221,6 +282,7 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
+        KeychainTokenStore.deleteToken()
         storage.set(false, forKey: Keys.authenticated)
         storage.set(false, forKey: Keys.verified)
         storage.removeObject(forKey: Keys.showCardNumbers)
@@ -235,5 +297,56 @@ final class EnvironmentStore: ObservableObject {
         enabledYugioh = preferences.enabledYugioh
         enabledMagic = preferences.enabledMagic
         enabledPokemon = preferences.enabledPokemon
+    }
+}
+
+private enum KeychainTokenStore {
+    private static let service = "com.tcger.auth"
+    private static let account = "jwt-token"
+
+    static func saveToken(_ token: String) {
+        guard let encoded = token.data(using: .utf8) else {
+            return
+        }
+
+        deleteToken()
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecValueData as String: encoded
+        ]
+
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    static func loadToken() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else {
+            return nil
+        }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func deleteToken() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        SecItemDelete(query as CFDictionary)
     }
 }

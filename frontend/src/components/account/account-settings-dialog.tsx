@@ -12,7 +12,7 @@ import { getSettings, updateSettings, type AppSettings } from '@/lib/api/setting
 import { getUserPreferences, updateUserPreferences } from '@/lib/api/user-preferences';
 import { GAME_LABELS } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
-import { useModuleStore } from '@/stores/preferences';
+import { useModuleStore, type ManageableGame } from '@/stores/preferences';
 
 const iconPaths = {
   yugioh: '/icons/Yugioh.svg',
@@ -49,7 +49,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [updatingPreference, setUpdatingPreference] = useState<'showCardNumbers' | 'showPricing' | null>(null);
-  const [updatingGame, setUpdatingGame] = useState<string | null>(null);
+  const [updatingGame, setUpdatingGame] = useState<ManageableGame | null>(null);
 
   const activeCount = useMemo(() => Object.values(enabledGames).filter(Boolean).length, [enabledGames]);
   const isAdmin = user?.isAdmin ?? false;
@@ -133,15 +133,16 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
     setUpdatingGame(game);
     toggleGame(game);
 
-    const gameKeyMap = {
-      yugioh: 'enabledYugioh',
-      magic: 'enabledMagic',
-      pokemon: 'enabledPokemon'
-    } as const;
+    const preferencePayload =
+      game === 'yugioh'
+        ? { enabledYugioh: newValue }
+        : game === 'magic'
+          ? { enabledMagic: newValue }
+          : { enabledPokemon: newValue };
 
     try {
-      await updateUserPreferences({ [gameKeyMap[game]]: newValue }, token);
-      updateStoredPreferences({ [gameKeyMap[game]]: newValue } as any);
+      await updateUserPreferences(preferencePayload, token);
+      updateStoredPreferences(preferencePayload as any);
     } catch (error) {
       console.error('Failed to update enabled game:', error);
       toggleGame(game);
@@ -204,7 +205,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
           </div>
 
           <div className="grid gap-3">
-            {(Object.entries(enabledGames) as Array<[keyof typeof enabledGames, boolean]>).map(([game, enabled]) => {
+            {(Object.entries(enabledGames) as Array<[ManageableGame, boolean]>).map(([game, enabled]) => {
               const iconPath = iconPaths[game];
               return (
                 <div key={game} className="flex items-center justify-between rounded-lg border bg-background p-3">

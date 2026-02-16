@@ -15,6 +15,48 @@ extension APIService {
         return settings
     }
 
+    struct UpdateSettingsRequest: Codable {
+        let publicDashboard: Bool?
+        let publicCollections: Bool?
+        let requireAuth: Bool?
+        let appName: String?
+    }
+
+    func updateSettings(
+        config: ServerConfiguration,
+        token: String,
+        publicDashboard: Bool? = nil,
+        publicCollections: Bool? = nil,
+        requireAuth: Bool? = nil,
+        appName: String? = nil
+    ) async throws -> AppSettings {
+        let body = UpdateSettingsRequest(
+            publicDashboard: publicDashboard,
+            publicCollections: publicCollections,
+            requireAuth: requireAuth,
+            appName: appName
+        )
+
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "settings",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+
+        guard response.statusCode == 200 else {
+            let serverMessage = parseServerMessage(from: data)
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
+        }
+
+        guard let settings = try? JSONDecoder().decode(AppSettings.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return settings
+    }
+
     struct UserPreferences: Codable {
         let showCardNumbers: Bool
         let showPricing: Bool

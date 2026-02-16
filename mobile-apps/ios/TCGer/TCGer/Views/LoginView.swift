@@ -4,6 +4,7 @@ struct LoginView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Binding var isAuthenticating: Bool
     var onAuthenticate: () -> Void
+    var onShowSignup: (() -> Void)?
 
     var body: some View {
         Form {
@@ -37,6 +38,13 @@ struct LoginView: View {
                     }
                 }
                 .disabled(!environmentStore.credentials.isComplete || isAuthenticating)
+
+                if let onShowSignup {
+                    Button(action: onShowSignup) {
+                        Label("Create Account", systemImage: "person.badge.plus")
+                    }
+                    .disabled(isAuthenticating)
+                }
 
                 Button(role: .destructive, action: environmentStore.resetEverything) {
                     Label("Reset Configuration", systemImage: "arrow.uturn.backward")

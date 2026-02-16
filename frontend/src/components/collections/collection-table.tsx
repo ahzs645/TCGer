@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, Filter, Loader2, Plus, RefreshCcw, Trash, TrendingUp } from 'lucide-react';
 
@@ -81,14 +81,17 @@ export function CollectionTable() {
     await updateCollectionCard(token, fromBinderId, cardId, { targetBinderId: toBinderId });
   };
 
-  const changeActiveCollection = (id: string, updateUrl = true) => {
-    setActiveCollectionId(id);
-    if (!updateUrl) return;
-    const search = id
-      ? `?binder=${id === ALL_COLLECTION_ID ? 'all' : encodeURIComponent(id)}`
-      : '';
-    router.replace(`/collections${search}`, { scroll: false });
-  };
+  const changeActiveCollection = useCallback(
+    (id: string, updateUrl = true) => {
+      setActiveCollectionId(id);
+      if (!updateUrl) return;
+      const search = id
+        ? `?binder=${id === ALL_COLLECTION_ID ? 'all' : encodeURIComponent(id)}`
+        : '';
+      router.replace(`/collections${search}`, { scroll: false });
+    },
+    [router]
+  );
 
   useEffect(() => {
     if (!showPricing && sortBy === 'price') {
@@ -123,7 +126,7 @@ export function CollectionTable() {
     if (!isValidActive) {
       changeActiveCollection(ALL_COLLECTION_ID);
     }
-  }, [collections, activeCollectionId, searchParams, router]);
+  }, [collections, activeCollectionId, searchParams, changeActiveCollection, router]);
 
   useEffect(() => {
     setSelection({});
@@ -575,7 +578,7 @@ function CardDetailsPanel({
   binderOptions: { id: string; name: string; colorHex?: string | null }[];
   onMove: (args: CardMoveArgs) => Promise<void>;
 }) {
-  const copies = (card?.copies ?? []) as CollectionCardCopy[];
+  const copies = useMemo(() => (card?.copies ?? []) as CollectionCardCopy[], [card?.copies]);
   const [selectedCopyId, setSelectedCopyId] = useState<string | null>(null);
   const [condition, setCondition] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -601,7 +604,7 @@ function CardDetailsPanel({
       }
       return null;
     });
-  }, [card?.id, copies]);
+  }, [card, copies]);
 
   useEffect(() => {
     if (selectedCopy) {
@@ -613,7 +616,7 @@ function CardDetailsPanel({
     }
     setStatus('idle');
     setErrorMessage(null);
-  }, [selectedCopy?.id, selectedCopy?.condition, selectedCopy?.notes]);
+  }, [selectedCopy]);
   useEffect(() => {
     if (binderId) {
       setPendingBinderId(binderId);
@@ -1045,8 +1048,14 @@ function CollectionRow({
   onSelectCard: () => void;
 }) {
   const price = card.price ?? 0;
+  const previousHistoryEntry =
+    card.priceHistory && card.priceHistory.length > 1 ? card.priceHistory[card.priceHistory.length - 2] : undefined;
   const previousPrice =
-    card.priceHistory && card.priceHistory.length > 1 ? card.priceHistory[card.priceHistory.length - 2] : price;
+    previousHistoryEntry !== undefined
+      ? typeof previousHistoryEntry === 'number'
+        ? previousHistoryEntry
+        : previousHistoryEntry.price
+      : price;
   const delta = previousPrice ? ((price - previousPrice) / previousPrice) * 100 : 0;
   const positive = delta >= 0;
   const binderAccent = normalizeHexColor(card.binderColorHex);

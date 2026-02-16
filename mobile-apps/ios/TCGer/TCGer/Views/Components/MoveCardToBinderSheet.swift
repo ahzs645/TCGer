@@ -5,6 +5,7 @@ struct MoveCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: CollectionCard
+    let sourceBinderId: String
     let isProcessing: Bool
     let onMove: (String, [String]) async -> Void
 
@@ -18,10 +19,12 @@ struct MoveCardToBinderSheet: View {
 
     init(
         card: CollectionCard,
+        sourceBinderId: String,
         isProcessing: Bool,
         onMove: @escaping (String, [String]) async -> Void
     ) {
         self.card = card
+        self.sourceBinderId = sourceBinderId
         self.isProcessing = isProcessing
         self.onMove = onMove
         _selectedCopyIds = State(initialValue: Set(card.copies.map { $0.id }))
@@ -193,7 +196,7 @@ struct MoveCardToBinderSheet: View {
                 config: environmentStore.serverConfiguration,
                 token: token
             )
-            availableBinders = fetched.filter { !$0.isUnsortedBinder }
+            availableBinders = fetched.filter { $0.id != sourceBinderId }
             if selectedBinderId == nil {
                 selectedBinderId = availableBinders.first?.id
             }
@@ -208,6 +211,11 @@ struct MoveCardToBinderSheet: View {
     private func performMove() async {
         guard let binderId = selectedBinderId else {
             errorMessage = "Select a binder"
+            return
+        }
+
+        guard binderId != sourceBinderId else {
+            errorMessage = "Select a different destination binder."
             return
         }
 

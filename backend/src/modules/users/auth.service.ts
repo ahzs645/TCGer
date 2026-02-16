@@ -1,6 +1,5 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import type {
   SignupInput,
   LoginInput,
@@ -11,8 +10,7 @@ import type {
 } from '@tcg/api-types';
 
 import { env } from '../../config/env';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 // Re-export shared types for existing consumers
 export type {
@@ -29,13 +27,29 @@ interface SignupServiceInput extends SignupInput {
   isAdmin?: boolean;
 }
 
+interface AuthTokenPayload {
+  userId: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+function createHttpError(status: number, message: string): Error & { status: number } {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
+}
+
+function signAuthToken(payload: AuthTokenPayload): string {
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: '7d' });
+}
+
 export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
   const { email, password, username, isAdmin = false } = input;
 
   // Check if user already exists
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    throw new Error('User with this email already exists');
+    throw createHttpError(409, 'User with this email already exists');
   }
 
   // Hash password
@@ -52,11 +66,7 @@ export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
   });
 
   // Generate JWT
-  const token = jwt.sign(
-    { userId: user.id, email: user.email, isAdmin: user.isAdmin },
-    env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const token = signAuthToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin });
 
   return {
     user: {
@@ -80,21 +90,17 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   // Find user
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    throw new Error('Invalid email or password');
+    throw createHttpError(401, 'Invalid email or password');
   }
 
   // Verify password
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    throw new Error('Invalid email or password');
+    throw createHttpError(401, 'Invalid email or password');
   }
 
   // Generate JWT
-  const token = jwt.sign(
-    { userId: user.id, email: user.email, isAdmin: user.isAdmin },
-    env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const token = signAuthToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin });
 
   return {
     user: {
@@ -121,7 +127,7 @@ export async function setupInitialAdmin(input: SignupServiceInput): Promise<Auth
   // Check if admin already exists
   const hasAdmin = await hasAdminUser();
   if (hasAdmin) {
-    throw new Error('Admin user already exists');
+    throw createHttpError(409, 'Admin user already exists');
   }
 
   // Create admin user
@@ -130,10 +136,19 @@ export async function setupInitialAdmin(input: SignupServiceInput): Promise<Auth
 
 export async function verifyToken(token: string): Promise<{ userId: string; email: string }> {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; email: string };
-    return decoded;
+    const decoded = jwt.verify(token, env.JWT_SECRET);
+    if (typeof decoded === 'string') {
+      throw createHttpError(401, 'Invalid token payload');
+    }
+
+    const payload = decoded as jwt.JwtPayload & { userId?: unknown; email?: unknown };
+    if (typeof payload.userId !== 'string' || typeof payload.email !== 'string') {
+      throw createHttpError(401, 'Invalid token payload');
+    }
+
+    return { userId: payload.userId, email: payload.email };
   } catch (error) {
-    throw new Error('Invalid or expired token');
+    throw createHttpError(401, 'Invalid or expired token');
   }
 }
 
@@ -155,7 +170,7 @@ export async function getUserById(userId: string) {
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw createHttpError(404, 'User not found');
   }
 
   return user;
@@ -174,7 +189,7 @@ export async function getUserPreferences(userId: string) {
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw createHttpError(404, 'User not found');
   }
 
   return user;
@@ -203,7 +218,7 @@ export async function updateUserProfile(userId: string, input: UpdateProfileInpu
       where: { email: input.email }
     });
     if (existingUser && existingUser.id !== userId) {
-      throw new Error('Email is already in use');
+      throw createHttpError(409, 'Email is already in use');
     }
   }
 
@@ -235,13 +250,13 @@ export async function changePassword(userId: string, input: ChangePasswordInput)
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw createHttpError(404, 'User not found');
   }
 
   // Verify current password
   const valid = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!valid) {
-    throw new Error('Current password is incorrect');
+    throw createHttpError(400, 'Current password is incorrect');
   }
 
   // Hash new password

@@ -374,6 +374,7 @@ struct ProfileView: View {
 
             await MainActor.run {
                 self.profile = loadedProfile
+                environmentStore.applyUserProfile(loadedProfile)
                 self.isLoading = false
             }
         } catch {
@@ -454,6 +455,9 @@ struct ProfileView: View {
                 // Update environment store email if changed
                 if let emailUpdate = emailUpdate {
                     environmentStore.credentials.email = emailUpdate
+                }
+                if let profile = self.profile {
+                    environmentStore.applyUserProfile(profile)
                 }
 
                 isEditingProfile = false

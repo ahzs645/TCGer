@@ -4,8 +4,10 @@ import { searchQuerySchema, cardParamsSchema } from '@tcg/api-types';
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
 import { getCardPrints, searchCards } from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
+import { requireAuth } from '../middleware/auth';
 
 export const cardsRouter = Router();
+cardsRouter.use(requireAuth);
 
 cardsRouter.get(
   '/search',

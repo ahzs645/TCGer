@@ -20,8 +20,15 @@ struct CollectionDetailView: View {
     @State private var movingCardId: String?
     @State private var showingDeleteBinderConfirmation = false
     @State private var isDeletingBinder = false
+    @State private var availableTags: [CollectionCardTag] = []
+    @State private var selectedTagFilters: Set<String> = []
+    @State private var selectedConditionFilters: Set<String> = []
+    @State private var minPriceFilter = ""
+    @State private var maxPriceFilter = ""
+    @State private var searchText = ""
 
     private let apiService = APIService()
+    private let conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor", "NM", "LP", "MP", "HP", "DMG"]
 
     init(collection: Collection) {
         self.collection = collection
@@ -41,6 +48,48 @@ struct CollectionDetailView: View {
             updatedAt: collection.updatedAt,
             colorHex: isEditing ? selectedColor.toHex() : collection.colorHex
         )
+    }
+
+    private var filteredCards: [CollectionCard] {
+        cards.filter { card in
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let query = searchText.lowercased()
+                let matchesSearch =
+                    card.name.lowercased().contains(query) ||
+                    (card.setName?.lowercased().contains(query) ?? false) ||
+                    (card.setCode?.lowercased().contains(query) ?? false)
+                if !matchesSearch {
+                    return false
+                }
+            }
+
+            if !selectedTagFilters.isEmpty {
+                let cardTagIds = Set(card.copies.flatMap { $0.tags.map(\.id) })
+                if !selectedTagFilters.isSubset(of: cardTagIds) {
+                    return false
+                }
+            }
+
+            if !selectedConditionFilters.isEmpty {
+                let cardConditions = Set(
+                    card.copies.compactMap { normalizeFilterValue($0.condition) } +
+                    [normalizeFilterValue(card.condition)].compactMap { $0 }
+                )
+                let wanted = Set(selectedConditionFilters.compactMap { normalizeFilterValue($0) })
+                if cardConditions.isDisjoint(with: wanted) {
+                    return false
+                }
+            }
+
+            if let minPrice = Double(minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines)), (card.price ?? 0) < minPrice {
+                return false
+            }
+            if let maxPrice = Double(maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines)), (card.price ?? 0) > maxPrice {
+                return false
+            }
+
+            return true
+        }
     }
 
     var body: some View {
@@ -97,26 +146,104 @@ struct CollectionDetailView: View {
                         }
 
                         Section {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 8) {
+                                    Menu {
+                                        ForEach(availableTags) { tag in
+                                            Button {
+                                                toggleTagFilter(tag.id)
+                                            } label: {
+                                                Label(
+                                                    tag.label,
+                                                    systemImage: selectedTagFilters.contains(tag.id)
+                                                        ? "checkmark.circle.fill"
+                                                        : "circle"
+                                                )
+                                            }
+                                        }
+                                        if !selectedTagFilters.isEmpty {
+                                            Divider()
+                                            Button("Clear Tag Filters") {
+                                                selectedTagFilters.removeAll()
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Tags", systemImage: "tag")
+                                            .font(.subheadline)
+                                    }
+
+                                    Menu {
+                                        ForEach(conditionOptions, id: \.self) { option in
+                                            Button {
+                                                toggleConditionFilter(option)
+                                            } label: {
+                                                Label(
+                                                    option,
+                                                    systemImage: selectedConditionFilters.contains(option)
+                                                        ? "checkmark.circle.fill"
+                                                        : "circle"
+                                                )
+                                            }
+                                        }
+                                        if !selectedConditionFilters.isEmpty {
+                                            Divider()
+                                            Button("Clear Condition Filters") {
+                                                selectedConditionFilters.removeAll()
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Condition", systemImage: "line.3.horizontal.decrease.circle")
+                                            .font(.subheadline)
+                                    }
+                                }
+
+                                HStack(spacing: 12) {
+                                    TextField("Min $", text: $minPriceFilter)
+                                        .keyboardType(.decimalPad)
+                                        .textFieldStyle(.roundedBorder)
+                                    TextField("Max $", text: $maxPriceFilter)
+                                        .keyboardType(.decimalPad)
+                                        .textFieldStyle(.roundedBorder)
+                                }
+
+                                if hasActiveFilters {
+                                    Button("Clear All Filters") {
+                                        clearFilters()
+                                    }
+                                    .font(.caption)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color(.systemBackground))
+                        } header: {
+                            Text("Filters")
+                        }
+
+                        Section {
                             if cards.isEmpty {
                                 emptyStateView
+                            } else if filteredCards.isEmpty {
+                                filteredEmptyStateView
                             } else {
-                                ForEach(cards) { card in
-                                    CollectionCardRow(
-                                        card: card,
-                                        showPricing: environmentStore.showPricing
-                                    )
-                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color(.systemBackground))
-                                    .swipeActions(edge: .leading) {
-                                        Button {
-                                            beginEditing(card)
-                                        } label: {
-                                            Label("Edit", systemImage: "square.and.pencil")
-                                        }
-                                        .tint(.blue)
+                                ForEach(filteredCards) { card in
+                                    if environmentStore.isAuthenticated {
+                                        CollectionCardRow(
+                                            card: card,
+                                            showPricing: environmentStore.showPricing
+                                        )
+                                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color(.systemBackground))
+                                        .swipeActions(edge: .leading) {
+                                            Button {
+                                                beginEditing(card)
+                                            } label: {
+                                                Label("Edit", systemImage: "square.and.pencil")
+                                            }
+                                            .tint(.blue)
 
-                                        if collection.isUnsortedBinder {
                                             Button {
                                                 cardBeingMoved = card
                                             } label: {
@@ -124,19 +251,27 @@ struct CollectionDetailView: View {
                                             }
                                             .tint(.purple)
                                         }
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            cardPendingDeletion = card
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                cardPendingDeletion = card
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
                                         }
+                                    } else {
+                                        CollectionCardRow(
+                                            card: card,
+                                            showPricing: environmentStore.showPricing
+                                        )
+                                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color(.systemBackground))
                                     }
                                 }
                             }
                         }
 
-                        if !collection.isUnsortedBinder, isEditing {
+                        if !collection.isUnsortedBinder, isEditing, environmentStore.isAuthenticated {
                             Section {
                                 Button(role: .destructive) {
                                     showingDeleteBinderConfirmation = true
@@ -160,6 +295,7 @@ struct CollectionDetailView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .searchable(text: $searchText, prompt: "Search cards, sets, or codes")
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -175,27 +311,32 @@ struct CollectionDetailView: View {
                     }
 
                     ToolbarItem(placement: .primaryAction) {
-                        HStack(spacing: 12) {
-                            if isEditing {
-                                Button(isSaving ? "Saving..." : "Save") {
-                                    Task {
-                                        await saveChanges()
+                        if environmentStore.isAuthenticated {
+                            HStack(spacing: 12) {
+                                if isEditing {
+                                    Button(isSaving ? "Saving..." : "Save") {
+                                        Task {
+                                            await saveChanges()
+                                        }
                                     }
-                                }
-                                .disabled(editedName.isEmpty || isSaving)
-                                .foregroundColor(.green)
-                                .fontWeight(.semibold)
-                            } else {
-                                Button(action: { isEditing = true }) {
-                                    Text("Edit")
-                                }
+                                    .disabled(editedName.isEmpty || isSaving)
+                                    .foregroundColor(.green)
+                                    .fontWeight(.semibold)
+                                } else {
+                                    Button(action: { isEditing = true }) {
+                                        Text("Edit")
+                                    }
 
-                                Button(action: { showingAddCard = true }) {
-                                    Image(systemName: "plus")
+                                    Button(action: { showingAddCard = true }) {
+                                        Image(systemName: "plus")
+                                    }
                                 }
                             }
                         }
                     }
+                }
+                .task {
+                    await loadAvailableTags()
                 }
                 .sheet(isPresented: $showingAddCard) {
                     AddCardToBinderFromSearchView(binderId: collection.id)
@@ -205,7 +346,12 @@ struct CollectionDetailView: View {
                         card: context.card,
                         isIndividualCopy: !context.canEditQuantity,
                         copyDetails: context.copy,
-                        isSaving: editingCardId == context.collectionEntryId
+                        isSaving: editingCardId == context.collectionEntryId,
+                        availableTags: availableTags,
+                        selectedTagIds: context.copy?.tags.map(\.id) ?? context.card.copies.first?.tags.map(\.id) ?? [],
+                        onCreateTag: { label in
+                            try await createTag(label: label)
+                        }
                     ) { payload in
 #if DEBUG
                         print(
@@ -213,6 +359,7 @@ struct CollectionDetailView: View {
                             "condition:\(payload.condition ?? "nil") " +
                             "language:\(payload.language ?? "nil") " +
                             "notes:\(payload.notes ?? "nil") " +
+                            "tags:\(payload.tags) " +
                             "print:\(payload.selectedPrint?.id ?? "nil") " +
                             "canEditQuantity:\(context.canEditQuantity)"
                         )
@@ -225,6 +372,7 @@ struct CollectionDetailView: View {
                                 condition: payload.condition,
                                 language: payload.language,
                                 notes: payload.notes,
+                                tags: payload.tags,
                                 newPrint: payload.selectedPrint
                             )
                         }
@@ -239,6 +387,7 @@ struct CollectionDetailView: View {
                 .sheet(item: $cardBeingMoved) { card in
                     MoveCardToBinderSheet(
                         card: card,
+                        sourceBinderId: collection.id,
                         isProcessing: movingCardId == card.id
                     ) { binderId, copyIds in
                         await moveCard(
@@ -305,20 +454,46 @@ struct CollectionDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
-            Button(action: { showingAddCard = true }) {
-                HStack(spacing: 10) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                    Text("Add Your First Card")
-                        .font(.headline)
+            if environmentStore.isAuthenticated {
+                Button(action: { showingAddCard = true }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                        Text("Add Your First Card")
+                            .font(.headline)
+                    }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+            } else {
+                Text("Sign in to add cards to this binder.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color(.systemBackground))
+    }
+
+    private var filteredEmptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 44))
+                .foregroundColor(.secondary)
+            Text("No cards match your filters")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Button("Clear Filters") {
+                clearFilters()
+            }
+            .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color(.systemBackground))
@@ -391,6 +566,7 @@ struct CollectionDetailView: View {
         condition: String?,
         language: String?,
         notes: String?,
+        tags: [String],
         newPrint: Card?
     ) async {
         guard let token = environmentStore.authToken else {
@@ -402,7 +578,7 @@ struct CollectionDetailView: View {
 
         do {
 #if DEBUG
-            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") newPrint: \(newPrint?.id ?? "nil")")
+            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") tags: \(tags) newPrint: \(newPrint?.id ?? "nil")")
 #endif
             let updated = try await apiService.updateCardInBinder(
                 config: environmentStore.serverConfiguration,
@@ -413,6 +589,7 @@ struct CollectionDetailView: View {
                 condition: condition,
                 language: language,
                 notes: notes,
+                tags: tags,
                 newPrint: newPrint,
                 targetBinderId: nil
             )
@@ -457,12 +634,91 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
+    private func loadAvailableTags() async {
+        guard let token = environmentStore.authToken else {
+            availableTags = []
+            return
+        }
+
+        do {
+            let tags = try await apiService.getTags(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            availableTags = tags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        } catch {
+            // Non-fatal; tag controls still work with existing tags.
+            print("Failed to load tags: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func createTag(label: String) async throws -> CollectionCardTag {
+        guard let token = environmentStore.authToken else {
+            throw APIService.APIError.unauthorized
+        }
+
+        let created = try await apiService.createTag(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            label: label
+        )
+
+        if !availableTags.contains(where: { $0.id == created.id }) {
+            availableTags.append(created)
+            availableTags.sort { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        }
+
+        return created
+    }
+
+    private var hasActiveFilters: Bool {
+        !selectedTagFilters.isEmpty ||
+        !selectedConditionFilters.isEmpty ||
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func clearFilters() {
+        selectedTagFilters.removeAll()
+        selectedConditionFilters.removeAll()
+        minPriceFilter = ""
+        maxPriceFilter = ""
+        searchText = ""
+    }
+
+    private func toggleTagFilter(_ tagId: String) {
+        if selectedTagFilters.contains(tagId) {
+            selectedTagFilters.remove(tagId)
+        } else {
+            selectedTagFilters.insert(tagId)
+        }
+    }
+
+    private func toggleConditionFilter(_ condition: String) {
+        if selectedConditionFilters.contains(condition) {
+            selectedConditionFilters.remove(condition)
+        } else {
+            selectedConditionFilters.insert(condition)
+        }
+    }
+
+    private func normalizeFilterValue(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed.uppercased()
+    }
+
+    @MainActor
     private func moveCard(
         card: CollectionCard,
         destinationBinderId: String,
         selectedCopyIds: [String]
     ) async {
-        guard collection.isUnsortedBinder else {
+        if destinationBinderId == collection.id {
+            errorMessage = "Select a different destination binder."
             cardBeingMoved = nil
             return
         }

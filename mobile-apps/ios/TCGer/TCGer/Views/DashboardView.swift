@@ -59,11 +59,13 @@ struct DashboardView: View {
             }
             .navigationTitle("Dashboard")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingSearch.wrappedValue = true
-                    } label: {
-                        Image(systemName: "magnifyingglass")
+                if environmentStore.isAuthenticated {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showingSearch.wrappedValue = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
                     }
                 }
             }
@@ -89,24 +91,22 @@ struct DashboardView: View {
 
     @MainActor
     private func loadData() async {
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            isLoading = false
-            return
-        }
-
         isLoading = true
         errorMessage = nil
 
         do {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
-                token: token,
-                useCache: environmentStore.offlineModeEnabled
+                token: environmentStore.authToken,
+                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
             isLoading = false
         } catch {
-            errorMessage = error.localizedDescription
+            if let apiError = error as? APIService.APIError, case .unauthorized = apiError {
+                errorMessage = "Sign in is required to view dashboard collections."
+            } else {
+                errorMessage = error.localizedDescription
+            }
             isLoading = false
         }
     }

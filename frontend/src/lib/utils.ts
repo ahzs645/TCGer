@@ -5,12 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const GAME_LABELS: Record<string, string> = {
+export const GAME_LABELS = {
   all: 'All Games',
   yugioh: 'Yu-Gi-Oh!',
   magic: 'Magic: The Gathering',
   pokemon: 'Pokémon'
-};
+} as const;
 
 export type SupportedGame = keyof typeof GAME_LABELS;
 

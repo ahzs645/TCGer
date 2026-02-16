@@ -11,6 +11,7 @@ import {
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 import {
   getUserBinders,
+  getUserBinder,
   createBinder,
   updateBinder,
   deleteBinder,
@@ -88,6 +89,26 @@ collectionsRouter.post(
     const data = tagPayloadSchema.parse(req.body);
     const tag = await createUserTag(userId, data);
     res.status(201).json(tag);
+  })
+);
+
+// Get a single binder (or library pseudo-binder) for the authenticated user
+collectionsRouter.get(
+  '/:binderId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { binderId } = req.params;
+
+    try {
+      const binder = await getUserBinder(userId, binderId);
+      res.json(binder);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Binder not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Binder not found' });
+      }
+      throw error;
+    }
   })
 );
 

@@ -118,8 +118,21 @@ function computeDelta(items: CollectionCard[]): number {
   if (!items.length) return 0;
   const values = items.map((card) => {
     const history = card.priceHistory ?? [];
-    const previous = history.length > 1 ? history[history.length - 2] : card.price ?? 0;
-    const current = card.price ?? previous;
+    const previousEntry = history.length > 1 ? history[history.length - 2] : undefined;
+    const latestEntry = history.length ? history[history.length - 1] : undefined;
+    const previous =
+      previousEntry !== undefined
+        ? typeof previousEntry === 'number'
+          ? previousEntry
+          : previousEntry.price
+        : card.price ?? 0;
+    const latest =
+      latestEntry !== undefined
+        ? typeof latestEntry === 'number'
+          ? latestEntry
+          : latestEntry.price
+        : undefined;
+    const current = card.price ?? latest ?? previous;
     if (!previous) return 0;
     return ((current - previous) / previous) * 100;
   });

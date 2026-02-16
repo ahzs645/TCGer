@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Collection as PrismaCollection, Prisma } from '@prisma/client';
 import type {
   CreateBinderInput,
   UpdateBinderInput,
@@ -492,6 +492,17 @@ export async function getUserBinders(userId: string) {
   return formattedBinders;
 }
 
+export async function getUserBinder(userId: string, binderId: string) {
+  const binders = await getUserBinders(userId);
+  const binder = binders.find((entry) => entry.id === binderId);
+
+  if (!binder) {
+    throw new Error('Binder not found');
+  }
+
+  return binder;
+}
+
 export async function createBinder(userId: string, input: CreateBinderInput) {
   const binder = await prisma.binder.create({
     data: {
@@ -612,7 +623,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
-    const created = [] as Prisma.Collection[];
+    const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
         data: {
@@ -686,7 +697,7 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
-    const created = [] as Prisma.Collection[];
+    const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
         data: {

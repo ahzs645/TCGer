@@ -906,8 +906,8 @@ export class PokemonAdapter implements TcgAdapter {
     return ENERGY_SYMBOL_MAP[key] ?? symbol.toLowerCase();
   }
 
-  private buildFinishList(variants: PokemonVariantFlags): PokemonPrintMetadata['finishes'] {
-    const finishes: PokemonPrintMetadata['finishes'] = [];
+  private buildFinishList(variants: PokemonVariantFlags): NonNullable<PokemonPrintMetadata['finishes']> {
+    const finishes: NonNullable<PokemonPrintMetadata['finishes']> = [];
     if (variants.normal) {
       finishes.push('normal');
     }
@@ -1019,9 +1019,9 @@ export class PokemonAdapter implements TcgAdapter {
       if (!response.ok) {
         return null;
       }
-      const payload = await response.json();
-      const data = payload?.data ?? payload;
-      return data?.id ? (data as TCGdexCardDetail) : null;
+      const payload = (await response.json()) as unknown;
+      const data = (payload as { data?: TCGdexCardDetail }).data ?? (payload as TCGdexCardDetail);
+      return data && typeof data.id === 'string' ? data : null;
     } catch (error) {
       console.error('PokemonAdapter.fetchTcgDexCardDetailByUrl error', url, error);
       return null;

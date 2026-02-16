@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronDown, Loader2, Minus, Plus } from 'lucide-react';
 
@@ -181,7 +182,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     setPrintError(null);
     setIsPrintDialogOpen(false);
     setIsLoadingPrints(false);
-  }, [card.id]);
+  }, [card]);
 
   useEffect(() => {
     setCardImageSrc(activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE);
@@ -248,7 +249,7 @@ export function CardPreview({ card }: CardPreviewProps) {
   };
 
   const handleAddInitialQuantity = async () => {
-    if (!isSignedIn) {
+    if (!isSignedIn || !token) {
       setStatus('error');
       setStatusMessage('Sign in to add cards to a binder.');
       return;
@@ -409,9 +410,11 @@ export function CardPreview({ card }: CardPreviewProps) {
                           isSelected ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/60'
                         }`}
                       >
-                        <img
+                        <Image
                           src={print.imageUrlSmall ?? CARD_PLACEHOLDER_IMAGE}
                           alt={print.name}
+                          width={40}
+                          height={56}
                           className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
                           loading="lazy"
                           onError={(event) => {
@@ -489,12 +492,15 @@ export function CardPreview({ card }: CardPreviewProps) {
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
-              <img
+              <Image
                 draggable={false}
                 loading="lazy"
                 className="card-test"
                 alt={activeCard.name}
                 src={cardImageSrc}
+                width={320}
+                height={448}
+                sizes="(max-width: 640px) 45vw, 20vw"
                 style={cardStyle}
                 onError={handleCardImageError}
               />

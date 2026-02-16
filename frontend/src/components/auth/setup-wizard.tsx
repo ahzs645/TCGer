@@ -73,13 +73,13 @@ export function SetupWizard() {
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2">
           <Image
-            src="/favicon.svg"
-            alt="TCG Manager"
+            src="/logo.svg"
+            alt="TCGer logo"
             width={64}
             height={64}
             className="dark:invert"
           />
-          <h1 className="text-2xl font-bold">Welcome to TCG Manager</h1>
+          <h1 className="text-2xl font-bold">Welcome to TCGer</h1>
           <p className="text-center text-sm text-muted-foreground">
             {isLoginMode ? 'Sign in to your account' : "Let's get started by creating your admin account"}
           </p>

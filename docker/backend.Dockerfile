@@ -8,6 +8,7 @@ COPY backend/package*.json ./
 RUN npm install
 
 COPY backend .
+COPY docs /app/docs
 COPY tsconfig.base.json /app/tsconfig.base.json
 
 FROM base AS dev
@@ -24,6 +25,7 @@ COPY --from=build /app/backend/dist ./dist
 COPY backend/package*.json ./
 RUN npm install --omit=dev
 COPY backend/prisma ./prisma
+COPY docs /app/docs
 
 EXPOSE 3000
 CMD ["node", "dist/server.js"]

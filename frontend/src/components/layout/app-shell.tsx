@@ -36,8 +36,8 @@ export function AppShell({ children }: AppShellProps) {
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
-              <Image src="/favicon.svg" alt="TCG Manager" width={32} height={32} className="h-8 w-8 dark:invert" />
-              TCG Manager
+              <Image src="/logo.svg" alt="TCGer logo" width={32} height={32} className="h-8 w-8 dark:invert" />
+              TCGer
             </Link>
             <nav className="hidden items-center gap-1 md:flex">
               {navigation.map((item) => {

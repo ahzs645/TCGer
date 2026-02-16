@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
@@ -209,7 +210,10 @@ export function MockCollectionView() {
   const binders = collections;
   const flattenedCards = useMemo(() => flattenBinders(binders), [binders]);
   const activeBinder = useMemo(() => binders.find((binder) => binder.id === binderFilter) ?? null, [binders, binderFilter]);
-  const workingCards = binderFilter === 'all' ? flattenedCards : activeBinder?.cards ?? [];
+  const workingCards = useMemo(
+    () => (binderFilter === 'all' ? flattenedCards : activeBinder?.cards ?? []),
+    [binderFilter, flattenedCards, activeBinder]
+  );
 
   const maxPrice = useMemo(() => {
     const maxValue = flattenedCards.reduce((value, card) => Math.max(value, card.price ?? 0), 0);
@@ -1002,9 +1006,11 @@ export function MockCollectionView() {
                       )}
                     >
                       {print.imageUrlSmall ? (
-                        <img
+                        <Image
                           src={print.imageUrlSmall}
                           alt={print.name}
+                          width={40}
+                          height={56}
                           className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
                           loading="lazy"
                         />

@@ -11,12 +11,12 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const lexend = Lexend({ subsets: ['latin'], variable: '--font-heading' });
 
 export const metadata: Metadata = {
-  title: 'TCG Collection Manager',
+  title: 'TCGer',
   description: 'Unified hub for Yu-Gi-Oh!, Magic, and Pokémon collections.',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg'
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg'
   }
 };
 
