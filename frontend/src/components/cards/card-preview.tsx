@@ -13,7 +13,7 @@ import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
 import { useWishlistsStore } from '@/stores/wishlists';
-import type { Card, CardPrintsResponse, PokemonFinishType, PokemonFunctionalGroup } from '@/types/card';
+import type { Card, CardPrintsResponse, CollectionCard, PokemonFinishType, PokemonFunctionalGroup } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
 import { SetSymbol } from './set-symbol';
 
@@ -67,7 +67,7 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [cardImageSrc, setCardImageSrc] = useState(
     activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE
   );
-  const existingEntry = selectedBinder?.cards.find((binderCard) => binderCard.cardId === activeCard.id);
+  const existingEntry = selectedBinder?.cards.find((binderCard: CollectionCard) => binderCard.cardId === activeCard.id);
   const serverQuantity = existingEntry?.quantity ?? 0;
   const quantity = optimisticQuantity ?? serverQuantity;
   const showQuantityControls = quantity > 0;
