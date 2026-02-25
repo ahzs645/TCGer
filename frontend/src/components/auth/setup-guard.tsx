@@ -21,6 +21,14 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const [needsAuth, setNeedsAuth] = useState(false);
 
   useEffect(() => {
+    // Demo pages bypass all auth/setup checks
+    if (pathname?.startsWith('/demo')) {
+      setLoading(false);
+      setShouldBlock(false);
+      setNeedsAuth(false);
+      return;
+    }
+
     const checkAccess = async () => {
       try {
         // First check if setup is required
