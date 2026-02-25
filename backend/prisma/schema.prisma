@@ -21,6 +21,7 @@ model User {
   binders     Binder[]
   collections Collection[]
   tags        Tag[]
+  wishlists   Wishlist[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
@@ -190,4 +191,42 @@ model PokemonCard {
   holo            Boolean? @default(false)
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model Wishlist {
+  id          String         @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  colorHex    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards WishlistCard[]
+
+  @@unique([userId, name])
+}
+
+model WishlistCard {
+  id            String   @id @default(uuid())
+  wishlistId    String
+  externalId    String
+  tcg           String
+  name          String
+  setCode       String?
+  setName       String?
+  rarity        String?
+  imageUrl      String?
+  imageUrlSmall String?
+  setSymbolUrl  String?
+  setLogoUrl    String?
+  collectorNumber String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, externalId, tcg])
 }

@@ -44,6 +44,13 @@ Common URLs:
 - `POST /collections/cards`
 - `GET /collections/tags`
 - `POST /collections/tags`
+- `GET /wishlists`
+- `POST /wishlists`
+- `GET /wishlists/:wishlistId`
+- `PATCH /wishlists/:wishlistId`
+- `DELETE /wishlists/:wishlistId`
+- `POST /wishlists/:wishlistId/cards`
+- `DELETE /wishlists/:wishlistId/cards/:cardId`
 - `GET /users/me`
 - `PATCH /users/me`
 - `POST /users/me/change-password`

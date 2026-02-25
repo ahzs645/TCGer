@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Calculator, LayoutDashboard, Search, Table } from 'lucide-react';
+import { Calculator, Heart, LayoutDashboard, Search, Table } from 'lucide-react';
 
 import {
   CommandDialog,
@@ -78,6 +78,11 @@ export function CommandMenu() {
               <Table className="mr-2 h-4 w-4" />
               Collections
               <CommandShortcut>G L</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => handleNavigate('/wishlists')}>
+              <Heart className="mr-2 h-4 w-4" />
+              Wishlists
+              <CommandShortcut>G W</CommandShortcut>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
