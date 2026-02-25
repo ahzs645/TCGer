@@ -29,6 +29,7 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             marketing-site/package-lock.json
             docs/package-lock.json
 
@@ -38,6 +39,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          npm ci
           npm ci --prefix marketing-site
           npm ci --prefix docs
 
@@ -68,6 +70,21 @@ jobs:
         run: |
           mkdir -p marketing-site/dist/docs
           cp -R docs/dist/. marketing-site/dist/docs/
+
+      - name: Build frontend demo (static export)
+        run: |
+          BASE_PATH="${{ steps.pages.outputs.base_path }}"
+          if [ -z "$BASE_PATH" ]; then
+            BASE_PATH=""
+          fi
+          # Remove trailing slash for Next.js basePath (must not end with /)
+          BASE_PATH="${BASE_PATH%/}"
+          DEMO_EXPORT=true BASE_PATH="$BASE_PATH" npm --prefix frontend run build:demo
+
+      - name: Copy demo pages into Pages artifact
+        run: |
+          cp -R frontend/out/demo marketing-site/dist/demo
+          cp -R frontend/out/_next marketing-site/dist/_next
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
