@@ -29,6 +29,7 @@ import { useModuleStore } from '@/stores/preferences';
 import type { CollectionCard, CollectionCardCopy, TcgCode } from '@/types/card';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
+import { SetSymbol } from '@/components/cards/set-symbol';
 
 type CardUpdateArgs = {
   cardId: string;
@@ -779,10 +780,19 @@ function CardDetailsPanel({
             )}
             <div>
               <h3 className="text-lg font-semibold leading-tight">{card.name}</h3>
-              <p className="text-xs text-muted-foreground">
-                {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
-                {showCardNumbers && card.setCode ? ` · #${card.setCode}` : ''}
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <SetSymbol
+                  symbolUrl={card.setSymbolUrl}
+                  setCode={card.setCode}
+                  setName={card.setName}
+                  tcg={card.tcg}
+                  size="sm"
+                />
+                <span>
+                  {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
+                  {showCardNumbers && card.setCode ? ` · #${card.setCode}` : ''}
+                </span>
+              </div>
               {(binderName || parentCollectionName) && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Binder{' '}
@@ -1084,10 +1094,19 @@ function CollectionRow({
       <TableCell>
         <div className="space-y-1">
           <p className="font-medium leading-tight">{card.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
-            {showCardNumbers ? ` · #${card.setCode ?? '—'}` : ''}
-          </p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <SetSymbol
+              symbolUrl={card.setSymbolUrl}
+              setCode={card.setCode}
+              setName={card.setName}
+              tcg={card.tcg}
+              size="xs"
+            />
+            <span>
+              {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown set'}
+              {showCardNumbers ? ` · #${card.setCode ?? '—'}` : ''}
+            </span>
+          </div>
           {showBinderName && card.binderName ? (
             <p className="text-[11px] text-muted-foreground">
               Binder{' '}
@@ -1108,7 +1127,12 @@ function CollectionRow({
           ) : null}
         </div>
       </TableCell>
-      <TableCell>{card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown'}</TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1">
+          <SetSymbol symbolUrl={card.setSymbolUrl} setCode={card.setCode} setName={card.setName} tcg={card.tcg} size="xs" />
+          {card.setName ?? (showCardNumbers ? card.setCode : undefined) ?? 'Unknown'}
+        </span>
+      </TableCell>
       <TableCell>{card.rarity ?? 'N/A'}</TableCell>
       <TableCell className="text-right">{card.quantity}</TableCell>
       <TableCell className="text-right">{card.condition ?? 'Unknown'}</TableCell>

@@ -135,6 +135,7 @@ export interface CollectionCard {
   imageUrl?: string;
   imageUrlSmall?: string;
   setSymbolUrl?: string;
+  setLogoUrl?: string;
   regulationMark?: string;
   languageCode?: string;
   attributes?: Record<string, unknown>;

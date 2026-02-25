@@ -7,6 +7,7 @@ import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { settingsRouter } from './settings.router';
 import { usersRouter } from './users.router';
+import { wishlistsRouter } from './wishlists.router';
 
 export function registerRoutes(app: Express): void {
   app.use('/', docsRouter);
@@ -16,4 +17,5 @@ export function registerRoutes(app: Express): void {
   app.use('/cards', cardsRouter);
   app.use('/collections', collectionsRouter);
   app.use('/users', usersRouter);
+  app.use('/wishlists', wishlistsRouter);
 }
