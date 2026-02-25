@@ -156,9 +156,16 @@ const CollectionView = () => {
 5. Deck Builder (/decks)
     * Game-specific deck building
     * Format validation per game
-6. Wishlist (/wishlist)
-    * Cards to acquire
-    * Price tracking alerts
+6. Wishlists (/wishlists)
+    * Create named wishlists to track cards you want to collect (e.g., "Every Darkrai", "Eevee Collection")
+    * Search and add cards from any TCG to a wishlist
+    * Automatic comparison against your collection to compute completion percentage
+    * Progress bars and owned/missing counts per wishlist
+    * Filter wishlist cards by ownership status (all / owned / missing)
+    * Search within a wishlist by card name, set name, or set code
+    * Cards displayed with set expansion symbols and ownership indicators
+    * Quick "Add to Wishlist" dropdown available in card search preview
+    * Price tracking alerts (planned)
 7. Statistics (/stats)
     * Collection value over time
     * Distribution by game, rarity, set
@@ -195,13 +202,29 @@ const useGameConfig = () => {
 * Icons: Distinct icons for each game in navigation
 * Adaptive Layouts: Card layouts adapt to game-specific attributes
 * Smooth Transitions: Animated transitions when switching games
-9. Advanced Features
+9. Set Expansion Symbols
+
+Expansion symbols (the small set icons found on physical cards) are displayed uniformly across all three TCGs using the `SetSymbol` component.
+
+**Symbol sources by TCG:**
+* **Pokemon**: `setSymbolUrl` for the expansion icon (from pokemontcg.io or TCGdex) and `setLogoUrl` for the full set branding logo.
+* **MTG**: Scryfall SVG symbols (`https://svgs.scryfall.io/sets/{code}.svg`). Used for both the symbol and logo variants.
+* **Yu-Gi-Oh!**: No universal set symbol images exist. The component displays a styled letter label derived from the TCG set prefix (e.g., `LOB`, `MRD`, `DUEA`).
+
+**Fallback behavior:**
+* If no symbol image URL is available, or if the image fails to load, a colored letter-label box is shown instead.
+* The label shows the first 1-5 characters of the set code in uppercase.
+* Label colors are TCG-themed: red for Pokemon, amber for MTG, violet for Yu-Gi-Oh.
+
+**Component usage:** `<SetSymbol>` accepts `symbolUrl`, `logoUrl`, `setCode`, `setName`, `tcg`, `variant` (symbol or logo), and `size` (xs, sm, md, lg). It is integrated into card search previews, collection table rows, collection detail panels, and wishlist card items.
+
+10. Advanced Features
 * Comparison Mode: Compare cards across different games
 * Import/Export: CSV/JSON export per game or all
 * Barcode Scanner: Mobile-optimized for quick card adding
 * Price Alerts: Track specific cards across games
 * Trading Interface: Manage trades with other users
-10. Responsive Behavior
+11. Responsive Behavior
 
 
 typescript
