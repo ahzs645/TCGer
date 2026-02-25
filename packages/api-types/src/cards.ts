@@ -80,6 +80,7 @@ export const cardSchema = z.object({
   imageUrl: z.string().optional(),
   imageUrlSmall: z.string().optional(),
   setSymbolUrl: z.string().optional(),
+  setLogoUrl: z.string().optional(),
   regulationMark: z.string().optional(),
   language: z.string().optional(),
   pokemonPrint: pokemonPrintMetadataSchema.optional(),

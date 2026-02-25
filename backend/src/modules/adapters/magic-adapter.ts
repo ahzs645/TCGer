@@ -200,6 +200,7 @@ export class MagicAdapter implements TcgAdapter {
       imageUrl: image.large ?? image.normal ?? image.small,
       imageUrlSmall: image.small ?? image.normal ?? image.large,
       setSymbolUrl: symbolUrl,
+      setLogoUrl: symbolUrl,
       attributes: {
         mana_cost: card.mana_cost ?? face?.mana_cost,
         type_line: card.type_line ?? face?.type_line,

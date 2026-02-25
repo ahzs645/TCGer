@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronDown, Loader2, Minus, Plus } from 'lucide-react';
+import { ChevronDown, Heart, Loader2, Minus, Plus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,10 @@ import { fetchCardPrintsApi } from '@/lib/api-client';
 import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
+import { useWishlistsStore } from '@/stores/wishlists';
 import type { Card, CardPrintsResponse, PokemonFinishType, PokemonFunctionalGroup } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
+import { SetSymbol } from './set-symbol';
 
 const PRINT_SUPPORTED_GAMES: Card['tcg'][] = ['magic', 'pokemon'];
 const GAME_LABELS: Record<Card['tcg'], string> = {
@@ -524,8 +526,18 @@ export function CardPreview({ card }: CardPreviewProps) {
               </Badge>
             </div>
           )}
-          {activeCard.setName && (
-            <p className="text-[10px] text-center text-muted-foreground break-words px-1">{activeCard.setName}</p>
+          {(activeCard.setName || activeCard.setCode) && (
+            <div className="flex items-center justify-center gap-1 px-1">
+              <SetSymbol
+                symbolUrl={activeCard.setSymbolUrl}
+                logoUrl={activeCard.setLogoUrl}
+                setCode={activeCard.setCode}
+                setName={activeCard.setName}
+                tcg={activeCard.tcg}
+                size="xs"
+              />
+              <p className="text-[10px] text-center text-muted-foreground break-words">{activeCard.setName}</p>
+            </div>
           )}
         </div>
         <div className="mt-3 w-full space-y-3 text-xs">
@@ -639,9 +651,75 @@ export function CardPreview({ card }: CardPreviewProps) {
               {statusMessage}
             </p>
           ) : null}
+          {isSignedIn && (
+            <WishlistQuickAdd card={activeCard} />
+          )}
         </div>
       </div>
     </>
+  );
+}
+
+function WishlistQuickAdd({ card }: { card: Card }) {
+  const token = useAuthStore((state) => state.token);
+  const { wishlists, addCardToWishlist, fetchWishlists, hasFetched } = useWishlistsStore();
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (token && !hasFetched) {
+      fetchWishlists(token);
+    }
+  }, [token, hasFetched, fetchWishlists]);
+
+  if (!wishlists.length) return null;
+
+  const isInAnyWishlist = wishlists.some((w) =>
+    w.cards.some((c) => c.externalId === card.id && c.tcg === card.tcg)
+  );
+
+  const handleAdd = async (wishlistId: string) => {
+    if (!token || adding) return;
+    setAdding(true);
+    try {
+      await addCardToWishlist(token, wishlistId, {
+        externalId: card.id,
+        tcg: card.tcg,
+        name: card.name,
+        setCode: card.setCode,
+        setName: card.setName,
+        rarity: card.rarity,
+        imageUrl: card.imageUrl,
+        imageUrlSmall: card.imageUrlSmall,
+        setSymbolUrl: card.setSymbolUrl,
+        setLogoUrl: card.setLogoUrl,
+        collectorNumber: card.collectorNumber
+      });
+    } catch {
+      // Error handled in store
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="pt-1 border-t border-dashed">
+      <Select onValueChange={handleAdd} disabled={adding}>
+        <SelectTrigger className="h-8 w-full text-xs gap-1">
+          <Heart className={`h-3 w-3 ${isInAnyWishlist ? 'fill-current text-red-500' : ''}`} />
+          <SelectValue placeholder="Add to wishlist..." />
+        </SelectTrigger>
+        <SelectContent>
+          {wishlists.map((w) => {
+            const alreadyIn = w.cards.some((c) => c.externalId === card.id && c.tcg === card.tcg);
+            return (
+              <SelectItem key={w.id} value={w.id} disabled={alreadyIn}>
+                {w.name} {alreadyIn ? '(added)' : ''}
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

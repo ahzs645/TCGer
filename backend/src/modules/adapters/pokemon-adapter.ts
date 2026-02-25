@@ -406,7 +406,8 @@ export class PokemonAdapter implements TcgAdapter {
       collectorNumber: card.localId ?? card.id,
       imageUrl,
       imageUrlSmall,
-      setSymbolUrl: card.set?.symbol ?? card.set?.logo,
+      setSymbolUrl: card.set?.symbol,
+      setLogoUrl: card.set?.logo,
       regulationMark: card.regulationMark,
       attributes: {
         hp: card.hp,
@@ -422,7 +423,6 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   private mapCard(card: PokemonCard): CardDTO {
-    const setSymbol = card.set?.images?.symbol ?? card.set?.images?.logo;
     const retreatCost = Array.isArray(card.retreatCost) ? card.retreatCost.length : undefined;
 
     return {
@@ -436,7 +436,8 @@ export class PokemonAdapter implements TcgAdapter {
       releasedAt: card.set?.releaseDate,
       imageUrl: card.images?.large ?? card.images?.small,
       imageUrlSmall: card.images?.small ?? card.images?.large,
-      setSymbolUrl: setSymbol,
+      setSymbolUrl: card.set?.images?.symbol,
+      setLogoUrl: card.set?.images?.logo,
       regulationMark: card.regulationMark,
       attributes: {
         supertype: card.supertype,

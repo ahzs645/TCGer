@@ -23,6 +23,8 @@ tags:
     description: Card search and details
   - name: Collections
     description: Binder and card collection management (requires auth)
+  - name: Wishlists
+    description: Wishlist management with collection completion tracking (requires auth)
   - name: Users
     description: User profile and preferences (requires auth)
   - name: Settings
@@ -483,6 +485,149 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  # ─── Wishlists ──────────────────────────────────────────────────────
+  /wishlists:
+    get:
+      tags: [Wishlists]
+      summary: List all wishlists for the authenticated user
+      operationId: getWishlists
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of wishlists with completion data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WishlistResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Wishlists]
+      summary: Create a new wishlist
+      operationId: createWishlist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWishlistInput"
+      responses:
+        "201":
+          description: Wishlist created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /wishlists/{wishlistId}:
+    get:
+      tags: [Wishlists]
+      summary: Get a single wishlist with all cards and completion status
+      operationId: getWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+      responses:
+        "200":
+          description: Wishlist detail with cards and ownership info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Wishlists]
+      summary: Update a wishlist
+      operationId: updateWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWishlistInput"
+      responses:
+        "200":
+          description: Updated wishlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Wishlists]
+      summary: Delete a wishlist
+      operationId: deleteWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+      responses:
+        "204":
+          description: Wishlist deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wishlists/{wishlistId}/cards:
+    post:
+      tags: [Wishlists]
+      summary: Add a card to a wishlist
+      operationId: addCardToWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddWishlistCardInput"
+      responses:
+        "201":
+          description: Card added to wishlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistCardResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wishlists/{wishlistId}/cards/{wishlistCardId}:
+    delete:
+      tags: [Wishlists]
+      summary: Remove a card from a wishlist
+      operationId: removeCardFromWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+        - name: wishlistCardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Card removed from wishlist
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   # ─── Users ───────────────────────────────────────────────────────────
   /users/me:
     get:
@@ -652,6 +797,12 @@ components:
       required: true
       schema:
         type: string
+    wishlistId:
+      name: wishlistId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     ValidationError:
@@ -785,6 +936,10 @@ components:
           type: string
         setSymbolUrl:
           type: string
+          description: URL to the set expansion symbol image
+        setLogoUrl:
+          type: string
+          description: URL to the set logo/branding image (Pokemon and MTG)
         regulationMark:
           type: string
         language:
@@ -1190,6 +1345,140 @@ components:
         colorHex:
           type: string
           pattern: "^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+
+    # ─── Wishlists ─────────────────────────────────────────────────
+    WishlistCardResponse:
+      type: object
+      required: [id, externalId, tcg, name, owned, ownedQuantity, createdAt]
+      properties:
+        id:
+          type: string
+        externalId:
+          type: string
+        tcg:
+          $ref: "#/components/schemas/TcgCode"
+        name:
+          type: string
+        setCode:
+          type: string
+        setName:
+          type: string
+        rarity:
+          type: string
+        imageUrl:
+          type: string
+        imageUrlSmall:
+          type: string
+        setSymbolUrl:
+          type: string
+          description: URL to the set expansion symbol image
+        setLogoUrl:
+          type: string
+          description: URL to the set logo/branding image
+        collectorNumber:
+          type: string
+        notes:
+          type: string
+        owned:
+          type: boolean
+          description: Whether this card exists in the user's collection
+        ownedQuantity:
+          type: integer
+          description: Total quantity owned across all binders
+        createdAt:
+          type: string
+          format: date-time
+
+    WishlistResponse:
+      type: object
+      required: [id, name, cards, totalCards, ownedCards, completionPercent, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        colorHex:
+          type: string
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/WishlistCardResponse"
+        totalCards:
+          type: integer
+          description: Number of unique cards in the wishlist
+        ownedCards:
+          type: integer
+          description: Number of cards that exist in the user's collection
+        completionPercent:
+          type: integer
+          description: Completion percentage (0-100)
+          minimum: 0
+          maximum: 100
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateWishlistInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        colorHex:
+          type: string
+          pattern: "^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+
+    UpdateWishlistInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        colorHex:
+          type: string
+          pattern: "^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+
+    AddWishlistCardInput:
+      type: object
+      required: [externalId, tcg, name]
+      properties:
+        externalId:
+          type: string
+          minLength: 1
+        tcg:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        setCode:
+          type: string
+        setName:
+          type: string
+        rarity:
+          type: string
+        imageUrl:
+          type: string
+        imageUrlSmall:
+          type: string
+        setSymbolUrl:
+          type: string
+        setLogoUrl:
+          type: string
+        collectorNumber:
+          type: string
+        notes:
+          type: string
 
     # ─── Users ───────────────────────────────────────────────────────
     UserProfile:
