@@ -43,6 +43,9 @@ jobs:
           npm ci --prefix marketing-site
           npm ci --prefix docs
 
+      - name: Build shared API types
+        run: npm --prefix packages/api-types run build
+
       - name: Build marketing site
         run: |
           BASE_PATH="${{ steps.pages.outputs.base_path }}"
