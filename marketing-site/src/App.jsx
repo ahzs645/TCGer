@@ -4,6 +4,7 @@ const THEME_KEY = "tcger-theme";
 const BASE = import.meta.env.BASE_URL || "/";
 const API_DOCS = `${BASE}api/docs/`;
 const PRODUCT_DOCS = `${BASE}docs/`;
+const DEMO = `${BASE}demo/`;
 const GH = "https://github.com/ahzs645/TCGer";
 
 function getTheme() {
@@ -209,7 +210,8 @@ export default function App() {
             </p>
             <div className="hero-btns">
               <a className="btn btn-warm" href={GH} target="_blank" rel="noreferrer">Get Started</a>
-              <a className="btn btn-ghost" href={API_DOCS}>API Documentation</a>
+              <a className="btn btn-ghost" href={DEMO}>Live Demo</a>
+              <a className="btn btn-ghost" href={PRODUCT_DOCS}>Docs</a>
             </div>
           </div>
           <div className="hero-visual rv" style={{ transitionDelay: "180ms" }}>
