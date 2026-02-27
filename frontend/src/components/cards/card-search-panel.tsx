@@ -141,7 +141,7 @@ export function CardSearchPanel() {
                     return acc;
                   }, {} as Record<string, typeof cards>);
 
-                  return Object.entries(groupedCards).map(([tcg, tcgCards]) => (
+                  return (Object.entries(groupedCards) as [string, typeof cards][]).map(([tcg, tcgCards]) => (
                     <div key={tcg}>
                       <h3 className="text-lg font-semibold mb-4 capitalize">
                         {GAME_LABELS[tcg as keyof typeof GAME_LABELS] || tcg}
