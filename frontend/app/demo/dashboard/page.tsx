@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
@@ -164,8 +165,8 @@ export default function DemoDashboardPage() {
       </div>
 
       {/* ---- Main content ---- */}
-      <main className="flex-1 bg-muted/20 pb-20 pt-20 md:pb-8">
-        <div className="container space-y-6 py-8">
+      <main className="flex-1 bg-muted/20 pb-20 pt-16 md:pb-8 md:pt-20">
+        <div className="container space-y-4 py-4 md:space-y-6 md:py-8">
           {activeTab === 'dashboard' && <DemoDashboard />}
           {activeTab === 'cards' && <DemoCardSearch />}
           {activeTab === 'collections' && <DemoCollections />}
@@ -182,8 +183,8 @@ export default function DemoDashboardPage() {
 
 function DemoDashboard() {
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
         <StatCard
           title="Total Cards"
           value={MOCK_STATS.totalCards.toLocaleString()}
@@ -212,14 +213,14 @@ function DemoDashboard() {
 
       {/* Game breakdown */}
       <Card>
-        <CardHeader>
-          <CardTitle>Card Distribution</CardTitle>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base md:text-xl">Card Distribution</CardTitle>
           <CardDescription>Your collection by trading card game.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+          <div className="grid gap-3 md:gap-4 md:grid-cols-3">
             {MOCK_GAMES.map((game) => (
-              <div key={game.name} className="space-y-2 rounded-lg border bg-card p-4">
+              <div key={game.name} className="space-y-1.5 rounded-lg border bg-card p-3 md:space-y-2 md:p-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{game.name}</span>
                   <span className="text-muted-foreground">{game.copies}</span>
@@ -236,24 +237,24 @@ function DemoDashboard() {
 
       {/* Recent activity */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base md:text-xl">Recent Activity</CardTitle>
           <CardDescription>Latest updates across your binders.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+          <div className="space-y-2 md:space-y-4">
             {MOCK_RECENT.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4 transition hover:border-primary/50 hover:bg-muted/40"
+                className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3 transition hover:border-primary/50 hover:bg-muted/40 md:gap-4 md:p-4"
               >
-                <div>
-                  <p className="text-sm font-semibold leading-none">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-none truncate">{item.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
                     {item.tcg} &bull; {item.binder}
                   </p>
                 </div>
-                <time className="text-xs text-muted-foreground">{item.date}</time>
+                <time className="shrink-0 text-xs text-muted-foreground">{item.date}</time>
               </div>
             ))}
           </div>
@@ -274,26 +275,26 @@ function DemoCardSearch() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-semibold">Card Explorer</h1>
+        <h1 className="text-2xl font-heading font-semibold md:text-3xl">Card Explorer</h1>
         <p className="text-sm text-muted-foreground">
           Search across Yu-Gi-Oh!, Magic: The Gathering, and Pok&eacute;mon using the unified adapter layer.
         </p>
       </div>
 
       <Tabs defaultValue="all">
-        <TabsList>
-          <TabsTrigger value="all">All Games</TabsTrigger>
-          <TabsTrigger value="yugioh">Yu-Gi-Oh!</TabsTrigger>
-          <TabsTrigger value="magic">Magic</TabsTrigger>
-          <TabsTrigger value="pokemon">Pok&eacute;mon</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">All Games</TabsTrigger>
+          <TabsTrigger value="yugioh" className="text-xs sm:text-sm">Yu-Gi-Oh!</TabsTrigger>
+          <TabsTrigger value="magic" className="text-xs sm:text-sm">Magic</TabsTrigger>
+          <TabsTrigger value="pokemon" className="text-xs sm:text-sm">Pok&eacute;mon</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
+        <TabsContent value="all" className="space-y-3 md:space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search for a card name, set, or ID..."
-              className="pl-10"
+              className="w-full pl-10"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -301,10 +302,10 @@ function DemoCardSearch() {
 
           {!showResults && (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Search className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                <p className="text-lg font-medium text-muted-foreground">Start typing to search</p>
-                <p className="text-sm text-muted-foreground/80">
+              <CardContent className="flex flex-col items-center justify-center py-10 text-center md:py-16">
+                <Search className="mb-3 h-8 w-8 text-muted-foreground/40 md:mb-4 md:h-12 md:w-12" />
+                <p className="text-base font-medium text-muted-foreground md:text-lg">Start typing to search</p>
+                <p className="text-xs text-muted-foreground/80 md:text-sm">
                   Try &ldquo;Blue-Eyes&rdquo;, &ldquo;Lightning Bolt&rdquo;, or &ldquo;Charizard&rdquo;
                 </p>
               </CardContent>
@@ -312,20 +313,20 @@ function DemoCardSearch() {
           )}
 
           {showResults && (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
               {MOCK_SEARCH_RESULTS.map((card) => (
                 <Card key={card.name} className="cursor-pointer transition hover:border-primary/50 hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{card.name}</CardTitle>
-                      <Badge variant="secondary">{card.tcg}</Badge>
+                  <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm md:text-base">{card.name}</CardTitle>
+                      <Badge variant="secondary" className="shrink-0 text-xs">{card.tcg}</Badge>
                     </div>
                     <CardDescription>{card.set}</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Market price</span>
-                      <span className="font-semibold">{card.price}</span>
+                      <span className="text-xs text-muted-foreground md:text-sm">Market price</span>
+                      <span className="font-semibold text-sm md:text-base">{card.price}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -339,12 +340,12 @@ function DemoCardSearch() {
           <TabsContent key={tab} value={tab}>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search for a card name, set, or ID..." className="pl-10" disabled />
+              <Input placeholder="Search for a card name, set, or ID..." className="w-full pl-10" disabled />
             </div>
-            <Card className="mt-4">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Search className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                <p className="text-lg font-medium text-muted-foreground">Start typing to search</p>
+            <Card className="mt-3 md:mt-4">
+              <CardContent className="flex flex-col items-center justify-center py-10 text-center md:py-16">
+                <Search className="mb-3 h-8 w-8 text-muted-foreground/40 md:mb-4 md:h-12 md:w-12" />
+                <p className="text-base font-medium text-muted-foreground md:text-lg">Start typing to search</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -360,20 +361,45 @@ function DemoCardSearch() {
 
 function DemoCollections() {
   const [selectedBinder, setSelectedBinder] = useState<string | null>(null);
+  const activeBinder = MOCK_BINDERS.find((b) => b.id === selectedBinder);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <div className="space-y-4 md:space-y-6">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-heading font-semibold">Collection sandbox</h1>
+          <h1 className="text-2xl font-heading font-semibold md:text-3xl">Collection sandbox</h1>
           <Badge variant="outline">Beta</Badge>
         </div>
         <p className="text-sm text-muted-foreground">Per-copy inventory manager powered by your live binder data.</p>
       </div>
 
+      {/* Mobile: binder dropdown */}
+      <div className="lg:hidden space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Binder</h2>
+          <Button variant="outline" size="sm" disabled>+ New</Button>
+        </div>
+        <Select value={selectedBinder ?? ''} onValueChange={setSelectedBinder}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a binder..." />
+          </SelectTrigger>
+          <SelectContent>
+            {MOCK_BINDERS.map((binder) => (
+              <SelectItem key={binder.id} value={binder.id}>
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: binder.color }} />
+                  {binder.name}
+                  <span className="text-muted-foreground">&middot; {binder.cards}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        {/* Binder list */}
-        <div className="space-y-2">
+        {/* Desktop: binder sidebar */}
+        <div className="hidden lg:block space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Binders</h2>
             <Button variant="outline" size="sm" disabled>+ New</Button>
@@ -403,35 +429,34 @@ function DemoCollections() {
         {/* Content area */}
         <Card>
           {!selectedBinder ? (
-            <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-              <Table className="mb-4 h-12 w-12 text-muted-foreground/40" />
-              <p className="text-lg font-medium text-muted-foreground">Select a binder</p>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center md:py-20">
+              <Table className="mb-4 h-10 w-10 text-muted-foreground/40 md:h-12 md:w-12" />
+              <p className="text-base font-medium text-muted-foreground md:text-lg">Select a binder</p>
               <p className="text-sm text-muted-foreground/80">
-                Choose a binder from the left to view and manage its cards.
+                Choose a binder to view and manage its cards.
               </p>
             </CardContent>
           ) : (
             <>
-              <CardHeader>
+              <CardHeader className="p-4 md:p-6">
                 <div className="flex items-center gap-3">
                   <div
-                    className="h-4 w-4 rounded-full"
-                    style={{ backgroundColor: MOCK_BINDERS.find((b) => b.id === selectedBinder)?.color }}
+                    className="h-4 w-4 shrink-0 rounded-full"
+                    style={{ backgroundColor: activeBinder?.color }}
                   />
                   <div>
-                    <CardTitle>{MOCK_BINDERS.find((b) => b.id === selectedBinder)?.name}</CardTitle>
+                    <CardTitle className="text-base md:text-xl">{activeBinder?.name}</CardTitle>
                     <CardDescription>
-                      {MOCK_BINDERS.find((b) => b.id === selectedBinder)?.cards} cards &bull;{' '}
-                      {MOCK_BINDERS.find((b) => b.id === selectedBinder)?.game}
+                      {activeBinder?.cards} cards &bull; {activeBinder?.game}
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                 <div className="rounded-lg border">
-                  <div className="grid grid-cols-[1fr_100px_80px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide md:grid-cols-[1fr_100px_80px] md:gap-4 md:px-4 md:py-3">
                     <span>Card Name</span>
-                    <span>Condition</span>
+                    <span>Cond.</span>
                     <span className="text-right">Price</span>
                   </div>
                   {[
@@ -443,10 +468,10 @@ function DemoCollections() {
                   ].map((card) => (
                     <div
                       key={card.name}
-                      className="grid grid-cols-[1fr_100px_80px] gap-4 border-b px-4 py-3 text-sm last:border-b-0 hover:bg-muted/20 transition"
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b px-3 py-2.5 text-sm last:border-b-0 hover:bg-muted/20 transition md:grid-cols-[1fr_100px_80px] md:gap-4 md:px-4 md:py-3"
                     >
-                      <span className="font-medium truncate">{card.name}</span>
-                      <Badge variant="secondary" className="w-fit">{card.condition}</Badge>
+                      <span className="font-medium">{card.name}</span>
+                      <Badge variant="secondary" className="w-fit text-xs">{card.condition}</Badge>
                       <span className="text-right">{card.price}</span>
                     </div>
                   ))}
@@ -472,23 +497,23 @@ function DemoWishlists() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-semibold">Wishlists</h1>
+        <h1 className="text-2xl font-heading font-semibold md:text-3xl">Wishlists</h1>
         <p className="text-sm text-muted-foreground">Track cards you&apos;re looking to acquire.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {wishlists.map((list) => {
           const pct = Math.round((list.completed / list.items) * 100);
           return (
             <Card key={list.name} className="cursor-pointer transition hover:border-primary/50 hover:shadow-md">
-              <CardHeader>
-                <CardTitle className="text-base">{list.name}</CardTitle>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-sm md:text-base">{list.name}</CardTitle>
                 <CardDescription>{list.items} cards &bull; {pct}% complete</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+              <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
+                <div className="space-y-1.5">
                   <div className="h-2 rounded-full bg-muted">
                     <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
                   </div>
@@ -517,13 +542,13 @@ function StatCard({ title, value, description, icon }: {
 }) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <span className="text-muted-foreground">{icon}</span>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-4">
+        <CardTitle className="text-xs font-medium text-muted-foreground md:text-sm">{title}</CardTitle>
+        <span className="text-muted-foreground hidden sm:inline">{icon}</span>
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-semibold tracking-tight">{value}</div>
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+        <div className="text-xl font-semibold tracking-tight md:text-3xl">{value}</div>
+        <p className="mt-1 text-xs text-muted-foreground md:mt-2 md:text-sm">{description}</p>
       </CardContent>
     </Card>
   );
