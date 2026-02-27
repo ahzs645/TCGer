@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
+  ArrowLeft,
   ArrowUpRight,
+  Check,
   Coins,
   Heart,
   LayoutDashboard,
@@ -15,13 +17,15 @@ import {
   Sparkles,
   Sun,
   Table,
-  User
+  User,
+  X
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -67,6 +71,50 @@ const MOCK_SEARCH_RESULTS = [
   { name: 'Exodia the Forbidden One', set: 'LOB-124', tcg: 'Yu-Gi-Oh!', price: '$38.00' }
 ];
 
+const MOCK_WISHLIST_CARDS: Record<string, Array<{ name: string; set: string; tcg: string; rarity: string; owned: boolean }>> = {
+  'Must-Have Staples': [
+    { name: 'Ash Blossom & Joyous Spring', set: 'DUDE-EN003', tcg: 'Yu-Gi-Oh!', rarity: 'Ultra Rare', owned: true },
+    { name: 'Lightning Bolt', set: 'STA-042', tcg: 'Magic', rarity: 'Uncommon', owned: true },
+    { name: 'Pikachu VMAX', set: 'VIV-044', tcg: 'Pok\u00e9mon', rarity: 'VMAX', owned: true },
+    { name: 'Nibiru, the Primal Being', set: 'TN19-EN013', tcg: 'Yu-Gi-Oh!', rarity: 'Prismatic Secret', owned: true },
+    { name: 'Counterspell', set: 'STA-016', tcg: 'Magic', rarity: 'Uncommon', owned: true },
+    { name: 'Pot of Prosperity', set: 'BLVO-EN065', tcg: 'Yu-Gi-Oh!', rarity: 'Secret Rare', owned: true },
+    { name: 'Mew ex', set: 'MEW-151', tcg: 'Pok\u00e9mon', rarity: 'Double Rare', owned: true },
+    { name: 'Infinite Impermanence', set: 'FLOD-EN077', tcg: 'Yu-Gi-Oh!', rarity: 'Secret Rare', owned: false },
+    { name: 'Swords to Plowshares', set: 'STA-010', tcg: 'Magic', rarity: 'Uncommon', owned: false },
+    { name: 'Effect Veiler', set: 'DREV-EN002', tcg: 'Yu-Gi-Oh!', rarity: 'Ultra Rare', owned: false },
+    { name: 'Boss\'s Orders', set: 'PAL-172', tcg: 'Pok\u00e9mon', rarity: 'Rare', owned: false },
+    { name: 'Called by the Grave', set: 'FLOD-EN065', tcg: 'Yu-Gi-Oh!', rarity: 'Common', owned: false }
+  ],
+  'Scarlet & Violet Chase Cards': [
+    { name: 'Charizard ex', set: 'PAL-199', tcg: 'Pok\u00e9mon', rarity: 'Special Art Rare', owned: true },
+    { name: 'Miraidon ex', set: 'SVI-081', tcg: 'Pok\u00e9mon', rarity: 'Double Rare', owned: true },
+    { name: 'Koraidon ex', set: 'SVI-124', tcg: 'Pok\u00e9mon', rarity: 'Double Rare', owned: true },
+    { name: 'Iono', set: 'PAL-185', tcg: 'Pok\u00e9mon', rarity: 'Special Art Rare', owned: false },
+    { name: 'Gardevoir ex', set: 'SVI-086', tcg: 'Pok\u00e9mon', rarity: 'Double Rare', owned: false },
+    { name: 'Arcanine ex', set: 'OBF-032', tcg: 'Pok\u00e9mon', rarity: 'Double Rare', owned: false },
+    { name: 'Mew ex', set: 'MEW-151', tcg: 'Pok\u00e9mon', rarity: 'Illustration Rare', owned: false },
+    { name: 'Umbreon ex', set: 'OBF-130', tcg: 'Pok\u00e9mon', rarity: 'Special Art Rare', owned: false }
+  ],
+  'Modern Upgrades': [
+    { name: 'Ragavan, Nimble Pilferer', set: 'MH2-138', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Wrenn and Six', set: 'MH1-217', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Endurance', set: 'MH2-157', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Solitude', set: 'MH2-032', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Fury', set: 'MH2-126', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Grief', set: 'MH2-087', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Subtlety', set: 'MH2-067', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Murktide Regent', set: 'MH2-052', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Evoke Cycle (Foil)', set: 'MH2-032', tcg: 'Magic', rarity: 'Mythic Rare', owned: true },
+    { name: 'Prismatic Vista', set: 'MH1-244', tcg: 'Magic', rarity: 'Rare', owned: false },
+    { name: 'Force of Negation', set: 'MH1-052', tcg: 'Magic', rarity: 'Rare', owned: false },
+    { name: 'Urza\'s Saga', set: 'MH2-259', tcg: 'Magic', rarity: 'Rare', owned: false },
+    { name: 'Mishra\'s Bauble', set: 'IMA-219', tcg: 'Magic', rarity: 'Uncommon', owned: false },
+    { name: 'Engineered Explosives', set: 'MMA-230', tcg: 'Magic', rarity: 'Rare', owned: false },
+    { name: 'Chalice of the Void', set: 'MMA-203', tcg: 'Magic', rarity: 'Rare', owned: false }
+  ]
+};
+
 /* ------------------------------------------------------------------ */
 /*  Navigation items                                                    */
 /* ------------------------------------------------------------------ */
@@ -86,6 +134,7 @@ const NAV_ITEMS: Array<{ key: DemoTab; label: string; icon: typeof LayoutDashboa
 
 export default function DemoDashboardPage() {
   const [activeTab, setActiveTab] = useState<DemoTab>('dashboard');
+  const [profileOpen, setProfileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   return (
@@ -128,10 +177,14 @@ export default function DemoDashboardPage() {
               <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
             </Button>
-            <div className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition hover:bg-muted/60 active:bg-muted"
+            >
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="hidden sm:inline">demo@tcger.app</span>
-            </div>
+            </button>
             <Button variant="ghost" size="icon" asChild>
               <Link href="/demo" aria-label="Sign out">
                 <LogOut className="h-4 w-4" />
@@ -164,8 +217,45 @@ export default function DemoDashboardPage() {
         </div>
       </div>
 
+      {/* ---- Profile dialog ---- */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 bg-muted">
+                <User className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-semibold">Demo User</p>
+                <p className="text-sm text-muted-foreground">demo@tcger.app</p>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-lg border p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Member since</span>
+                <span>Feb 2026</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total cards</span>
+                <span>{MOCK_STATS.totalCards.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Active games</span>
+                <span>{MOCK_STATS.activeGames}</span>
+              </div>
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              This is a demo profile. In the full app you can edit your avatar, username, and preferences.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ---- Main content ---- */}
-      <main className="flex-1 bg-muted/20 pb-20 pt-16 md:pb-8 md:pt-20">
+      <main className="flex-1 bg-muted/20 pb-20 pt-20 md:pb-8 md:pt-20">
         <div className="container space-y-4 py-4 md:space-y-6 md:py-8">
           {activeTab === 'dashboard' && <DemoDashboard />}
           {activeTab === 'cards' && <DemoCardSearch />}
@@ -490,11 +580,114 @@ function DemoCollections() {
 /* ------------------------------------------------------------------ */
 
 function DemoWishlists() {
+  const [activeWishlist, setActiveWishlist] = useState<string | null>(null);
+  const [filterOwned, setFilterOwned] = useState<'all' | 'owned' | 'missing'>('all');
+
   const wishlists = [
     { name: 'Must-Have Staples', items: 12, completed: 7 },
     { name: 'Scarlet & Violet Chase Cards', items: 8, completed: 3 },
     { name: 'Modern Upgrades', items: 15, completed: 9 }
   ];
+
+  const activeList = wishlists.find((w) => w.name === activeWishlist);
+  const activeCards = activeWishlist ? (MOCK_WISHLIST_CARDS[activeWishlist] ?? []) : [];
+  const filteredCards = activeCards.filter((c) => {
+    if (filterOwned === 'owned') return c.owned;
+    if (filterOwned === 'missing') return !c.owned;
+    return true;
+  });
+
+  if (activeWishlist && activeList) {
+    const pct = Math.round((activeList.completed / activeList.items) * 100);
+    return (
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => { setActiveWishlist(null); setFilterOwned('all'); }}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-heading font-semibold md:text-3xl truncate">{activeList.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {activeList.completed} / {activeList.items} owned &bull; {pct}% complete
+            </p>
+          </div>
+        </div>
+
+        <div className="h-2 w-full max-w-xs rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all',
+              pct === 100 ? 'bg-emerald-500' : 'bg-primary'
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <Select value={filterOwned} onValueChange={(v) => setFilterOwned(v as 'all' | 'owned' | 'missing')}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cards</SelectItem>
+              <SelectItem value="owned">Owned</SelectItem>
+              <SelectItem value="missing">Missing</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredCards.map((card) => (
+            <div
+              key={card.name + card.set}
+              className={cn(
+                'rounded-lg border p-3 transition',
+                card.owned
+                  ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30'
+                  : 'border-input bg-card'
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    'flex h-[56px] w-[40px] shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground',
+                    !card.owned && 'opacity-50'
+                  )}
+                >
+                  {card.owned ? (
+                    <Check className="h-5 w-5 text-emerald-500" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold leading-tight truncate">{card.name}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground truncate">{card.set}</p>
+                  <Badge variant="outline" className="mt-1 text-[9px] h-4">{card.rarity}</Badge>
+                  <div className="mt-1">
+                    {card.owned ? (
+                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Owned</span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-muted-foreground">Not owned</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredCards.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Heart className="mb-3 h-10 w-10 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">No cards match your filter.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -507,7 +700,11 @@ function DemoWishlists() {
         {wishlists.map((list) => {
           const pct = Math.round((list.completed / list.items) * 100);
           return (
-            <Card key={list.name} className="cursor-pointer transition hover:border-primary/50 hover:shadow-md">
+            <Card
+              key={list.name}
+              className="cursor-pointer transition hover:border-primary/50 hover:shadow-md active:scale-[0.98]"
+              onClick={() => setActiveWishlist(list.name)}
+            >
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="text-sm md:text-base">{list.name}</CardTitle>
                 <CardDescription>{list.items} cards &bull; {pct}% complete</CardDescription>
