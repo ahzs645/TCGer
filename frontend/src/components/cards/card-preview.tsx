@@ -12,8 +12,8 @@ import { fetchCardPrintsApi } from '@/lib/api-client';
 import { useModuleStore } from '@/stores/preferences';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
-import { useWishlistsStore } from '@/stores/wishlists';
-import type { Card, CardPrintsResponse, CollectionCard, PokemonFinishType, PokemonFunctionalGroup } from '@/types/card';
+import { useWishlistsStore, type WishlistCardResponse } from '@/stores/wishlists';
+import type { Card, CardPrintsResponse, CollectionCard, PokemonFinishType, PokemonFunctionalAttack, PokemonFunctionalGroup } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
 import { SetSymbol } from './set-symbol';
 
@@ -224,7 +224,7 @@ export function CardPreview({ card }: CardPreviewProps) {
   }, [supportsPrintSelection, isPrintDialogOpen, printOptions, card.tcg, card.id, selectedPrintCard.id]);
 
   const handleCardImageError = useCallback(() => {
-    setCardImageSrc((currentSrc) => {
+    setCardImageSrc((currentSrc: string) => {
       if (currentSrc === activeCard.imageUrlSmall && activeCard.imageUrl && activeCard.imageUrl !== currentSrc) {
         return activeCard.imageUrl;
       }
@@ -383,7 +383,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                     </div>
                     {pokemonFunctionalGroup.attacks?.length ? (
                       <div className="space-y-1">
-                        {pokemonFunctionalGroup.attacks.map((attack) => (
+                        {pokemonFunctionalGroup.attacks.map((attack: PokemonFunctionalAttack) => (
                           <div key={`${attack.name}-${attack.damage ?? 'na'}`}>
                             <p className="font-medium">{attack.name}</p>
                             <p className="text-muted-foreground">
@@ -400,7 +400,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                   </div>
                 ) : null}
                 <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                  {(printOptions && printOptions.length > 0 ? printOptions : [card]).map((print) => {
+                  {(printOptions && printOptions.length > 0 ? printOptions : [card]).map((print: Card) => {
                     const isSelected = selectedPrintCard.id === print.id;
                     const finishes = getFinishBadges(print);
                     return (
@@ -674,7 +674,7 @@ function WishlistQuickAdd({ card }: { card: Card }) {
   if (!wishlists.length) return null;
 
   const isInAnyWishlist = wishlists.some((w) =>
-    w.cards.some((c) => c.externalId === card.id && c.tcg === card.tcg)
+    w.cards.some((c: WishlistCardResponse) => c.externalId === card.id && c.tcg === card.tcg)
   );
 
   const handleAdd = async (wishlistId: string) => {
@@ -710,7 +710,7 @@ function WishlistQuickAdd({ card }: { card: Card }) {
         </SelectTrigger>
         <SelectContent>
           {wishlists.map((w) => {
-            const alreadyIn = w.cards.some((c) => c.externalId === card.id && c.tcg === card.tcg);
+            const alreadyIn = w.cards.some((c: WishlistCardResponse) => c.externalId === card.id && c.tcg === card.tcg);
             return (
               <SelectItem key={w.id} value={w.id} disabled={alreadyIn}>
                 {w.name} {alreadyIn ? '(added)' : ''}
