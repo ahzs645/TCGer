@@ -56,6 +56,11 @@ body {
   @apply border-border;
 }
 
+html,
+body {
+  overscroll-behavior: none;
+}
+
 html {
   font-feature-settings: "ss01" on, "ss02" on, "cv01" on;
 }
