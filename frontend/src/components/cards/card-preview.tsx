@@ -205,7 +205,7 @@ export function CardPreview({ card }: CardPreviewProps) {
         setPrintData(data);
         const prints = data.prints ?? [];
         if (prints.length) {
-          const matching = prints.find((entry) => entry.id === selectedPrintCard.id);
+          const matching = prints.find((entry: Card) => entry.id === selectedPrintCard.id);
           setSelectedPrintCard(matching ?? prints[0]);
         }
       })
