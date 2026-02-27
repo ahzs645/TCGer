@@ -71,6 +71,9 @@ jobs:
           mkdir -p marketing-site/dist/docs
           cp -R docs/dist/. marketing-site/dist/docs/
 
+      - name: Build shared packages
+        run: npm run build --workspace=packages/api-types
+
       - name: Build frontend demo (static export)
         run: |
           BASE_PATH="${{ steps.pages.outputs.base_path }}"
