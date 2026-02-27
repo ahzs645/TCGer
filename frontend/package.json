@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm --prefix ../packages/api-types run build",
     "build": "next build",
+    "prebuild:demo": "npm --prefix ../packages/api-types run build",
     "build:demo": "DEMO_EXPORT=true next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
