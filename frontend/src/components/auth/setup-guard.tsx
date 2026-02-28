@@ -28,10 +28,11 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   // Wait for zustand to hydrate auth state from localStorage before running
   // access checks. Without this, the first render always sees
   // isAuthenticated=false and briefly flashes the auth screen on reload.
-  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
+  // Guard with optional chaining so static export (no localStorage) doesn't crash.
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist?.hasHydrated?.() ?? false);
   useEffect(() => {
-    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
-    return unsub;
+    const unsub = useAuthStore.persist?.onFinishHydration?.(() => setHydrated(true));
+    return () => unsub?.();
   }, []);
 
   useEffect(() => {
