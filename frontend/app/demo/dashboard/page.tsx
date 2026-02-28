@@ -1,27 +1,16 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { isDemoMode } from '@/lib/demo-mode';
+import { AppShell } from '@/components/layout/app-shell';
+import { DashboardContent } from '@/components/dashboard/dashboard-content';
 
 /**
- * Legacy demo dashboard route — redirects to the main app (which now handles
- * demo mode transparently) or back to the demo login page.
+ * Demo dashboard — renders the same dashboard as the root page so that the
+ * demo stays inside the /demo/* path.  The GitHub Pages deployment only
+ * includes /demo and /_next from the Next.js static export; redirecting to
+ * "/" would land on the marketing site instead of the app dashboard.
  */
-export default function DemoDashboardRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isDemoMode()) {
-      router.replace('/');
-    } else {
-      router.replace('/demo');
-    }
-  }, [router]);
-
+export default function DemoDashboardPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-    </div>
+    <AppShell>
+      <DashboardContent />
+    </AppShell>
   );
 }
