@@ -76,9 +76,32 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </div>
       </header>
-      <main className="flex-1 bg-muted/20 pt-20">
+      <main className="flex-1 bg-muted/20 pt-20 pb-16 md:pb-0">
         <div className="container space-y-6 py-8">{children}</div>
       </main>
+
+      {/* Mobile bottom navigation */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur md:hidden">
+        <div className="flex h-14 items-center justify-around">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors',
+                  isActive ? 'text-primary font-medium' : 'text-muted-foreground'
+                )}
+              >
+                <Icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
