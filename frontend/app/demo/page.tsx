@@ -28,7 +28,7 @@ export default function DemoLoginPage() {
       setDemoMode(true);
       const { user, token } = demoLogin();
       useAuthStore.getState().setAuth(user, token);
-      router.push('/');
+      router.push('/demo/dashboard');
     }, 800);
   };
 
