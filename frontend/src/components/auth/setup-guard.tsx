@@ -25,6 +25,15 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const [shouldBlock, setShouldBlock] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);
 
+  // Wait for zustand to hydrate auth state from localStorage before running
+  // access checks. Without this, the first render always sees
+  // isAuthenticated=false and briefly flashes the auth screen on reload.
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, []);
+
   useEffect(() => {
     // Demo pages bypass all auth/setup checks
     if (pathname?.startsWith('/demo')) {
@@ -34,10 +43,25 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Don't check access until the auth store has hydrated from localStorage.
+    // This prevents a flash of the auth screen when a valid session exists.
+    if (!hydrated) return;
+
+    // Track whether this effect invocation has been superseded by a newer one.
+    // Prevents stale async results from overwriting current state (e.g. an old
+    // checkAccess that started before login completing after the post-login one).
+    let stale = false;
+
+    // Show spinner while re-checking so users see a brief loading state
+    // instead of a flash of the stale "Authentication Required" screen.
+    setLoading(true);
+
     const checkAccess = async () => {
       try {
         // First check if setup is required
         const { setupRequired: required } = await checkSetupRequired();
+        if (stale) return;
+
         if (typeof setSetupRequired === 'function') {
           setSetupRequired(required);
         } else {
@@ -70,6 +94,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
 
         // Now check app settings for authentication requirements
         const settings = await getSettings();
+        if (stale) return;
 
         // Check if the current route requires authentication
         const isDashboard = pathname === '/';
@@ -98,16 +123,21 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
           setShouldBlock(false);
         }
       } catch (error) {
+        if (stale) return;
         console.error('Failed to check access:', error);
         setShouldBlock(false);
         setNeedsAuth(false);
       } finally {
-        setLoading(false);
+        if (!stale) setLoading(false);
       }
     };
 
     checkAccess();
-  }, [pathname, router, setSetupRequired, isAuthenticated]);
+
+    return () => {
+      stale = true;
+    };
+  }, [hydrated, pathname, router, setSetupRequired, isAuthenticated]);
 
   // Always render the same structure
   if (loading || shouldBlock) {
