@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, Filter, Loader2, Plus, RefreshCcw, Trash, TrendingUp } from 'lucide-react';
 
 import { CollectionSummary } from '@/components/collections/collection-summary';
@@ -30,6 +30,7 @@ import type { CollectionCard, CollectionCardCopy, TcgCode } from '@/types/card';
 import { useCollectionsStore } from '@/stores/collections';
 import { useAuthStore } from '@/stores/auth';
 import { SetSymbol } from '@/components/cards/set-symbol';
+import { getAppRoute } from '@/lib/app-routes';
 
 type CardUpdateArgs = {
   cardId: string;
@@ -69,6 +70,7 @@ export function CollectionTable() {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const handleCardUpdate = async ({ cardId, binderId, updates }: CardUpdateArgs) => {
     if (!token) {
       throw new Error('You must be signed in to update cards.');
@@ -89,9 +91,9 @@ export function CollectionTable() {
       const search = id
         ? `?binder=${id === ALL_COLLECTION_ID ? 'all' : encodeURIComponent(id)}`
         : '';
-      router.replace(`/collections${search}`, { scroll: false });
+      router.replace(`${getAppRoute('/collections', pathname)}${search}`, { scroll: false });
     },
-    [router]
+    [pathname, router]
   );
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export function CollectionTable() {
     if (!collections.length) {
       if (activeCollectionId !== '') {
         changeActiveCollection('', false);
-        router.replace('/collections', { scroll: false });
+        router.replace(getAppRoute('/collections', pathname), { scroll: false });
       }
       return;
     }
@@ -127,7 +129,7 @@ export function CollectionTable() {
     if (!isValidActive) {
       changeActiveCollection(ALL_COLLECTION_ID);
     }
-  }, [collections, activeCollectionId, searchParams, changeActiveCollection, router]);
+  }, [collections, activeCollectionId, searchParams, changeActiveCollection, pathname, router]);
 
   useEffect(() => {
     setSelection({});

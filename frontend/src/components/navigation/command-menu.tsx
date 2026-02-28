@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Calculator, Heart, LayoutDashboard, Search, Table } from 'lucide-react';
 
@@ -15,12 +15,14 @@ import {
   CommandShortcut
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
+import { getAppRoute } from '@/lib/app-routes';
 import { cn, GAME_LABELS } from '@/lib/utils';
 import { supportedGameOptions, useGameFilterStore } from '@/stores/game-filter';
 
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { selectedGame, setGame } = useGameFilterStore((state) => ({
     selectedGame: state.selectedGame,
     setGame: state.setGame
@@ -39,7 +41,7 @@ export function CommandMenu() {
 
   const handleNavigate = (path: string) => {
     setOpen(false);
-    router.push(path);
+    router.push(getAppRoute(path, pathname));
   };
 
   const quickCalculations = [

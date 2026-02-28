@@ -8,6 +8,7 @@ import { Heart, LayoutDashboard, Search, Table } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { getAppRoute } from '@/lib/app-routes';
 import { cn } from '@/lib/utils';
 import { isDemoMode } from '@/lib/demo-mode';
 import { getUserPreferences } from '@/lib/api/user-preferences';
@@ -31,6 +32,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const dashboardHref = getAppRoute('/', pathname);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -38,7 +40,7 @@ export function AppShell({ children }: AppShellProps) {
       <header className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 backdrop-blur">
         <div className="container flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 text-lg font-heading font-semibold">
+            <Link href={dashboardHref} className="flex items-center gap-2 text-lg font-heading font-semibold">
               <Image src="/logo.svg" alt="TCGer logo" width={32} height={32} className="h-8 w-8 dark:invert" />
               TCGer
             </Link>
@@ -49,7 +51,8 @@ export function AppShell({ children }: AppShellProps) {
             )}
             <nav className="hidden items-center gap-1 md:flex">
               {navigation.map((item) => {
-                const isActive = pathname === item.href;
+                const href = getAppRoute(item.href, pathname);
+                const isActive = pathname === href;
                 const Icon = item.icon;
                 return (
                   <Button
@@ -59,7 +62,7 @@ export function AppShell({ children }: AppShellProps) {
                     asChild
                     className={cn(isActive && 'bg-primary text-primary-foreground')}
                   >
-                    <Link href={item.href} className="flex items-center gap-2">
+                    <Link href={href} className="flex items-center gap-2">
                       <Icon className="h-4 w-4" />
                       <span>{item.label}</span>
                     </Link>
@@ -84,12 +87,13 @@ export function AppShell({ children }: AppShellProps) {
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur md:hidden">
         <div className="flex h-14 items-center justify-around">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            const href = getAppRoute(item.href, pathname);
+            const isActive = pathname === href;
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 className={cn(
                   'flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors',
                   isActive ? 'text-primary font-medium' : 'text-muted-foreground'
