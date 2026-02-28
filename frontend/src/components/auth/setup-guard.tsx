@@ -6,12 +6,17 @@ import { useRouter, usePathname } from 'next/navigation';
 import { LogIn } from 'lucide-react';
 import { checkSetupRequired } from '@/lib/api/auth';
 import { getSettings } from '@/lib/api/settings';
+import { ensureDemoInterceptor } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { LoginDialog } from '@/components/auth/login-dialog';
 import { SignupDialog } from '@/components/auth/signup-dialog';
 
 export function SetupGuard({ children }: { children: React.ReactNode }) {
+  // Re-install demo fetch interceptor if user was already in demo mode
+  // (e.g. returning from a page refresh). Must run before any API calls.
+  ensureDemoInterceptor();
+
   const router = useRouter();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);

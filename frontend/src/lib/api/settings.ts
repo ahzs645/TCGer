@@ -2,13 +2,9 @@ import type { AppSettings, UpdateSettingsInput } from '@tcg/api-types';
 
 export type { AppSettings, UpdateSettingsInput } from '@tcg/api-types';
 
-import { isDemoMode } from '@/lib/demo-mode';
-import * as demo from './demo-adapter';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getSettings(): Promise<AppSettings> {
-  if (isDemoMode()) return demo.demoGetSettings();
   const response = await fetch(`${API_BASE_URL}/settings`);
 
   if (!response.ok) {
@@ -22,7 +18,6 @@ export async function updateSettings(
   data: UpdateSettingsInput,
   token: string
 ): Promise<AppSettings> {
-  if (isDemoMode()) return demo.demoUpdateSettings(data);
   const response = await fetch(`${API_BASE_URL}/settings`, {
     method: 'PATCH',
     headers: {

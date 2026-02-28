@@ -8,13 +8,9 @@ import type {
 
 export type { WishlistResponse, WishlistCardResponse, CreateWishlistInput, UpdateWishlistInput, AddWishlistCardInput };
 
-import { isDemoMode } from '@/lib/demo-mode';
-import * as demo from './demo-adapter';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getWishlists(token: string): Promise<WishlistResponse[]> {
-  if (isDemoMode()) return demo.demoGetWishlists();
   const response = await fetch(`${API_BASE_URL}/wishlists`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -31,7 +27,6 @@ export async function getWishlists(token: string): Promise<WishlistResponse[]> {
 }
 
 export async function getWishlist(token: string, wishlistId: string): Promise<WishlistResponse> {
-  if (isDemoMode()) return demo.demoGetWishlist(wishlistId);
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -51,7 +46,6 @@ export async function createWishlist(
   token: string,
   data: CreateWishlistInput
 ): Promise<WishlistResponse> {
-  if (isDemoMode()) return demo.demoCreateWishlist(data);
   const response = await fetch(`${API_BASE_URL}/wishlists`, {
     method: 'POST',
     headers: {
@@ -74,7 +68,6 @@ export async function updateWishlist(
   wishlistId: string,
   data: UpdateWishlistInput
 ): Promise<WishlistResponse> {
-  if (isDemoMode()) return demo.demoUpdateWishlist(wishlistId, data);
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
     method: 'PATCH',
     headers: {
@@ -96,7 +89,6 @@ export async function deleteWishlist(
   token: string,
   wishlistId: string
 ): Promise<void> {
-  if (isDemoMode()) return demo.demoDeleteWishlist(wishlistId);
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
     method: 'DELETE',
     headers: {
@@ -115,7 +107,6 @@ export async function addCardToWishlist(
   wishlistId: string,
   data: AddWishlistCardInput
 ): Promise<WishlistCardResponse> {
-  if (isDemoMode()) return demo.demoAddCardToWishlist(wishlistId, data);
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/cards`, {
     method: 'POST',
     headers: {
@@ -138,7 +129,6 @@ export async function removeCardFromWishlist(
   wishlistId: string,
   cardId: string
 ): Promise<void> {
-  if (isDemoMode()) return demo.demoRemoveCardFromWishlist(wishlistId, cardId);
   const response = await fetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards/${cardId}`,
     {
