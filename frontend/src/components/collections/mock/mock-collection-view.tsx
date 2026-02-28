@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ import { useTagsStore } from '@/stores/tags';
 import { useAuthStore } from '@/stores/auth';
 import { useModuleStore } from '@/stores/preferences';
 import { cn } from '@/lib/utils';
+import { getAppRoute } from '@/lib/app-routes';
 import type {
   Card as TcgCard,
   CardPrintsResponse,
@@ -136,6 +137,7 @@ function getFinishBadges(print: TcgCard): PokemonFinishType[] {
 export function MockCollectionView() {
   const token = useAuthStore((state) => state.token);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { collections, fetchCollections, updateCollectionCard, addCollection, updateCollection, hasFetched, isLoading } = useCollectionsStore((state) => ({
     collections: state.collections,
@@ -417,7 +419,12 @@ export function MockCollectionView() {
 
   const handleBinderChange = (binderId: string) => {
     setBinderFilter(binderId);
-    router.replace(binderId === 'all' ? '/collections' : `/collections?binder=${binderId}`, { scroll: false });
+    router.replace(
+      binderId === 'all'
+        ? getAppRoute('/collections', pathname)
+        : `${getAppRoute('/collections', pathname)}?binder=${binderId}`,
+      { scroll: false }
+    );
   };
 
   const handleTagToggle = (tagId: string) => {

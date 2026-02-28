@@ -3,9 +3,11 @@
 import { useEffect, useMemo } from 'react';
 import { ArrowUpRight, Coins, Library, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAppRoute } from '@/lib/app-routes';
 import { GAME_LABELS } from '@/lib/utils';
 import { useGameFilterStore } from '@/stores/game-filter';
 import { useModuleStore } from '@/stores/preferences';
@@ -86,6 +88,7 @@ function buildDashboardStats(cards: DashboardCard[], showPricing: boolean): Dash
 }
 
 export function DashboardContent() {
+  const pathname = usePathname();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const { enabledGames, showPricing } = useModuleStore((state) => ({
     enabledGames: state.enabledGames,
@@ -302,7 +305,9 @@ function RecentActivity({
           {items.map((item) => (
             <Link
               key={item.id}
-              href={item.binderId ? `/collections?binder=${encodeURIComponent(item.binderId)}` : '/collections'}
+              href={item.binderId
+                ? `${getAppRoute('/collections', pathname)}?binder=${encodeURIComponent(item.binderId)}`
+                : getAppRoute('/collections', pathname)}
               className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4 transition hover:border-primary/50 hover:bg-muted/40"
             >
               <div>
