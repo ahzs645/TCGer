@@ -1,7 +1,8 @@
 'use client';
 
-import { LogIn, LogOut, Settings, Sparkles, User, UserPlus, Waypoints } from 'lucide-react';
+import { LogIn, LogOut, Settings, Sparkles, User } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { AccountSettingsDialog } from '@/components/account/account-settings-dialog';
 import { ProfileDialog } from '@/components/account/profile-dialog';
@@ -17,9 +18,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { logout } from '@/lib/api/auth';
+import { isDemoMode, setDemoMode } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
 
 export function UserMenu() {
+  const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -27,6 +30,7 @@ export function UserMenu() {
   const { user, token, isAuthenticated, clearAuth } = useAuthStore();
 
   const handleLogout = async () => {
+    const wasDemo = isDemoMode();
     if (token) {
       try {
         await logout(token);
@@ -34,7 +38,13 @@ export function UserMenu() {
         console.error('Logout error:', error);
       }
     }
+    if (wasDemo) {
+      setDemoMode(false);
+    }
     clearAuth();
+    if (wasDemo) {
+      router.push('/demo');
+    }
   };
 
   const handleSwitchToSignup = () => {
