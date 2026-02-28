@@ -2,9 +2,13 @@ import type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/
 
 export type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/api-types';
 
+import { isDemoMode } from '@/lib/demo-mode';
+import * as demo from './demo-adapter';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getUserProfile(token: string): Promise<UserProfile> {
+  if (isDemoMode()) return demo.demoGetUserProfile();
   const response = await fetch(`${API_BASE_URL}/users/me`, {
     headers: {
       Authorization: `Bearer ${token}`
@@ -22,6 +26,7 @@ export async function updateUserProfile(
   data: UpdateProfileInput,
   token: string
 ): Promise<Omit<UserProfile, 'createdAt'>> {
+  if (isDemoMode()) return demo.demoUpdateUserProfile(data);
   const response = await fetch(`${API_BASE_URL}/users/me`, {
     method: 'PATCH',
     headers: {
@@ -43,6 +48,7 @@ export async function changePassword(
   data: ChangePasswordInput,
   token: string
 ): Promise<{ success: boolean }> {
+  if (isDemoMode()) return demo.demoChangePassword();
   const response = await fetch(`${API_BASE_URL}/users/me/change-password`, {
     method: 'POST',
     headers: {

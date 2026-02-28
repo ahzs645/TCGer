@@ -21,11 +21,15 @@ export type UpdateCollectionInput = UpdateBinderInput;
 export type AddCardToCollectionInput = AddCardInput;
 export type UpdateCollectionCardInput = UpdateCardInput;
 
+import { isDemoMode } from '@/lib/demo-mode';
+import * as demo from './demo-adapter';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export const LIBRARY_COLLECTION_ID = '__library__';
 
 export async function getCollections(token: string): Promise<Collection[]> {
+  if (isDemoMode()) return demo.demoGetCollections();
   const response = await fetch(`${API_BASE_URL}/collections`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -45,6 +49,7 @@ export async function createCollection(
   token: string,
   data: CreateCollectionInput
 ): Promise<Collection> {
+  if (isDemoMode()) return demo.demoCreateCollection(data);
   const response = await fetch(`${API_BASE_URL}/collections`, {
     method: 'POST',
     headers: {
@@ -67,6 +72,7 @@ export async function updateCollection(
   collectionId: string,
   data: UpdateCollectionInput
 ): Promise<Collection> {
+  if (isDemoMode()) return demo.demoUpdateCollection(collectionId, data);
   const response = await fetch(`${API_BASE_URL}/collections/${collectionId}`, {
     method: 'PATCH',
     headers: {
@@ -88,6 +94,7 @@ export async function deleteCollection(
   token: string,
   collectionId: string
 ): Promise<void> {
+  if (isDemoMode()) return demo.demoDeleteCollection(collectionId);
   const response = await fetch(`${API_BASE_URL}/collections/${collectionId}`, {
     method: 'DELETE',
     headers: {
@@ -106,6 +113,7 @@ export async function addCardToCollection(
   collectionId: string,
   data: AddCardToCollectionInput
 ): Promise<void> {
+  if (isDemoMode()) return demo.demoAddCardToCollection(collectionId, data);
   if (collectionId === LIBRARY_COLLECTION_ID) {
     const response = await fetch(`${API_BASE_URL}/collections/cards`, {
       method: 'POST',
@@ -145,6 +153,7 @@ export async function removeCardFromCollection(
   collectionId: string,
   cardId: string
 ): Promise<void> {
+  if (isDemoMode()) return demo.demoRemoveCardFromCollection(collectionId, cardId);
   const response = await fetch(
     `${API_BASE_URL}/collections/${collectionId}/cards/${cardId}`,
     {
@@ -167,6 +176,7 @@ export async function updateCollectionCard(
   cardId: string,
   data: UpdateCollectionCardInput
 ): Promise<CollectionCard> {
+  if (isDemoMode()) return demo.demoUpdateCollectionCard(binderId, cardId, data);
   const response = await fetch(`${API_BASE_URL}/collections/${binderId}/cards/${cardId}`, {
     method: 'PATCH',
     headers: {
@@ -185,6 +195,7 @@ export async function updateCollectionCard(
 }
 
 export async function getTags(token: string): Promise<CollectionTagResponse[]> {
+  if (isDemoMode()) return demo.demoGetTags();
   const response = await fetch(`${API_BASE_URL}/collections/tags`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -201,6 +212,7 @@ export async function getTags(token: string): Promise<CollectionTagResponse[]> {
 }
 
 export async function createTag(token: string, data: CreateTagInput): Promise<CollectionTagResponse> {
+  if (isDemoMode()) return demo.demoCreateTag(data);
   const response = await fetch(`${API_BASE_URL}/collections/tags`, {
     method: 'POST',
     headers: {

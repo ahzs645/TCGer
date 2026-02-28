@@ -2,9 +2,13 @@ import type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckRespons
 
 export type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckResponse } from '@tcg/api-types';
 
+import { isDemoMode } from '@/lib/demo-mode';
+import * as demo from './demo-adapter';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function signup(data: SignupInput): Promise<AuthResponse> {
+  if (isDemoMode()) return demo.demoSignup();
   const response = await fetch(`${API_BASE_URL}/auth/signup`, {
     method: 'POST',
     headers: {
@@ -22,6 +26,7 @@ export async function signup(data: SignupInput): Promise<AuthResponse> {
 }
 
 export async function login(data: LoginInput): Promise<AuthResponse> {
+  if (isDemoMode()) return demo.demoLogin();
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: {
@@ -39,6 +44,7 @@ export async function login(data: LoginInput): Promise<AuthResponse> {
 }
 
 export async function logout(token: string): Promise<void> {
+  if (isDemoMode()) return demo.demoLogout();
   await fetch(`${API_BASE_URL}/auth/logout`, {
     method: 'POST',
     headers: {
@@ -48,6 +54,7 @@ export async function logout(token: string): Promise<void> {
 }
 
 export async function getCurrentUser(token: string): Promise<{ user: AuthUser }> {
+  if (isDemoMode()) return demo.demoGetCurrentUser();
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     headers: {
       Authorization: `Bearer ${token}`
@@ -62,6 +69,7 @@ export async function getCurrentUser(token: string): Promise<{ user: AuthUser }>
 }
 
 export async function checkSetupRequired(): Promise<SetupCheckResponse> {
+  if (isDemoMode()) return demo.demoCheckSetupRequired();
   const response = await fetch(`${API_BASE_URL}/auth/setup-required`);
 
   if (!response.ok) {
@@ -72,6 +80,7 @@ export async function checkSetupRequired(): Promise<SetupCheckResponse> {
 }
 
 export async function setupAdmin(data: SignupInput): Promise<AuthResponse> {
+  if (isDemoMode()) return demo.demoSetupAdmin();
   const response = await fetch(`${API_BASE_URL}/auth/setup`, {
     method: 'POST',
     headers: {
