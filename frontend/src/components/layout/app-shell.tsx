@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Heart, LayoutDashboard, Search, Table } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { isDemoMode } from '@/lib/demo-mode';
 import { getUserPreferences } from '@/lib/api/user-preferences';
 import { useAuthStore } from '@/stores/auth';
 
@@ -40,6 +42,11 @@ export function AppShell({ children }: AppShellProps) {
               <Image src="/logo.svg" alt="TCGer logo" width={32} height={32} className="h-8 w-8 dark:invert" />
               TCGer
             </Link>
+            {isDemoMode() && (
+              <Badge variant="secondary" className="hidden text-xs sm:inline-flex">
+                Demo Mode
+              </Badge>
+            )}
             <nav className="hidden items-center gap-1 md:flex">
               {navigation.map((item) => {
                 const isActive = pathname === item.href;

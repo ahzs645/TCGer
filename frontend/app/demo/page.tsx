@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setDemoMode } from '@/lib/demo-mode';
+import { demoLogin } from '@/lib/api/demo-adapter';
+import { useAuthStore } from '@/stores/auth';
 
 export default function DemoLoginPage() {
   const router = useRouter();
@@ -20,9 +23,12 @@ export default function DemoLoginPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate a short login delay then navigate to the demo dashboard
+    // Enable demo mode, seed store, set fake auth, then redirect to main app
     setTimeout(() => {
-      router.push('/demo/dashboard');
+      setDemoMode(true);
+      const { user, token } = demoLogin();
+      useAuthStore.getState().setAuth(user, token);
+      router.push('/');
     }, 800);
   };
 

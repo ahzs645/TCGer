@@ -1,4 +1,6 @@
 import { DEFAULT_API_BASE_URL } from '@/lib/utils';
+import { isDemoMode } from '@/lib/demo-mode';
+import * as demo from '@/lib/api/demo-adapter';
 import type { Card, CardPrintsResponse, SearchCardsResponse, TcgCode } from '@/types/card';
 
 const API_BASE_URL = DEFAULT_API_BASE_URL.replace(/\/$/, '');
@@ -13,6 +15,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'all' }): Promise<Card[]> {
+  if (isDemoMode()) return demo.demoSearchCards(params);
   const { query, tcg } = params;
   const usp = new URLSearchParams({ query });
   if (tcg && tcg !== 'all') {
@@ -27,6 +30,7 @@ export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'a
 }
 
 export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string }): Promise<CardPrintsResponse> {
+  if (isDemoMode()) return demo.demoFetchCardPrints() as CardPrintsResponse;
   const { tcg, cardId } = params;
   const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
     next: { revalidate: 30 }
