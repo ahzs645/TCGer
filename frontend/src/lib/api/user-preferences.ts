@@ -2,13 +2,9 @@ import type { UserPreferences } from '@tcg/api-types';
 
 export type { UserPreferences } from '@tcg/api-types';
 
-import { isDemoMode } from '@/lib/demo-mode';
-import * as demo from './demo-adapter';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getUserPreferences(token: string): Promise<UserPreferences> {
-  if (isDemoMode()) return demo.demoGetUserPreferences();
   const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
     headers: {
       Authorization: `Bearer ${token}`
@@ -26,7 +22,6 @@ export async function updateUserPreferences(
   data: Partial<UserPreferences>,
   token: string
 ): Promise<UserPreferences> {
-  if (isDemoMode()) return demo.demoUpdateUserPreferences(data);
   const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
     method: 'PATCH',
     headers: {
