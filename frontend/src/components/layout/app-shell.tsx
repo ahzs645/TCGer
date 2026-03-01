@@ -60,11 +60,11 @@ export function AppShell({ children }: AppShellProps) {
                     variant={isActive ? 'default' : 'ghost'}
                     size="sm"
                     asChild
-                    className={cn(isActive && 'bg-primary text-primary-foreground')}
+                    className={cn('xl:px-3', isActive && 'bg-primary text-primary-foreground')}
                   >
-                    <Link href={href} className="flex items-center gap-2">
+                    <Link href={href} className="flex items-center gap-2" title={item.label}>
                       <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                      <span className="hidden xl:inline">{item.label}</span>
                     </Link>
                   </Button>
                 );
