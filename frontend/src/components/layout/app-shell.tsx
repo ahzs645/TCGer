@@ -16,7 +16,6 @@ import { useAuthStore } from '@/stores/auth';
 
 import { CommandMenu } from '../navigation/command-menu';
 import { GameSwitcher } from '../navigation/game-switcher';
-import { ThemeToggle } from '../navigation/theme-toggle';
 import { UserMenu } from '../navigation/user-menu';
 
 const navigation = [
@@ -74,7 +73,6 @@ export function AppShell({ children }: AppShellProps) {
           <div className="flex items-center gap-2">
             <CommandMenu />
             <GameSwitcher />
-            <ThemeToggle />
             <UserMenu />
           </div>
         </div>

@@ -189,12 +189,14 @@ export function CollectionView() {
   const [printError, setPrintError] = useState<string | null>(null);
   const [isSavingPrintSelection, setIsSavingPrintSelection] = useState(false);
 
+  // Sync binder filter from URL only on initial mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const binderParam = searchParams.get('binder');
     if (binderParam) {
       setBinderFilter(binderParam);
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     if (token && !hasFetched) {
@@ -223,7 +225,7 @@ export function CollectionView() {
 
   useEffect(() => {
     setPriceRange([0, maxPrice]);
-  }, [maxPrice, binderFilter]);
+  }, [maxPrice]);
 
   const filteredCards = useMemo(() => {
     return workingCards.filter((card) => {

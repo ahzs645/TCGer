@@ -1,8 +1,9 @@
 'use client';
 
-import { LogIn, LogOut, Settings, Sparkles, User } from 'lucide-react';
+import { LogIn, LogOut, Moon, Settings, Sparkles, Sun, User } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 
 import { AccountSettingsDialog } from '@/components/account/account-settings-dialog';
 import { ProfileDialog } from '@/components/account/profile-dialog';
@@ -28,6 +29,8 @@ export function UserMenu() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const { user, token, isAuthenticated, clearAuth } = useAuthStore();
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   const handleLogout = async () => {
     const wasDemo = isDemoMode();
@@ -102,6 +105,10 @@ export function UserMenu() {
           <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
             Account & preferences
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setTheme(isDark ? 'light' : 'dark')}>
+            {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+            {isDark ? 'Light mode' : 'Dark mode'}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={handleLogout}>
