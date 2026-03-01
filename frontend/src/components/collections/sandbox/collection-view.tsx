@@ -159,6 +159,7 @@ export function CollectionView() {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCopyId, setSelectedCopyId] = useState<string | null>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [draftBinderId, setDraftBinderId] = useState<string>(LIBRARY_COLLECTION_ID);
   const [draftCondition, setDraftCondition] = useState<(typeof CONDITION_ORDER)[number]>('NM');
   const [draftNotes, setDraftNotes] = useState('');
@@ -408,6 +409,12 @@ export function CollectionView() {
 
   const toggleRowExpansion = (cardId: string) => {
     setExpandedRows((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
+  };
+
+  /** Select a card via user tap — opens the mobile drawer */
+  const selectCard = (cardId: string) => {
+    setSelectedCardId(cardId);
+    setMobileDrawerOpen(true);
   };
 
   const toggleTagFilter = (tagId: string) => {
@@ -777,11 +784,11 @@ export function CollectionView() {
                         'w-full text-left px-4 py-3 transition-colors cursor-pointer',
                         isSelected && 'bg-primary/5'
                       )}
-                      onClick={() => setSelectedCardId(card.id)}
+                      onClick={() => selectCard(card.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          setSelectedCardId(card.id);
+                          selectCard(card.id);
                         }
                       }}
                     >
@@ -835,7 +842,7 @@ export function CollectionView() {
                                 selectedCopyId === copy.id ? 'border-primary/70 bg-muted/40' : 'hover:border-primary/40'
                               )}
                               onClick={() => {
-                                setSelectedCardId(card.id);
+                                selectCard(card.id);
                                 setSelectedCopyId(copy.id);
                               }}
                             >
@@ -883,7 +890,7 @@ export function CollectionView() {
                       <TableRow
                         key={`${card.id}-row`}
                         className={cn('cursor-pointer transition-colors', selectedCardId === card.id && 'bg-primary/5')}
-                        onClick={() => setSelectedCardId(card.id)}
+                        onClick={() => selectCard(card.id)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -942,7 +949,7 @@ export function CollectionView() {
                               <div className="text-xs uppercase text-muted-foreground">Individual copies</div>
                               {card.copies?.map((copy, index) => {
                                 const handleClick = () => {
-                                  setSelectedCardId(card.id);
+                                  selectCard(card.id);
                                   setSelectedCopyId(copy.id);
                                 };
                                 return (
@@ -1080,9 +1087,9 @@ export function CollectionView() {
         onSelectPrint={supportsPrintSelection ? handlePrintButtonClick : undefined}
         printSelectionLabel={printSelectionLabel}
         printSelectionDisabled={printSelectionDisabled}
+        open={mobileDrawerOpen}
         onClose={() => {
-          setSelectedCardId(null);
-          setSelectedCopyId(null);
+          setMobileDrawerOpen(false);
         }}
       />
 
