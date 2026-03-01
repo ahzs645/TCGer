@@ -13,7 +13,7 @@ import {
 import { FilterControls } from './filter-controls';
 import { Filter } from 'lucide-react';
 import type { CollectionTag } from '@/lib/api/collections';
-import type { CONDITION_ORDER } from './mock-helpers';
+import type { CONDITION_ORDER } from './helpers';
 
 interface FilterDialogProps {
   priceRange: [number, number];
