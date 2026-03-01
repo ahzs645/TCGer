@@ -684,26 +684,26 @@ export function MockCollectionView() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="gap-2">
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="gap-1 sm:gap-2 pb-2 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Sparkles className="h-4 w-4 text-primary" />
             Binder pulse
           </CardTitle>
-          <CardDescription>Snapshot metrics for the current scope—rows, copies, and trending tags.</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Snapshot metrics for the current scope—rows, copies, and trending tags.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-6 sm:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Visible rows</p>
-              <p className="text-2xl font-semibold text-foreground">{summary.rows}</p>
+        <CardContent className="space-y-4 sm:space-y-6">
+          <div className="flex items-baseline gap-4 sm:gap-6 sm:grid sm:grid-cols-3">
+            <div className="flex items-baseline gap-1.5 sm:block">
+              <p className="text-[11px] uppercase text-muted-foreground sm:text-xs">Rows</p>
+              <p className="text-lg font-semibold text-foreground sm:text-2xl">{summary.rows}</p>
             </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Total copies</p>
-              <p className="text-2xl font-semibold text-foreground">{summary.copies}</p>
+            <div className="flex items-baseline gap-1.5 sm:block">
+              <p className="text-[11px] uppercase text-muted-foreground sm:text-xs">Copies</p>
+              <p className="text-lg font-semibold text-foreground sm:text-2xl">{summary.copies}</p>
             </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Focus tags</p>
-              <p className="text-sm font-medium text-foreground">
+            <div className="flex items-baseline gap-1.5 sm:block min-w-0">
+              <p className="text-[11px] uppercase text-muted-foreground shrink-0 sm:text-xs">Tags</p>
+              <p className="text-sm font-medium text-foreground truncate">
                 {summary.highlightedTags
                   .map(([tagId]) => tags.find((tag) => tag.id === tagId)?.label)
                   .filter(Boolean)
