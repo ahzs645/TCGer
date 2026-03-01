@@ -20,7 +20,7 @@ import { fetchCardPrintsApi } from '@/lib/api-client';
 import { conditionRangeLabel, formatCurrency, CONDITION_ORDER } from './mock-helpers';
 import { FilterDialog } from './filter-dialog';
 import { BinderList } from './binder-list';
-import { MockDetailPanel } from './detail-panel';
+import { MockDetailPanel, MobileDetailDrawer } from './detail-panel';
 import { useCollectionsStore } from '@/stores/collections';
 import { useTagsStore } from '@/stores/tags';
 import { useAuthStore } from '@/stores/auth';
@@ -727,7 +727,7 @@ export function MockCollectionView() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="overflow-hidden">
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -941,6 +941,48 @@ export function MockCollectionView() {
           printSelectionDisabled={printSelectionDisabled}
         />
       </div>
+
+      <MobileDetailDrawer
+        card={selectedCard}
+        selectedCopy={selectedCopy}
+        availableTags={tags}
+        draftCopyTags={draftCopyTags}
+        onToggleTag={handleTagToggle}
+        onCreateTag={handleCreateTag}
+        binderOptions={binderOptions}
+        draftBinderId={draftBinderId}
+        draftCondition={draftCondition}
+        draftNotes={draftNotes}
+        onBinderChange={(value) => {
+          setDraftBinderId(value);
+          setPendingBinderId(value);
+        }}
+        onConditionChange={setDraftCondition}
+        onNotesChange={setDraftNotes}
+        onSave={handleSave}
+        onReset={() => {
+          if (!selectedCopy) {
+            return;
+          }
+          setDraftCondition(((selectedCopy.condition as (typeof CONDITION_ORDER)[number]) ?? 'NM') as (typeof CONDITION_ORDER)[number]);
+          setDraftNotes(selectedCopy.notes ?? '');
+          setDraftCopyTags(selectedCopy.tags.map((tag) => tag.id));
+          setStatus('idle');
+          setErrorMessage(null);
+        }}
+        onMove={handleMove}
+        moveStatus={moveStatus}
+        moveError={moveError}
+        status={status}
+        errorMessage={errorMessage}
+        onSelectPrint={supportsPrintSelection ? handlePrintButtonClick : undefined}
+        printSelectionLabel={printSelectionLabel}
+        printSelectionDisabled={printSelectionDisabled}
+        onClose={() => {
+          setSelectedCardId(null);
+          setSelectedCopyId(null);
+        }}
+      />
 
       <Dialog
         open={isPrintDialogOpen}
