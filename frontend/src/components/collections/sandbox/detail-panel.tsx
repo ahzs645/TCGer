@@ -48,6 +48,7 @@ export interface DetailPanelProps {
   printSelectionLabel?: string;
   printSelectionDisabled?: boolean;
   onClose?: () => void;
+  open?: boolean;
 }
 
 /** Compact card header for the mobile drawer */
@@ -552,11 +553,12 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     onSelectPrint,
     printSelectionLabel,
     printSelectionDisabled,
-    onClose
+    onClose,
+    open: openProp
   } = props;
 
   const isMobile = useIsMobile();
-  const isOpen = isMobile && !!card;
+  const isOpen = isMobile && (openProp ?? false);
 
   return (
     <Drawer
