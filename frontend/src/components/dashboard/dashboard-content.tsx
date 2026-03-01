@@ -293,6 +293,7 @@ function RecentActivity({
     timestamp: string;
   }>;
 }) {
+  const pathname = usePathname();
   return (
     <Card>
       <CardHeader>
