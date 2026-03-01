@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,16 +11,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 
 import { LIBRARY_COLLECTION_ID, type Collection, type CollectionCard, type CollectionCardCopy, type CollectionTag, type UpdateCollectionCardInput } from '@/lib/api/collections';
 import { fetchCardPrintsApi } from '@/lib/api-client';
-import { conditionRangeLabel, formatCurrency, CONDITION_ORDER } from './mock-helpers';
+import { conditionRangeLabel, formatCurrency, CONDITION_ORDER } from './helpers';
 import { FilterDialog } from './filter-dialog';
 import { BinderList } from './binder-list';
-import { MockDetailPanel, MobileDetailDrawer } from './detail-panel';
+import { DetailPanel, MobileDetailDrawer } from './detail-panel';
 import { useCollectionsStore } from '@/stores/collections';
 import { useTagsStore } from '@/stores/tags';
 import { useAuthStore } from '@/stores/auth';
@@ -134,7 +133,7 @@ function getFinishBadges(print: TcgCard): PokemonFinishType[] {
   return finishes;
 }
 
-export function MockCollectionView() {
+export function CollectionView() {
   const token = useAuthStore((state) => state.token);
   const router = useRouter();
   const pathname = usePathname();
@@ -903,7 +902,7 @@ export function MockCollectionView() {
           </CardContent>
         </Card>
 
-        <MockDetailPanel
+        <DetailPanel
           card={selectedCard}
           selectedCopy={selectedCopy}
           availableTags={tags}

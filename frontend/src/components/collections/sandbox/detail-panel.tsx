@@ -12,7 +12,7 @@ import { Dialog, DialogPortal, DialogOverlay, DialogContent, DialogTitle, Dialog
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import { CONDITION_COPY, CONDITION_ORDER, conditionRangeLabel, formatCurrency } from './mock-helpers';
+import { CONDITION_COPY, CONDITION_ORDER, conditionRangeLabel, formatCurrency } from './helpers';
 import type { CollectionCard, CollectionCardCopy, CollectionTag } from '@/lib/api/collections';
 import { TagCombobox } from './tag-combobox';
 import { useModuleStore } from '@/stores/preferences';
@@ -23,7 +23,7 @@ const GAME_LABELS: Record<string, string> = {
   pokemon: 'Pokémon'
 };
 
-export interface MockDetailPanelProps {
+export interface DetailPanelProps {
   card: CollectionCard | null;
   selectedCopy: CollectionCardCopy | null;
   availableTags: CollectionTag[];
@@ -401,7 +401,7 @@ function EditForm({
 }
 
 /** Desktop sidebar detail panel — unchanged behavior, hidden on mobile */
-export function MockDetailPanel(props: MockDetailPanelProps) {
+export function DetailPanel(props: DetailPanelProps) {
   const {
     card,
     selectedCopy,
@@ -512,7 +512,7 @@ export function MockDetailPanel(props: MockDetailPanelProps) {
 }
 
 /** Mobile bottom-sheet detail panel — visible only below lg breakpoint */
-export function MobileDetailDrawer(props: MockDetailPanelProps) {
+export function MobileDetailDrawer(props: DetailPanelProps) {
   const {
     card,
     selectedCopy,

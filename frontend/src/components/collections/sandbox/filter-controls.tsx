@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Filter, Tag as TagIcon } from 'lucide-react';
 import type { CollectionTag } from '@/lib/api/collections';
-import { CONDITION_COPY, CONDITION_ORDER, formatCurrency } from './mock-helpers';
+import { CONDITION_COPY, CONDITION_ORDER, formatCurrency } from './helpers';
 
 interface FilterControlsProps {
   priceRange: [number, number];

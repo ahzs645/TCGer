@@ -1,7 +1,7 @@
 'use client';
 
 import { AppShell } from '@/components/layout/app-shell';
-import { MockCollectionView } from '@/components/collections/mock/mock-collection-view';
+import { CollectionView } from '@/components/collections/sandbox/collection-view';
 import { Badge } from '@/components/ui/badge';
 
 export default function CollectionsPage() {
@@ -15,7 +15,7 @@ export default function CollectionsPage() {
           </div>
           <p className="text-sm text-muted-foreground">Per-copy inventory manager powered by your live binder data.</p>
         </div>
-        <MockCollectionView />
+        <CollectionView />
       </div>
     </AppShell>
   );
