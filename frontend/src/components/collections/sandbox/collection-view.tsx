@@ -759,7 +759,109 @@ export function CollectionView() {
               <span>{selectedCard ? `Binder: ${selectedCard.binderName ?? 'Unsorted'}` : 'Select a row to edit'}</span>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          {/* Mobile: compact card list */}
+          <CardContent className="p-0 md:hidden">
+            <div className="divide-y">
+              {sortedCards.map((card) => {
+                const expanded = expandedRows[card.id];
+                const isSelected = selectedCardId === card.id;
+                const binderColor = card.binderColorHex
+                  ? (card.binderColorHex.startsWith('#') ? card.binderColorHex : `#${card.binderColorHex}`)
+                  : undefined;
+                return (
+                  <div key={card.id}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={cn(
+                        'w-full text-left px-4 py-3 transition-colors cursor-pointer',
+                        isSelected && 'bg-primary/5'
+                      )}
+                      onClick={() => setSelectedCardId(card.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedCardId(card.id);
+                        }
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <button
+                          type="button"
+                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRowExpansion(card.id);
+                          }}
+                        >
+                          {expanded ? '−' : '+'}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {binderColor && (
+                              <span
+                                className="inline-flex h-2 w-2 rounded-full shrink-0"
+                                style={{ backgroundColor: binderColor }}
+                              />
+                            )}
+                            <p className="text-sm font-medium truncate">{card.name}</p>
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground">
+                            <span>{card.binderName ?? 'Unsorted'}</span>
+                            <span>·</span>
+                            <span>{card.rarity ?? 'N/A'}</span>
+                            <span>·</span>
+                            <span>{card.copies?.length ?? card.quantity} {(card.copies?.length ?? card.quantity) === 1 ? 'copy' : 'copies'}</span>
+                            {showPricing && card.price !== undefined && (
+                              <>
+                                <span>·</span>
+                                <span>{formatCurrency(card.price)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {expanded && card.copies?.length ? (
+                      <div className="px-4 pb-3 pl-[3.25rem]">
+                        <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                          <p className="text-[10px] uppercase text-muted-foreground">Copies</p>
+                          {card.copies.map((copy, index) => (
+                            <button
+                              key={copy.id}
+                              type="button"
+                              className={cn(
+                                'w-full text-left rounded-md border px-3 py-2 text-xs transition',
+                                selectedCopyId === copy.id ? 'border-primary/70 bg-muted/40' : 'hover:border-primary/40'
+                              )}
+                              onClick={() => {
+                                setSelectedCardId(card.id);
+                                setSelectedCopyId(copy.id);
+                              }}
+                            >
+                              <span className="font-semibold">{copy.condition ?? 'Unknown'}</span>
+                              <span className="text-muted-foreground"> #{index + 1}</span>
+                              {copy.notes?.trim() ? (
+                                <p className="mt-0.5 text-muted-foreground truncate">{copy.notes}</p>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {!sortedCards.length && (
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  No cards match these filters.
+                </div>
+              )}
+            </div>
+          </CardContent>
+
+          {/* Desktop: full table */}
+          <CardContent className="p-0 hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
