@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -511,7 +511,22 @@ export function DetailPanel(props: DetailPanelProps) {
   );
 }
 
-/** Mobile bottom-sheet detail panel — visible only below lg breakpoint */
+/** Returns true when viewport is below the lg breakpoint (1024px) */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 1023px)');
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isMobile;
+}
+
+/** Mobile bottom-sheet detail panel — only opens below lg breakpoint */
 export function MobileDetailDrawer(props: DetailPanelProps) {
   const {
     card,
@@ -540,57 +555,56 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     onClose
   } = props;
 
-  const isOpen = !!card;
+  const isMobile = useIsMobile();
+  const isOpen = isMobile && !!card;
 
   return (
-    <div className="lg:hidden">
-      <Drawer
-        open={isOpen}
-        onOpenChange={(open) => {
-          if (!open) onClose?.();
-        }}
-      >
-        <DrawerContent className="max-h-[85vh]">
-          <VisuallyHidden>
-            <DrawerTitle>{card?.name ?? 'Card details'}</DrawerTitle>
-            <DrawerDescription>Edit card details</DrawerDescription>
-          </VisuallyHidden>
-          {card && (
-            <div className="overflow-y-auto px-4 pb-6 pt-2 space-y-4">
-              <CompactCardHeader card={card} />
-              <PrintSelection
-                card={card}
-                selectedCopy={selectedCopy}
-                onSelectPrint={onSelectPrint}
-                printSelectionLabel={printSelectionLabel}
-                printSelectionDisabled={printSelectionDisabled}
-              />
-              <EditForm
-                selectedCopy={selectedCopy}
-                availableTags={availableTags}
-                draftCopyTags={draftCopyTags}
-                onToggleTag={onToggleTag}
-                onCreateTag={onCreateTag}
-                binderOptions={binderOptions}
-                draftBinderId={draftBinderId}
-                draftCondition={draftCondition}
-                draftNotes={draftNotes}
-                onBinderChange={onBinderChange}
-                onConditionChange={onConditionChange}
-                onNotesChange={onNotesChange}
-                onSave={onSave}
-                onReset={onReset}
-                onMove={onMove}
-                moveStatus={moveStatus}
-                moveError={moveError}
-                status={status}
-                errorMessage={errorMessage}
-                compact
-              />
-            </div>
-          )}
-        </DrawerContent>
-      </Drawer>
-    </div>
+    <Drawer
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose?.();
+      }}
+    >
+      <DrawerContent className="max-h-[85vh]">
+        <VisuallyHidden>
+          <DrawerTitle>{card?.name ?? 'Card details'}</DrawerTitle>
+          <DrawerDescription>Edit card details</DrawerDescription>
+        </VisuallyHidden>
+        {card && (
+          <div className="overflow-y-auto px-4 pb-6 pt-2 space-y-4">
+            <CompactCardHeader card={card} />
+            <PrintSelection
+              card={card}
+              selectedCopy={selectedCopy}
+              onSelectPrint={onSelectPrint}
+              printSelectionLabel={printSelectionLabel}
+              printSelectionDisabled={printSelectionDisabled}
+            />
+            <EditForm
+              selectedCopy={selectedCopy}
+              availableTags={availableTags}
+              draftCopyTags={draftCopyTags}
+              onToggleTag={onToggleTag}
+              onCreateTag={onCreateTag}
+              binderOptions={binderOptions}
+              draftBinderId={draftBinderId}
+              draftCondition={draftCondition}
+              draftNotes={draftNotes}
+              onBinderChange={onBinderChange}
+              onConditionChange={onConditionChange}
+              onNotesChange={onNotesChange}
+              onSave={onSave}
+              onReset={onReset}
+              onMove={onMove}
+              moveStatus={moveStatus}
+              moveError={moveError}
+              status={status}
+              errorMessage={errorMessage}
+              compact
+            />
+          </div>
+        )}
+      </DrawerContent>
+    </Drawer>
   );
 }

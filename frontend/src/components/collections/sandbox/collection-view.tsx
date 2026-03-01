@@ -688,7 +688,6 @@ export function CollectionView() {
             <Sparkles className="h-4 w-4 text-primary" />
             Binder pulse
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Snapshot metrics for the current scope—rows, copies, and trending tags.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6">
           <div className="flex items-baseline gap-4 sm:gap-6 sm:grid sm:grid-cols-3">
