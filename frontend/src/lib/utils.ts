@@ -14,7 +14,7 @@ export const GAME_LABELS = {
 
 export type SupportedGame = keyof typeof GAME_LABELS;
 
-const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 const internalApiBase = process.env.BACKEND_API_ORIGIN ?? publicApiBase;
 
 export const DEFAULT_API_BASE_URL = typeof window === 'undefined' ? internalApiBase : publicApiBase;

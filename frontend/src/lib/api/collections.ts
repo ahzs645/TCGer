@@ -10,6 +10,7 @@ import type {
   CollectionTagResponse,
   CreateTagInput
 } from '@tcg/api-types';
+import { API_BASE_URL } from './base-url';
 
 // Re-export shared types with frontend naming convention
 export type { CollectionTag, CollectionCardCopy, CollectionCard, CollectionTagResponse, CreateTagInput } from '@tcg/api-types';
@@ -20,8 +21,6 @@ export type CreateCollectionInput = CreateBinderInput;
 export type UpdateCollectionInput = UpdateBinderInput;
 export type AddCardToCollectionInput = AddCardInput;
 export type UpdateCollectionCardInput = UpdateCardInput;
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export const LIBRARY_COLLECTION_ID = '__library__';
 

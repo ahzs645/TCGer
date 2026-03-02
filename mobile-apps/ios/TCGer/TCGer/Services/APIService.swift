@@ -104,7 +104,8 @@ private struct AnyEncodable: Encodable {
     }
 }
 
-private actor DemoStore {
+@MainActor
+final class DemoStore {
     static let shared = DemoStore()
 
     private enum Constants {
@@ -434,9 +435,10 @@ private actor DemoStore {
         let resolvedCard = card ?? searchCatalog.first(where: { $0.id == cardId }) ?? placeholderCard(id: cardId)
         let qty = max(1, quantity)
 
-        var binder = collections[binderIndex]
-        if let existingIndex = binder.cards.firstIndex(where: { $0.cardId == resolvedCard.id }) {
-            var existing = binder.cards[existingIndex]
+        let binder = collections[binderIndex]
+        var binderCards = binder.cards
+        if let existingIndex = binderCards.firstIndex(where: { $0.cardId == resolvedCard.id }) {
+            var existing = binderCards[existingIndex]
             let newCopies = makeCopies(
                 quantity: qty,
                 condition: condition ?? existing.condition,
@@ -466,7 +468,7 @@ private actor DemoStore {
                 collectorNumber: existing.collectorNumber,
                 copies: allCopies
             )
-            binder.cards[existingIndex] = existing
+            binderCards[existingIndex] = existing
         } else {
             let newCard = CollectionCard(
                 id: "demo-cc-\(nextCollectionCardId)",
@@ -496,19 +498,10 @@ private actor DemoStore {
                 )
             )
             nextCollectionCardId += 1
-            binder.cards.append(newCard)
+            binderCards.append(newCard)
         }
 
-        binder = Collection(
-            id: binder.id,
-            name: binder.name,
-            description: binder.description,
-            cards: binder.cards,
-            createdAt: binder.createdAt,
-            updatedAt: DemoStore.isoFormatter.string(from: Date()),
-            colorHex: binder.colorHex
-        )
-        collections[binderIndex] = binder
+        collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
     }
 
     func updateCardInBinder(
@@ -527,14 +520,15 @@ private actor DemoStore {
             throw APIService.APIError.serverError(status: 404, message: "Binder not found")
         }
 
-        var sourceBinder = collections[sourceBinderIndex]
-        guard let sourceCardIndex = sourceBinder.cards.firstIndex(where: {
+        let sourceBinder = collections[sourceBinderIndex]
+        var sourceCards = sourceBinder.cards
+        guard let sourceCardIndex = sourceCards.firstIndex(where: {
             $0.id == collectionCardOrCopyId || $0.copies.contains(where: { $0.id == collectionCardOrCopyId })
         }) else {
             throw APIService.APIError.serverError(status: 404, message: "Card not found")
         }
 
-        var sourceCard = sourceBinder.cards[sourceCardIndex]
+        var sourceCard = sourceCards[sourceCardIndex]
         let targetCopyId = sourceCard.copies.contains(where: { $0.id == collectionCardOrCopyId }) ? collectionCardOrCopyId : nil
 
         if let destinationId = targetBinderId, destinationId != binderId {
@@ -542,7 +536,8 @@ private actor DemoStore {
                 throw APIService.APIError.serverError(status: 404, message: "Destination binder not found")
             }
 
-            var destinationBinder = collections[destinationIndex]
+            let destinationBinder = collections[destinationIndex]
+            var destinationCards = destinationBinder.cards
             let movingCopies: [CollectionCardCopy]
 
             if let targetCopyId {
@@ -553,13 +548,13 @@ private actor DemoStore {
                 sourceCard = replaceCard(sourceCard, copies: [])
             }
 
-            sourceBinder.cards[sourceCardIndex] = sourceCard
-            sourceBinder.cards.removeAll { $0.quantity <= 0 }
+            sourceCards[sourceCardIndex] = sourceCard
+            sourceCards.removeAll { $0.quantity <= 0 }
 
-            if let destinationCardIndex = destinationBinder.cards.firstIndex(where: { $0.cardId == sourceCard.cardId }) {
-                let existing = destinationBinder.cards[destinationCardIndex]
+            if let destinationCardIndex = destinationCards.firstIndex(where: { $0.cardId == sourceCard.cardId }) {
+                let existing = destinationCards[destinationCardIndex]
                 let mergedCopies = existing.copies + movingCopies
-                destinationBinder.cards[destinationCardIndex] = replaceCard(existing, copies: mergedCopies)
+                destinationCards[destinationCardIndex] = replaceCard(existing, copies: mergedCopies)
             } else {
                 let movedCard = CollectionCard(
                     id: "demo-cc-\(nextCollectionCardId)",
@@ -581,15 +576,13 @@ private actor DemoStore {
                     copies: movingCopies
                 )
                 nextCollectionCardId += 1
-                destinationBinder.cards.append(movedCard)
+                destinationCards.append(movedCard)
             }
 
-            sourceBinder = stampUpdatedAt(sourceBinder)
-            destinationBinder = stampUpdatedAt(destinationBinder)
-            collections[sourceBinderIndex] = sourceBinder
-            collections[destinationIndex] = destinationBinder
+            collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
+            collections[destinationIndex] = stampUpdatedAt(destinationBinder, cards: destinationCards)
 
-            guard let updatedDestination = destinationBinder.cards.first(where: { $0.cardId == sourceCard.cardId }) else {
+            guard let updatedDestination = destinationCards.first(where: { $0.cardId == sourceCard.cardId }) else {
                 throw APIService.APIError.serverError(status: 500, message: "Failed to move card")
             }
             return updatedDestination
@@ -674,9 +667,8 @@ private actor DemoStore {
             )
         }
 
-        sourceBinder.cards[sourceCardIndex] = updatedCard
-        sourceBinder = stampUpdatedAt(sourceBinder)
-        collections[sourceBinderIndex] = sourceBinder
+        sourceCards[sourceCardIndex] = updatedCard
+        collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
         return updatedCard
     }
 
@@ -685,27 +677,27 @@ private actor DemoStore {
             throw APIService.APIError.serverError(status: 404, message: "Binder not found")
         }
 
-        var binder = collections[binderIndex]
-        guard let cardIndex = binder.cards.firstIndex(where: {
+        let binder = collections[binderIndex]
+        var binderCards = binder.cards
+        guard let cardIndex = binderCards.firstIndex(where: {
             $0.id == collectionCardOrCopyId || $0.copies.contains(where: { $0.id == collectionCardOrCopyId })
         }) else {
             throw APIService.APIError.serverError(status: 404, message: "Card not found")
         }
 
-        var card = binder.cards[cardIndex]
+        var card = binderCards[cardIndex]
         if card.id != collectionCardOrCopyId {
             card = replaceCard(card, copies: card.copies.filter { $0.id != collectionCardOrCopyId })
             if card.quantity > 0 {
-                binder.cards[cardIndex] = card
+                binderCards[cardIndex] = card
             } else {
-                binder.cards.remove(at: cardIndex)
+                binderCards.remove(at: cardIndex)
             }
         } else {
-            binder.cards.remove(at: cardIndex)
+            binderCards.remove(at: cardIndex)
         }
 
-        binder = stampUpdatedAt(binder)
-        collections[binderIndex] = binder
+        collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
     }
 
     private func seedData() {
@@ -1003,12 +995,12 @@ private actor DemoStore {
         return copies
     }
 
-    private func stampUpdatedAt(_ collection: Collection) -> Collection {
+    private func stampUpdatedAt(_ collection: Collection, cards: [CollectionCard]? = nil) -> Collection {
         Collection(
             id: collection.id,
             name: collection.name,
             description: collection.description,
-            cards: collection.cards,
+            cards: cards ?? collection.cards,
             createdAt: collection.createdAt,
             updatedAt: DemoStore.isoFormatter.string(from: Date()),
             colorHex: collection.colorHex

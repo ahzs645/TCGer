@@ -16,7 +16,7 @@ extension APIService {
         token: String
     ) async throws -> UserProfile {
         if config.isDemoMode {
-            return await DemoStore.shared.getUserProfile()
+            return DemoStore.shared.getUserProfile()
         }
 
         let (data, response) = try await makeRequest(
@@ -60,7 +60,7 @@ extension APIService {
         email: String? = nil
     ) async throws -> UpdatedProfile {
         if config.isDemoMode {
-            return await DemoStore.shared.updateUserProfile(username: username, email: email)
+            return DemoStore.shared.updateUserProfile(username: username, email: email)
         }
 
         let body = UpdateProfileRequest(
@@ -106,7 +106,7 @@ extension APIService {
         newPassword: String
     ) async throws {
         if config.isDemoMode {
-            await DemoStore.shared.changePassword(
+            DemoStore.shared.changePassword(
                 currentPassword: currentPassword,
                 newPassword: newPassword
             )

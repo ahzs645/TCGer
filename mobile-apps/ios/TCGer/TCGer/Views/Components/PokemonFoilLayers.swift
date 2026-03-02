@@ -483,7 +483,6 @@ private struct SunpillarStripeOverlay: View {
 private struct RepeatingDiagonalPattern: View {
     var body: some View {
         GeometryReader { proxy in
-            let size = proxy.size
             Canvas { context, size in
                 let spacing: CGFloat = 80
                 let angle: CGFloat = 133 * .pi / 180

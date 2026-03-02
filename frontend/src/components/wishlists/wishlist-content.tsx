@@ -96,18 +96,23 @@ export function WishlistContent() {
     return cards;
   }, [activeWishlist, collectionSearchTerm, filterOwned]);
 
+  const wishlistCardIds = useMemo(
+    () => new Set((activeWishlist?.cards ?? []).map((card) => card.externalId)),
+    [activeWishlist?.cards]
+  );
+
+  const isCardInWishlist = useCallback(
+    (cardId: string): boolean => wishlistCardIds.has(cardId),
+    [wishlistCardIds]
+  );
+
   // Cards in search results that can be selected (not already in wishlist)
   const selectableCards = useMemo(
-    () => searchResults.filter((card) => !isCardInWishlist(card.id)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [searchResults, activeWishlist?.cards]
+    () => searchResults.filter((card) => !wishlistCardIds.has(card.id)),
+    [searchResults, wishlistCardIds]
   );
 
   const allSelectableSelected = selectableCards.length > 0 && selectableCards.every((c) => selectedCards.has(c.id));
-
-  function isCardInWishlist(cardId: string): boolean {
-    return activeWishlist?.cards.some((c) => c.externalId === cardId) ?? false;
-  }
 
   const handleSelectWishlist = useCallback((wishlistId: string) => {
     setActiveWishlistId(wishlistId);

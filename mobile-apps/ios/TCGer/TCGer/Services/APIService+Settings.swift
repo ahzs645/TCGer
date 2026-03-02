@@ -3,7 +3,7 @@ import Foundation
 extension APIService {
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
         if config.isDemoMode {
-            return await DemoStore.shared.getSettings()
+            return DemoStore.shared.getSettings()
         }
 
         let (data, response) = try await makeRequest(config: config, path: "settings")
@@ -35,7 +35,7 @@ extension APIService {
         appName: String? = nil
     ) async throws -> AppSettings {
         if config.isDemoMode {
-            return await DemoStore.shared.updateSettings(
+            return DemoStore.shared.updateSettings(
                 publicDashboard: publicDashboard,
                 publicCollections: publicCollections,
                 requireAuth: requireAuth,
@@ -83,7 +83,7 @@ extension APIService {
         token: String
     ) async throws -> UserPreferences {
         if config.isDemoMode {
-            return await DemoStore.shared.getUserPreferences()
+            return DemoStore.shared.getUserPreferences()
         }
 
         let (data, response) = try await makeRequest(
@@ -124,7 +124,7 @@ extension APIService {
         enabledPokemon: Bool? = nil
     ) async throws -> UserPreferences {
         if config.isDemoMode {
-            return await DemoStore.shared.updateUserPreferences(
+            return DemoStore.shared.updateUserPreferences(
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,

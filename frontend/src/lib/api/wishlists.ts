@@ -6,10 +6,9 @@ import type {
   WishlistResponse,
   WishlistCardResponse
 } from '@tcg/api-types';
+import { API_BASE_URL } from './base-url';
 
 export type { WishlistResponse, WishlistCardResponse, CreateWishlistInput, UpdateWishlistInput, AddWishlistCardInput, AddWishlistCardsInput };
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 export async function getWishlists(token: string): Promise<WishlistResponse[]> {
   const response = await fetch(`${API_BASE_URL}/wishlists`, {
