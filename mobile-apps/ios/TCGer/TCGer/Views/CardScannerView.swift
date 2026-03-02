@@ -205,7 +205,6 @@ struct CardScannerView: View {
             .disabled(
                 isProcessingPhoto ||
                 isUnauthorized ||
-                isErrorState ||
                 viewModel.latestResult != nil ||
                 !isModeSupported ||
                 !hasEnabledScanModes

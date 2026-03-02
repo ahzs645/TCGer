@@ -12,6 +12,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var isConfigured = false
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
+    var onPhotoCaptureError: ((Error) -> Void)?
     var onSampleBuffer: ((CMSampleBuffer) -> Void)?
 
     override init() {
@@ -97,7 +98,10 @@ extension CardScannerCameraController: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
-        guard error == nil else { return }
+        if let error {
+            onPhotoCaptureError?(error)
+            return
+        }
         onPhotoCapture?(photo)
     }
 }

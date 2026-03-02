@@ -65,6 +65,36 @@ struct CollectionCardRow: View {
         return unique.joined(separator: ", ")
     }
 
+    private func languageCode() -> String? {
+        guard let language = languageSummary() else { return nil }
+        let normalizedLanguage = language.trimmingCharacters(in: .whitespacesAndNewlines)
+        let mapping: [String: String] = [
+            "english": "EN",
+            "japanese": "JP",
+            "german": "DE",
+            "french": "FR",
+            "italian": "IT",
+            "spanish": "ES",
+            "portuguese": "PT",
+            "korean": "KO",
+            "chinese": "ZH"
+        ]
+
+        if let mapped = mapping[normalizedLanguage.lowercased()] {
+            return mapped
+        }
+
+        let compact = normalizedLanguage
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .joined()
+            .uppercased()
+
+        if compact.count >= 2 {
+            return String(compact.prefix(2))
+        }
+        return compact.isEmpty ? nil : compact
+    }
+
     private func notesSummary() -> String? {
         var values = card.copies.compactMap { normalized($0.notes) }
         if values.isEmpty, let fallback = normalized(card.notes) {
@@ -113,13 +143,28 @@ struct CollectionCardRow: View {
                             )
                     }
                 }
-                .frame(width: 50, height: 70)
-                .cornerRadius(4)
+                .frame(width: 74, height: 104)
+                .cornerRadius(8)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(card.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(card.name)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+
+                        Spacer()
+
+                        if let code = languageCode() {
+                            Text(code)
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
 
                     HStack(spacing: 8) {
                         Text("×\(card.quantity)")
@@ -137,12 +182,18 @@ struct CollectionCardRow: View {
                         }
                     }
 
-                    if let conditionSummary = conditionSummary() {
-                        SummaryRow(label: "Conditions", value: conditionSummary, icon: "line.3.horizontal.decrease")
-                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            if let conditionSummary = conditionSummary() {
+                                MetaTagChip(
+                                    title: "Condition",
+                                    value: conditionSummary,
+                                    icon: "line.3.horizontal.decrease",
+                                    color: .orange
+                                )
+                            }
 
-                    if let languageSummary = languageSummary() {
-                        SummaryRow(label: "Languages", value: languageSummary, icon: "globe")
+                        }
                     }
 
                     if let notesSummary = notesSummary() {
@@ -200,11 +251,34 @@ struct CollectionCardRow: View {
         }
     }
 
+    private struct MetaTagChip: View {
+        let title: String
+        let value: String
+        let icon: String
+        let color: Color
+
+        var body: some View {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                Text("\(title): \(value)")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .font(.caption2)
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+        }
+    }
+
     private struct TagSummaryRow: View {
         let tags: [CollectionCardTag]
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
                 Text("Tags")
                     .font(.caption)
                     .foregroundColor(.secondary)

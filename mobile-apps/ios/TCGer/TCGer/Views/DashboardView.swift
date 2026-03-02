@@ -31,15 +31,16 @@ struct DashboardView: View {
                             showPricing: environmentStore.showPricing
                         )
 
-                        Button {
-                            activeSheet = .tiltTester
-                        } label: {
-                            Label("Open Tilt Card Demo", systemImage: "sparkles")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.accentColor)
+                        // Frontend entry for the tilt demo is disabled for now.
+                        // Button {
+                        //     activeSheet = .tiltTester
+                        // } label: {
+                        //     Label("Open Tilt Card Demo", systemImage: "sparkles")
+                        //         .font(.headline)
+                        //         .frame(maxWidth: .infinity)
+                        // }
+                        // .buttonStyle(.borderedProminent)
+                        // .tint(.accentColor)
 
                         // Recent Collections
                         if recentCollections.isEmpty {

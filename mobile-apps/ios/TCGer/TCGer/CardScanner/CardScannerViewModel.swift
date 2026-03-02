@@ -43,6 +43,9 @@ final class CardScannerViewModel: ObservableObject {
         cameraController.onPhotoCapture = { [weak self] photo in
             Task { await self?.handleCapturedPhoto(photo) }
         }
+        cameraController.onPhotoCaptureError = { [weak self] error in
+            Task { await self?.handleCaptureFailure(error) }
+        }
         cameraController.onSampleBuffer = { [weak self] sampleBuffer in
             guard let self else { return }
             Task {
@@ -173,7 +176,17 @@ final class CardScannerViewModel: ObservableObject {
             state = .result(scanResult)
         case .failure(let error):
             errorMessage = error.errorDescription ?? error.localizedDescription
-            state = .error(errorMessage ?? "Scan failed.")
+            state = .ready
+        }
+    }
+
+    private func handleCaptureFailure(_ error: Error) async {
+        isProcessingPhoto = false
+        errorMessage = error.localizedDescription
+        if !isSimulator, AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+            state = .ready
+        } else {
+            state = .idle
         }
     }
 
@@ -214,13 +227,9 @@ final class CardScannerViewModel: ObservableObject {
                     switch error {
                     case .noMatch:
                         break
-                    case .ineligibleMode:
-                        self.state = .error("Live scanning for this mode is not available yet.")
-                    case .missingAuthToken:
-                        self.state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
                     default:
-                        self.errorMessage = error.errorDescription ?? error.localizedDescription
-                        self.state = .error(self.errorMessage ?? "Scan failed.")
+                        // Keep live scanning failures non-blocking to avoid locking the scanner UI.
+                        self.state = .ready
                     }
                 }
             }
