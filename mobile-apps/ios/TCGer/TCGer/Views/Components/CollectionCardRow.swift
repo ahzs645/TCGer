@@ -6,6 +6,7 @@ struct CollectionCardRow: View {
     let showDeleteConfirmation: Bool
     let onConfirmDelete: (() -> Void)?
     let onCancelDelete: (() -> Void)?
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isCopiesExpanded = false
 
     private let conditionPriority = [
@@ -131,6 +132,18 @@ struct CollectionCardRow: View {
         return tags
     }
 
+    private var cardBackgroundColor: Color {
+        colorScheme == .dark ? Color(.secondarySystemBackground) : Color(.systemGray6)
+    }
+
+    private var cardBorderColor: Color {
+        colorScheme == .dark ? .white.opacity(0.08) : .black.opacity(0.06)
+    }
+
+    private var previewCardBackgroundColor: Color {
+        colorScheme == .dark ? Color(.systemGray4) : Color(.systemGray5)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
@@ -142,14 +155,14 @@ struct CollectionCardRow: View {
                             .aspectRatio(contentMode: .fit)
                     case .empty, .failure:
                         Rectangle()
-                            .fill(Color(.systemGray5))
+                            .fill(previewCardBackgroundColor)
                             .overlay(
                                 Image(systemName: "photo")
                                     .foregroundColor(.secondary)
                             )
                     @unknown default:
                         Rectangle()
-                            .fill(Color(.systemGray5))
+                            .fill(previewCardBackgroundColor)
                             .overlay(
                                 Image(systemName: "photo")
                                     .foregroundColor(.secondary)
@@ -157,7 +170,12 @@ struct CollectionCardRow: View {
                     }
                 }
                 .frame(width: 74, height: 104)
+                .background(previewCardBackgroundColor)
                 .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.0), lineWidth: 1)
+                )
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline) {
@@ -174,7 +192,7 @@ struct CollectionCardRow: View {
                                 .foregroundColor(.blue)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.12))
+                                .background(Color.blue.opacity(colorScheme == .dark ? 0.24 : 0.12))
                                 .clipShape(Capsule())
                         }
                     }
@@ -263,12 +281,16 @@ struct CollectionCardRow: View {
                     }
                 }
                 .padding(10)
-                .background(Color.red.opacity(0.08))
+                .background(Color.red.opacity(colorScheme == .dark ? 0.20 : 0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(cardBackgroundColor)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(cardBorderColor, lineWidth: 1)
+        )
         .cornerRadius(8)
         .overlay(alignment: .bottomTrailing) {
             if card.copies.count > 1 && !showDeleteConfirmation {
@@ -312,6 +334,7 @@ struct CollectionCardRow: View {
         let value: String
         let icon: String
         let color: Color
+        @Environment(\.colorScheme) private var colorScheme
 
         var body: some View {
             HStack(spacing: 4) {
@@ -325,7 +348,7 @@ struct CollectionCardRow: View {
             .foregroundColor(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(color.opacity(0.12))
+            .background(color.opacity(colorScheme == .dark ? 0.22 : 0.12))
             .clipShape(Capsule())
         }
     }
@@ -351,13 +374,14 @@ struct CollectionCardRow: View {
 
     private struct TagChip: View {
         let tag: CollectionCardTag
+        @Environment(\.colorScheme) private var colorScheme
 
         var body: some View {
             Text(tag.label)
                 .font(.caption2)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.fromHex(tag.colorHex).opacity(0.15))
+                .background(Color.fromHex(tag.colorHex).opacity(colorScheme == .dark ? 0.28 : 0.15))
                 .foregroundColor(Color.fromHex(tag.colorHex))
                 .cornerRadius(8)
         }
@@ -366,6 +390,7 @@ struct CollectionCardRow: View {
     private struct CopyDetailRow: View {
         let copy: CollectionCardCopy
         let index: Int
+        @Environment(\.colorScheme) private var colorScheme
 
         private func normalized(_ value: String?) -> String? {
             guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
@@ -428,7 +453,7 @@ struct CollectionCardRow: View {
                 }
             }
             .padding(8)
-            .background(Color(.secondarySystemBackground))
+            .background(colorScheme == .dark ? Color(.tertiarySystemBackground) : Color(.secondarySystemBackground))
             .cornerRadius(8)
         }
     }
