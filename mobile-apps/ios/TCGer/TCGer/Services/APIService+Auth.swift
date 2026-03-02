@@ -6,7 +6,7 @@ extension APIService {
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return await DemoStore.shared.authenticate(email: credentials.email)
+            return DemoStore.shared.authenticate(email: credentials.email)
         }
 
         let payload = LoginPayload(email: credentials.email, password: credentials.password)
@@ -37,7 +37,7 @@ extension APIService {
         username: String?
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return await DemoStore.shared.authenticate(email: email, username: username)
+            return DemoStore.shared.authenticate(email: email, username: username)
         }
 
         let payload = SignupPayload(email: email, password: password, username: username)
@@ -51,7 +51,7 @@ extension APIService {
         username: String?
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return await DemoStore.shared.authenticate(email: email, username: username)
+            return DemoStore.shared.authenticate(email: email, username: username)
         }
 
         let payload = SignupPayload(email: email, password: password, username: username)
@@ -60,7 +60,7 @@ extension APIService {
 
     func checkSetupRequired(config: ServerConfiguration) async throws -> SetupCheckResponse {
         if config.isDemoMode {
-            return await DemoStore.shared.checkSetupRequired()
+            return DemoStore.shared.checkSetupRequired()
         }
 
         let (data, response) = try await makeRequest(

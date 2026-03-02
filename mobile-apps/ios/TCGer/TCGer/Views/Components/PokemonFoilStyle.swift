@@ -677,9 +677,6 @@ enum PokemonFoilStyle: CaseIterable {
                     center: highlightCenter
                 )
             ])
-
-        default:
-            return nil
         }
     }
 

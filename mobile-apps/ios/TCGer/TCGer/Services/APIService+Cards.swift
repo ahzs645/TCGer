@@ -8,7 +8,7 @@ extension APIService {
         game: TCGGame = .all
     ) async throws -> CardSearchResponse {
         if config.isDemoMode {
-            return await DemoStore.shared.searchCards(query: query, game: game)
+            return DemoStore.shared.searchCards(query: query, game: game)
         }
 
         var path = "cards/search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
@@ -40,7 +40,7 @@ extension APIService {
         cardId: String
     ) async throws -> [Card] {
         if config.isDemoMode {
-            return await DemoStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
+            return DemoStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
         }
 
         let path = "cards/\(tcg)/\(cardId)/prints"

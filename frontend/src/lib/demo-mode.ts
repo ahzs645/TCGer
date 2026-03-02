@@ -13,14 +13,9 @@
  */
 
 import { handleDemoRequest } from './api/demo-adapter';
+import { API_BASE_URL as DEMO_API_BASE_URL } from './api/base-url';
 
 const STORAGE_KEY = 'tcg-demo-mode';
-
-const API_BASE_URL = (
-  typeof window !== 'undefined'
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000')
-    : 'http://localhost:3000'
-).replace(/\/$/, '');
 
 /* ------------------------------------------------------------------ */
 /*  Demo-mode flag                                                      */
@@ -52,8 +47,8 @@ function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
 
   // Only intercept requests to our API base URL
-  if (url.startsWith(API_BASE_URL)) {
-    const path = url.slice(API_BASE_URL.length); // e.g. "/auth/login"
+  if (url.startsWith(DEMO_API_BASE_URL)) {
+    const path = url.slice(DEMO_API_BASE_URL.length); // e.g. "/auth/login"
     const method = init?.method?.toUpperCase() ?? 'GET';
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
     return handleDemoRequest(method, path, body);

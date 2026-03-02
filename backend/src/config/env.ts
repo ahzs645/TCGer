@@ -23,4 +23,11 @@ if (!parsed.success) {
   throw new Error('Failed to load environment variables');
 }
 
+if (parsed.data.NODE_ENV !== 'test' && !parsed.data.DATABASE_URL) {
+  console.error('Invalid environment configuration:', {
+    DATABASE_URL: ['DATABASE_URL is required when NODE_ENV is not test']
+  });
+  throw new Error('Failed to load environment variables');
+}
+
 export const env = parsed.data;

@@ -190,14 +190,11 @@ export function CollectionView() {
   const [printError, setPrintError] = useState<string | null>(null);
   const [isSavingPrintSelection, setIsSavingPrintSelection] = useState(false);
 
-  // Sync binder filter from URL only on initial mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const binderParam = searchParams.get('binder');
-    if (binderParam) {
-      setBinderFilter(binderParam);
-    }
-  }, []);
+    const nextBinder = binderParam ?? 'all';
+    setBinderFilter((current) => (current === nextBinder ? current : nextBinder));
+  }, [searchParams]);
 
   useEffect(() => {
     if (token && !hasFetched) {

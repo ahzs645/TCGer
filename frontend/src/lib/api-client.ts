@@ -1,7 +1,5 @@
-import { DEFAULT_API_BASE_URL } from '@/lib/utils';
+import { API_BASE_URL } from '@/lib/api/base-url';
 import type { Card, CardPrintsResponse, SearchCardsResponse, TcgCode } from '@/types/card';
-
-const API_BASE_URL = DEFAULT_API_BASE_URL.replace(/\/$/, '');
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {

@@ -32,13 +32,7 @@ cardsRouter.get(
   asyncHandler(async (req, res) => {
     const { tcg, cardId } = cardParamsSchema.parse(req.params);
     const adapter = adapterRegistry.get(tcg);
-    const card =
-      (await adapter.fetchCardById(cardId)) ??
-      (await (async () => {
-        // Temporary placeholder until adapters support fetchCardById.
-        const results = await searchCards({ query: cardId, tcg });
-        return results.find((entry) => entry.id.includes(cardId)) ?? null;
-      })());
+    const card = await adapter.fetchCardById(cardId);
 
     if (!card) {
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Card not found' });
