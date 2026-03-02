@@ -141,7 +141,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const fn = () => setStuck(window.scrollY > 20);
+    const fn = () => setStuck(window.scrollY > 50);
     fn();
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
