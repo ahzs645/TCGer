@@ -57,4 +57,4 @@ Common URLs:
 - `GET /users/me/preferences`
 - `PATCH /users/me/preferences`
 - `GET /settings`
-- `PATCH /settings`
+- `PATCH /settings` (admin only)

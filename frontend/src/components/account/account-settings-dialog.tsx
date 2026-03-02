@@ -142,7 +142,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
 
     try {
       await updateUserPreferences(preferencePayload, token);
-      updateStoredPreferences(preferencePayload as any);
+      updateStoredPreferences(preferencePayload);
     } catch (error) {
       console.error('Failed to update enabled game:', error);
       toggleGame(game);
