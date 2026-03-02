@@ -3,15 +3,28 @@ import SwiftUI
 struct CollectionCardRow: View {
     let card: CollectionCard
     let showPricing: Bool
+    let showDeleteConfirmation: Bool
+    let onConfirmDelete: (() -> Void)?
+    let onCancelDelete: (() -> Void)?
+    @State private var isCopiesExpanded = false
 
     private let conditionPriority = [
         "GEM MINT", "MINT", "NEAR MINT", "NM", "LIGHTLY PLAYED", "LP",
         "MODERATE PLAY", "MP", "HEAVY PLAY", "HP", "DAMAGED", "DMG", "POOR"
     ]
 
-    init(card: CollectionCard, showPricing: Bool) {
+    init(
+        card: CollectionCard,
+        showPricing: Bool,
+        showDeleteConfirmation: Bool = false,
+        onConfirmDelete: (() -> Void)? = nil,
+        onCancelDelete: (() -> Void)? = nil
+    ) {
         self.card = card
         self.showPricing = showPricing
+        self.showDeleteConfirmation = showDeleteConfirmation
+        self.onConfirmDelete = onConfirmDelete
+        self.onCancelDelete = onCancelDelete
     }
 
     private func normalized(_ value: String?) -> String? {
@@ -215,7 +228,7 @@ struct CollectionCardRow: View {
                 Spacer()
             }
 
-            if card.copies.count > 1 {
+            if card.copies.count > 1, isCopiesExpanded {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(card.copies.enumerated()), id: \.element.id) { index, copy in
@@ -223,10 +236,53 @@ struct CollectionCardRow: View {
                     }
                 }
             }
+
+            if showDeleteConfirmation {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("This will remove all copies of \(card.name) from this binder.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 10) {
+                        if let onCancelDelete {
+                            Button("Cancel") {
+                                onCancelDelete()
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
+                        }
+
+                        if let onConfirmDelete {
+                            Button("Delete \"\(card.name)\"") {
+                                onConfirmDelete()
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.red)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color.red.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(8)
+        .overlay(alignment: .bottomTrailing) {
+            if card.copies.count > 1 && !showDeleteConfirmation {
+                Button {
+                    isCopiesExpanded.toggle()
+                } label: {
+                    Image(systemName: isCopiesExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
         .contentShape(Rectangle())
         .cardPreviewContextMenu(card: card.previewCard)
     }

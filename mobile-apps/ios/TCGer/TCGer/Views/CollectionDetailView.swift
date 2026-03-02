@@ -324,7 +324,16 @@ struct CollectionDetailView: View {
                                     if environmentStore.isAuthenticated {
                                         CollectionCardRow(
                                             card: card,
-                                            showPricing: environmentStore.showPricing
+                                            showPricing: environmentStore.showPricing,
+                                            showDeleteConfirmation: cardPendingDeletion?.id == card.id,
+                                            onConfirmDelete: {
+                                                Task {
+                                                    await deleteCard(card)
+                                                }
+                                            },
+                                            onCancelDelete: {
+                                                cardPendingDeletion = nil
+                                            }
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
@@ -501,25 +510,6 @@ struct CollectionDetailView: View {
                     if let error = errorMessage {
                         Text(error)
                     }
-                }
-                .confirmationDialog(
-                    "Remove Card?",
-                    isPresented: Binding(
-                        get: { cardPendingDeletion != nil },
-                        set: { if !$0 { cardPendingDeletion = nil } }
-                    ),
-                    presenting: cardPendingDeletion
-                ) { card in
-                    Button("Delete \"\(card.name)\"", role: .destructive) {
-                        Task {
-                            await deleteCard(card)
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {
-                        cardPendingDeletion = nil
-                    }
-                } message: { card in
-                    Text("This will remove all copies of \(card.name) from this binder.")
                 }
                 .alert("Delete Binder?", isPresented: $showingDeleteBinderConfirmation) {
                     Button("Delete", role: .destructive) {
