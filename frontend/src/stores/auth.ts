@@ -26,7 +26,9 @@ interface AuthState {
   setAuth: (user: AuthUser, token: string) => void;
   clearAuth: () => void;
   setSetupRequired: (required: boolean) => void;
-  updateStoredPreferences: (preferences: Partial<Pick<AuthUser, DisplayPreferenceKeys>>) => void;
+  updateStoredPreferences: (
+    preferences: Partial<Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>>
+  ) => void;
 }
 
 function withDisplayDefaults(user: AuthUser | null): AuthUser | null {
@@ -104,11 +106,11 @@ export const useAuthStore = create<AuthState>()(
           showPricing:
             preferences.showPricing ?? currentUser.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
           enabledYugioh:
-            (preferences as any).enabledYugioh ?? currentUser.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
+            preferences.enabledYugioh ?? currentUser.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
           enabledMagic:
-            (preferences as any).enabledMagic ?? currentUser.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
+            preferences.enabledMagic ?? currentUser.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
           enabledPokemon:
-            (preferences as any).enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
+            preferences.enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
         };
 
         set({ user: updatedUser });
@@ -138,7 +140,10 @@ useAuthStore.subscribe((state, previousState) => {
     const normalized = withDisplayDefaults(state.user);
     if (
       normalized?.showCardNumbers !== state.user.showCardNumbers ||
-      normalized?.showPricing !== state.user.showPricing
+      normalized?.showPricing !== state.user.showPricing ||
+      normalized?.enabledYugioh !== state.user.enabledYugioh ||
+      normalized?.enabledMagic !== state.user.enabledMagic ||
+      normalized?.enabledPokemon !== state.user.enabledPokemon
     ) {
       useAuthStore.setState({ user: normalized });
       syncDisplayPreferences(normalized ?? undefined);

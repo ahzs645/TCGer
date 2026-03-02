@@ -31,39 +31,3 @@ export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string 
   });
   return handleResponse<CardPrintsResponse>(res);
 }
-
-export interface DashboardStats {
-  totalCards: number;
-  totalValue: number;
-  byGame: Record<TcgCode, { count: number; estimatedValue: number }>;
-  recentActivity: Array<{ id: string; name: string; tcg: TcgCode; timestamp: string }>;
-}
-
-export function calculateDashboardStats(cards: Card[]): DashboardStats {
-  const initial: DashboardStats = {
-    totalCards: cards.length,
-    totalValue: 0,
-    byGame: {
-      yugioh: { count: 0, estimatedValue: 0 },
-      magic: { count: 0, estimatedValue: 0 },
-      pokemon: { count: 0, estimatedValue: 0 }
-    },
-    recentActivity: []
-  };
-
-  return cards.reduce<DashboardStats>((acc, card, index) => {
-    const price = Number((card.attributes?.price ?? 0) as number) || Math.random() * 5 + 1;
-    acc.totalValue += price;
-    acc.byGame[card.tcg].count += 1;
-    acc.byGame[card.tcg].estimatedValue += price;
-    if (index < 5) {
-      acc.recentActivity.push({
-        id: card.id,
-        name: card.name,
-        tcg: card.tcg,
-        timestamp: new Date(Date.now() - index * 86400000).toISOString()
-      });
-    }
-    return acc;
-  }, initial);
-}

@@ -13,7 +13,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 
 ## Repo layout
 - `backend/` - Express + Prisma API service.
-- `frontend/` - Next.js 14 web app (app router).
+- `frontend/` - Next.js 15 web app (app router).
 - `services/` - Optional cache services (scryfall-bulk, ygo-cache, tcgdex-cache, pokemon-cache).
 - `docker/` - Compose files, nginx gateway, cache backup scripts.
 - `mobile-apps/` - iOS SwiftUI client (in progress) and Android placeholder.
@@ -89,7 +89,7 @@ Key routes (see `backend/src/api/routes`):
 - `GET /collections/tags`, `POST /collections/tags`
 - `GET /users/me`, `PATCH /users/me`, `POST /users/me/change-password`
 - `GET /users/me/preferences`, `PATCH /users/me/preferences`
-- `GET /settings`, `PATCH /settings` (admin hook; auth check TODO)
+- `GET /settings` (public app config), `PATCH /settings` (admin only)
 
 ## Cache services (optional)
 - `services/scryfall-bulk` (port 4010): local Scryfall bulk mirror for Magic.

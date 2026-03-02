@@ -6,7 +6,7 @@ description: High-level structure of TCGer services and applications.
 ## Repository layout
 
 - `backend/`: Express + Prisma API service
-- `frontend/`: Next.js 14 web app
+- `frontend/`: Next.js 15 web app
 - `services/`: optional cache services (`scryfall-bulk`, `ygo-cache`, `tcgdex-cache`, `pokemon-cache`)
 - `docker/`: compose files, nginx gateway, backup/restore scripts
 - `mobile-apps/`: iOS app (in progress) and Android placeholder
