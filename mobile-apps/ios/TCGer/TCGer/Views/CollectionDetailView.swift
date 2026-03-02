@@ -26,10 +26,9 @@ struct CollectionDetailView: View {
     @State private var minPriceFilter = ""
     @State private var maxPriceFilter = ""
     @State private var searchText = ""
+    @State private var showFilters = false
 
     private let apiService = APIService()
-    private let conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor", "NM", "LP", "MP", "HP", "DMG"]
-
     init(collection: Collection) {
         self.collection = collection
         _editedName = State(initialValue: collection.name)
@@ -92,6 +91,169 @@ struct CollectionDetailView: View {
         }
     }
 
+    private var binderTagOptions: [CollectionCardTag] {
+        var seen = Set<String>()
+        var tags: [CollectionCardTag] = []
+        for tag in cards.flatMap(\.copies).flatMap(\.tags) {
+            if seen.insert(tag.id).inserted {
+                tags.append(tag)
+            }
+        }
+        return tags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    }
+
+    private var binderConditionOptions: [String] {
+        let preferredOrder = ["MINT", "NEAR MINT", "EXCELLENT", "GOOD", "LIGHT PLAYED", "PLAYED", "POOR", "NM", "LP", "MP", "HP", "DMG"]
+
+        var seen = Set<String>()
+        let allConditions = cards.flatMap { card in
+            card.copies.compactMap(\.condition) + [card.condition].compactMap { $0 }
+        }
+        let normalized = allConditions.compactMap(normalizeFilterValue).filter { seen.insert($0).inserted }
+
+        return normalized.sorted { lhs, rhs in
+            let leftIndex = preferredOrder.firstIndex(of: lhs) ?? preferredOrder.count
+            let rightIndex = preferredOrder.firstIndex(of: rhs) ?? preferredOrder.count
+            if leftIndex == rightIndex {
+                return lhs < rhs
+            }
+            return leftIndex < rightIndex
+        }
+    }
+
+    @ViewBuilder
+    private var filtersSectionContent: some View {
+        if showFilters {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Button {
+                        showFilters = false
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Hide filters")
+                    Spacer()
+                }
+
+                HStack(spacing: 10) {
+                    tagFilterMenu
+                    conditionFilterMenu
+                }
+
+                HStack(spacing: 12) {
+                    TextField("Min $", text: $minPriceFilter)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Max $", text: $maxPriceFilter)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                HStack(spacing: 12) {
+                    if hasActiveFilters {
+                        Button("Clear All Filters") {
+                            clearFilters()
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } else {
+            Button {
+                showFilters = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.title3)
+                    if activeFilterCount > 0 {
+                        Text("\(activeFilterCount)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show filters")
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var tagFilterMenu: some View {
+        Menu {
+            if binderTagOptions.isEmpty {
+                Text("No tags in this binder")
+            } else {
+                ForEach(binderTagOptions) { tag in
+                    Button {
+                        toggleTagFilter(tag.id)
+                    } label: {
+                        Label(
+                            tag.label,
+                            systemImage: selectedTagFilters.contains(tag.id)
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                        )
+                    }
+                }
+            }
+            if !selectedTagFilters.isEmpty {
+                Divider()
+                Button("Clear Tag Filters") {
+                    selectedTagFilters.removeAll()
+                }
+            }
+        } label: {
+            filterMenuLabel(text: "Tags", icon: "tag")
+        }
+    }
+
+    private var conditionFilterMenu: some View {
+        Menu {
+            if binderConditionOptions.isEmpty {
+                Text("No conditions in this binder")
+            } else {
+                ForEach(binderConditionOptions, id: \.self) { option in
+                    Button {
+                        toggleConditionFilter(option)
+                    } label: {
+                        Label(
+                            option,
+                            systemImage: selectedConditionFilters.contains(option)
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                        )
+                    }
+                }
+            }
+            if !selectedConditionFilters.isEmpty {
+                Divider()
+                Button("Clear Condition Filters") {
+                    selectedConditionFilters.removeAll()
+                }
+            }
+        } label: {
+            filterMenuLabel(text: "Condition", icon: "line.3.horizontal.decrease.circle")
+        }
+    }
+
+    private func filterMenuLabel(text: String, icon: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+            Text(text)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(.caption2)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     var body: some View {
         ZStack {
             NavigationView {
@@ -146,79 +308,10 @@ struct CollectionDetailView: View {
                         }
 
                         Section {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 8) {
-                                    Menu {
-                                        ForEach(availableTags) { tag in
-                                            Button {
-                                                toggleTagFilter(tag.id)
-                                            } label: {
-                                                Label(
-                                                    tag.label,
-                                                    systemImage: selectedTagFilters.contains(tag.id)
-                                                        ? "checkmark.circle.fill"
-                                                        : "circle"
-                                                )
-                                            }
-                                        }
-                                        if !selectedTagFilters.isEmpty {
-                                            Divider()
-                                            Button("Clear Tag Filters") {
-                                                selectedTagFilters.removeAll()
-                                            }
-                                        }
-                                    } label: {
-                                        Label("Tags", systemImage: "tag")
-                                            .font(.subheadline)
-                                    }
-
-                                    Menu {
-                                        ForEach(conditionOptions, id: \.self) { option in
-                                            Button {
-                                                toggleConditionFilter(option)
-                                            } label: {
-                                                Label(
-                                                    option,
-                                                    systemImage: selectedConditionFilters.contains(option)
-                                                        ? "checkmark.circle.fill"
-                                                        : "circle"
-                                                )
-                                            }
-                                        }
-                                        if !selectedConditionFilters.isEmpty {
-                                            Divider()
-                                            Button("Clear Condition Filters") {
-                                                selectedConditionFilters.removeAll()
-                                            }
-                                        }
-                                    } label: {
-                                        Label("Condition", systemImage: "line.3.horizontal.decrease.circle")
-                                            .font(.subheadline)
-                                    }
-                                }
-
-                                HStack(spacing: 12) {
-                                    TextField("Min $", text: $minPriceFilter)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
-                                    TextField("Max $", text: $maxPriceFilter)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
-                                }
-
-                                if hasActiveFilters {
-                                    Button("Clear All Filters") {
-                                        clearFilters()
-                                    }
-                                    .font(.caption)
-                                }
-                            }
-                            .padding(.vertical, 4)
+                            filtersSectionContent
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color(.systemBackground))
-                        } header: {
-                            Text("Filters")
                         }
 
                         Section {
@@ -678,6 +771,16 @@ struct CollectionDetailView: View {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var activeFilterCount: Int {
+        var count = 0
+        if !selectedTagFilters.isEmpty { count += 1 }
+        if !selectedConditionFilters.isEmpty { count += 1 }
+        if !minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { count += 1 }
+        if !maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { count += 1 }
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { count += 1 }
+        return count
     }
 
     private func clearFilters() {
