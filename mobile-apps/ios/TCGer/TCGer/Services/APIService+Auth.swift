@@ -5,6 +5,10 @@ extension APIService {
         config: ServerConfiguration,
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
+        if config.isDemoMode {
+            return await DemoStore.shared.authenticate(email: credentials.email)
+        }
+
         let payload = LoginPayload(email: credentials.email, password: credentials.password)
         let (data, response) = try await makeRequest(
             config: config,
@@ -32,6 +36,10 @@ extension APIService {
         password: String,
         username: String?
     ) async throws -> AuthResponse {
+        if config.isDemoMode {
+            return await DemoStore.shared.authenticate(email: email, username: username)
+        }
+
         let payload = SignupPayload(email: email, password: password, username: username)
         return try await executeAuthRequest(config: config, path: "auth/signup", payload: payload)
     }
@@ -42,11 +50,19 @@ extension APIService {
         password: String,
         username: String?
     ) async throws -> AuthResponse {
+        if config.isDemoMode {
+            return await DemoStore.shared.authenticate(email: email, username: username)
+        }
+
         let payload = SignupPayload(email: email, password: password, username: username)
         return try await executeAuthRequest(config: config, path: "auth/setup", payload: payload)
     }
 
     func checkSetupRequired(config: ServerConfiguration) async throws -> SetupCheckResponse {
+        if config.isDemoMode {
+            return await DemoStore.shared.checkSetupRequired()
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "auth/setup-required"
@@ -64,6 +80,10 @@ extension APIService {
     }
 
     func verifyServer(config: ServerConfiguration) async -> Bool {
+        if config.isDemoMode {
+            return true
+        }
+
         guard let url = config.endpoint(path: "health") ?? config.normalizedURL else {
             return false
         }

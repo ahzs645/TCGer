@@ -7,6 +7,10 @@ extension APIService {
         query: String,
         game: TCGGame = .all
     ) async throws -> CardSearchResponse {
+        if config.isDemoMode {
+            return await DemoStore.shared.searchCards(query: query, game: game)
+        }
+
         var path = "cards/search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
         if game != .all {
             path += "&tcg=\(game.rawValue)"
@@ -35,6 +39,10 @@ extension APIService {
         tcg: String,
         cardId: String
     ) async throws -> [Card] {
+        if config.isDemoMode {
+            return await DemoStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
+        }
+
         let path = "cards/\(tcg)/\(cardId)/prints"
 
         let (data, response) = try await makeRequest(config: config, path: path, token: token)
