@@ -36,12 +36,19 @@ final class EnvironmentStore: ObservableObject {
         static let autoSyncEnabled = "autoSyncEnabled"
     }
 
+    private enum DemoDefaults {
+        static let token = "demo-token-static"
+        static let userId = "demo-user-001"
+        static let email = "demo@tcger.app"
+        static let username = "Demo User"
+    }
+
     init() {
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
-            serverConfiguration = decoded
+            serverConfiguration = decoded.baseURL.isEmpty ? .localDefault : decoded
         } else {
-            serverConfiguration = .empty
+            serverConfiguration = .localDefault
         }
 
         if let data = storage.data(forKey: Keys.credentials),
@@ -100,6 +107,10 @@ final class EnvironmentStore: ObservableObject {
             autoSyncEnabled = true
         } else {
             autoSyncEnabled = storage.bool(forKey: Keys.autoSyncEnabled)
+        }
+
+        if serverConfiguration.isDemoMode {
+            enableDemoSession(force: false)
         }
 
         $serverConfiguration
@@ -297,6 +308,47 @@ final class EnvironmentStore: ObservableObject {
         enabledYugioh = preferences.enabledYugioh
         enabledMagic = preferences.enabledMagic
         enabledPokemon = preferences.enabledPokemon
+    }
+
+    func enableDemoSession(force: Bool) {
+        guard serverConfiguration.isDemoMode else { return }
+
+        if force || authToken == nil {
+            storeToken(DemoDefaults.token)
+        }
+
+        if force || currentUser == nil {
+            currentUser = User(
+                id: DemoDefaults.userId,
+                email: DemoDefaults.email,
+                username: DemoDefaults.username,
+                isAdmin: true,
+                showCardNumbers: showCardNumbers,
+                showPricing: showPricing,
+                enabledYugioh: enabledYugioh,
+                enabledMagic: enabledMagic,
+                enabledPokemon: enabledPokemon
+            )
+        }
+
+        if force || appSettings == nil {
+            appSettings = AppSettings(
+                id: 0,
+                publicDashboard: true,
+                publicCollections: true,
+                requireAuth: false,
+                appName: "TCGer Demo",
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+        }
+
+        if force || !isAuthenticated {
+            isAuthenticated = true
+            storage.set(true, forKey: Keys.authenticated)
+        }
+
+        isServerVerified = true
+        storage.set(true, forKey: Keys.verified)
     }
 }
 

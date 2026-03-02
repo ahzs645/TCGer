@@ -1,7 +1,7 @@
 import Foundation
 
 extension APIService {
-    struct UserProfile: Codable {
+    struct UserProfile: Codable, Sendable {
         let id: String
         let email: String
         let username: String?
@@ -15,6 +15,10 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> UserProfile {
+        if config.isDemoMode {
+            return await DemoStore.shared.getUserProfile()
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "users/me",
@@ -35,12 +39,12 @@ extension APIService {
         return profile
     }
 
-    struct UpdateProfileRequest: Codable {
+    struct UpdateProfileRequest: Codable, Sendable {
         let username: String?
         let email: String?
     }
 
-    struct UpdatedProfile: Codable {
+    struct UpdatedProfile: Codable, Sendable {
         let id: String
         let email: String
         let username: String?
@@ -55,6 +59,10 @@ extension APIService {
         username: String? = nil,
         email: String? = nil
     ) async throws -> UpdatedProfile {
+        if config.isDemoMode {
+            return await DemoStore.shared.updateUserProfile(username: username, email: email)
+        }
+
         let body = UpdateProfileRequest(
             username: username,
             email: email
@@ -82,12 +90,12 @@ extension APIService {
         return profile
     }
 
-    struct ChangePasswordRequest: Codable {
+    struct ChangePasswordRequest: Codable, Sendable {
         let currentPassword: String
         let newPassword: String
     }
 
-    struct ChangePasswordResponse: Codable {
+    struct ChangePasswordResponse: Codable, Sendable {
         let success: Bool
     }
 
@@ -97,6 +105,14 @@ extension APIService {
         currentPassword: String,
         newPassword: String
     ) async throws {
+        if config.isDemoMode {
+            await DemoStore.shared.changePassword(
+                currentPassword: currentPassword,
+                newPassword: newPassword
+            )
+            return
+        }
+
         let body = ChangePasswordRequest(
             currentPassword: currentPassword,
             newPassword: newPassword

@@ -2,6 +2,10 @@ import Foundation
 
 extension APIService {
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
+        if config.isDemoMode {
+            return await DemoStore.shared.getSettings()
+        }
+
         let (data, response) = try await makeRequest(config: config, path: "settings")
 
         guard response.statusCode == 200 else {
@@ -15,7 +19,7 @@ extension APIService {
         return settings
     }
 
-    struct UpdateSettingsRequest: Codable {
+    struct UpdateSettingsRequest: Codable, Sendable {
         let publicDashboard: Bool?
         let publicCollections: Bool?
         let requireAuth: Bool?
@@ -30,6 +34,15 @@ extension APIService {
         requireAuth: Bool? = nil,
         appName: String? = nil
     ) async throws -> AppSettings {
+        if config.isDemoMode {
+            return await DemoStore.shared.updateSettings(
+                publicDashboard: publicDashboard,
+                publicCollections: publicCollections,
+                requireAuth: requireAuth,
+                appName: appName
+            )
+        }
+
         let body = UpdateSettingsRequest(
             publicDashboard: publicDashboard,
             publicCollections: publicCollections,
@@ -57,7 +70,7 @@ extension APIService {
         return settings
     }
 
-    struct UserPreferences: Codable {
+    struct UserPreferences: Codable, Sendable {
         let showCardNumbers: Bool
         let showPricing: Bool
         let enabledYugioh: Bool
@@ -69,6 +82,10 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> UserPreferences {
+        if config.isDemoMode {
+            return await DemoStore.shared.getUserPreferences()
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "users/me/preferences",
@@ -89,7 +106,7 @@ extension APIService {
         return preferences
     }
 
-    struct UpdatePreferencesRequest: Codable {
+    struct UpdatePreferencesRequest: Codable, Sendable {
         let showCardNumbers: Bool?
         let showPricing: Bool?
         let enabledYugioh: Bool?
@@ -106,6 +123,16 @@ extension APIService {
         enabledMagic: Bool? = nil,
         enabledPokemon: Bool? = nil
     ) async throws -> UserPreferences {
+        if config.isDemoMode {
+            return await DemoStore.shared.updateUserPreferences(
+                showCardNumbers: showCardNumbers,
+                showPricing: showPricing,
+                enabledYugioh: enabledYugioh,
+                enabledMagic: enabledMagic,
+                enabledPokemon: enabledPokemon
+            )
+        }
+
         let body = UpdatePreferencesRequest(
             showCardNumbers: showCardNumbers,
             showPricing: showPricing,

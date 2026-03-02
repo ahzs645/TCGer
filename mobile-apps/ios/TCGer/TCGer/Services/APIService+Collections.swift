@@ -11,6 +11,10 @@ extension APIService {
         token: String? = nil,
         useCache: Bool = false
     ) async throws -> [Collection] {
+        if config.isDemoMode {
+            return await DemoStore.shared.getCollections()
+        }
+
         if useCache || !NetworkMonitor.shared.isConnected {
             if let cached: [Collection] = try? CacheManager.shared.load(
                 [Collection].self,
@@ -84,6 +88,10 @@ extension APIService {
         token: String? = nil,
         id: String
     ) async throws -> Collection {
+        if config.isDemoMode {
+            return try await DemoStore.shared.getCollection(id: id)
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections/\(id)",
@@ -118,6 +126,14 @@ extension APIService {
         description: String?,
         colorHex: String? = nil
     ) async throws -> Collection {
+        if config.isDemoMode {
+            return await DemoStore.shared.createCollection(
+                name: name,
+                description: description,
+                colorHex: colorHex
+            )
+        }
+
         let body = CreateCollectionRequest(name: name, description: description, colorHex: colorHex)
         let (data, response) = try await makeRequest(
             config: config,
@@ -155,6 +171,15 @@ extension APIService {
         description: String? = nil,
         colorHex: String? = nil
     ) async throws -> Collection {
+        if config.isDemoMode {
+            return try await DemoStore.shared.updateCollection(
+                id: id,
+                name: name,
+                description: description,
+                colorHex: colorHex
+            )
+        }
+
         let body = UpdateCollectionRequest(name: name, description: description, colorHex: colorHex)
         let (data, response) = try await makeRequest(
             config: config,
@@ -183,6 +208,11 @@ extension APIService {
         token: String,
         id: String
     ) async throws {
+        if config.isDemoMode {
+            try await DemoStore.shared.deleteCollection(id: id)
+            return
+        }
+
         let (_, response) = try await makeRequest(
             config: config,
             path: "collections/\(id)",
@@ -202,6 +232,10 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [CollectionCardTag] {
+        if config.isDemoMode {
+            return await DemoStore.shared.getTags()
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections/tags",
@@ -228,6 +262,10 @@ extension APIService {
         label: String,
         colorHex: String? = nil
     ) async throws -> CollectionCardTag {
+        if config.isDemoMode {
+            return await DemoStore.shared.createTag(label: label, colorHex: colorHex)
+        }
+
         let payload = TagPayload(label: label, colorHex: colorHex)
         let (data, response) = try await makeRequest(
             config: config,
@@ -318,6 +356,23 @@ extension APIService {
         newTags: [TagPayload]? = nil,
         card: Card? = nil
     ) async throws {
+        if config.isDemoMode {
+            try await DemoStore.shared.addCardToBinder(
+                binderId: binderId,
+                cardId: cardId,
+                quantity: quantity,
+                condition: condition,
+                language: language,
+                notes: notes,
+                price: price,
+                acquisitionPrice: acquisitionPrice,
+                tagIds: tags,
+                newTags: newTags,
+                card: card
+            )
+            return
+        }
+
         let cardData: AddCardToBinderRequest.CardData?
         if let card {
             cardData = AddCardToBinderRequest.CardData(
@@ -379,6 +434,21 @@ extension APIService {
         newPrint: Card? = nil,
         targetBinderId: String? = nil
     ) async throws -> CollectionCard {
+        if config.isDemoMode {
+            return try await DemoStore.shared.updateCardInBinder(
+                binderId: binderId,
+                collectionCardOrCopyId: collectionCardId,
+                quantity: quantity,
+                condition: condition,
+                language: language,
+                notes: notes,
+                tagIds: tags,
+                newTags: newTags,
+                newPrint: newPrint,
+                targetBinderId: targetBinderId
+            )
+        }
+
         let cardOverride: CardOverride?
         if let print = newPrint {
             cardOverride = CardOverride(
@@ -455,6 +525,14 @@ extension APIService {
         binderId: String,
         collectionCardId: String
     ) async throws {
+        if config.isDemoMode {
+            try await DemoStore.shared.deleteCardFromBinder(
+                binderId: binderId,
+                collectionCardOrCopyId: collectionCardId
+            )
+            return
+        }
+
         let (_, response) = try await makeRequest(
             config: config,
             path: "collections/\(binderId)/cards/\(collectionCardId)",

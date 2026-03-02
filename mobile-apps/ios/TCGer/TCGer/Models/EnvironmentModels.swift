@@ -3,6 +3,9 @@ import Foundation
 struct ServerConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
 
+    static let defaultLocalBaseURL = "http://localhost:3001"
+    static let demoLocalBaseURL = "demo://local"
+
     init(baseURL: String) {
         self.baseURL = ServerConfiguration.sanitized(baseURL)
     }
@@ -25,6 +28,10 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
     var normalizedURL: URL? {
         guard !baseURL.isEmpty else { return nil }
         return URL(string: baseURL)
+    }
+
+    var isDemoMode: Bool {
+        baseURL == ServerConfiguration.demoLocalBaseURL
     }
 
     var isValid: Bool {
@@ -91,6 +98,8 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
     }
 
     static let empty = ServerConfiguration(baseURL: "")
+    static let localDefault = ServerConfiguration(baseURL: defaultLocalBaseURL)
+    static let demoLocal = ServerConfiguration(baseURL: demoLocalBaseURL)
 }
 
 struct LoginCredentials: Codable, Equatable, Sendable {
