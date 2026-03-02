@@ -2,6 +2,7 @@ import type {
   CreateWishlistInput,
   UpdateWishlistInput,
   AddWishlistCardInput,
+  AddWishlistCardsInput,
   WishlistResponse,
   WishlistCardResponse
 } from '@tcg/api-types';
@@ -295,4 +296,51 @@ export async function removeCardFromWishlist(
   }
 
   await prisma.wishlistCard.delete({ where: { id: cardId } });
+}
+
+export async function addCardsToWishlist(
+  userId: string,
+  wishlistId: string,
+  input: AddWishlistCardsInput
+): Promise<WishlistResponse> {
+  const wishlist = await prisma.wishlist.findFirst({
+    where: { id: wishlistId, userId }
+  });
+
+  if (!wishlist) {
+    throw new Error('Wishlist not found');
+  }
+
+  // Insert cards in a transaction, skipping duplicates
+  await prisma.$transaction(
+    input.cards.map((card) =>
+      prisma.wishlistCard.upsert({
+        where: {
+          wishlistId_externalId_tcg: {
+            wishlistId,
+            externalId: card.externalId,
+            tcg: card.tcg
+          }
+        },
+        update: {},
+        create: {
+          wishlistId,
+          externalId: card.externalId,
+          tcg: card.tcg,
+          name: card.name,
+          setCode: card.setCode,
+          setName: card.setName,
+          rarity: card.rarity,
+          imageUrl: card.imageUrl,
+          imageUrlSmall: card.imageUrlSmall,
+          setSymbolUrl: card.setSymbolUrl,
+          setLogoUrl: card.setLogoUrl,
+          collectorNumber: card.collectorNumber,
+          notes: card.notes
+        }
+      })
+    )
+  );
+
+  return getUserWishlist(userId, wishlistId);
 }
