@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   createWishlistSchema,
   updateWishlistSchema,
-  addWishlistCardSchema
+  addWishlistCardSchema,
+  addWishlistCardsSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -13,6 +14,7 @@ import {
   updateWishlist,
   deleteWishlist,
   addCardToWishlist,
+  addCardsToWishlist,
   removeCardFromWishlist
 } from '../../modules/wishlists/wishlists.service';
 import { asyncHandler } from '../../utils/async-handler';
@@ -94,6 +96,27 @@ wishlistsRouter.delete(
     try {
       await deleteWishlist(userId, wishlistId);
       res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wishlist not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Add multiple cards to a wishlist
+wishlistsRouter.post(
+  '/:wishlistId/cards/batch',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { wishlistId } = req.params;
+    const data = addWishlistCardsSchema.parse(req.body);
+
+    try {
+      const wishlist = await addCardsToWishlist(userId, wishlistId, data);
+      res.status(201).json(wishlist);
     } catch (error) {
       if (error instanceof Error && error.message === 'Wishlist not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });

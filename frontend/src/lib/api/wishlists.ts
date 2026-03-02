@@ -2,11 +2,12 @@ import type {
   CreateWishlistInput,
   UpdateWishlistInput,
   AddWishlistCardInput,
+  AddWishlistCardsInput,
   WishlistResponse,
   WishlistCardResponse
 } from '@tcg/api-types';
 
-export type { WishlistResponse, WishlistCardResponse, CreateWishlistInput, UpdateWishlistInput, AddWishlistCardInput };
+export type { WishlistResponse, WishlistCardResponse, CreateWishlistInput, UpdateWishlistInput, AddWishlistCardInput, AddWishlistCardsInput };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
@@ -119,6 +120,28 @@ export async function addCardToWishlist(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Failed to add card to wishlist');
+  }
+
+  return response.json();
+}
+
+export async function addCardsToWishlist(
+  token: string,
+  wishlistId: string,
+  data: AddWishlistCardsInput
+): Promise<WishlistResponse> {
+  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/cards/batch`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to add cards to wishlist');
   }
 
   return response.json();

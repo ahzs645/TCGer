@@ -37,6 +37,11 @@ export const addWishlistCardSchema = z.object({
 });
 export type AddWishlistCardInput = z.infer<typeof addWishlistCardSchema>;
 
+export const addWishlistCardsSchema = z.object({
+  cards: z.array(addWishlistCardSchema).min(1, 'At least one card is required')
+});
+export type AddWishlistCardsInput = z.infer<typeof addWishlistCardsSchema>;
+
 // ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------

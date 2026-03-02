@@ -102,8 +102,8 @@ function FullCardHeader({ card, onImageClick }: { card: CollectionCard; onImageC
     : 'var(--border)';
 
   return (
-    <div className="flex gap-4">
-      <div className="w-36 shrink-0">
+    <div className="flex min-w-0 gap-3">
+      <div className="w-28 shrink-0">
         {card.imageUrl ? (
           <Button
             variant="ghost"
@@ -126,38 +126,38 @@ function FullCardHeader({ card, onImageClick }: { card: CollectionCard; onImageC
           </div>
         )}
       </div>
-      <div className="space-y-2">
-        <CardTitle>{card.name}</CardTitle>
+      <div className="min-w-0 flex-1 space-y-2">
+        <CardTitle className="line-clamp-2">{card.name}</CardTitle>
         {showCardNumbers && (card.setName || card.setCode) && (
-          <p className="text-sm text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground">
             {card.setName ?? card.setCode}
           </p>
         )}
         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-          <div>
+          <div className="min-w-0">
             <p className="uppercase">Binder</p>
-            <p className="text-sm font-medium text-foreground">{card.binderName ?? 'Unsorted'}</p>
+            <p className="break-words text-sm font-medium leading-snug text-foreground">{card.binderName ?? 'Unsorted'}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="uppercase">Game</p>
-            <p className="text-sm font-medium text-foreground">{GAME_LABELS[card.tcg]}</p>
+            <p className="break-words text-sm font-medium leading-snug text-foreground">{GAME_LABELS[card.tcg]}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="uppercase">Rarity</p>
-            <p className="text-sm font-medium text-foreground">{card.rarity ?? 'Unknown'}</p>
+            <p className="break-words text-sm font-medium leading-snug text-foreground">{card.rarity ?? 'Unknown'}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="uppercase">Quantity</p>
-            <p className="text-sm font-medium text-foreground">{card.copies.length}</p>
+            <p className="break-words text-sm font-medium leading-snug text-foreground">{card.copies.length}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="uppercase">Condition</p>
-            <p className="text-sm font-medium text-foreground">{conditionRangeLabel(card.copies)}</p>
+            <p className="break-words text-sm font-medium leading-snug text-foreground">{conditionRangeLabel(card.copies)}</p>
           </div>
           {showPricing && (
-            <div>
+            <div className="min-w-0">
               <p className="uppercase">Est. value</p>
-              <p className="text-sm font-medium text-foreground">{formatCurrency(card.price)}</p>
+              <p className="break-words text-sm font-medium leading-snug text-foreground">{formatCurrency(card.price)}</p>
             </div>
           )}
         </div>
