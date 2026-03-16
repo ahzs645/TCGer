@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useWishlistsStore, type WishlistCardResponse } from '@/stores/wishlists';
 import type { Card, CardPrintsResponse, CollectionCard, PokemonFinishType, PokemonFunctionalAttack, PokemonFunctionalGroup } from '@/types/card';
 import { normalizeHexColor } from '@/lib/color';
+import { getCardBackImage } from '@/lib/utils';
 import { SetSymbol } from './set-symbol';
 
 const PRINT_SUPPORTED_GAMES: Card['tcg'][] = ['magic', 'pokemon'];
@@ -23,8 +24,6 @@ const GAME_LABELS: Record<Card['tcg'], string> = {
   pokemon: 'Pokémon',
   yugioh: 'Yu-Gi-Oh!'
 };
-
-const CARD_PLACEHOLDER_IMAGE = '/images/card-placeholder.jpg';
 
 interface CardPreviewProps {
   card: Card;
@@ -64,8 +63,9 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [printError, setPrintError] = useState<string | null>(null);
   const selectedBinder = collections.find((binder) => binder.id === selectedBinderId);
   const activeCard = supportsPrintSelection ? selectedPrintCard : card;
+  const cardBackImage = getCardBackImage(activeCard.tcg);
   const [cardImageSrc, setCardImageSrc] = useState(
-    activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE
+    activeCard.imageUrlSmall || activeCard.imageUrl || cardBackImage
   );
   const existingEntry = selectedBinder?.cards.find((binderCard: CollectionCard) => binderCard.cardId === activeCard.id);
   const serverQuantity = existingEntry?.quantity ?? 0;
@@ -187,8 +187,8 @@ export function CardPreview({ card }: CardPreviewProps) {
   }, [card]);
 
   useEffect(() => {
-    setCardImageSrc(activeCard.imageUrlSmall || activeCard.imageUrl || CARD_PLACEHOLDER_IMAGE);
-  }, [activeCard.id, activeCard.imageUrlSmall, activeCard.imageUrl]);
+    setCardImageSrc(activeCard.imageUrlSmall || activeCard.imageUrl || getCardBackImage(activeCard.tcg));
+  }, [activeCard.id, activeCard.imageUrlSmall, activeCard.imageUrl, activeCard.tcg]);
 
   useEffect(() => {
     if (!supportsPrintSelection || !isPrintDialogOpen || printOptions) {
@@ -228,12 +228,12 @@ export function CardPreview({ card }: CardPreviewProps) {
       if (currentSrc === activeCard.imageUrlSmall && activeCard.imageUrl && activeCard.imageUrl !== currentSrc) {
         return activeCard.imageUrl;
       }
-      if (currentSrc === CARD_PLACEHOLDER_IMAGE) {
+      if (currentSrc === cardBackImage) {
         return currentSrc;
       }
-      return CARD_PLACEHOLDER_IMAGE;
+      return cardBackImage;
     });
-  }, [activeCard.imageUrl, activeCard.imageUrlSmall]);
+  }, [activeCard.imageUrl, activeCard.imageUrlSmall, cardBackImage]);
 
   const handleBinderChange = (binderId: string) => {
     setSelectedBinderId(binderId);
@@ -413,7 +413,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                         }`}
                       >
                         <Image
-                          src={print.imageUrlSmall ?? CARD_PLACEHOLDER_IMAGE}
+                          src={print.imageUrlSmall ?? cardBackImage}
                           alt={print.name}
                           width={40}
                           height={56}
@@ -421,7 +421,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                           loading="lazy"
                           onError={(event) => {
                             event.currentTarget.onerror = null;
-                            event.currentTarget.src = CARD_PLACEHOLDER_IMAGE;
+                            event.currentTarget.src = cardBackImage;
                           }}
                         />
                         <div className="flex-1">

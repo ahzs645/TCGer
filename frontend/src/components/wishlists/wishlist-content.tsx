@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetSymbol } from '@/components/cards/set-symbol';
-import { cn, GAME_LABELS, type SupportedGame } from '@/lib/utils';
+import { cn, GAME_LABELS, getCardBackImage, type SupportedGame } from '@/lib/utils';
 import { normalizeHexColor } from '@/lib/color';
 import { searchCardsApi } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth';
@@ -23,7 +23,6 @@ import { useWishlistsStore } from '@/stores/wishlists';
 import type { WishlistCardResponse } from '@/stores/wishlists';
 import type { Card as CardType, TcgCode } from '@/types/card';
 
-const CARD_PLACEHOLDER_IMAGE = '/images/card-placeholder.jpg';
 
 export function WishlistContent() {
   const { token, isAuthenticated } = useAuthStore();
@@ -610,7 +609,7 @@ export function WishlistContent() {
                         />
                       )}
                       <Image
-                        src={card.imageUrlSmall ?? CARD_PLACEHOLDER_IMAGE}
+                        src={card.imageUrlSmall ?? getCardBackImage(card.tcg)}
                         alt={card.name}
                         width={40}
                         height={56}
@@ -618,7 +617,7 @@ export function WishlistContent() {
                         loading="lazy"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = CARD_PLACEHOLDER_IMAGE;
+                          e.currentTarget.src = getCardBackImage(card.tcg);
                         }}
                       />
                       <div className="flex-1 min-w-0">
@@ -717,14 +716,14 @@ function WishlistCardItem({
       <div className="flex gap-3">
         <div className="relative h-[70px] w-[50px] flex-shrink-0 overflow-hidden rounded">
           <Image
-            src={card.imageUrlSmall ?? card.imageUrl ?? CARD_PLACEHOLDER_IMAGE}
+            src={card.imageUrlSmall ?? card.imageUrl ?? getCardBackImage(card.tcg)}
             alt={card.name}
             fill
             className={cn('object-cover', !card.owned && 'opacity-50 grayscale')}
             sizes="50px"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = CARD_PLACEHOLDER_IMAGE;
+              e.currentTarget.src = getCardBackImage(card.tcg);
             }}
           />
           {card.owned && (
