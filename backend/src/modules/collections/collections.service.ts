@@ -64,6 +64,10 @@ type CollectionCopyDto = {
   acquisitionPrice?: number;
   serialNumber?: string;
   acquiredAt?: string;
+  isFoil?: boolean;
+  isSigned?: boolean;
+  isAltered?: boolean;
+  imageUrls?: string[];
   tags: CollectionTagDto[];
 };
 
@@ -173,6 +177,10 @@ function mapCollectionCopy(collection: PrismaCollectionWithCard): CollectionCopy
     acquisitionPrice: collection.acquisitionPrice ? parseFloat(collection.acquisitionPrice.toString()) : undefined,
     serialNumber: collection.serialNumber ?? undefined,
     acquiredAt: collection.acquiredAt ? collection.acquiredAt.toISOString() : undefined,
+    isFoil: collection.isFoil || undefined,
+    isSigned: collection.isSigned || undefined,
+    isAltered: collection.isAltered || undefined,
+    imageUrls: collection.imageUrls?.length ? collection.imageUrls : undefined,
     tags:
       collection.tags?.map((entry) => ({
         id: entry.tag.id,
@@ -380,6 +388,9 @@ async function applyQuantityAdjustment(
           notes: template.notes,
           price: template.price,
           acquisitionPrice: template.acquisitionPrice,
+          isFoil: template.isFoil,
+          isSigned: template.isSigned,
+          isAltered: template.isAltered,
           serialNumber: null,
           acquiredAt: null
         }
@@ -636,6 +647,9 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
+          isFoil: input.isFoil ?? false,
+          isSigned: input.isSigned ?? false,
+          isAltered: input.isAltered ?? false,
           serialNumber,
           acquiredAt
         }
@@ -710,6 +724,9 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
+          isFoil: input.isFoil ?? false,
+          isSigned: input.isSigned ?? false,
+          isAltered: input.isAltered ?? false,
           serialNumber,
           acquiredAt
         }
@@ -805,6 +822,15 @@ export async function updateCardInBinder(
   const parsedAcquiredAt = parseOptionalDate(input.acquiredAt);
   if (parsedAcquiredAt !== undefined) {
     updatePayload.acquiredAt = parsedAcquiredAt;
+  }
+  if (input.isFoil !== undefined) {
+    updatePayload.isFoil = input.isFoil;
+  }
+  if (input.isSigned !== undefined) {
+    updatePayload.isSigned = input.isSigned;
+  }
+  if (input.isAltered !== undefined) {
+    updatePayload.isAltered = input.isAltered;
   }
   if (hasTargetBinder) {
     if (resolvedTargetBinderId) {
@@ -937,6 +963,59 @@ export async function updateCardInBinder(
     : undefined);
 
   return aggregated[0] ?? null;
+}
+
+export async function addImageToCollection(
+  userId: string,
+  collectionId: string,
+  imagePublicPath: string
+) {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, userId }
+  });
+
+  if (!collection) {
+    throw new Error('Collection entry not found');
+  }
+
+  const updated = await prisma.collection.update({
+    where: { id: collectionId },
+    data: {
+      imageUrls: {
+        push: imagePublicPath
+      }
+    }
+  });
+
+  return updated.imageUrls;
+}
+
+export async function removeImageFromCollection(
+  userId: string,
+  collectionId: string,
+  imageIndex: number
+) {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, userId }
+  });
+
+  if (!collection) {
+    throw new Error('Collection entry not found');
+  }
+
+  const urls = [...collection.imageUrls];
+  if (imageIndex < 0 || imageIndex >= urls.length) {
+    throw new Error('Image index out of range');
+  }
+
+  const removedUrl = urls.splice(imageIndex, 1)[0];
+
+  await prisma.collection.update({
+    where: { id: collectionId },
+    data: { imageUrls: urls }
+  });
+
+  return removedUrl;
 }
 
 export async function getUserTags(userId: string) {

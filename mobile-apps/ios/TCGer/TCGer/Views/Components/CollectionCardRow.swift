@@ -132,6 +132,18 @@ struct CollectionCardRow: View {
         return tags
     }
 
+    private var hasAnyFoil: Bool {
+        card.copies.contains { $0.isFoil == true }
+    }
+
+    private var hasAnySigned: Bool {
+        card.copies.contains { $0.isSigned == true }
+    }
+
+    private var hasAnyAltered: Bool {
+        card.copies.contains { $0.isAltered == true }
+    }
+
     private var cardBackgroundColor: Color {
         colorScheme == .dark ? Color(.secondarySystemBackground) : Color(.systemGray6)
     }
@@ -224,6 +236,15 @@ struct CollectionCardRow: View {
                                 )
                             }
 
+                            if hasAnyFoil {
+                                AttributeBadge(icon: "sparkles", label: "Foil", color: .yellow)
+                            }
+                            if hasAnySigned {
+                                AttributeBadge(icon: "pencil.line", label: "Signed", color: .purple)
+                            }
+                            if hasAnyAltered {
+                                AttributeBadge(icon: "paintpalette", label: "Altered", color: .pink)
+                            }
                         }
                     }
 
@@ -387,6 +408,28 @@ struct CollectionCardRow: View {
         }
     }
 
+    private struct AttributeBadge: View {
+        let icon: String
+        let label: String
+        let color: Color
+        @Environment(\.colorScheme) private var colorScheme
+
+        var body: some View {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                Text(label)
+                    .lineLimit(1)
+            }
+            .font(.caption2)
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(color.opacity(colorScheme == .dark ? 0.22 : 0.12))
+            .clipShape(Capsule())
+        }
+    }
+
     private struct CopyDetailRow: View {
         let copy: CollectionCardCopy
         let index: Int
@@ -423,6 +466,14 @@ struct CollectionCardRow: View {
             return labels.joined(separator: ", ")
         }
 
+        private var attributeLabels: [String] {
+            var labels: [String] = []
+            if copy.isFoil == true { labels.append("Foil") }
+            if copy.isSigned == true { labels.append("Signed") }
+            if copy.isAltered == true { labels.append("Altered") }
+            return labels
+        }
+
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -433,6 +484,21 @@ struct CollectionCardRow: View {
                     Text(detailLine)
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                }
+
+                if !attributeLabels.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(attributeLabels, id: \.self) { label in
+                            Text(label)
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                                .foregroundColor(.accentColor)
+                                .cornerRadius(4)
+                        }
+                    }
                 }
 
                 if let notes = normalized(copy.notes) {

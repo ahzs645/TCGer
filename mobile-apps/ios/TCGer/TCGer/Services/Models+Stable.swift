@@ -49,6 +49,10 @@ struct StableCollectionCardCopy: Identifiable, Codable {
     let acquisitionPrice: Double?
     let serialNumber: String?
     let acquiredAt: String?
+    let isFoil: Bool?
+    let isSigned: Bool?
+    let isAltered: Bool?
+    let imageUrls: [String]?
     let tags: [StableCollectionCardTag]
 
     func asModel() -> CollectionCardCopy {
@@ -61,6 +65,10 @@ struct StableCollectionCardCopy: Identifiable, Codable {
             acquisitionPrice: acquisitionPrice,
             serialNumber: serialNumber,
             acquiredAt: acquiredAt,
+            isFoil: isFoil,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            imageUrls: imageUrls,
             tags: tags.map { $0.asModel() }
         )
     }

@@ -474,6 +474,9 @@ struct CollectionDetailView: View {
                                 condition: payload.condition,
                                 language: payload.language,
                                 notes: payload.notes,
+                                isFoil: payload.isFoil,
+                                isSigned: payload.isSigned,
+                                isAltered: payload.isAltered,
                                 tags: payload.tags,
                                 newPrint: payload.selectedPrint
                             )
@@ -649,6 +652,9 @@ struct CollectionDetailView: View {
         condition: String?,
         language: String?,
         notes: String?,
+        isFoil: Bool = false,
+        isSigned: Bool = false,
+        isAltered: Bool = false,
         tags: [String],
         newPrint: Card?
     ) async {
@@ -661,7 +667,7 @@ struct CollectionDetailView: View {
 
         do {
 #if DEBUG
-            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") tags: \(tags) newPrint: \(newPrint?.id ?? "nil")")
+            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered) tags: \(tags) newPrint: \(newPrint?.id ?? "nil")")
 #endif
             let updated = try await apiService.updateCardInBinder(
                 config: environmentStore.serverConfiguration,
@@ -672,6 +678,9 @@ struct CollectionDetailView: View {
                 condition: condition,
                 language: language,
                 notes: notes,
+                isFoil: isFoil,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 tags: tags,
                 newPrint: newPrint,
                 targetBinderId: nil

@@ -51,14 +51,17 @@ struct CardScannerView: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(item: $selectedCardForBinder) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
                 await addCardToBinder(
                     card: card,
                     binderId: binderId,
                     quantity: quantity,
                     condition: condition,
                     language: language,
-                    notes: notes
+                    notes: notes,
+                    isFoil: isFoil,
+                    isSigned: isSigned,
+                    isAltered: isAltered
                 )
             }
         }
@@ -247,7 +250,10 @@ struct CardScannerView: View {
         quantity: Int,
         condition: String?,
         language: String?,
-        notes: String?
+        notes: String?,
+        isFoil: Bool = false,
+        isSigned: Bool = false,
+        isAltered: Bool = false
     ) async {
         guard let token = environmentStore.authToken else {
             viewModel.errorMessage = "Not authenticated."
@@ -267,6 +273,9 @@ struct CardScannerView: View {
                 notes: notes,
                 price: card.price,
                 acquisitionPrice: nil,
+                isFoil: isFoil,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 card: card
             )
         } catch {

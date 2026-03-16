@@ -298,6 +298,9 @@ extension APIService {
         let notes: String?
         let price: Double?
         let acquisitionPrice: Double?
+        let isFoil: Bool?
+        let isSigned: Bool?
+        let isAltered: Bool?
         let tags: [String]?
         let newTags: [TagPayload]?
         let cardData: CardData?
@@ -335,6 +338,9 @@ extension APIService {
         let condition: String?
         let language: String?
         let notes: String?
+        let isFoil: Bool?
+        let isSigned: Bool?
+        let isAltered: Bool?
         let tags: [String]?
         let newTags: [TagPayload]?
         let cardOverride: CardOverride?
@@ -352,6 +358,9 @@ extension APIService {
         notes: String? = nil,
         price: Double? = nil,
         acquisitionPrice: Double? = nil,
+        isFoil: Bool? = nil,
+        isSigned: Bool? = nil,
+        isAltered: Bool? = nil,
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         card: Card? = nil
@@ -397,6 +406,9 @@ extension APIService {
             notes: notes,
             price: price,
             acquisitionPrice: acquisitionPrice,
+            isFoil: isFoil,
+            isSigned: isSigned,
+            isAltered: isAltered,
             tags: tags,
             newTags: newTags,
             cardData: cardData
@@ -429,6 +441,9 @@ extension APIService {
         condition: String? = nil,
         language: String? = nil,
         notes: String? = nil,
+        isFoil: Bool? = nil,
+        isSigned: Bool? = nil,
+        isAltered: Bool? = nil,
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         newPrint: Card? = nil,
@@ -477,6 +492,9 @@ extension APIService {
             condition: condition,
             language: language,
             notes: notes,
+            isFoil: isFoil,
+            isSigned: isSigned,
+            isAltered: isAltered,
             tags: tags,
             newTags: newTags,
             cardOverride: cardOverride,
@@ -536,6 +554,103 @@ extension APIService {
         let (_, response) = try await makeRequest(
             config: config,
             path: "collections/\(binderId)/cards/\(collectionCardId)",
+            method: "DELETE",
+            token: token
+        )
+
+        guard response.statusCode == 204 || response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+    }
+
+    // MARK: - Export
+
+    func exportCollection(
+        config: ServerConfiguration,
+        token: String,
+        format: String = "json"
+    ) async throws -> Data {
+        if config.isDemoMode {
+            return Data("[]".utf8)
+        }
+
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/export?format=\(format)",
+            token: token
+        )
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        return data
+    }
+
+    // MARK: - Image Upload
+
+    func uploadImage(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        collectionId: String,
+        imageData: Data,
+        filename: String = "photo.jpg"
+    ) async throws -> [String] {
+        guard let url = config.endpoint(path: "collections/\(binderId)/cards/\(collectionId)/images") else {
+            throw APIError.invalidURL
+        }
+
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"images\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (data, response) = try await execute(request)
+
+        guard response.statusCode == 201 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        struct ImageUploadResponse: Codable {
+            let imageUrls: [String]
+        }
+
+        guard let result = try? JSONDecoder().decode(ImageUploadResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return result.imageUrls
+    }
+
+    func deleteImage(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        collectionId: String,
+        imageIndex: Int
+    ) async throws {
+        let (_, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/cards/\(collectionId)/images/\(imageIndex)",
             method: "DELETE",
             token: token
         )

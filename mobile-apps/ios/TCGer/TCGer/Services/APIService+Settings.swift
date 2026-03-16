@@ -76,6 +76,7 @@ extension APIService {
         let enabledYugioh: Bool
         let enabledMagic: Bool
         let enabledPokemon: Bool
+        let defaultGame: String?
     }
 
     func getUserPreferences(
@@ -112,6 +113,7 @@ extension APIService {
         let enabledYugioh: Bool?
         let enabledMagic: Bool?
         let enabledPokemon: Bool?
+        let defaultGame: String?
     }
 
     func updateUserPreferences(
@@ -121,7 +123,8 @@ extension APIService {
         showPricing: Bool? = nil,
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
-        enabledPokemon: Bool? = nil
+        enabledPokemon: Bool? = nil,
+        defaultGame: String? = nil
     ) async throws -> UserPreferences {
         if config.isDemoMode {
             return DemoStore.shared.updateUserPreferences(
@@ -138,7 +141,8 @@ extension APIService {
             showPricing: showPricing,
             enabledYugioh: enabledYugioh,
             enabledMagic: enabledMagic,
-            enabledPokemon: enabledPokemon
+            enabledPokemon: enabledPokemon,
+            defaultGame: defaultGame
         )
 
         let (data, response) = try await makeRequest(

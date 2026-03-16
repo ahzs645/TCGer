@@ -1,3 +1,4 @@
+import path from 'node:path';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -20,6 +21,9 @@ app.use(helmet());
 app.use(cors());
 app.use(compression());
 app.use(express.json());
+
+// Serve uploaded images
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 registerRoutes(app);
 

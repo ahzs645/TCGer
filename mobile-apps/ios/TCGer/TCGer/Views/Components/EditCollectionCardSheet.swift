@@ -9,6 +9,9 @@ struct EditCollectionCardSheet: View {
         let condition: String?
         let language: String?
         let notes: String?
+        let isFoil: Bool
+        let isSigned: Bool
+        let isAltered: Bool
         let tags: [String]
         let selectedPrint: Card?
     }
@@ -26,6 +29,9 @@ struct EditCollectionCardSheet: View {
     @State private var notes: String
     @State private var selectedTagIds: Set<String>
     @State private var localTags: [CollectionCardTag]
+    @State private var isFoil: Bool
+    @State private var isSigned: Bool
+    @State private var isAltered: Bool
     @State private var newTagLabel = ""
     @State private var isCreatingTag = false
     @State private var tagError: String?
@@ -83,6 +89,9 @@ struct EditCollectionCardSheet: View {
         _conditionSelection = State(initialValue: copyDetails?.condition ?? card.condition ?? "")
         _languageSelection = State(initialValue: copyDetails?.language ?? card.language ?? "")
         _notes = State(initialValue: copyDetails?.notes ?? card.notes ?? "")
+        _isFoil = State(initialValue: copyDetails?.isFoil ?? false)
+        _isSigned = State(initialValue: copyDetails?.isSigned ?? false)
+        _isAltered = State(initialValue: copyDetails?.isAltered ?? false)
         _selectedTagIds = State(initialValue: Set(selectedTagIds))
         _localTags = State(initialValue: availableTags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending })
     }
@@ -219,6 +228,20 @@ struct EditCollectionCardSheet: View {
                 }
 
                 Section {
+                    Toggle(isOn: $isFoil) {
+                        Label("Foil", systemImage: "sparkles")
+                    }
+                    Toggle(isOn: $isSigned) {
+                        Label("Signed", systemImage: "pencil.line")
+                    }
+                    Toggle(isOn: $isAltered) {
+                        Label("Altered Art", systemImage: "paintpalette")
+                    }
+                } header: {
+                    Text("Attributes")
+                }
+
+                Section {
                     TextField("Description or notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
@@ -306,6 +329,9 @@ struct EditCollectionCardSheet: View {
                             condition: conditionToSave.isEmpty ? nil : conditionToSave,
                             language: languageToSave.isEmpty ? nil : languageToSave,
                             notes: notesToSave.isEmpty ? nil : notesToSave,
+                            isFoil: isFoil,
+                            isSigned: isSigned,
+                            isAltered: isAltered,
                             tags: selectedTagIds.sorted(),
                             selectedPrint: selectedPrintToSave
                         )
