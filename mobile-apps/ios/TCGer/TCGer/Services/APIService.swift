@@ -138,7 +138,10 @@ final class DemoStore {
             showPricing: true,
             enabledYugioh: true,
             enabledMagic: true,
-            enabledPokemon: true
+            enabledPokemon: true,
+            enabledOnepiece: true,
+            enabledLorcana: true,
+            enabledDragonball: true
         )
         self.user = User(
             id: Constants.userId,
@@ -149,7 +152,10 @@ final class DemoStore {
             showPricing: true,
             enabledYugioh: true,
             enabledMagic: true,
-            enabledPokemon: true
+            enabledPokemon: true,
+            enabledOnepiece: true,
+            enabledLorcana: true,
+            enabledDragonball: true
         )
         self.appSettings = AppSettings(
             id: 0,
@@ -185,7 +191,10 @@ final class DemoStore {
                 showPricing: preferences.showPricing,
                 enabledYugioh: preferences.enabledYugioh,
                 enabledMagic: preferences.enabledMagic,
-                enabledPokemon: preferences.enabledPokemon
+                enabledPokemon: preferences.enabledPokemon,
+                enabledOnepiece: preferences.enabledOnepiece,
+                enabledLorcana: preferences.enabledLorcana,
+                enabledDragonball: preferences.enabledDragonball
             )
         }
         if let username {
@@ -199,7 +208,10 @@ final class DemoStore {
                 showPricing: preferences.showPricing,
                 enabledYugioh: preferences.enabledYugioh,
                 enabledMagic: preferences.enabledMagic,
-                enabledPokemon: preferences.enabledPokemon
+                enabledPokemon: preferences.enabledPokemon,
+                enabledOnepiece: preferences.enabledOnepiece,
+                enabledLorcana: preferences.enabledLorcana,
+                enabledDragonball: preferences.enabledDragonball
             )
         }
         return AuthResponse(user: user, token: Constants.token)
@@ -239,14 +251,20 @@ final class DemoStore {
         showPricing: Bool?,
         enabledYugioh: Bool?,
         enabledMagic: Bool?,
-        enabledPokemon: Bool?
+        enabledPokemon: Bool?,
+        enabledOnepiece: Bool?,
+        enabledLorcana: Bool?,
+        enabledDragonball: Bool?
     ) -> APIService.UserPreferences {
         preferences = APIService.UserPreferences(
             showCardNumbers: showCardNumbers ?? preferences.showCardNumbers,
             showPricing: showPricing ?? preferences.showPricing,
             enabledYugioh: enabledYugioh ?? preferences.enabledYugioh,
             enabledMagic: enabledMagic ?? preferences.enabledMagic,
-            enabledPokemon: enabledPokemon ?? preferences.enabledPokemon
+            enabledPokemon: enabledPokemon ?? preferences.enabledPokemon,
+            enabledOnepiece: enabledOnepiece ?? preferences.enabledOnepiece,
+            enabledLorcana: enabledLorcana ?? preferences.enabledLorcana,
+            enabledDragonball: enabledDragonball ?? preferences.enabledDragonball
         )
         user = User(
             id: user.id,
@@ -257,7 +275,10 @@ final class DemoStore {
             showPricing: preferences.showPricing,
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
-            enabledPokemon: preferences.enabledPokemon
+            enabledPokemon: preferences.enabledPokemon,
+            enabledOnepiece: preferences.enabledOnepiece,
+            enabledLorcana: preferences.enabledLorcana,
+            enabledDragonball: preferences.enabledDragonball
         )
         return preferences
     }
@@ -289,7 +310,10 @@ final class DemoStore {
             showPricing: preferences.showPricing,
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
-            enabledPokemon: preferences.enabledPokemon
+            enabledPokemon: preferences.enabledPokemon,
+            enabledOnepiece: preferences.enabledOnepiece,
+            enabledLorcana: preferences.enabledLorcana,
+            enabledDragonball: preferences.enabledDragonball
         )
 
         return APIService.UpdatedProfile(

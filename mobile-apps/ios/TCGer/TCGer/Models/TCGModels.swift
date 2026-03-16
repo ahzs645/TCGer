@@ -62,6 +62,9 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         case "yugioh": return "Yu-Gi-Oh!"
         case "magic": return "Magic: The Gathering"
         case "pokemon": return "Pokémon"
+        case "onepiece": return "One Piece"
+        case "lorcana": return "Disney Lorcana"
+        case "dragonball": return "Dragon Ball Super"
         default: return tcg.capitalized
         }
     }
@@ -183,6 +186,9 @@ struct User: Codable, Sendable {
     let enabledYugioh: Bool?
     let enabledMagic: Bool?
     let enabledPokemon: Bool?
+    let enabledOnepiece: Bool?
+    let enabledLorcana: Bool?
+    let enabledDragonball: Bool?
     let defaultGame: String?
 }
 
@@ -232,6 +238,9 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
         case "yugioh": return "Yu-Gi-Oh!"
         case "magic": return "Magic: The Gathering"
         case "pokemon": return "Pokémon"
+        case "onepiece": return "One Piece"
+        case "lorcana": return "Disney Lorcana"
+        case "dragonball": return "Dragon Ball Super"
         default: return tcg.capitalized
         }
     }
@@ -243,6 +252,9 @@ enum TCGGame: String, CaseIterable, Identifiable {
     case yugioh = "yugioh"
     case magic = "magic"
     case pokemon = "pokemon"
+    case onepiece = "onepiece"
+    case lorcana = "lorcana"
+    case dragonball = "dragonball"
 
     var id: String { rawValue }
 
@@ -252,6 +264,9 @@ enum TCGGame: String, CaseIterable, Identifiable {
         case .yugioh: return "Yu-Gi-Oh!"
         case .magic: return "Magic: The Gathering"
         case .pokemon: return "Pokémon"
+        case .onepiece: return "One Piece"
+        case .lorcana: return "Disney Lorcana"
+        case .dragonball: return "Dragon Ball Super"
         }
     }
 
@@ -261,6 +276,9 @@ enum TCGGame: String, CaseIterable, Identifiable {
         case .yugioh: return "YugiohIcon"
         case .magic: return "MTGIcon"
         case .pokemon: return "PokemonIcon"
+        case .onepiece: return "OnePieceIcon"
+        case .lorcana: return "LorcanaIcon"
+        case .dragonball: return "DragonBallIcon"
         }
     }
 
@@ -270,6 +288,9 @@ enum TCGGame: String, CaseIterable, Identifiable {
         case .yugioh: return "suit.club.fill"
         case .magic: return "sparkles"
         case .pokemon: return "bolt.fill"
+        case .onepiece: return "sail.boat.fill"
+        case .lorcana: return "wand.and.stars"
+        case .dragonball: return "flame.fill"
         }
     }
 }

@@ -137,6 +137,9 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
                    let game = TCGGame(rawValue: defaultGame),

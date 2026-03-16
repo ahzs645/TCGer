@@ -9,7 +9,10 @@ export const GAME_LABELS = {
   all: 'All Games',
   yugioh: 'Yu-Gi-Oh!',
   magic: 'Magic: The Gathering',
-  pokemon: 'Pokémon'
+  pokemon: 'Pokémon',
+  onepiece: 'One Piece',
+  lorcana: 'Disney Lorcana',
+  dragonball: 'Dragon Ball Super'
 } as const;
 
 export type SupportedGame = keyof typeof GAME_LABELS;

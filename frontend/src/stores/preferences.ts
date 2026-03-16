@@ -17,7 +17,10 @@ interface ModuleState {
 const initialState: Record<ManageableGame, boolean> = {
   yugioh: true,
   magic: true,
-  pokemon: true
+  pokemon: true,
+  onepiece: true,
+  lorcana: true,
+  dragonball: true
 };
 
 export const useModuleStore = create<ModuleState>((set) => ({

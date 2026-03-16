@@ -14,10 +14,13 @@ import { GAME_LABELS } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useModuleStore, type ManageableGame } from '@/stores/preferences';
 
-const iconPaths = {
+const iconPaths: Record<string, string> = {
   yugioh: '/icons/Yugioh.svg',
   magic: '/icons/MTG.svg',
-  pokemon: '/icons/Pokemon.svg'
+  pokemon: '/icons/Pokemon.svg',
+  onepiece: '/icons/OnePiece.svg',
+  lorcana: '/icons/Lorcana.svg',
+  dragonball: '/icons/DragonBall.svg'
 };
 
 interface AccountSettingsDialogProps {
@@ -133,12 +136,16 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
     setUpdatingGame(game);
     toggleGame(game);
 
-    const preferencePayload =
-      game === 'yugioh'
-        ? { enabledYugioh: newValue }
-        : game === 'magic'
-          ? { enabledMagic: newValue }
-          : { enabledPokemon: newValue };
+    const gamePreferenceMap: Record<string, string> = {
+      yugioh: 'enabledYugioh',
+      magic: 'enabledMagic',
+      pokemon: 'enabledPokemon',
+      onepiece: 'enabledOnepiece',
+      lorcana: 'enabledLorcana',
+      dragonball: 'enabledDragonball'
+    };
+    const preferenceKey = gamePreferenceMap[game] ?? `enabled${game.charAt(0).toUpperCase()}${game.slice(1)}`;
+    const preferencePayload = { [preferenceKey]: newValue };
 
     try {
       await updateUserPreferences(preferencePayload, token);
@@ -198,7 +205,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
             <div>
               <h3 className="text-sm font-semibold">TCG Modules</h3>
               <p className="text-sm text-muted-foreground">
-                Toggle which adapters are active in your dashboards and search. ({activeCount}/3 enabled)
+                Toggle which adapters are active in your dashboards and search. ({activeCount}/{Object.keys(enabledGames).length} enabled)
               </p>
             </div>
             <ShieldCheck className="h-5 w-5 text-muted-foreground" />

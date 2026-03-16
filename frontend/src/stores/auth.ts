@@ -12,11 +12,14 @@ const DEFAULT_DISPLAY_PREFERENCES = {
 const DEFAULT_ENABLED_GAMES = {
   enabledYugioh: true,
   enabledMagic: true,
-  enabledPokemon: true
+  enabledPokemon: true,
+  enabledOnepiece: true,
+  enabledLorcana: true,
+  enabledDragonball: true
 };
 
 type DisplayPreferenceKeys = 'showCardNumbers' | 'showPricing';
-type EnabledGamesKeys = 'enabledYugioh' | 'enabledMagic' | 'enabledPokemon';
+type EnabledGamesKeys = 'enabledYugioh' | 'enabledMagic' | 'enabledPokemon' | 'enabledOnepiece' | 'enabledLorcana' | 'enabledDragonball';
 
 interface AuthState {
   user: AuthUser | null;
@@ -42,7 +45,10 @@ function withDisplayDefaults(user: AuthUser | null): AuthUser | null {
     showPricing: user.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
     enabledYugioh: user.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
     enabledMagic: user.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
-    enabledPokemon: user.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
+    enabledPokemon: user.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon,
+    enabledOnepiece: user.enabledOnepiece ?? DEFAULT_ENABLED_GAMES.enabledOnepiece,
+    enabledLorcana: user.enabledLorcana ?? DEFAULT_ENABLED_GAMES.enabledLorcana,
+    enabledDragonball: user.enabledDragonball ?? DEFAULT_ENABLED_GAMES.enabledDragonball
   };
 }
 
@@ -57,6 +63,9 @@ function syncDisplayPreferences(
   setGameEnabled('yugioh', preferences?.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh);
   setGameEnabled('magic', preferences?.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic);
   setGameEnabled('pokemon', preferences?.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon);
+  setGameEnabled('onepiece', preferences?.enabledOnepiece ?? DEFAULT_ENABLED_GAMES.enabledOnepiece);
+  setGameEnabled('lorcana', preferences?.enabledLorcana ?? DEFAULT_ENABLED_GAMES.enabledLorcana);
+  setGameEnabled('dragonball', preferences?.enabledDragonball ?? DEFAULT_ENABLED_GAMES.enabledDragonball);
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -110,7 +119,13 @@ export const useAuthStore = create<AuthState>()(
           enabledMagic:
             preferences.enabledMagic ?? currentUser.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
           enabledPokemon:
-            preferences.enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
+            preferences.enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon,
+          enabledOnepiece:
+            preferences.enabledOnepiece ?? currentUser.enabledOnepiece ?? DEFAULT_ENABLED_GAMES.enabledOnepiece,
+          enabledLorcana:
+            preferences.enabledLorcana ?? currentUser.enabledLorcana ?? DEFAULT_ENABLED_GAMES.enabledLorcana,
+          enabledDragonball:
+            preferences.enabledDragonball ?? currentUser.enabledDragonball ?? DEFAULT_ENABLED_GAMES.enabledDragonball
         };
 
         set({ user: updatedUser });
@@ -143,7 +158,10 @@ useAuthStore.subscribe((state, previousState) => {
       normalized?.showPricing !== state.user.showPricing ||
       normalized?.enabledYugioh !== state.user.enabledYugioh ||
       normalized?.enabledMagic !== state.user.enabledMagic ||
-      normalized?.enabledPokemon !== state.user.enabledPokemon
+      normalized?.enabledPokemon !== state.user.enabledPokemon ||
+      normalized?.enabledOnepiece !== state.user.enabledOnepiece ||
+      normalized?.enabledLorcana !== state.user.enabledLorcana ||
+      normalized?.enabledDragonball !== state.user.enabledDragonball
     ) {
       useAuthStore.setState({ user: normalized });
       syncDisplayPreferences(normalized ?? undefined);

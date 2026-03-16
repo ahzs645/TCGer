@@ -10,7 +10,10 @@ import { useModuleStore } from '@/stores/preferences';
 const iconPaths: Record<Exclude<SupportedGame, 'all'>, string> = {
   yugioh: '/icons/Yugioh.svg',
   magic: '/icons/MTG.svg',
-  pokemon: '/icons/Pokemon.svg'
+  pokemon: '/icons/Pokemon.svg',
+  onepiece: '/icons/OnePiece.svg',
+  lorcana: '/icons/Lorcana.svg',
+  dragonball: '/icons/DragonBall.svg'
 };
 
 export function GameSwitcher() {

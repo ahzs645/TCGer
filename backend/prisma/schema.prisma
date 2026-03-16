@@ -15,10 +15,13 @@ model User {
   isAdmin     Boolean      @default(false)
   showCardNumbers Boolean  @default(true)
   showPricing     Boolean  @default(true)
-  enabledYugioh   Boolean  @default(true)
-  enabledMagic    Boolean  @default(true)
-  enabledPokemon  Boolean  @default(true)
-  defaultGame     String?
+  enabledYugioh     Boolean  @default(true)
+  enabledMagic      Boolean  @default(true)
+  enabledPokemon    Boolean  @default(true)
+  enabledOnepiece   Boolean  @default(true)
+  enabledLorcana    Boolean  @default(true)
+  enabledDragonball Boolean  @default(true)
+  defaultGame       String?
   binders     Binder[]
   collections Collection[]
   tags        Tag[]

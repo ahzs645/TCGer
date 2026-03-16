@@ -35,6 +35,15 @@ struct CardScannerView: View {
         .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
             syncSelectedModeWithModules()
         }
+        .onChange(of: environmentStore.enabledOnepiece, initial: false) { _, _ in
+            syncSelectedModeWithModules()
+        }
+        .onChange(of: environmentStore.enabledLorcana, initial: false) { _, _ in
+            syncSelectedModeWithModules()
+        }
+        .onChange(of: environmentStore.enabledDragonball, initial: false) { _, _ in
+            syncSelectedModeWithModules()
+        }
         .sheet(item: $viewModel.latestResult, onDismiss: {
             viewModel.clearResult()
         }) { result in

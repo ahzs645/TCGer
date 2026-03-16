@@ -78,7 +78,10 @@ export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
       showPricing: user.showPricing,
       enabledYugioh: user.enabledYugioh,
       enabledMagic: user.enabledMagic,
-      enabledPokemon: user.enabledPokemon
+      enabledPokemon: user.enabledPokemon,
+      enabledOnepiece: user.enabledOnepiece,
+      enabledLorcana: user.enabledLorcana,
+      enabledDragonball: user.enabledDragonball
     },
     token
   };
@@ -112,7 +115,10 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
       showPricing: user.showPricing,
       enabledYugioh: user.enabledYugioh,
       enabledMagic: user.enabledMagic,
-      enabledPokemon: user.enabledPokemon
+      enabledPokemon: user.enabledPokemon,
+      enabledOnepiece: user.enabledOnepiece,
+      enabledLorcana: user.enabledLorcana,
+      enabledDragonball: user.enabledDragonball
     },
     token
   };
@@ -165,6 +171,9 @@ export async function getUserById(userId: string) {
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: true,
+      enabledLorcana: true,
+      enabledDragonball: true,
       createdAt: true
     }
   });
@@ -185,6 +194,9 @@ export async function getUserPreferences(userId: string) {
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: true,
+      enabledLorcana: true,
+      enabledDragonball: true,
       defaultGame: true
     }
   });
@@ -206,6 +218,9 @@ export async function updateUserPreferences(userId: string, input: UpdatePrefere
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: true,
+      enabledLorcana: true,
+      enabledDragonball: true,
       defaultGame: true
     }
   });
@@ -236,7 +251,10 @@ export async function updateUserProfile(userId: string, input: UpdateProfileInpu
       showPricing: true,
       enabledYugioh: true,
       enabledMagic: true,
-      enabledPokemon: true
+      enabledPokemon: true,
+      enabledOnepiece: true,
+      enabledLorcana: true,
+      enabledDragonball: true
     }
   });
 

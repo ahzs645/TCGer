@@ -11,6 +11,9 @@ export const updatePreferencesSchema = z
     enabledYugioh: z.boolean().optional(),
     enabledMagic: z.boolean().optional(),
     enabledPokemon: z.boolean().optional(),
+    enabledOnepiece: z.boolean().optional(),
+    enabledLorcana: z.boolean().optional(),
+    enabledDragonball: z.boolean().optional(),
     defaultGame: z.string().nullable().optional()
   })
   .refine(
@@ -56,5 +59,8 @@ export interface UserPreferences {
   enabledYugioh: boolean;
   enabledMagic: boolean;
   enabledPokemon: boolean;
+  enabledOnepiece: boolean;
+  enabledLorcana: boolean;
+  enabledDragonball: boolean;
   defaultGame: string | null;
 }

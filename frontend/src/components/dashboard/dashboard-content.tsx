@@ -42,7 +42,10 @@ function buildDashboardStats(cards: DashboardCard[], showPricing: boolean): Dash
     byGame: {
       yugioh: { copies: 0, value: 0 },
       magic: { copies: 0, value: 0 },
-      pokemon: { copies: 0, value: 0 }
+      pokemon: { copies: 0, value: 0 },
+      onepiece: { copies: 0, value: 0 },
+      lorcana: { copies: 0, value: 0 },
+      dragonball: { copies: 0, value: 0 }
     },
     recentActivity: []
   };
@@ -102,7 +105,7 @@ export function DashboardContent() {
   }));
   const { token, isAuthenticated } = useAuthStore();
 
-  const noGamesEnabled = !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+  const noGamesEnabled = !Object.values(enabledGames).some(Boolean);
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
 
   useEffect(() => {

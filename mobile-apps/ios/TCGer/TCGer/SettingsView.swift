@@ -139,6 +139,51 @@ struct SettingsView: View {
                     .onChange(of: environmentStore.enabledPokemon) {
                         Task { await updatePreferences(enabledPokemon: environmentStore.enabledPokemon) }
                     }
+
+                    Toggle(isOn: $environmentStore.enabledOnepiece) {
+                        HStack {
+                            Image(systemName: "sail.boat.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.accentColor)
+                            Text("One Piece")
+                        }
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledOnepiece) {
+                        Task { await updatePreferences(enabledOnepiece: environmentStore.enabledOnepiece) }
+                    }
+
+                    Toggle(isOn: $environmentStore.enabledLorcana) {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.accentColor)
+                            Text("Disney Lorcana")
+                        }
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledLorcana) {
+                        Task { await updatePreferences(enabledLorcana: environmentStore.enabledLorcana) }
+                    }
+
+                    Toggle(isOn: $environmentStore.enabledDragonball) {
+                        HStack {
+                            Image(systemName: "flame.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.accentColor)
+                            Text("Dragon Ball Super")
+                        }
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledDragonball) {
+                        Task { await updatePreferences(enabledDragonball: environmentStore.enabledDragonball) }
+                    }
                 } header: {
                     Text("TCG Modules")
                 } footer: {
@@ -184,6 +229,9 @@ struct SettingsView: View {
                         Text("Yu-Gi-Oh!").tag("yugioh")
                         Text("Magic: The Gathering").tag("magic")
                         Text("Pokémon").tag("pokemon")
+                        Text("One Piece").tag("onepiece")
+                        Text("Disney Lorcana").tag("lorcana")
+                        Text("Dragon Ball Super").tag("dragonball")
                     }
                     .disabled(!environmentStore.isAuthenticated)
                 } header: {
@@ -651,6 +699,9 @@ private extension SettingsView {
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
         enabledPokemon: Bool? = nil,
+        enabledOnepiece: Bool? = nil,
+        enabledLorcana: Bool? = nil,
+        enabledDragonball: Bool? = nil,
         defaultGame: String?? = nil
     ) async {
         guard !isApplyingRemotePreferences,
@@ -671,6 +722,9 @@ private extension SettingsView {
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
                 enabledPokemon: enabledPokemon,
+                enabledOnepiece: enabledOnepiece,
+                enabledLorcana: enabledLorcana,
+                enabledDragonball: enabledDragonball,
                 defaultGame: resolvedDefaultGame
             )
 

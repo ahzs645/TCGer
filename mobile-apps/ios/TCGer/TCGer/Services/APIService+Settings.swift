@@ -76,6 +76,9 @@ extension APIService {
         let enabledYugioh: Bool
         let enabledMagic: Bool
         let enabledPokemon: Bool
+        let enabledOnepiece: Bool
+        let enabledLorcana: Bool
+        let enabledDragonball: Bool
         let defaultGame: String?
     }
 
@@ -113,6 +116,9 @@ extension APIService {
         let enabledYugioh: Bool?
         let enabledMagic: Bool?
         let enabledPokemon: Bool?
+        let enabledOnepiece: Bool?
+        let enabledLorcana: Bool?
+        let enabledDragonball: Bool?
         let defaultGame: String?
     }
 
@@ -124,6 +130,9 @@ extension APIService {
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
         enabledPokemon: Bool? = nil,
+        enabledOnepiece: Bool? = nil,
+        enabledLorcana: Bool? = nil,
+        enabledDragonball: Bool? = nil,
         defaultGame: String? = nil
     ) async throws -> UserPreferences {
         if config.isDemoMode {
@@ -132,7 +141,10 @@ extension APIService {
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
-                enabledPokemon: enabledPokemon
+                enabledPokemon: enabledPokemon,
+                enabledOnepiece: enabledOnepiece,
+                enabledLorcana: enabledLorcana,
+                enabledDragonball: enabledDragonball
             )
         }
 
@@ -142,6 +154,9 @@ extension APIService {
             enabledYugioh: enabledYugioh,
             enabledMagic: enabledMagic,
             enabledPokemon: enabledPokemon,
+            enabledOnepiece: enabledOnepiece,
+            enabledLorcana: enabledLorcana,
+            enabledDragonball: enabledDragonball,
             defaultGame: defaultGame
         )
 

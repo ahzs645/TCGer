@@ -13,7 +13,10 @@ const envSchema = z.object({
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
   YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7'),
   POKEMON_API_BASE_URL: z.string().url().default('https://api.pokemontcg.io/v2'),
-  TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en')
+  TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en'),
+  ONEPIECE_API_BASE_URL: z.string().url().default('https://apitcg.com'),
+  LORCANA_API_BASE_URL: z.string().url().default('https://api.lorcana-api.com'),
+  DRAGONBALL_API_BASE_URL: z.string().url().default('https://www.dbs-cardgame.com')
 });
 
 const parsed = envSchema.safeParse(process.env);

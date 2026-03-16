@@ -4,7 +4,7 @@ import { z } from 'zod';
 // Core enums & primitives
 // ---------------------------------------------------------------------------
 
-export const tcgCodeSchema = z.enum(['yugioh', 'magic', 'pokemon']);
+export const tcgCodeSchema = z.enum(['yugioh', 'magic', 'pokemon', 'onepiece', 'lorcana', 'dragonball']);
 export type TcgCode = z.infer<typeof tcgCodeSchema>;
 
 export const pokemonFinishTypeSchema = z.enum(['normal', 'reverse', 'holo', 'firstEdition']);

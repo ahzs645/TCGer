@@ -13,7 +13,7 @@ export const useGameFilterStore = create<GameFilterState>((set) => ({
   setGame: (game) => set({ selectedGame: game })
 }));
 
-export const supportedGames: SupportedGame[] = ['all', 'yugioh', 'magic', 'pokemon'];
+export const supportedGames: SupportedGame[] = ['all', 'yugioh', 'magic', 'pokemon', 'onepiece', 'lorcana', 'dragonball'];
 export const supportedGameOptions = supportedGames.map((value) => ({ value, label: GAME_LABELS[value] }));
 
 useModuleStore.subscribe((state) => {

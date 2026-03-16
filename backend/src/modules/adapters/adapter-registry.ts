@@ -1,4 +1,7 @@
+import { DragonBallAdapter } from './dragonball-adapter';
+import { LorcanaAdapter } from './lorcana-adapter';
 import { MagicAdapter } from './magic-adapter';
+import { OnePieceAdapter } from './onepiece-adapter';
 import { PokemonAdapter } from './pokemon-adapter';
 import { TcgAdapter, TcgCode } from './types';
 import { YugiohAdapter } from './yugioh-adapter';
@@ -25,6 +28,13 @@ class AdapterRegistry {
   }
 }
 
-const defaultAdapters: TcgAdapter[] = [new YugiohAdapter(), new MagicAdapter(), new PokemonAdapter()];
+const defaultAdapters: TcgAdapter[] = [
+  new YugiohAdapter(),
+  new MagicAdapter(),
+  new PokemonAdapter(),
+  new OnePieceAdapter(),
+  new LorcanaAdapter(),
+  new DragonBallAdapter()
+];
 
 export const adapterRegistry = new AdapterRegistry(defaultAdapters);
