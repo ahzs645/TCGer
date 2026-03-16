@@ -14,6 +14,18 @@ export const GAME_LABELS = {
 
 export type SupportedGame = keyof typeof GAME_LABELS;
 
+const CARD_BACK_IMAGES: Record<string, string> = {
+  pokemon: '/images/pokemon-card-back.png',
+  magic: '/images/mtg-card-back.png',
+  yugioh: '/images/yugioh-card-back.png'
+};
+
+const DEFAULT_CARD_BACK = '/images/pokemon-card-back.png';
+
+export function getCardBackImage(tcg?: string): string {
+  return (tcg && CARD_BACK_IMAGES[tcg]) || DEFAULT_CARD_BACK;
+}
+
 const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 const internalApiBase = process.env.BACKEND_API_ORIGIN ?? publicApiBase;
 
