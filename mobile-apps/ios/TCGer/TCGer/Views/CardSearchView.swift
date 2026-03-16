@@ -457,6 +457,47 @@ private struct CardCell: View {
                         .lineLimit(1)
                 }
 
+                // Pokemon TCG format legality & dex number
+                if card.tcg == "pokemon" {
+                    HStack(spacing: 4) {
+                        if let supertype = card.supertype {
+                            Text(supertype)
+                                .font(.system(size: 9))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color(.systemGray4))
+                                .cornerRadius(3)
+                        }
+                        if card.formatLegality?.standard == true {
+                            Text("Standard")
+                                .font(.system(size: 9))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.15))
+                                .cornerRadius(3)
+                        }
+                        if card.formatLegality?.expanded == true {
+                            Text("Expanded")
+                                .font(.system(size: 9))
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.blue.opacity(0.15))
+                                .cornerRadius(3)
+                        }
+                        if let dexNum = card.pokedexNumber {
+                            Text("#\(dexNum)")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color(.systemGray5))
+                                .cornerRadius(3)
+                        }
+                    }
+                }
+
                 if showPricing, let price = card.price {
                     Text("$\(String(format: "%.2f", price))")
                         .font(.caption2)

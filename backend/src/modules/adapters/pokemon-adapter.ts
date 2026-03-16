@@ -1,5 +1,6 @@
 import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
+import { ENERGY_TYPE_CODES } from '@tcg/api-types';
 import type {
   CardDTO,
   CardPrintsResult,
@@ -24,19 +25,10 @@ const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POKEMON_REQUEST_TIMEOUT_M
 const configuredVariantConcurrency = Number.parseInt(process.env.POKEMON_VARIANT_FETCH_CONCURRENCY ?? '', 10);
 const VARIANT_FETCH_CONCURRENCY = Number.isFinite(configuredVariantConcurrency) && configuredVariantConcurrency > 0 ? configuredVariantConcurrency : 4;
 
-const ENERGY_SYMBOL_MAP: Record<string, string> = {
-  C: 'colorless',
-  W: 'water',
-  R: 'fire',
-  G: 'grass',
-  L: 'lightning',
-  P: 'psychic',
-  F: 'fighting',
-  D: 'darkness',
-  Y: 'fairy',
-  M: 'metal',
-  N: 'dragon'
-};
+/** Map energy symbol codes to lowercase names for normalization */
+const ENERGY_SYMBOL_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(ENERGY_TYPE_CODES).map(([code, name]) => [code, name.toLowerCase()])
+);
 
 let rateLimitChain: Promise<void> = Promise.resolve();
 let nextAllowedRequestTime = 0;
@@ -441,6 +433,17 @@ export class PokemonAdapter implements TcgAdapter {
     // TCGdex returns "None" for promo cards, convert to "Promo"
     const rarity = card.rarity === 'None' ? 'Promo' : card.rarity;
 
+    // Build format legality from TCGdex legal field
+    const formatLegality = card.legal ? {
+      standard: card.legal.standard ?? undefined,
+      expanded: card.legal.expanded ?? undefined
+    } : undefined;
+
+    // Build Pokedex entries from TCGdex dexId array
+    const dexEntries = card.dexId?.length
+      ? card.dexId.map((num) => ({ number: num, name: card.name }))
+      : undefined;
+
     return {
       id: card.id,
       tcg: this.game,
@@ -454,6 +457,9 @@ export class PokemonAdapter implements TcgAdapter {
       setSymbolUrl: card.set?.symbol,
       setLogoUrl: card.set?.logo,
       regulationMark: card.regulationMark,
+      supertype: card.category,
+      formatLegality,
+      dexEntries,
       attributes: {
         hp: card.hp,
         types: card.types,
@@ -484,8 +490,8 @@ export class PokemonAdapter implements TcgAdapter {
       setSymbolUrl: card.set?.images?.symbol,
       setLogoUrl: card.set?.images?.logo,
       regulationMark: card.regulationMark,
+      supertype: card.supertype,
       attributes: {
-        supertype: card.supertype,
         subtypes: card.subtypes,
         hp: card.hp,
         types: card.types,
@@ -697,6 +703,12 @@ export class PokemonAdapter implements TcgAdapter {
         }
         if (metadata.language) {
           dto.language = metadata.language;
+        }
+        if (metadata.formatLegality && !dto.formatLegality) {
+          dto.formatLegality = metadata.formatLegality;
+        }
+        if (metadata.dexEntries?.length && !dto.dexEntries?.length) {
+          dto.dexEntries = metadata.dexEntries;
         }
         if (metadata.tcgdexImage && !dto.imageUrl) {
           dto.imageUrl = metadata.tcgdexImage;
@@ -1004,7 +1016,14 @@ export class PokemonAdapter implements TcgAdapter {
       variants,
       category: detail.category,
       regulationMark: detail.regulationMark,
-      language: detail.language
+      language: detail.language,
+      formatLegality: detail.legal ? {
+        standard: detail.legal.standard ?? undefined,
+        expanded: detail.legal.expanded ?? undefined
+      } : undefined,
+      dexEntries: detail.dexId?.length
+        ? detail.dexId.map((num) => ({ number: num, name: card.name }))
+        : undefined
     };
     const finishes = this.buildFinishList(variants);
     if (finishes.length) {
