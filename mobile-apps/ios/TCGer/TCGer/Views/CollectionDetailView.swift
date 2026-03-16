@@ -27,6 +27,21 @@ struct CollectionDetailView: View {
     @State private var maxPriceFilter = ""
     @State private var searchText = ""
     @State private var showFilters = false
+    @State private var sortOption: CardSortOption = .name
+
+    enum CardSortOption: String, CaseIterable {
+        case name = "Name"
+        case number = "Card Number"
+        case rarity = "Rarity"
+
+        var systemImage: String {
+            switch self {
+            case .name: return "textformat.abc"
+            case .number: return "number"
+            case .rarity: return "sparkles"
+            }
+        }
+    }
 
     private let apiService = APIService()
     init(collection: Collection) {
@@ -50,7 +65,7 @@ struct CollectionDetailView: View {
     }
 
     private var filteredCards: [CollectionCard] {
-        cards.filter { card in
+        let filtered = cards.filter { card in
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let query = searchText.lowercased()
                 let matchesSearch =
@@ -88,6 +103,15 @@ struct CollectionDetailView: View {
             }
 
             return true
+        }
+
+        switch sortOption {
+        case .name:
+            return filtered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .number:
+            return filtered.sorted { CardNumberInfo.compare($0.collectorNumber, $1.collectorNumber) == .orderedAscending }
+        case .rarity:
+            return filtered.sorted { ($0.rarity ?? "").localizedCaseInsensitiveCompare($1.rarity ?? "") == .orderedAscending }
         }
     }
 
@@ -140,6 +164,29 @@ struct CollectionDetailView: View {
                 HStack(spacing: 10) {
                     tagFilterMenu
                     conditionFilterMenu
+                    // Sort picker
+                    Menu {
+                        ForEach(CardSortOption.allCases, id: \.self) { option in
+                            Button {
+                                sortOption = option
+                            } label: {
+                                Label(option.rawValue, systemImage: option.systemImage)
+                                if sortOption == option {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.arrow.down")
+                            Text(sortOption.rawValue)
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(8)
+                    }
                 }
 
                 HStack(spacing: 12) {

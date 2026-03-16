@@ -60,7 +60,7 @@ export function CollectionTable() {
   }));
   const [activeCollectionId, setActiveCollectionId] = useState<string>(collections.length ? ALL_COLLECTION_ID : '');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'rarity' | 'price'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'rarity' | 'price' | 'number'>('name');
   const [isFilterOpen, setFilterOpen] = useState(false);
   const [rarityFilter, setRarityFilter] = useState<string>('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
@@ -378,6 +378,7 @@ export function CollectionTable() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="number">Card number</SelectItem>
                 <SelectItem value="rarity">Rarity</SelectItem>
                 {showPricing && <SelectItem value="price">Estimated price</SelectItem>}
               </SelectContent>
@@ -1369,16 +1370,42 @@ function ActiveFilters({
   );
 }
 
-function compareCards(a: CollectionCard, b: CollectionCard, sortBy: 'name' | 'rarity' | 'price', showPricing: boolean) {
+function compareCards(a: CollectionCard, b: CollectionCard, sortBy: 'name' | 'rarity' | 'price' | 'number', showPricing: boolean) {
   if (sortBy === 'price' && showPricing) {
     const priceA = a.price ?? 0;
     const priceB = b.price ?? 0;
     return priceB - priceA;
   }
 
+  if (sortBy === 'number') {
+    return compareCollectorNumbers(a.collectorNumber, b.collectorNumber);
+  }
+
   const valueA = (a[sortBy] ?? '').toString().toLowerCase();
   const valueB = (b[sortBy] ?? '').toString().toLowerCase();
   return valueA.localeCompare(valueB);
+}
+
+function compareCollectorNumbers(a?: string, b?: string): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  const partsA = a.match(/^([A-Za-z]*)(\d+)(.*)$/);
+  const partsB = b.match(/^([A-Za-z]*)(\d+)(.*)$/);
+
+  if (!partsA && !partsB) return a.localeCompare(b);
+  if (!partsA) return 1;
+  if (!partsB) return -1;
+
+  const prefixCmp = (partsA[1] || '').localeCompare(partsB[1] || '');
+  if (prefixCmp !== 0) return prefixCmp;
+
+  const numA = parseInt(partsA[2], 10);
+  const numB = parseInt(partsB[2], 10);
+  if (numA !== numB) return numA - numB;
+
+  return (partsA[3] || '').localeCompare(partsB[3] || '');
 }
 
 function formatCsvValue(value: unknown): string {

@@ -432,6 +432,8 @@ export function CardPreview({ card }: CardPreviewProps) {
                           <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
                             {print.regulationMark ? <span>Reg {print.regulationMark}</span> : null}
                             {print.language ? <span className="uppercase">{print.language}</span> : null}
+                            {print.formatLegality?.standard ? <span className="text-green-600">Standard</span> : null}
+                            {print.formatLegality?.expanded ? <span className="text-blue-600">Expanded</span> : null}
                           </div>
                           {finishes.length ? (
                             <div className="mt-1 flex flex-wrap gap-1">
@@ -524,6 +526,30 @@ export function CardPreview({ card }: CardPreviewProps) {
               <Badge variant="outline" className="text-[10px] h-5">
                 {activeCard.rarity}
               </Badge>
+            </div>
+          )}
+          {activeCard.tcg === 'pokemon' && (
+            <div className="flex flex-wrap justify-center gap-1">
+              {activeCard.supertype && (
+                <Badge variant="secondary" className="text-[10px] h-5">
+                  {activeCard.supertype}
+                </Badge>
+              )}
+              {activeCard.formatLegality?.standard && (
+                <Badge variant="outline" className="text-[10px] h-5 border-green-500/50 text-green-600">
+                  Standard
+                </Badge>
+              )}
+              {activeCard.formatLegality?.expanded && (
+                <Badge variant="outline" className="text-[10px] h-5 border-blue-500/50 text-blue-600">
+                  Expanded
+                </Badge>
+              )}
+              {activeCard.dexEntries?.length ? (
+                <Badge variant="outline" className="text-[10px] h-5">
+                  #{activeCard.dexEntries[0].number}
+                </Badge>
+              ) : null}
             </div>
           )}
           {(activeCard.setName || activeCard.setCode) && (
