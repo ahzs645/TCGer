@@ -39,7 +39,7 @@ struct EditCollectionCardSheet: View {
     @State private var selectedPrint: Card?
 
     private let conditions = ["", "Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
-    private let languages = ["", "English", "Japanese", "German", "French", "Italian", "Spanish", "Portuguese", "Korean", "Chinese"]
+    private let languages = [""] + PokemonCardLanguage.allCases.map(\.rawValue)
 
     private var supportsPrintSelection: Bool {
         card.supportsPrintSelection

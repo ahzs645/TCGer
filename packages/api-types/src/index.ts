@@ -1,4 +1,5 @@
 export * from './cards';
+export * from './pokemon';
 export * from './auth';
 export * from './collections';
 export * from './users';

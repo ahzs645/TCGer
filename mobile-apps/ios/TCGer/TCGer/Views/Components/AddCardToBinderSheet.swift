@@ -23,7 +23,7 @@ struct AddCardToBinderSheet: View {
     private let apiService = APIService()
 
     private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
-    private let languages = ["English", "Japanese", "German", "French", "Italian", "Spanish", "Portuguese", "Korean", "Chinese"]
+    private let languages = PokemonCardLanguage.allCases.map(\.rawValue)
 
     var body: some View {
         NavigationView {

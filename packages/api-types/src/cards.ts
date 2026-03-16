@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pokemonFormatLegalitySchema, pokedexEntrySchema } from './pokemon';
 
 // ---------------------------------------------------------------------------
 // Core enums & primitives
@@ -29,7 +30,10 @@ export const pokemonPrintMetadataSchema = z.object({
   finishes: z.array(pokemonFinishTypeSchema).optional(),
   category: z.string().optional(),
   regulationMark: z.string().optional(),
-  language: z.string().optional()
+  language: z.string().optional(),
+  formatLegality: pokemonFormatLegalitySchema.optional(),
+  dexEntries: z.array(pokedexEntrySchema).optional(),
+  region: z.string().optional()
 });
 export type PokemonPrintMetadata = z.infer<typeof pokemonPrintMetadataSchema>;
 
@@ -83,6 +87,10 @@ export const cardSchema = z.object({
   setLogoUrl: z.string().optional(),
   regulationMark: z.string().optional(),
   language: z.string().optional(),
+  supertype: z.string().optional(),
+  formatLegality: pokemonFormatLegalitySchema.optional(),
+  dexEntries: z.array(pokedexEntrySchema).optional(),
+  region: z.string().optional(),
   pokemonPrint: pokemonPrintMetadataSchema.optional(),
   attributes: z.record(z.unknown()).optional()
 });
