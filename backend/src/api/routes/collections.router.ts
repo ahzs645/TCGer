@@ -5,7 +5,8 @@ import {
   addCardSchema,
   addLibraryCardSchema,
   updateCardSchema,
-  tagPayloadSchema
+  tagPayloadSchema,
+  exportFormatSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -20,9 +21,13 @@ import {
   removeCardFromBinder,
   updateCardInBinder,
   getUserTags,
-  createUserTag
+  createUserTag,
+  addImageToCollection,
+  removeImageFromCollection
 } from '../../modules/collections/collections.service';
+import { exportCollectionAsJson, exportCollectionAsCsv } from '../../modules/collections/export.service';
 import { asyncHandler } from '../../utils/async-handler';
+import { uploadImages, getImagePublicPath, deleteImageFile } from '../../utils/upload';
 
 export const collectionsRouter = Router();
 
@@ -34,6 +39,28 @@ collectionsRouter.get(
     const userId = (req as AuthRequest).user!.id;
     const binders = await getUserBinders(userId);
     res.json(binders);
+  })
+);
+
+// Export collection as JSON or CSV
+collectionsRouter.get(
+  '/export',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const format = exportFormatSchema.parse(req.query.format ?? 'json');
+
+    if (format === 'csv') {
+      const csv = await exportCollectionAsCsv(userId);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="collection-export.csv"');
+      res.send(csv);
+    } else {
+      const data = await exportCollectionAsJson(userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="collection-export.json"');
+      res.json(data);
+    }
   })
 );
 
@@ -201,6 +228,61 @@ collectionsRouter.patch(
     } catch (error) {
       if (error instanceof Error && error.message === 'Collection entry not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Collection entry not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Upload images to a collection card copy
+collectionsRouter.post(
+  '/:binderId/cards/:collectionId/images',
+  requireAuth,
+  uploadImages.array('images', 5),
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { collectionId } = req.params;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files?.length) {
+      return res.status(400).json({ error: 'BAD_REQUEST', message: 'No images provided' });
+    }
+
+    try {
+      let imageUrls: string[] = [];
+      for (const file of files) {
+        const publicPath = getImagePublicPath(file.filename);
+        imageUrls = await addImageToCollection(userId, collectionId, publicPath);
+      }
+      res.status(201).json({ imageUrls });
+    } catch (error) {
+      // Clean up uploaded files on error
+      for (const file of files) {
+        deleteImageFile(getImagePublicPath(file.filename));
+      }
+      if (error instanceof Error && error.message === 'Collection entry not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Collection entry not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Delete an image from a collection card copy
+collectionsRouter.delete(
+  '/:binderId/cards/:collectionId/images/:imageIndex',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { collectionId, imageIndex } = req.params;
+
+    try {
+      const removedUrl = await removeImageFromCollection(userId, collectionId, parseInt(imageIndex, 10));
+      deleteImageFile(removedUrl);
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && (error.message === 'Collection entry not found' || error.message === 'Image index out of range')) {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
       }
       throw error;
     }

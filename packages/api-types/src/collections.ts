@@ -57,6 +57,9 @@ export const addCardSchema = z.object({
   acquisitionPrice: z.number().optional(),
   serialNumber: z.string().optional(),
   acquiredAt: z.string().datetime().optional(),
+  isFoil: z.boolean().optional(),
+  isSigned: z.boolean().optional(),
+  isAltered: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
   newTags: z.array(tagPayloadSchema).optional(),
   cardData: cardDataPayloadSchema.optional()
@@ -80,6 +83,9 @@ export const updateCardSchema = z
     notes: z.string().nullable().optional(),
     serialNumber: z.string().nullable().optional(),
     acquiredAt: z.string().datetime().nullable().optional(),
+    isFoil: z.boolean().optional(),
+    isSigned: z.boolean().optional(),
+    isAltered: z.boolean().optional(),
     quantity: z.number().int().min(1).optional(),
     tags: z.array(z.string()).optional(),
     newTags: z.array(tagPayloadSchema).optional(),
@@ -95,6 +101,9 @@ export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 // ---------------------------------------------------------------------------
 // Tag request schemas
 // ---------------------------------------------------------------------------
+
+export const exportFormatSchema = z.enum(['json', 'csv']);
+export type ExportFormat = z.infer<typeof exportFormatSchema>;
 
 export const createTagSchema = tagPayloadSchema;
 export type CreateTagInput = z.infer<typeof createTagSchema>;
@@ -118,6 +127,10 @@ export interface CollectionCardCopy {
   acquisitionPrice?: number;
   serialNumber?: string;
   acquiredAt?: string;
+  isFoil?: boolean;
+  isSigned?: boolean;
+  isAltered?: boolean;
+  imageUrls?: string[];
   tags: CollectionTag[];
 }
 

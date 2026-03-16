@@ -120,6 +120,25 @@ export type CardPrintsResponse = z.infer<typeof cardPrintsResponseSchema>;
 // Request validation schemas (used by backend routes)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Set schemas
+// ---------------------------------------------------------------------------
+
+export const tcgSetSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  tcg: tcgCodeSchema,
+  releaseDate: z.string().optional(),
+  totalCards: z.number().optional(),
+  iconUrl: z.string().optional(),
+  logoUrl: z.string().optional()
+});
+export type TcgSet = z.infer<typeof tcgSetSchema>;
+
+// ---------------------------------------------------------------------------
+// Request validation schemas (used by backend routes)
+// ---------------------------------------------------------------------------
+
 export const searchQuerySchema = z.object({
   query: z.string().min(1, 'query parameter is required'),
   tcg: z.string().optional()

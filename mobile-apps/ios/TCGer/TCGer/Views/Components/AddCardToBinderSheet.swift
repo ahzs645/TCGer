@@ -5,7 +5,7 @@ struct AddCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: Card
-    let onAdd: (String, Int, String?, String?, String?) async -> Void
+    let onAdd: (String, Int, String?, String?, String?, Bool, Bool, Bool) async -> Void
 
     @State private var collections: [Collection] = []
     @State private var selectedBinderId: String?
@@ -13,6 +13,9 @@ struct AddCardToBinderSheet: View {
     @State private var condition: String = "Near Mint"
     @State private var language: String = "English"
     @State private var notes: String = ""
+    @State private var isFoil: Bool = false
+    @State private var isSigned: Bool = false
+    @State private var isAltered: Bool = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
@@ -127,6 +130,21 @@ struct AddCardToBinderSheet: View {
                     Text("Card Details")
                 }
 
+                // Attributes
+                Section {
+                    Toggle(isOn: $isFoil) {
+                        Label("Foil", systemImage: "sparkles")
+                    }
+                    Toggle(isOn: $isSigned) {
+                        Label("Signed", systemImage: "pencil.line")
+                    }
+                    Toggle(isOn: $isAltered) {
+                        Label("Altered Art", systemImage: "paintpalette")
+                    }
+                } header: {
+                    Text("Attributes")
+                }
+
                 // Notes
                 Section {
                     TextField("Notes (optional)", text: $notes, axis: .vertical)
@@ -215,7 +233,10 @@ struct AddCardToBinderSheet: View {
             quantity,
             condition,
             language,
-            notes.isEmpty ? nil : notes
+            notes.isEmpty ? nil : notes,
+            isFoil,
+            isSigned,
+            isAltered
         )
 
         isAdding = false
@@ -307,8 +328,8 @@ private struct CardPreviewRow: View {
                     collectorNumber: nil,
                     releasedAt: nil
                 ),
-                onAdd: { binderId, quantity, condition, language, notes in
-                    print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A")")
+                onAdd: { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
+                    print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered)")
                 }
             )
             .environmentObject(environmentStore)

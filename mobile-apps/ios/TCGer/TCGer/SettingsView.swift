@@ -19,6 +19,10 @@ struct SettingsView: View {
     @State private var isLoadingAppSettings = false
     @State private var isUpdatingAppSettings = false
     @State private var appSettingsError: String?
+    @State private var isExporting = false
+    @State private var showingExportSheet = false
+    @State private var exportData: Data?
+    @State private var exportFilename: String?
 
     var body: some View {
         NavigationView {
@@ -168,6 +172,20 @@ struct SettingsView: View {
                     .onChange(of: environmentStore.showPricing) {
                         Task { await updatePreferences(showPricing: environmentStore.showPricing) }
                     }
+
+                    Picker("Default Game", selection: Binding(
+                        get: { environmentStore.defaultGame ?? "" },
+                        set: { value in
+                            environmentStore.defaultGame = value.isEmpty ? nil : value
+                            Task { await updatePreferences(defaultGame: value.isEmpty ? nil : value) }
+                        }
+                    )) {
+                        Text("None").tag("")
+                        Text("Yu-Gi-Oh!").tag("yugioh")
+                        Text("Magic: The Gathering").tag("magic")
+                        Text("Pokémon").tag("pokemon")
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
                 } header: {
                     Text("Display Preferences")
                 }
@@ -332,6 +350,43 @@ struct SettingsView: View {
                     Text("Offline mode downloads your collections for viewing without internet. Clear cache to free up storage.")
                 }
 
+                // Export Section
+                if environmentStore.isAuthenticated {
+                    Section {
+                        Button(action: { Task { await exportCollection(format: "json") } }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundColor(.accentColor)
+                                Text("Export as JSON")
+                                Spacer()
+                                if isExporting {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                }
+                            }
+                        }
+                        .disabled(isExporting)
+
+                        Button(action: { Task { await exportCollection(format: "csv") } }) {
+                            HStack {
+                                Image(systemName: "tablecells")
+                                    .foregroundColor(.accentColor)
+                                Text("Export as CSV")
+                                Spacer()
+                                if isExporting {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                }
+                            }
+                        }
+                        .disabled(isExporting)
+                    } header: {
+                        Text("Export Collection")
+                    } footer: {
+                        Text("Download your entire collection as a file for backup or analysis")
+                    }
+                }
+
                 // Actions Section
                 Section {
                     Button("Sign Out", role: .destructive) {
@@ -383,6 +438,11 @@ struct SettingsView: View {
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
                     .environmentObject(environmentStore)
+            }
+            .sheet(isPresented: $showingExportSheet) {
+                if let data = exportData, let filename = exportFilename {
+                    ExportShareSheet(data: data, filename: filename)
+                }
             }
             .task(id: networkMonitor.isConnected) {
                 let isConnected = networkMonitor.isConnected
@@ -590,7 +650,8 @@ private extension SettingsView {
         showPricing: Bool? = nil,
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
-        enabledPokemon: Bool? = nil
+        enabledPokemon: Bool? = nil,
+        defaultGame: String?? = nil
     ) async {
         guard !isApplyingRemotePreferences,
               environmentStore.isAuthenticated,
@@ -601,6 +662,7 @@ private extension SettingsView {
         let api = APIService()
 
         do {
+            let resolvedDefaultGame: String? = if case .some(let value) = defaultGame { value } else { nil }
             let prefs = try await api.updateUserPreferences(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -608,7 +670,8 @@ private extension SettingsView {
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
-                enabledPokemon: enabledPokemon
+                enabledPokemon: enabledPokemon,
+                defaultGame: resolvedDefaultGame
             )
 
             await MainActor.run {
@@ -645,4 +708,53 @@ private extension SettingsView {
             serverStatus = reachable ? .online : .offline
         }
     }
+
+    func exportCollection(format: String) async {
+        guard environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        await MainActor.run {
+            isExporting = true
+        }
+
+        let api = APIService()
+
+        do {
+            let data = try await api.exportCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                format: format
+            )
+            let ext = format == "csv" ? "csv" : "json"
+            let filename = "collection-export.\(ext)"
+
+            await MainActor.run {
+                exportData = data
+                exportFilename = filename
+                isExporting = false
+                showingExportSheet = true
+            }
+        } catch {
+            await MainActor.run {
+                isExporting = false
+            }
+            print("Export failed: \(error)")
+        }
+    }
+}
+
+// MARK: - Export Share Sheet
+private struct ExportShareSheet: UIViewControllerRepresentable {
+    let data: Data
+    let filename: String
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? data.write(to: tempURL)
+        return UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -34,6 +34,12 @@ struct ContentView: View {
             }
 
             if environmentStore.isAuthenticated {
+                Tab("Sets", systemImage: "square.stack.3d.up") {
+                    SetBrowserView()
+                }
+            }
+
+            if environmentStore.isAuthenticated {
                 Tab("Scan", systemImage: "camera.viewfinder") {
                     CardScannerView()
                 }

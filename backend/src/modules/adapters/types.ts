@@ -1,6 +1,7 @@
 // Re-export shared API types (canonical source: @tcg/api-types)
 export type {
   TcgCode,
+  TcgSet,
   Card,
   PokemonPrintMetadata,
   PokemonVariantFlags,
@@ -18,7 +19,7 @@ export type { PokemonFunctionalAbility as PokemonFunctionalAbilityDTO } from '@t
 export type { PokemonFunctionalGroup as PokemonFunctionalGroupDTO } from '@tcg/api-types';
 export type { CardPrintsResponse as CardPrintsResult } from '@tcg/api-types';
 
-import type { TcgCode, Card, CardPrintsResponse } from '@tcg/api-types';
+import type { TcgCode, TcgSet, Card, CardPrintsResponse } from '@tcg/api-types';
 
 // Backend-only: adapter interface (not part of the API contract)
 export interface TcgAdapter {
@@ -26,4 +27,6 @@ export interface TcgAdapter {
   searchCards(query: string): Promise<Card[]>;
   fetchCardById(externalId: string): Promise<Card | null>;
   fetchCardPrints?(externalId: string): Promise<CardPrintsResponse>;
+  fetchSets?(): Promise<TcgSet[]>;
+  fetchSetCards?(setCode: string): Promise<Card[]>;
 }
