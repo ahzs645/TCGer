@@ -263,7 +263,20 @@ export function CollectionView() {
     });
   }, [workingCards, searchTerm, activeTags, activeConditions, priceRange]);
 
-  const sortedCards = useMemo(() => [...filteredCards].sort((a, b) => a.name.localeCompare(b.name)), [filteredCards]);
+  const sortedCards = useMemo(() => [...filteredCards].sort((a, b) => {
+    if (a.collectorNumber && b.collectorNumber) {
+      const partsA = a.collectorNumber.match(/^([A-Za-z]*)(\d+)(.*)$/);
+      const partsB = b.collectorNumber.match(/^([A-Za-z]*)(\d+)(.*)$/);
+      if (partsA && partsB) {
+        const prefixCmp = (partsA[1] || '').localeCompare(partsB[1] || '');
+        if (prefixCmp !== 0) return prefixCmp;
+        const numA = parseInt(partsA[2], 10);
+        const numB = parseInt(partsB[2], 10);
+        if (numA !== numB) return numA - numB;
+      }
+    }
+    return a.name.localeCompare(b.name);
+  }), [filteredCards]);
 
   useEffect(() => {
     if (!sortedCards.length) {
