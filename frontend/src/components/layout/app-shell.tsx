@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Heart, LayoutDashboard, Search, Table } from 'lucide-react';
+import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, Bell, Zap, Truck } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,12 @@ const navigation = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/cards', label: 'Card Search', icon: Search },
   { href: '/collections', label: 'Collections', icon: Table },
-  { href: '/wishlists', label: 'Wishlists', icon: Heart }
+  { href: '/wishlists', label: 'Wishlists', icon: Heart },
+  { href: '/decks', label: 'Decks', icon: Layers },
+  { href: '/prices', label: 'Prices', icon: DollarSign },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/trades', label: 'Trades', icon: Repeat2 },
+  { href: '/sealed', label: 'Sealed', icon: Package }
 ];
 
 interface AppShellProps {
