@@ -119,14 +119,17 @@ struct AddCardToBinderFromSearchView: View {
                 currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
                     await addCardToBinder(
                         cardId: card.id,
                         binderId: binderId,
                         quantity: quantity,
                         condition: condition,
                         language: language,
-                        notes: notes
+                        notes: notes,
+                        isFoil: isFoil,
+                        isSigned: isSigned,
+                        isAltered: isAltered
                     )
                 }
             }
@@ -207,7 +210,10 @@ struct AddCardToBinderFromSearchView: View {
         quantity: Int,
         condition: String?,
         language: String?,
-        notes: String?
+        notes: String?,
+        isFoil: Bool = false,
+        isSigned: Bool = false,
+        isAltered: Bool = false
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -228,6 +234,9 @@ struct AddCardToBinderFromSearchView: View {
                 notes: notes,
                 price: nil,
                 acquisitionPrice: nil,
+                isFoil: isFoil,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 card: card
             )
             dismiss()

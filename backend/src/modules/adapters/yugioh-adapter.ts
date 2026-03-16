@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import type { TcgSet } from '@tcg/api-types';
 import { CardDTO, TcgAdapter } from './types';
 
 const API_ROOT = env.YGO_API_BASE_URL.replace(/\/+$/, '');
@@ -100,6 +101,51 @@ export class YugiohAdapter implements TcgAdapter {
     } catch (error) {
       console.error('YugiohAdapter.fetchCardById error', error);
       return null;
+    }
+  }
+
+  async fetchSets(): Promise<TcgSet[]> {
+    try {
+      const response = await rateLimitedFetch(`${API_ROOT}/cardsets.php`);
+      if (!response.ok) {
+        throw new Error(`YGO sets fetch failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as Array<{
+        set_name: string;
+        set_code: string;
+        num_of_cards: number;
+        tcg_date?: string;
+      }>;
+
+      return (payload ?? []).map((s) => ({
+        code: s.set_code,
+        name: s.set_name,
+        tcg: this.game as const,
+        releaseDate: s.tcg_date,
+        totalCards: s.num_of_cards
+      })).sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
+    } catch (error) {
+      console.error('YugiohAdapter.fetchSets error', error);
+      return [];
+    }
+  }
+
+  async fetchSetCards(setCode: string): Promise<CardDTO[]> {
+    try {
+      const url = new URL(CARDINFO_URL);
+      url.searchParams.set('cardset', setCode);
+      url.searchParams.set('num', '250');
+      url.searchParams.set('offset', '0');
+
+      const response = await rateLimitedFetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`YGO set cards fetch failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as YgoApiResponse;
+      return (payload.data ?? []).map((card) => this.mapCard(card));
+    } catch (error) {
+      console.error('YugiohAdapter.fetchSetCards error', error);
+      return [];
     }
   }
 

@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import type { TcgSet } from '@tcg/api-types';
 import { CardDTO, CardPrintsResult, TcgAdapter } from './types';
 
 const API_ROOT = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
@@ -179,6 +180,66 @@ export class MagicAdapter implements TcgAdapter {
     } catch (error) {
       console.error('MagicAdapter.fetchCardPrints error', error);
       return { mode: 'simple', prints: [], total: 0 };
+    }
+  }
+
+  async fetchSets(): Promise<TcgSet[]> {
+    try {
+      const response = await rateLimitedFetch(`${API_ROOT}/sets`);
+      if (!response.ok) {
+        throw new Error(`Scryfall sets fetch failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as { data: Array<{
+        code: string;
+        name: string;
+        released_at?: string;
+        card_count?: number;
+        icon_svg_uri?: string;
+        set_type?: string;
+      }> };
+
+      return (payload.data ?? [])
+        .filter((s) => s.set_type === 'expansion' || s.set_type === 'core' || s.set_type === 'masters' || s.set_type === 'draft_innovation')
+        .map((s) => ({
+          code: s.code,
+          name: s.name,
+          tcg: this.game as const,
+          releaseDate: s.released_at,
+          totalCards: s.card_count,
+          iconUrl: s.icon_svg_uri,
+          logoUrl: s.icon_svg_uri
+        }))
+        .sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
+    } catch (error) {
+      console.error('MagicAdapter.fetchSets error', error);
+      return [];
+    }
+  }
+
+  async fetchSetCards(setCode: string): Promise<CardDTO[]> {
+    try {
+      const url = new URL(`${BASE_URL}/search`);
+      url.searchParams.set('q', `set:${setCode}`);
+      url.searchParams.set('order', 'set');
+      url.searchParams.set('unique', 'cards');
+
+      const allCards: ScryfallCard[] = [];
+      let nextPageUrl: string | undefined = url.toString();
+
+      while (nextPageUrl) {
+        const response = await rateLimitedFetch(nextPageUrl);
+        if (!response.ok) break;
+        const payload = (await response.json()) as ScryfallSearchResponse;
+        allCards.push(...(payload.data ?? []));
+        nextPageUrl = payload.has_more && payload.next_page ? payload.next_page : undefined;
+        // Limit to prevent excessive requests
+        if (allCards.length >= 500) break;
+      }
+
+      return allCards.map((card) => this.mapCard(card));
+    } catch (error) {
+      console.error('MagicAdapter.fetchSetCards error', error);
+      return [];
     }
   }
 

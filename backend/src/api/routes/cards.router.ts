@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { searchQuerySchema, cardParamsSchema } from '@tcg/api-types';
 
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
-import { getCardPrints, searchCards } from '../../modules/cards/cards.service';
+import { getCardPrints, searchCards, getSets, getSetCards } from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
 import { requireAuth } from '../middleware/auth';
 
@@ -14,6 +14,26 @@ cardsRouter.get(
   asyncHandler(async (req, res) => {
     const { query, tcg } = searchQuerySchema.parse(req.query);
     const cards = await searchCards({ query, tcg });
+    res.json({ cards, total: cards.length });
+  })
+);
+
+// Browse sets
+cardsRouter.get(
+  '/sets',
+  asyncHandler(async (req, res) => {
+    const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    const sets = await getSets(tcg);
+    res.json({ sets, total: sets.length });
+  })
+);
+
+// Get cards in a specific set
+cardsRouter.get(
+  '/sets/:tcg/:setCode',
+  asyncHandler(async (req, res) => {
+    const { tcg, setCode } = req.params;
+    const cards = await getSetCards(tcg, setCode);
     res.json({ cards, total: cards.length });
   })
 );

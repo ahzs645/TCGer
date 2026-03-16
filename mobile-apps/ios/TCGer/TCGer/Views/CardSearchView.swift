@@ -110,14 +110,17 @@ struct CardSearchView: View {
                 currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes in
+                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
                     await addCardToBinder(
                         cardId: card.id,
                         binderId: binderId,
                         quantity: quantity,
                         condition: condition,
                         language: language,
-                        notes: notes
+                        notes: notes,
+                        isFoil: isFoil,
+                        isSigned: isSigned,
+                        isAltered: isAltered
                     )
                 }
             }
@@ -134,6 +137,14 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
+            .onAppear {
+                if let defaultGame = environmentStore.defaultGame,
+                   let game = TCGGame(rawValue: defaultGame),
+                   environmentStore.isGameEnabled(game),
+                   !hasSearched {
+                    selectedGame = game
+                }
+            }
         }
     }
 
@@ -217,7 +228,10 @@ struct CardSearchView: View {
         quantity: Int,
         condition: String?,
         language: String?,
-        notes: String?
+        notes: String?,
+        isFoil: Bool = false,
+        isSigned: Bool = false,
+        isAltered: Bool = false
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -239,6 +253,9 @@ struct CardSearchView: View {
                 notes: notes,
                 price: nil,
                 acquisitionPrice: nil,
+                isFoil: isFoil,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 card: card
             )
             addCardSuccessMessage = "Card added to binder successfully!"

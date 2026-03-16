@@ -65,6 +65,72 @@ extension APIService {
 
         return printsResponse.prints
     }
+
+    // MARK: - Sets
+
+    struct SetsResponse: Decodable {
+        let sets: [TcgSet]
+        let total: Int
+    }
+
+    func getSets(
+        config: ServerConfiguration,
+        token: String,
+        tcg: String? = nil
+    ) async throws -> [TcgSet] {
+        if config.isDemoMode {
+            return []
+        }
+
+        var path = "cards/sets"
+        if let tcg {
+            path += "?tcg=\(tcg)"
+        }
+
+        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        guard let setsResponse = try? JSONDecoder().decode(SetsResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return setsResponse.sets
+    }
+
+    func getSetCards(
+        config: ServerConfiguration,
+        token: String,
+        tcg: String,
+        setCode: String
+    ) async throws -> [Card] {
+        if config.isDemoMode {
+            return []
+        }
+
+        let path = "cards/sets/\(tcg)/\(setCode)"
+
+        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        let decoder = JSONDecoder.tcgCardDecoder
+        guard let cardsResponse = try? decoder.decode(CardSearchResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return cardsResponse.cards
+    }
 }
 
 private extension JSONDecoder {

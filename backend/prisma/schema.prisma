@@ -18,6 +18,7 @@ model User {
   enabledYugioh   Boolean  @default(true)
   enabledMagic    Boolean  @default(true)
   enabledPokemon  Boolean  @default(true)
+  defaultGame     String?
   binders     Binder[]
   collections Collection[]
   tags        Tag[]
@@ -95,6 +96,10 @@ model Collection {
   notes            String?
   price            Decimal? @db.Decimal(10, 2)
   acquisitionPrice Decimal? @db.Decimal(10, 2)
+  isFoil           Boolean  @default(false)
+  isSigned         Boolean  @default(false)
+  isAltered        Boolean  @default(false)
+  imageUrls        String[] @default([])
   customAttributes Json?
   serialNumber     String?
   acquiredAt       DateTime?
