@@ -10,7 +10,8 @@ export const updatePreferencesSchema = z
     showPricing: z.boolean().optional(),
     enabledYugioh: z.boolean().optional(),
     enabledMagic: z.boolean().optional(),
-    enabledPokemon: z.boolean().optional()
+    enabledPokemon: z.boolean().optional(),
+    defaultGame: z.string().nullable().optional()
   })
   .refine(
     (data) => Object.values(data).some((v) => v !== undefined),
@@ -55,4 +56,5 @@ export interface UserPreferences {
   enabledYugioh: boolean;
   enabledMagic: boolean;
   enabledPokemon: boolean;
+  defaultGame: string | null;
 }

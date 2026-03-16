@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import type { TcgSet } from '@tcg/api-types';
 import type {
   CardDTO,
   CardPrintsResult,
@@ -369,6 +370,50 @@ export class PokemonAdapter implements TcgAdapter {
       total: prints.length,
       functionalGroup
     };
+  }
+
+  async fetchSets(): Promise<TcgSet[]> {
+    try {
+      const response = await rateLimitedFetch(`${API_ROOT}/sets`);
+      if (!response.ok) {
+        throw new Error(`Pokemon sets fetch failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as { data: Array<{
+        id: string;
+        name: string;
+        releaseDate?: string;
+        total?: number;
+        images?: { symbol?: string; logo?: string };
+      }> };
+
+      return (payload.data ?? []).map((s) => ({
+        code: s.id,
+        name: s.name,
+        tcg: this.game as const,
+        releaseDate: s.releaseDate,
+        totalCards: s.total,
+        iconUrl: s.images?.symbol,
+        logoUrl: s.images?.logo
+      })).sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
+    } catch (error) {
+      console.error('PokemonAdapter.fetchSets error', error);
+      return [];
+    }
+  }
+
+  async fetchSetCards(setCode: string): Promise<CardDTO[]> {
+    try {
+      const url = `${CARDS_ENDPOINT}?q=set.id:${setCode}&pageSize=250&orderBy=number`;
+      const response = await rateLimitedFetch(url);
+      if (!response.ok) {
+        throw new Error(`Pokemon set cards fetch failed: ${response.status}`);
+      }
+      const payload = (await response.json()) as PokemonSearchResponse;
+      return (payload.data ?? []).map((card) => this.mapCard(card));
+    } catch (error) {
+      console.error('PokemonAdapter.fetchSetCards error', error);
+      return [];
+    }
   }
 
   private mapTCGdexCard(card: TCGdexCardSummary): CardDTO {

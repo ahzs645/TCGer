@@ -149,6 +149,10 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     let acquisitionPrice: Double?
     let serialNumber: String?
     let acquiredAt: String?
+    let isFoil: Bool?
+    let isSigned: Bool?
+    let isAltered: Bool?
+    let imageUrls: [String]?
     let tags: [CollectionCardTag]
 }
 
@@ -179,6 +183,7 @@ struct User: Codable, Sendable {
     let enabledYugioh: Bool?
     let enabledMagic: Bool?
     let enabledPokemon: Bool?
+    let defaultGame: String?
 }
 
 struct AuthResponse: Codable, Sendable {
@@ -207,6 +212,28 @@ struct SetStats: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case setName, cardCount, tcg
+    }
+}
+
+// MARK: - TCG Set
+struct TcgSet: Identifiable, Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let tcg: String
+    let releaseDate: String?
+    let totalCards: Int?
+    let iconUrl: String?
+    let logoUrl: String?
+
+    var id: String { "\(tcg)-\(code)" }
+
+    var tcgDisplayName: String {
+        switch tcg.lowercased() {
+        case "yugioh": return "Yu-Gi-Oh!"
+        case "magic": return "Magic: The Gathering"
+        case "pokemon": return "Pokémon"
+        default: return tcg.capitalized
+        }
     }
 }
 

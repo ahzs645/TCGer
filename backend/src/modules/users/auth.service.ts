@@ -184,7 +184,8 @@ export async function getUserPreferences(userId: string) {
       showPricing: true,
       enabledYugioh: true,
       enabledMagic: true,
-      enabledPokemon: true
+      enabledPokemon: true,
+      defaultGame: true
     }
   });
 
@@ -204,7 +205,8 @@ export async function updateUserPreferences(userId: string, input: UpdatePrefere
       showPricing: true,
       enabledYugioh: true,
       enabledMagic: true,
-      enabledPokemon: true
+      enabledPokemon: true,
+      defaultGame: true
     }
   });
 
