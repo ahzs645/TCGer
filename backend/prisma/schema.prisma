@@ -213,6 +213,26 @@ model Wishlist {
   @@unique([userId, name])
 }
 
+model CardHash {
+  id         String   @id @default(uuid())
+  tcg        String                         // 'magic' | 'pokemon' | 'yugioh'
+  externalId String                         // Scryfall ID, YGO ID, etc.
+  name       String
+  setCode    String?
+  setName    String?
+  rarity     String?
+  imageUrl   String?
+  rHash      String                         // Red-channel pHash (hex)
+  gHash      String                         // Green-channel pHash (hex)
+  bHash      String                         // Blue-channel pHash (hex)
+  hashSize   Int      @default(16)          // pHash block size (16 → 256-bit)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tcg, externalId])
+  @@index([tcg])
+}
+
 model WishlistCard {
   id            String   @id @default(uuid())
   wishlistId    String

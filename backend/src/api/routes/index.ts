@@ -5,6 +5,7 @@ import { cardsRouter } from './cards.router';
 import { collectionsRouter } from './collections.router';
 import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
+import { scanRouter } from './scan.router';
 import { settingsRouter } from './settings.router';
 import { usersRouter } from './users.router';
 import { wishlistsRouter } from './wishlists.router';
@@ -15,6 +16,7 @@ export function registerRoutes(app: Express): void {
   app.use('/auth', authRouter);
   app.use('/settings', settingsRouter);
   app.use('/cards', cardsRouter);
+  app.use('/cards/scan', scanRouter);
   app.use('/collections', collectionsRouter);
   app.use('/users', usersRouter);
   app.use('/wishlists', wishlistsRouter);
