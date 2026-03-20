@@ -18,6 +18,19 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // GitHub Pages SPA redirect handler — restores the path saved by 404.html
+      (function() {
+        var redirect = sessionStorage.getItem('spa-redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa-redirect');
+          var target = redirect.startsWith('/') ? redirect : '/' + redirect;
+          if (target !== location.pathname) {
+            history.replaceState(null, '', target);
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
