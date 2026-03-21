@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, Bell, Zap, Truck } from 'lucide-react';
+import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, MoreHorizontal, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,9 @@ const navigation = [
   { href: '/trades', label: 'Trades', icon: Repeat2 },
   { href: '/sealed', label: 'Sealed', icon: Package }
 ];
+
+const mobileNavPrimary = navigation.slice(0, 4);
+const mobileNavSecondary = navigation.slice(4);
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -87,9 +90,22 @@ export function AppShell({ children }: AppShellProps) {
       </main>
 
       {/* Mobile bottom navigation */}
+      <MobileBottomNav pathname={pathname} />
+    </div>
+  );
+}
+
+function MobileBottomNav({ pathname }: { pathname: string }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const isSecondaryActive = mobileNavSecondary.some(
+    (item) => pathname === getAppRoute(item.href, pathname)
+  );
+
+  return (
+    <>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur md:hidden">
         <div className="flex h-14 items-center justify-around">
-          {navigation.map((item) => {
+          {mobileNavPrimary.map((item) => {
             const href = getAppRoute(item.href, pathname);
             const isActive = pathname === href;
             const Icon = item.icon;
@@ -107,9 +123,55 @@ export function AppShell({ children }: AppShellProps) {
               </Link>
             );
           })}
+          <button
+            onClick={() => setMoreOpen(!moreOpen)}
+            className={cn(
+              'flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors',
+              isSecondaryActive || moreOpen ? 'text-primary font-medium' : 'text-muted-foreground'
+            )}
+          >
+            <MoreHorizontal className={cn('h-5 w-5', (isSecondaryActive || moreOpen) && 'text-primary')} />
+            <span>More</span>
+          </button>
         </div>
       </nav>
-    </div>
+
+      {/* More menu overlay */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-background pb-16 pt-4">
+            <div className="flex items-center justify-between px-6 pb-3">
+              <span className="text-sm font-medium text-muted-foreground">More</span>
+              <button onClick={() => setMoreOpen(false)} className="text-muted-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 px-4">
+              {mobileNavSecondary.map((item) => {
+                const href = getAppRoute(item.href, pathname);
+                const isActive = pathname === href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={href}
+                    onClick={() => setMoreOpen(false)}
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs transition-colors',
+                      isActive ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'
+                    )}
+                  >
+                    <Icon className={cn('h-6 w-6', isActive && 'text-primary')} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
