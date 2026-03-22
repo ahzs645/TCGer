@@ -277,7 +277,8 @@ final class EnvironmentStore: ObservableObject {
             showPricing: profile.showPricing,
             enabledYugioh: nil,
             enabledMagic: nil,
-            enabledPokemon: nil
+            enabledPokemon: nil,
+            defaultGame: nil
         )
     }
 

@@ -138,7 +138,8 @@ final class DemoStore {
             showPricing: true,
             enabledYugioh: true,
             enabledMagic: true,
-            enabledPokemon: true
+            enabledPokemon: true,
+            defaultGame: nil
         )
         self.user = User(
             id: Constants.userId,
@@ -149,7 +150,8 @@ final class DemoStore {
             showPricing: true,
             enabledYugioh: true,
             enabledMagic: true,
-            enabledPokemon: true
+            enabledPokemon: true,
+            defaultGame: nil
         )
         self.appSettings = AppSettings(
             id: 0,
