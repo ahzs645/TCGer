@@ -199,7 +199,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     setIsLoadingPrints(true);
     setPrintError(null);
 
-    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id })
+    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id, token })
       .then((data) => {
         if (cancelled) return;
         setPrintData(data);

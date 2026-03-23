@@ -353,7 +353,7 @@ export function CollectionView() {
     setIsLoadingPrints(true);
     setPrintError(null);
     const targetExternalId = selectedCard.externalId ?? selectedCard.cardId;
-    fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: targetExternalId })
+    fetchCardPrintsApi({ tcg: selectedCard.tcg as TcgCode, cardId: targetExternalId, token })
       .then((data) => {
         if (cancelled) {
           return;

@@ -3,13 +3,15 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { searchCardsApi } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth';
 import type { TcgCode } from '@/types/card';
 
 export function useCardSearch(query: string, tcg?: TcgCode | 'all') {
+  const token = useAuthStore((state) => state.token);
   return useQuery({
     queryKey: ['cards', { query, tcg }],
-    queryFn: () => searchCardsApi({ query, tcg }),
-    enabled: query.trim().length > 0,
+    queryFn: () => searchCardsApi({ query, tcg, token }),
+    enabled: query.trim().length > 0 && !!token,
     staleTime: 1000 * 60 * 5
   });
 }
