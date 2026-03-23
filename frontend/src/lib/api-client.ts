@@ -10,13 +10,16 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'all' }): Promise<Card[]> {
-  const { query, tcg } = params;
+export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'all'; token?: string | null }): Promise<Card[]> {
+  const { query, tcg, token } = params;
   const usp = new URLSearchParams({ query });
   if (tcg && tcg !== 'all') {
     usp.set('tcg', tcg);
   }
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/cards/search?${usp.toString()}`, {
+    headers,
     next: { revalidate: 30 }
   });
 
@@ -24,9 +27,12 @@ export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'a
   return data.cards ?? [];
 }
 
-export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string }): Promise<CardPrintsResponse> {
-  const { tcg, cardId } = params;
+export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string; token?: string | null }): Promise<CardPrintsResponse> {
+  const { tcg, cardId, token } = params;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
+    headers,
     next: { revalidate: 30 }
   });
   return handleResponse<CardPrintsResponse>(res);
