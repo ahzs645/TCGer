@@ -387,7 +387,9 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                       : 'tcgdexApiBaseUrl';
                     const overrideUrl = appSettings?.[overrideKey as keyof AdminAppSettings] as string | null;
                     const activeUrl = overrideUrl || source.url;
-                    const authInfo = SOURCE_AUTH_INFO[key];
+                    const local = isLocalCache(activeUrl);
+                    const note = local ? SOURCE_NOTES[key].local : SOURCE_NOTES[key].remote;
+                    const authType = local && key === 'pokemon' ? 'none' as const : SOURCE_AUTH[key];
 
                     return (
                       <DataSourceCard
@@ -400,8 +402,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                         testResult={result}
                         onTest={() => handleTestSource(key)}
                         onOverride={(url) => handleSettingChange(overrideKey, url || null)}
-                        authType={authInfo.authType}
-                        note={authInfo.note}
+                        authType={authType}
+                        note={note}
                         scrydexApiKey={key === 'pokemon' ? appSettings?.scrydexApiKey : undefined}
                         scrydexTeamId={key === 'pokemon' ? appSettings?.scrydexTeamId : undefined}
                         onScrydexKeyChange={key === 'pokemon' ? (v) => handleSettingChange('scrydexApiKey', v || null) : undefined}
@@ -428,11 +430,22 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   );
 }
 
-const SOURCE_AUTH_INFO: Record<SourceKey, { authType: 'none' | 'api-key'; note: string }> = {
-  scryfall: { authType: 'none', note: 'Free, no key needed. Rate limit: ~10 req/s.' },
-  yugioh: { authType: 'none', note: 'Free, no key needed. Rate limit: 20 req/s.' },
-  pokemon: { authType: 'api-key', note: 'Requires Scrydex API key and team ID.' },
-  tcgdex: { authType: 'none', note: 'Free, no key needed. Used for variant enrichment.' },
+function isLocalCache(url: string) {
+  return /localhost|:\d{4}|-bulk|-cache/i.test(url);
+}
+
+const SOURCE_NOTES: Record<SourceKey, { remote: string; local: string }> = {
+  scryfall: { remote: 'Free, no key needed. Rate limit: ~10 req/s.', local: 'Local Scryfall bulk cache. No rate limits.' },
+  yugioh: { remote: 'Free, no key needed. Rate limit: 20 req/s.', local: 'Local YGO cache. No rate limits.' },
+  pokemon: { remote: 'Requires Scrydex API key and team ID.', local: 'Local Pokémon cache. Requires bulk profile running.' },
+  tcgdex: { remote: 'Free, no key needed. Used for variant enrichment.', local: 'Local TCGdex cache. Used for variant enrichment.' },
+};
+
+const SOURCE_AUTH: Record<SourceKey, 'none' | 'api-key'> = {
+  scryfall: 'none',
+  yugioh: 'none',
+  pokemon: 'api-key',
+  tcgdex: 'none',
 };
 
 interface PreferenceCardProps {

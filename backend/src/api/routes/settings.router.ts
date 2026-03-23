@@ -124,7 +124,12 @@ settingsRouter.post(
       }
     } catch (err: unknown) {
       const latencyMs = Date.now() - start;
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      const raw = err instanceof Error ? err.message : 'Unknown error';
+      const message = raw === 'fetch failed' || raw.includes('ENOTFOUND') || raw.includes('ECONNREFUSED')
+        ? `Service unreachable (${new URL(url).hostname})`
+        : raw.includes('abort')
+          ? 'Timeout (5s)'
+          : raw;
       res.json({ ok: false, latencyMs, error: message });
     } finally {
       clearTimeout(timeout);
