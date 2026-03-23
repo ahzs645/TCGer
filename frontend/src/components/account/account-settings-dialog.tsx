@@ -507,7 +507,11 @@ function DataSourceCard({
             </div>
             <p className="text-xs font-mono text-muted-foreground truncate max-w-[300px]">
               {activeUrl}
-              {overrideUrl && <span className="ml-1 text-yellow-600 dark:text-yellow-400">(override)</span>}
+              {overrideUrl ? (
+                <span className="ml-1 text-yellow-600 dark:text-yellow-400">(override)</span>
+              ) : /localhost|:\d{4}|-bulk|-cache/i.test(activeUrl) ? (
+                <span className="ml-1 text-blue-600 dark:text-blue-400">(local cache)</span>
+              ) : null}
             </p>
             <p className="text-[11px] text-muted-foreground/70 mt-0.5">{note}</p>
           </div>

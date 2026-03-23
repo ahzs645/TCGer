@@ -77,30 +77,36 @@ settingsRouter.post(
     const settings = await getAppSettings();
     const s = settings as Record<string, unknown>;
 
+    const baseUrls: Record<string, string> = {
+      scryfall: (s.scryfallApiBaseUrl as string) || env.SCRYFALL_API_BASE_URL,
+      yugioh: (s.ygoApiBaseUrl as string) || env.YGO_API_BASE_URL,
+      pokemon: (s.scrydexApiBaseUrl as string) || env.POKEMON_API_BASE_URL,
+      tcgdex: (s.tcgdexApiBaseUrl as string) || env.TCGDEX_API_BASE_URL,
+    };
+
+    const base = baseUrls[source].replace(/\/+$/, '');
+    const isLocal = /localhost|:\d{4}|scryfall-bulk|ygo-cache|tcgdex-cache|pokemon-cache/i.test(base);
+
+    // Local cache services all expose GET /health; public APIs need a real query
     let url: string;
-    switch (source) {
-      case 'scryfall': {
-        const base = (s.scryfallApiBaseUrl as string) || env.SCRYFALL_API_BASE_URL;
-        url = `${base}/cards/named?exact=Lightning+Bolt`;
-        break;
-      }
-      case 'yugioh': {
-        const base = (s.ygoApiBaseUrl as string) || env.YGO_API_BASE_URL;
-        url = `${base}/cardinfo.php?name=Dark+Magician`;
-        break;
-      }
-      case 'pokemon': {
-        const base = (s.scrydexApiBaseUrl as string) || env.POKEMON_API_BASE_URL;
-        const isScrydex = base.includes('scrydex');
-        url = isScrydex
-          ? `${base}/pokemon/v1/cards?q=name:pikachu&pageSize=1`
-          : `${base}/cards?q=name:pikachu&pageSize=1`;
-        break;
-      }
-      case 'tcgdex': {
-        const base = (s.tcgdexApiBaseUrl as string) || env.TCGDEX_API_BASE_URL;
-        url = `${base}/cards/swsh1-1`;
-        break;
+    if (isLocal) {
+      url = `${base}/health`;
+    } else {
+      switch (source) {
+        case 'scryfall':
+          url = `${base}/cards/named?exact=Lightning+Bolt`;
+          break;
+        case 'yugioh':
+          url = `${base}/cardinfo.php?fname=Dark+Magician&num=1`;
+          break;
+        case 'pokemon':
+          url = base.includes('scrydex')
+            ? `${base}/pokemon/v1/cards?q=name:pikachu&pageSize=1`
+            : `${base}/cards?q=name:pikachu&pageSize=1`;
+          break;
+        case 'tcgdex':
+          url = `${base}/cards?q=pikachu&pageSize=1`;
+          break;
       }
     }
 
