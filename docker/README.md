@@ -12,7 +12,7 @@ docker compose -f docker-compose.yml --env-file ../.env.docker up --build
 
 # In a separate terminal, run the frontend on your host
 cd ../frontend
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api npm run dev
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 npm run dev
 ```
 
 This starts:
@@ -20,7 +20,7 @@ This starts:
 - `redis` (7-alpine)
 - `backend` running `npm run dev` with hot reload (code mounted from your host), exposed on `localhost:3001`
 
-The frontend runs natively on your machine with full Next.js hot reload speed. It connects to the backend at `http://localhost:3001`.
+The frontend runs natively on your machine with full Next.js hot reload speed. It connects to the backend directly at `http://localhost:3001` (no `/api` prefix — that's only used with the nginx gateway).
 
 ## Development — Full Docker Stack
 

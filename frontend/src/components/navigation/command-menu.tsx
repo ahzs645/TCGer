@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Calculator, Heart, LayoutDashboard, Search, Table } from 'lucide-react';
+import { secondaryNavigation } from '@/components/layout/app-shell';
 
 import {
   CommandDialog,
@@ -86,6 +87,15 @@ export function CommandMenu() {
               Wishlists
               <CommandShortcut>G W</CommandShortcut>
             </CommandItem>
+            {secondaryNavigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <CommandItem key={item.href} onSelect={() => handleNavigate(item.href)}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {item.label}
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Switch TCG">
