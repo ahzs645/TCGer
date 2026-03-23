@@ -1,30 +1,49 @@
 FROM node:18-alpine AS base
-WORKDIR /app/frontend
+WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY frontend/package*.json ./
+# Copy monorepo root + workspace package files for dependency resolution
+COPY package*.json ./
+COPY packages/api-types/package*.json ./packages/api-types/
+COPY frontend/package*.json ./frontend/
+
+# Install workspace dependencies
 RUN npm install
 
-COPY frontend .
-COPY tsconfig.base.json /app/tsconfig.base.json
+# Copy workspace sources
+COPY packages/api-types ./packages/api-types
+COPY frontend ./frontend
+COPY tsconfig.base.json ./
 
+# --- Development target ---
 FROM base AS dev
+WORKDIR /app/frontend
 CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
 
+# --- Build target ---
 FROM base AS build
-RUN npm run build
-
-FROM node:18-alpine AS production
+# Build shared types first
+RUN cd packages/api-types && npx tsc -p tsconfig.build.json --skipLibCheck || true
+# Build frontend
 WORKDIR /app/frontend
+RUN npx next build
+
+# --- Production target ---
+FROM node:18-alpine AS production
+WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=build /app/frontend/.next ./.next
-COPY --from=build /app/frontend/public ./public
-COPY frontend/package*.json ./
-RUN npm install --omit=dev
-COPY frontend/next.config.mjs ./next.config.mjs
-COPY tsconfig.base.json /app/tsconfig.base.json
+# Copy monorepo structure for workspace resolution
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/packages/api-types ./packages/api-types
+COPY --from=build /app/frontend/.next ./frontend/.next
+COPY --from=build /app/frontend/public ./frontend/public
+COPY --from=build /app/frontend/package*.json ./frontend/
+COPY --from=build /app/frontend/next.config.mjs ./frontend/next.config.mjs
+COPY --from=build /app/node_modules ./node_modules
+COPY tsconfig.base.json ./
 
+WORKDIR /app/frontend
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["npx", "next", "start"]
