@@ -48,4 +48,4 @@ COPY docs ./docs
 
 WORKDIR /app/backend
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy 2>/dev/null; node dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
