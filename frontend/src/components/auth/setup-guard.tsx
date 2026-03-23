@@ -22,6 +22,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [shouldBlock, setShouldBlock] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);
 
@@ -53,9 +54,12 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
     // checkAccess that started before login completing after the post-login one).
     let stale = false;
 
-    // Show spinner while re-checking so users see a brief loading state
-    // instead of a flash of the stale "Authentication Required" screen.
-    setLoading(true);
+    // Only show the full-screen spinner on the very first check.
+    // Subsequent navigations keep the current page visible while re-checking
+    // in the background, preventing the white flash between pages.
+    if (!initialCheckDone) {
+      setLoading(true);
+    }
 
     const checkAccess = async () => {
       try {
@@ -129,7 +133,10 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
         setShouldBlock(false);
         setNeedsAuth(false);
       } finally {
-        if (!stale) setLoading(false);
+        if (!stale) {
+          setLoading(false);
+          setInitialCheckDone(true);
+        }
       }
     };
 
