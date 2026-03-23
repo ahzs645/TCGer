@@ -77,7 +77,7 @@ export function SetupWizard() {
             alt="TCGer logo"
             width={64}
             height={64}
-            className="dark:invert"
+            className="w-auto dark:invert"
           />
           <h1 className="text-2xl font-bold">Welcome to TCGer</h1>
           <p className="text-center text-sm text-muted-foreground">
