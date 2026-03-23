@@ -45,6 +45,11 @@ model AppSettings {
   publicCollections     Boolean  @default(false)
   requireAuth           Boolean  @default(true)
   appName               String   @default("TCG Manager")
+  pokemonTcgApiKey      String?
+  scryfallApiBaseUrl    String?
+  ygoApiBaseUrl         String?
+  pokemonApiBaseUrl     String?
+  tcgdexApiBaseUrl      String?
   updatedAt             DateTime @updatedAt
 }
 

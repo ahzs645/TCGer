@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Bell, Globe, Moon, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Bell, Globe, Key, Moon, ShieldCheck, User as UserIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { getSettings, updateSettings, type AppSettings } from '@/lib/api/settings';
+import { getAdminSettings, updateSettings, type AdminAppSettings } from '@/lib/api/settings';
 import { getUserPreferences, updateUserPreferences } from '@/lib/api/user-preferences';
 import { GAME_LABELS } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
@@ -45,7 +46,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const updateStoredPreferences = useAuthStore((state) => state.updateStoredPreferences);
-  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [appSettings, setAppSettings] = useState<AdminAppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [updatingPreference, setUpdatingPreference] = useState<'showCardNumbers' | 'showPricing' | null>(null);
@@ -55,9 +56,9 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const isAdmin = user?.isAdmin ?? false;
 
   useEffect(() => {
-    if (open && isAdmin) {
+    if (open && isAdmin && token) {
       setLoadingSettings(true);
-      getSettings()
+      getAdminSettings(token)
         .then(setAppSettings)
         .catch((error) => console.error('Failed to load settings:', error))
         .finally(() => setLoadingSettings(false));
@@ -78,14 +79,14 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
       .finally(() => setLoadingPreferences(false));
   }, [open, token, updateStoredPreferences]);
 
-  const handleSettingChange = async (key: keyof AppSettings, value: boolean) => {
+  const handleSettingChange = async (key: string, value: boolean | string | null) => {
     if (!token || !appSettings) return;
 
     const updatedSettings = { ...appSettings, [key]: value };
     setAppSettings(updatedSettings);
 
     try {
-      await updateSettings({ [key]: value }, token);
+      await updateSettings({ [key]: value } as never, token);
     } catch (error) {
       console.error('Failed to update settings:', error);
       setAppSettings(appSettings);
@@ -331,6 +332,60 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                 </>
               ) : null}
             </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <Key className="h-4 w-4" />
+                  API Configuration
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure external API keys and service URLs. Leave blank to use environment defaults.
+                </p>
+              </div>
+
+              {loadingSettings ? (
+                <div className="flex justify-center p-4">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : appSettings ? (
+                <div className="space-y-3">
+                  <ApiKeyField
+                    label="Pokémon TCG API Key"
+                    description="Required for Pokémon card data from pokemontcg.io"
+                    value={appSettings.pokemonTcgApiKey}
+                    onSave={(v) => handleSettingChange('pokemonTcgApiKey', v || null)}
+                    isSecret
+                  />
+                  <ApiKeyField
+                    label="Scryfall API Base URL"
+                    description="Override for local Scryfall bulk cache (e.g. http://scryfall-bulk:4010)"
+                    value={appSettings.scryfallApiBaseUrl}
+                    onSave={(v) => handleSettingChange('scryfallApiBaseUrl', v || null)}
+                  />
+                  <ApiKeyField
+                    label="Yu-Gi-Oh API Base URL"
+                    description="Override for local YGO cache (e.g. http://ygo-cache:4020)"
+                    value={appSettings.ygoApiBaseUrl}
+                    onSave={(v) => handleSettingChange('ygoApiBaseUrl', v || null)}
+                  />
+                  <ApiKeyField
+                    label="Pokémon API Base URL"
+                    description="Override for Pokémon card search (e.g. http://tcgdex-cache:4040)"
+                    value={appSettings.pokemonApiBaseUrl}
+                    onSave={(v) => handleSettingChange('pokemonApiBaseUrl', v || null)}
+                  />
+                  <ApiKeyField
+                    label="TCGdex API Base URL"
+                    description="Override for TCGdex variant enrichment"
+                    value={appSettings.tcgdexApiBaseUrl}
+                    onSave={(v) => handleSettingChange('tcgdexApiBaseUrl', v || null)}
+                  />
+                </div>
+              ) : null}
+            </section>
           </>
         )}
 
@@ -352,6 +407,61 @@ interface PreferenceCardProps {
   description: string;
   icon: React.ReactNode;
   action: React.ReactNode;
+}
+
+function ApiKeyField({ label, description, value, onSave, isSecret }: {
+  label: string;
+  description: string;
+  value: string | null;
+  onSave: (value: string) => void;
+  isSecret?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+
+  const handleSave = () => {
+    onSave(draft);
+    setEditing(false);
+  };
+
+  const displayValue = value
+    ? isSecret
+      ? `${'•'.repeat(Math.min(value.length, 20))}${value.slice(-4)}`
+      : value
+    : '';
+
+  return (
+    <div className="rounded-lg border bg-background p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        {!editing && (
+          <Button size="sm" variant="outline" onClick={() => { setDraft(value ?? ''); setEditing(true); }}>
+            {value ? 'Edit' : 'Set'}
+          </Button>
+        )}
+      </div>
+      {!editing && value && (
+        <p className="text-xs font-mono text-muted-foreground">{displayValue}</p>
+      )}
+      {editing && (
+        <div className="flex items-center gap-2">
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={isSecret ? 'Enter API key…' : 'Enter URL…'}
+            className="text-sm font-mono"
+            type={isSecret ? 'password' : 'text'}
+            autoComplete="off"
+          />
+          <Button size="sm" onClick={handleSave}>Save</Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PreferenceCard({ title, description, icon, action }: PreferenceCardProps) {

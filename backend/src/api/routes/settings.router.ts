@@ -1,17 +1,24 @@
 import { Router } from 'express';
 import { updateSettingsSchema } from '@tcg/api-types';
 
-import { getAppSettings, updateAppSettings } from '../../modules/settings/settings.service';
-import { requireAuth, type AuthRequest } from '../middleware/auth';
+import { getAppSettings, updateAppSettings, stripApiKeys } from '../../modules/settings/settings.service';
+import { requireAuth, optionalAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
 
 export const settingsRouter = Router();
 
 settingsRouter.get(
   '/',
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const settings = await getAppSettings();
-    res.json(settings);
+    const user = (req as AuthRequest).user;
+    // Only admins see API key fields
+    if (user?.isAdmin) {
+      res.json(settings);
+    } else {
+      res.json(stripApiKeys(settings as unknown as Record<string, unknown>));
+    }
   })
 );
 

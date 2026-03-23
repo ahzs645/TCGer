@@ -19,11 +19,22 @@ export async function getAppSettings() {
   return settings;
 }
 
+/** Strip sensitive fields for non-admin responses */
+export function stripApiKeys(settings: Record<string, unknown>) {
+  const { pokemonTcgApiKey, scryfallApiBaseUrl, ygoApiBaseUrl, pokemonApiBaseUrl, tcgdexApiBaseUrl, ...public_ } = settings as Record<string, unknown>;
+  return public_;
+}
+
 export async function updateAppSettings(data: {
   publicDashboard?: boolean;
   publicCollections?: boolean;
   requireAuth?: boolean;
   appName?: string;
+  pokemonTcgApiKey?: string | null;
+  scryfallApiBaseUrl?: string | null;
+  ygoApiBaseUrl?: string | null;
+  pokemonApiBaseUrl?: string | null;
+  tcgdexApiBaseUrl?: string | null;
 }) {
   return prisma.appSettings.upsert({
     where: { id: 1 },
