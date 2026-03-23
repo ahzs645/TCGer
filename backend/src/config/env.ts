@@ -9,10 +9,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   REDIS_URL: z.string().optional(),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters long'),
-  POKEMON_TCG_API_KEY: z.string().optional(),
+  SCRYDEX_API_KEY: z.string().optional(),
+  SCRYDEX_TEAM_ID: z.string().optional(),
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
   YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7'),
-  POKEMON_API_BASE_URL: z.string().url().default('https://api.pokemontcg.io/v2'),
+  POKEMON_API_BASE_URL: z.string().url().default('https://api.scrydex.com'),
   TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en')
 });
 

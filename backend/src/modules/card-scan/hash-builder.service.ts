@@ -252,8 +252,11 @@ async function fetchPokemonCards(
   let hasMore = true;
 
   const headers: Record<string, string> = {};
-  if (env.POKEMON_TCG_API_KEY) {
-    headers['X-Api-Key'] = env.POKEMON_TCG_API_KEY;
+  if (env.SCRYDEX_API_KEY) {
+    headers['X-Api-Key'] = env.SCRYDEX_API_KEY;
+  }
+  if (env.SCRYDEX_TEAM_ID) {
+    headers['X-Team-ID'] = env.SCRYDEX_TEAM_ID;
   }
 
   while (hasMore && (!limit || cards.length < limit)) {

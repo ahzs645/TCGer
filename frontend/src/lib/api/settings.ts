@@ -48,3 +48,44 @@ export async function updateSettings(
 
   return response.json();
 }
+
+export type SourceKey = 'scryfall' | 'yugioh' | 'pokemon' | 'tcgdex';
+
+export interface SourceDefaults {
+  [key: string]: { url: string; label: string };
+}
+
+export interface TestSourceResult {
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+}
+
+export async function getSourceDefaults(token: string): Promise<SourceDefaults> {
+  const response = await fetch(`${API_BASE_URL}/settings/source-defaults`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch source defaults');
+  }
+
+  return response.json();
+}
+
+export async function testSource(source: SourceKey, token: string): Promise<TestSourceResult> {
+  const response = await fetch(`${API_BASE_URL}/settings/test-source`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ source })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to test source');
+  }
+
+  return response.json();
+}

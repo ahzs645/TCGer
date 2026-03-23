@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Bell, Globe, Key, Moon, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Activity, Bell, CheckCircle2, Globe, Key, Loader2, Moon, Settings2, ShieldCheck, User as UserIcon, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { getAdminSettings, updateSettings, type AdminAppSettings } from '@/lib/api/settings';
+import { getAdminSettings, getSourceDefaults, testSource, updateSettings, type AdminAppSettings, type SourceDefaults, type SourceKey, type TestSourceResult } from '@/lib/api/settings';
 import { getUserPreferences, updateUserPreferences } from '@/lib/api/user-preferences';
 import { GAME_LABELS } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
@@ -49,6 +49,8 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   const [appSettings, setAppSettings] = useState<AdminAppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
+  const [sourceDefaults, setSourceDefaults] = useState<SourceDefaults | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, TestSourceResult | 'loading'>>({});
   const [updatingPreference, setUpdatingPreference] = useState<'showCardNumbers' | 'showPricing' | null>(null);
   const [updatingGame, setUpdatingGame] = useState<ManageableGame | null>(null);
 
@@ -58,8 +60,10 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   useEffect(() => {
     if (open && isAdmin && token) {
       setLoadingSettings(true);
-      getAdminSettings(token)
-        .then(setAppSettings)
+      Promise.all([
+        getAdminSettings(token).then(setAppSettings),
+        getSourceDefaults(token).then(setSourceDefaults)
+      ])
         .catch((error) => console.error('Failed to load settings:', error))
         .finally(() => setLoadingSettings(false));
     }
@@ -91,6 +95,24 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
       console.error('Failed to update settings:', error);
       setAppSettings(appSettings);
     }
+  };
+
+  const handleTestSource = async (source: SourceKey) => {
+    if (!token) return;
+    setTestResults((prev) => ({ ...prev, [source]: 'loading' }));
+    try {
+      const result = await testSource(source, token);
+      setTestResults((prev) => ({ ...prev, [source]: result }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [source]: { ok: false, latencyMs: 0, error: 'Request failed' } }));
+    }
+  };
+
+  const handleTestAll = async () => {
+    if (!token) return;
+    const sources: SourceKey[] = ['scryfall', 'yugioh', 'pokemon', 'tcgdex'];
+    sources.forEach((s) => setTestResults((prev) => ({ ...prev, [s]: 'loading' })));
+    await Promise.allSettled(sources.map((s) => handleTestSource(s)));
   };
 
   const handlePreferenceToggle = async (preference: 'showCardNumbers' | 'showPricing', value: boolean) => {
@@ -336,53 +358,57 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
             <Separator />
 
             <section className="space-y-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-sm font-semibold">
-                  <Key className="h-4 w-4" />
-                  API Configuration
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Configure external API keys and service URLs. Leave blank to use environment defaults.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    <Activity className="h-4 w-4" />
+                    Data Sources
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    External APIs that power card search and pricing. Test connectivity or override URLs.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={handleTestAll} disabled={loadingSettings}>
+                  Test All
+                </Button>
               </div>
 
               {loadingSettings ? (
                 <div className="flex justify-center p-4">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
-              ) : appSettings ? (
+              ) : sourceDefaults ? (
                 <div className="space-y-3">
-                  <ApiKeyField
-                    label="Pokémon TCG API Key"
-                    description="Required for Pokémon card data from pokemontcg.io"
-                    value={appSettings.pokemonTcgApiKey}
-                    onSave={(v) => handleSettingChange('pokemonTcgApiKey', v || null)}
-                    isSecret
-                  />
-                  <ApiKeyField
-                    label="Scryfall API Base URL"
-                    description="Override for local Scryfall bulk cache (e.g. http://scryfall-bulk:4010)"
-                    value={appSettings.scryfallApiBaseUrl}
-                    onSave={(v) => handleSettingChange('scryfallApiBaseUrl', v || null)}
-                  />
-                  <ApiKeyField
-                    label="Yu-Gi-Oh API Base URL"
-                    description="Override for local YGO cache (e.g. http://ygo-cache:4020)"
-                    value={appSettings.ygoApiBaseUrl}
-                    onSave={(v) => handleSettingChange('ygoApiBaseUrl', v || null)}
-                  />
-                  <ApiKeyField
-                    label="Pokémon API Base URL"
-                    description="Override for Pokémon card search (e.g. http://tcgdex-cache:4040)"
-                    value={appSettings.pokemonApiBaseUrl}
-                    onSave={(v) => handleSettingChange('pokemonApiBaseUrl', v || null)}
-                  />
-                  <ApiKeyField
-                    label="TCGdex API Base URL"
-                    description="Override for TCGdex variant enrichment"
-                    value={appSettings.tcgdexApiBaseUrl}
-                    onSave={(v) => handleSettingChange('tcgdexApiBaseUrl', v || null)}
-                  />
+                  {(Object.entries(sourceDefaults) as Array<[SourceKey, { url: string; label: string }]>).map(([key, source]) => {
+                    const result = testResults[key];
+                    const overrideKey = key === 'scryfall' ? 'scryfallApiBaseUrl'
+                      : key === 'yugioh' ? 'ygoApiBaseUrl'
+                      : key === 'pokemon' ? 'scrydexApiBaseUrl'
+                      : 'tcgdexApiBaseUrl';
+                    const overrideUrl = appSettings?.[overrideKey as keyof AdminAppSettings] as string | null;
+                    const activeUrl = overrideUrl || source.url;
+                    const authInfo = SOURCE_AUTH_INFO[key];
+
+                    return (
+                      <DataSourceCard
+                        key={key}
+                        sourceKey={key}
+                        label={source.label}
+                        defaultUrl={source.url}
+                        activeUrl={activeUrl}
+                        overrideUrl={overrideUrl}
+                        testResult={result}
+                        onTest={() => handleTestSource(key)}
+                        onOverride={(url) => handleSettingChange(overrideKey, url || null)}
+                        authType={authInfo.authType}
+                        note={authInfo.note}
+                        scrydexApiKey={key === 'pokemon' ? appSettings?.scrydexApiKey : undefined}
+                        scrydexTeamId={key === 'pokemon' ? appSettings?.scrydexTeamId : undefined}
+                        onScrydexKeyChange={key === 'pokemon' ? (v) => handleSettingChange('scrydexApiKey', v || null) : undefined}
+                        onScrydexTeamIdChange={key === 'pokemon' ? (v) => handleSettingChange('scrydexTeamId', v || null) : undefined}
+                      />
+                    );
+                  })}
                 </div>
               ) : null}
             </section>
@@ -402,6 +428,13 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
   );
 }
 
+const SOURCE_AUTH_INFO: Record<SourceKey, { authType: 'none' | 'api-key'; note: string }> = {
+  scryfall: { authType: 'none', note: 'Free, no key needed. Rate limit: ~10 req/s.' },
+  yugioh: { authType: 'none', note: 'Free, no key needed. Rate limit: 20 req/s.' },
+  pokemon: { authType: 'api-key', note: 'Requires Scrydex API key and team ID.' },
+  tcgdex: { authType: 'none', note: 'Free, no key needed. Used for variant enrichment.' },
+};
+
 interface PreferenceCardProps {
   title: string;
   description: string;
@@ -409,55 +442,144 @@ interface PreferenceCardProps {
   action: React.ReactNode;
 }
 
-function ApiKeyField({ label, description, value, onSave, isSecret }: {
+function DataSourceCard({
+  label,
+  defaultUrl,
+  activeUrl,
+  overrideUrl,
+  testResult,
+  onTest,
+  onOverride,
+  authType,
+  note,
+  scrydexApiKey,
+  scrydexTeamId,
+  onScrydexKeyChange,
+  onScrydexTeamIdChange,
+}: {
+  sourceKey: SourceKey;
   label: string;
-  description: string;
-  value: string | null;
-  onSave: (value: string) => void;
-  isSecret?: boolean;
+  defaultUrl: string;
+  activeUrl: string;
+  overrideUrl: string | null;
+  testResult: TestSourceResult | 'loading' | undefined;
+  onTest: () => void;
+  onOverride: (url: string) => void;
+  authType: 'none' | 'api-key';
+  note: string;
+  scrydexApiKey?: string | null;
+  scrydexTeamId?: string | null;
+  onScrydexKeyChange?: (value: string) => void;
+  onScrydexTeamIdChange?: (value: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
+  const [showOverride, setShowOverride] = useState(false);
+  const [urlDraft, setUrlDraft] = useState(overrideUrl ?? '');
+  const [keyDraft, setKeyDraft] = useState('');
+  const [teamIdDraft, setTeamIdDraft] = useState('');
 
-  const handleSave = () => {
-    onSave(draft);
-    setEditing(false);
-  };
-
-  const displayValue = value
-    ? isSecret
-      ? `${'•'.repeat(Math.min(value.length, 20))}${value.slice(-4)}`
-      : value
-    : '';
+  const isLoading = testResult === 'loading';
+  const result = testResult && testResult !== 'loading' ? testResult : null;
+  const needsKey = authType === 'api-key';
 
   return (
     <div className="rounded-lg border bg-background p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          {result ? (
+            result.ok ? (
+              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+            )
+          ) : isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+          ) : (
+            <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">{label}</p>
+              {needsKey && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${scrydexApiKey ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
+                  {scrydexApiKey ? 'Key set' : 'Key required'}
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-mono text-muted-foreground truncate max-w-[300px]">
+              {activeUrl}
+              {overrideUrl && <span className="ml-1 text-yellow-600 dark:text-yellow-400">(override)</span>}
+            </p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{note}</p>
+          </div>
         </div>
-        {!editing && (
-          <Button size="sm" variant="outline" onClick={() => { setDraft(value ?? ''); setEditing(true); }}>
-            {value ? 'Edit' : 'Set'}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {result && (
+            <span className={`text-xs tabular-nums ${result.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {result.ok ? `${result.latencyMs}ms` : result.error || 'Failed'}
+            </span>
+          )}
+          <Button size="sm" variant="ghost" onClick={onTest} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Test'}
           </Button>
-        )}
+          <Button size="sm" variant="ghost" onClick={() => setShowOverride(!showOverride)}>
+            {needsKey ? <Key className="h-3 w-3" /> : <Settings2 className="h-3 w-3" />}
+          </Button>
+        </div>
       </div>
-      {!editing && value && (
-        <p className="text-xs font-mono text-muted-foreground">{displayValue}</p>
-      )}
-      {editing && (
-        <div className="flex items-center gap-2">
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={isSecret ? 'Enter API key…' : 'Enter URL…'}
-            className="text-sm font-mono"
-            type={isSecret ? 'password' : 'text'}
-            autoComplete="off"
-          />
-          <Button size="sm" onClick={handleSave}>Save</Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+
+      {showOverride && (
+        <div className="space-y-2 pt-2 border-t">
+          <p className="text-[11px] text-muted-foreground">Override the base URL (leave empty to use the default).</p>
+          <div className="flex items-center gap-2">
+            <Input
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              placeholder={defaultUrl}
+              className="text-xs font-mono"
+              autoComplete="off"
+            />
+            <Button size="sm" variant="outline" onClick={() => { onOverride(urlDraft); setShowOverride(false); }}>
+              Save
+            </Button>
+            {overrideUrl && (
+              <Button size="sm" variant="ghost" onClick={() => { onOverride(''); setUrlDraft(''); setShowOverride(false); }}>
+                Reset
+              </Button>
+            )}
+          </div>
+          {onScrydexKeyChange && (
+            <>
+              <p className="text-[11px] text-muted-foreground mt-2">Scrydex credentials (required for Pokemon card data):</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={keyDraft}
+                  onChange={(e) => setKeyDraft(e.target.value)}
+                  placeholder={scrydexApiKey ? `••••••••${scrydexApiKey.slice(-4)}` : 'Scrydex API Key'}
+                  className="text-xs font-mono"
+                  type="password"
+                  autoComplete="off"
+                />
+                <Button size="sm" variant="outline" onClick={() => { onScrydexKeyChange(keyDraft); setKeyDraft(''); }}>
+                  Set
+                </Button>
+              </div>
+            </>
+          )}
+          {onScrydexTeamIdChange && (
+            <div className="flex items-center gap-2">
+              <Input
+                value={teamIdDraft}
+                onChange={(e) => setTeamIdDraft(e.target.value)}
+                placeholder={scrydexTeamId ? `••••••••${scrydexTeamId.slice(-4)}` : 'Scrydex Team ID'}
+                className="text-xs font-mono"
+                type="password"
+                autoComplete="off"
+              />
+              <Button size="sm" variant="outline" onClick={() => { onScrydexTeamIdChange(teamIdDraft); setTeamIdDraft(''); }}>
+                Set
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
