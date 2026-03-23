@@ -13,13 +13,14 @@ import type {
 } from './types';
 
 const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
-const CARDS_ENDPOINT = `${API_ROOT}/cards`;
+const isScrydex = /scrydex\.com/i.test(API_ROOT);
+const CARDS_ENDPOINT = isScrydex ? `${API_ROOT}/pokemon/v1/cards` : `${API_ROOT}/cards`;
 const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
 const TCGDEX_CARDS_ENDPOINT = `${VARIANT_API_ROOT}/cards`;
 const isTCGdex = /tcgdex-cache/i.test(API_ROOT) || /tcgdex\.net/i.test(new URL(API_ROOT).hostname);
-const isRemotePokemon = /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
+const isRemoteApi = isScrydex || /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
 const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
-const DEFAULT_REQUEST_DELAY_MS = isRemotePokemon ? 200 : 0;
+const DEFAULT_REQUEST_DELAY_MS = isRemoteApi ? 100 : 0;
 const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay >= 0 ? configuredDelay : DEFAULT_REQUEST_DELAY_MS;
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POKEMON_REQUEST_TIMEOUT_MS ?? '8000', 10);
 const configuredVariantConcurrency = Number.parseInt(process.env.POKEMON_VARIANT_FETCH_CONCURRENCY ?? '', 10);
@@ -63,9 +64,11 @@ async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Resp
 }
 
 interface PokemonSearchResponse {
+  status?: string;
   data: PokemonCard[];
   page?: number;
   pageSize?: number;
+  page_size?: number;
   count?: number;
   totalCount?: number;
 }
@@ -509,8 +512,11 @@ export class PokemonAdapter implements TcgAdapter {
     const headers: Record<string, string> = {
       Accept: 'application/json'
     };
-    if (env.POKEMON_TCG_API_KEY) {
-      headers['X-Api-Key'] = env.POKEMON_TCG_API_KEY;
+    if (env.SCRYDEX_API_KEY) {
+      headers['X-Api-Key'] = env.SCRYDEX_API_KEY;
+    }
+    if (env.SCRYDEX_TEAM_ID) {
+      headers['X-Team-ID'] = env.SCRYDEX_TEAM_ID;
     }
     return headers;
   }

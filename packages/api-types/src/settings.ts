@@ -9,10 +9,11 @@ export const updateSettingsSchema = z.object({
   publicCollections: z.boolean().optional(),
   requireAuth: z.boolean().optional(),
   appName: z.string().optional(),
-  pokemonTcgApiKey: z.string().nullable().optional(),
+  scrydexApiKey: z.string().nullable().optional(),
+  scrydexTeamId: z.string().nullable().optional(),
   scryfallApiBaseUrl: z.string().nullable().optional(),
   ygoApiBaseUrl: z.string().nullable().optional(),
-  pokemonApiBaseUrl: z.string().nullable().optional(),
+  scrydexApiBaseUrl: z.string().nullable().optional(),
   tcgdexApiBaseUrl: z.string().nullable().optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
@@ -32,9 +33,10 @@ export interface AppSettings {
 
 /** Extended settings visible only to admins (includes API keys) */
 export interface AdminAppSettings extends AppSettings {
-  pokemonTcgApiKey: string | null;
+  scrydexApiKey: string | null;
+  scrydexTeamId: string | null;
   scryfallApiBaseUrl: string | null;
   ygoApiBaseUrl: string | null;
-  pokemonApiBaseUrl: string | null;
+  scrydexApiBaseUrl: string | null;
   tcgdexApiBaseUrl: string | null;
 }
