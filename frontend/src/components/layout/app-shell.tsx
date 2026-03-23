@@ -6,6 +6,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, MoreHorizontal, X } from 'lucide-react';
 
+/** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
+export const secondaryNavigation = [
+  { href: '/decks', label: 'Decks', icon: Layers },
+  { href: '/prices', label: 'Prices', icon: DollarSign },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/trades', label: 'Trades', icon: Repeat2 },
+  { href: '/sealed', label: 'Sealed', icon: Package },
+];
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getAppRoute } from '@/lib/app-routes';
@@ -23,15 +32,10 @@ const navigation = [
   { href: '/cards', label: 'Card Search', icon: Search },
   { href: '/collections', label: 'Collections', icon: Table },
   { href: '/wishlists', label: 'Wishlists', icon: Heart },
-  { href: '/decks', label: 'Decks', icon: Layers },
-  { href: '/prices', label: 'Prices', icon: DollarSign },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/trades', label: 'Trades', icon: Repeat2 },
-  { href: '/sealed', label: 'Sealed', icon: Package }
 ];
 
 const mobileNavPrimary = navigation.slice(0, 4);
-const mobileNavSecondary = navigation.slice(4);
+const mobileNavSecondary = secondaryNavigation;
 
 interface AppShellProps {
   children: React.ReactNode;

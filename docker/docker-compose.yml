@@ -127,7 +127,7 @@ services:
       dockerfile: docker/backend.Dockerfile
       target: dev
     container_name: tcg-backend
-    command: sh -c "npm install && npm run --workspace=packages/api-types build 2>/dev/null; cd backend && npm run dev"
+    command: sh -c "cd /app && npm install && npm run --workspace=packages/api-types build 2>/dev/null; cd /app/backend && npm run dev"
     environment:
       NODE_ENV: development
       PORT: 3000
