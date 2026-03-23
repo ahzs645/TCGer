@@ -131,6 +131,7 @@ export function SetupWizard() {
               required
               disabled={loading}
               minLength={isLoginMode ? undefined : 8}
+              autoComplete={isLoginMode ? 'current-password' : 'new-password'}
             />
             {!isLoginMode && (
               <p className="text-xs text-muted-foreground">
@@ -150,6 +151,7 @@ export function SetupWizard() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="new-password"
               />
             </div>
           )}
