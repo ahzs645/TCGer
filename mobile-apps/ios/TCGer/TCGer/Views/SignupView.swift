@@ -4,7 +4,7 @@ struct SignupView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Binding var isSubmitting: Bool
 
-    let onSignup: (_ email: String, _ password: String, _ username: String?) -> Void
+    let onSignup: (_ email: String, _ password: String, _ username: String) -> Void
     let onCancel: () -> Void
 
     @State private var email = ""
@@ -16,14 +16,14 @@ struct SignupView: View {
     var body: some View {
         Form {
             Section(header: Text("Create Account"), footer: footerText) {
-                TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textContentType(.emailAddress)
+                TextField("Username", text: $username)
+                    .textContentType(.username)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
 
-                TextField("Username (optional)", text: $username)
-                    .textContentType(.username)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
 
@@ -59,11 +59,6 @@ struct SignupView: View {
             }
         }
         .navigationTitle("Sign Up")
-        .onAppear {
-            if email.isEmpty {
-                email = environmentStore.credentials.email
-            }
-        }
     }
 
     private func submit() {
@@ -71,6 +66,16 @@ struct SignupView: View {
 
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedUsername.isEmpty else {
+            validationMessage = "Username is required."
+            return
+        }
+
+        guard trimmedUsername.count >= 3 else {
+            validationMessage = "Username must be at least 3 characters."
+            return
+        }
 
         guard !trimmedEmail.isEmpty else {
             validationMessage = "Email is required."
@@ -92,11 +97,7 @@ struct SignupView: View {
             return
         }
 
-        onSignup(
-            trimmedEmail,
-            password,
-            trimmedUsername.isEmpty ? nil : trimmedUsername
-        )
+        onSignup(trimmedEmail, password, trimmedUsername)
     }
 
     private var footerText: some View {

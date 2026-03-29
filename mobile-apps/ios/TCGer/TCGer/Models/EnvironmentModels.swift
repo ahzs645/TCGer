@@ -103,11 +103,11 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
 }
 
 struct LoginCredentials: Codable, Equatable, Sendable {
-    var email: String = ""
+    var username: String = ""
     var password: String = ""
 
     var isComplete: Bool {
-        !email.isEmpty && !password.isEmpty
+        !username.isEmpty && !password.isEmpty
     }
 
     static let empty = LoginCredentials()

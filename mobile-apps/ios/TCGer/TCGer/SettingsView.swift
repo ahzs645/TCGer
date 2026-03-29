@@ -465,8 +465,8 @@ struct SettingsView: View {
         if let email = environmentStore.currentUser?.email, !email.isEmpty {
             return email
         }
-        if !environmentStore.credentials.email.isEmpty {
-            return environmentStore.credentials.email
+        if !environmentStore.credentials.username.isEmpty {
+            return environmentStore.credentials.username
         }
         return "Not signed in"
     }

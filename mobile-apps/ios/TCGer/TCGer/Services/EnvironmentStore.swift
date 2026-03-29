@@ -271,6 +271,7 @@ final class EnvironmentStore: ObservableObject {
         currentUser = User(
             id: profile.id,
             email: profile.email,
+            name: profile.username,
             username: profile.username,
             isAdmin: profile.isAdmin,
             showCardNumbers: profile.showCardNumbers,
@@ -341,13 +342,15 @@ final class EnvironmentStore: ObservableObject {
             currentUser = User(
                 id: DemoDefaults.userId,
                 email: DemoDefaults.email,
+                name: DemoDefaults.username,
                 username: DemoDefaults.username,
                 isAdmin: true,
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
-                enabledPokemon: enabledPokemon
+                enabledPokemon: enabledPokemon,
+                defaultGame: nil
             )
         }
 

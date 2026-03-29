@@ -6,13 +6,16 @@ extension APIService {
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return DemoStore.shared.authenticate(email: credentials.email)
+            return DemoStore.shared.authenticate(username: credentials.username)
         }
 
-        let payload = LoginPayload(email: credentials.email, password: credentials.password)
+        let payload = UsernameLoginPayload(
+            username: credentials.username,
+            password: credentials.password
+        )
         let (data, response) = try await makeRequest(
             config: config,
-            path: "auth/login",
+            path: "auth/sign-in/username",
             method: "POST",
             body: payload
         )
@@ -26,7 +29,8 @@ extension APIService {
         case 401:
             throw APIError.unauthorized
         default:
-            throw APIError.serverError(status: response.statusCode)
+            let serverMessage = parseServerMessage(from: data)
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
         }
     }
 
@@ -34,28 +38,74 @@ extension APIService {
         config: ServerConfiguration,
         email: String,
         password: String,
-        username: String?
+        username: String
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return DemoStore.shared.authenticate(email: email, username: username)
+            return DemoStore.shared.authenticate(username: username, email: email)
         }
 
-        let payload = SignupPayload(email: email, password: password, username: username)
-        return try await executeAuthRequest(config: config, path: "auth/signup", payload: payload)
+        let payload = SignupPayload(
+            email: email,
+            password: password,
+            name: username,
+            username: username
+        )
+        return try await executeAuthRequest(config: config, path: "auth/sign-up/email", payload: payload)
     }
 
     func setupInitialAdmin(
         config: ServerConfiguration,
         email: String,
         password: String,
-        username: String?
+        username: String
     ) async throws -> AuthResponse {
         if config.isDemoMode {
-            return DemoStore.shared.authenticate(email: email, username: username)
+            return DemoStore.shared.authenticate(username: username, email: email)
         }
 
-        let payload = SignupPayload(email: email, password: password, username: username)
-        return try await executeAuthRequest(config: config, path: "auth/setup", payload: payload)
+        // Step 1: Sign up via Better Auth
+        let signupPayload = SignupPayload(
+            email: email,
+            password: password,
+            name: username,
+            username: username
+        )
+        let authResponse = try await executeAuthRequest(
+            config: config,
+            path: "auth/sign-up/email",
+            payload: signupPayload
+        )
+
+        // Step 2: Promote to admin via setup endpoint (with bearer token)
+        let (_, promoteResponse) = try await makeRequest(
+            config: config,
+            path: "setup/setup",
+            method: "POST",
+            token: authResponse.token
+        )
+
+        guard (200..<300).contains(promoteResponse.statusCode) else {
+            throw APIError.serverError(
+                status: promoteResponse.statusCode,
+                message: "Account created but admin promotion failed"
+            )
+        }
+
+        // Return auth response with isAdmin set to true
+        let adminUser = User(
+            id: authResponse.user.id,
+            email: authResponse.user.email,
+            name: authResponse.user.name,
+            username: authResponse.user.username,
+            isAdmin: true,
+            showCardNumbers: authResponse.user.showCardNumbers,
+            showPricing: authResponse.user.showPricing,
+            enabledYugioh: authResponse.user.enabledYugioh,
+            enabledMagic: authResponse.user.enabledMagic,
+            enabledPokemon: authResponse.user.enabledPokemon,
+            defaultGame: authResponse.user.defaultGame
+        )
+        return AuthResponse(user: adminUser, token: authResponse.token)
     }
 
     func checkSetupRequired(config: ServerConfiguration) async throws -> SetupCheckResponse {
@@ -65,7 +115,7 @@ extension APIService {
 
         let (data, response) = try await makeRequest(
             config: config,
-            path: "auth/setup-required"
+            path: "setup/setup-required"
         )
 
         guard response.statusCode == 200 else {
@@ -142,14 +192,15 @@ private extension APIService {
         }
     }
 
-    struct LoginPayload: Encodable {
-        let email: String
+    struct UsernameLoginPayload: Encodable {
+        let username: String
         let password: String
     }
 
     struct SignupPayload: Encodable {
         let email: String
         let password: String
-        let username: String?
+        let name: String
+        let username: String
     }
 }
