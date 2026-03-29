@@ -5,11 +5,13 @@
   "packageManager": "npm@11.7.0",
   "workspaces": [
     "backend",
+    "convex-backend",
     "frontend",
     "packages/*"
   ],
   "scripts": {
     "dev": "turbo dev --filter=@tcg/backend",
+    "dev:convex": "turbo dev --filter=@tcg/convex-backend",
     "dev:frontend": "turbo dev --filter=@tcg/frontend",
     "dev:marketing": "npm --prefix marketing-site run dev",
     "docs:dev": "npm --prefix docs run dev",
