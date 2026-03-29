@@ -42,8 +42,8 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export interface UserProfile {
   id: string;
-  email: string | null;
-  username: string;
+  email: string;
+  username: string | null;
   isAdmin: boolean;
   showCardNumbers: boolean;
   showPricing: boolean;

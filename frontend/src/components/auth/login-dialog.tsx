@@ -17,7 +17,7 @@ interface LoginDialogProps {
 }
 
 export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialogProps) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,11 +29,14 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
     setLoading(true);
 
     try {
-      const result = await login({ username, password });
+      const result = await login({ email, password });
       setAuth(result.user, result.token);
-      setUsername('');
+      setEmail('');
       setPassword('');
       onOpenChange(false);
+
+      // The SetupGuard will automatically re-render when isAuthenticated changes
+      // No need for router.refresh() which can cause race conditions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -58,15 +61,15 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              type="text"
-              placeholder="Your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              autoComplete="username"
+              autoComplete="email"
             />
           </div>
 
@@ -75,7 +78,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
             <Input
               id="password"
               type="password"
-              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

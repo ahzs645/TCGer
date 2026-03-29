@@ -29,7 +29,7 @@ interface SignupServiceInput extends SignupInput {
 
 interface AuthTokenPayload {
   userId: string;
-  username: string;
+  email: string;
   isAdmin: boolean;
 }
 
@@ -44,12 +44,12 @@ function signAuthToken(payload: AuthTokenPayload): string {
 }
 
 export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
-  const { username, password, email, isAdmin = false } = input;
+  const { email, password, username, isAdmin = false } = input;
 
-  // Check if username already exists
-  const existing = await prisma.user.findUnique({ where: { username } });
+  // Check if user already exists
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    throw createHttpError(409, 'User with this username already exists');
+    throw createHttpError(409, 'User with this email already exists');
   }
 
   // Hash password
@@ -58,15 +58,15 @@ export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
   // Create user
   const user = await prisma.user.create({
     data: {
+      email,
       username,
-      email: email || null,
       passwordHash,
       isAdmin
     }
   });
 
   // Generate JWT
-  const token = signAuthToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin });
+  const token = signAuthToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin });
 
   return {
     user: {
@@ -85,22 +85,22 @@ export async function signup(input: SignupServiceInput): Promise<AuthResponse> {
 }
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
-  const { username, password } = input;
+  const { email, password } = input;
 
-  // Find user by username
-  const user = await prisma.user.findUnique({ where: { username } });
+  // Find user
+  const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    throw createHttpError(401, 'Invalid username or password');
+    throw createHttpError(401, 'Invalid email or password');
   }
 
   // Verify password
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    throw createHttpError(401, 'Invalid username or password');
+    throw createHttpError(401, 'Invalid email or password');
   }
 
   // Generate JWT
-  const token = signAuthToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin });
+  const token = signAuthToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin });
 
   return {
     user: {
@@ -134,22 +134,19 @@ export async function setupInitialAdmin(input: SignupServiceInput): Promise<Auth
   return signup({ ...input, isAdmin: true });
 }
 
-export async function verifyToken(token: string): Promise<{ userId: string; username: string }> {
+export async function verifyToken(token: string): Promise<{ userId: string; email: string }> {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     if (typeof decoded === 'string') {
       throw createHttpError(401, 'Invalid token payload');
     }
 
-    const payload = decoded as jwt.JwtPayload & { userId?: unknown; username?: unknown; email?: unknown };
-    if (typeof payload.userId !== 'string') {
+    const payload = decoded as jwt.JwtPayload & { userId?: unknown; email?: unknown };
+    if (typeof payload.userId !== 'string' || typeof payload.email !== 'string') {
       throw createHttpError(401, 'Invalid token payload');
     }
 
-    // Support both old (email-based) and new (username-based) tokens
-    const username = typeof payload.username === 'string' ? payload.username : '';
-
-    return { userId: payload.userId, username };
+    return { userId: payload.userId, email: payload.email };
   } catch (error) {
     throw createHttpError(401, 'Invalid or expired token');
   }
@@ -217,13 +214,13 @@ export async function updateUserPreferences(userId: string, input: UpdatePrefere
 }
 
 export async function updateUserProfile(userId: string, input: UpdateProfileInput) {
-  // If username is being changed, check if it's already taken
-  if (input.username) {
+  // If email is being changed, check if it's already taken
+  if (input.email) {
     const existingUser = await prisma.user.findUnique({
-      where: { username: input.username }
+      where: { email: input.email }
     });
     if (existingUser && existingUser.id !== userId) {
-      throw createHttpError(409, 'Username is already in use');
+      throw createHttpError(409, 'Email is already in use');
     }
   }
 
