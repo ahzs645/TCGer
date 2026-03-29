@@ -4,6 +4,8 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
+    profiles:
+      - legacy
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-tcg_collection}
       POSTGRES_USER: ${POSTGRES_USER:-tcguser}
@@ -13,9 +15,26 @@ services:
     networks:
       - tcg-net
 
-  redis:
-    image: redis:7-alpine
+  convex-backend:
+    build:
+      context: ..
+      dockerfile: docker/convex-backend.Dockerfile
+      target: production
     restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?err}
+      BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-false}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
+      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
+      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
+      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
+    ports:
+      - "${CONVEX_PORT:-3210}:3210"
+      - "${CONVEX_SITE_PORT:-3211}:3211"
     networks:
       - tcg-net
 
@@ -104,19 +123,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      BACKEND_MODE: ${BACKEND_MODE:-convex}
       DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
-      REDIS_URL: redis://redis:6379
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?err}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COLLECTIONS_BACKEND: ${COLLECTIONS_BACKEND:-convex}
+      WISHLISTS_BACKEND: ${WISHLISTS_BACKEND:-convex}
+      CONVEX_HTTP_ORIGIN: ${CONVEX_HTTP_ORIGIN:-http://convex-backend:3211}
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
       POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
     depends_on:
-      postgres:
-        condition: service_started
-      redis:
+      convex-backend:
         condition: service_started
     networks:
       - tcg-net
@@ -128,8 +147,13 @@ services:
       target: production
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
       BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}
+      NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:-http://localhost:3210}
+      NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:-http://localhost:3211}
+      CONVEX_URL_INTERNAL: ${CONVEX_URL_INTERNAL:-http://convex-backend:3210}
+      CONVEX_SITE_URL_INTERNAL: ${CONVEX_SITE_URL_INTERNAL:-http://convex-backend:3211}
     depends_on:
       backend:
         condition: service_started

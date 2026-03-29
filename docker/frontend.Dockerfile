@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:20-bookworm-slim AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -29,7 +29,7 @@ WORKDIR /app/frontend
 RUN npx next build
 
 # --- Production target ---
-FROM node:18-alpine AS production
+FROM node:20-bookworm-slim AS production
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

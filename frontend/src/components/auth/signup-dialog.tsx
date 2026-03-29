@@ -56,7 +56,7 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
       }
 
       if (result.data) {
-        const sessionToken = result.data.session?.token;
+        const sessionToken = result.data.token ?? undefined;
         setAuth(
           toAuthUser(result.data.user as Record<string, unknown>),
           sessionToken

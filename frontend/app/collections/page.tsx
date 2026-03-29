@@ -3,6 +3,7 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { CollectionView } from '@/components/collections/sandbox/collection-view';
 import { Badge } from '@/components/ui/badge';
+import { isConvexCollectionsBackend } from '@/lib/api/collections';
 
 export default function CollectionsPage() {
   return (
@@ -12,6 +13,7 @@ export default function CollectionsPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-heading font-semibold">Collection sandbox</h1>
             <Badge variant="outline">Beta</Badge>
+            {isConvexCollectionsBackend && <Badge>Convex Native</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">Per-copy inventory manager powered by your live binder data.</p>
         </div>

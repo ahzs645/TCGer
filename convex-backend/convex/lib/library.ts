@@ -129,7 +129,7 @@ async function ensureTag(
   });
 }
 
-async function replaceEntryTags(
+export async function replaceEntryTags(
   ctx: MutationCtx,
   entryId: Id<"collectionEntries">,
   userId: Id<"users">,
@@ -183,7 +183,7 @@ async function hydrateTags(ctx: ReaderCtx, entryId: Id<"collectionEntries">) {
     }));
 }
 
-async function hydrateEntry(ctx: ReaderCtx, entry: Doc<"collectionEntries">) {
+export async function hydrateEntry(ctx: ReaderCtx, entry: Doc<"collectionEntries">) {
   const card = await ctx.db.get(entry.cardId);
   if (!card) {
     throw new ConvexError({
@@ -323,6 +323,9 @@ export async function addEntryForViewer(
     updatedAt: timestamp
   });
 
+  await ctx.db.patch(args.binderId, {
+    updatedAt: timestamp
+  });
   await replaceEntryTags(ctx, entryId, userId, args.tagIds, args.newTags);
   const entry = await ctx.db.get(entryId);
   if (!entry) {
@@ -389,6 +392,17 @@ export async function updateEntryForViewer(
     updatedAt: now()
   });
 
+  const targetBinderId = args.binderId ?? entry.binderId;
+  const touchedAt = now();
+  await ctx.db.patch(targetBinderId, {
+    updatedAt: touchedAt
+  });
+  if (entry.binderId !== targetBinderId) {
+    await ctx.db.patch(entry.binderId, {
+      updatedAt: touchedAt
+    });
+  }
+
   await replaceEntryTags(ctx, entry._id, userId, args.tagIds, args.newTags);
   const updated = await ctx.db.get(entry._id);
   if (!updated) {
@@ -418,4 +432,7 @@ export async function removeEntryForViewer(
     .collect();
   await Promise.all(assignments.map((assignment) => ctx.db.delete(assignment._id)));
   await ctx.db.delete(entryId);
+  await ctx.db.patch(entry.binderId, {
+    updatedAt: now()
+  });
 }

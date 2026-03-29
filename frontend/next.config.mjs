@@ -27,14 +27,6 @@ const nextConfig = {
         async rewrites() {
           return [
             {
-              source: '/api/:path*',
-              destination: `${backendOrigin}/:path*`
-            },
-            {
-              source: '/auth/:path*',
-              destination: `${backendOrigin}/auth/:path*`
-            },
-            {
               source: '/health',
               destination: `${backendOrigin}/health`
             }

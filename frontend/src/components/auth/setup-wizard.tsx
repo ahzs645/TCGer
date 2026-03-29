@@ -47,7 +47,7 @@ export function SetupWizard() {
       if (result.data) {
         const user = toAuthUser(result.data.user as Record<string, unknown>);
         user.isAdmin = true;
-        setAuth(user, result.data.session?.token);
+        setAuth(user, result.data.token ?? undefined);
       }
 
       router.push('/collections');
@@ -94,7 +94,7 @@ export function SetupWizard() {
       if (result.data) {
         const user = toAuthUser(result.data.user as Record<string, unknown>);
         user.isAdmin = true;
-        setAuth(user, result.data.session?.token);
+        setAuth(user, result.data.token ?? undefined);
       }
 
       router.push('/collections');

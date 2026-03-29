@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
-import { fromNodeHeaders } from 'better-auth/node';
 
-import { auth } from '../../lib/auth';
+import { env } from '../../config/env';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -14,21 +13,56 @@ export interface AuthRequest extends Request {
   };
 }
 
+interface SessionUser {
+  id: string;
+  email: string;
+  username?: string | null;
+  isAdmin?: boolean;
+  showCardNumbers?: boolean;
+  showPricing?: boolean;
+}
+
+function buildSessionHeaders(req: Request) {
+  const headers = new Headers();
+  const authorization = req.header('authorization');
+  const cookie = req.header('cookie');
+
+  if (authorization) {
+    headers.set('Authorization', authorization);
+  }
+  if (cookie) {
+    headers.set('Cookie', cookie);
+  }
+
+  return headers;
+}
+
+export async function getSessionUserFromRequest(req: Request): Promise<SessionUser | null> {
+  const response = await fetch(new URL('/api/auth/get-session', env.CONVEX_HTTP_ORIGIN), {
+    method: 'GET',
+    headers: buildSessionHeaders(req)
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const session = (await response.json().catch(() => null)) as { user?: SessionUser } | null;
+  return session?.user ?? null;
+}
+
 /** Attach user if token present, but don't block unauthenticated requests */
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers)
-    });
-    if (session?.user) {
-      const user = session.user as Record<string, unknown>;
+    const user = await getSessionUserFromRequest(req);
+    if (user) {
       (req as AuthRequest).user = {
-        id: user.id as string,
-        email: user.email as string,
-        username: (user.username as string) ?? null,
-        isAdmin: (user.isAdmin as boolean) ?? false,
-        showCardNumbers: (user.showCardNumbers as boolean) ?? true,
-        showPricing: (user.showPricing as boolean) ?? true
+        id: user.id,
+        email: user.email,
+        username: user.username ?? null,
+        isAdmin: user.isAdmin ?? false,
+        showCardNumbers: user.showCardNumbers ?? true,
+        showPricing: user.showPricing ?? true
       };
     }
   } catch {
@@ -39,26 +73,23 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers)
-    });
+    const user = await getSessionUserFromRequest(req);
 
-    if (!session?.user) {
+    if (!user) {
       res.status(401).json({ error: 'UNAUTHORIZED', message: 'Not authenticated' });
       return;
     }
 
-    const user = session.user as Record<string, unknown>;
     (req as AuthRequest).user = {
-      id: user.id as string,
-      email: user.email as string,
-      username: (user.username as string) ?? null,
-      isAdmin: (user.isAdmin as boolean) ?? false,
-      showCardNumbers: (user.showCardNumbers as boolean) ?? true,
-      showPricing: (user.showPricing as boolean) ?? true
+      id: user.id,
+      email: user.email,
+      username: user.username ?? null,
+      isAdmin: user.isAdmin ?? false,
+      showCardNumbers: user.showCardNumbers ?? true,
+      showPricing: user.showPricing ?? true
     };
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid or expired session' });
   }
 }
