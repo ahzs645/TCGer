@@ -162,7 +162,7 @@ services:
       dockerfile: docker/frontend.Dockerfile
       target: dev
     container_name: tcg-frontend
-    command: sh -c "npm install && cd frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    command: sh -c "cd /app && npm install && cd /app/frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
