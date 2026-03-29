@@ -4,7 +4,9 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
+import { toNodeHandler } from 'better-auth/node';
 
+import { auth } from './lib/auth';
 import { env } from './config/env';
 import { errorHandler } from './api/middleware/error-handler';
 import { notFoundHandler } from './api/middleware/not-found';
@@ -18,8 +20,18 @@ app.use(
   })
 );
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: env.BETTER_AUTH_URL || true,
+    credentials: true
+  })
+);
 app.use(compression());
+
+// Better Auth handler MUST be mounted before express.json()
+// Express v4 uses wildcard pattern /auth/*
+app.all('/auth/*', toNodeHandler(auth));
+
 app.use(express.json());
 
 // Serve uploaded images
