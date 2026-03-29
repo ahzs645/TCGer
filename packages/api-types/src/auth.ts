@@ -5,14 +5,14 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 
 export const signupSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  username: z.string().optional()
+  email: z.string().email('Invalid email address').optional()
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required')
 });
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -23,8 +23,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const authUserSchema = z.object({
   id: z.string(),
-  email: z.string(),
-  username: z.string().nullable(),
+  email: z.string().nullable(),
+  username: z.string(),
   isAdmin: z.boolean(),
   showCardNumbers: z.boolean(),
   showPricing: z.boolean(),

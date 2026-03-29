@@ -17,8 +17,8 @@ interface SignupDialogProps {
 }
 
 export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDialogProps) {
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,16 +42,13 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
     setLoading(true);
 
     try {
-      const result = await signup({ email, password, username: username || undefined });
+      const result = await signup({ username, password, email: email || undefined });
       setAuth(result.user, result.token);
-      setEmail('');
       setUsername('');
+      setEmail('');
       setPassword('');
       setConfirmPassword('');
       onOpenChange(false);
-
-      // The SetupGuard will automatically re-render when isAuthenticated changes
-      // No need for router.refresh() which can cause race conditions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -76,27 +73,27 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="signup-email">Email</Label>
-            <Input
-              id="signup-email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="signup-username">Username (optional)</Label>
+            <Label htmlFor="signup-username">Username</Label>
             <Input
               id="signup-username"
               type="text"
               placeholder="CardCollector123"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              required
               autoComplete="username"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="signup-email">Email (optional)</Label>
+            <Input
+              id="signup-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
 
@@ -105,7 +102,7 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
             <Input
               id="signup-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -118,7 +115,7 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
             <Input
               id="signup-confirm-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

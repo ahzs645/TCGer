@@ -12,8 +12,8 @@ import { AlertCircle } from 'lucide-react';
 
 export function SetupWizard() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,7 +28,7 @@ export function SetupWizard() {
     setLoading(true);
 
     try {
-      const result = await login({ email, password });
+      const result = await login({ username, password });
       setAuth(result.user, result.token);
       router.push('/collections');
     } catch (err) {
@@ -55,9 +55,9 @@ export function SetupWizard() {
 
     try {
       const result = await setupAdmin({
-        email,
+        username,
         password,
-        username: username || undefined
+        email: email || undefined
       });
 
       setAuth(result.user, result.token);
@@ -94,27 +94,28 @@ export function SetupWizard() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="admin@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="username"
+              type="text"
+              placeholder={isLoginMode ? 'Your username' : 'Admin'}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               disabled={loading}
+              autoComplete="username"
             />
           </div>
 
           {!isLoginMode && (
             <div className="space-y-2">
-              <Label htmlFor="username">Username (optional)</Label>
+              <Label htmlFor="email">Email (optional)</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Admin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
               />
             </div>
@@ -125,7 +126,7 @@ export function SetupWizard() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -146,7 +147,7 @@ export function SetupWizard() {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
