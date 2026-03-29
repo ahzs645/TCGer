@@ -1,0 +1,64 @@
+# This workflow builds all TCGer container images and pushes them to GHCR
+# on every push to main. Flux CD watches GHCR for new tags and auto-deploys.
+
+name: Build and push container images
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/ahzs645
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: tcger-backend
+            dockerfile: docker/backend.Dockerfile
+            target: production
+          - name: tcger-frontend
+            dockerfile: docker/frontend.Dockerfile
+            target: production
+          - name: tcger-scryfall
+            dockerfile: services/scryfall-bulk/Dockerfile
+            target: ""
+          - name: tcger-ygo
+            dockerfile: services/ygo-cache/Dockerfile
+            target: ""
+          - name: tcger-tcgdex
+            dockerfile: services/tcgdex-cache/Dockerfile
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags
+        id: tags
+        run: |
+          TIMESTAMP=$(date +%s)
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version_tag=main-${TIMESTAMP}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target || '' }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ steps.tags.outputs.version_tag }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:main
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
