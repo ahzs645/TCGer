@@ -27,11 +27,18 @@ export function SetupWizard() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername) {
+      setError('Username is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const result = await signIn.username({
-        username,
+        username: normalizedUsername,
         password
       });
 
@@ -60,6 +67,18 @@ export function SetupWizard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const normalizedUsername = username.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (normalizedUsername.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    if (!normalizedEmail) {
+      setError('Email is required');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -76,10 +95,10 @@ export function SetupWizard() {
     try {
       // Step 1: Sign up via Better Auth
       const result = await signUp.email({
-        email,
+        email: normalizedEmail,
         password,
-        name: username,
-        username
+        name: normalizedUsername,
+        username: normalizedUsername
       });
 
       if (result.error) {
@@ -113,7 +132,7 @@ export function SetupWizard() {
             alt="TCGer logo"
             width={64}
             height={64}
-            className="w-auto dark:invert"
+            className="dark:invert"
           />
           <h1 className="text-2xl font-bold">Welcome to TCGer</h1>
           <p className="text-center text-sm text-muted-foreground">

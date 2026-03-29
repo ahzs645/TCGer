@@ -196,6 +196,7 @@ services:
     command: sh -c "cd /app && npm install && cd /app/frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
     environment:
       NODE_ENV: development
+      NEXT_DIST_DIR: ${NEXT_DIST_DIR:-.next-docker}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
       BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}

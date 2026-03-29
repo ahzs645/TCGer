@@ -549,6 +549,9 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     try {
       const identity = getBridgeIdentity(request);
+      if (identity) {
+        await ctx.runMutation(internal.bridge.ensureViewer, identity);
+      }
       const settings = await ctx.runQuery(internal.bridge.getSettings, {
         subject: identity?.subject
       });
