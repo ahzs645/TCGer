@@ -7,10 +7,14 @@ export async function getSettings(token?: string | null): Promise<AppSettings> {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}/settings`, { headers });
+  const response = await fetch(`${API_BASE_URL}/settings`, {
+    headers,
+    credentials: 'include'
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch settings');
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to fetch settings');
   }
 
   return response.json();

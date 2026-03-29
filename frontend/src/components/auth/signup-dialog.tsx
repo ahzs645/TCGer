@@ -29,6 +29,18 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const normalizedUsername = username.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (normalizedUsername.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    if (!normalizedEmail) {
+      setError('Email is required');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -44,10 +56,10 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
 
     try {
       const result = await signUp.email({
-        email,
+        email: normalizedEmail,
         password,
-        name: username,
-        username
+        name: normalizedUsername,
+        username: normalizedUsername
       });
 
       if (result.error) {

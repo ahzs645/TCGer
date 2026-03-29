@@ -5,8 +5,10 @@ import { fileURLToPath } from 'url';
 const isDemoExport = process.env.DEMO_EXPORT === 'true';
 const backendOrigin = (process.env.BACKEND_API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001').replace(/\/$/, '');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = process.env.NEXT_DIST_DIR || '.next';
 
 const nextConfig = {
+  distDir,
   outputFileTracingRoot: path.join(__dirname, '..'),
   ...(isDemoExport
     ? {

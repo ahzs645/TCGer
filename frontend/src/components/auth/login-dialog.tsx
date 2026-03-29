@@ -27,11 +27,18 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername) {
+      setError('Username is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const result = await signIn.username({
-        username,
+        username: normalizedUsername,
         password
       });
 

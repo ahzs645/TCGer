@@ -21,7 +21,10 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isPending: sessionPending } = useSession();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { isAuthenticated, token } = useAuthStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    token: state.token
+  }));
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(true);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -100,7 +103,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
         }
 
         // Now check app settings for authentication requirements
-        const settings = await getSettings();
+        const settings = await getSettings(isAuthenticated ? token : null);
         if (stale) return;
 
         // Check if the current route requires authentication
@@ -147,7 +150,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
     return () => {
       stale = true;
     };
-  }, [hydrated, pathname, router, sessionPending, setSetupRequired, isAuthenticated]);
+  }, [hydrated, pathname, router, sessionPending, setSetupRequired, isAuthenticated, token]);
 
   // Always render the same structure
   if (loading || shouldBlock || sessionPending) {
