@@ -6,10 +6,12 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
+  BACKEND_MODE: z.enum(['hybrid', 'convex']).default('hybrid'),
   DATABASE_URL: z.string().url().optional(),
-  REDIS_URL: z.string().optional(),
-  BETTER_AUTH_SECRET: z.string().min(16, 'BETTER_AUTH_SECRET must be at least 16 characters long'),
-  BETTER_AUTH_URL: z.string().url().optional(),
+  APP_ORIGIN: z.string().url().optional(),
+  COLLECTIONS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
+  WISHLISTS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
+  CONVEX_HTTP_ORIGIN: z.string().url().optional(),
   SCRYDEX_API_KEY: z.string().optional(),
   SCRYDEX_TEAM_ID: z.string().optional(),
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
@@ -25,9 +27,20 @@ if (!parsed.success) {
   throw new Error('Failed to load environment variables');
 }
 
-if (parsed.data.NODE_ENV !== 'test' && !parsed.data.DATABASE_URL) {
+if (
+  parsed.data.NODE_ENV !== 'test' &&
+  parsed.data.BACKEND_MODE !== 'convex' &&
+  !parsed.data.DATABASE_URL
+) {
   console.error('Invalid environment configuration:', {
     DATABASE_URL: ['DATABASE_URL is required when NODE_ENV is not test']
+  });
+  throw new Error('Failed to load environment variables');
+}
+
+if (parsed.data.NODE_ENV !== 'test' && !parsed.data.CONVEX_HTTP_ORIGIN) {
+  console.error('Invalid environment configuration:', {
+    CONVEX_HTTP_ORIGIN: ['CONVEX_HTTP_ORIGIN is required for Convex-backed auth and bridge routes']
   });
   throw new Error('Failed to load environment variables');
 }

@@ -2,9 +2,11 @@ import type { Metadata } from 'next';
 import { Inter, Lexend } from 'next/font/google';
 import './globals.css';
 
+import { ConvexClientProvider } from '@/components/providers/convex-client-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { SetupGuard } from '@/components/auth/setup-guard';
+import { getToken } from '@/lib/auth-server';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
@@ -20,7 +22,9 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const token = await getToken().catch(() => null);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -30,11 +34,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           lexend.variable
         )}
       >
-        <ThemeProvider>
-          <QueryProvider>
-            <SetupGuard>{children}</SetupGuard>
-          </QueryProvider>
-        </ThemeProvider>
+        <ConvexClientProvider initialToken={token}>
+          <ThemeProvider>
+            <QueryProvider>
+              <SetupGuard>{children}</SetupGuard>
+            </QueryProvider>
+          </ThemeProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );

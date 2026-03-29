@@ -1,10 +1,10 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: tcg-postgres
     restart: unless-stopped
+    profiles:
+      - legacy
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-tcg_collection}
       POSTGRES_USER: ${POSTGRES_USER:-tcguser}
@@ -21,12 +21,42 @@ services:
     networks:
       - tcg-net
 
-  redis:
-    image: redis:7-alpine
-    container_name: tcg-redis
-    restart: unless-stopped
+  convex-backend:
+    build:
+      context: ..
+      dockerfile: docker/convex-backend.Dockerfile
+      target: dev
+    container_name: tcg-convex-backend
+    command: sh -c "cd /app && npm install && cd /app/convex-backend && npm run dev -- --typecheck disable --tail-logs disable"
+    environment:
+      NODE_ENV: development
+      CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-tcger-local-convex-auth-secret-2026}
+      BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-true}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
+      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
+      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
+      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
+    volumes:
+      - ../convex-backend:/app/convex-backend
+      - /app/node_modules
+      - ../tsconfig.base.json:/app/tsconfig.base.json:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3211/health').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     ports:
-      - "6379:6379"
+      - "${CONVEX_PORT:-3210}:3210"
+      - "${CONVEX_SITE_PORT:-3211}:3211"
     networks:
       - tcg-net
 
@@ -128,14 +158,16 @@ services:
       dockerfile: docker/backend.Dockerfile
       target: dev
     container_name: tcg-backend
-    command: sh -c "cd /app && npm install && npm run --workspace=packages/api-types build 2>/dev/null; cd /app/backend && npm run dev"
+    command: sh -c "cd /app && npm install && npm run --workspace=packages/api-types build 2>/dev/null; cd /app/backend && if [ \"${BACKEND_MODE:-convex}\" != \"convex\" ]; then npx prisma db push --accept-data-loss; fi && npm run dev"
     environment:
       NODE_ENV: development
       PORT: 3000
+      BACKEND_MODE: ${BACKEND_MODE:-convex}
       DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
-      REDIS_URL: redis://redis:6379
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-changemeplease-atleast32chars!!}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COLLECTIONS_BACKEND: ${COLLECTIONS_BACKEND:-convex}
+      WISHLISTS_BACKEND: ${WISHLISTS_BACKEND:-convex}
+      CONVEX_HTTP_ORIGIN: ${CONVEX_HTTP_ORIGIN:-http://convex-backend:3211}
       SCRYDEX_API_KEY: ${SCRYDEX_API_KEY:-}
       SCRYDEX_TEAM_ID: ${SCRYDEX_TEAM_ID:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
@@ -150,10 +182,8 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3000"
     depends_on:
-      postgres:
+      convex-backend:
         condition: service_healthy
-      redis:
-        condition: service_started
     networks:
       - tcg-net
 
@@ -166,8 +196,14 @@ services:
     command: sh -c "cd /app && npm install && cd /app/frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
     environment:
       NODE_ENV: development
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
       BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}
+      NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:-http://localhost:3210}
+      NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:-http://localhost:3211}
+      CONVEX_URL_INTERNAL: ${CONVEX_URL_INTERNAL:-http://convex-backend:3210}
+      CONVEX_SITE_URL_INTERNAL: ${CONVEX_SITE_URL_INTERNAL:-http://convex-backend:3211}
+      NEXT_PUBLIC_COLLECTIONS_BACKEND: ${NEXT_PUBLIC_COLLECTIONS_BACKEND:-rest}
     volumes:
       - ../frontend:/app/frontend
       - ../packages:/app/packages

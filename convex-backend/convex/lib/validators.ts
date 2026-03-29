@@ -116,3 +116,78 @@ export const viewerValidator = v.object({
   createdAt: v.string(),
   updatedAt: v.string()
 });
+
+export const userProfileValidator = v.object({
+  id: v.string(),
+  email: v.string(),
+  username: v.union(v.string(), v.null()),
+  isAdmin: v.boolean(),
+  showCardNumbers: v.boolean(),
+  showPricing: v.boolean(),
+  createdAt: v.string()
+});
+
+export const userPreferencesValidator = v.object({
+  showCardNumbers: v.boolean(),
+  showPricing: v.boolean(),
+  enabledYugioh: v.boolean(),
+  enabledMagic: v.boolean(),
+  enabledPokemon: v.boolean(),
+  defaultGame: v.union(tcgCodeValidator, v.null())
+});
+
+export const appSettingsValidator = v.object({
+  id: v.number(),
+  publicDashboard: v.boolean(),
+  publicCollections: v.boolean(),
+  requireAuth: v.boolean(),
+  appName: v.string(),
+  updatedAt: v.string()
+});
+
+export const adminAppSettingsValidator = v.object({
+  id: v.number(),
+  publicDashboard: v.boolean(),
+  publicCollections: v.boolean(),
+  requireAuth: v.boolean(),
+  appName: v.string(),
+  scrydexApiKey: v.union(v.string(), v.null()),
+  scrydexTeamId: v.union(v.string(), v.null()),
+  scryfallApiBaseUrl: v.union(v.string(), v.null()),
+  ygoApiBaseUrl: v.union(v.string(), v.null()),
+  scrydexApiBaseUrl: v.union(v.string(), v.null()),
+  tcgdexApiBaseUrl: v.union(v.string(), v.null()),
+  updatedAt: v.string()
+});
+
+export const wishlistCardValidator = v.object({
+  id: v.id("wishlistCards"),
+  externalId: v.string(),
+  tcg: tcgCodeValidator,
+  name: v.string(),
+  setCode: v.optional(v.string()),
+  setName: v.optional(v.string()),
+  rarity: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  imageUrlSmall: v.optional(v.string()),
+  setSymbolUrl: v.optional(v.string()),
+  setLogoUrl: v.optional(v.string()),
+  collectorNumber: v.optional(v.string()),
+  notes: v.optional(v.string()),
+  owned: v.boolean(),
+  ownedQuantity: v.number(),
+  createdAt: v.string()
+});
+
+export const wishlistValidator = v.object({
+  id: v.id("wishlists"),
+  name: v.string(),
+  description: v.optional(v.string()),
+  colorHex: v.optional(v.string()),
+  cards: v.array(wishlistCardValidator),
+  totalCards: v.number(),
+  ownedCards: v.number(),
+  completionPercent: v.number(),
+  createdAt: v.string(),
+  updatedAt: v.string()
+});

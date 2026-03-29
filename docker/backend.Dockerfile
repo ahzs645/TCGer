@@ -1,8 +1,10 @@
-FROM node:18-alpine AS base
+FROM node:20-bookworm-slim AS base
 WORKDIR /app
 
 # Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy monorepo root + workspace package files for dependency resolution
 COPY package*.json ./
@@ -31,11 +33,13 @@ WORKDIR /app/backend
 RUN npx prisma generate && (npx tsc -p tsconfig.build.json --skipLibCheck || true) && test -f dist/server.js
 
 # --- Production target ---
-FROM node:18-alpine AS production
+FROM node:20-bookworm-slim AS production
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache openssl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy monorepo structure for workspace resolution
 COPY --from=build /app/package*.json ./
@@ -48,4 +52,4 @@ COPY docs ./docs
 
 WORKDIR /app/backend
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "if [ \"${BACKEND_MODE:-hybrid}\" != \"convex\" ]; then npx prisma migrate deploy; fi && node dist/server.js"]

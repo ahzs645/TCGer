@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { CollectionTagResponse, CreateTagInput } from '@/lib/api/collections';
 import { getTags, createTag } from '@/lib/api/collections';
+import { useAuthStore } from '@/stores/auth';
 
 interface TagState {
   tags: CollectionTagResponse[];
@@ -17,7 +18,7 @@ export const useTagsStore = create<TagState>((set) => ({
   fetchTags: async (token: string) => {
     set({ isLoading: true, error: null });
     try {
-      const tags = await getTags(token);
+      const tags = await getTags(token, useAuthStore.getState().user);
       set({ tags, isLoading: false });
     } catch (error) {
       set({
@@ -28,7 +29,7 @@ export const useTagsStore = create<TagState>((set) => ({
   },
   addTag: async (token: string, input: CreateTagInput) => {
     try {
-      const tag = await createTag(token, input);
+      const tag = await createTag(token, input, useAuthStore.getState().user);
       set((state) => ({ tags: [...state.tags, tag] }));
       return tag;
     } catch (error) {

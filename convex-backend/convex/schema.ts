@@ -19,7 +19,25 @@ export default defineSchema({
     defaultGame: v.optional(tcgCode),
     createdAt: v.number(),
     updatedAt: v.number()
-  }).index("by_auth_subject", ["authSubject"]),
+  })
+    .index("by_auth_subject", ["authSubject"])
+    .index("by_is_admin", ["isAdmin"]),
+
+  appSettings: defineTable({
+    key: v.string(),
+    publicDashboard: v.boolean(),
+    publicCollections: v.boolean(),
+    requireAuth: v.boolean(),
+    appName: v.string(),
+    scrydexApiKey: v.optional(v.string()),
+    scrydexTeamId: v.optional(v.string()),
+    scryfallApiBaseUrl: v.optional(v.string()),
+    ygoApiBaseUrl: v.optional(v.string()),
+    scrydexApiBaseUrl: v.optional(v.string()),
+    tcgdexApiBaseUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  }).index("by_key", ["key"]),
 
   binders: defineTable({
     userId: v.id("users"),
@@ -61,6 +79,37 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_label", ["userId", "label"]),
 
+  wishlists: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    colorHex: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_name", ["userId", "name"]),
+
+  wishlistCards: defineTable({
+    wishlistId: v.id("wishlists"),
+    externalId: v.string(),
+    tcg: tcgCode,
+    name: v.string(),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    rarity: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    imageUrlSmall: v.optional(v.string()),
+    setSymbolUrl: v.optional(v.string()),
+    setLogoUrl: v.optional(v.string()),
+    collectorNumber: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_wishlist", ["wishlistId"])
+    .index("by_wishlist_external_tcg", ["wishlistId", "externalId", "tcg"]),
+
   collectionEntries: defineTable({
     userId: v.id("users"),
     binderId: v.id("binders"),
@@ -77,6 +126,7 @@ export default defineSchema({
     isSigned: v.optional(v.boolean()),
     isAltered: v.optional(v.boolean()),
     imageUrls: v.optional(v.array(v.string())),
+    imageStorageIds: v.optional(v.array(v.id("_storage"))),
     createdAt: v.number(),
     updatedAt: v.number()
   })

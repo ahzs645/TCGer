@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
 import { env } from '../../config/env';
-import { prisma } from '../../lib/prisma';
 
 export const healthRouter = Router();
 
@@ -14,9 +13,29 @@ healthRouter.get('/', (_req, res) => {
 
 healthRouter.get('/ready', async (_req, res) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const checks: Promise<unknown>[] = [];
+
+    if (env.BACKEND_MODE !== 'convex') {
+      checks.push(import('../../lib/prisma').then(({ prisma }) => prisma.$queryRaw`SELECT 1`));
+    }
+
+    checks.push(
+      fetch(new URL('/health', env.CONVEX_HTTP_ORIGIN)).then((response) => {
+        if (!response.ok) {
+          throw new Error(`Convex returned ${response.status}`);
+        }
+      })
+    );
+
+    await Promise.all(checks);
     res.json({ status: 'ready' });
   } catch (_error) {
-    res.status(503).json({ status: 'not_ready', message: 'Database unavailable' });
+    res.status(503).json({
+      status: 'not_ready',
+      message:
+        env.BACKEND_MODE === 'convex'
+          ? 'Convex backend unavailable'
+          : 'One or more backing services are unavailable'
+    });
   }
 });

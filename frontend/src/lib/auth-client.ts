@@ -1,12 +1,11 @@
+import { convexClient } from '@convex-dev/better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import { usernameClient } from 'better-auth/client/plugins';
 
-const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
-
 export const authClient = createAuthClient({
-  baseURL: publicApiBase,
-  basePath: '/auth',
-  plugins: [usernameClient()]
+  baseURL: process.env.NEXT_PUBLIC_SITE_URL,
+  basePath: '/api/auth',
+  plugins: [convexClient(), usernameClient()]
 });
 
 export const {

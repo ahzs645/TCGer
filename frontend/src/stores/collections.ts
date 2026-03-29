@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as collectionsApi from '@/lib/api/collections';
+import { useAuthStore } from '@/stores/auth';
 
 export type { Collection, CollectionCard } from '@/lib/api/collections';
 
@@ -35,7 +36,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   fetchCollections: async (token: string) => {
     set({ isLoading: true, error: null });
     try {
-      const collections = await collectionsApi.getCollections(token);
+      const collections = await collectionsApi.getCollections(token, useAuthStore.getState().user);
       set({ collections, isLoading: false, hasFetched: true });
     } catch (error) {
       set({
@@ -49,7 +50,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   addCollection: async (token: string, input: { name: string; description?: string }) => {
     set({ isLoading: true, error: null });
     try {
-      const newCollection = await collectionsApi.createCollection(token, input);
+      const newCollection = await collectionsApi.createCollection(token, input, useAuthStore.getState().user);
       set((state) => ({
         collections: [...state.collections, newCollection],
         isLoading: false,
@@ -69,7 +70,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   removeCollection: async (token: string, id: string) => {
     set({ isLoading: true, error: null });
     try {
-      await collectionsApi.deleteCollection(token, id);
+      await collectionsApi.deleteCollection(token, id, useAuthStore.getState().user);
       set((state) => ({
         collections: state.collections.filter((c) => c.id !== id),
         isLoading: false,
@@ -88,7 +89,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   updateCollection: async (token: string, id: string, input: { name?: string; description?: string; colorHex?: string }) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await collectionsApi.updateCollection(token, id, input);
+      const updated = await collectionsApi.updateCollection(token, id, input, useAuthStore.getState().user);
       set((state) => ({
         collections: state.collections.map((c) => (c.id === id ? updated : c)),
         isLoading: false,
@@ -106,7 +107,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
 
   addCardToBinder: async (token: string, binderId: string, input: collectionsApi.AddCardToCollectionInput) => {
     try {
-      await collectionsApi.addCardToCollection(token, binderId, input);
+      await collectionsApi.addCardToCollection(token, binderId, input, useAuthStore.getState().user);
       await get().fetchCollections(token);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to add card to collection';
@@ -117,7 +118,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
 
   updateCollectionCard: async (token: string, binderId: string, cardId: string, input: collectionsApi.UpdateCollectionCardInput) => {
     try {
-      await collectionsApi.updateCollectionCard(token, binderId, cardId, input);
+      await collectionsApi.updateCollectionCard(token, binderId, cardId, input, useAuthStore.getState().user);
       await get().fetchCollections(token);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update card in collection';
@@ -129,7 +130,7 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
 
   removeCollectionCard: async (token: string, binderId: string, cardId: string) => {
     try {
-      await collectionsApi.removeCardFromCollection(token, binderId, cardId);
+      await collectionsApi.removeCardFromCollection(token, binderId, cardId, useAuthStore.getState().user);
       await get().fetchCollections(token);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove card from collection';

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { LogIn } from 'lucide-react';
 import { checkSetupRequired } from '@/lib/api/auth';
+import { useSession } from '@/lib/auth-client';
 import { getSettings } from '@/lib/api/settings';
 import { ensureDemoInterceptor } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
@@ -19,6 +20,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
 
   const router = useRouter();
   const pathname = usePathname();
+  const { isPending: sessionPending } = useSession();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
 
     // Don't check access until the auth store has hydrated from localStorage.
     // This prevents a flash of the auth screen when a valid session exists.
-    if (!hydrated) return;
+    if (!hydrated || sessionPending) return;
 
     // Track whether this effect invocation has been superseded by a newer one.
     // Prevents stale async results from overwriting current state (e.g. an old
@@ -145,10 +147,10 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
     return () => {
       stale = true;
     };
-  }, [hydrated, pathname, router, setSetupRequired, isAuthenticated]);
+  }, [hydrated, pathname, router, sessionPending, setSetupRequired, isAuthenticated]);
 
   // Always render the same structure
-  if (loading || shouldBlock) {
+  if (loading || shouldBlock || sessionPending) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />

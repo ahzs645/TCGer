@@ -1,11 +1,7 @@
 import { Router } from 'express';
-import { z } from 'zod';
-import { updateSettingsSchema } from '@tcg/api-types';
-
-import { env } from '../../config/env';
-import { getAppSettings, updateAppSettings, stripApiKeys } from '../../modules/settings/settings.service';
 import { requireAuth, optionalAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
+import { proxyToConvexHttp } from './convex-http.proxy';
 
 export const settingsRouter = Router();
 
@@ -13,18 +9,7 @@ settingsRouter.get(
   '/source-defaults',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const user = (req as AuthRequest).user;
-    if (!user?.isAdmin) {
-      res.status(403).json({ error: 'FORBIDDEN', message: 'Admin access required' });
-      return;
-    }
-
-    res.json({
-      scryfall: { url: env.SCRYFALL_API_BASE_URL, label: 'Scryfall (Magic)' },
-      yugioh: { url: env.YGO_API_BASE_URL, label: 'YGOPRODeck (Yu-Gi-Oh)' },
-      pokemon: { url: env.POKEMON_API_BASE_URL, label: 'Scrydex (Pokémon)' },
-      tcgdex: { url: env.TCGDEX_API_BASE_URL, label: 'TCGdex (Pokémon Variants)' },
-    });
+    await proxyToConvexHttp(req as AuthRequest, res);
   })
 );
 
@@ -32,14 +17,7 @@ settingsRouter.get(
   '/',
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const settings = await getAppSettings();
-    const user = (req as AuthRequest).user;
-    // Only admins see API key fields
-    if (user?.isAdmin) {
-      res.json(settings);
-    } else {
-      res.json(stripApiKeys(settings as unknown as Record<string, unknown>));
-    }
+    await proxyToConvexHttp(req as AuthRequest, res);
   })
 );
 
@@ -47,92 +25,14 @@ settingsRouter.patch(
   '/',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const user = (req as AuthRequest).user;
-    if (!user?.isAdmin) {
-      res.status(403).json({ error: 'FORBIDDEN', message: 'Admin access required' });
-      return;
-    }
-
-    const data = updateSettingsSchema.parse(req.body);
-    const settings = await updateAppSettings(data);
-    res.json(settings);
+    await proxyToConvexHttp(req as AuthRequest, res);
   })
 );
-
-const testSourceSchema = z.object({
-  source: z.enum(['scryfall', 'yugioh', 'pokemon', 'tcgdex'])
-});
 
 settingsRouter.post(
   '/test-source',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const user = (req as AuthRequest).user;
-    if (!user?.isAdmin) {
-      res.status(403).json({ error: 'FORBIDDEN', message: 'Admin access required' });
-      return;
-    }
-
-    const { source } = testSourceSchema.parse(req.body);
-    const settings = await getAppSettings();
-    const s = settings as Record<string, unknown>;
-
-    const baseUrls: Record<string, string> = {
-      scryfall: (s.scryfallApiBaseUrl as string) || env.SCRYFALL_API_BASE_URL,
-      yugioh: (s.ygoApiBaseUrl as string) || env.YGO_API_BASE_URL,
-      pokemon: (s.scrydexApiBaseUrl as string) || env.POKEMON_API_BASE_URL,
-      tcgdex: (s.tcgdexApiBaseUrl as string) || env.TCGDEX_API_BASE_URL,
-    };
-
-    const base = baseUrls[source].replace(/\/+$/, '');
-    const isLocal = /localhost|:\d{4}|scryfall-bulk|ygo-cache|tcgdex-cache|pokemon-cache/i.test(base);
-
-    // Local cache services all expose GET /health; public APIs need a real query
-    let url: string;
-    if (isLocal) {
-      url = `${base}/health`;
-    } else {
-      switch (source) {
-        case 'scryfall':
-          url = `${base}/cards/named?exact=Lightning+Bolt`;
-          break;
-        case 'yugioh':
-          url = `${base}/cardinfo.php?fname=Dark+Magician&num=1`;
-          break;
-        case 'pokemon':
-          url = base.includes('scrydex')
-            ? `${base}/pokemon/v1/cards?q=name:pikachu&pageSize=1`
-            : `${base}/cards?q=name:pikachu&pageSize=1`;
-          break;
-        case 'tcgdex':
-          url = `${base}/cards?q=pikachu&pageSize=1`;
-          break;
-      }
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const start = Date.now();
-
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      const latencyMs = Date.now() - start;
-      if (response.ok) {
-        res.json({ ok: true, latencyMs });
-      } else {
-        res.json({ ok: false, latencyMs, error: `HTTP ${response.status}` });
-      }
-    } catch (err: unknown) {
-      const latencyMs = Date.now() - start;
-      const raw = err instanceof Error ? err.message : 'Unknown error';
-      const message = raw === 'fetch failed' || raw.includes('ENOTFOUND') || raw.includes('ECONNREFUSED')
-        ? `Service unreachable (${new URL(url).hostname})`
-        : raw.includes('abort')
-          ? 'Timeout (5s)'
-          : raw;
-      res.json({ ok: false, latencyMs, error: message });
-    } finally {
-      clearTimeout(timeout);
-    }
+    await proxyToConvexHttp(req as AuthRequest, res);
   })
 );
