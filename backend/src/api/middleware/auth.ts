@@ -5,8 +5,8 @@ import { verifyToken, getUserById } from '../../modules/users/auth.service';
 export interface AuthRequest extends Request {
   user?: {
     id: string;
-    email: string | null;
-    username: string;
+    email: string;
+    username?: string | null;
     isAdmin: boolean;
     showCardNumbers: boolean;
     showPricing: boolean;
