@@ -1,61 +1,17 @@
 import { Router } from 'express';
-import { signupSchema, loginSchema } from '@tcg/api-types';
+import { fromNodeHeaders } from 'better-auth/node';
 
+import { auth } from '../../lib/auth';
 import {
-  login,
-  signup,
-  verifyToken,
-  getUserById,
   hasAdminUser,
-  setupInitialAdmin
+  setUserAsAdmin
 } from '../../modules/users/auth.service';
 import { asyncHandler } from '../../utils/async-handler';
 
-export const authRouter = Router();
+// Custom setup endpoints — Better Auth handles sign-up/sign-in/sign-out at /auth/*
+export const setupRouter = Router();
 
-authRouter.post(
-  '/signup',
-  asyncHandler(async (req, res) => {
-    const data = signupSchema.parse(req.body);
-    const result = await signup(data);
-    res.status(201).json(result);
-  })
-);
-
-authRouter.post(
-  '/login',
-  asyncHandler(async (req, res) => {
-    const data = loginSchema.parse(req.body);
-    const result = await login(data);
-    res.json(result);
-  })
-);
-
-authRouter.get(
-  '/me',
-  asyncHandler(async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'No token provided' });
-    }
-
-    const token = authHeader.substring(7);
-    const { userId } = await verifyToken(token);
-    const user = await getUserById(userId);
-
-    res.json({ user });
-  })
-);
-
-authRouter.post(
-  '/logout',
-  asyncHandler(async (req, res) => {
-    // Since we're using JWT, logout is handled client-side by removing the token
-    res.json({ message: 'Logged out successfully' });
-  })
-);
-
-authRouter.get(
+setupRouter.get(
   '/setup-required',
   asyncHandler(async (req, res) => {
     const setupRequired = !(await hasAdminUser());
@@ -63,11 +19,28 @@ authRouter.get(
   })
 );
 
-authRouter.post(
+setupRouter.post(
   '/setup',
   asyncHandler(async (req, res) => {
-    const data = signupSchema.parse(req.body);
-    const result = await setupInitialAdmin(data);
-    res.status(201).json(result);
+    // Check if admin already exists
+    const adminExists = await hasAdminUser();
+    if (adminExists) {
+      res.status(409).json({ error: 'CONFLICT', message: 'Admin user already exists' });
+      return;
+    }
+
+    // The user should already be signed up via Better Auth.
+    // This endpoint promotes the current session user to admin.
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers)
+    });
+
+    if (!session?.user) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sign up first, then call setup' });
+      return;
+    }
+
+    await setUserAsAdmin(session.user.id);
+    res.status(200).json({ message: 'Admin account configured successfully' });
   })
 );

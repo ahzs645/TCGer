@@ -1,67 +1,14 @@
-import type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckResponse } from '@tcg/api-types';
 import { API_BASE_URL } from './base-url';
 
-export type { SignupInput, LoginInput, AuthUser, AuthResponse, SetupCheckResponse } from '@tcg/api-types';
+// Re-export Better Auth client for convenience
+export { authClient, signIn, signUp, signOut, useSession } from '@/lib/auth-client';
 
-export async function signup(data: SignupInput): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Signup failed');
-  }
-
-  return response.json();
-}
-
-export async function login(data: LoginInput): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Login failed');
-  }
-
-  return response.json();
-}
-
-export async function logout(token: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/auth/logout`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-}
-
-export async function getCurrentUser(token: string): Promise<{ user: AuthUser }> {
-  const response = await fetch(`${API_BASE_URL}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch user');
-  }
-
-  return response.json();
+export interface SetupCheckResponse {
+  setupRequired: boolean;
 }
 
 export async function checkSetupRequired(): Promise<SetupCheckResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/setup-required`);
+  const response = await fetch(`${API_BASE_URL}/setup/setup-required`);
 
   if (!response.ok) {
     throw new Error('Failed to check setup status');
@@ -70,13 +17,10 @@ export async function checkSetupRequired(): Promise<SetupCheckResponse> {
   return response.json();
 }
 
-export async function setupAdmin(data: SignupInput): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/setup`, {
+export async function promoteToAdmin(): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE_URL}/setup/setup`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
+    credentials: 'include'
   });
 
   if (!response.ok) {

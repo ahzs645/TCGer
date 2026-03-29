@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { AuthUser } from '@/lib/api/auth';
 import { useModuleStore } from './preferences';
 
 const DEFAULT_DISPLAY_PREFERENCES = {
@@ -15,6 +14,18 @@ const DEFAULT_ENABLED_GAMES = {
   enabledPokemon: true
 };
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  username?: string | null;
+  isAdmin: boolean;
+  showCardNumbers: boolean;
+  showPricing: boolean;
+  enabledYugioh: boolean;
+  enabledMagic: boolean;
+  enabledPokemon: boolean;
+}
+
 type DisplayPreferenceKeys = 'showCardNumbers' | 'showPricing';
 type EnabledGamesKeys = 'enabledYugioh' | 'enabledMagic' | 'enabledPokemon';
 
@@ -23,7 +34,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   setupRequired: boolean | null;
-  setAuth: (user: AuthUser, token: string) => void;
+  setAuth: (user: AuthUser, token?: string) => void;
   clearAuth: () => void;
   setSetupRequired: (required: boolean) => void;
   updateStoredPreferences: (
@@ -71,7 +82,7 @@ export const useAuthStore = create<AuthState>()(
 
         set({
           user: normalizedUser,
-          token,
+          token: token ?? null,
           isAuthenticated: true,
           setupRequired: false
         });

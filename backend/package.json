@@ -5,9 +5,9 @@
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "scripts": {
-    "dev": "prisma generate && ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "prisma generate && tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "start": "node dist/server.js",
+    "start": "tsx src/server.ts",
     "lint": "eslint . --ext .ts",
     "test": "jest --passWithNoTests",
     "format": "prettier --write \"src/**/*.ts\""
@@ -16,6 +16,7 @@
     "@prisma/client": "^6.18.0",
     "@tcg/api-types": "*",
     "bcrypt": "^6.0.0",
+    "better-auth": "^1.5.6",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -27,6 +28,7 @@
     "pino-http": "^8.5.0",
     "sharp": "^0.34.5",
     "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.21.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
