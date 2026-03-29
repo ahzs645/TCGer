@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { login } from '@/lib/api/auth';
+import { signIn } from '@/lib/auth-client';
+import { toAuthUser } from '@/lib/auth-helpers';
 import { useAuthStore } from '@/stores/auth';
 
 interface LoginDialogProps {
@@ -17,7 +18,7 @@ interface LoginDialogProps {
 }
 
 export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialogProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,14 +30,27 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
     setLoading(true);
 
     try {
-      const result = await login({ email, password });
-      setAuth(result.user, result.token);
-      setEmail('');
+      const result = await signIn.username({
+        username,
+        password
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? 'Login failed');
+        return;
+      }
+
+      if (result.data) {
+        const sessionToken = result.data.session?.token;
+        setAuth(
+          toAuthUser(result.data.user as Record<string, unknown>),
+          sessionToken
+        );
+      }
+
+      setUsername('');
       setPassword('');
       onOpenChange(false);
-
-      // The SetupGuard will automatically re-render when isAuthenticated changes
-      // No need for router.refresh() which can cause race conditions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -61,15 +75,15 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="username"
+              type="text"
+              placeholder="Your username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
 
@@ -78,7 +92,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

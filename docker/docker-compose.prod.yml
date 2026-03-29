@@ -106,7 +106,8 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-tcguser}:${POSTGRES_PASSWORD:-tcgpassword}@postgres:5432/${POSTGRES_DB:-tcg_collection}
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?err}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?err}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api}
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}

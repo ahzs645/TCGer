@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { signup } from '@/lib/api/auth';
+import { signUp } from '@/lib/auth-client';
+import { toAuthUser } from '@/lib/auth-helpers';
 import { useAuthStore } from '@/stores/auth';
 
 interface SignupDialogProps {
@@ -17,8 +18,8 @@ interface SignupDialogProps {
 }
 
 export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDialogProps) {
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,16 +43,31 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
     setLoading(true);
 
     try {
-      const result = await signup({ email, password, username: username || undefined });
-      setAuth(result.user, result.token);
-      setEmail('');
+      const result = await signUp.email({
+        email,
+        password,
+        name: username,
+        username
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? 'Signup failed');
+        return;
+      }
+
+      if (result.data) {
+        const sessionToken = result.data.session?.token;
+        setAuth(
+          toAuthUser(result.data.user as Record<string, unknown>),
+          sessionToken
+        );
+      }
+
       setUsername('');
+      setEmail('');
       setPassword('');
       setConfirmPassword('');
       onOpenChange(false);
-
-      // The SetupGuard will automatically re-render when isAuthenticated changes
-      // No need for router.refresh() which can cause race conditions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -76,6 +92,19 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
           )}
 
           <div className="space-y-2">
+            <Label htmlFor="signup-username">Username</Label>
+            <Input
+              id="signup-username"
+              type="text"
+              placeholder="CardCollector123"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoComplete="username"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="signup-email">Email</Label>
             <Input
               id="signup-email"
@@ -89,23 +118,11 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="signup-username">Username (optional)</Label>
-            <Input
-              id="signup-username"
-              type="text"
-              placeholder="CardCollector123"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="signup-password">Password</Label>
             <Input
               id="signup-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -118,7 +135,7 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
             <Input
               id="signup-confirm-password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

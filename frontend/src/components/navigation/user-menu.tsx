@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { logout } from '@/lib/api/auth';
+import { signOut } from '@/lib/auth-client';
 import { isDemoMode, setDemoMode } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
 
@@ -28,18 +28,16 @@ export function UserMenu() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
-  const { user, token, isAuthenticated, clearAuth } = useAuthStore();
+  const { user, isAuthenticated, clearAuth } = useAuthStore();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
   const handleLogout = async () => {
     const wasDemo = isDemoMode();
-    if (token) {
-      try {
-        await logout(token);
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
     }
     if (wasDemo) {
       setDemoMode(false);

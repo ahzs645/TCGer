@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { setupAdmin, login } from '@/lib/api/auth';
+import { signUp, signIn } from '@/lib/auth-client';
+import { toAuthUser } from '@/lib/auth-helpers';
+import { promoteToAdmin } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +14,8 @@ import { AlertCircle } from 'lucide-react';
 
 export function SetupWizard() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,8 +30,26 @@ export function SetupWizard() {
     setLoading(true);
 
     try {
-      const result = await login({ email, password });
-      setAuth(result.user, result.token);
+      const result = await signIn.username({
+        username,
+        password
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      // Promote to admin after login
+      await promoteToAdmin();
+
+      if (result.data) {
+        const user = toAuthUser(result.data.user as Record<string, unknown>);
+        user.isAdmin = true;
+        setAuth(user, result.data.session?.token);
+      }
+
       router.push('/collections');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -54,13 +74,29 @@ export function SetupWizard() {
     setLoading(true);
 
     try {
-      const result = await setupAdmin({
+      // Step 1: Sign up via Better Auth
+      const result = await signUp.email({
         email,
         password,
-        username: username || undefined
+        name: username,
+        username
       });
 
-      setAuth(result.user, result.token);
+      if (result.error) {
+        setError(result.error.message ?? 'Setup failed');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Promote the new user to admin
+      await promoteToAdmin();
+
+      if (result.data) {
+        const user = toAuthUser(result.data.user as Record<string, unknown>);
+        user.isAdmin = true;
+        setAuth(user, result.data.session?.token);
+      }
+
       router.push('/collections');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
@@ -94,27 +130,29 @@ export function SetupWizard() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="admin@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="username"
+              type="text"
+              placeholder={isLoginMode ? 'Your username' : 'Admin'}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               disabled={loading}
+              autoComplete="username"
             />
           </div>
 
           {!isLoginMode && (
             <div className="space-y-2">
-              <Label htmlFor="username">Username (optional)</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Admin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                 disabled={loading}
               />
             </div>
@@ -125,7 +163,7 @@ export function SetupWizard() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -146,7 +184,7 @@ export function SetupWizard() {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
