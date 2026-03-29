@@ -421,6 +421,7 @@ struct AppSettings: Codable, Sendable {
 struct User: Codable, Sendable {
     let id: String
     let email: String
+    let name: String?
     let username: String?
     let isAdmin: Bool
     let showCardNumbers: Bool?

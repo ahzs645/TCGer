@@ -3,7 +3,7 @@ import SwiftUI
 struct InitialSetupView: View {
     @Binding var isSubmitting: Bool
 
-    let onCreateAdmin: (_ email: String, _ password: String, _ username: String?) -> Void
+    let onCreateAdmin: (_ email: String, _ password: String, _ username: String) -> Void
     let onRefreshStatus: () -> Void
 
     @State private var email = ""
@@ -18,14 +18,14 @@ struct InitialSetupView: View {
                 header: Text("Initial Admin Setup"),
                 footer: Text("Create the first administrator account for this server.")
             ) {
-                TextField("Admin Email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textContentType(.emailAddress)
+                TextField("Username", text: $username)
+                    .textContentType(.username)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
 
-                TextField("Username (optional)", text: $username)
-                    .textContentType(.username)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
 
@@ -69,6 +69,16 @@ struct InitialSetupView: View {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        guard !trimmedUsername.isEmpty else {
+            validationMessage = "Username is required."
+            return
+        }
+
+        guard trimmedUsername.count >= 3 else {
+            validationMessage = "Username must be at least 3 characters."
+            return
+        }
+
         guard !trimmedEmail.isEmpty else {
             validationMessage = "Email is required."
             return
@@ -89,10 +99,6 @@ struct InitialSetupView: View {
             return
         }
 
-        onCreateAdmin(
-            trimmedEmail,
-            password,
-            trimmedUsername.isEmpty ? nil : trimmedUsername
-        )
+        onCreateAdmin(trimmedEmail, password, trimmedUsername)
     }
 }

@@ -121,7 +121,7 @@ struct RootView: View {
                 config: environmentStore.serverConfiguration,
                 credentials: environmentStore.credentials
             )
-            await completeAuthentication(response, fallbackEmail: environmentStore.credentials.email)
+            await completeAuthentication(response, fallbackUsername: environmentStore.credentials.username)
         } catch {
             if let apiError = error as? APIService.APIError {
                 errorMessage = apiError.localizedDescription
@@ -133,7 +133,7 @@ struct RootView: View {
     }
 
     @MainActor
-    private func signup(email: String, password: String, username: String?) async {
+    private func signup(email: String, password: String, username: String) async {
         guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else { return }
 
         isAuthenticating = true
@@ -146,7 +146,7 @@ struct RootView: View {
                 password: password,
                 username: username
             )
-            await completeAuthentication(response, fallbackEmail: email)
+            await completeAuthentication(response, fallbackUsername: username)
             showingSignup = false
         } catch {
             if let apiError = error as? APIService.APIError {
@@ -158,7 +158,7 @@ struct RootView: View {
     }
 
     @MainActor
-    private func createInitialAdmin(email: String, password: String, username: String?) async {
+    private func createInitialAdmin(email: String, password: String, username: String) async {
         guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else { return }
 
         isAuthenticating = true
@@ -172,7 +172,7 @@ struct RootView: View {
                 username: username
             )
             setupRequired = false
-            await completeAuthentication(response, fallbackEmail: email)
+            await completeAuthentication(response, fallbackUsername: username)
         } catch {
             if let apiError = error as? APIService.APIError {
                 errorMessage = apiError.localizedDescription
@@ -183,9 +183,9 @@ struct RootView: View {
     }
 
     @MainActor
-    private func completeAuthentication(_ response: AuthResponse, fallbackEmail: String?) async {
+    private func completeAuthentication(_ response: AuthResponse, fallbackUsername: String?) async {
         environmentStore.credentials = LoginCredentials(
-            email: fallbackEmail ?? response.user.email,
+            username: fallbackUsername ?? response.user.username ?? "",
             password: ""
         )
         environmentStore.applyAuthUser(response.user)

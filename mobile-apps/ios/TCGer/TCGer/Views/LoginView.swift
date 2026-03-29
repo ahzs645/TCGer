@@ -9,14 +9,13 @@ struct LoginView: View {
     var body: some View {
         Form {
             Section(header: Text("Credentials"), footer: footerText) {
-                TextField("Email", text: Binding(
-                    get: { environmentStore.credentials.email },
-                    set: { environmentStore.credentials.email = $0 }
+                TextField("Username", text: Binding(
+                    get: { environmentStore.credentials.username },
+                    set: { environmentStore.credentials.username = $0 }
                 ))
                 #if os(iOS) || os(tvOS) || os(visionOS)
-                    .keyboardType(.emailAddress)
                     .textContentType(.username)
-                    .autocapitalization(.none) // or .textInputAutocapitalization(.never) on iOS 15+
+                    .autocapitalization(.none)
                     .disableAutocorrection(true)
                 #endif
 

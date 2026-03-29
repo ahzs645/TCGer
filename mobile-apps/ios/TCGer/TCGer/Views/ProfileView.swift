@@ -452,9 +452,9 @@ struct ProfileView: View {
                     )
                 }
 
-                // Update environment store email if changed
-                if let emailUpdate = emailUpdate {
-                    environmentStore.credentials.email = emailUpdate
+                // Update environment store username if changed
+                if let usernameUpdate = usernameUpdate {
+                    environmentStore.credentials.username = usernameUpdate
                 }
                 if let profile = self.profile {
                     environmentStore.applyUserProfile(profile)

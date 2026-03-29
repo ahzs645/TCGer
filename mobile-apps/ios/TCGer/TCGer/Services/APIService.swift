@@ -144,7 +144,8 @@ final class DemoStore {
         self.user = User(
             id: Constants.userId,
             email: "demo@tcger.app",
-            username: "Demo User",
+            name: "Demo User",
+            username: "DemoUser",
             isAdmin: true,
             showCardNumbers: true,
             showPricing: true,
@@ -176,34 +177,23 @@ final class DemoStore {
         seedData()
     }
 
-    func authenticate(email: String?, username: String? = nil) -> AuthResponse {
-        if let email, !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            user = User(
-                id: user.id,
-                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                username: user.username,
-                isAdmin: true,
-                showCardNumbers: preferences.showCardNumbers,
-                showPricing: preferences.showPricing,
-                enabledYugioh: preferences.enabledYugioh,
-                enabledMagic: preferences.enabledMagic,
-                enabledPokemon: preferences.enabledPokemon
-            )
-        }
-        if let username {
-            let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
-            user = User(
-                id: user.id,
-                email: user.email,
-                username: trimmed.isEmpty ? user.username : trimmed,
-                isAdmin: true,
-                showCardNumbers: preferences.showCardNumbers,
-                showPricing: preferences.showPricing,
-                enabledYugioh: preferences.enabledYugioh,
-                enabledMagic: preferences.enabledMagic,
-                enabledPokemon: preferences.enabledPokemon
-            )
-        }
+    func authenticate(username: String? = nil, email: String? = nil) -> AuthResponse {
+        let resolvedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedUsername = username?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        user = User(
+            id: user.id,
+            email: (resolvedEmail?.isEmpty == false) ? resolvedEmail! : user.email,
+            name: resolvedUsername ?? user.name,
+            username: (resolvedUsername?.isEmpty == false) ? resolvedUsername : user.username,
+            isAdmin: true,
+            showCardNumbers: preferences.showCardNumbers,
+            showPricing: preferences.showPricing,
+            enabledYugioh: preferences.enabledYugioh,
+            enabledMagic: preferences.enabledMagic,
+            enabledPokemon: preferences.enabledPokemon,
+            defaultGame: nil
+        )
         return AuthResponse(user: user, token: Constants.token)
     }
 
@@ -248,18 +238,21 @@ final class DemoStore {
             showPricing: showPricing ?? preferences.showPricing,
             enabledYugioh: enabledYugioh ?? preferences.enabledYugioh,
             enabledMagic: enabledMagic ?? preferences.enabledMagic,
-            enabledPokemon: enabledPokemon ?? preferences.enabledPokemon
+            enabledPokemon: enabledPokemon ?? preferences.enabledPokemon,
+            defaultGame: nil
         )
         user = User(
             id: user.id,
             email: user.email,
+            name: user.name,
             username: user.username,
             isAdmin: user.isAdmin,
             showCardNumbers: preferences.showCardNumbers,
             showPricing: preferences.showPricing,
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
-            enabledPokemon: preferences.enabledPokemon
+            enabledPokemon: preferences.enabledPokemon,
+            defaultGame: nil
         )
         return preferences
     }
@@ -285,13 +278,15 @@ final class DemoStore {
         user = User(
             id: user.id,
             email: resolvedEmail,
+            name: resolvedUsername ?? user.name,
             username: resolvedUsername,
             isAdmin: user.isAdmin,
             showCardNumbers: preferences.showCardNumbers,
             showPricing: preferences.showPricing,
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
-            enabledPokemon: preferences.enabledPokemon
+            enabledPokemon: preferences.enabledPokemon,
+            defaultGame: nil
         )
 
         return APIService.UpdatedProfile(
