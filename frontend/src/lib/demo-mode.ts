@@ -54,8 +54,41 @@ function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     return handleDemoRequest(method, path, body);
   }
 
+  // Intercept Better Auth session requests so they don't hang on GitHub Pages
+  // where no backend server exists.  Better Auth uses /api/auth/* endpoints.
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith('/api/auth/')) {
+      return handleBetterAuthDemo(parsed.pathname);
+    }
+  } catch {
+    // relative URL or parse failure — ignore
+  }
+
   // Everything else goes through the real fetch
   return realFetch!(input, init);
+}
+
+/**
+ * Stub handler for Better Auth endpoints in demo mode.
+ * Returns minimal valid responses so the auth client resolves quickly
+ * instead of hanging on a missing server.
+ */
+function handleBetterAuthDemo(pathname: string): Promise<Response> {
+  const jsonResponse = (data: unknown, status = 200) =>
+    Promise.resolve(
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+  if (pathname.includes('get-session')) {
+    return jsonResponse({ session: null, user: null });
+  }
+
+  // Default: return empty OK for any other auth endpoint
+  return jsonResponse({});
 }
 
 function installInterceptor(): void {

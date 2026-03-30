@@ -152,8 +152,13 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
     };
   }, [hydrated, pathname, router, sessionPending, setSetupRequired, isAuthenticated, token]);
 
+  // Demo paths bypass all blocking conditions — they never need a real
+  // backend session, and Better Auth's useSession may hang on GitHub Pages
+  // where no server exists.
+  const isDemo = pathname?.startsWith('/demo');
+
   // Always render the same structure
-  if (loading || shouldBlock || sessionPending) {
+  if (loading || shouldBlock || (!isDemo && sessionPending)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
