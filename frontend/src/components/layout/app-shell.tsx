@@ -34,8 +34,8 @@ const navigation = [
   { href: '/wishlists', label: 'Wishlists', icon: Heart },
 ];
 
-const mobileNavPrimary = navigation.slice(0, 4);
-const mobileNavSecondary = secondaryNavigation;
+const mobileNavPrimary = navigation.slice(0, 3);
+const mobileNavSecondary = [navigation[3], ...secondaryNavigation];
 
 interface AppShellProps {
   children: React.ReactNode;
