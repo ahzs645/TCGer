@@ -171,6 +171,18 @@ export function handleDemoRequest(method: string, path: string, body?: unknown):
     return handleSettings(method, body);
   }
 
+  // ── Setup ───────────────────────────────────────────────────────
+  if (segments[0] === 'setup') {
+    if (segments[1] === 'setup-required' && method === 'GET') {
+      return json({ setupRequired: false });
+    }
+    if (segments[1] === 'setup' && method === 'POST') {
+      store().init();
+      return json({ user: demoAuthUser(), token: 'demo-token-static' });
+    }
+    return notFound();
+  }
+
   // ── Card Search ─────────────────────────────────────────────────
   if (segments[0] === 'cards') {
     return handleCards(method, segments.slice(1), queryString);
