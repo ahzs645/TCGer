@@ -1,0 +1,23 @@
+---
+const apiDocsUrl = 'https://tcger.ahmadjalil.com/api/docs/';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content={`0;url=${apiDocsUrl}`} />
+    <meta name="robots" content="noindex" />
+    <title>Redirecting to API Guide</title>
+    <link rel="canonical" href={apiDocsUrl} />
+    <script is:inline define:vars={{ apiDocsUrl }}>
+      window.location.replace(apiDocsUrl);
+    </script>
+  </head>
+  <body>
+    <main>
+      <p>
+        Redirecting to the <a href={apiDocsUrl}>API Guide</a>.
+      </p>
+    </main>
+  </body>
+</html>
