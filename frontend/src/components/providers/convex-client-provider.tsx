@@ -6,6 +6,7 @@ import { ConvexReactClient } from 'convex/react';
 
 import { authClient, useSession } from '@/lib/auth-client';
 import { toAuthUser } from '@/lib/auth-helpers';
+import { ensureDemoInterceptor, isDemoMode } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
 
 const convex = new ConvexReactClient(
@@ -13,6 +14,8 @@ const convex = new ConvexReactClient(
 );
 
 function AuthSessionSync() {
+  ensureDemoInterceptor();
+
   const { data: session, isPending } = useSession();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -20,6 +23,14 @@ function AuthSessionSync() {
 
   React.useEffect(() => {
     if (isPending) {
+      return;
+    }
+
+    const onDemoRoute =
+      typeof window !== 'undefined' &&
+      (window.location.pathname === '/demo' || window.location.pathname.startsWith('/demo/'));
+
+    if (onDemoRoute || isDemoMode()) {
       return;
     }
 
@@ -46,6 +57,8 @@ export function ConvexClientProvider({
   children: React.ReactNode;
   initialToken?: string | null;
 }) {
+  ensureDemoInterceptor();
+
   return (
     <ConvexBetterAuthProvider
       client={convex}
