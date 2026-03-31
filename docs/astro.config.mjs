@@ -1,6 +1,8 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const API_DOCS_URL = 'https://tcger.ahmadjalil.com/api/docs/';
+
 export default defineConfig({
   integrations: [
     starlight({
@@ -26,7 +28,7 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
-            { label: 'API Guide', link: '/reference/api/' },
+            { label: 'API Guide', link: API_DOCS_URL },
             { label: 'Architecture', link: '/reference/architecture/' }
           ]
         },
