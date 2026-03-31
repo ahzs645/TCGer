@@ -17,6 +17,18 @@ import { API_BASE_URL as DEMO_API_BASE_URL } from './api/base-url';
 
 const STORAGE_KEY = 'tcg-demo-mode';
 
+function isDemoPath(pathname: string | null | undefined): boolean {
+  return pathname === '/demo' || pathname?.startsWith('/demo/') === true;
+}
+
+function shouldStubBetterAuth(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return isDemoMode() || isDemoPath(window.location.pathname);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Demo-mode flag                                                      */
 /* ------------------------------------------------------------------ */
@@ -43,11 +55,15 @@ export function setDemoMode(enabled: boolean): void {
 
 let realFetch: typeof globalThis.fetch | null = null;
 
-function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+function getFallbackFetch(): typeof globalThis.fetch {
+  return realFetch ?? globalThis.fetch.bind(globalThis);
+}
+
+function maybeHandleDemoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> | null {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
 
   // Only intercept requests to our API base URL
-  if (url.startsWith(DEMO_API_BASE_URL)) {
+  if (isDemoMode() && url.startsWith(DEMO_API_BASE_URL)) {
     const path = url.slice(DEMO_API_BASE_URL.length); // e.g. "/auth/login"
     const method = init?.method?.toUpperCase() ?? 'GET';
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
@@ -56,13 +72,30 @@ function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise
 
   // Intercept Better Auth session requests so they don't hang on GitHub Pages
   // where no backend server exists.  Better Auth uses /api/auth/* endpoints.
-  try {
-    const parsed = new URL(url);
-    if (parsed.pathname.startsWith('/api/auth/')) {
-      return handleBetterAuthDemo(parsed.pathname);
+  if (shouldStubBetterAuth()) {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.pathname.startsWith('/api/auth/')) {
+        return handleBetterAuthDemo(parsed.pathname);
+      }
+    } catch {
+      if (url.startsWith('/api/auth/')) {
+        return handleBetterAuthDemo(url);
+      }
     }
-  } catch {
-    // relative URL or parse failure — ignore
+  }
+
+  return null;
+}
+
+export function demoAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return maybeHandleDemoFetch(input, init) ?? getFallbackFetch()(input, init);
+}
+
+function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const demoResponse = maybeHandleDemoFetch(input, init);
+  if (demoResponse) {
+    return demoResponse;
   }
 
   // Everything else goes through the real fetch
@@ -110,7 +143,7 @@ function uninstallInterceptor(): void {
  * the interceptor if the user was already in demo mode from a previous session.
  */
 export function ensureDemoInterceptor(): void {
-  if (isDemoMode()) {
+  if (typeof window !== 'undefined' && (isDemoMode() || isDemoPath(window.location.pathname))) {
     installInterceptor();
   }
 }
