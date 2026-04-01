@@ -9,7 +9,7 @@ servers:
     description: Docker gateway / reverse-proxy path
   - url: /
     description: Direct backend service (no API prefix)
-  - url: http://localhost:3001
+  - url: http://localhost:3004
     description: Local backend example port
 
 security: []

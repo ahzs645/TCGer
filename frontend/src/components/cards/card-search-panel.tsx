@@ -32,7 +32,13 @@ export function CardSearchPanel() {
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isFetching, refetch } = useCardSearch(searchQuery, selectedGame === 'all' ? undefined : selectedGame);
+  const {
+    data,
+    error,
+    isError,
+    isFetching,
+    refetch
+  } = useCardSearch(searchQuery, selectedGame === 'all' ? undefined : selectedGame);
   const filteredCards = (data ?? []).filter((card) => enabledGames[card.tcg as keyof typeof enabledGames]);
   const cards = filteredCards;
   const selectedGameDisabled = selectedGame !== 'all' && !enabledGames[selectedGame as keyof typeof enabledGames];
@@ -111,6 +117,10 @@ export function CardSearchPanel() {
             <CardDescription>
               {noGamesEnabled
                 ? 'Enable at least one module to resume cross-game search.'
+                : isError
+                  ? error instanceof Error
+                    ? error.message
+                    : 'Search failed.'
                 : searchQuery
                   ? `${cards.length} cards matched "${searchQuery}".`
                   : 'Enter a keyword and run a search to see results.'}
@@ -125,8 +135,14 @@ export function CardSearchPanel() {
                 <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
                   {noGamesEnabled
                     ? 'All modules are disabled. Re-enable at least one trading card game in settings.'
+                    : isError
+                      ? error instanceof Error
+                        ? error.message
+                        : 'Search failed. Try again.'
                     : selectedGameDisabled
                       ? 'Selected game is disabled. Toggle it on in module preferences to continue.'
+                      : searchQuery
+                        ? `No exact matches for "${searchQuery}". Try correcting the spelling or using a broader query.`
                       : 'No results yet. Try adjusting your query or game filter.'}
                 </div>
               ) : (

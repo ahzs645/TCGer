@@ -10,8 +10,8 @@ TCGer API docs are now exposed directly by the backend service using OpenAPI + S
 
 ## Where to open Swagger UI
 
-- Local backend (direct): `http://localhost:3001/docs` (or your backend port)
-- Docker gateway path: `http://localhost:3000/api/docs`
+- Local backend (direct): `http://localhost:3004/docs` (or your backend port)
+- Docker gateway path: `http://localhost:3003/api/docs`
 
 ## Authorizing secured endpoints
 
@@ -26,6 +26,6 @@ The spec includes multiple server options:
 
 - `/api` for nginx/gateway path routing.
 - `/` for direct backend routing.
-- `http://localhost:3001` as a local example.
+- `http://localhost:3004` as a local example.
 
 If requests fail due to path prefix, switch the selected server in Swagger UI.

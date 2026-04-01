@@ -20,6 +20,7 @@ export async function searchCardsApi(params: { query: string; tcg?: TcgCode | 'a
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/cards/search?${usp.toString()}`, {
     headers,
+    credentials: 'include',
     next: { revalidate: 30 }
   });
 
@@ -33,6 +34,7 @@ export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string;
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
     headers,
+    credentials: 'include',
     next: { revalidate: 30 }
   });
   return handleResponse<CardPrintsResponse>(res);

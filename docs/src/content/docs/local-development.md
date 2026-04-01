@@ -21,7 +21,7 @@ npm install
 ```bash
 cd backend
 npx prisma migrate dev
-PORT=3001 JWT_SECRET=changeme-super-secret npm run dev
+PORT=3004 JWT_SECRET=changeme-super-secret npm run dev
 ```
 
 ## Frontend
@@ -30,7 +30,7 @@ In a second terminal:
 
 ```bash
 cd frontend
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 npm run dev
+NEXT_PUBLIC_SITE_URL=http://localhost:3003 NEXT_PUBLIC_API_BASE_URL=http://localhost:3004 npm run dev -- --port 3003
 ```
 
 ## Environment variables

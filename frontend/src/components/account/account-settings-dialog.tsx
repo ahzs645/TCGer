@@ -234,7 +234,7 @@ export function AccountSettingsDialog({ open, onOpenChange }: AccountSettingsDia
                 <div key={game} className="flex items-center justify-between rounded-lg border bg-background p-3">
                   <div className="flex items-center gap-3">
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
-                      <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="h-4 w-4 dark:invert" />
+                      <Image src={iconPath} alt={GAME_LABELS[game]} width={16} height={16} className="dark:invert" />
                     </span>
                     <div>
                       <p className="text-sm font-medium">{GAME_LABELS[game]}</p>

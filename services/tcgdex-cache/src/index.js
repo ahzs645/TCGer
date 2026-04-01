@@ -20,6 +20,89 @@ let cardById = new Map();
 let metadata = null;
 let refreshPromise = null;
 
+function normalizeForSearch(value) {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function levenshteinDistance(left, right) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left.length) {
+    return right.length;
+  }
+
+  if (!right.length) {
+    return left.length;
+  }
+
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+  for (let row = 0; row < left.length; row += 1) {
+    let diagonal = previous[0];
+    previous[0] = row + 1;
+
+    for (let column = 0; column < right.length; column += 1) {
+      const current = previous[column + 1];
+      if (left[row] === right[column]) {
+        previous[column + 1] = diagonal;
+      } else {
+        previous[column + 1] = Math.min(
+          previous[column] + 1,
+          previous[column + 1] + 1,
+          diagonal + 1
+        );
+      }
+      diagonal = current;
+    }
+  }
+
+  return previous[right.length];
+}
+
+function fuzzyMatchCards(searchTerm) {
+  const maxDistance = Math.max(1, Math.floor(searchTerm.length / 4));
+
+  return cards
+    .map((card) => {
+      const name = normalizeForSearch(card?.name);
+      const id = normalizeForSearch(card?.id);
+      const candidates = [name, id].filter(Boolean);
+      let bestScore = Number.POSITIVE_INFINITY;
+
+      for (const candidate of candidates) {
+        if (Math.abs(candidate.length - searchTerm.length) > maxDistance + 2) {
+          continue;
+        }
+
+        if (candidate[0] !== searchTerm[0]) {
+          continue;
+        }
+
+        bestScore = Math.min(bestScore, levenshteinDistance(searchTerm, candidate));
+      }
+
+      return {
+        card,
+        score: bestScore
+      };
+    })
+    .filter(({ score }) => Number.isFinite(score) && score <= maxDistance)
+    .sort((left, right) => {
+      if (left.score !== right.score) {
+        return left.score - right.score;
+      }
+
+      return String(left.card?.name || '').localeCompare(String(right.card?.name || ''));
+    })
+    .map(({ card }) => card);
+}
+
 function sleep(duration) {
   return new Promise((resolve) => {
     setTimeout(resolve, duration);
@@ -177,6 +260,7 @@ async function refreshData(force = false) {
 
 function searchCardsLocal(query, page, pageSize) {
   const searchTerm = (query || '').toLowerCase();
+  const normalizedSearchTerm = normalizeForSearch(query);
   let filtered = cards;
 
   if (searchTerm) {
@@ -185,6 +269,10 @@ function searchCardsLocal(query, page, pageSize) {
       const id = (card.id || '').toLowerCase();
       return name.includes(searchTerm) || id.includes(searchTerm);
     });
+
+    if (!filtered.length && normalizedSearchTerm.length >= 4) {
+      filtered = fuzzyMatchCards(normalizedSearchTerm);
+    }
   }
 
   const totalCount = filtered.length;

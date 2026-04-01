@@ -13,27 +13,33 @@ From the repository root:
 
 ```bash
 cp .env.docker.example .env.docker
-docker compose -f docker/docker-compose.yml --env-file .env.docker up --build
+cp frontend/.env.local.example frontend/.env.local
+npm run docker:dev:legacy:bulk
+```
+
+In a second terminal:
+
+```bash
+npm run dev:frontend
 ```
 
 Open:
 
-- App: `http://localhost:3000`
-- API base: `http://localhost:3000/api`
+- App: `http://localhost:3003`
+- API base: `http://localhost:3004`
 
 ## First-run setup
 
-On a fresh database, open `http://localhost:3000/setup` and create the initial admin account.
+On a fresh database, open `http://localhost:3003/setup` and create the initial admin account.
 
 ## Optional cache services
 
 To start optional bulk/cache services:
 
 ```bash
-docker compose -f docker/docker-compose.yml --env-file .env.docker --profile bulk up --build
+npm run docker:dev:legacy:bulk
 ```
 
 Notes:
 
 - `pokemon-cache` is deprecated in favor of `tcgdex-cache`.
-- You can run without cache services if you want a simpler setup first.

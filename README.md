@@ -19,17 +19,40 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 - `mobile-apps/` - iOS SwiftUI client (in progress) and Android placeholder.
 - `docs/` - Starlight documentation site source + OpenAPI spec.
 
-## Quick start (Docker)
+## Quick start (recommended: frontend on host, services in Docker)
 ```bash
 cp .env.docker.example .env.docker
-docker compose -f docker/docker-compose.yml --env-file .env.docker up --build
+cp frontend/.env.local.example frontend/.env.local
+npm run docker:dev:legacy:bulk
 ```
 
-Open the app at `http://localhost:3000` (or `APP_PORT`). The API is exposed at `http://localhost:3000/api`.
+In a second terminal:
+
+```bash
+npm run dev:frontend
+```
+
+Open the app at `http://localhost:3003`.
+
+This starts:
+- the frontend locally with normal Next.js hot reload
+- the Dockerized backend on `http://localhost:3004`
+- Postgres on `localhost:5432`
+- the cache services from the `bulk` profile
+
+If the default ports are already in use on your machine, change `APP_PORT`, `BACKEND_PORT`, `CONVEX_PORT`, or `CONVEX_SITE_PORT` in `.env.docker`.
+
+## Full Docker stack
+```bash
+cp .env.docker.example .env.docker
+docker compose -f docker/docker-compose.yml --env-file .env.docker --profile frontend up --build
+```
+
+Open the app at `http://localhost:3003` (or `APP_PORT`). The API is exposed at `http://localhost:3003/api`.
 
 Optional cache services:
 ```bash
-docker compose -f docker/docker-compose.yml --env-file .env.docker --profile bulk up --build
+npm run docker:dev:full:bulk
 ```
 
 Notes:
@@ -47,14 +70,20 @@ Backend:
 ```bash
 cd backend
 npx prisma migrate dev
-PORT=3001 JWT_SECRET=changeme-super-secret npm run dev
+PORT=3004 JWT_SECRET=changeme-super-secret npm run dev
 ```
 
 Frontend (point to the backend port):
 ```bash
 cd frontend
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 npm run dev
+NEXT_PUBLIC_SITE_URL=http://localhost:3003 NEXT_PUBLIC_API_BASE_URL=http://localhost:3004 npm run dev -- --port 3003
 ```
+
+Docker-backed local development shortcuts from the repo root:
+- `npm run docker:dev:legacy` - backend stack + Postgres for hybrid/legacy routes.
+- `npm run docker:dev:legacy:bulk` - backend stack + Postgres + cache services.
+- `npm run docker:dev:full` - full Docker stack including the frontend and nginx gateway.
+- `npm run docker:down` - stop the Docker development stack.
 
 ## Environment variables
 Backend (see `backend/src/config/env.ts`):
@@ -67,7 +96,7 @@ Backend (see `backend/src/config/env.ts`):
 - `POKEMON_TCG_API_KEY` (optional for official Pokemon API).
 
 Frontend:
-- `NEXT_PUBLIC_API_BASE_URL` (public API base; typically `http://localhost:3000/api` with nginx).
+- `NEXT_PUBLIC_API_BASE_URL` (public API base; typically `http://localhost:3003/api` with nginx).
 - `BACKEND_API_ORIGIN` (internal API origin for server-side Next.js fetches).
 
 ## API overview
