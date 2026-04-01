@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:host": "next dev --port 3003",
     "prebuild": "npm --prefix ../packages/api-types run build",
     "build": "next build",
     "prebuild:demo": "npm --prefix ../packages/api-types run build && rm -rf app/api",

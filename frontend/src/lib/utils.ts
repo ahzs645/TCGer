@@ -26,7 +26,7 @@ export function getCardBackImage(tcg?: string): string {
   return (tcg && CARD_BACK_IMAGES[tcg]) || DEFAULT_CARD_BACK;
 }
 
-const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3004';
 const internalApiBase = process.env.BACKEND_API_ORIGIN ?? publicApiBase;
 
 export const DEFAULT_API_BASE_URL = typeof window === 'undefined' ? internalApiBase : publicApiBase;

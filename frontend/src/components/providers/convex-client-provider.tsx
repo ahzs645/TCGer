@@ -10,7 +10,7 @@ import { ensureDemoInterceptor, isDemoMode } from '@/lib/demo-mode';
 import { useAuthStore } from '@/stores/auth';
 
 const convex = new ConvexReactClient(
-  process.env.NEXT_PUBLIC_CONVEX_URL ?? 'http://127.0.0.1:3210'
+  process.env.NEXT_PUBLIC_CONVEX_URL ?? 'http://localhost:3210'
 );
 
 function AuthSessionSync() {

@@ -55,7 +55,7 @@ export function GameSwitcher() {
               alt={GAME_LABELS[game]}
               width={16}
               height={16}
-              className={`h-4 w-4 transition-all ${
+              className={`transition-all ${
                 isSelected
                   ? 'opacity-100 invert dark:invert-0 dark:brightness-0'
                   : 'opacity-70 dark:opacity-100 dark:invert'
