@@ -615,6 +615,10 @@ final class DemoStore {
                             acquisitionPrice: template.acquisitionPrice,
                             serialNumber: template.serialNumber,
                             acquiredAt: template.acquiredAt,
+                            isFoil: template.isFoil,
+                            isSigned: template.isSigned,
+                            isAltered: template.isAltered,
+                            imageUrls: template.imageUrls,
                             tags: template.tags
                         )
                     )
@@ -636,6 +640,10 @@ final class DemoStore {
                     acquisitionPrice: copy.acquisitionPrice,
                     serialNumber: copy.serialNumber,
                     acquiredAt: copy.acquiredAt,
+                    isFoil: copy.isFoil,
+                    isSigned: copy.isSigned,
+                    isAltered: copy.isAltered,
+                    imageUrls: copy.imageUrls,
                     tags: selectedTags.isEmpty ? copy.tags : selectedTags
                 )
             }
@@ -984,6 +992,10 @@ final class DemoStore {
                     acquisitionPrice: acquisitionPrice,
                     serialNumber: nil,
                     acquiredAt: now,
+                    isFoil: nil,
+                    isSigned: nil,
+                    isAltered: nil,
+                    imageUrls: nil,
                     tags: tags
                 )
             )
