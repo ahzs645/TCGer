@@ -11,6 +11,7 @@ import type {
   CreateTagInput
 } from '@tcg/api-types';
 import { API_BASE_URL } from './base-url';
+import { resolvePublicConvexSiteOrigin } from '@/lib/utils';
 
 export interface CollectionsViewerContext {
   id: string;
@@ -33,7 +34,8 @@ export const COLLECTIONS_BACKEND = process.env.NEXT_PUBLIC_COLLECTIONS_BACKEND ?
 export const isConvexCollectionsBackend = COLLECTIONS_BACKEND === 'convex';
 
 const CONVEX_COLLECTIONS_ORIGIN =
-  process.env.NEXT_PUBLIC_CONVEX_COLLECTIONS_ORIGIN?.replace(/\/+$/, '') ?? '';
+  process.env.NEXT_PUBLIC_CONVEX_COLLECTIONS_ORIGIN?.replace(/\/+$/, '') ??
+  (typeof window !== 'undefined' ? resolvePublicConvexSiteOrigin() : '');
 
 function getCollectionsBaseUrl() {
   if (!isConvexCollectionsBackend) {

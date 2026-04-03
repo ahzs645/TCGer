@@ -1,18 +1,17 @@
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const convexSiteUrl =
+const configuredConvexSiteUrl =
   process.env.CONVEX_SITE_URL_INTERNAL ??
   process.env.NEXT_PUBLIC_CONVEX_SITE_URL ??
   'http://localhost:3211';
-
-const publicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3003';
+const configuredPublicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
 async function proxy(request: Request) {
   const requestUrl = new URL(request.url);
-  const targetUrl = new URL(`${requestUrl.pathname}${requestUrl.search}`, convexSiteUrl);
+  const targetUrl = new URL(`${requestUrl.pathname}${requestUrl.search}`, configuredConvexSiteUrl);
   const headers = new Headers(request.headers);
-  const publicUrl = new URL(publicSiteUrl);
+  const publicUrl = new URL(configuredPublicSiteUrl ?? requestUrl.origin);
 
   headers.set('accept-encoding', 'identity');
   headers.set('x-forwarded-host', publicUrl.host);
