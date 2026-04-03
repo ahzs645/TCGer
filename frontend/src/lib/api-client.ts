@@ -39,3 +39,17 @@ export async function fetchCardPrintsApi(params: { tcg: TcgCode; cardId: string;
   });
   return handleResponse<CardPrintsResponse>(res);
 }
+
+export async function fetchCardByIdApi(params: { tcg: TcgCode; cardId: string; token?: string | null }): Promise<Card> {
+  const { tcg, cardId, token } = params;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}`, {
+    headers,
+    credentials: 'include',
+    next: { revalidate: 30 }
+  });
+
+  const data = await handleResponse<{ card: Card }>(res);
+  return data.card;
+}

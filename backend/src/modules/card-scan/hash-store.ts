@@ -84,16 +84,19 @@ function normalizeRecord(record: CardHashRecord): CardHashRecord {
 
 class PrismaCardHashStore implements CardHashStore {
   readonly mode = 'prisma' as const;
+  private cachePromise: Promise<Map<string, CardHashRecord[]>> | null = null;
 
   constructor(private readonly client: PrismaClient) {}
 
   async getAll(query: CardHashQuery = {}): Promise<CardHashRecord[]> {
-    const records = await this.client.cardHash.findMany({
-      where: query.tcg ? { tcg: query.tcg } : undefined,
-      orderBy: [{ name: 'asc' }, { externalId: 'asc' }],
-    });
+    const cache = await this.getCache();
+    if (query.tcg) {
+      return [...(cache.get(query.tcg) ?? [])];
+    }
 
-    return records.map((record) => normalizeRecord(record));
+    return Array.from(cache.values())
+      .flat()
+      .sort(compareEntriesByName);
   }
 
   async getPage(query: CardHashPageQuery): Promise<CardHashRecord[]> {
@@ -108,17 +111,16 @@ class PrismaCardHashStore implements CardHashStore {
   }
 
   async count(query: CardHashQuery = {}): Promise<number> {
-    return this.client.cardHash.count({
-      where: query.tcg ? { tcg: query.tcg } : undefined,
-    });
+    const cache = await this.getCache();
+    if (query.tcg) {
+      return cache.get(query.tcg)?.length ?? 0;
+    }
+
+    return Array.from(cache.values()).reduce((total, entries) => total + entries.length, 0);
   }
 
   async getExternalIdSet(tcg: string): Promise<Set<string>> {
-    const records = await this.client.cardHash.findMany({
-      where: { tcg },
-      select: { externalId: true },
-    });
-
+    const records = await this.getAll({ tcg });
     return new Set(records.map((record) => record.externalId));
   }
 
@@ -145,6 +147,36 @@ class PrismaCardHashStore implements CardHashStore {
         )
       );
     }
+
+    this.cachePromise = null;
+  }
+
+  private async getCache(): Promise<Map<string, CardHashRecord[]>> {
+    if (!this.cachePromise) {
+      this.cachePromise = this.loadCache();
+    }
+
+    return this.cachePromise;
+  }
+
+  private async loadCache(): Promise<Map<string, CardHashRecord[]>> {
+    const records = await this.client.cardHash.findMany({
+      orderBy: [{ tcg: 'asc' }, { name: 'asc' }, { externalId: 'asc' }],
+    });
+
+    const grouped = new Map<string, CardHashRecord[]>();
+    for (const record of records) {
+      const normalized = normalizeRecord(record);
+      const bucket = grouped.get(normalized.tcg) ?? [];
+      bucket.push(normalized);
+      grouped.set(normalized.tcg, bucket);
+    }
+
+    for (const bucket of grouped.values()) {
+      bucket.sort(compareEntriesByName);
+    }
+
+    return grouped;
   }
 }
 

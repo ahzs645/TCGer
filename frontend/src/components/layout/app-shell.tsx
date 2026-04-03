@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, MoreHorizontal, X } from 'lucide-react';
+import { Heart, LayoutDashboard, Search, Table, Layers, DollarSign, BarChart3, Repeat2, Package, MoreHorizontal, X, Camera } from 'lucide-react';
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
 export const secondaryNavigation = [
@@ -30,6 +30,7 @@ import { UserMenu } from '../navigation/user-menu';
 const navigation = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/cards', label: 'Card Search', icon: Search },
+  { href: '/scan', label: 'Scan', icon: Camera },
   { href: '/collections', label: 'Collections', icon: Table },
   { href: '/wishlists', label: 'Wishlists', icon: Heart },
 ];

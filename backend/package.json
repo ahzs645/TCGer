@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma/client": "^6.18.0",
     "@tcg/api-types": "*",
+    "@techstark/opencv-js": "^4.12.0-release.1",
     "bcrypt": "^6.0.0",
     "better-auth": "^1.5.6",
     "compression": "^1.7.4",

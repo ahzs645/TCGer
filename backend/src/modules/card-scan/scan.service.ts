@@ -5,7 +5,7 @@
 
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
-import { preprocessCardImage } from './preprocess';
+import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
 
 // ---------- types ----------
 
@@ -25,6 +25,14 @@ export interface ScanResult {
   bestMatch: ScanMatch | null;
   candidates: ScanMatch[];
   hashGenerated: RGBHash;
+  meta: {
+    quality: ScanQualityMetrics | null;
+    thresholdUsed: number;
+    variantUsed: string;
+    variantsTried: string[];
+    perspectiveCorrected: boolean;
+    contourAreaRatio: number | null;
+  };
 }
 
 // ---------- configuration ----------
@@ -36,12 +44,11 @@ export interface ScanResult {
  * Moss Machine uses ~80 per channel with its 256-bit hashes.
  */
 const MAX_COMBINED_DISTANCE = 240;
+const STRICT_COMBINED_DISTANCE = 160;
+const MEDIUM_COMBINED_DISTANCE = 200;
 
 /** Maximum number of candidates to return. */
 const MAX_CANDIDATES = 5;
-
-/** Quick rejection: skip full comparison if any single channel exceeds this. */
-const SINGLE_CHANNEL_REJECT = 100;
 
 // ---------- public API ----------
 
@@ -52,59 +59,64 @@ export async function scanCardImage(
   imageBuffer: Buffer,
   tcgFilter?: string
 ): Promise<ScanResult> {
-  // 1. Preprocess the image (crop card area, normalize)
-  const processed = await preprocessCardImage(imageBuffer);
-
-  // 2. Generate pHash
-  const hashGenerated = await computeRGBHash(processed);
-
-  // 3. Fetch hash database (filtered by TCG if specified)
+  const runtimeScan = await prepareRuntimeScanImage(imageBuffer);
   const hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
+  const attemptedVariants: string[] = [];
+  const allMatches = new Map<string, ScanMatch>();
+  let bestAttempt: { hash: RGBHash; variant: ScanRuntimeVariant; threshold: number; match: ScanMatch | null } | null = null;
 
-  // 4. Compare and rank matches
-  const matches: ScanMatch[] = [];
+  const passes = buildScanPasses(runtimeScan.variants);
 
-  for (const entry of hashEntries) {
-    const entryHash: RGBHash = {
-      r: entry.rHash,
-      g: entry.gHash,
-      b: entry.bHash,
-    };
+  for (const pass of passes) {
+    for (const variant of pass.variants) {
+      attemptedVariants.push(variant.name);
+      const hash = await computeRGBHash(variant.image);
+      const matches = rankMatches(hashEntries, hash, pass.maxDistance);
 
-    // Quick rejection on red channel
-    const rDist = hammingDistance(hashGenerated.r, entryHash.r);
-    if (rDist > SINGLE_CHANNEL_REJECT) continue;
+      for (const match of matches) {
+        const key = `${match.tcg}:${match.externalId}`;
+        const existing = allMatches.get(key);
+        if (!existing || match.distance < existing.distance) {
+          allMatches.set(key, match);
+        }
+      }
 
-    // Full comparison
-    const gDist = hammingDistance(hashGenerated.g, entryHash.g);
-    if (rDist + gDist > MAX_COMBINED_DISTANCE) continue;
+      const bestMatch = matches[0] ?? null;
+      if (!bestAttempt || isBetterAttempt(bestMatch, bestAttempt.match)) {
+        bestAttempt = {
+          hash,
+          variant,
+          threshold: pass.maxDistance,
+          match: bestMatch,
+        };
+      }
 
-    const bDist = hammingDistance(hashGenerated.b, entryHash.b);
-    const totalDist = rDist + gDist + bDist;
+      if (bestMatch?.distance === 0) {
+        break;
+      }
+    }
 
-    if (totalDist <= MAX_COMBINED_DISTANCE) {
-      matches.push({
-        externalId: entry.externalId,
-        tcg: entry.tcg,
-        name: entry.name,
-        setCode: entry.setCode,
-        setName: entry.setName,
-        rarity: entry.rarity,
-        imageUrl: entry.imageUrl,
-        confidence: Math.max(0, 1 - totalDist / MAX_COMBINED_DISTANCE),
-        distance: totalDist,
-      });
+    if (bestAttempt?.match && isStrongEnough(bestAttempt.match, pass.maxDistance)) {
+      break;
     }
   }
 
-  // Sort by distance (ascending = best first)
-  matches.sort((a, b) => a.distance - b.distance);
-  const candidates = matches.slice(0, MAX_CANDIDATES);
+  const candidates = Array.from(allMatches.values())
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, MAX_CANDIDATES);
 
   return {
     bestMatch: candidates[0] ?? null,
     candidates,
-    hashGenerated,
+    hashGenerated: bestAttempt?.hash ?? (await computeRGBHash(runtimeScan.primaryVariant.image)),
+    meta: {
+      quality: runtimeScan.quality,
+      thresholdUsed: bestAttempt?.threshold ?? MAX_COMBINED_DISTANCE,
+      variantUsed: bestAttempt?.variant.name ?? runtimeScan.primaryVariant.name,
+      variantsTried: Array.from(new Set(attemptedVariants)),
+      perspectiveCorrected: runtimeScan.perspectiveCorrection.applied,
+      contourAreaRatio: runtimeScan.perspectiveCorrection.contourAreaRatio,
+    },
   };
 }
 
@@ -130,4 +142,84 @@ export async function getCardHashes(tcg?: string, page = 1, pageSize = 500) {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   };
+}
+
+function buildScanPasses(variants: ScanRuntimeVariant[]) {
+  const uprightVariants = variants.filter((variant) => !variant.rotated180);
+  const correctedVariants = variants.filter((variant) => variant.perspectiveCorrected);
+  const fallbackVariants = Array.from(new Set([
+    ...uprightVariants,
+    ...correctedVariants.filter((variant) => variant.rotated180),
+    ...variants.filter((variant) => variant.rotated180),
+  ]));
+
+  return [
+    { maxDistance: STRICT_COMBINED_DISTANCE, variants: variants.slice(0, 1) },
+    { maxDistance: MEDIUM_COMBINED_DISTANCE, variants: fallbackVariants.slice(0, Math.max(2, fallbackVariants.length)) },
+    { maxDistance: MAX_COMBINED_DISTANCE, variants },
+  ];
+}
+
+function rankMatches(
+  hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
+  hashGenerated: RGBHash,
+  maxDistance: number
+): ScanMatch[] {
+  const matches: ScanMatch[] = [];
+  const singleChannelReject = Math.max(64, Math.floor(maxDistance * 0.6));
+
+  for (const entry of hashEntries) {
+    const entryHash: RGBHash = {
+      r: entry.rHash,
+      g: entry.gHash,
+      b: entry.bHash,
+    };
+
+    const rDist = hammingDistance(hashGenerated.r, entryHash.r);
+    if (rDist > singleChannelReject) {
+      continue;
+    }
+
+    const gDist = hammingDistance(hashGenerated.g, entryHash.g);
+    if (rDist + gDist > maxDistance) {
+      continue;
+    }
+
+    const bDist = hammingDistance(hashGenerated.b, entryHash.b);
+    const totalDist = rDist + gDist + bDist;
+
+    if (totalDist > maxDistance) {
+      continue;
+    }
+
+    matches.push({
+      externalId: entry.externalId,
+      tcg: entry.tcg,
+      name: entry.name,
+      setCode: entry.setCode,
+      setName: entry.setName,
+      rarity: entry.rarity,
+      imageUrl: entry.imageUrl,
+      confidence: Math.max(0, 1 - totalDist / MAX_COMBINED_DISTANCE),
+      distance: totalDist,
+    });
+  }
+
+  return matches.sort((left, right) => left.distance - right.distance);
+}
+
+function isBetterAttempt(candidate: ScanMatch | null, current: ScanMatch | null): boolean {
+  if (!candidate) {
+    return false;
+  }
+
+  if (!current) {
+    return true;
+  }
+
+  return candidate.distance < current.distance;
+}
+
+function isStrongEnough(match: ScanMatch, maxDistance: number): boolean {
+  return match.distance === 0 || match.confidence >= 0.72 || match.distance <= Math.floor(maxDistance * 0.45);
 }
