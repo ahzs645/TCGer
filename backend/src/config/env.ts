@@ -8,6 +8,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   BACKEND_MODE: z.enum(['hybrid', 'convex']).default('hybrid'),
   DATABASE_URL: z.string().url().optional(),
+  CARD_SCAN_STORE: z.enum(['auto', 'file', 'prisma']).default('auto'),
+  CARD_SCAN_DATA_DIR: z.string().default('/tmp/tcger-card-scan'),
   APP_ORIGIN: z.string().url().optional(),
   COLLECTIONS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
   WISHLISTS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),

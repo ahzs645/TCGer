@@ -1,14 +1,11 @@
 /**
  * Card scan service — accepts an uploaded image, generates a pHash,
- * and matches it against the card_hashes table.
+ * and matches it against the configured card hash store.
  */
 
-import { PrismaClient } from '@prisma/client';
-import sharp from 'sharp';
-
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
-
-const prisma = new PrismaClient();
+import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
+import { preprocessCardImage } from './preprocess';
 
 // ---------- types ----------
 
@@ -62,8 +59,7 @@ export async function scanCardImage(
   const hashGenerated = await computeRGBHash(processed);
 
   // 3. Fetch hash database (filtered by TCG if specified)
-  const where = tcgFilter ? { tcg: tcgFilter } : {};
-  const hashEntries = await prisma.cardHash.findMany({ where });
+  const hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
 
   // 4. Compare and rank matches
   const matches: ScanMatch[] = [];
@@ -116,29 +112,15 @@ export async function scanCardImage(
  * Get card hash database entries for client-side matching (iOS, etc.).
  */
 export async function getCardHashes(tcg?: string, page = 1, pageSize = 500) {
-  const where = tcg ? { tcg } : {};
   const skip = (page - 1) * pageSize;
 
   const [entries, total] = await Promise.all([
-    prisma.cardHash.findMany({
-      where,
+    getCardHashPage({
+      ...(tcg ? { tcg } : {}),
       skip,
       take: pageSize,
-      select: {
-        externalId: true,
-        tcg: true,
-        name: true,
-        setCode: true,
-        setName: true,
-        rarity: true,
-        imageUrl: true,
-        rHash: true,
-        gHash: true,
-        bHash: true,
-      },
-      orderBy: { name: 'asc' },
     }),
-    prisma.cardHash.count({ where }),
+    countCardHashes(tcg ? { tcg } : {}),
   ]);
 
   return {
@@ -148,40 +130,4 @@ export async function getCardHashes(tcg?: string, page = 1, pageSize = 500) {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   };
-}
-
-// ---------- image preprocessing ----------
-
-/**
- * Preprocess uploaded card image:
- * - Auto-orient (EXIF)
- * - Resize to 1024px on longest side (preserve aspect, letterbox on white)
- * - Normalize exposure
- *
- * This mirrors the Moss Machine's preprocessing: letterbox to 1024×1024,
- * portrait orientation, white background.
- */
-async function preprocessCardImage(imageBuffer: Buffer): Promise<Buffer> {
-  const TARGET = 1024;
-
-  const img = sharp(imageBuffer).rotate(); // auto-orient EXIF
-  const meta = await img.metadata();
-  const w = meta.width ?? 1;
-  const h = meta.height ?? 1;
-
-  // Ensure portrait orientation
-  const isLandscape = w > h;
-
-  let processed = isLandscape ? img.rotate(90) : img;
-
-  // Resize to fit within TARGET × TARGET (maintain aspect)
-  processed = processed.resize(TARGET, TARGET, {
-    fit: 'contain',
-    background: { r: 255, g: 255, b: 255, alpha: 1 },
-  });
-
-  // Normalize (auto-level) to handle varying lighting
-  processed = processed.normalize();
-
-  return processed.removeAlpha().toBuffer();
 }

@@ -13,13 +13,17 @@
  *   - iOS: download hashes via GET /cards/hashes, match client-side
  */
 
-import { PrismaClient } from '@prisma/client';
-
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { computeRGBHash } from './phash';
-
-const prisma = new PrismaClient();
+import { preprocessCardImage } from './preprocess';
+import {
+  countCardHashes,
+  getCardHashExternalIdSet,
+  getCardHashStoreMode,
+  type CardHashRecord,
+  upsertCardHashes,
+} from './hash-store';
 
 // ---------- types ----------
 
@@ -29,6 +33,7 @@ interface HashBuildProgress {
   processed: number;
   errors: number;
   skipped: number;
+  storeMode: string;
 }
 
 interface CardImageEntry {
@@ -44,6 +49,24 @@ interface CardImageEntry {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isLocalUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname.endsWith('.svc') ||
+      hostname.endsWith('.svc.cluster.local') ||
+      /^10\.\d+\.\d+\.\d+$/.test(hostname) ||
+      /^192\.168\.\d+\.\d+$/.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(hostname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ---------- public API ----------
@@ -62,6 +85,7 @@ export async function buildHashDatabase(
     processed: 0,
     errors: 0,
     skipped: 0,
+    storeMode: getCardHashStoreMode(),
   };
 
   logger.info({ tcg, options }, 'Starting hash database build');
@@ -85,17 +109,14 @@ export async function buildHashDatabase(
   progress.total = cards.length;
   logger.info({ tcg, total: cards.length }, 'Fetched card list');
 
+  const existingIds = options.force ? new Set<string>() : await getCardHashExternalIdSet(tcg);
+  const pendingUpserts: CardHashRecord[] = [];
+
   for (const card of cards) {
     try {
-      // Check if hash already exists (skip unless force rebuild)
-      if (!options.force) {
-        const existing = await prisma.cardHash.findUnique({
-          where: { tcg_externalId: { tcg, externalId: card.externalId } },
-        });
-        if (existing) {
-          progress.skipped++;
-          continue;
-        }
+      if (existingIds.has(card.externalId)) {
+        progress.skipped++;
+        continue;
       }
 
       // Download image
@@ -107,36 +128,25 @@ export async function buildHashDatabase(
       }
 
       const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      const processedImage = await preprocessCardImage(imageBuffer);
 
       // Compute pHash
-      const hash = await computeRGBHash(imageBuffer);
+      const hash = await computeRGBHash(processedImage);
 
-      // Upsert into database
-      await prisma.cardHash.upsert({
-        where: { tcg_externalId: { tcg, externalId: card.externalId } },
-        create: {
-          tcg,
-          externalId: card.externalId,
-          name: card.name,
-          setCode: card.setCode,
-          setName: card.setName,
-          rarity: card.rarity,
-          imageUrl: card.imageUrl,
-          rHash: hash.r,
-          gHash: hash.g,
-          bHash: hash.b,
-        },
-        update: {
-          name: card.name,
-          setCode: card.setCode,
-          setName: card.setName,
-          rarity: card.rarity,
-          imageUrl: card.imageUrl,
-          rHash: hash.r,
-          gHash: hash.g,
-          bHash: hash.b,
-        },
+      pendingUpserts.push({
+        tcg,
+        externalId: card.externalId,
+        name: card.name,
+        setCode: card.setCode,
+        setName: card.setName,
+        rarity: card.rarity,
+        imageUrl: card.imageUrl,
+        rHash: hash.r,
+        gHash: hash.g,
+        bHash: hash.b,
+        hashSize: 16,
       });
+      existingIds.add(card.externalId);
 
       progress.processed++;
 
@@ -147,12 +157,23 @@ export async function buildHashDatabase(
         );
       }
 
-      // Rate limiting — be respectful to APIs
-      await sleep(tcg === 'magic' ? 100 : 200);
+      if (pendingUpserts.length >= 25) {
+        await upsertCardHashes(pendingUpserts.splice(0, pendingUpserts.length));
+      }
+
+      // External image hosts need throttling; in-cluster cache services do not.
+      const delayMs = isLocalUrl(card.imageUrl) ? 0 : tcg === 'magic' ? 100 : 200;
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
     } catch (err) {
       logger.error({ card: card.name, err }, 'Error processing card');
       progress.errors++;
     }
+  }
+
+  if (pendingUpserts.length) {
+    await upsertCardHashes(pendingUpserts);
   }
 
   logger.info(progress, 'Hash database build complete');
@@ -164,13 +185,13 @@ export async function buildHashDatabase(
  */
 export async function getHashDatabaseStats() {
   const [magic, pokemon, yugioh, total] = await Promise.all([
-    prisma.cardHash.count({ where: { tcg: 'magic' } }),
-    prisma.cardHash.count({ where: { tcg: 'pokemon' } }),
-    prisma.cardHash.count({ where: { tcg: 'yugioh' } }),
-    prisma.cardHash.count(),
+    countCardHashes({ tcg: 'magic' }),
+    countCardHashes({ tcg: 'pokemon' }),
+    countCardHashes({ tcg: 'yugioh' }),
+    countCardHashes(),
   ]);
 
-  return { magic, pokemon, yugioh, total };
+  return { magic, pokemon, yugioh, total, storeMode: getCardHashStoreMode() };
 }
 
 // ---------- TCG-specific card fetchers ----------
@@ -184,14 +205,17 @@ async function fetchMagicCards(
   limit?: number
 ): Promise<CardImageEntry[]> {
   const apiRoot = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
+  const requestDelayMs = isLocalUrl(apiRoot) ? 0 : 100;
   const cards: CardImageEntry[] = [];
 
   // Build search query
-  const query = setCode ? `set:${setCode}` : 'year>=2020'; // default: recent cards
+  const query = setCode ? `set:${setCode}` : 'game:paper';
   let url: string | null = `${apiRoot}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=set`;
 
   while (url && (!limit || cards.length < limit)) {
-    await sleep(100); // Scryfall rate limit: 10 req/sec
+    if (requestDelayMs > 0) {
+      await sleep(requestDelayMs);
+    }
 
     const response = await fetch(url);
     if (!response.ok) break;
@@ -244,9 +268,10 @@ async function fetchPokemonCards(
   limit?: number
 ): Promise<CardImageEntry[]> {
   const apiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
+  const requestDelayMs = isLocalUrl(apiRoot) ? 0 : 200;
+  const isTcgdex = /tcgdex/i.test(apiRoot);
   const cards: CardImageEntry[] = [];
-
-  const query = setCode ? `set.id:${setCode}` : '';
+  const query = !isTcgdex && setCode ? `set.id:${setCode}` : '';
   const pageSize = 250;
   let page = 1;
   let hasMore = true;
@@ -264,41 +289,77 @@ async function fetchPokemonCards(
       page: String(page),
       pageSize: String(pageSize),
     });
-    if (query) params.set('q', query);
-
-    await sleep(200); // rate limit
+    if (query) {
+      params.set('q', query);
+    }
+    if (requestDelayMs > 0) {
+      await sleep(requestDelayMs);
+    }
 
     const response = await fetch(`${apiRoot}/cards?${params}`, { headers });
     if (!response.ok) break;
 
-    const data = await response.json() as {
-      data: Array<{
-        id: string;
-        name: string;
-        set: { id: string; name: string };
-        rarity?: string;
-        images: { large?: string; small?: string };
-      }>;
-      totalCount: number;
-    };
+    if (isTcgdex) {
+      const data = (await response.json()) as {
+        data: Array<{
+          id: string;
+          localId?: string;
+          name: string;
+          image?: string;
+        }>;
+        totalCount: number;
+      };
 
-    for (const card of data.data) {
-      const imageUrl = card.images.large ?? card.images.small;
-      if (!imageUrl) continue;
+      for (const card of data.data) {
+        const matchesSet = !setCode || card.id.toLowerCase().startsWith(`${setCode.toLowerCase()}-`);
+        const imageUrl = card.image ? `${card.image}/high.webp` : null;
+        if (!matchesSet || !imageUrl) continue;
 
-      cards.push({
-        externalId: card.id,
-        name: card.name,
-        setCode: card.set.id,
-        setName: card.set.name,
-        rarity: card.rarity ?? null,
-        imageUrl,
-      });
+        cards.push({
+          externalId: card.id,
+          name: card.name,
+          setCode: card.id.split('-')[0] ?? null,
+          setName: null,
+          rarity: null,
+          imageUrl,
+        });
 
-      if (limit && cards.length >= limit) break;
+        if (limit && cards.length >= limit) break;
+      }
+
+      hasMore = page * pageSize < data.totalCount;
+    } else {
+      const query = setCode ? `set.id:${setCode}` : '';
+      const data = (await response.json()) as {
+        data: Array<{
+          id: string;
+          name: string;
+          set: { id: string; name: string };
+          rarity?: string;
+          images: { large?: string; small?: string };
+        }>;
+        totalCount: number;
+      };
+
+      for (const card of data.data) {
+        const imageUrl = card.images.large ?? card.images.small;
+        if (!imageUrl) continue;
+
+        cards.push({
+          externalId: card.id,
+          name: card.name,
+          setCode: card.set.id,
+          setName: card.set.name,
+          rarity: card.rarity ?? null,
+          imageUrl,
+        });
+
+        if (limit && cards.length >= limit) break;
+      }
+
+      hasMore = cards.length < data.totalCount;
     }
 
-    hasMore = cards.length < data.totalCount;
     page++;
   }
 
@@ -310,38 +371,62 @@ async function fetchPokemonCards(
  */
 async function fetchYugiohCards(limit?: number): Promise<CardImageEntry[]> {
   const apiRoot = env.YGO_API_BASE_URL.replace(/\/+$/, '');
+  const requestDelayMs = isLocalUrl(apiRoot) ? 0 : 200;
   const cards: CardImageEntry[] = [];
+  const pageSize = 200;
+  let offset = 0;
 
-  await sleep(200);
+  while (!limit || cards.length < limit) {
+    if (requestDelayMs > 0) {
+      await sleep(requestDelayMs);
+    }
 
-  const response = await fetch(`${apiRoot}/cardinfo.php?num=500&offset=0`);
-  if (!response.ok) return cards;
+    const response = await fetch(`${apiRoot}/cardinfo.php?num=${pageSize}&offset=${offset}`);
+    if (!response.ok) break;
 
-  const data = await response.json() as {
-    data: Array<{
-      id: number;
-      name: string;
-      card_images: Array<{ id: number; image_url: string; image_url_small: string }>;
-      card_sets?: Array<{ set_name: string; set_code: string; set_rarity: string }>;
-    }>;
-  };
+    const data = (await response.json()) as {
+      data: Array<{
+        id: number;
+        name: string;
+        card_images: Array<{ id: number; image_url: string; image_url_small: string }>;
+        card_sets?: Array<{ set_name: string; set_code: string; set_rarity: string }>;
+      }>;
+      meta?: {
+        next_page_offset?: number;
+      };
+    };
 
-  for (const card of data.data) {
-    const imageUrl = card.card_images?.[0]?.image_url;
-    if (!imageUrl) continue;
+    if (!Array.isArray(data.data) || !data.data.length) {
+      break;
+    }
 
-    const firstSet = card.card_sets?.[0];
+    for (const card of data.data) {
+      const imageUrl = card.card_images?.[0]?.image_url;
+      if (!imageUrl) continue;
 
-    cards.push({
-      externalId: String(card.id),
-      name: card.name,
-      setCode: firstSet?.set_code ?? null,
-      setName: firstSet?.set_name ?? null,
-      rarity: firstSet?.set_rarity ?? null,
-      imageUrl,
-    });
+      const firstSet = card.card_sets?.[0];
 
-    if (limit && cards.length >= limit) break;
+      cards.push({
+        externalId: String(card.id),
+        name: card.name,
+        setCode: firstSet?.set_code ?? null,
+        setName: firstSet?.set_name ?? null,
+        rarity: firstSet?.set_rarity ?? null,
+        imageUrl,
+      });
+
+      if (limit && cards.length >= limit) break;
+    }
+
+    if (limit && cards.length >= limit) {
+      break;
+    }
+
+    const nextOffset = data.meta?.next_page_offset;
+    if (typeof nextOffset !== 'number' || nextOffset <= offset) {
+      break;
+    }
+    offset = nextOffset;
   }
 
   return cards;

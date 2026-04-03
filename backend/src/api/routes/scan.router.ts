@@ -8,7 +8,7 @@ import {
 } from '../../modules/card-scan';
 import { uploadImages } from '../../utils/upload';
 import { asyncHandler } from '../../utils/async-handler';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, type AuthRequest } from '../middleware/auth';
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
@@ -107,6 +107,15 @@ scanRouter.get(
 scanRouter.post(
   '/build',
   asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+
+    if (!authReq.user?.isAdmin) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Admin access is required to build the card scan hash index',
+      });
+    }
+
     const { tcg, setCode, limit, force } = req.body as {
       tcg?: string;
       setCode?: string;
@@ -129,7 +138,7 @@ scanRouter.post(
       console.error('Hash build failed:', err);
     });
 
-    res.json({
+    res.status(202).json({
       message: `Hash database build started for ${tcg}`,
       tcg,
       setCode: setCode ?? null,
