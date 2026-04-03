@@ -31,7 +31,6 @@ async function loadWishlistsRouter(): Promise<ExpressRouter> {
 
 async function registerLegacyRoutes(app: Express) {
   const [
-    { scanRouter },
     { notificationsRouter },
     { decksRouter },
     { alertsRouter },
@@ -45,7 +44,6 @@ async function registerLegacyRoutes(app: Express) {
     { shipmentsRouter },
     { publicRouter }
   ] = await Promise.all([
-    import('./scan.router'),
     import('./notifications.router'),
     import('./decks.router'),
     import('./alerts.router'),
@@ -60,7 +58,6 @@ async function registerLegacyRoutes(app: Express) {
     import('./public.router')
   ]);
 
-  app.use('/cards/scan', scanRouter);
   app.use('/notifications', notificationsRouter);
   app.use('/decks', decksRouter);
   app.use('/alerts', alertsRouter);
@@ -76,7 +73,8 @@ async function registerLegacyRoutes(app: Express) {
 }
 
 export async function registerRoutes(app: Express): Promise<void> {
-  const [collectionsRouter, wishlistsRouter] = await Promise.all([
+  const [{ scanRouter }, collectionsRouter, wishlistsRouter] = await Promise.all([
+    import('./scan.router'),
     loadCollectionsRouter(),
     loadWishlistsRouter()
   ]);
@@ -86,6 +84,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/auth', authRouter);
   app.use('/setup', setupRouter);
   app.use('/settings', settingsRouter);
+  app.use('/cards/scan', scanRouter);
   app.use('/cards', cardsRouter);
   app.use('/collections', collectionsRouter);
   app.use('/users', usersRouter);

@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { URL } from 'node:url';
@@ -33,8 +33,8 @@ function parseBoolean(value, defaultValue) {
 const imageCacheConfig = {
   enabled: parseBoolean(process.env.SCRYFALL_BULK_CACHE_IMAGES ?? 'true', true),
   directory: (process.env.SCRYFALL_BULK_IMAGE_DIR || path.join(config.dataDir, 'images')).trim(),
-  preferredField: (process.env.SCRYFALL_BULK_IMAGE_FIELD || 'border_crop').trim(),
-  fallbackFields: (process.env.SCRYFALL_BULK_IMAGE_FALLBACKS || 'art_crop,large,normal,small').split(',').map((entry) => entry.trim()).filter(Boolean),
+  preferredField: (process.env.SCRYFALL_BULK_IMAGE_FIELD || 'normal').trim(),
+  fallbackFields: (process.env.SCRYFALL_BULK_IMAGE_FALLBACKS || 'large,small,border_crop,art_crop').split(',').map((entry) => entry.trim()).filter(Boolean),
   maxDownloadsPerRefresh: Number.parseInt(process.env.SCRYFALL_BULK_IMAGE_MAX_PER_REFRESH || '250', 10),
   concurrency: Math.max(1, Number.parseInt(process.env.SCRYFALL_BULK_IMAGE_CONCURRENCY || '4', 10))
 };
@@ -46,6 +46,7 @@ let activeFilePath = null;
 let lastMetadataCheck = 0;
 let dataState = null;
 let refreshPromise = null;
+let imageTargetByFilename = new Map();
 
 function sanitizeFilename(value) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -104,12 +105,17 @@ async function downloadBulk(entry) {
 function indexCards(cardList) {
   cardById = new Map();
   cardByOracle = new Map();
+  imageTargetByFilename = new Map();
+  const fieldOrder = getImageFieldOrder();
   for (const card of cardList) {
     if (card?.id) {
       cardById.set(card.id, card);
     }
     if (card?.oracle_id) {
       cardByOracle.set(card.oracle_id, card);
+    }
+    for (const target of buildImageTargets(card, fieldOrder)) {
+      imageTargetByFilename.set(`${target.id}${target.extension}`, target);
     }
   }
 }
@@ -194,9 +200,13 @@ function matchesTerms(card, terms) {
   return terms.every((term) => haystack.includes(term));
 }
 
-function searchCardsLocal(query, limit) {
+function searchCardsLocal(query, options = {}) {
   const { filters, terms } = parseQueryString(query);
-  const maxResults = Math.min(config.resultLimit, limit || DEFAULT_LIMIT);
+  const limit = Number.isFinite(options.limit) && options.limit > 0 ? options.limit : DEFAULT_LIMIT;
+  const page = Number.isFinite(options.page) && options.page > 0 ? options.page : 1;
+  const maxResults = Math.min(config.resultLimit, limit);
+  const offset = (page - 1) * maxResults;
+  const end = offset + maxResults;
   const collected = [];
   let totalMatches = 0;
 
@@ -208,12 +218,12 @@ function searchCardsLocal(query, limit) {
       continue;
     }
     totalMatches += 1;
-    if (collected.length < maxResults) {
+    if (totalMatches > offset && totalMatches <= end) {
       collected.push(card);
     }
   }
 
-  const hasMore = totalMatches > collected.length;
+  const hasMore = totalMatches > end;
   return {
     object: 'list',
     total_cards: totalMatches,
@@ -287,7 +297,18 @@ const server = http.createServer(async (request, response) => {
       }
       await refreshData();
       const limitParam = Number.parseInt(requestUrl.searchParams.get('limit') || '', 10);
-      const payload = searchCardsLocal(query, Number.isFinite(limitParam) ? limitParam : undefined);
+      const pageParam = Number.parseInt(requestUrl.searchParams.get('page') || '', 10);
+      const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+      const payload = searchCardsLocal(query, {
+        limit: Number.isFinite(limitParam) ? limitParam : undefined,
+        page,
+      });
+      if (payload.has_more) {
+        const nextPageUrl = new URL(requestUrl.toString());
+        nextPageUrl.searchParams.set('page', String(page + 1));
+        payload.next_page = nextPageUrl.toString();
+      }
+      payload.data = payload.data.map((card) => decorateCardForResponse(card, requestUrl.origin));
       sendJson(response, 200, payload);
       return;
     }
@@ -305,7 +326,31 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 404, { error: 'Card not found' });
         return;
       }
-      sendJson(response, 200, card);
+      sendJson(response, 200, decorateCardForResponse(card, requestUrl.origin));
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname.startsWith('/images/')) {
+      const filename = decodeURIComponent(requestUrl.pathname.replace('/images/', '').trim());
+      if (!filename) {
+        sendJson(response, 400, { error: 'Missing image filename' });
+        return;
+      }
+
+      await refreshData();
+      const target = imageTargetByFilename.get(filename);
+      if (!target) {
+        sendJson(response, 404, { error: 'Image not found' });
+        return;
+      }
+
+      await ensureDirectory(imageCacheConfig.directory);
+      const filePath = path.join(imageCacheConfig.directory, filename);
+      if (!(await fileExists(filePath))) {
+        await downloadImage({ ...target, filePath });
+      }
+
+      await sendImageFile(response, filePath);
       return;
     }
 
@@ -373,6 +418,19 @@ function extensionFromUrl(urlString) {
     }
   } catch {}
   return '.jpg';
+}
+
+function contentTypeForExtension(extension) {
+  switch (extension.toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.jpeg':
+    case '.jpg':
+    default:
+      return 'image/jpeg';
+  }
 }
 
 function buildImageTargets(card, fieldOrder) {
@@ -489,4 +547,67 @@ async function downloadImage(job) {
   const writer = createWriteStream(tempPath);
   await pipeline(response.body, writer);
   await rename(tempPath, job.filePath);
+}
+
+function cloneCard(card) {
+  return JSON.parse(JSON.stringify(card));
+}
+
+function toLocalImageUrl(origin, filename) {
+  return `${origin}/images/${encodeURIComponent(filename)}`;
+}
+
+function rewriteImageMap(imageMap, localUrl) {
+  if (!imageMap || typeof imageMap !== 'object') {
+    return imageMap;
+  }
+
+  const rewritten = {};
+  for (const key of Object.keys(imageMap)) {
+    rewritten[key] = localUrl;
+  }
+  return rewritten;
+}
+
+function decorateCardForResponse(card, origin) {
+  const cloned = cloneCard(card);
+  const targets = buildImageTargets(card, getImageFieldOrder());
+  if (!targets.length) {
+    return cloned;
+  }
+
+  const rootTarget = targets.find((target) => target.id === card.id) ?? targets[0];
+  if (cloned.image_uris && rootTarget) {
+    cloned.image_uris = rewriteImageMap(
+      cloned.image_uris,
+      toLocalImageUrl(origin, `${rootTarget.id}${rootTarget.extension}`)
+    );
+  }
+
+  if (Array.isArray(cloned.card_faces)) {
+    cloned.card_faces = cloned.card_faces.map((face, index) => {
+      if (!face?.image_uris) {
+        return face;
+      }
+      const target = targets.find((candidate) => candidate.id === `${card.id}-face${index}`);
+      if (!target) {
+        return face;
+      }
+      return {
+        ...face,
+        image_uris: rewriteImageMap(
+          face.image_uris,
+          toLocalImageUrl(origin, `${target.id}${target.extension}`)
+        )
+      };
+    });
+  }
+
+  return cloned;
+}
+
+async function sendImageFile(response, filePath) {
+  response.statusCode = 200;
+  response.setHeader('Content-Type', contentTypeForExtension(path.extname(filePath)));
+  createReadStream(filePath).pipe(response);
 }

@@ -17,8 +17,8 @@ Configuration happens via environment variables:
 | `SCRYFALL_BULK_DATA_DIR` | `/data` | Directory used to persist the downloaded JSON |
 | `SCRYFALL_BULK_CACHE_IMAGES` | `true` | Enable local caching of card artwork referenced by the bulk dataset |
 | `SCRYFALL_BULK_IMAGE_DIR` | `/data/images` | Destination directory for cached images |
-| `SCRYFALL_BULK_IMAGE_FIELD` | `border_crop` | Preferred `image_uris` field to download (e.g. `normal`, `large`) |
-| `SCRYFALL_BULK_IMAGE_FALLBACKS` | `art_crop,large,normal,small` | Comma-separated fallback order if the preferred field is missing |
+| `SCRYFALL_BULK_IMAGE_FIELD` | `normal` | Preferred `image_uris` field to download (e.g. `normal`, `large`) |
+| `SCRYFALL_BULK_IMAGE_FALLBACKS` | `large,small,border_crop,art_crop` | Comma-separated fallback order if the preferred field is missing |
 | `SCRYFALL_BULK_IMAGE_MAX_PER_REFRESH` | `250` | Maximum number of new images to fetch per refresh (set `0`/unset for unlimited) |
 | `SCRYFALL_BULK_IMAGE_CONCURRENCY` | `4` | Parallel download workers for the image cache |
 | `PORT` | `4010` | HTTP listen port |

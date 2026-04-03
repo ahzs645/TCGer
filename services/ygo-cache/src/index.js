@@ -1,10 +1,26 @@
 import http from 'node:http';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 
 const DEFAULT_REFRESH_MS = 12 * 60 * 60 * 1000; // 12 hours
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_MAX_PAGE_SIZE = 200;
+
+function parseBoolean(value, defaultValue) {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  const normalized = `${value}`.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) {
+    return false;
+  }
+  return defaultValue;
+}
 
 const config = {
   sourceBase: (process.env.YGO_SOURCE_BASE_URL || 'https://db.ygoprodeck.com/api/v7').replace(/\/+$/, ''),
@@ -16,6 +32,14 @@ const config = {
   maxPageSize: Math.max(1, Number.parseInt(process.env.YGO_CACHE_MAX_PAGE_SIZE || `${DEFAULT_MAX_PAGE_SIZE}`, 10))
 };
 
+const imageCacheConfig = {
+  enabled: parseBoolean(process.env.YGO_CACHE_IMAGES ?? 'true', true),
+  directory: (process.env.YGO_CACHE_IMAGE_DIR || path.join(config.dataDir, 'images')).trim(),
+  variants: (process.env.YGO_CACHE_IMAGE_VARIANTS || 'full,small').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean),
+  maxDownloadsPerRefresh: Number.parseInt(process.env.YGO_CACHE_IMAGE_MAX_PER_REFRESH || '250', 10),
+  concurrency: Math.max(1, Number.parseInt(process.env.YGO_CACHE_IMAGE_CONCURRENCY || '4', 10))
+};
+
 if (config.defaultPageSize > config.maxPageSize) {
   config.defaultPageSize = config.maxPageSize;
 }
@@ -25,9 +49,106 @@ let cardById = new Map();
 let metadata = null;
 let lastVersionCheck = 0;
 let refreshPromise = null;
+let imageTargetByFilename = new Map();
 
 function sanitizeFilename(value) {
   return value.replace(/[^a-zA-Z0-9_.-]/g, '-');
+}
+
+function extensionFromUrl(urlString) {
+  try {
+    const ext = path.extname(new URL(urlString).pathname);
+    if (ext) {
+      return ext;
+    }
+  } catch {}
+  return '.jpg';
+}
+
+function contentTypeForExtension(extension) {
+  switch (extension.toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.webp':
+      return 'image/webp';
+    case '.jpeg':
+    case '.jpg':
+    default:
+      return 'image/jpeg';
+  }
+}
+
+function ygoVariantField(variant) {
+  switch (variant) {
+    case 'small':
+      return 'image_url_small';
+    case 'cropped':
+      return 'image_url_cropped';
+    case 'full':
+    default:
+      return 'image_url';
+  }
+}
+
+function buildImageTargets(card) {
+  if (!Array.isArray(card?.card_images)) {
+    return [];
+  }
+
+  const targets = [];
+  for (const image of card.card_images) {
+    const imageId = image?.id ?? card.id;
+    for (const variant of imageCacheConfig.variants) {
+      const field = ygoVariantField(variant);
+      const url = image?.[field];
+      if (!url) {
+        continue;
+      }
+      const extension = extensionFromUrl(url);
+      targets.push({
+        filename: `${imageId}-${variant}${extension}`,
+        imageId: String(imageId),
+        variant,
+        url,
+        extension
+      });
+    }
+  }
+  return targets;
+}
+
+function cloneCard(card) {
+  return JSON.parse(JSON.stringify(card));
+}
+
+function toLocalImageUrl(origin, filename) {
+  return `${origin}/images/${encodeURIComponent(filename)}`;
+}
+
+function decorateCardForResponse(card, origin) {
+  const cloned = cloneCard(card);
+  if (!Array.isArray(cloned.card_images)) {
+    return cloned;
+  }
+
+  const targetByKey = new Map(
+    buildImageTargets(card).map((target) => [`${target.imageId}:${target.variant}`, target])
+  );
+
+  cloned.card_images = cloned.card_images.map((image) => {
+    const imageId = String(image?.id ?? card.id);
+    const fullTarget = targetByKey.get(`${imageId}:full`);
+    const smallTarget = targetByKey.get(`${imageId}:small`);
+    const croppedTarget = targetByKey.get(`${imageId}:cropped`);
+    return {
+      ...image,
+      image_url: fullTarget ? toLocalImageUrl(origin, fullTarget.filename) : image?.image_url,
+      image_url_small: smallTarget ? toLocalImageUrl(origin, smallTarget.filename) : image?.image_url_small,
+      image_url_cropped: croppedTarget ? toLocalImageUrl(origin, croppedTarget.filename) : image?.image_url_cropped
+    };
+  });
+
+  return cloned;
 }
 
 async function ensureDirectory(dirPath) {
@@ -78,9 +199,13 @@ async function downloadDataset(versionLabel) {
 
 function indexCards(cardList) {
   cardById = new Map();
+  imageTargetByFilename = new Map();
   for (const card of cardList) {
     if (card?.id !== undefined && card?.id !== null) {
       cardById.set(String(card.id), card);
+    }
+    for (const target of buildImageTargets(card)) {
+      imageTargetByFilename.set(target.filename, target);
     }
   }
 }
@@ -165,6 +290,7 @@ async function refreshData(force = false) {
       }
       const { cards: remoteCards, filePath } = await downloadDataset(remoteVersion || 'latest');
       await loadCards(remoteCards, filePath, versionInfo);
+      await cacheCardImages(cards);
       return metadata;
     } catch (error) {
       console.error('Failed to refresh Yu-Gi-Oh! cache', error);
@@ -178,6 +304,82 @@ async function refreshData(force = false) {
       refreshPromise = null;
     });
   return refreshPromise;
+}
+
+async function fileExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function downloadImage(job) {
+  const response = await fetch(job.url);
+  if (!response.ok || !response.body) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+  const tempPath = `${job.filePath}.tmp`;
+  const writer = createWriteStream(tempPath);
+  await pipeline(response.body, writer);
+  await rename(tempPath, job.filePath);
+}
+
+async function cacheCardImages(cardList) {
+  if (!imageCacheConfig.enabled || !cardList?.length) {
+    return;
+  }
+
+  await ensureDirectory(imageCacheConfig.directory);
+  const queue = [];
+
+  outer: for (const card of cardList) {
+    for (const target of buildImageTargets(card)) {
+      const filePath = path.join(imageCacheConfig.directory, target.filename);
+      if (await fileExists(filePath)) {
+        continue;
+      }
+      queue.push({ ...target, filePath });
+      if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
+        break outer;
+      }
+    }
+  }
+
+  if (!queue.length) {
+    return;
+  }
+
+  console.log(`Caching ${queue.length} Yu-Gi-Oh! images (target dir: ${imageCacheConfig.directory})`);
+  const workers = Math.min(imageCacheConfig.concurrency, queue.length);
+  let index = 0;
+  const errors = [];
+
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      while (true) {
+        const currentIndex = index;
+        index += 1;
+        if (currentIndex >= queue.length) {
+          break;
+        }
+        const job = queue[currentIndex];
+        try {
+          await downloadImage(job);
+        } catch (error) {
+          errors.push({ job, error });
+        }
+      }
+    })
+  );
+
+  if (errors.length) {
+    console.warn(`Failed to cache ${errors.length} Yu-Gi-Oh! images`);
+    errors.slice(0, 5).forEach(({ job, error }) => {
+      console.warn(`  - ${job.filename}: ${error.message}`);
+    });
+  }
 }
 
 function toLowerSet(value, separator = ',') {
@@ -486,6 +688,12 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
+async function sendImageFile(response, filePath) {
+  response.statusCode = 200;
+  response.setHeader('Content-Type', contentTypeForExtension(path.extname(filePath)));
+  createReadStream(filePath).pipe(response);
+}
+
 function methodNotAllowed(response) {
   sendJson(response, 405, { error: 'Method Not Allowed' });
 }
@@ -521,7 +729,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       const randomIndex = Math.floor(Math.random() * cards.length);
-      sendJson(response, 200, cards[randomIndex]);
+      sendJson(response, 200, decorateCardForResponse(cards[randomIndex], requestUrl.origin));
       return;
     }
 
@@ -538,9 +746,33 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       sendJson(response, 200, {
-        data: result.data,
+        data: result.data.map((card) => decorateCardForResponse(card, requestUrl.origin)),
         meta: result.meta
       });
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname.startsWith('/images/')) {
+      await refreshData();
+      const filename = decodeURIComponent(requestUrl.pathname.replace('/images/', '').trim());
+      if (!filename) {
+        sendJson(response, 400, { error: 'Missing image filename' });
+        return;
+      }
+
+      const target = imageTargetByFilename.get(filename);
+      if (!target) {
+        sendJson(response, 404, { error: 'Image not found' });
+        return;
+      }
+
+      await ensureDirectory(imageCacheConfig.directory);
+      const filePath = path.join(imageCacheConfig.directory, filename);
+      if (!(await fileExists(filePath))) {
+        await downloadImage({ ...target, filePath });
+      }
+
+      await sendImageFile(response, filePath);
       return;
     }
 

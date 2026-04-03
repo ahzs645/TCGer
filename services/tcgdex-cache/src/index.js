@@ -1,11 +1,27 @@
 import http from 'node:http';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 
 const TCGDEX_API_BASE = 'https://api.tcgdex.net/v2/en';
 const DEFAULT_REFRESH_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 250;
+
+function parseBoolean(value, defaultValue) {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  const normalized = `${value}`.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) {
+    return false;
+  }
+  return defaultValue;
+}
 
 const config = {
   dataDir: (process.env.TCGDEX_CACHE_DATA_DIR || '/data').trim(),
@@ -15,10 +31,19 @@ const config = {
   defaultPageSize: Math.max(1, Number.parseInt(process.env.TCGDEX_CACHE_PAGE_SIZE || `${DEFAULT_PAGE_SIZE}`, 10))
 };
 
+const imageCacheConfig = {
+  enabled: parseBoolean(process.env.TCGDEX_CACHE_IMAGES ?? 'true', true),
+  directory: (process.env.TCGDEX_CACHE_IMAGE_DIR || path.join(config.dataDir, 'images')).trim(),
+  variants: (process.env.TCGDEX_CACHE_IMAGE_VARIANTS || 'high.webp,low.webp').split(',').map((value) => value.trim()).filter(Boolean),
+  maxDownloadsPerRefresh: Number.parseInt(process.env.TCGDEX_CACHE_IMAGE_MAX_PER_REFRESH || '250', 10),
+  concurrency: Math.max(1, Number.parseInt(process.env.TCGDEX_CACHE_IMAGE_CONCURRENCY || '4', 10))
+};
+
 let cards = [];
 let cardById = new Map();
 let metadata = null;
 let refreshPromise = null;
+let imageBaseById = new Map();
 
 function normalizeForSearch(value) {
   return (value || '')
@@ -26,6 +51,43 @@ function normalizeForSearch(value) {
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/g, '');
+}
+
+function contentTypeForExtension(extension) {
+  switch (extension.toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.jpeg':
+    case '.jpg':
+      return 'image/jpeg';
+    case '.webp':
+    default:
+      return 'image/webp';
+  }
+}
+
+function toLocalImageBase(origin, cardId) {
+  return `${origin}/images/${encodeURIComponent(cardId)}`;
+}
+
+function decorateCardSummary(card, origin) {
+  if (!card?.image) {
+    return card;
+  }
+  return {
+    ...card,
+    image: toLocalImageBase(origin, card.id)
+  };
+}
+
+function decorateCardDetail(card, origin) {
+  if (!card?.image) {
+    return card;
+  }
+  return {
+    ...card,
+    image: toLocalImageBase(origin, card.id)
+  };
 }
 
 function levenshteinDistance(left, right) {
@@ -156,9 +218,13 @@ async function downloadAndCache() {
 
 function indexCards(cardList) {
   cardById = new Map();
+  imageBaseById = new Map();
   for (const card of cardList) {
     if (card?.id) {
       cardById.set(card.id.toLowerCase(), card);
+      if (card.image) {
+        imageBaseById.set(card.id.toLowerCase(), card.image);
+      }
     }
   }
 }
@@ -241,6 +307,7 @@ async function refreshData(force = false) {
       console.log('Refreshing TCGdex card cache...');
       const { cards: freshCards, filePath } = await downloadAndCache();
       await loadCards(freshCards, filePath);
+      await cacheCardImages(cards);
       console.log(`TCGdex cache refreshed: ${cards.length} cards`);
       return metadata;
     } catch (error) {
@@ -256,6 +323,99 @@ async function refreshData(force = false) {
     });
 
   return refreshPromise;
+}
+
+async function fileExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildImageJobs(cardList) {
+  const jobs = [];
+  for (const card of cardList) {
+    if (!card?.id || !card?.image) {
+      continue;
+    }
+    const safeId = encodeURIComponent(card.id.toLowerCase());
+    for (const variant of imageCacheConfig.variants) {
+      jobs.push({
+        cardId: card.id.toLowerCase(),
+        url: `${card.image}/${variant}`,
+        variant,
+        filePath: path.join(imageCacheConfig.directory, safeId, variant)
+      });
+    }
+  }
+  return jobs;
+}
+
+async function downloadImage(job) {
+  const response = await fetch(job.url);
+  if (!response.ok || !response.body) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+  await ensureDirectory(path.dirname(job.filePath));
+  const tempPath = `${job.filePath}.tmp`;
+  const writer = createWriteStream(tempPath);
+  await pipeline(response.body, writer);
+  await rename(tempPath, job.filePath);
+}
+
+async function cacheCardImages(cardList) {
+  if (!imageCacheConfig.enabled || !cardList?.length) {
+    return;
+  }
+
+  await ensureDirectory(imageCacheConfig.directory);
+  const queue = [];
+
+  outer: for (const job of buildImageJobs(cardList)) {
+    if (await fileExists(job.filePath)) {
+      continue;
+    }
+    queue.push(job);
+    if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
+      break outer;
+    }
+  }
+
+  if (!queue.length) {
+    return;
+  }
+
+  console.log(`Caching ${queue.length} TCGdex images (target dir: ${imageCacheConfig.directory})`);
+  const workers = Math.min(imageCacheConfig.concurrency, queue.length);
+  let index = 0;
+  const errors = [];
+
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      while (true) {
+        const currentIndex = index;
+        index += 1;
+        if (currentIndex >= queue.length) {
+          break;
+        }
+        const job = queue[currentIndex];
+        try {
+          await downloadImage(job);
+        } catch (error) {
+          errors.push({ job, error });
+        }
+      }
+    })
+  );
+
+  if (errors.length) {
+    console.warn(`Failed to cache ${errors.length} TCGdex images`);
+    errors.slice(0, 5).forEach(({ job, error }) => {
+      console.warn(`  - ${job.cardId}/${job.variant}: ${error.message}`);
+    });
+  }
 }
 
 function searchCardsLocal(query, page, pageSize) {
@@ -303,6 +463,12 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
+async function sendImageFile(response, filePath) {
+  response.statusCode = 200;
+  response.setHeader('Content-Type', contentTypeForExtension(path.extname(filePath)));
+  createReadStream(filePath).pipe(response);
+}
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -330,6 +496,7 @@ const server = http.createServer(async (request, response) => {
       const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
 
       const result = searchCardsLocal(query, page, pageSize);
+      result.data = result.data.map((card) => decorateCardSummary(card, requestUrl.origin));
       sendJson(response, 200, result);
       return;
     }
@@ -349,12 +516,43 @@ const server = http.createServer(async (request, response) => {
         // Fetch full details from API
         const fullCard = await fetchCardDetails(id);
         if (fullCard) {
-          sendJson(response, 200, { data: fullCard });
+          sendJson(response, 200, { data: decorateCardDetail(fullCard, requestUrl.origin) });
           return;
         }
       }
 
       sendJson(response, 404, { error: 'Card not found' });
+      return;
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname.startsWith('/images/')) {
+      await refreshData();
+      const segments = requestUrl.pathname.split('/').filter(Boolean);
+      if (segments.length !== 3) {
+        sendJson(response, 400, { error: 'Invalid image path' });
+        return;
+      }
+
+      const [, rawCardId, rawVariant] = segments;
+      const cardId = decodeURIComponent(rawCardId).toLowerCase();
+      const variant = decodeURIComponent(rawVariant);
+      const imageBase = imageBaseById.get(cardId);
+      if (!imageBase) {
+        sendJson(response, 404, { error: 'Image not found' });
+        return;
+      }
+
+      const filePath = path.join(imageCacheConfig.directory, encodeURIComponent(cardId), variant);
+      if (!(await fileExists(filePath))) {
+        await downloadImage({
+          cardId,
+          variant,
+          url: `${imageBase}/${variant}`,
+          filePath
+        });
+      }
+
+      await sendImageFile(response, filePath);
       return;
     }
 
