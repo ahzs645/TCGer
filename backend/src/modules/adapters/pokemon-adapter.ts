@@ -12,7 +12,13 @@ import type {
   TcgAdapter
 } from './types';
 
-const API_ROOT = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
+const POKEMON_TCG_IO_API_ROOT = 'https://api.pokemontcg.io/v2';
+const configuredPokemonApiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
+const scrydexConfigured = /scrydex\.com/i.test(configuredPokemonApiRoot);
+const hasScrydexApiKey = Boolean(env.SCRYDEX_API_KEY);
+const API_ROOT = scrydexConfigured && !hasScrydexApiKey
+  ? POKEMON_TCG_IO_API_ROOT
+  : configuredPokemonApiRoot;
 const isScrydex = /scrydex\.com/i.test(API_ROOT);
 const CARDS_ENDPOINT = isScrydex ? `${API_ROOT}/pokemon/v1/cards` : `${API_ROOT}/cards`;
 const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
@@ -25,6 +31,12 @@ const MIN_REQUEST_DELAY_MS = Number.isFinite(configuredDelay) && configuredDelay
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POKEMON_REQUEST_TIMEOUT_MS ?? '8000', 10);
 const configuredVariantConcurrency = Number.parseInt(process.env.POKEMON_VARIANT_FETCH_CONCURRENCY ?? '', 10);
 const VARIANT_FETCH_CONCURRENCY = Number.isFinite(configuredVariantConcurrency) && configuredVariantConcurrency > 0 ? configuredVariantConcurrency : 4;
+
+if (scrydexConfigured && !hasScrydexApiKey) {
+  console.warn(
+    'SCRYDEX_API_KEY is not configured; falling back to Pokemon TCG API for Pokemon card search'
+  );
+}
 
 /** Map energy symbol codes to lowercase names for normalization */
 const ENERGY_SYMBOL_MAP: Record<string, string> = Object.fromEntries(

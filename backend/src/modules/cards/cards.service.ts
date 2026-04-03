@@ -14,7 +14,7 @@ export type CardSearchInput = z.infer<typeof searchSchema>;
 export async function searchCards(input: CardSearchInput) {
   const { query, tcg } = searchSchema.parse(input);
 
-  if (tcg) {
+  if (tcg && tcg !== 'all') {
     const adapter = adapterRegistry.get(tcg);
     return adapter.searchCards(query);
   }
