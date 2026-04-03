@@ -8,6 +8,7 @@ protocol ScanStrategy: AnyObject {
     func scan(
         image: CGImage,
         context: CardScannerContext,
+        source: ScanInvocationKind,
         apiService: APIService
     ) async throws -> CardScanResult?
 }
@@ -37,6 +38,7 @@ final class CardScannerCoordinator {
 
     static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {
         let strategies: [ScanStrategy] = [
+            BackendHashScannerStrategy(),
             BoardCardEmbeddingScannerStrategy(),
             PokemonTextScannerStrategy(),
             MagicPerceptualHashScannerStrategy()
@@ -54,9 +56,17 @@ final class CardScannerCoordinator {
 
     func scan(
         image: CGImage,
-        context: CardScannerContext
+        context: CardScannerContext,
+        source: ScanInvocationKind
     ) async -> Result<CardScanResult, CardScannerError> {
-        let eligibleStrategies = supportedModes[context.mode] ?? []
+        let eligibleStrategies = (supportedModes[context.mode] ?? []).filter { strategy in
+            switch source {
+            case .livePreview:
+                return strategy.supportsLiveScanning
+            case .photoCapture:
+                return true
+            }
+        }
         guard !eligibleStrategies.isEmpty else {
             return .failure(.ineligibleMode)
         }
@@ -67,6 +77,7 @@ final class CardScannerCoordinator {
                 if var result = try await strategy.scan(
                     image: image,
                     context: context,
+                    source: source,
                     apiService: apiService
                 ) {
                     let elapsed = Date().timeIntervalSince(start)

@@ -168,7 +168,7 @@ final class CardScannerViewModel: ObservableObject {
             return
         }
 
-        let result = await coordinator.scan(image: cgImage, context: context)
+        let result = await coordinator.scan(image: cgImage, context: context, source: .photoCapture)
 
         switch result {
         case .success(let scanResult):
@@ -215,7 +215,7 @@ final class CardScannerViewModel: ObservableObject {
                 return
             }
 
-            let result = await coordinator.scan(image: cgImage, context: context)
+            let result = await coordinator.scan(image: cgImage, context: context, source: .livePreview)
 
             await MainActor.run {
                 self.isAnalyzingFrame = false
