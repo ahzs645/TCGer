@@ -36,7 +36,13 @@ final class BackendHashScannerStrategy: ScanStrategy {
         }
 
         guard let imageData = UIImage(cgImage: image).jpegData(compressionQuality: 0.88) else {
-            throw CardScannerError.underlying(APIService.APIError.decodingError)
+            throw CardScannerError.underlying(
+                NSError(
+                    domain: "TCGer.CardScanner",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Unable to encode the captured image for upload."]
+                )
+            )
         }
 
         let response = try await apiService.scanCardImage(
