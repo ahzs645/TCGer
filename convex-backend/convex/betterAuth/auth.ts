@@ -10,22 +10,42 @@ import authConfig from "../auth.config";
 
 const fallbackSecret = "tcger-convex-dev-local-secret-2026-not-default";
 
+const parseBooleanEnv = (value: string | undefined): boolean | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+};
+
 export const authComponent = createClient<DataModel>(components.betterAuth, {
   verbose: false
 });
 
-export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
-  ({
+export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
+  const siteUrl = process.env.SITE_URL;
+  const useSecureCookies =
+    parseBooleanEnv(process.env.BETTER_AUTH_USE_SECURE_COOKIES) ??
+    siteUrl?.startsWith("https://") ??
+    false;
+
+  return ({
     appName: "TCGer",
-    baseURL: process.env.SITE_URL,
+    baseURL: siteUrl,
     basePath: "/api/auth",
     secret: process.env.BETTER_AUTH_SECRET ?? fallbackSecret,
-    trustedOrigins: process.env.SITE_URL ? [process.env.SITE_URL] : undefined,
+    trustedOrigins: siteUrl ? [siteUrl] : undefined,
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true
     },
     advanced: {
+      useSecureCookies,
       disableOriginCheck: process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true",
       disableCSRFCheck: process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true"
     },
@@ -78,6 +98,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
       }
     }
   }) satisfies BetterAuthOptions;
+};
 
 export const options = createAuthOptions({} as GenericCtx<DataModel>);
 
