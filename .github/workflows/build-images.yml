@@ -20,6 +20,9 @@ jobs:
     strategy:
       matrix:
         include:
+          - name: tcger-convex-backend
+            dockerfile: docker/convex-backend.Dockerfile
+            target: production
           - name: tcger-backend
             dockerfile: docker/backend.Dockerfile
             target: production

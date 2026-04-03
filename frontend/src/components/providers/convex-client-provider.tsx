@@ -7,11 +7,8 @@ import { ConvexReactClient } from 'convex/react';
 import { authClient, useSession } from '@/lib/auth-client';
 import { toAuthUser } from '@/lib/auth-helpers';
 import { ensureDemoInterceptor, isDemoMode } from '@/lib/demo-mode';
+import { resolvePublicConvexOrigin } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
-
-const convex = new ConvexReactClient(
-  process.env.NEXT_PUBLIC_CONVEX_URL ?? 'http://localhost:3210'
-);
 
 function AuthSessionSync() {
   ensureDemoInterceptor();
@@ -58,10 +55,13 @@ export function ConvexClientProvider({
   initialToken?: string | null;
 }) {
   ensureDemoInterceptor();
+  const [convexClient] = React.useState(
+    () => new ConvexReactClient(resolvePublicConvexOrigin())
+  );
 
   return (
     <ConvexBetterAuthProvider
-      client={convex}
+      client={convexClient}
       authClient={authClient}
       initialToken={initialToken}
     >
