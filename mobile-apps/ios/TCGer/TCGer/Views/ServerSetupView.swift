@@ -49,7 +49,7 @@ struct ServerSetupView: View {
             if selectedMode == .local {
                 Section(
                     header: Text("Local Server"),
-                    footer: Text("Examples: http://localhost:3001 or http://10.1.15.216:3001")
+                    footer: Text("Examples: http://localhost:3001, http://10.1.15.216:3001, or the phone-test stack at http://192.168.1.50:31452")
                 ) {
                     TextField("Local API URL", text: $localInput)
                         .keyboardType(.URL)

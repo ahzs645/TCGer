@@ -214,6 +214,14 @@ struct CardScannerView: View {
             )
             .buttonStyle(.plain)
             .padding(.bottom, 12)
+
+            if hasEnabledScanModes && isModeSupported {
+                Text("Live preview uses on-device strategies. The shutter runs the full backend scan for the selected game.")
+                    .font(.footnote)
+                    .foregroundColor(.white.opacity(0.88))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
     }
 
@@ -351,6 +359,7 @@ private struct ScanResultSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerSection
                     confidenceSection
+                    matcherSection
                     if !result.alternatives.isEmpty {
                         alternativesSection
                     }
@@ -459,6 +468,25 @@ private struct ScanResultSheet: View {
         .cornerRadius(12)
     }
 
+    private var matcherSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Matcher")
+                .font(.headline)
+
+            ScanMetricRow(label: "Strategy", value: selectedCandidate.originatingStrategy.rawValue)
+            ScanMetricRow(label: "Elapsed", value: String(format: "%.2fs", result.elapsed))
+
+            ForEach(selectedCandidate.debugInfo.keys.sorted(), id: \.self) { key in
+                if let value = selectedCandidate.debugInfo[key] {
+                    ScanMetricRow(label: key, value: value)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+
     private var alternativesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Alternatives")
@@ -507,5 +535,23 @@ private extension ScanResultSheet {
         Image(
             uiImage: UIImage(cgImage: result.capturedImage)
         )
+    }
+}
+
+private struct ScanMetricRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.footnote)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.footnote, design: .monospaced))
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
