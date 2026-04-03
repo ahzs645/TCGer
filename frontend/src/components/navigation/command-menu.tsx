@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Calculator, Heart, LayoutDashboard, Search, Table } from 'lucide-react';
+import { Calculator, Camera, Heart, LayoutDashboard, Search, Table } from 'lucide-react';
 import { secondaryNavigation } from '@/components/layout/app-shell';
 
 import {
@@ -76,6 +76,11 @@ export function CommandMenu() {
               <Search className="mr-2 h-4 w-4" />
               Card Search
               <CommandShortcut>G C</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => handleNavigate('/scan')}>
+              <Camera className="mr-2 h-4 w-4" />
+              Card Scan
+              <CommandShortcut>G S</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => handleNavigate('/collections')}>
               <Table className="mr-2 h-4 w-4" />

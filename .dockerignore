@@ -8,5 +8,6 @@ tmp
 .env
 .env.local
 .env.docker
+frontend/.env.local
 .DS_Store
 *.log

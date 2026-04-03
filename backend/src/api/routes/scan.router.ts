@@ -51,6 +51,7 @@ scanRouter.post(
       match: result.bestMatch,
       candidates: result.candidates,
       hash: result.hashGenerated,
+      meta: result.meta,
     });
   })
 );
