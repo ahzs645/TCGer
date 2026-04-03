@@ -152,6 +152,7 @@ enum ScanStrategyKind: String, Sendable {
     case textOCR
     case perceptualHash
     case mlDetector
+    case serverHash
 }
 
 struct CardScannerContext: Sendable {
@@ -159,6 +160,11 @@ struct CardScannerContext: Sendable {
     let serverConfiguration: ServerConfiguration
     let authToken: String?
     let showPricing: Bool
+}
+
+enum ScanInvocationKind: Sendable {
+    case livePreview
+    case photoCapture
 }
 
 enum CardScannerError: Error, LocalizedError, Sendable {

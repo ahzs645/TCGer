@@ -19,10 +19,20 @@ export interface CardScanMatch {
   distance: number;
 }
 
+export interface CardScanMeta {
+  quality?: number;
+  thresholdUsed?: number;
+  variantUsed?: string;
+  variantsTried?: string[];
+  perspectiveCorrected?: boolean;
+  contourAreaRatio?: number;
+}
+
 export interface CardScanResponse {
   match: CardScanMatch | null;
   candidates: CardScanMatch[];
   hash: CardScanHash;
+  meta?: CardScanMeta;
 }
 
 export interface CardScanStats {

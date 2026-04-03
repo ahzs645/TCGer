@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Camera, Loader2, Sparkles, Target } from 'lucide-react';
+import { AlertCircle, Camera, Loader2, Sparkles, Target, Video } from 'lucide-react';
 
 import { fetchCardByIdApi } from '@/lib/api-client';
 import { getCardScanStatsApi, scanCardImageApi, type CardScanMatch, type CardScanResponse, type CardScanStats } from '@/lib/api/scan';
@@ -35,8 +35,18 @@ function confidenceTone(confidence: number): string {
   return 'bg-rose-500/10 text-rose-700 border-rose-300';
 }
 
+function formatQuality(quality?: number): string | null {
+  if (quality === undefined || Number.isNaN(quality)) {
+    return null;
+  }
+  return `${Math.round(quality * 100)}%`;
+}
+
 export function CardScanPanel() {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const liveStreamRef = useRef<MediaStream | null>(null);
   const { token, isAuthenticated } = useAuthStore((state) => ({
     token: state.token,
     isAuthenticated: state.isAuthenticated
@@ -53,6 +63,10 @@ export function CardScanPanel() {
   const [isScanning, setIsScanning] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isResolvingCards, setIsResolvingCards] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'idle' | 'starting' | 'live'>('idle');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [liveCameraSupported, setLiveCameraSupported] = useState(false);
+  const [liveCameraUnavailableReason, setLiveCameraUnavailableReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedGame !== 'all') {
@@ -65,8 +79,35 @@ export function CardScanPanel() {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
+      if (liveStreamRef.current) {
+        liveStreamRef.current.getTracks().forEach((track) => track.stop());
+        liveStreamRef.current = null;
+      }
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const hasMediaDevices = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+    const hasSecureContext = window.isSecureContext;
+
+    if (hasMediaDevices && hasSecureContext) {
+      setLiveCameraSupported(true);
+      setLiveCameraUnavailableReason(null);
+      return;
+    }
+
+    setLiveCameraSupported(false);
+    if (!hasMediaDevices) {
+      setLiveCameraUnavailableReason('This browser does not expose a live camera stream. Still-photo capture remains available.');
+      return;
+    }
+
+    setLiveCameraUnavailableReason('Live camera preview needs HTTPS or localhost. On plain HTTP, use Take Photo / Upload instead.');
+  }, []);
 
   useEffect(() => {
     if (!token || !isAuthenticated) {
@@ -143,12 +184,7 @@ export function CardScanPanel() {
     inputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0] ?? null;
-    if (!nextFile) {
-      return;
-    }
-
+  const updateSelectedFile = (nextFile: File | null) => {
     setSelectedFile(nextFile);
     setScanError(null);
     setResult(null);
@@ -157,24 +193,112 @@ export function CardScanPanel() {
       if (previousUrl) {
         URL.revokeObjectURL(previousUrl);
       }
-      return URL.createObjectURL(nextFile);
+      return nextFile ? URL.createObjectURL(nextFile) : null;
     });
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0] ?? null;
+    if (!nextFile) {
+      return;
+    }
+
+    updateSelectedFile(nextFile);
+  };
+
   const handleClear = () => {
-    setSelectedFile(null);
-    setResult(null);
-    setResolvedCards({});
-    setScanError(null);
-    setPreviewUrl((previousUrl) => {
-      if (previousUrl) {
-        URL.revokeObjectURL(previousUrl);
-      }
-      return null;
-    });
+    stopLiveCamera();
+    updateSelectedFile(null);
+    setCameraError(null);
     if (inputRef.current) {
       inputRef.current.value = '';
     }
+  };
+
+  const stopLiveCamera = () => {
+    if (liveStreamRef.current) {
+      liveStreamRef.current.getTracks().forEach((track) => track.stop());
+      liveStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraMode('idle');
+  };
+
+  const handleStartLiveCamera = async () => {
+    if (!liveCameraSupported) {
+      return;
+    }
+
+    setCameraError(null);
+    setCameraMode('starting');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' }
+        }
+      });
+
+      if (liveStreamRef.current) {
+        liveStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      liveStreamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => undefined);
+      }
+
+      setCameraMode('live');
+    } catch (error) {
+      setCameraMode('idle');
+      setCameraError(error instanceof Error ? error.message : 'Unable to open the camera preview.');
+    }
+  };
+
+  const handleCaptureFrame = async () => {
+    const video = videoRef.current;
+    const canvas = captureCanvasRef.current;
+
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError('The live camera preview is not ready yet. Wait a moment and try again.');
+      return;
+    }
+
+    const longestSide = Math.max(video.videoWidth, video.videoHeight);
+    const scale = longestSide > 1600 ? 1600 / longestSide : 1;
+
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setCameraError('Unable to capture a frame from the live preview.');
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+    });
+
+    if (!blob) {
+      setCameraError('Unable to encode the captured frame.');
+      return;
+    }
+
+    const file = new File([blob], `card-scan-${Date.now()}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now()
+    });
+
+    updateSelectedFile(file);
+    stopLiveCamera();
   };
 
   const handleScan = async () => {
@@ -214,6 +338,7 @@ export function CardScanPanel() {
 
   const bestMatch = result?.match ?? null;
   const bestMatchCard = bestMatch ? resolvedCards[resultKey(bestMatch)] : null;
+  const scanMeta = result?.meta ?? null;
   const otherCandidates = result?.candidates.filter((candidate) => {
     if (!bestMatch) {
       return true;
@@ -242,9 +367,12 @@ export function CardScanPanel() {
             className="hidden"
             onChange={handleFileChange}
           />
+          <canvas ref={captureCanvasRef} className="hidden" />
 
           <div className="overflow-hidden rounded-xl border bg-muted/40">
-            {previewUrl ? (
+            {cameraMode === 'live' ? (
+              <video ref={videoRef} muted playsInline autoPlay className="h-72 w-full bg-black object-cover" />
+            ) : previewUrl ? (
               <img
                 src={previewUrl}
                 alt="Selected card preview"
@@ -262,6 +390,12 @@ export function CardScanPanel() {
               </div>
             )}
           </div>
+
+          {(liveCameraUnavailableReason || cameraError) && (
+            <div className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+              {cameraError ?? liveCameraUnavailableReason}
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Scan Scope</label>
@@ -283,6 +417,28 @@ export function CardScanPanel() {
               <Camera className="h-4 w-4" />
               Take Photo / Upload
             </Button>
+            {cameraMode === 'live' ? (
+              <>
+                <Button type="button" variant="secondary" onClick={handleCaptureFrame} className="gap-2">
+                  <Target className="h-4 w-4" />
+                  Capture Frame
+                </Button>
+                <Button type="button" variant="outline" onClick={stopLiveCamera}>
+                  Stop Camera
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleStartLiveCamera}
+                disabled={!liveCameraSupported || cameraMode === 'starting'}
+                className="gap-2"
+              >
+                {cameraMode === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                Live Camera
+              </Button>
+            )}
             <Button type="button" variant="secondary" onClick={handleScan} disabled={isScanning || !selectedFile}>
               {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
               Scan Card
@@ -300,6 +456,13 @@ export function CardScanPanel() {
               </p>
             </div>
           )}
+
+          <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+            <p className="font-medium">Phone Testing Notes</p>
+            <p className="mt-1 text-muted-foreground">
+              Still-photo capture works on the current HTTP test stack. Live browser camera preview only becomes available on HTTPS or localhost because mobile browsers require a secure context for streaming camera access.
+            </p>
+          </div>
 
           <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
             <div className="flex items-center justify-between">
@@ -378,6 +541,8 @@ export function CardScanPanel() {
                 </Badge>
                 <Badge variant="outline">{GAME_LABELS[bestMatch.tcg]}</Badge>
                 <Badge variant="outline">Distance {bestMatch.distance}</Badge>
+                {scanMeta?.perspectiveCorrected ? <Badge variant="secondary">Perspective corrected</Badge> : null}
+                {formatQuality(scanMeta?.quality) ? <Badge variant="secondary">Quality {formatQuality(scanMeta?.quality)}</Badge> : null}
                 {isResolvingCards && <Badge variant="secondary">Refreshing card details…</Badge>}
               </div>
 
@@ -403,6 +568,8 @@ export function CardScanPanel() {
                     <ScanFact label="Game" value={GAME_LABELS[bestMatch.tcg]} />
                     <ScanFact label="Set Code" value={bestMatch.setCode ?? 'N/A'} />
                     <ScanFact label="Confidence" value={formatConfidence(bestMatch.confidence)} />
+                    {scanMeta?.variantUsed ? <ScanFact label="Scan Variant" value={scanMeta.variantUsed} /> : null}
+                    {scanMeta?.thresholdUsed ? <ScanFact label="Threshold" value={String(scanMeta.thresholdUsed)} /> : null}
                   </div>
                 </div>
               </div>

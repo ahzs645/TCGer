@@ -18,6 +18,7 @@ final class PokemonTextScannerStrategy: ScanStrategy {
     func scan(
         image: CGImage,
         context: CardScannerContext,
+        source: ScanInvocationKind,
         apiService: APIService
     ) async throws -> CardScanResult? {
         guard supports(context.mode) else {
