@@ -14,6 +14,10 @@ struct EditCollectionCardSheet: View {
         let isAltered: Bool
         let tags: [String]
         let selectedPrint: Card?
+        let gradingCompany: String?
+        let gradingScore: String?
+        let certNumber: String?
+        let storageLocation: String?
     }
 
     let card: CollectionCard
@@ -37,6 +41,10 @@ struct EditCollectionCardSheet: View {
     @State private var tagError: String?
     @State private var showingPrintSelection = false
     @State private var selectedPrint: Card?
+    @State private var gradingCompany: String
+    @State private var gradingScore: String
+    @State private var certNumber: String
+    @State private var storageLocation: String
 
     private let conditions = ["", "Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = [""] + PokemonCardLanguage.allCases.map(\.rawValue)
@@ -94,6 +102,10 @@ struct EditCollectionCardSheet: View {
         _isAltered = State(initialValue: copyDetails?.isAltered ?? false)
         _selectedTagIds = State(initialValue: Set(selectedTagIds))
         _localTags = State(initialValue: availableTags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending })
+        _gradingCompany = State(initialValue: copyDetails?.gradingCompany ?? "")
+        _gradingScore = State(initialValue: copyDetails?.gradingScore ?? "")
+        _certNumber = State(initialValue: copyDetails?.certNumber ?? "")
+        _storageLocation = State(initialValue: copyDetails?.storageLocation ?? "")
     }
 
     var body: some View {
@@ -242,6 +254,31 @@ struct EditCollectionCardSheet: View {
                 }
 
                 Section {
+                    Picker("Company", selection: $gradingCompany) {
+                        Text("None").tag("")
+                        Text("PSA").tag("PSA")
+                        Text("BGS / Beckett").tag("BGS")
+                        Text("CGC").tag("CGC")
+                        Text("SGC").tag("SGC")
+                        Text("Other").tag("Other")
+                    }
+                    if !gradingCompany.isEmpty {
+                        TextField("Grade (e.g., 10, 9.5)", text: $gradingScore)
+                            .keyboardType(.decimalPad)
+                        TextField("Certificate Number", text: $certNumber)
+                            .keyboardType(.numberPad)
+                    }
+                } header: {
+                    Text("Grading")
+                }
+
+                Section {
+                    TextField("e.g., Home Safe, Display Case, PSA Submission", text: $storageLocation)
+                } header: {
+                    Text("Storage Location")
+                }
+
+                Section {
                     TextField("Description or notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
@@ -324,6 +361,10 @@ struct EditCollectionCardSheet: View {
                         let languageToSave = languageSelection.trimmingCharacters(in: .whitespacesAndNewlines)
                         let notesToSave = notes.trimmingCharacters(in: .whitespacesAndNewlines)
                         let selectedPrintToSave = selectedPrint
+                        let gradingCompanyTrimmed = gradingCompany.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let gradingScoreTrimmed = gradingScore.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let certNumberTrimmed = certNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let storageTrimmed = storageLocation.trimmingCharacters(in: .whitespacesAndNewlines)
                         let payload = SavePayload(
                             quantity: quantityToSave,
                             condition: conditionToSave.isEmpty ? nil : conditionToSave,
@@ -333,7 +374,11 @@ struct EditCollectionCardSheet: View {
                             isSigned: isSigned,
                             isAltered: isAltered,
                             tags: selectedTagIds.sorted(),
-                            selectedPrint: selectedPrintToSave
+                            selectedPrint: selectedPrintToSave,
+                            gradingCompany: gradingCompanyTrimmed.isEmpty ? nil : gradingCompanyTrimmed,
+                            gradingScore: gradingScoreTrimmed.isEmpty ? nil : gradingScoreTrimmed,
+                            certNumber: certNumberTrimmed.isEmpty ? nil : certNumberTrimmed,
+                            storageLocation: storageTrimmed.isEmpty ? nil : storageTrimmed
                         )
 #if DEBUG
                         print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") tags:\(payload.tags) print:\(payload.selectedPrint?.id ?? "nil")")

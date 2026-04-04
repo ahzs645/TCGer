@@ -34,6 +34,7 @@ struct CollectionDetailView: View {
     @State private var showingBulkDeleteConfirmation = false
     @State private var showingBulkConditionSheet = false
     @State private var isBulkProcessing = false
+    @State private var cardToSell: CollectionCard?
 
     enum CardSortOption: String, CaseIterable {
         case name = "Name"
@@ -433,6 +434,12 @@ struct CollectionDetailView: View {
                                             } label: {
                                                 Label("Delete", systemImage: "trash")
                                             }
+                                            Button {
+                                                cardToSell = card
+                                            } label: {
+                                                Label("Sold", systemImage: "dollarsign.circle")
+                                            }
+                                            .tint(.green)
                                         }
                                     } else {
                                         CollectionCardRow(
@@ -684,6 +691,13 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showingBulkConditionSheet) {
             BulkConditionSheet(selectedCount: selectedCardIds.count) { condition in
                 Task { await bulkChangeCondition(condition) }
+            }
+        }
+        .sheet(item: $cardToSell) { card in
+            MarkAsSoldSheet(card: card) { amount, platform, removeFromBinder in
+                Task {
+                    await markCardAsSold(card: card, amount: amount, platform: platform, removeFromBinder: removeFromBinder)
+                }
             }
         }
     }
@@ -1178,6 +1192,39 @@ struct CollectionDetailView: View {
         isBulkProcessing = false
         showingBulkConditionSheet = false
         HapticManager.notification(.success)
+    }
+
+    @MainActor
+    private func markCardAsSold(card: CollectionCard, amount: Double, platform: String?, removeFromBinder: Bool) async {
+        guard let token = environmentStore.authToken else { return }
+
+        do {
+            _ = try await apiService.createTransaction(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                type: "sale",
+                cardName: card.name,
+                tcg: card.tcg,
+                quantity: card.quantity,
+                amount: amount,
+                platform: platform
+            )
+
+            if removeFromBinder {
+                try await apiService.deleteCardFromBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: card.id
+                )
+                cards.removeAll { $0.id == card.id }
+            }
+
+            HapticManager.notification(.success)
+            cardToSell = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

@@ -619,6 +619,10 @@ final class DemoStore {
                             isSigned: template.isSigned,
                             isAltered: template.isAltered,
                             imageUrls: template.imageUrls,
+                            gradingCompany: template.gradingCompany,
+                            gradingScore: template.gradingScore,
+                            certNumber: template.certNumber,
+                            storageLocation: template.storageLocation,
                             tags: template.tags
                         )
                     )
@@ -644,6 +648,10 @@ final class DemoStore {
                     isSigned: copy.isSigned,
                     isAltered: copy.isAltered,
                     imageUrls: copy.imageUrls,
+                    gradingCompany: copy.gradingCompany,
+                    gradingScore: copy.gradingScore,
+                    certNumber: copy.certNumber,
+                    storageLocation: copy.storageLocation,
                     tags: selectedTags.isEmpty ? copy.tags : selectedTags
                 )
             }
@@ -996,6 +1004,10 @@ final class DemoStore {
                     isSigned: nil,
                     isAltered: nil,
                     imageUrls: nil,
+                    gradingCompany: nil,
+                    gradingScore: nil,
+                    certNumber: nil,
+                    storageLocation: nil,
                     tags: tags
                 )
             )

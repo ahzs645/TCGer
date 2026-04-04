@@ -8,6 +8,8 @@ struct CollectionsView: View {
     @State private var errorMessage: String?
     @State private var showingCreateSheet = false
    @State private var selectedCollection: Collection?
+    @State private var selectedSmartFolder: SmartFolder?
+    @State private var showingSmartFolderEditor = false
 
     private let apiService = APIService()
     private var displayCollections: [Collection] {
@@ -48,11 +50,57 @@ struct CollectionsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
-                    CollectionsList(
-                        collections: displayCollections,
-                        selectedCollection: $selectedCollection,
-                        showPricing: environmentStore.showPricing
-                    )
+                    ScrollView {
+                        if !environmentStore.smartFolders.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Smart Folders")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+
+                                ForEach(environmentStore.smartFolders) { folder in
+                                    Button {
+                                        selectedSmartFolder = folder
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: "wand.and.stars")
+                                                .foregroundColor(Color.fromHex(folder.colorHex))
+                                                .frame(width: 24)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(folder.name)
+                                                    .font(.subheadline)
+                                                    .fontWeight(.medium)
+                                                Text("\(folder.rules.count) rules (\(folder.matchMode.rawValue.lowercased()))")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(12)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        }
+
+                        LazyVStack(spacing: 16) {
+                            ForEach(displayCollections) { collection in
+                                CollectionCardView(collection: collection, showPricing: environmentStore.showPricing)
+                                    .onTapGesture {
+                                        selectedCollection = collection
+                                    }
+                            }
+                        }
+                        .padding()
+                    }
                 }
             }
             .navigationTitle("Binders")
@@ -67,8 +115,17 @@ struct CollectionsView: View {
                             }
                         }
 
-                        Button {
-                            showingCreateSheet = true
+                        Menu {
+                            Button {
+                                showingCreateSheet = true
+                            } label: {
+                                Label("New Binder", systemImage: "folder.badge.plus")
+                            }
+                            Button {
+                                showingSmartFolderEditor = true
+                            } label: {
+                                Label("New Smart Folder", systemImage: "wand.and.stars")
+                            }
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -101,6 +158,15 @@ struct CollectionsView: View {
         }
         .task {
             await loadCollections()
+        }
+        .sheet(item: $selectedSmartFolder) { folder in
+            SmartFolderDetailView(folder: folder)
+                .environmentObject(environmentStore)
+        }
+        .sheet(isPresented: $showingSmartFolderEditor) {
+            SmartFolderEditorSheet { folder in
+                environmentStore.smartFolders.append(folder)
+            }
         }
     }
 

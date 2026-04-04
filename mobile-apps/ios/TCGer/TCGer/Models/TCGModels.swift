@@ -398,6 +398,10 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     let isSigned: Bool?
     let isAltered: Bool?
     let imageUrls: [String]?
+    let gradingCompany: String?
+    let gradingScore: String?
+    let certNumber: String?
+    let storageLocation: String?
     let tags: [CollectionCardTag]
 }
 
@@ -552,4 +556,52 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     let owned: Bool
     let ownedQuantity: Int
     let createdAt: String
+}
+
+// MARK: - Sealed Products
+
+struct SealedProduct: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let tcg: String
+    let name: String
+    let productType: String
+    let setCode: String?
+    let cardsPerPack: Int?
+    let packsPerBox: Int?
+    let releaseDate: String?
+    let imageUrl: String?
+    let msrp: Double?
+    let upc: String?
+}
+
+struct SealedInventoryItem: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let product: SealedProduct
+    let quantity: Int
+    let purchasePrice: Double?
+    let purchaseDate: String?
+    let notes: String?
+    let createdAt: String
+}
+
+// MARK: - Finance / Transactions
+
+struct Transaction: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let type: String
+    let cardName: String?
+    let tcg: String?
+    let quantity: Int
+    let amount: Double
+    let currency: String
+    let platform: String?
+    let notes: String?
+    let date: String
+}
+
+struct FinanceSummary: Codable, Sendable {
+    let totalSpent: Double
+    let totalEarned: Double
+    let profitLoss: Double
+    let transactionCount: Int
 }

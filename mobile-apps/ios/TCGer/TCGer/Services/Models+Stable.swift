@@ -54,6 +54,10 @@ struct StableCollectionCardCopy: Identifiable, Codable {
     let isAltered: Bool?
     let imageUrls: [String]?
     let tags: [StableCollectionCardTag]
+    let gradingCompany: String?
+    let gradingScore: String?
+    let certNumber: String?
+    let storageLocation: String?
 
     func asModel() -> CollectionCardCopy {
         CollectionCardCopy(
@@ -69,6 +73,10 @@ struct StableCollectionCardCopy: Identifiable, Codable {
             isSigned: isSigned,
             isAltered: isAltered,
             imageUrls: imageUrls,
+            gradingCompany: gradingCompany,
+            gradingScore: gradingScore,
+            certNumber: certNumber,
+            storageLocation: storageLocation,
             tags: tags.map { $0.asModel() }
         )
     }

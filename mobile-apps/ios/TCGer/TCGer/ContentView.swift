@@ -46,6 +46,12 @@ struct ContentView: View {
             }
 
             if environmentStore.isAuthenticated {
+                Tab("Sealed", systemImage: "shippingbox.fill") {
+                    SealedInventoryView()
+                }
+            }
+
+            if environmentStore.isAuthenticated {
                 Tab("Scan", systemImage: "camera.viewfinder") {
                     CardScannerView()
                 }

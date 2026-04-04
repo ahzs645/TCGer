@@ -232,6 +232,22 @@ struct SettingsView: View {
                     Text("Display Preferences")
                 }
 
+                // Security Section
+                if BiometricAuthManager.isAvailable {
+                    Section {
+                        Toggle(isOn: $environmentStore.biometricLockEnabled) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Require \(BiometricAuthManager.displayName)")
+                                Text("Lock the app when backgrounded")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Security")
+                    }
+                }
+
                 if environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin {
                     // Admin Access Policy Section
                     Section {
@@ -301,6 +317,24 @@ struct SettingsView: View {
                         Text("Admin Access Policy")
                     } footer: {
                         Text("These settings mirror web access policy options.")
+                    }
+                }
+
+                // Finance Section
+                if environmentStore.isAuthenticated {
+                    Section {
+                        NavigationLink {
+                            TransactionsView()
+                                .environmentObject(environmentStore)
+                        } label: {
+                            HStack {
+                                Image(systemName: "dollarsign.circle")
+                                    .foregroundColor(.green)
+                                Text("Transaction History")
+                            }
+                        }
+                    } header: {
+                        Text("Finance")
                     }
                 }
 
