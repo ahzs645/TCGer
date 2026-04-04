@@ -72,6 +72,31 @@ npm run docker:dev:full:bulk
 - `tcgdex-cache` — Pokémon card database (21,632+ cards). Used by default (`POKEMON_API_BASE_URL=http://tcgdex-cache:4040`).
 - `pokemon-cache` — (deprecated) Use tcgdex-cache instead.
 
+## Dedicated Card Hash Builds
+
+Use the separate card-scan compose file when you want to build a standalone local Pokemon library plus hash map without starting the app stack:
+
+```bash
+cd ..
+cp .env.docker.example .env.docker
+CARD_HASH_BUILD_FORCE=true npm run docker:hash:pokemon
+```
+
+This starts only:
+- `tcgdex-cache` for the cached Pokemon dataset and image proxy
+- `card-hash-builder` for the one-shot pHash build
+
+Useful overrides:
+- `CARD_HASH_BUILD_LIMIT=250` — smoke test on a smaller subset
+- `CARD_HASH_BUILD_SET_CODE=sv7` — build a single Pokemon set
+- `CARD_HASH_BUILD_CONCURRENCY=8` — raise hashing concurrency
+- `CARD_SCAN_NODE_MAX_OLD_SPACE_SIZE=6144` — give the builder more heap for very large runs
+
+The resulting artifacts are stored in the named volume `tcger_card_scan_data`:
+- `/data/card-scan/hashes.json` — app-compatible hash store
+- `/data/card-library/pokemon/index.json` — standalone metadata + hash index
+- `/data/card-library/pokemon/images/...` — local card-image corpus
+
 ## Production Build
 ```bash
 docker compose -f docker/docker-compose.prod.yml --env-file .env.docker up --build -d
