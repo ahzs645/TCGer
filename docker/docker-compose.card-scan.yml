@@ -1,0 +1,71 @@
+services:
+  tcgdex-cache:
+    build:
+      context: ..
+      dockerfile: services/tcgdex-cache/Dockerfile
+    environment:
+      PORT: 4040
+      TCGDEX_CACHE_DATA_DIR: /data
+      TCGDEX_CACHE_REFRESH_MS: ${TCGDEX_CACHE_REFRESH_MS:-86400000}
+      TCGDEX_CACHE_PAGE_SIZE: ${TCGDEX_CACHE_PAGE_SIZE:-20}
+      TCGDEX_CACHE_IMAGES: ${TCGDEX_CACHE_IMAGES:-true}
+      TCGDEX_CACHE_IMAGE_MAX_PER_REFRESH: ${TCGDEX_CACHE_IMAGE_MAX_PER_REFRESH:-250}
+      TCGDEX_CACHE_IMAGE_CONCURRENCY: ${TCGDEX_CACHE_IMAGE_CONCURRENCY:-4}
+    volumes:
+      - tcger_tcgdex_cache_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4040/health').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    networks:
+      - tcger-card-scan-net
+
+  card-hash-builder:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+      target: production
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=${CARD_SCAN_NODE_MAX_OLD_SPACE_SIZE:-4096}
+      BACKEND_MODE: convex
+      CONVEX_HTTP_ORIGIN: ${CONVEX_HTTP_ORIGIN:-http://localhost:3211}
+      CARD_SCAN_STORE: file
+      CARD_SCAN_DATA_DIR: /data/card-scan
+      CARD_HASH_LIBRARY_DIR: /data/card-library
+      POKEMON_API_BASE_URL: http://tcgdex-cache:4040
+      TCGDEX_API_BASE_URL: http://tcgdex-cache:4040
+      CARD_HASH_BUILD_TCG: ${CARD_HASH_BUILD_TCG:-pokemon}
+      CARD_HASH_BUILD_LIMIT: ${CARD_HASH_BUILD_LIMIT:-}
+      CARD_HASH_BUILD_SET_CODE: ${CARD_HASH_BUILD_SET_CODE:-}
+      CARD_HASH_BUILD_FORCE: ${CARD_HASH_BUILD_FORCE:-false}
+      CARD_HASH_BUILD_STATS_ONLY: ${CARD_HASH_BUILD_STATS_ONLY:-false}
+      CARD_HASH_BUILD_CONCURRENCY: ${CARD_HASH_BUILD_CONCURRENCY:-6}
+      CARD_HASH_BUILD_UPSERT_BATCH_SIZE: ${CARD_HASH_BUILD_UPSERT_BATCH_SIZE:-250}
+    depends_on:
+      tcgdex-cache:
+        condition: service_healthy
+    entrypoint: ["node", "dist/scripts/build-card-hashes.js"]
+    volumes:
+      - tcger_card_scan_data:/data
+    restart: "no"
+    networks:
+      - tcger-card-scan-net
+
+volumes:
+  tcger_card_scan_data:
+    name: tcger_card_scan_data
+  tcger_tcgdex_cache_data:
+    name: tcger_tcgdex_cache_data
+
+networks:
+  tcger-card-scan-net:
+    driver: bridge

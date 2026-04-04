@@ -83,6 +83,7 @@ Docker-backed local development shortcuts from the repo root:
 - `npm run docker:dev:legacy` - backend stack + Postgres for hybrid/legacy routes.
 - `npm run docker:dev:legacy:bulk` - backend stack + Postgres + cache services.
 - `npm run docker:dev:full` - full Docker stack including the frontend and nginx gateway.
+- `npm run docker:hash:pokemon` - one-shot Pokemon card hash-map build into `tcger_card_scan_data`.
 - `npm run docker:down` - stop the Docker development stack.
 
 ## Environment variables
@@ -125,6 +126,27 @@ Key routes (see `backend/src/api/routes`):
 - `services/ygo-cache` (port 4020): cached YGOPRODeck cardinfo mirror.
 - `services/tcgdex-cache` (port 4040): cached TCGdex data for Pokemon (default).
 - `services/pokemon-cache` (port 4030): cached official Pokemon TCG API (deprecated).
+
+## Hash map builds
+
+Use the dedicated card-scan stack when you want to build a large standalone Pokemon artifact set without starting the full app:
+
+```bash
+cp .env.docker.example .env.docker
+CARD_HASH_BUILD_FORCE=true npm run docker:hash:pokemon
+```
+
+This produces:
+- `/data/card-scan/hashes.json` in the `tcger_card_scan_data` volume for scan matching.
+- `/data/card-library/pokemon/index.json` for standalone metadata + hash records.
+- `/data/card-library/pokemon/images/...` for a local Pokemon image library.
+
+Useful overrides:
+- `CARD_HASH_BUILD_LIMIT=500` to test on a subset first.
+- `CARD_HASH_BUILD_CONCURRENCY=8` to push harder on local CPU/network.
+- `CARD_HASH_BUILD_SET_CODE=sv7` to build a single Pokemon set.
+
+The generated artifacts are written to the named Docker volume `tcger_card_scan_data`.
 
 ## Mobile apps
 - iOS SwiftUI client with dashboard, collections, scanner, and API service layers lives in `mobile-apps/ios/TCGer` (in progress).

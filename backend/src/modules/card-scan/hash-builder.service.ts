@@ -15,6 +15,7 @@
 
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
+import { CardHashLibraryWriter } from './hash-library';
 import { computeRGBHash } from './phash';
 import { preprocessCardImage } from './preprocess';
 import {
@@ -45,10 +46,37 @@ interface CardImageEntry {
   imageUrl: string;
 }
 
+interface HashBuildOptions {
+  limit?: number;
+  setCode?: string;
+  force?: boolean;
+  concurrency?: number;
+  upsertBatchSize?: number;
+  libraryDir?: string;
+}
+
+type HashBuildResult =
+  | { status: 'processed'; record: CardHashRecord; imageBuffer: Buffer; contentType: string | null }
+  | { status: 'error' };
+
+const DEFAULT_HASH_BUILD_CONCURRENCY = parsePositiveInteger(
+  process.env.CARD_HASH_BUILD_CONCURRENCY,
+  6
+);
+const DEFAULT_HASH_UPSERT_BATCH_SIZE = parsePositiveInteger(
+  process.env.CARD_HASH_BUILD_UPSERT_BATCH_SIZE,
+  250
+);
+
 // ---------- rate limiting ----------
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function isLocalUrl(url: string): boolean {
@@ -77,7 +105,7 @@ function isLocalUrl(url: string): boolean {
  */
 export async function buildHashDatabase(
   tcg: 'magic' | 'pokemon' | 'yugioh',
-  options: { limit?: number; setCode?: string; force?: boolean } = {}
+  options: HashBuildOptions = {}
 ): Promise<HashBuildProgress> {
   const progress: HashBuildProgress = {
     tcg,
@@ -111,29 +139,98 @@ export async function buildHashDatabase(
 
   const existingIds = options.force ? new Set<string>() : await getCardHashExternalIdSet(tcg);
   const pendingUpserts: CardHashRecord[] = [];
+  const concurrency = Math.max(1, options.concurrency ?? DEFAULT_HASH_BUILD_CONCURRENCY);
+  const upsertBatchSize = Math.max(1, options.upsertBatchSize ?? DEFAULT_HASH_UPSERT_BATCH_SIZE);
+  const libraryWriter = options.libraryDir
+    ? new CardHashLibraryWriter(options.libraryDir, tcg, Boolean(options.force))
+    : null;
 
-  for (const card of cards) {
-    try {
+  if (libraryWriter) {
+    await libraryWriter.init();
+  }
+
+  for (let index = 0; index < cards.length; index += concurrency) {
+    const chunk = cards.slice(index, index + concurrency);
+    const pendingCards: CardImageEntry[] = [];
+
+    for (const card of chunk) {
       if (existingIds.has(card.externalId)) {
         progress.skipped++;
         continue;
       }
+      pendingCards.push(card);
+    }
 
-      // Download image
-      const imageResponse = await fetch(card.imageUrl);
-      if (!imageResponse.ok) {
-        logger.warn({ card: card.name, status: imageResponse.status }, 'Failed to download image');
+    const results = await Promise.all(
+      pendingCards.map((card) => buildHashRecord(tcg, card))
+    );
+
+    for (const result of results) {
+      if (result.status === 'error') {
         progress.errors++;
         continue;
       }
 
-      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-      const processedImage = await preprocessCardImage(imageBuffer);
+      pendingUpserts.push(result.record);
+      existingIds.add(result.record.externalId);
+      if (libraryWriter) {
+        await libraryWriter.writeRecord(result.record, result.imageBuffer, result.contentType);
+      }
 
-      // Compute pHash
-      const hash = await computeRGBHash(processedImage);
+      progress.processed++;
 
-      pendingUpserts.push({
+      if (progress.processed % 50 === 0) {
+        logger.info(
+          { tcg, processed: progress.processed, total: progress.total },
+          'Hash build progress'
+        );
+      }
+
+      if (pendingUpserts.length >= upsertBatchSize) {
+        await upsertCardHashes(pendingUpserts.splice(0, pendingUpserts.length));
+      }
+    }
+  }
+
+  if (pendingUpserts.length) {
+    await upsertCardHashes(pendingUpserts);
+  }
+
+  if (libraryWriter) {
+    const library = await libraryWriter.persist();
+    logger.info({ tcg, library }, 'Card hash library updated');
+  }
+
+  logger.info(progress, 'Hash database build complete');
+  return progress;
+}
+
+async function buildHashRecord(
+  tcg: 'magic' | 'pokemon' | 'yugioh',
+  card: CardImageEntry
+): Promise<HashBuildResult> {
+  try {
+    // External image hosts need throttling; in-cluster cache services do not.
+    const delayMs = isLocalUrl(card.imageUrl) ? 0 : tcg === 'magic' ? 100 : 200;
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    const imageResponse = await fetch(card.imageUrl);
+    if (!imageResponse.ok) {
+      logger.warn({ card: card.name, status: imageResponse.status }, 'Failed to download image');
+      return { status: 'error' };
+    }
+
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const processedImage = await preprocessCardImage(imageBuffer);
+    const hash = await computeRGBHash(processedImage);
+
+    return {
+      status: 'processed',
+      imageBuffer,
+      contentType: imageResponse.headers.get('content-type'),
+      record: {
         tcg,
         externalId: card.externalId,
         name: card.name,
@@ -145,39 +242,12 @@ export async function buildHashDatabase(
         gHash: hash.g,
         bHash: hash.b,
         hashSize: 16,
-      });
-      existingIds.add(card.externalId);
-
-      progress.processed++;
-
-      if (progress.processed % 50 === 0) {
-        logger.info(
-          { tcg, processed: progress.processed, total: progress.total },
-          'Hash build progress'
-        );
-      }
-
-      if (pendingUpserts.length >= 25) {
-        await upsertCardHashes(pendingUpserts.splice(0, pendingUpserts.length));
-      }
-
-      // External image hosts need throttling; in-cluster cache services do not.
-      const delayMs = isLocalUrl(card.imageUrl) ? 0 : tcg === 'magic' ? 100 : 200;
-      if (delayMs > 0) {
-        await sleep(delayMs);
-      }
-    } catch (err) {
-      logger.error({ card: card.name, err }, 'Error processing card');
-      progress.errors++;
-    }
+      },
+    };
+  } catch (err) {
+    logger.error({ card: card.name, err }, 'Error processing card');
+    return { status: 'error' };
   }
-
-  if (pendingUpserts.length) {
-    await upsertCardHashes(pendingUpserts);
-  }
-
-  logger.info(progress, 'Hash database build complete');
-  return progress;
 }
 
 /**

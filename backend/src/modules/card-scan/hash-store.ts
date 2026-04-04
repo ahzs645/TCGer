@@ -8,6 +8,12 @@ import { logger } from '../../utils/logger';
 
 export type CardScanStoreMode = 'file' | 'prisma';
 
+export interface CardHashStoreDetails {
+  mode: CardScanStoreMode;
+  dataDir?: string;
+  filePath?: string;
+}
+
 export interface CardHashRecord {
   tcg: string;
   externalId: string;
@@ -33,6 +39,7 @@ interface CardHashPageQuery extends CardHashQuery {
 
 interface CardHashStore {
   readonly mode: CardScanStoreMode;
+  getDetails(): CardHashStoreDetails;
   getAll(query?: CardHashQuery): Promise<CardHashRecord[]>;
   getPage(query: CardHashPageQuery): Promise<CardHashRecord[]>;
   count(query?: CardHashQuery): Promise<number>;
@@ -87,6 +94,10 @@ class PrismaCardHashStore implements CardHashStore {
   private cachePromise: Promise<Map<string, CardHashRecord[]>> | null = null;
 
   constructor(private readonly client: PrismaClient) {}
+
+  getDetails(): CardHashStoreDetails {
+    return { mode: this.mode };
+  }
 
   async getAll(query: CardHashQuery = {}): Promise<CardHashRecord[]> {
     const cache = await this.getCache();
@@ -187,6 +198,14 @@ class FileCardHashStore implements CardHashStore {
 
   constructor(private readonly dataDir: string) {}
 
+  getDetails(): CardHashStoreDetails {
+    return {
+      mode: this.mode,
+      dataDir: this.dataDir,
+      filePath: this.filePath,
+    };
+  }
+
   async getAll(query: CardHashQuery = {}): Promise<CardHashRecord[]> {
     const cache = await this.getCache();
     const entries = Array.from(cache.values());
@@ -201,13 +220,32 @@ class FileCardHashStore implements CardHashStore {
   }
 
   async count(query: CardHashQuery = {}): Promise<number> {
-    const entries = await this.getAll(query);
-    return entries.length;
+    const cache = await this.getCache();
+    if (!query.tcg) {
+      return cache.size;
+    }
+
+    let total = 0;
+    for (const entry of cache.values()) {
+      if (entry.tcg === query.tcg) {
+        total += 1;
+      }
+    }
+
+    return total;
   }
 
   async getExternalIdSet(tcg: string): Promise<Set<string>> {
-    const entries = await this.getAll({ tcg });
-    return new Set(entries.map((entry) => entry.externalId));
+    const cache = await this.getCache();
+    const externalIds = new Set<string>();
+
+    for (const entry of cache.values()) {
+      if (entry.tcg === tcg) {
+        externalIds.add(entry.externalId);
+      }
+    }
+
+    return externalIds;
   }
 
   async upsertMany(records: CardHashRecord[]): Promise<void> {
@@ -271,18 +309,14 @@ class FileCardHashStore implements CardHashStore {
   }
 
   private async persist(cache: Map<string, CardHashRecord>): Promise<void> {
-    const payload = JSON.stringify(
-      {
-        version: 1,
-        entries: Array.from(cache.values()).sort(compareEntriesByName),
-      },
-      null,
-      2
-    );
+    const payload = JSON.stringify({
+      version: 1,
+      entries: Array.from(cache.values()).sort(compareEntriesByName),
+    });
 
     this.writeChain = this.writeChain.then(async () => {
       await mkdir(this.dataDir, { recursive: true });
-      await writeFile(this.filePath, payload, 'utf8');
+      await writeFile(this.filePath, `${payload}\n`, 'utf8');
     });
 
     await this.writeChain;
@@ -297,6 +331,10 @@ const store: CardHashStore =
 
 export function getCardHashStoreMode(): CardScanStoreMode {
   return store.mode;
+}
+
+export function getCardHashStoreDetails(): CardHashStoreDetails {
+  return store.getDetails();
 }
 
 export async function getAllCardHashes(query: CardHashQuery = {}): Promise<CardHashRecord[]> {

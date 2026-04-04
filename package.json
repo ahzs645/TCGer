@@ -19,6 +19,8 @@
     "docker:dev:legacy:bulk": "BACKEND_MODE=hybrid docker compose -f docker/docker-compose.yml --env-file .env.docker --profile legacy --profile bulk up --build",
     "docker:dev:full": "docker compose -f docker/docker-compose.yml --env-file .env.docker --profile frontend up --build",
     "docker:dev:full:bulk": "docker compose -f docker/docker-compose.yml --env-file .env.docker --profile frontend --profile bulk up --build",
+    "docker:hash:pokemon": "docker compose -f docker/docker-compose.card-scan.yml --env-file .env.docker up --build --abort-on-container-exit --exit-code-from card-hash-builder card-hash-builder",
+    "docker:hash:down": "docker compose -f docker/docker-compose.card-scan.yml --env-file .env.docker down",
     "docker:down": "docker compose -f docker/docker-compose.yml --env-file .env.docker down",
     "docker:down:volumes": "docker compose -f docker/docker-compose.yml --env-file .env.docker down -v",
     "dev:marketing": "npm --prefix marketing-site run dev",
