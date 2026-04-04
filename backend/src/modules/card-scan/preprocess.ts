@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { createRequire } from 'node:module';
 
 /**
  * Normalize card images into a stable input for perceptual hashing.
@@ -13,8 +14,8 @@ const PERSPECTIVE_MAX_SIZE = 1200;
 const MIN_CARD_AREA_RATIO = 0.08;
 const TARGET_CARD_ASPECT_RATIO = 0.714;
 const MAX_ASPECT_ERROR_RATIO = 0.3;
-const cvBundlePath = require.resolve('@techstark/opencv-js/dist/opencv.js');
-const cvModule = require(cvBundlePath) as typeof import('@techstark/opencv-js');
+const localRequire = createRequire(__filename);
+let cvModule: typeof import('@techstark/opencv-js') | null | undefined;
 let cvWarmupPromise: Promise<void> | null = null;
 
 export interface ScanRuntimeVariant {
@@ -54,12 +55,40 @@ function debugScan(message: string, payload?: unknown): void {
   console.log(`[card-scan] ${message}`, payload);
 }
 
-async function warmCvRuntime(): Promise<void> {
+function createRgbaMat(
+  cv: typeof import('@techstark/opencv-js'),
+  data: Uint8ClampedArray,
+  width: number,
+  height: number
+): InstanceType<typeof import('@techstark/opencv-js')['Mat']> {
+  return cv.matFromArray(height, width, cv.CV_8UC4, data);
+}
+
+function getCvModule(): typeof import('@techstark/opencv-js') | null {
+  if (cvModule !== undefined) {
+    return cvModule;
+  }
+
+  try {
+    cvModule = localRequire('@techstark/opencv-js') as typeof import('@techstark/opencv-js');
+  } catch {
+    cvModule = null;
+  }
+
+  return cvModule;
+}
+
+async function warmCvRuntime(): Promise<boolean> {
+  if (!getCvModule()) {
+    return false;
+  }
+
   if (!cvWarmupPromise) {
     cvWarmupPromise = new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   await cvWarmupPromise;
+  return true;
 }
 
 async function normalizeCardImage(imageBuffer: Buffer): Promise<Buffer> {
@@ -175,9 +204,16 @@ async function computeScanQuality(imageBuffer: Buffer): Promise<ScanQualityMetri
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  await warmCvRuntime();
+  if (!(await warmCvRuntime())) {
+    debugScan('quality:no-cv-module');
+    return null;
+  }
 
-  const cv = cvModule;
+  const cv = getCvModule();
+  if (!cv) {
+    debugScan('quality:no-cv-module');
+    return null;
+  }
   let src: InstanceType<typeof cv.Mat> | null = null;
   let gray: InstanceType<typeof cv.Mat> | null = null;
   let blurred: InstanceType<typeof cv.Mat> | null = null;
@@ -189,11 +225,12 @@ async function computeScanQuality(imageBuffer: Buffer): Promise<ScanQualityMetri
   let laplacianStd: InstanceType<typeof cv.Mat> | null = null;
 
   try {
-    src = cv.matFromImageData({
-      data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
-      width: info.width,
-      height: info.height,
-    });
+    src = createRgbaMat(
+      cv,
+      new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
+      info.width,
+      info.height
+    );
     gray = new cv.Mat();
     blurred = new cv.Mat();
     edges = new cv.Mat();
@@ -267,28 +304,31 @@ async function tryPerspectiveCorrectCard(
     .raw()
     .toBuffer({ resolveWithObject: true });
   debugScan('perspective:buffer-ready', { width: info.width, height: info.height });
-  await warmCvRuntime();
+  if (!(await warmCvRuntime())) {
+    debugScan('perspective:no-cv-module');
+    return null;
+  }
 
-  const cv = cvModule;
+  const cv = getCvModule();
+  if (!cv) {
+    debugScan('perspective:no-cv-module');
+    return null;
+  }
   let src: InstanceType<typeof cv.Mat> | null = null;
   let gray: InstanceType<typeof cv.Mat> | null = null;
   let blurred: InstanceType<typeof cv.Mat> | null = null;
-  let edges: InstanceType<typeof cv.Mat> | null = null;
-  let contours: InstanceType<typeof cv.MatVector> | null = null;
-  let hierarchy: InstanceType<typeof cv.Mat> | null = null;
   let kernel: InstanceType<typeof cv.Mat> | null = null;
+  let bestCandidate: CardQuadrilateral | null = null;
 
   try {
-    src = cv.matFromImageData({
-      data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
-      width: info.width,
-      height: info.height,
-    });
+    src = createRgbaMat(
+      cv,
+      new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
+      info.width,
+      info.height
+    );
     gray = new cv.Mat();
     blurred = new cv.Mat();
-    edges = new cv.Mat();
-    contours = new cv.MatVector();
-    hierarchy = new cv.Mat();
     kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
   } catch {
     debugScan('perspective:no-cv');
@@ -299,11 +339,7 @@ async function tryPerspectiveCorrectCard(
     debugScan('perspective:mats-ready');
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
-    cv.Canny(blurred, edges, 60, 180);
-    cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
-    cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-    const bestCandidate = findBestCardQuadrilateral(cv, contours, info.width * info.height);
+    bestCandidate = findBestCardQuadrilateralFromVariants(cv, gray, blurred, kernel, info.width * info.height);
     debugScan('perspective:candidate', bestCandidate);
     if (!bestCandidate) {
       return null;
@@ -371,9 +407,6 @@ async function tryPerspectiveCorrectCard(
     src?.delete();
     gray?.delete();
     blurred?.delete();
-    edges?.delete();
-    contours?.delete();
-    hierarchy?.delete();
     kernel?.delete();
   }
 }
@@ -397,59 +430,148 @@ function findBestCardQuadrilateral(
   imageArea: number
 ): CardQuadrilateral | null {
   let bestCandidate: CardQuadrilateral | null = null;
+  const epsilonFactors = [0.015, 0.02, 0.03, 0.04, 0.05];
 
   for (let index = 0; index < contours.size(); index++) {
     const contour = contours.get(index);
     const perimeter = cv.arcLength(contour, true);
-    const approx = new cv.Mat();
 
     try {
-      cv.approxPolyDP(contour, approx, 0.02 * perimeter, true);
-      if (approx.rows !== 4) {
-        continue;
-      }
+      for (const epsilonFactor of epsilonFactors) {
+        const approx = new cv.Mat();
 
-      const ordered = orderQuadrilateralPoints(Array.from(approx.data32S));
-      const width = Math.round(
-        Math.max(distanceBetween(ordered[0], ordered[1]), distanceBetween(ordered[2], ordered[3]))
-      );
-      const height = Math.round(
-        Math.max(distanceBetween(ordered[0], ordered[3]), distanceBetween(ordered[1], ordered[2]))
-      );
+        try {
+          cv.approxPolyDP(contour, approx, epsilonFactor * perimeter, true);
+          if (approx.rows !== 4) {
+            continue;
+          }
 
-      if (width < 120 || height < 160) {
-        continue;
-      }
+          const candidate = buildQuadrilateralCandidate(cv, approx, imageArea);
+          if (!candidate) {
+            continue;
+          }
 
-      const aspectRatio = width / Math.max(1, height);
-      const aspectError = Math.abs(aspectRatio - TARGET_CARD_ASPECT_RATIO) / TARGET_CARD_ASPECT_RATIO;
-      if (aspectError > MAX_ASPECT_ERROR_RATIO) {
-        continue;
-      }
-
-      const area = cv.contourArea(approx);
-      const areaRatio = area / Math.max(1, imageArea);
-      if (areaRatio < MIN_CARD_AREA_RATIO) {
-        continue;
-      }
-
-      const score = areaRatio * 2 + (1 - Math.min(1, aspectError));
-      if (!bestCandidate || score > bestCandidate.score) {
-        bestCandidate = {
-          points: ordered,
-          width,
-          height,
-          areaRatio,
-          score,
-        };
+          if (!bestCandidate || candidate.score > bestCandidate.score) {
+            bestCandidate = candidate;
+          }
+        } finally {
+          approx.delete();
+        }
       }
     } finally {
-      approx.delete();
       contour.delete();
     }
   }
 
   return bestCandidate;
+}
+
+function findBestCardQuadrilateralFromVariants(
+  cv: typeof import('@techstark/opencv-js'),
+  gray: InstanceType<typeof import('@techstark/opencv-js')['Mat']>,
+  blurred: InstanceType<typeof import('@techstark/opencv-js')['Mat']>,
+  kernel: InstanceType<typeof import('@techstark/opencv-js')['Mat']>,
+  imageArea: number
+): CardQuadrilateral | null {
+  const masks: Array<{ name: string; mask: InstanceType<typeof cv.Mat> }> = [];
+  let largeKernel: InstanceType<typeof cv.Mat> | null = null;
+
+  try {
+    const cannyMask = new cv.Mat();
+    cv.Canny(blurred, cannyMask, 60, 180);
+    cv.morphologyEx(cannyMask, cannyMask, cv.MORPH_CLOSE, kernel);
+    masks.push({ name: 'canny', mask: cannyMask });
+
+    const adaptiveMask = new cv.Mat();
+    cv.adaptiveThreshold(
+      blurred,
+      adaptiveMask,
+      255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY_INV,
+      31,
+      7
+    );
+    cv.morphologyEx(adaptiveMask, adaptiveMask, cv.MORPH_CLOSE, kernel);
+    masks.push({ name: 'adaptive', mask: adaptiveMask });
+
+    const otsuMask = new cv.Mat();
+    cv.threshold(blurred, otsuMask, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+    cv.morphologyEx(otsuMask, otsuMask, cv.MORPH_CLOSE, kernel);
+    masks.push({ name: 'otsu', mask: otsuMask });
+
+    largeKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
+    const foregroundMask = new cv.Mat();
+    cv.threshold(blurred, foregroundMask, 245, 255, cv.THRESH_BINARY_INV);
+    cv.morphologyEx(foregroundMask, foregroundMask, cv.MORPH_CLOSE, largeKernel);
+    cv.morphologyEx(foregroundMask, foregroundMask, cv.MORPH_OPEN, kernel);
+    masks.push({ name: 'foreground', mask: foregroundMask });
+
+    let bestCandidate: CardQuadrilateral | null = null;
+
+    for (const { name, mask } of masks) {
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+
+      try {
+        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        const candidate = findBestCardQuadrilateral(cv, contours, imageArea);
+        debugScan(`perspective:variant:${name}`, candidate);
+        if (candidate && (!bestCandidate || candidate.score > bestCandidate.score)) {
+          bestCandidate = candidate;
+        }
+      } finally {
+        contours.delete();
+        hierarchy.delete();
+      }
+    }
+
+    return bestCandidate;
+  } finally {
+    largeKernel?.delete();
+    for (const { mask } of masks) {
+      mask.delete();
+    }
+  }
+}
+
+function buildQuadrilateralCandidate(
+  cv: typeof import('@techstark/opencv-js'),
+  approx: InstanceType<typeof import('@techstark/opencv-js')['Mat']>,
+  imageArea: number
+): CardQuadrilateral | null {
+  const ordered = orderQuadrilateralPoints(Array.from(approx.data32S));
+  const width = Math.round(
+    Math.max(distanceBetween(ordered[0], ordered[1]), distanceBetween(ordered[2], ordered[3]))
+  );
+  const height = Math.round(
+    Math.max(distanceBetween(ordered[0], ordered[3]), distanceBetween(ordered[1], ordered[2]))
+  );
+
+  if (width < 120 || height < 160) {
+    return null;
+  }
+
+  const aspectRatio = width / Math.max(1, height);
+  const aspectError = Math.abs(aspectRatio - TARGET_CARD_ASPECT_RATIO) / TARGET_CARD_ASPECT_RATIO;
+  if (aspectError > MAX_ASPECT_ERROR_RATIO) {
+    return null;
+  }
+
+  const area = cv.contourArea(approx);
+  const areaRatio = area / Math.max(1, imageArea);
+  if (areaRatio < MIN_CARD_AREA_RATIO) {
+    return null;
+  }
+
+  const score = areaRatio * 2 + (1 - Math.min(1, aspectError));
+  return {
+    points: ordered,
+    width,
+    height,
+    areaRatio,
+    score,
+  };
 }
 
 function orderQuadrilateralPoints(points: number[]): CardPoint[] {

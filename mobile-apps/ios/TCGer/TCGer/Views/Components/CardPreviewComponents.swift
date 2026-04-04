@@ -118,11 +118,20 @@ struct CardPreviewContextView: View {
 private struct CardPreviewContextMenuModifier: ViewModifier {
     let card: Card
     let onSelect: (() -> Void)?
+    let onAddToWishlist: (() -> Void)?
 
     func body(content: Content) -> some View {
         content.contextMenu {
             if let onSelect {
                 Button("Select this print", action: onSelect)
+                Divider()
+            }
+            if let onAddToWishlist {
+                Button {
+                    onAddToWishlist()
+                } label: {
+                    Label("Add to Wishlist", systemImage: "heart")
+                }
                 Divider()
             }
             Button("Close", role: .cancel) { }
@@ -134,8 +143,8 @@ private struct CardPreviewContextMenuModifier: ViewModifier {
 
 extension View {
     /// Attaches a context menu preview for the given card, using an optional selection action.
-    func cardPreviewContextMenu(card: Card, onSelect: (() -> Void)? = nil) -> some View {
-        modifier(CardPreviewContextMenuModifier(card: card, onSelect: onSelect))
+    func cardPreviewContextMenu(card: Card, onSelect: (() -> Void)? = nil, onAddToWishlist: (() -> Void)? = nil) -> some View {
+        modifier(CardPreviewContextMenuModifier(card: card, onSelect: onSelect, onAddToWishlist: onAddToWishlist))
     }
 }
 

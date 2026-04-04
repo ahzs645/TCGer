@@ -14,6 +14,10 @@ struct CardSearchView: View {
     @State private var selectedPrint: Card?
     @State private var currentPrintOptions: [Card] = []
     @State private var addSheetCard: Card?
+    @State private var wishlistSheetCard: Card?
+
+    var addToWishlistId: String?
+    var onCardAdded: (() -> Void)?
 
     private let apiService = APIService()
 
@@ -71,6 +75,13 @@ struct CardSearchView: View {
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
                             Task { await handleCardSelection(card) }
+                        },
+                        onAddToWishlist: { card in
+                            if let wishlistId = addToWishlistId {
+                                Task { await addCardToWishlistDirectly(card: card, wishlistId: wishlistId) }
+                            } else {
+                                wishlistSheetCard = card
+                            }
                         }
                     )
                 }
@@ -123,6 +134,10 @@ struct CardSearchView: View {
                         isAltered: isAltered
                     )
                 }
+            }
+            .sheet(item: $wishlistSheetCard) { card in
+                AddToWishlistSheet(card: card)
+                    .environmentObject(environmentStore)
             }
             .alert("Success", isPresented: Binding(
                 get: { addCardSuccessMessage != nil },
@@ -218,6 +233,23 @@ struct CardSearchView: View {
     private func validateSelectedGame() {
         if !environmentStore.isGameEnabled(selectedGame) {
             selectedGame = .all
+        }
+    }
+
+    @MainActor
+    private func addCardToWishlistDirectly(card: Card, wishlistId: String) async {
+        guard let token = environmentStore.authToken else { return }
+        do {
+            _ = try await apiService.addCardToWishlist(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                wishlistId: wishlistId,
+                card: card
+            )
+            addCardSuccessMessage = "Added \(card.name) to wishlist"
+            onCardAdded?()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -338,6 +370,7 @@ private struct SearchResultsList: View {
     let showPricing: Bool
     let showCardNumbers: Bool
     let onCardTap: (Card) -> Void
+    var onAddToWishlist: ((Card) -> Void)?
 
     // Group cards by TCG
     var groupedCards: [(String, [Card])] {
@@ -366,7 +399,9 @@ private struct SearchResultsList: View {
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
                                 CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
-                                    .cardPreviewContextMenu(card: card, onSelect: { onCardTap(card) })
+                                    .cardPreviewContextMenu(card: card, onSelect: { onCardTap(card) }, onAddToWishlist: {
+                                        onAddToWishlist?(card)
+                                    })
                             }
                         }
                     } header: {

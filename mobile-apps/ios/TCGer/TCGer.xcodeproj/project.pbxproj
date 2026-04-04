@@ -6,19 +6,64 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		25A4EACF5EF0BFE0C98D6D50 /* TCGerWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AF8D4E9D72556DE46D8D550B /* TCGerWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		EC2499F5C851D2C9D29A7E23 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C3C831DB2EA9F37F007FE5BA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AB028AC54606E61098DBD76C;
+			remoteInfo = TCGerWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		478A241F63A5B98EA490E28F /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				25A4EACF5EF0BFE0C98D6D50 /* TCGerWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		AF8D4E9D72556DE46D8D550B /* TCGerWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TCGerWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3C831E32EA9F37F007FE5BA /* TCGer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TCGer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B4696ABA185F2176D191B295 /* TCGerWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = TCGerWidgets;
+			sourceTree = "<group>";
+		};
 		C3C831E52EA9F37F007FE5BA /* TCGer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TCGer;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		2C6F6EAE4700D74293A80423 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C3C831E02EA9F37F007FE5BA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -34,6 +79,7 @@
 			children = (
 				C3C831E52EA9F37F007FE5BA /* TCGer */,
 				C3C831E42EA9F37F007FE5BA /* Products */,
+				B4696ABA185F2176D191B295 /* TCGerWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -41,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				C3C831E32EA9F37F007FE5BA /* TCGer.app */,
+				AF8D4E9D72556DE46D8D550B /* TCGerWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +95,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AB028AC54606E61098DBD76C /* TCGerWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E1100429A48C00B4DA8F3959 /* Build configuration list for PBXNativeTarget "TCGerWidgets" */;
+			buildPhases = (
+				81D21CC7072A54D46367A32D /* Sources */,
+				2C6F6EAE4700D74293A80423 /* Frameworks */,
+				94FA91424137BF6334E686A1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B4696ABA185F2176D191B295 /* TCGerWidgets */,
+			);
+			name = TCGerWidgets;
+			productName = TCGerWidgets;
+			productReference = AF8D4E9D72556DE46D8D550B /* TCGerWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		C3C831E22EA9F37F007FE5BA /* TCGer */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C3C831EE2EA9F37F007FE5BA /* Build configuration list for PBXNativeTarget "TCGer" */;
@@ -55,17 +122,17 @@
 				C3C831DF2EA9F37F007FE5BA /* Sources */,
 				C3C831E02EA9F37F007FE5BA /* Frameworks */,
 				C3C831E12EA9F37F007FE5BA /* Resources */,
+				478A241F63A5B98EA490E28F /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				46DB5E3CFFF6EC2C63F28635 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C3C831E52EA9F37F007FE5BA /* TCGer */,
 			);
 			name = TCGer;
-			packageProductDependencies = (
-			);
 			productName = TCGer;
 			productReference = C3C831E32EA9F37F007FE5BA /* TCGer.app */;
 			productType = "com.apple.product-type.application";
@@ -80,6 +147,9 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					AB028AC54606E61098DBD76C = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
 					C3C831E22EA9F37F007FE5BA = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -100,11 +170,19 @@
 			projectRoot = "";
 			targets = (
 				C3C831E22EA9F37F007FE5BA /* TCGer */,
+				AB028AC54606E61098DBD76C /* TCGerWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		94FA91424137BF6334E686A1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C3C831E12EA9F37F007FE5BA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +193,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		81D21CC7072A54D46367A32D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C3C831DF2EA9F37F007FE5BA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -124,7 +209,54 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		46DB5E3CFFF6EC2C63F28635 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = TCGerWidgets;
+			target = AB028AC54606E61098DBD76C /* TCGerWidgets */;
+			targetProxy = EC2499F5C851D2C9D29A7E23 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		4450F4F4BF38F2ED540D9011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = TCGerWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6347A46LMY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "TCGerWidgets-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = firstform.TCGer.TCGerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		C3C831EC2EA9F37F007FE5BA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -246,6 +378,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TCGer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6347A46LMY;
@@ -282,6 +415,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TCGer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6347A46LMY;
@@ -313,6 +447,44 @@
 			};
 			name = Release;
 		};
+		CC5CBDBA8902A45C6CB44D87 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = TCGerWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6347A46LMY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "TCGerWidgets-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = firstform.TCGer.TCGerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -330,6 +502,15 @@
 			buildConfigurations = (
 				C3C831EF2EA9F37F007FE5BA /* Debug */,
 				C3C831F02EA9F37F007FE5BA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E1100429A48C00B4DA8F3959 /* Build configuration list for PBXNativeTarget "TCGerWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC5CBDBA8902A45C6CB44D87 /* Release */,
+				4450F4F4BF38F2ED540D9011 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

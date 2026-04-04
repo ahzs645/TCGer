@@ -28,6 +28,12 @@ struct CollectionDetailView: View {
     @State private var searchText = ""
     @State private var showFilters = false
     @State private var sortOption: CardSortOption = .name
+    @State private var isSelectMode = false
+    @State private var selectedCardIds: Set<String> = []
+    @State private var showingBulkMoveSheet = false
+    @State private var showingBulkDeleteConfirmation = false
+    @State private var showingBulkConditionSheet = false
+    @State private var isBulkProcessing = false
 
     enum CardSortOption: String, CaseIterable {
         case name = "Name"
@@ -368,7 +374,28 @@ struct CollectionDetailView: View {
                                 filteredEmptyStateView
                             } else {
                                 ForEach(filteredCards) { card in
-                                    if environmentStore.isAuthenticated {
+                                    if isSelectMode {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: selectedCardIds.contains(card.id) ? "checkmark.circle.fill" : "circle")
+                                                .foregroundColor(selectedCardIds.contains(card.id) ? .accentColor : .secondary)
+                                                .font(.title3)
+                                            CollectionCardRow(
+                                                card: card,
+                                                showPricing: environmentStore.showPricing
+                                            )
+                                        }
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            if selectedCardIds.contains(card.id) {
+                                                selectedCardIds.remove(card.id)
+                                            } else {
+                                                selectedCardIds.insert(card.id)
+                                            }
+                                        }
+                                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color(.systemBackground))
+                                    } else if environmentStore.isAuthenticated {
                                         CollectionCardRow(
                                             card: card,
                                             showPricing: environmentStore.showPricing,
@@ -462,7 +489,12 @@ struct CollectionDetailView: View {
                     ToolbarItem(placement: .primaryAction) {
                         if environmentStore.isAuthenticated {
                             HStack(spacing: 12) {
-                                if isEditing {
+                                if isSelectMode {
+                                    Button("Cancel") {
+                                        isSelectMode = false
+                                        selectedCardIds.removeAll()
+                                    }
+                                } else if isEditing {
                                     Button(isSaving ? "Saving..." : "Save") {
                                         Task {
                                             await saveChanges()
@@ -472,6 +504,12 @@ struct CollectionDetailView: View {
                                     .foregroundColor(.green)
                                     .fontWeight(.semibold)
                                 } else {
+                                    Button("Select") {
+                                        isSelectMode = true
+                                        selectedCardIds.removeAll()
+                                    }
+                                    .disabled(cards.isEmpty)
+
                                     Button(action: { isEditing = true }) {
                                         Text("Edit")
                                     }
@@ -575,6 +613,78 @@ struct CollectionDetailView: View {
                 }
             }
 
+            // Bulk Action Bar
+            if isSelectMode && !selectedCardIds.isEmpty {
+                VStack(spacing: 0) {
+                    Divider()
+                    HStack(spacing: 24) {
+                        Button {
+                            if selectedCardIds.count == filteredCards.count {
+                                selectedCardIds.removeAll()
+                            } else {
+                                selectedCardIds = Set(filteredCards.map(\.id))
+                            }
+                        } label: {
+                            Text(selectedCardIds.count == filteredCards.count ? "Deselect All" : "Select All")
+                                .font(.caption)
+                        }
+
+                        Spacer()
+
+                        Button { showingBulkMoveSheet = true } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "arrowshape.turn.up.right")
+                                Text("Move").font(.caption2)
+                            }
+                        }
+                        .disabled(isBulkProcessing)
+
+                        Button { showingBulkConditionSheet = true } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "pencil")
+                                Text("Condition").font(.caption2)
+                            }
+                        }
+                        .disabled(isBulkProcessing)
+
+                        Button(role: .destructive) { showingBulkDeleteConfirmation = true } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "trash")
+                                Text("Delete").font(.caption2)
+                            }
+                        }
+                        .disabled(isBulkProcessing)
+
+                        Text("\(selectedCardIds.count)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                }
+            }
+        }
+        .confirmationDialog("Delete \(selectedCardIds.count) cards?", isPresented: $showingBulkDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete \(selectedCardIds.count) cards", role: .destructive) {
+                Task { await bulkDelete() }
+            }
+        }
+        .sheet(isPresented: $showingBulkMoveSheet) {
+            BulkMoveSheet(
+                sourceBinderId: collection.id,
+                selectedCount: selectedCardIds.count,
+                isProcessing: isBulkProcessing
+            ) { destinationBinderId in
+                await bulkMove(to: destinationBinderId)
+            }
+            .environmentObject(environmentStore)
+        }
+        .sheet(isPresented: $showingBulkConditionSheet) {
+            BulkConditionSheet(selectedCount: selectedCardIds.count) { condition in
+                Task { await bulkChangeCondition(condition) }
+            }
         }
     }
 
@@ -955,6 +1065,116 @@ struct CollectionDetailView: View {
             isDeletingBinder = false
             showingDeleteBinderConfirmation = false
         }
+    }
+
+    // MARK: - Bulk Actions
+
+    @MainActor
+    private func bulkDelete() async {
+        guard let token = environmentStore.authToken else { return }
+        isBulkProcessing = true
+
+        var failCount = 0
+        for cardId in selectedCardIds {
+            do {
+                try await apiService.deleteCardFromBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: cardId
+                )
+                cards.removeAll { $0.id == cardId }
+            } catch {
+                failCount += 1
+            }
+        }
+
+        if failCount > 0 {
+            errorMessage = "Failed to delete \(failCount) card(s)"
+        }
+
+        selectedCardIds.removeAll()
+        isSelectMode = false
+        isBulkProcessing = false
+    }
+
+    @MainActor
+    private func bulkMove(to destinationBinderId: String) async {
+        guard let token = environmentStore.authToken else { return }
+        guard destinationBinderId != collection.id else {
+            errorMessage = "Select a different destination binder."
+            return
+        }
+
+        isBulkProcessing = true
+
+        var failCount = 0
+        for cardId in selectedCardIds {
+            do {
+                _ = try await apiService.updateCardInBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: cardId,
+                    quantity: nil,
+                    condition: nil,
+                    language: nil,
+                    notes: nil,
+                    newPrint: nil,
+                    targetBinderId: destinationBinderId
+                )
+            } catch {
+                failCount += 1
+            }
+        }
+
+        if failCount > 0 {
+            errorMessage = "Failed to move \(failCount) card(s)"
+        }
+
+        await reloadBinderCards()
+        selectedCardIds.removeAll()
+        isSelectMode = false
+        isBulkProcessing = false
+        showingBulkMoveSheet = false
+    }
+
+    @MainActor
+    private func bulkChangeCondition(_ condition: String) async {
+        guard let token = environmentStore.authToken else { return }
+        isBulkProcessing = true
+
+        var failCount = 0
+        for cardId in selectedCardIds {
+            do {
+                let updated = try await apiService.updateCardInBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: collection.id,
+                    collectionCardId: cardId,
+                    quantity: nil,
+                    condition: condition,
+                    language: nil,
+                    notes: nil,
+                    newPrint: nil,
+                    targetBinderId: nil
+                )
+                if let index = cards.firstIndex(where: { $0.id == cardId }) {
+                    cards[index] = updated
+                }
+            } catch {
+                failCount += 1
+            }
+        }
+
+        if failCount > 0 {
+            errorMessage = "Failed to update \(failCount) card(s)"
+        }
+
+        selectedCardIds.removeAll()
+        isSelectMode = false
+        isBulkProcessing = false
+        showingBulkConditionSheet = false
     }
 }
 

@@ -73,6 +73,48 @@ struct SettingsView: View {
                     Text("Account")
                 }
 
+                // Appearance Section
+                Section {
+                    Picker("Theme", selection: $environmentStore.appColorScheme) {
+                        ForEach(AppColorScheme.allCases) { scheme in
+                            Text(scheme.displayName).tag(scheme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Accent Color")
+                            .font(.subheadline)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+                            ForEach(AccentColorChoice.allCases) { accent in
+                                Circle()
+                                    .fill(accent.color)
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(Color.primary, lineWidth: environmentStore.accentColorChoice == accent ? 2.5 : 0)
+                                    )
+                                    .overlay(
+                                        Group {
+                                            if environmentStore.accentColorChoice == accent {
+                                                Image(systemName: "checkmark")
+                                                    .font(.caption.bold())
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+                                    )
+                                    .onTapGesture {
+                                        environmentStore.accentColorChoice = accent
+                                    }
+                                    .accessibilityLabel(accent.displayName)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Appearance")
+                }
+
                 // Server Section
                 Section {
                     HStack {

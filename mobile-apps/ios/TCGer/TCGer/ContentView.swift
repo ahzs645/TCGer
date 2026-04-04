@@ -40,6 +40,12 @@ struct ContentView: View {
             }
 
             if environmentStore.isAuthenticated {
+                Tab("Wishlists", systemImage: "heart.fill") {
+                    WishlistsView()
+                }
+            }
+
+            if environmentStore.isAuthenticated {
                 Tab("Scan", systemImage: "camera.viewfinder") {
                     CardScannerView()
                 }
