@@ -67,6 +67,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var autoSyncEnabled: Bool
     @Published var appColorScheme: AppColorScheme
     @Published var accentColorChoice: AccentColorChoice
+    @Published var biometricLockEnabled: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -87,6 +88,7 @@ final class EnvironmentStore: ObservableObject {
         static let autoSyncEnabled = "autoSyncEnabled"
         static let appColorScheme = "tcg.appearance.colorScheme"
         static let accentColor = "tcg.appearance.accentColor"
+        static let biometricLockEnabled = "tcg.security.biometricLock"
     }
 
     private enum DemoDefaults {
@@ -179,6 +181,8 @@ final class EnvironmentStore: ObservableObject {
         } else {
             accentColorChoice = .blue
         }
+
+        biometricLockEnabled = storage.bool(forKey: Keys.biometricLockEnabled)
 
         if serverConfiguration.isDemoMode {
             enableDemoSession(force: false)

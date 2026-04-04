@@ -240,6 +240,7 @@ struct AddCardToBinderSheet: View {
         )
 
         isAdding = false
+        HapticManager.notification(.success)
         dismiss()
     }
 

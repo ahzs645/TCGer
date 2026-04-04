@@ -1096,6 +1096,7 @@ struct CollectionDetailView: View {
         selectedCardIds.removeAll()
         isSelectMode = false
         isBulkProcessing = false
+        HapticManager.notification(.success)
     }
 
     @MainActor
@@ -1137,6 +1138,7 @@ struct CollectionDetailView: View {
         isSelectMode = false
         isBulkProcessing = false
         showingBulkMoveSheet = false
+        HapticManager.notification(.success)
     }
 
     @MainActor
@@ -1175,6 +1177,7 @@ struct CollectionDetailView: View {
         isSelectMode = false
         isBulkProcessing = false
         showingBulkConditionSheet = false
+        HapticManager.notification(.success)
     }
 }
 
