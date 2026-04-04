@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var setupRequired: Bool?
     @State private var showingSignup = false
     @State private var errorMessage: String?
+    @State private var isAppLocked = true
 
     private let apiService = APIService()
 
@@ -72,6 +73,30 @@ struct RootView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "Unknown error")
+        }
+        .overlay {
+            if environmentStore.biometricLockEnabled && isAppLocked {
+                BiometricLockScreen {
+                    Task {
+                        let success = await BiometricAuthManager.authenticate()
+                        if success { isAppLocked = false }
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .task {
+            if environmentStore.biometricLockEnabled {
+                let success = await BiometricAuthManager.authenticate()
+                if success { isAppLocked = false }
+            } else {
+                isAppLocked = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            if environmentStore.biometricLockEnabled {
+                isAppLocked = true
+            }
         }
     }
 
@@ -314,5 +339,35 @@ private struct ServerVerificationView: View {
             Spacer()
         }
         .padding()
+    }
+}
+
+private struct BiometricLockScreen: View {
+    let onUnlock: () -> Void
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Image(systemName: BiometricAuthManager.biometricType == .faceID ? "faceid" : "touchid")
+                    .font(.system(size: 50))
+                    .foregroundColor(.accentColor)
+
+                Text("TCGer is Locked")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Button(action: onUnlock) {
+                    Label("Unlock with \(BiometricAuthManager.displayName)", systemImage: "lock.open.fill")
+                        .font(.headline)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
     }
 }

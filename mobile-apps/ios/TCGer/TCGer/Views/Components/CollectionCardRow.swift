@@ -144,6 +144,25 @@ struct CollectionCardRow: View {
         card.copies.contains { $0.isAltered == true }
     }
 
+    private var gradingSummary: (company: String, score: String)? {
+        for copy in card.copies {
+            if let company = copy.gradingCompany, !company.isEmpty,
+               let score = copy.gradingScore, !score.isEmpty {
+                return (company, score)
+            }
+        }
+        return nil
+    }
+
+    private var storageLocationSummary: String? {
+        for copy in card.copies {
+            if let loc = copy.storageLocation, !loc.isEmpty {
+                return loc
+            }
+        }
+        return nil
+    }
+
     private var cardBackgroundColor: Color {
         colorScheme == .dark ? Color(.secondarySystemBackground) : Color(.systemGray6)
     }
@@ -244,6 +263,12 @@ struct CollectionCardRow: View {
                             }
                             if hasAnyAltered {
                                 AttributeBadge(icon: "paintpalette", label: "Altered", color: .pink)
+                            }
+                            if let grading = gradingSummary {
+                                GradingBadge(company: grading.company, score: grading.score)
+                            }
+                            if let location = storageLocationSummary {
+                                AttributeBadge(icon: "mappin.and.ellipse", label: location, color: .teal)
                             }
                         }
                     }

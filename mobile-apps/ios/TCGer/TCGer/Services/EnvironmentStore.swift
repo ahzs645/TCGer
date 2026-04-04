@@ -68,6 +68,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var appColorScheme: AppColorScheme
     @Published var accentColorChoice: AccentColorChoice
     @Published var biometricLockEnabled: Bool
+    @Published var smartFolders: [SmartFolder]
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -89,6 +90,7 @@ final class EnvironmentStore: ObservableObject {
         static let appColorScheme = "tcg.appearance.colorScheme"
         static let accentColor = "tcg.appearance.accentColor"
         static let biometricLockEnabled = "tcg.security.biometricLock"
+        static let smartFolders = "tcg.smartFolders"
     }
 
     private enum DemoDefaults {
@@ -183,6 +185,13 @@ final class EnvironmentStore: ObservableObject {
         }
 
         biometricLockEnabled = storage.bool(forKey: Keys.biometricLockEnabled)
+
+        if let smartData = storage.data(forKey: Keys.smartFolders),
+           let decoded = try? JSONDecoder().decode([SmartFolder].self, from: smartData) {
+            smartFolders = decoded
+        } else {
+            smartFolders = []
+        }
 
         if serverConfiguration.isDemoMode {
             enableDemoSession(force: false)
@@ -302,6 +311,22 @@ final class EnvironmentStore: ObservableObject {
                 self?.storage.set(value.rawValue, forKey: Keys.accentColor)
             }
             .store(in: &cancellables)
+
+        $biometricLockEnabled
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value, forKey: Keys.biometricLockEnabled)
+            }
+            .store(in: &cancellables)
+
+        $smartFolders
+            .dropFirst()
+            .sink { [weak self] value in
+                if let data = try? JSONEncoder().encode(value) {
+                    self?.storage.set(data, forKey: Keys.smartFolders)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     var enabledGames: [TCGGame] {
@@ -395,6 +420,8 @@ final class EnvironmentStore: ObservableObject {
         autoSyncEnabled = true
         appColorScheme = .system
         accentColorChoice = .blue
+        biometricLockEnabled = false
+        smartFolders = []
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
@@ -408,6 +435,8 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.autoSyncEnabled)
         storage.removeObject(forKey: Keys.appColorScheme)
         storage.removeObject(forKey: Keys.accentColor)
+        storage.removeObject(forKey: Keys.biometricLockEnabled)
+        storage.removeObject(forKey: Keys.smartFolders)
     }
 
     func applyUserPreferences(_ preferences: APIService.UserPreferences) {
