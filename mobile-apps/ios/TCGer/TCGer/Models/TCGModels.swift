@@ -519,3 +519,37 @@ enum TCGGame: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// MARK: - Wishlist Models
+
+struct Wishlist: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let description: String?
+    let colorHex: String?
+    let cards: [WishlistCard]
+    let totalCards: Int
+    let ownedCards: Int
+    let completionPercent: Int
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let externalId: String
+    let tcg: String
+    let name: String
+    let setCode: String?
+    let setName: String?
+    let rarity: String?
+    let imageUrl: String?
+    let imageUrlSmall: String?
+    let setSymbolUrl: String?
+    let setLogoUrl: String?
+    let collectorNumber: String?
+    let notes: String?
+    let owned: Bool
+    let ownedQuantity: Int
+    let createdAt: String
+}

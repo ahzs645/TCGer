@@ -8,6 +8,8 @@
     "dev": "prisma generate && tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "build:hashes": "tsx src/scripts/build-card-hashes.ts",
+    "backfill:hash-features": "tsx src/scripts/backfill-card-hash-features.ts",
+    "scan:video": "tsx src/scripts/scan-video.ts",
     "start": "tsx src/server.ts",
     "lint": "eslint . --ext .ts",
     "test": "jest --passWithNoTests",

@@ -15,6 +15,8 @@ struct TCGerApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(environmentStore)
+                .preferredColorScheme(environmentStore.appColorScheme.colorScheme)
+                .tint(environmentStore.accentColorChoice.color)
         }
     }
 }

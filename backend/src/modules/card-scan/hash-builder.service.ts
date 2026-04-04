@@ -15,12 +15,17 @@
 
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
+import {
+  computeCardFeatureHashes,
+  flattenCardFeatureHashes,
+  hasCompleteCardFeatureHashes,
+} from './feature-hashes';
 import { CardHashLibraryWriter } from './hash-library';
 import { computeRGBHash } from './phash';
 import { preprocessCardImage } from './preprocess';
 import {
   countCardHashes,
-  getCardHashExternalIdSet,
+  getAllCardHashes,
   getCardHashStoreMode,
   type CardHashRecord,
   upsertCardHashes,
@@ -137,7 +142,11 @@ export async function buildHashDatabase(
   progress.total = cards.length;
   logger.info({ tcg, total: cards.length }, 'Fetched card list');
 
-  const existingIds = options.force ? new Set<string>() : await getCardHashExternalIdSet(tcg);
+  const existingRecords = options.force
+    ? new Map<string, CardHashRecord>()
+    : new Map(
+        (await getAllCardHashes({ tcg })).map((record) => [record.externalId, record])
+      );
   const pendingUpserts: CardHashRecord[] = [];
   const concurrency = Math.max(1, options.concurrency ?? DEFAULT_HASH_BUILD_CONCURRENCY);
   const upsertBatchSize = Math.max(1, options.upsertBatchSize ?? DEFAULT_HASH_UPSERT_BATCH_SIZE);
@@ -154,7 +163,8 @@ export async function buildHashDatabase(
     const pendingCards: CardImageEntry[] = [];
 
     for (const card of chunk) {
-      if (existingIds.has(card.externalId)) {
+      const existingRecord = existingRecords.get(card.externalId);
+      if (existingRecord && hasCompleteCardFeatureHashes(existingRecord)) {
         progress.skipped++;
         continue;
       }
@@ -172,7 +182,7 @@ export async function buildHashDatabase(
       }
 
       pendingUpserts.push(result.record);
-      existingIds.add(result.record.externalId);
+      existingRecords.set(result.record.externalId, result.record);
       if (libraryWriter) {
         await libraryWriter.writeRecord(result.record, result.imageBuffer, result.contentType);
       }
@@ -225,6 +235,7 @@ async function buildHashRecord(
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     const processedImage = await preprocessCardImage(imageBuffer);
     const hash = await computeRGBHash(processedImage);
+    const featureHashes = await computeCardFeatureHashes(tcg, processedImage);
 
     return {
       status: 'processed',
@@ -241,6 +252,7 @@ async function buildHashRecord(
         rHash: hash.r,
         gHash: hash.g,
         bHash: hash.b,
+        ...flattenCardFeatureHashes(featureHashes),
         hashSize: 16,
       },
     };
@@ -399,7 +411,6 @@ async function fetchPokemonCards(
 
       hasMore = page * pageSize < data.totalCount;
     } else {
-      const query = setCode ? `set.id:${setCode}` : '';
       const data = (await response.json()) as {
         data: Array<{
           id: string;

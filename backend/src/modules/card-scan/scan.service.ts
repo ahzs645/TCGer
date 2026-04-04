@@ -4,6 +4,7 @@
  */
 
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
+import { computeCardFeatureHashes, getStoredCardFeatureHashes, type CardFeatureHashes } from './feature-hashes';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
 import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
 
@@ -19,6 +20,9 @@ export interface ScanMatch {
   imageUrl: string | null;
   confidence: number;        // 0..1
   distance: number;          // raw combined Hamming distance
+  fullDistance?: number;
+  titleDistance?: number | null;
+  footerDistance?: number | null;
 }
 
 export interface ScanResult {
@@ -32,6 +36,8 @@ export interface ScanResult {
     variantsTried: string[];
     perspectiveCorrected: boolean;
     contourAreaRatio: number | null;
+    rerankUsed: boolean;
+    shortlistSize: number;
   };
 }
 
@@ -46,6 +52,9 @@ export interface ScanResult {
 const MAX_COMBINED_DISTANCE = 240;
 const STRICT_COMBINED_DISTANCE = 160;
 const MEDIUM_COMBINED_DISTANCE = 200;
+const SHORTLIST_MARGIN = 96;
+const SHORTLIST_LIMIT = 24;
+type SupportedTcg = 'magic' | 'pokemon' | 'yugioh';
 
 /** Maximum number of candidates to return. */
 const MAX_CANDIDATES = 5;
@@ -63,15 +72,26 @@ export async function scanCardImage(
   const hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
   const attemptedVariants: string[] = [];
   const allMatches = new Map<string, ScanMatch>();
-  let bestAttempt: { hash: RGBHash; variant: ScanRuntimeVariant; threshold: number; match: ScanMatch | null } | null = null;
+  let bestAttempt: {
+    hash: RGBHash;
+    variant: ScanRuntimeVariant;
+    threshold: number;
+    shortlistSize: number;
+    rerankUsed: boolean;
+    match: ScanMatch | null;
+  } | null = null;
 
   const passes = buildScanPasses(runtimeScan.variants);
 
   for (const pass of passes) {
     for (const variant of pass.variants) {
       attemptedVariants.push(variant.name);
-      const hash = await computeRGBHash(variant.image);
-      const matches = rankMatches(hashEntries, hash, pass.maxDistance);
+      const [hash, featureHashesByTcg] = await Promise.all([
+        computeRGBHash(variant.image),
+        computeFeatureHashesByTcg(variant.image, hashEntries, tcgFilter),
+      ]);
+      const rankedCandidates = rankMatches(hashEntries, hash, featureHashesByTcg, pass.maxDistance);
+      const matches = rankedCandidates.slice(0, MAX_CANDIDATES).map(({ match }) => match);
 
       for (const match of matches) {
         const key = `${match.tcg}:${match.externalId}`;
@@ -87,6 +107,8 @@ export async function scanCardImage(
           hash,
           variant,
           threshold: pass.maxDistance,
+          shortlistSize: rankedCandidates.length,
+          rerankUsed: rankedCandidates.some(({ reranked }) => reranked),
           match: bestMatch,
         };
       }
@@ -116,6 +138,8 @@ export async function scanCardImage(
       variantsTried: Array.from(new Set(attemptedVariants)),
       perspectiveCorrected: runtimeScan.perspectiveCorrection.applied,
       contourAreaRatio: runtimeScan.perspectiveCorrection.contourAreaRatio,
+      rerankUsed: bestAttempt?.rerankUsed ?? false,
+      shortlistSize: bestAttempt?.shortlistSize ?? 0,
     },
   };
 }
@@ -160,13 +184,27 @@ function buildScanPasses(variants: ScanRuntimeVariant[]) {
   ];
 }
 
+interface RankedCandidate {
+  match: ScanMatch;
+  reranked: boolean;
+}
+
 function rankMatches(
   hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
   hashGenerated: RGBHash,
+  featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>,
   maxDistance: number
-): ScanMatch[] {
-  const matches: ScanMatch[] = [];
-  const singleChannelReject = Math.max(64, Math.floor(maxDistance * 0.6));
+): RankedCandidate[] {
+  const shortlist: Array<{
+    entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
+    fullDistance: number;
+    titleDistance: number | null;
+    footerDistance: number | null;
+    scoreDistance: number;
+    reranked: boolean;
+  }> = [];
+  const singleChannelReject = Math.max(64, Math.floor((maxDistance + SHORTLIST_MARGIN) * 0.6));
+  const shortlistMaxDistance = Math.min(320, maxDistance + SHORTLIST_MARGIN);
 
   for (const entry of hashEntries) {
     const entryHash: RGBHash = {
@@ -181,31 +219,66 @@ function rankMatches(
     }
 
     const gDist = hammingDistance(hashGenerated.g, entryHash.g);
-    if (rDist + gDist > maxDistance) {
+    if (rDist + gDist > shortlistMaxDistance) {
       continue;
     }
 
     const bDist = hammingDistance(hashGenerated.b, entryHash.b);
     const totalDist = rDist + gDist + bDist;
 
-    if (totalDist > maxDistance) {
+    if (totalDist > shortlistMaxDistance) {
       continue;
     }
 
-    matches.push({
-      externalId: entry.externalId,
-      tcg: entry.tcg,
-      name: entry.name,
-      setCode: entry.setCode,
-      setName: entry.setName,
-      rarity: entry.rarity,
-      imageUrl: entry.imageUrl,
-      confidence: Math.max(0, 1 - totalDist / MAX_COMBINED_DISTANCE),
-      distance: totalDist,
+    const storedFeatureHashes = getStoredCardFeatureHashes(entry);
+    const scanFeatureHashes = readFeatureHashesForEntry(entry.tcg, featureHashesByTcg);
+    const titleDistance =
+      scanFeatureHashes.title && storedFeatureHashes.title
+        ? rgbDistance(scanFeatureHashes.title, storedFeatureHashes.title)
+        : null;
+    const footerDistance =
+      scanFeatureHashes.footer && storedFeatureHashes.footer
+        ? rgbDistance(scanFeatureHashes.footer, storedFeatureHashes.footer)
+        : null;
+    const featureScore = computeFeatureScore(totalDist, titleDistance, footerDistance);
+
+    pushShortlist(shortlist, {
+      entry,
+      fullDistance: totalDist,
+      titleDistance,
+      footerDistance,
+      scoreDistance: featureScore,
+      reranked: titleDistance !== null || footerDistance !== null,
     });
   }
 
-  return matches.sort((left, right) => left.distance - right.distance);
+  return shortlist
+    .filter((candidate) => candidate.scoreDistance <= maxDistance)
+    .sort((left, right) => {
+      return (
+        left.scoreDistance - right.scoreDistance ||
+        left.fullDistance - right.fullDistance ||
+        left.entry.name.localeCompare(right.entry.name)
+      );
+    })
+    .slice(0, SHORTLIST_LIMIT)
+    .map((candidate) => ({
+      reranked: candidate.reranked,
+      match: {
+        externalId: candidate.entry.externalId,
+        tcg: candidate.entry.tcg,
+        name: candidate.entry.name,
+        setCode: candidate.entry.setCode,
+        setName: candidate.entry.setName,
+        rarity: candidate.entry.rarity,
+        imageUrl: candidate.entry.imageUrl,
+        confidence: Math.max(0, 1 - candidate.scoreDistance / MAX_COMBINED_DISTANCE),
+        distance: Math.round(candidate.scoreDistance),
+        fullDistance: candidate.fullDistance,
+        titleDistance: candidate.titleDistance,
+        footerDistance: candidate.footerDistance,
+      },
+    }));
 }
 
 function isBetterAttempt(candidate: ScanMatch | null, current: ScanMatch | null): boolean {
@@ -222,4 +295,103 @@ function isBetterAttempt(candidate: ScanMatch | null, current: ScanMatch | null)
 
 function isStrongEnough(match: ScanMatch, maxDistance: number): boolean {
   return match.distance === 0 || match.confidence >= 0.72 || match.distance <= Math.floor(maxDistance * 0.45);
+}
+
+async function computeFeatureHashesByTcg(
+  imageBuffer: Buffer,
+  hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
+  tcgFilter?: string
+): Promise<Partial<Record<SupportedTcg, CardFeatureHashes>>> {
+  const tcgs = new Set<SupportedTcg>();
+
+  if (tcgFilter === 'magic' || tcgFilter === 'pokemon' || tcgFilter === 'yugioh') {
+    tcgs.add(tcgFilter);
+  } else {
+    for (const entry of hashEntries) {
+      if (entry.tcg === 'magic' || entry.tcg === 'pokemon' || entry.tcg === 'yugioh') {
+        tcgs.add(entry.tcg);
+      }
+      if (tcgs.size === 3) {
+        break;
+      }
+    }
+  }
+
+  const entries = await Promise.all(
+    Array.from(tcgs).map(async (tcg) => [tcg, await computeCardFeatureHashes(tcg, imageBuffer)] as const)
+  );
+
+  return Object.fromEntries(entries) as Partial<Record<SupportedTcg, CardFeatureHashes>>;
+}
+
+function rgbDistance(left: RGBHash, right: RGBHash): number {
+  return (
+    hammingDistance(left.r, right.r) +
+    hammingDistance(left.g, right.g) +
+    hammingDistance(left.b, right.b)
+  );
+}
+
+function computeFeatureScore(
+  fullDistance: number,
+  titleDistance: number | null,
+  footerDistance: number | null
+): number {
+  let score = fullDistance * 0.72;
+  let weights = 0.72;
+
+  if (footerDistance !== null) {
+    score += footerDistance * 0.2;
+    weights += 0.2;
+  }
+
+  if (titleDistance !== null) {
+    score += titleDistance * 0.08;
+    weights += 0.08;
+  }
+
+  return score / weights;
+}
+
+function pushShortlist(
+  shortlist: Array<{
+    entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
+    fullDistance: number;
+    titleDistance: number | null;
+    footerDistance: number | null;
+    scoreDistance: number;
+    reranked: boolean;
+  }>,
+  candidate: {
+    entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
+    fullDistance: number;
+    titleDistance: number | null;
+    footerDistance: number | null;
+    scoreDistance: number;
+    reranked: boolean;
+  }
+): void {
+  shortlist.push(candidate);
+  shortlist.sort((left, right) => {
+    return (
+      left.scoreDistance - right.scoreDistance ||
+      left.fullDistance - right.fullDistance ||
+      left.entry.externalId.localeCompare(right.entry.externalId)
+    );
+  });
+
+  if (shortlist.length > SHORTLIST_LIMIT) {
+    shortlist.length = SHORTLIST_LIMIT;
+  }
+}
+
+function readFeatureHashesForEntry(
+  tcg: string,
+  featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>
+): CardFeatureHashes {
+  if (tcg === 'magic' || tcg === 'pokemon' || tcg === 'yugioh') {
+    return featureHashesByTcg[tcg] ?? { title: null, footer: null };
+  }
+
+  return { title: null, footer: null };
 }

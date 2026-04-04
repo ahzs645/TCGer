@@ -118,6 +118,7 @@ struct CollectionsView: View {
                 token: environmentStore.authToken,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
+            environmentStore.updateWidgetData(collections: collections)
             isLoading = false
             errorMessage = nil
         } catch {

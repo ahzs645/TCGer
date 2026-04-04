@@ -290,6 +290,12 @@ model CardHash {
   rHash      String                         // Red-channel pHash (hex)
   gHash      String                         // Green-channel pHash (hex)
   bHash      String                         // Blue-channel pHash (hex)
+  titleRHash String?
+  titleGHash String?
+  titleBHash String?
+  footerRHash String?
+  footerGHash String?
+  footerBHash String?
   hashSize   Int      @default(16)          // pHash block size (16 → 256-bit)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

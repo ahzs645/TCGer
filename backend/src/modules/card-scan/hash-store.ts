@@ -25,6 +25,12 @@ export interface CardHashRecord {
   rHash: string;
   gHash: string;
   bHash: string;
+  titleRHash?: string | null;
+  titleGHash?: string | null;
+  titleBHash?: string | null;
+  footerRHash?: string | null;
+  footerGHash?: string | null;
+  footerBHash?: string | null;
   hashSize: number;
 }
 
@@ -85,6 +91,12 @@ function normalizeRecord(record: CardHashRecord): CardHashRecord {
     setName: record.setName ?? null,
     rarity: record.rarity ?? null,
     imageUrl: record.imageUrl ?? null,
+    titleRHash: record.titleRHash ?? null,
+    titleGHash: record.titleGHash ?? null,
+    titleBHash: record.titleBHash ?? null,
+    footerRHash: record.footerRHash ?? null,
+    footerGHash: record.footerGHash ?? null,
+    footerBHash: record.footerBHash ?? null,
     hashSize: record.hashSize ?? 16,
   };
 }

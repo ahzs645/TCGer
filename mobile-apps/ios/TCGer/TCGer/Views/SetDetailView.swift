@@ -11,6 +11,9 @@ struct SetDetailView: View {
     @State private var selectedPrint: Card?
     @State private var currentPrintOptions: [Card] = []
     @State private var addSheetCard: Card?
+    @State private var wishlistSheetCard: Card?
+    @State private var ownedCardIds: Set<String> = []
+    @State private var ownershipLoaded = false
 
     private let apiService = APIService()
 
@@ -72,14 +75,40 @@ struct SetDetailView: View {
                         .padding(.top, 8)
                     }
 
+                    // Set Completion Progress
+                    if ownershipLoaded && !cards.isEmpty {
+                        let ownedCount = cards.filter { ownedCardIds.contains($0.id) }.count
+                        let total = cards.count
+                        let percent = total > 0 ? Int((Double(ownedCount) / Double(total)) * 100) : 0
+
+                        VStack(spacing: 6) {
+                            HStack {
+                                Text("\(ownedCount) of \(total) owned")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Text("\(percent)%")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(percent == 100 ? .green : .accentColor)
+                            }
+                            ProgressView(value: Double(ownedCount), total: Double(max(1, total)))
+                                .tint(percent == 100 ? .green : .accentColor)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 4)
+                    }
+
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible())
                     ], spacing: 16) {
                         ForEach(cards) { card in
-                            SetCardCell(card: card, showPricing: environmentStore.showPricing)
+                            SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
                                 .cardPreviewContextMenu(card: card, onSelect: {
                                     Task { await handleCardSelection(card) }
+                                }, onAddToWishlist: {
+                                    wishlistSheetCard = card
                                 })
                         }
                     }
@@ -91,6 +120,7 @@ struct SetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadCards()
+            await loadOwnershipData()
         }
         .sheet(isPresented: $showingPrintSelection) {
             if let card = selectedCard {
@@ -115,6 +145,10 @@ struct SetDetailView: View {
                 addSheetCard = chosenPrint
                 selectedCard = nil
             }
+        }
+        .sheet(item: $wishlistSheetCard) { card in
+            AddToWishlistSheet(card: card)
+                .environmentObject(environmentStore)
         }
         .sheet(item: $addSheetCard, onDismiss: {
             selectedPrint = nil
@@ -235,6 +269,30 @@ struct SetDetailView: View {
     }
 
     @MainActor
+    private func loadOwnershipData() async {
+        guard let token = environmentStore.authToken else { return }
+
+        do {
+            let collections = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                useCache: true
+            )
+            var ids = Set<String>()
+            for collection in collections {
+                for card in collection.cards {
+                    ids.insert(card.externalId ?? card.cardId)
+                }
+            }
+            ownedCardIds = ids
+            ownershipLoaded = true
+        } catch {
+            // Silently fail - ownership is an enhancement, not critical
+            ownershipLoaded = true
+        }
+    }
+
+    @MainActor
     private func loadCards() async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -264,35 +322,46 @@ struct SetDetailView: View {
 private struct SetCardCell: View {
     let card: Card
     let showPricing: Bool
+    var isOwned: Bool?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(ProgressView())
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
+            ZStack(alignment: .topTrailing) {
+                CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .overlay(ProgressView())
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    case .failure:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.secondary)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .aspectRatio(0.7, contentMode: .fit)
+                    }
+                }
+                .cornerRadius(8)
+
+                if isOwned == true {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.green)
+                        .background(Circle().fill(Color.white).frame(width: 14, height: 14))
+                        .offset(x: -4, y: 4)
                 }
             }
-            .cornerRadius(8)
 
             VStack(alignment: .leading, spacing: 4) {
                 if let rarity = card.rarity {
@@ -329,5 +398,6 @@ private struct SetCardCell: View {
         .background(Color(.systemGray6))
         .cornerRadius(12)
         .contentShape(Rectangle())
+        .opacity(isOwned == false ? 0.6 : 1.0)
     }
 }

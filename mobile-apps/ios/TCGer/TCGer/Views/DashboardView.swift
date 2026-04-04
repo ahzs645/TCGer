@@ -101,6 +101,7 @@ struct DashboardView: View {
                 token: environmentStore.authToken,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
+            environmentStore.updateWidgetData(collections: collections)
             isLoading = false
         } catch {
             if let apiError = error as? APIService.APIError, case .unauthorized = apiError {

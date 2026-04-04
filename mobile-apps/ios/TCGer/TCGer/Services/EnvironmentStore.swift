@@ -1,6 +1,53 @@
 import Combine
 import Foundation
 import Security
+import SwiftUI
+import WidgetKit
+
+enum AppColorScheme: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
+enum AccentColorChoice: String, CaseIterable, Identifiable {
+    case blue, green, orange, pink, purple, red, yellow, teal, indigo, mint
+
+    var id: String { rawValue }
+
+    var displayName: String { rawValue.capitalized }
+
+    var color: Color {
+        switch self {
+        case .blue: return .blue
+        case .green: return .green
+        case .orange: return .orange
+        case .pink: return .pink
+        case .purple: return .purple
+        case .red: return .red
+        case .yellow: return .yellow
+        case .teal: return .teal
+        case .indigo: return .indigo
+        case .mint: return .mint
+        }
+    }
+}
 
 final class EnvironmentStore: ObservableObject {
     @Published var serverConfiguration: ServerConfiguration
@@ -18,6 +65,8 @@ final class EnvironmentStore: ObservableObject {
     @Published var defaultGame: String?
     @Published var offlineModeEnabled: Bool
     @Published var autoSyncEnabled: Bool
+    @Published var appColorScheme: AppColorScheme
+    @Published var accentColorChoice: AccentColorChoice
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -36,6 +85,8 @@ final class EnvironmentStore: ObservableObject {
         static let defaultGame = "defaultGame"
         static let offlineModeEnabled = "offlineModeEnabled"
         static let autoSyncEnabled = "autoSyncEnabled"
+        static let appColorScheme = "tcg.appearance.colorScheme"
+        static let accentColor = "tcg.appearance.accentColor"
     }
 
     private enum DemoDefaults {
@@ -112,6 +163,21 @@ final class EnvironmentStore: ObservableObject {
             autoSyncEnabled = true
         } else {
             autoSyncEnabled = storage.bool(forKey: Keys.autoSyncEnabled)
+        }
+
+        // Appearance preferences
+        if let schemeRaw = storage.string(forKey: Keys.appColorScheme),
+           let scheme = AppColorScheme(rawValue: schemeRaw) {
+            appColorScheme = scheme
+        } else {
+            appColorScheme = .system
+        }
+
+        if let accentRaw = storage.string(forKey: Keys.accentColor),
+           let accent = AccentColorChoice(rawValue: accentRaw) {
+            accentColorChoice = accent
+        } else {
+            accentColorChoice = .blue
         }
 
         if serverConfiguration.isDemoMode {
@@ -218,6 +284,20 @@ final class EnvironmentStore: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        $appColorScheme
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.rawValue, forKey: Keys.appColorScheme)
+            }
+            .store(in: &cancellables)
+
+        $accentColorChoice
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.rawValue, forKey: Keys.accentColor)
+            }
+            .store(in: &cancellables)
     }
 
     var enabledGames: [TCGGame] {
@@ -309,6 +389,8 @@ final class EnvironmentStore: ObservableObject {
         defaultGame = nil
         offlineModeEnabled = false
         autoSyncEnabled = true
+        appColorScheme = .system
+        accentColorChoice = .blue
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
@@ -320,6 +402,8 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.defaultGame)
         storage.removeObject(forKey: Keys.offlineModeEnabled)
         storage.removeObject(forKey: Keys.autoSyncEnabled)
+        storage.removeObject(forKey: Keys.appColorScheme)
+        storage.removeObject(forKey: Keys.accentColor)
     }
 
     func applyUserPreferences(_ preferences: APIService.UserPreferences) {
@@ -329,6 +413,41 @@ final class EnvironmentStore: ObservableObject {
         enabledMagic = preferences.enabledMagic
         enabledPokemon = preferences.enabledPokemon
         defaultGame = preferences.defaultGame
+    }
+
+    // MARK: - Widget Data
+
+    static let appGroupSuite = "group.firstform.TCGer.shared"
+
+    func updateWidgetData(collections: [Collection]) {
+        guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
+
+        let totalBinders = collections.filter { !$0.isUnsortedBinder }.count
+        let uniqueCards = collections.reduce(0) { $0 + $1.cards.count }
+        let totalCopies = collections.reduce(0) { sum, col in
+            sum + col.cards.reduce(0) { $0 + $1.quantity }
+        }
+
+        shared.set(totalBinders, forKey: "widget.totalBinders")
+        shared.set(uniqueCards, forKey: "widget.uniqueCards")
+        shared.set(totalCopies, forKey: "widget.totalCopies")
+        shared.set(Date().timeIntervalSince1970, forKey: "widget.lastUpdated")
+
+        // Recent cards (last 5 from each collection)
+        let recentCards: [[String: String]] = collections
+            .flatMap(\.cards)
+            .prefix(5)
+            .map { card in
+                var dict: [String: String] = ["name": card.name, "tcg": card.tcg]
+                if let setName = card.setName { dict["setName"] = setName }
+                if let img = card.imageUrlSmall ?? card.imageUrl { dict["imageUrl"] = img }
+                return dict
+            }
+        if let encoded = try? JSONSerialization.data(withJSONObject: recentCards) {
+            shared.set(encoded, forKey: "widget.recentCards")
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func enableDemoSession(force: Bool) {
