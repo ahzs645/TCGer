@@ -174,9 +174,11 @@ final class CardScannerViewModel: ObservableObject {
         case .success(let scanResult):
             latestResult = scanResult
             state = .result(scanResult)
+            HapticManager.notification(.success)
         case .failure(let error):
             errorMessage = error.errorDescription ?? error.localizedDescription
             state = .ready
+            HapticManager.notification(.error)
         }
     }
 

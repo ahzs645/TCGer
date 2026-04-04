@@ -161,6 +161,7 @@ struct AddToWishlistSheet: View {
                 card: card
             )
             successMessage = "Added to \(wishlist.name)"
+            HapticManager.notification(.success)
             onComplete?()
             try? await Task.sleep(for: .seconds(1))
             dismiss()
