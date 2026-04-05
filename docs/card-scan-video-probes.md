@@ -28,6 +28,18 @@ The video source-variant builder is exposed for debugging from:
 
 - `/Users/ahmadjalil/github/TCGer/backend/src/modules/card-scan/video-scan.service.ts`
 
+The video CLI now also includes a lightweight track manager in:
+
+- `/Users/ahmadjalil/github/TCGer/backend/src/scripts/scan-video.ts`
+
+The current tracking model is intentionally simple:
+
+- build crop proposals for each sampled frame
+- associate proposals to an existing track by overlap and motion
+- accumulate candidate scores on the track
+- emit once when the same card stays on top long enough
+- finalize when the track disappears or the video ends
+
 ## Kirlia frame probe
 
 Frame used:
@@ -100,6 +112,78 @@ Result:
 - `framesScanned: 1`
 - `matchedFrames: 0`
 
+### Tracking control test
+
+Synthetic clean clip:
+
+- `/tmp/tcger-track-test/exact-card.mp4`
+
+Source image:
+
+- `/tmp/tcger-server-pokemon/images/sv07/sv07-119.webp`
+
+Command:
+
+```bash
+cd /Users/ahmadjalil/github/TCGer/backend
+NODE_ENV=test \
+BACKEND_MODE=convex \
+CARD_SCAN_STORE=file \
+CARD_SCAN_DATA_DIR=/tmp/tcger-server-pokemon \
+npm run scan:video -- \
+  --video /tmp/tcger-track-test/exact-card.mp4 \
+  --tcg pokemon \
+  --fps 1 \
+  --offset 0 \
+  --duration 2 \
+  --max-frames 2 \
+  --max-windows 1 \
+  --max-proposals 1 \
+  --track-ttl 2 \
+  --min-stable 2
+```
+
+Result:
+
+- `framesScanned: 2`
+- `matchedFrames: 2`
+- one emitted detection, not duplicates
+- emitted card: `sv07-119 Bouffalant`
+
+This confirms the track manager behaves correctly when the underlying matcher is healthy.
+
+### Tracking on the Kirlia second
+
+Command:
+
+```bash
+cd /Users/ahmadjalil/github/TCGer/backend
+NODE_ENV=test \
+BACKEND_MODE=convex \
+CARD_SCAN_STORE=file \
+CARD_SCAN_DATA_DIR=/tmp/tcger-server-pokemon \
+npm run scan:video -- \
+  --video '/Users/ahmadjalil/Downloads/Untitled design.mp4' \
+  --tcg pokemon \
+  --fps 1 \
+  --offset 75 \
+  --duration 1 \
+  --max-frames 1 \
+  --max-windows 24 \
+  --max-proposals 2 \
+  --track-ttl 2 \
+  --min-stable 2
+```
+
+Result:
+
+- `framesScanned: 1`
+- `matchedFrames: 0`
+- one unknown track created
+- no emitted card
+
+This is the expected outcome for the current Kirlia failure case: tracking now suppresses duplicate adds and gives a stable place to accumulate evidence, but it does not manufacture identity when the crop pipeline still cannot produce a shortlist.
+
 ### Scanic reference spike
 
 Repo:
@@ -142,5 +226,5 @@ But for this Kirlia frame it still cannot produce a shortlist, and OCR on the re
 ## Next likely steps
 
 1. Replace heuristic crop windows with a detector or rotated-box isolator.
-2. Add track-level aggregation only after per-frame weak candidates exist.
+2. Keep the new track-level aggregation and feed it better crops.
 3. Revisit OCR narrowing after crop quality improves, not before.
