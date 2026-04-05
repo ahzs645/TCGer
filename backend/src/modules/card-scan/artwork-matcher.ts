@@ -279,8 +279,9 @@ export function matchArtwork(
     let similarity = artSim;
     if (hasHsv && entry.hsvHist && queryHsv) {
       const corr = hsvCorrelation(queryHsv, entry.hsvHist);
-      // Blend: 75% artwork grid, 25% HSV correlation (mapped to 0-1)
-      similarity = artSim * 0.75 + ((corr + 1) / 2) * 0.25;
+      // Blend: 90% artwork grid, 10% HSV correlation (mapped to 0-1)
+      // HSV is a tiebreaker, not a primary signal — video crops have noisy HSV
+      similarity = artSim * 0.90 + ((corr + 1) / 2) * 0.10;
     }
 
     results.push({

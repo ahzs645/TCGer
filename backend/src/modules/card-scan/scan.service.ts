@@ -147,10 +147,20 @@ export async function scanCardImage(
   // Skip when OCR name hint is active — the hash entries are already filtered by name
   if (isArtworkDatabaseLoaded() && !options?.ocrNameHint) {
     try {
-      const [artFp, artHsv] = await Promise.all([
-        computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon'),
-        computeHsvHistogram(imageBuffer),
-      ]);
+      // Artwork fingerprint + HSV on artwork region (same crop for consistency)
+      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      let artHsv: Awaited<ReturnType<typeof computeHsvHistogram>> | null = null;
+      try {
+        const sharp = (await import('sharp')).default;
+        const m = await sharp(imageBuffer).metadata();
+        const w = m.width ?? 0, h = m.height ?? 0;
+        if (w > 0 && h > 0) {
+          const artRegion = await sharp(imageBuffer)
+            .extract({ left: Math.round(w * 0.05), top: Math.round(h * 0.08), width: Math.round(w * 0.90), height: Math.round(h * 0.47) })
+            .toBuffer();
+          artHsv = await computeHsvHistogram(artRegion);
+        }
+      } catch { /* skip HSV if crop fails */ }
       const artMatches = matchArtwork(artFp, 3, tcgFilter, artHsv);
 
       if (artMatches.length > 0) {
