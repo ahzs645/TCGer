@@ -1,360 +1,229 @@
 # TCGer iOS App - Feature Roadmap
-## Inspired by CardWizz Flutter App
 
-Based on analysis of CardWizz (`/Users/ahmadjalil/Downloads/CardWizz-main`), here are the recommended features to incorporate into the native iOS TCGer app.
-
----
-
-## Current Features (Already Implemented ✅)
-
-### Core Functionality
-- ✅ User authentication (login/signup)
-- ✅ Collections/Binders management (create, view, edit, delete)
-- ✅ Card search across multiple TCGs (Yu-Gi-Oh!, Magic, Pokémon)
-- ✅ Add cards to collections
-- ✅ Basic collection statistics (card count, total value)
-- ✅ Card images and details
-- ✅ Backend API integration
+Based on competitive analysis of Collectr, Dex, PriceCharting, and Shiny TCG apps.
 
 ---
 
-## Priority 1: Essential Features (High Impact, Should Implement Next)
+## Implemented Features
 
-### 1. Card Scanner 📷
-**CardWizz Implementation**: `scanner_screen.dart`, `scanner_service.dart`
-- Camera-based card recognition
-- Barcode/QR code scanning
-- Set number OCR detection
-- Card frame overlay guide
-- Scanning tips and tutorials
+### Core (Pre-existing)
+- User authentication (login/signup/admin setup)
+- Collections/Binders management (CRUD, tags, colors)
+- Card search across multiple TCGs (Yu-Gi-Oh!, Magic, Pokemon)
+- Add/edit/remove cards with per-copy tracking (condition, language, foil, signed, altered)
+- Card scanning with 4 strategies (backend hash, text OCR, ML embedding, perceptual hash)
+- Collection statistics (card count, total value)
+- Collection export (CSV/JSON)
+- Server configuration with auto-discovery
+- Demo mode with in-memory data
+- Offline caching
 
-**iOS Implementation Plan**:
-```swift
-// New Files Needed:
-- Views/ScannerView.swift
-- Services/ScannerService.swift
-- Services/VisionService.swift (iOS Vision framework)
+### Round 1 (Competitor Analysis - April 2026)
+- **Theme/Appearance Customization** — System/Light/Dark mode + 10 accent colors
+- **Wishlist** — Full CRUD with completion tracking, add from search/sets, backend API integration
+- **Set Completion Tracking** — Progress bar + owned badges in set browser
+- **Bulk Actions** — Multi-select mode with batch move, delete, condition change
+- **Home Screen Widgets** — Collection stats + recent cards (WidgetKit, needs Xcode target setup)
 
-// Key Technologies:
-- AVFoundation for camera
-- Vision framework for text recognition
-- VNRecognizeTextRequest for card numbers
-- VNBarcodeObservationRequest for barcodes
-```
-
-**Benefits**:
-- Much faster card addition
-- Reduces manual entry errors
-- Greatly improves UX
-
----
-
-### 2. Price Tracking & History 📈
-**CardWizz Implementation**: `price_service.dart`, `price_change_tracker.dart`
-- eBay sold listings integration
-- Price history tracking
-- Price change notifications
-- Average price calculation
-- Multiple price sources (eBay, TCGPlayer)
-
-**iOS Implementation Plan**:
-```swift
-// New Files Needed:
-- Services/PriceService.swift
-- Services/EbayAPIService.swift
-- Models/PriceHistory.swift
-- Views/Components/PriceChartView.swift
-
-// Backend Updates Needed:
-- Add priceHistory table
-- Add price tracking endpoints
-- Integrate eBay API
-- Add background job for price updates
-```
-
-**Benefits**:
-- Know real market value
-- Track collection value over time
-- Make informed buying/selling decisions
+### Round 2 (Competitor Analysis - April 2026)
+- **Haptic Feedback** — On scan success/failure, card add, bulk actions, wishlist add
+- **Biometric App Lock** — Face ID / Touch ID with auto-lock on background
+- **Vault (Storage Location)** — Per-copy storage location field with filter support
+- **Slab View Mode** — Grading badge display + SlabCardView with company-specific styling
+- **Grading Integration** — Company, grade score, cert number fields on card copies
+- **Smart Folders** — Rule-based virtual folders (by TCG, rarity, condition, set, foil)
+- **Sealed Product Tracking** — Product catalog, inventory CRUD, backend API integration
+- **Mark as Sold / Transaction Log** — Sale recording, finance summary, P&L tracking
+- **Demo Data** — Full demo mode support for all new features with card back images
 
 ---
 
-### 3. Analytics Dashboard 📊
-**CardWizz Implementation**: `analytics_screen.dart`, `chart_service.dart`
-**Features**:
-- Portfolio value over time (line chart)
-- Rarity distribution (pie chart)
-- TCG breakdown (bar chart)
-- Acquisition timeline
-- Top movers (price changes)
-- Market insights
+## Deferred Features - Future Roadmap
 
-**iOS Implementation Plan**:
-```swift
-// New Files Needed:
-- Views/AnalyticsView.swift
-- Services/AnalyticsService.swift
-- Components/Charts/
-  - PortfolioValueChart.swift
-  - RarityDistributionChart.swift
-  - TCGBreakdownChart.swift
+### Price History Charts
+**What:** Interactive line charts showing card price changes over time (1W/1M/3M/1Y/All).
+**Who has it:** Collectr, Dex, PriceCharting (deep), Shiny — all 4 competitors.
+**Why deferred:** Requires a reliable pricing data source and historical price storage. The backend has a `PriceHistory` model and `PriceAlert` model in the Prisma schema, but no automated price ingestion pipeline exists yet.
+**What's needed to implement:**
+- Backend: Price ingestion service that periodically fetches prices from TCGPlayer/Scryfall/eBay APIs and writes to the `PriceHistory` table
+- Backend: Endpoint `GET /prices/:tcg/:cardId/history?period=30d` returning time-series data
+- iOS: `PriceChartView.swift` using Swift Charts framework (`import Charts`)
+- iOS: Integration into card detail views and collection card rows
+- Estimated effort: 2-3 days (iOS) + 1-2 weeks (backend price pipeline)
+**Existing backend infrastructure:**
+- `PriceHistory` model: cardId, price, currency, source, recordedAt
+- `PriceAlert` model: cardId, userId, targetPrice, direction (above/below), lastTriggered
+- Pricing service at `backend/src/modules/pricing/pricing.service.ts` with multi-source provider pattern
+- Price movers endpoint at `GET /prices/analytics/movers?tcg=...&period=7`
 
-// Use Swift Charts framework (iOS 16+)
-// Or: SwiftUICharts library for iOS 14-15
-```
+### Collection Value Over Time
+**What:** Historical chart of total portfolio value, showing growth/decline trends.
+**Who has it:** Collectr (P&L tracking), Dex (line charts), PriceCharting (historical), Shiny.
+**Why deferred:** Depends on Price History Charts above — without price data flowing, there's no collection value to chart.
+**What's needed to implement:**
+- Backend: Scheduled job to snapshot portfolio value daily into a `PortfolioSnapshot` table (user_id, total_value, total_cards, snapshot_date)
+- Backend: Endpoint `GET /finance/portfolio-history?from=&to=` returning time-series snapshots
+- iOS: `PortfolioValueChart.swift` using Swift Charts, displayed on DashboardView
+- Estimated effort: 1-2 days (iOS) + 1 week (backend snapshots + scheduler)
 
-**Benefits**:
-- Visual insights into collection
-- Track growth over time
-- Identify investment opportunities
+### Multi-Currency Support
+**What:** Display prices and collection values in user's preferred currency (EUR, GBP, JPY, etc.).
+**Who has it:** Collectr (full conversion), Dex (14 currencies), PriceCharting (exchange rates).
+**Why deferred:** Depends on having reliable pricing data first. Also needs exchange rate API integration.
+**What's needed to implement:**
+- Backend: Exchange rate service (e.g., from exchangerate-api.com or Open Exchange Rates)
+- Backend: `ExchangeRate` model with currency_code and to_usd rate, refreshed daily
+- Backend: User preference for `preferredCurrency` on the User model
+- iOS: `EnvironmentStore` property for `preferredCurrency`, format helper `CurrencyFormatter`
+- iOS: All price displays wrapped in currency formatter
+- Estimated effort: 2-3 days total
 
----
+### Lot Value Calculator
+**What:** A dealer/retailer tool for calculating bulk lot values with markup, sales tax, and receipt generation.
+**Who has it:** PriceCharting (sophisticated with receipts, pagination, tax calculation).
+**Why deferred:** Niche feature primarily for dealers/retailers. Most collectors won't use it.
+**What's needed to implement:**
+- iOS-only feature (no backend needed): `LotCalculatorView.swift`
+- Model: `Lot` (title, items, flatRateMarkup, percentMarkup, salesTaxPercent)
+- Model: `LotItem` (card reference, quantity, price)
+- Computed properties for subtotal, markup fees, tax, total
+- Receipt view with shareable PDF generation via `UIGraphicsPDFRenderer`
+- Store lots in UserDefaults or local CoreData
+- Estimated effort: 2-3 days
 
-## Priority 2: Enhanced UX (Medium Impact)
+### Achievements / Badges
+**What:** Gamification layer that rewards users for collection milestones (e.g., "First 100 cards", "Complete a set", "Scan 50 cards").
+**Who has it:** Dex (badge system with progress tracking, friend comparison).
+**What's needed to implement:**
+- Define achievement catalog (20-30 achievements with icons, descriptions, thresholds)
+- Backend: `Achievement` and `UserAchievement` models tracking unlock state and progress
+- Backend: Achievement evaluation triggered on card add, collection create, scan complete, etc.
+- iOS: `AchievementsView.swift` with badge grid, progress indicators, locked/unlocked states
+- iOS: Toast/celebration animation when achievement unlocked (confetti, haptic)
+- Consider: Local-only achievements (stored in UserDefaults) as MVP, backend-synced later
+- Estimated effort: 3-5 days
 
-### 4. Advanced Search & Filters 🔍
-**CardWizz Implementation**: `search_screen.dart`
-- Search history
-- Advanced filters (rarity, type, set, price range)
-- Sort options
-- Recent searches
-- Quick filters
+### PSA/CGC Population Reports
+**What:** Display grading population data — how many copies of a card exist at each grade level.
+**Who has it:** PriceCharting (PSA and CGC pop data integrated into item detail).
+**Why deferred:** Requires external data source. PSA and CGC don't have public APIs for population data.
+**What's needed to implement:**
+- Data source: PSA/CGC pop reports (may require scraping or third-party aggregator)
+- Backend: `PopulationReport` model with card reference, grading company, grade, count
+- Backend: Endpoint `GET /cards/:tcg/:cardId/population`
+- iOS: `PopulationReportView.swift` showing grade distribution as bar chart
+- iOS: Integrate into card detail or slab view
+- Estimated effort: 1-2 days (iOS) + significant backend work for data sourcing
 
-**iOS Implementation**:
-```swift
-// Enhance existing:
-- Views/CardSearchView.swift
+### Content Creators Corner
+**What:** Showcase section highlighting TCG content creators (YouTubers, streamers, influencers).
+**Who has it:** Collectr (ContentCreatorCard, ContentCreatorCarousel).
+**Why deferred:** Social/community feature. Self-hosted app doesn't have a content discovery platform.
+**What's needed to implement:**
+- Backend: `ContentCreator` model with name, platform, url, imageUrl, description
+- Backend: Admin endpoint to manage creator listings
+- iOS: `ContentCreatorsView.swift` with horizontal carousel of creator cards
+- iOS: Deep links to YouTube/Twitch/Instagram profiles
+- Estimated effort: 1-2 days
 
-// Add:
-- Components/FilterSheet.swift
-- Services/SearchHistoryService.swift
-- Models/SearchFilters.swift
-```
+### Pokedex Tracking
+**What:** Browse Pokemon by species (Pokedex number) rather than by card. See all cards featuring a specific Pokemon across all sets.
+**Who has it:** Dex (dedicated Pokedex tab with regional browsing, species detail, friend comparison).
+**What's needed to implement:**
+- Backend: Endpoint `GET /pokemon/pokedex` returning species list with dex numbers, names, types
+- Backend: Endpoint `GET /pokemon/pokedex/:dexNumber/cards` returning all cards for that Pokemon
+- iOS: `PokedexView.swift` — scrollable list of Pokemon species with images, dex numbers
+- iOS: `PokedexDetailView.swift` — all cards for a species, ownership status, set info
+- iOS: New tab or section under Sets
+- Data source: Pokemon TCG API already returns `dexEntries` on Pokemon cards
+- The iOS `Card` model already has `dexEntries: [PokedexEntry]?` field
+- Estimated effort: 2-3 days
 
----
+### Push Notifications / Price Alerts
+**What:** Push notifications for price drops, new set releases, collection milestones.
+**Who has it:** All 4 competitors use FCM or OneSignal.
+**What's needed to implement:**
+- Apple Push Notification service (APNs) setup with certificates
+- Backend: `PriceAlert` model exists in schema — wire it to notification delivery
+- Backend: Notification service that evaluates alerts and sends via APNs
+- iOS: Request notification permission, register device token, handle incoming notifications
+- iOS: `NotificationSettingsView.swift` for managing alert preferences
+- Estimated effort: 3-5 days (+ APNs certificate setup)
 
-### 5. Collection Insights 📋
-**CardWizz Implementation**: Built into `collections_screen.dart`
-- Duplicate card detection
-- Missing cards from sets
-- Completion percentage by set
-- Value distribution
-- Condition breakdown
+### Social Auth (Google/Apple Sign-In)
+**What:** Sign in with Google or Apple account instead of email/password.
+**Who has it:** All 4 competitors.
+**What's needed to implement:**
+- Backend: OAuth provider integration via better-auth (already used) — add Google and Apple providers
+- iOS: `AuthenticationServices` framework for Sign in with Apple (native)
+- iOS: Google Sign-In SDK for Google auth
+- iOS: Update LoginView to show social auth buttons
+- Estimated effort: 2-3 days (+ Apple Developer portal configuration)
 
-**iOS Implementation**:
-```swift
-// New Views:
-- Views/CollectionInsightsView.swift
-- Components/SetCompletionView.swift
-- Components/DuplicatesListView.swift
-```
+### Barcode/UPC Scanning
+**What:** Scan sealed product barcodes (UPC) to quickly identify and add to sealed inventory.
+**Who has it:** Collectr (Google ML Kit), PriceCharting (ZXing).
+**What's needed to implement:**
+- iOS: `VNBarcodeObservation` via Vision framework (built-in, no third-party SDK needed)
+- iOS: Integrate into CardScannerView as a barcode scanning mode
+- Backend: Match UPC to SealedProduct via the `upc` field already in the schema
+- Estimated effort: 1-2 days
 
----
+### Deep Linking
+**What:** Share cards and collections via URLs that open directly in the app.
+**Who has it:** Collectr, Dex, Shiny.
+**What's needed to implement:**
+- iOS: Universal Links configuration (apple-app-site-association file on server)
+- iOS: Handle incoming URLs in `TCGerApp.swift` via `.onOpenURL`
+- URL scheme: `tcger://card/{tcg}/{cardId}`, `tcger://binder/{binderId}`
+- Backend: Serve apple-app-site-association at `/.well-known/`
+- Estimated effort: 1-2 days
 
-### 6. Card Detail Enhancements 🎴
-**CardWizz Implementation**: `pokemon_card_details_screen.dart`, `mtg_card_details_screen.dart`
-**Features**:
-- Price history chart
-- Market listings
-- Similar cards
-- Set information
-- Card attributes (for MTG: mana cost, for Pokémon: HP, attacks)
-- Add to wishlist
-- Share card
+### Showcase / Public Portfolio URL
+**What:** Generate a shareable URL for your collection that others can browse.
+**Who has it:** Collectr (Showcase with unique URLs).
+**What's needed to implement:**
+- Backend already has `isPublic: Boolean` and `shareToken: String` on the Binder model
+- Backend: Public endpoint `GET /public/binders/:shareToken` returning binder data without auth
+- iOS: Toggle in binder edit to make public, copy share URL
+- Frontend: Public binder view page at `/showcase/:shareToken`
+- Estimated effort: 1-2 days
 
-**iOS Implementation**:
-```swift
-// Create TCG-specific detail views:
-- Views/Details/PokemonCardDetailView.swift
-- Views/Details/MagicCardDetailView.swift
-- Views/Details/YuGiOhCardDetailView.swift
+### Custom App Icons
+**What:** Let users choose from multiple app icon variants.
+**Who has it:** Collectr (~20 variants), Shiny (dynamic icons).
+**What's needed to implement:**
+- iOS: `UIApplication.shared.setAlternateIconName()` API
+- Create 5-10 icon variants in different styles/colors
+- iOS: Icon picker grid in Settings (similar to accent color picker)
+- Estimated effort: 1 day (+ icon design time)
 
-// Shared components:
-- Components/PriceHistoryView.swift
-- Components/MarketListingsView.swift
-```
+### In-App Review Prompts
+**What:** Prompt users to rate the app at strategic moments.
+**Who has it:** Shiny, Collectr.
+**What's needed to implement:**
+- iOS: `SKStoreReviewController.requestReview()` from StoreKit
+- Trigger after milestones: 10th card added, first set completed, first scan
+- Track prompt count to avoid over-prompting (Apple limits to 3x/year)
+- Estimated effort: 30 minutes
 
----
-
-## Priority 3: Nice-to-Have Features (Lower Priority)
-
-### 7. Wishlist System 💭
-- Track cards you want to buy
-- Price alerts for wishlist items
-- Move from wishlist to collection
-
-### 8. Export & Sharing 📤
-**CardWizz Implementation**: Export functionality in `collections_screen.dart`
-- CSV export for grading services
-- PDF collection reports
-- Share collection with friends
-- Backup/restore
-
-### 9. Dark Mode & Themes 🎨
-**CardWizz Implementation**: `theme_provider.dart`
-- Full dark mode support
-- Custom color schemes per TCG
-- Theme persistence
-
-### 10. Offline Mode 📴
-- Cache card data
-- Offline search in owned cards
-- Sync when online
-
----
-
-## Backend API Updates Required
-
-### New Endpoints Needed:
-
-```typescript
-// Price Tracking
-POST   /cards/:id/track-price
-GET    /cards/:id/price-history
-GET    /cards/price-changes (for analytics)
-
-// Scanner
-POST   /cards/search-by-number
-POST   /cards/search-by-barcode
-
-// Analytics
-GET    /collections/:id/analytics
-GET    /collections/:id/insights
-GET    /portfolio/history?from=&to=
-
-// Wishlist
-GET    /wishlist
-POST   /wishlist
-DELETE /wishlist/:id
-
-// Export
-GET    /collections/:id/export?format=csv|pdf
-```
-
-### Database Schema Updates:
-
-```sql
--- Price History
-CREATE TABLE price_history (
-  id UUID PRIMARY KEY,
-  card_id VARCHAR NOT NULL,
-  tcg VARCHAR NOT NULL,
-  price DECIMAL(10,2) NOT NULL,
-  source VARCHAR NOT NULL, -- 'ebay', 'tcgplayer', etc
-  recorded_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(card_id, tcg, recorded_at)
-);
-
--- Wishlist
-CREATE TABLE wishlist (
-  id UUID PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id),
-  card_id VARCHAR NOT NULL,
-  tcg VARCHAR NOT NULL,
-  target_price DECIMAL(10,2),
-  notify_on_price_drop BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, card_id, tcg)
-);
-
--- Portfolio Snapshots (for analytics)
-CREATE TABLE portfolio_snapshots (
-  id UUID PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id),
-  total_value DECIMAL(10,2) NOT NULL,
-  total_cards INTEGER NOT NULL,
-  snapshot_date DATE NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, snapshot_date)
-);
-```
+### Easter Egg
+**What:** Hidden fun surprises in the app.
+**Who has it:** Collectr (hidden snake game triggered by SecretButton).
+**What's needed to implement:**
+- iOS: Hidden gesture (e.g., 10 taps on app version in Settings)
+- Mini-game view (snake, card flip memory, etc.)
+- Estimated effort: 1-2 hours for a simple game
 
 ---
 
-## Implementation Timeline Recommendation
+## Implementation Priority (Next Round)
 
-### Phase 1 (2-3 weeks): Price Tracking Foundation
-1. Add price history backend
-2. Integrate eBay API
-3. Create price tracking service
-4. Add basic price charts to card details
-
-### Phase 2 (1-2 weeks): Scanner
-1. Implement camera view
-2. Add Vision framework integration
-3. Create OCR for card numbers
-4. Test with physical cards
-
-### Phase 3 (2-3 weeks): Analytics Dashboard
-1. Create analytics calculations
-2. Implement chart views
-3. Add portfolio tracking
-4. Create insights view
-
-### Phase 4 (1-2 weeks): Enhanced Search
-1. Add search history
-2. Implement advanced filters
-3. Add sort options
-4. Create filter UI
-
-### Phase 5 (1 week): Polish
-1. Dark mode
-2. Export features
-3. Wishlist
-4. Offline mode basics
-
----
-
-## Key Technologies to Use
-
-### iOS Native
-- **SwiftUI** - Already using, continue
-- **Swift Charts** - For analytics (iOS 16+)
-- **Vision** - Card scanning, OCR
-- **AVFoundation** - Camera access
-- **Core Data** - Offline caching
-- **UserDefaults** - Settings persistence
-
-### Backend
-- **eBay Finding API** - Price data
-- **TCGPlayer API** - Price data (if available)
-- **Prisma** - Already using
-- **Node-cron** - Price update jobs
-
----
-
-## CardWizz Features NOT to Port (and why)
-
-❌ **Firebase Authentication** - We're using our own backend auth
-❌ **Premium/IAP System** - Not needed for MVP
-❌ **Google Sign-In** - Can add later if needed
-❌ **Multiple Languages** - English only for now
-❌ **Performance Monitoring** - Use iOS native analytics instead
-
----
-
-## Quick Wins (Easiest to Implement First)
-
-1. **Search History** - Just localStorage, very simple
-2. **Dark Mode** - SwiftUI makes this trivial
-3. **Basic Charts** - Swift Charts is built-in
-4. **Card Sharing** - iOS share sheet is native
-
----
-
-## Next Steps
-
-1. Review this roadmap with the team
-2. Prioritize which features to implement first
-3. Start with Price Tracking backend (needed for most features)
-4. Implement Scanner (huge UX improvement)
-5. Add Analytics dashboard (high visual impact)
-
----
-
-## Questions to Consider
-
-- Which features provide the most value to users?
-- What's the minimum viable improvement over current app?
-- Which features require the most backend work?
-- Should we do iOS-first or ensure web app has same features?
+If implementing more features, recommended order:
+1. **In-App Review Prompts** — 30 min, free engagement boost
+2. **Barcode/UPC Scanning** — 1-2 days, leverages existing scanner + sealed inventory
+3. **Deep Linking** — 1-2 days, improves sharing
+4. **Showcase / Public Portfolio** — 1-2 days, backend fields already exist
+5. **Custom App Icons** — 1 day + design, visible polish
+6. **Pokedex Tracking** — 2-3 days, unique differentiator for Pokemon collectors
+7. **Price History Charts** — 2-3 days iOS + backend pipeline needed
