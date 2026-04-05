@@ -18,6 +18,7 @@ import path from 'node:path';
 // ---------- types ----------
 
 export type ArtworkFingerprint = Float32Array; // 192 elements (8×8×3)
+export type HsvHistogram = Float32Array; // H_BINS * S_BINS elements
 
 export interface ArtworkFingerprintEntry {
   externalId: string;
@@ -25,6 +26,7 @@ export interface ArtworkFingerprintEntry {
   setCode: string | null;
   fingerprint: ArtworkFingerprint;
   norm: number; // pre-computed L2 norm for fast cosine similarity
+  hsvHist: HsvHistogram | null; // HSV histogram for color distribution matching
 }
 
 export interface ArtworkMatch {
@@ -45,6 +47,7 @@ interface ArtworkDatabaseJson {
     name: string;
     setCode: string | null;
     fingerprint: string; // base64-encoded Float32Array
+    hsvHist?: string; // base64-encoded Float32Array (HSV histogram)
   }>;
 }
 
@@ -52,6 +55,9 @@ interface ArtworkDatabaseJson {
 
 const GRID_SIZE = 8;
 const FINGERPRINT_DIM = GRID_SIZE * GRID_SIZE * 3; // 192
+const HSV_H_BINS = 30;
+const HSV_S_BINS = 32;
+const HSV_HIST_DIM = HSV_H_BINS * HSV_S_BINS; // 960
 
 /** TCG-specific artwork crop regions (fraction of card dimensions). */
 const ARTWORK_REGIONS: Record<string, { top: number; bottom: number; left: number; right: number }> = {
@@ -140,6 +146,67 @@ export async function computeArtworkFingerprint(
 }
 
 /**
+ * Compute HSV histogram from a card image (full card, not just artwork).
+ * HSV captures color distribution independently of spatial layout,
+ * which helps distinguish cards with similar artwork but different color tones.
+ */
+export async function computeHsvHistogram(imageBuffer: Buffer): Promise<HsvHistogram> {
+  const size = 128;
+  const raw = await sharp(imageBuffer)
+    .resize(size, size, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+
+  const hist = new Float32Array(HSV_HIST_DIM);
+  const pixels = size * size;
+
+  for (let i = 0; i < pixels; i++) {
+    const r = raw[i * 3]! / 255;
+    const g = raw[i * 3 + 1]! / 255;
+    const b = raw[i * 3 + 2]! / 255;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const d = mx - mn;
+
+    let h = 0;
+    if (d > 0) {
+      if (mx === r) h = 60 * (((g - b) / d) % 6);
+      else if (mx === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+    }
+    if (h < 0) h += 360;
+    const s = mx > 0 ? d / mx : 0;
+
+    const hBin = Math.min(HSV_H_BINS - 1, Math.floor((h / 360) * HSV_H_BINS));
+    const sBin = Math.min(HSV_S_BINS - 1, Math.floor(s * HSV_S_BINS));
+    hist[hBin * HSV_S_BINS + sBin]++;
+  }
+
+  // Normalise to sum=1
+  let sum = 0;
+  for (let i = 0; i < hist.length; i++) sum += hist[i]!;
+  if (sum > 0) for (let i = 0; i < hist.length; i++) hist[i] /= sum;
+  return hist;
+}
+
+/**
+ * Pearson correlation between two HSV histograms. Returns [-1, 1].
+ */
+export function hsvCorrelation(a: HsvHistogram, b: HsvHistogram): number {
+  const n = a.length;
+  let s1 = 0, s2 = 0, s12 = 0, s11 = 0, s22 = 0;
+  for (let i = 0; i < n; i++) {
+    s1 += a[i]!; s2 += b[i]!;
+    s12 += a[i]! * b[i]!;
+    s11 += a[i]! * a[i]!;
+    s22 += b[i]! * b[i]!;
+  }
+  const denom = Math.sqrt((n * s11 - s1 * s1) * (n * s22 - s2 * s2));
+  return denom > 0 ? (n * s12 - s1 * s2) / denom : 0;
+}
+
+/**
  * Cosine similarity between two fingerprints.
  */
 export function cosineSimilarity(a: ArtworkFingerprint, b: ArtworkFingerprint): number {
@@ -176,6 +243,7 @@ export async function loadArtworkDatabase(dataDir: string): Promise<ArtworkFinge
       setCode: entry.setCode,
       fingerprint: fp,
       norm: Math.sqrt(normSq),
+      hsvHist: entry.hsvHist ? base64ToFingerprint(entry.hsvHist) : null,
     };
   });
 
@@ -189,7 +257,8 @@ export async function loadArtworkDatabase(dataDir: string): Promise<ArtworkFinge
 export function matchArtwork(
   query: ArtworkFingerprint,
   topK = 5,
-  tcgFilter?: string
+  tcgFilter?: string,
+  queryHsv?: HsvHistogram | null
 ): ArtworkMatch[] {
   if (!artworkDb) return [];
 
@@ -198,12 +267,21 @@ export function matchArtwork(
   queryNorm = Math.sqrt(queryNorm);
   if (queryNorm === 0) return [];
 
+  const hasHsv = queryHsv && artworkDb[0]?.hsvHist;
+
   const results: ArtworkMatch[] = [];
 
   for (const entry of artworkDb) {
     let dot = 0;
     for (let i = 0; i < query.length; i++) dot += query[i]! * entry.fingerprint[i]!;
-    const similarity = dot / (queryNorm * entry.norm);
+    const artSim = dot / (queryNorm * entry.norm);
+
+    let similarity = artSim;
+    if (hasHsv && entry.hsvHist && queryHsv) {
+      const corr = hsvCorrelation(queryHsv, entry.hsvHist);
+      // Blend: 75% artwork grid, 25% HSV correlation (mapped to 0-1)
+      similarity = artSim * 0.75 + ((corr + 1) / 2) * 0.25;
+    }
 
     results.push({
       externalId: entry.externalId,
@@ -257,12 +335,16 @@ export async function buildArtworkDatabase(
   for (const entry of entries) {
     try {
       const imageBuffer = await readFile(entry.imagePath);
-      const fp = await computeArtworkFingerprint(imageBuffer, tcg);
+      const [fp, hsv] = await Promise.all([
+        computeArtworkFingerprint(imageBuffer, tcg),
+        computeHsvHistogram(imageBuffer),
+      ]);
       results.push({
         externalId: entry.externalId,
         name: entry.name,
         setCode: entry.setCode,
         fingerprint: fingerprintToBase64(fp),
+        hsvHist: fingerprintToBase64(hsv),
       });
     } catch {
       // Skip cards with missing or unreadable images

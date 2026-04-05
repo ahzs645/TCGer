@@ -9,6 +9,7 @@ import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store
 import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
 import {
   computeArtworkFingerprint,
+  computeHsvHistogram,
   matchArtwork,
   loadArtworkDatabase,
   isArtworkDatabaseLoaded,
@@ -146,8 +147,11 @@ export async function scanCardImage(
   // Skip when OCR name hint is active — the hash entries are already filtered by name
   if (isArtworkDatabaseLoaded() && !options?.ocrNameHint) {
     try {
-      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
-      const artMatches = matchArtwork(artFp, 3, tcgFilter);
+      const [artFp, artHsv] = await Promise.all([
+        computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon'),
+        computeHsvHistogram(imageBuffer),
+      ]);
+      const artMatches = matchArtwork(artFp, 3, tcgFilter, artHsv);
 
       if (artMatches.length > 0) {
         const topArt = artMatches[0]!;

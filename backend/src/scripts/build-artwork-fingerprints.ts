@@ -17,6 +17,7 @@ import path from 'node:path';
 
 import {
   computeArtworkFingerprint,
+  computeHsvHistogram,
   fingerprintToBase64,
   type ArtworkBuildEntry,
   buildArtworkDatabase,
@@ -170,13 +171,17 @@ async function buildFromApi(tcg: string, dataDir: string): Promise<void> {
       if (!response.ok) { errors++; continue; }
 
       const imageBuffer = Buffer.from(await response.arrayBuffer());
-      const fp = await computeArtworkFingerprint(imageBuffer, tcg);
+      const [fp, hsv] = await Promise.all([
+        computeArtworkFingerprint(imageBuffer, tcg),
+        computeHsvHistogram(imageBuffer),
+      ]);
 
       entries.push({
         externalId: card.externalId,
         name: nameMap.get(card.externalId) ?? card.name,
         setCode: card.setCode,
         fingerprint: fingerprintToBase64(fp),
+        hsvHist: fingerprintToBase64(hsv),
       });
 
       processed++;
