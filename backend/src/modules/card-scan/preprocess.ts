@@ -196,7 +196,7 @@ function normalizeScore(value: number, min: number, max: number): number {
   return Math.max(0, Math.min(1, (value - min) / (max - min)));
 }
 
-async function computeScanQuality(imageBuffer: Buffer): Promise<ScanQualityMetrics | null> {
+export async function computeScanQuality(imageBuffer: Buffer): Promise<ScanQualityMetrics | null> {
   debugScan('quality:start');
   const { data, info } = await sharp(imageBuffer)
     .rotate()
