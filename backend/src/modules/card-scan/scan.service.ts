@@ -7,6 +7,12 @@ import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
 import { computeCardFeatureHashes, getStoredCardFeatureHashes, type CardFeatureHashes } from './feature-hashes';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
 import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
+import {
+  computeArtworkFingerprint,
+  matchArtwork,
+  loadArtworkDatabase,
+  isArtworkDatabaseLoaded,
+} from './artwork-matcher';
 
 // ---------- types ----------
 
@@ -66,10 +72,23 @@ const MAX_CANDIDATES = 5;
  */
 export async function scanCardImage(
   imageBuffer: Buffer,
-  tcgFilter?: string
+  tcgFilter?: string,
+  options?: { maxDistanceOverride?: number; ocrNameHint?: string }
 ): Promise<ScanResult> {
   const runtimeScan = await prepareRuntimeScanImage(imageBuffer);
-  const hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
+  let hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
+
+  // OCR name hint: fuzzy-filter hash entries to matching card names
+  if (options?.ocrNameHint) {
+    const hint = options.ocrNameHint.toLowerCase();
+    const { levenshtein } = await import('./card-detector');
+    hashEntries = hashEntries.filter((entry) => {
+      const firstName = entry.name.toLowerCase().split(/\s+/)[0] ?? '';
+      if (firstName.length < 3) return false; // skip single-letter names like "M", "N"
+      const trimmedHint = hint.slice(0, firstName.length + 2);
+      return levenshtein(trimmedHint, firstName) <= 3;
+    });
+  }
   const attemptedVariants: string[] = [];
   const allMatches = new Map<string, ScanMatch>();
   let bestAttempt: {
@@ -81,7 +100,7 @@ export async function scanCardImage(
     match: ScanMatch | null;
   } | null = null;
 
-  const passes = buildScanPasses(runtimeScan.variants);
+  const passes = buildScanPasses(runtimeScan.variants, options?.maxDistanceOverride);
 
   for (const pass of passes) {
     for (const variant of pass.variants) {
@@ -120,6 +139,60 @@ export async function scanCardImage(
 
     if (bestAttempt?.match && isStrongEnough(bestAttempt.match, pass.maxDistance)) {
       break;
+    }
+  }
+
+  // Artwork fingerprint matching: boost candidates that also match visually
+  // Skip when OCR name hint is active — the hash entries are already filtered by name
+  if (isArtworkDatabaseLoaded() && !options?.ocrNameHint) {
+    try {
+      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      const artMatches = matchArtwork(artFp, 3, tcgFilter);
+
+      if (artMatches.length > 0) {
+        const topArt = artMatches[0]!;
+        const secondArt = artMatches[1];
+        const margin = secondArt ? topArt.similarity - secondArt.similarity : 0.1;
+
+        // Only inject the artwork top-1 as a candidate when:
+        // - pHash found no match, OR
+        // - artwork has a meaningful similarity margin over #2
+        const pHashBest = Array.from(allMatches.values()).sort((a, b) => a.distance - b.distance)[0];
+        const shouldInject = !pHashBest || margin >= 0.005;
+
+        if (shouldInject) {
+          const key = `${tcgFilter ?? 'pokemon'}:${topArt.externalId}`;
+          if (!allMatches.has(key)) {
+            const entry = hashEntries.find((h) => h.externalId === topArt.externalId);
+            if (entry) {
+              // Use a moderate distance so artwork doesn't dominate pHash
+              const artDistance = Math.round((1 - topArt.similarity) * MAX_COMBINED_DISTANCE * 1.5);
+              allMatches.set(key, {
+                externalId: entry.externalId,
+                tcg: entry.tcg,
+                name: entry.name,
+                setCode: entry.setCode,
+                setName: entry.setName,
+                rarity: entry.rarity,
+                imageUrl: entry.imageUrl,
+                confidence: topArt.similarity,
+                distance: artDistance,
+                fullDistance: artDistance,
+                titleDistance: null,
+                footerDistance: null,
+              });
+            }
+          }
+        }
+      }
+    } catch { /* artwork matching unavailable, continue without */ }
+  }
+
+  // Try loading artwork database lazily on first scan
+  if (!isArtworkDatabaseLoaded()) {
+    const dataDir = process.env.CARD_SCAN_DATA_DIR;
+    if (dataDir) {
+      loadArtworkDatabase(dataDir).catch(() => { /* not available */ });
     }
   }
 
@@ -168,7 +241,7 @@ export async function getCardHashes(tcg?: string, page = 1, pageSize = 500) {
   };
 }
 
-function buildScanPasses(variants: ScanRuntimeVariant[]) {
+function buildScanPasses(variants: ScanRuntimeVariant[], maxDistanceOverride?: number) {
   const uprightVariants = variants.filter((variant) => !variant.rotated180);
   const correctedVariants = variants.filter((variant) => variant.perspectiveCorrected);
   const fallbackVariants = Array.from(new Set([
@@ -177,10 +250,14 @@ function buildScanPasses(variants: ScanRuntimeVariant[]) {
     ...variants.filter((variant) => variant.rotated180),
   ]));
 
+  const maxDist = maxDistanceOverride ?? MAX_COMBINED_DISTANCE;
+  const medDist = maxDistanceOverride ? Math.round(maxDistanceOverride * 0.83) : MEDIUM_COMBINED_DISTANCE;
+  const strictDist = maxDistanceOverride ? Math.round(maxDistanceOverride * 0.67) : STRICT_COMBINED_DISTANCE;
+
   return [
-    { maxDistance: STRICT_COMBINED_DISTANCE, variants: variants.slice(0, 1) },
-    { maxDistance: MEDIUM_COMBINED_DISTANCE, variants: fallbackVariants.slice(0, Math.max(2, fallbackVariants.length)) },
-    { maxDistance: MAX_COMBINED_DISTANCE, variants },
+    { maxDistance: strictDist, variants: variants.slice(0, 1) },
+    { maxDistance: medDist, variants: fallbackVariants.slice(0, Math.max(2, fallbackVariants.length)) },
+    { maxDistance: maxDist, variants },
   ];
 }
 
@@ -204,7 +281,7 @@ function rankMatches(
     reranked: boolean;
   }> = [];
   const singleChannelReject = Math.max(64, Math.floor((maxDistance + SHORTLIST_MARGIN) * 0.6));
-  const shortlistMaxDistance = Math.min(320, maxDistance + SHORTLIST_MARGIN);
+  const shortlistMaxDistance = maxDistance + SHORTLIST_MARGIN;
 
   for (const entry of hashEntries) {
     const entryHash: RGBHash = {

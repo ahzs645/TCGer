@@ -124,6 +124,36 @@ export function rgbHammingDistance(a: RGBHash, b: RGBHash): number {
   );
 }
 
+// ---------- histogram equalization ----------
+
+/**
+ * In-place histogram equalization for a single channel.
+ * Maps pixel values to a uniform distribution, normalising brightness/contrast.
+ */
+function equalizeChannel(channel: Float64Array, pixelCount: number): void {
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < pixelCount; i++) {
+    hist[Math.round(Math.min(255, Math.max(0, channel[i])))]++;
+  }
+
+  const cdf = new Uint32Array(256);
+  cdf[0] = hist[0];
+  for (let i = 1; i < 256; i++) cdf[i] = cdf[i - 1] + hist[i];
+
+  let cdfMin = 0;
+  for (let i = 0; i < 256; i++) {
+    if (cdf[i] > 0) { cdfMin = cdf[i]; break; }
+  }
+
+  const denom = pixelCount - cdfMin;
+  if (denom <= 0) return;
+
+  for (let i = 0; i < pixelCount; i++) {
+    const bin = Math.round(Math.min(255, Math.max(0, channel[i])));
+    channel[i] = ((cdf[bin] - cdfMin) * 255) / denom;
+  }
+}
+
 // ---------- internals ----------
 
 /**
