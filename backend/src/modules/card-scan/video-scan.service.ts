@@ -19,7 +19,7 @@ const MIN_TRIM_REDUCTION_PX = 24;
 const MIN_CONTENT_AREA_RATIO = 0.2;
 const MAX_CANDIDATES = 5;
 
-interface VideoSourceVariant {
+export interface VideoSourceVariant {
   name: string;
   image: Buffer;
   width: number;
@@ -124,6 +124,10 @@ async function buildVideoSourceVariants(frameBuffer: Buffer): Promise<VideoSourc
   }
 
   return variants;
+}
+
+export async function buildVideoSourceVariantsForDebug(frameBuffer: Buffer): Promise<VideoSourceVariant[]> {
+  return buildVideoSourceVariants(frameBuffer);
 }
 
 async function createVariant(name: string, image: Buffer): Promise<VideoSourceVariant> {

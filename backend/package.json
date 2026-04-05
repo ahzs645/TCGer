@@ -10,6 +10,7 @@
     "build:hashes": "tsx src/scripts/build-card-hashes.ts",
     "backfill:hash-features": "tsx src/scripts/backfill-card-hash-features.ts",
     "scan:video": "tsx src/scripts/scan-video.ts",
+    "probe:video-frame": "tsx src/scripts/probe-video-frame.ts",
     "start": "tsx src/server.ts",
     "lint": "eslint . --ext .ts",
     "test": "jest --passWithNoTests",
@@ -32,6 +33,7 @@
     "pino-http": "^8.5.0",
     "sharp": "^0.34.5",
     "swagger-ui-express": "^5.0.1",
+    "tesseract.js": "^7.0.0",
     "tsx": "^4.21.0",
     "zod": "^3.22.4"
   },

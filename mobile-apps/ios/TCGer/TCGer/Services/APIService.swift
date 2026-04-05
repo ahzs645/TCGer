@@ -125,6 +125,12 @@ final class DemoStore {
     private var nextCollectionCardId: Int
     private var nextCopyId: Int
     private var nextTagId: Int
+    private var wishlists: [Wishlist]
+    private var sealedProducts: [SealedProduct]
+    private var sealedInventory: [SealedInventoryItem]
+    private var transactions: [Transaction]
+    private var nextWishlistId: Int
+    private var nextTransactionId: Int
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -174,7 +180,14 @@ final class DemoStore {
         self.nextCollectionCardId = 100
         self.nextCopyId = 1000
         self.nextTagId = 4
+        self.nextWishlistId = 1
+        self.nextTransactionId = 1
+        self.wishlists = []
+        self.sealedProducts = []
+        self.sealedInventory = []
+        self.transactions = []
         seedData()
+        seedNewFeatureData()
     }
 
     func authenticate(username: String? = nil, email: String? = nil) -> AuthResponse {
@@ -713,6 +726,15 @@ final class DemoStore {
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
     }
 
+    private static func cardBack(for tcg: String) -> String {
+        switch tcg {
+        case "pokemon": return "PokemonCardBack"
+        case "magic": return "MagicCardBack"
+        case "yugioh": return "YugiohCardBack"
+        default: return "PokemonCardBack"
+        }
+    }
+
     private func seedData() {
         let pikaBase = Card(
             id: "demo-pokemon-pikachu-base",
@@ -721,8 +743,8 @@ final class DemoStore {
             setCode: "PR",
             setName: "Promo",
             rarity: "Rare",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "pokemon"),
+            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
             price: 6.75,
             collectorNumber: "25",
             releasedAt: nil,
@@ -737,8 +759,8 @@ final class DemoStore {
             setCode: "SV",
             setName: "Surging Sparks",
             rarity: "Illustration Rare",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "pokemon"),
+            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
             price: 19.25,
             collectorNumber: "188",
             releasedAt: nil,
@@ -753,8 +775,8 @@ final class DemoStore {
             setCode: "PAF",
             setName: "Paldean Fates",
             rarity: "Ultra Rare",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "pokemon"),
+            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
             price: 33.40,
             collectorNumber: "54",
             releasedAt: nil,
@@ -769,8 +791,8 @@ final class DemoStore {
             setCode: "M10",
             setName: "Magic 2010",
             rarity: "Common",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "magic"),
+            imageUrlSmall: DemoStore.cardBack(for: "magic"),
             price: 2.10,
             collectorNumber: "146",
             releasedAt: nil
@@ -782,8 +804,8 @@ final class DemoStore {
             setCode: "2XM",
             setName: "Double Masters",
             rarity: "Uncommon",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "magic"),
+            imageUrlSmall: DemoStore.cardBack(for: "magic"),
             price: 3.75,
             collectorNumber: "132",
             releasedAt: nil
@@ -795,8 +817,8 @@ final class DemoStore {
             setCode: "LEA",
             setName: "Limited Edition Alpha",
             rarity: "Rare",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "magic"),
+            imageUrlSmall: DemoStore.cardBack(for: "magic"),
             price: 25000,
             collectorNumber: "233",
             releasedAt: nil
@@ -808,8 +830,8 @@ final class DemoStore {
             setCode: "SDK",
             setName: "Starter Deck: Kaiba",
             rarity: "Ultra Rare",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "yugioh"),
+            imageUrlSmall: DemoStore.cardBack(for: "yugioh"),
             price: 18.50,
             collectorNumber: nil,
             releasedAt: nil
@@ -842,8 +864,8 @@ final class DemoStore {
                 setCode: charizard.setCode,
                 setName: charizard.setName,
                 rarity: charizard.rarity,
-                imageUrl: nil,
-                imageUrlSmall: nil,
+                imageUrl: DemoStore.cardBack(for: charizard.tcg),
+                imageUrlSmall: DemoStore.cardBack(for: charizard.tcg),
                 quantity: 1,
                 price: charizard.price,
                 condition: "Near Mint",
@@ -869,8 +891,8 @@ final class DemoStore {
                 setCode: boltM10.setCode,
                 setName: boltM10.setName,
                 rarity: boltM10.rarity,
-                imageUrl: nil,
-                imageUrlSmall: nil,
+                imageUrl: DemoStore.cardBack(for: boltM10.tcg),
+                imageUrlSmall: DemoStore.cardBack(for: boltM10.tcg),
                 quantity: 3,
                 price: boltM10.price,
                 condition: "Excellent",
@@ -913,8 +935,8 @@ final class DemoStore {
                         setCode: blueEyes.setCode,
                         setName: blueEyes.setName,
                         rarity: blueEyes.rarity,
-                        imageUrl: nil,
-                        imageUrlSmall: nil,
+                        imageUrl: DemoStore.cardBack(for: blueEyes.tcg),
+                        imageUrlSmall: DemoStore.cardBack(for: blueEyes.tcg),
                         quantity: 1,
                         price: blueEyes.price,
                         condition: "Good",
@@ -950,8 +972,8 @@ final class DemoStore {
                         setCode: pikaBase.setCode,
                         setName: pikaBase.setName,
                         rarity: pikaBase.rarity,
-                        imageUrl: nil,
-                        imageUrlSmall: nil,
+                        imageUrl: DemoStore.cardBack(for: pikaBase.tcg),
+                        imageUrlSmall: DemoStore.cardBack(for: pikaBase.tcg),
                         quantity: 2,
                         price: pikaBase.price,
                         condition: "Near Mint",
@@ -1058,11 +1080,158 @@ final class DemoStore {
             setCode: "DEMO",
             setName: "Demo Set",
             rarity: "Common",
-            imageUrl: nil,
-            imageUrlSmall: nil,
+            imageUrl: DemoStore.cardBack(for: "pokemon"),
+            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
             price: 1.0,
             collectorNumber: nil,
             releasedAt: nil
         )
+    }
+
+    // MARK: - New Feature Demo Data
+
+    private func seedNewFeatureData() {
+        let now = DemoStore.isoFormatter.string(from: Date())
+
+        // Wishlists
+        wishlists = [
+            Wishlist(
+                id: "demo-wishlist-1",
+                name: "Want List",
+                description: "Cards I'm looking for",
+                colorHex: "e91e63",
+                cards: [
+                    WishlistCard(id: "demo-wc-1", externalId: "demo-pokemon-charizard", tcg: "pokemon", name: "Charizard ex", setCode: "PAF", setName: "Paldean Fates", rarity: "Ultra Rare", imageUrl: DemoStore.cardBack(for: "pokemon"), imageUrlSmall: DemoStore.cardBack(for: "pokemon"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "54", notes: nil, owned: true, ownedQuantity: 1, createdAt: now),
+                    WishlistCard(id: "demo-wc-2", externalId: "demo-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: DemoStore.cardBack(for: "magic"), imageUrlSmall: DemoStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: "The dream card", owned: false, ownedQuantity: 0, createdAt: now),
+                    WishlistCard(id: "demo-wc-3", externalId: "demo-ygo-blue-eyes", tcg: "yugioh", name: "Blue-Eyes White Dragon", setCode: "SDK", setName: "Starter Deck: Kaiba", rarity: "Ultra Rare", imageUrl: DemoStore.cardBack(for: "yugioh"), imageUrlSmall: DemoStore.cardBack(for: "yugioh"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: nil, notes: nil, owned: true, ownedQuantity: 1, createdAt: now)
+                ],
+                totalCards: 3,
+                ownedCards: 2,
+                completionPercent: 67,
+                createdAt: now,
+                updatedAt: now
+            ),
+            Wishlist(
+                id: "demo-wishlist-2",
+                name: "Grails",
+                description: "High-value chase cards",
+                colorHex: "ffd700",
+                cards: [
+                    WishlistCard(id: "demo-wc-4", externalId: "demo-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: DemoStore.cardBack(for: "magic"), imageUrlSmall: DemoStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
+                ],
+                totalCards: 1,
+                ownedCards: 0,
+                completionPercent: 0,
+                createdAt: now,
+                updatedAt: now
+            )
+        ]
+
+        // Sealed Products
+        sealedProducts = [
+            SealedProduct(id: "demo-sp-1", tcg: "pokemon", name: "Surging Sparks Booster Box", productType: "box", setCode: "SV", cardsPerPack: 10, packsPerBox: 36, releaseDate: "2024-11-08", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 143.64, upc: "820650855221"),
+            SealedProduct(id: "demo-sp-2", tcg: "pokemon", name: "Paldean Fates Elite Trainer Box", productType: "etb", setCode: "PAF", cardsPerPack: 10, packsPerBox: 9, releaseDate: "2024-01-26", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 49.99, upc: "820650853159"),
+            SealedProduct(id: "demo-sp-3", tcg: "magic", name: "Modern Horizons 3 Draft Booster Box", productType: "box", setCode: "MH3", cardsPerPack: 15, packsPerBox: 36, releaseDate: "2024-06-14", imageUrl: DemoStore.cardBack(for: "magic"), msrp: 287.64, upc: nil),
+            SealedProduct(id: "demo-sp-4", tcg: "yugioh", name: "Age of Overlord Booster Box", productType: "box", setCode: "AGOV", cardsPerPack: 9, packsPerBox: 24, releaseDate: "2023-10-19", imageUrl: DemoStore.cardBack(for: "yugioh"), msrp: 79.99, upc: nil),
+            SealedProduct(id: "demo-sp-5", tcg: "pokemon", name: "Prismatic Evolutions Booster Pack", productType: "booster", setCode: "PRE", cardsPerPack: 10, packsPerBox: nil, releaseDate: "2025-01-17", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 5.99, upc: nil)
+        ]
+
+        sealedInventory = [
+            SealedInventoryItem(id: "demo-si-1", product: sealedProducts[0], quantity: 2, purchasePrice: 130.00, purchaseDate: "2024-11-15", notes: "From LGS pre-order", createdAt: now),
+            SealedInventoryItem(id: "demo-si-2", product: sealedProducts[1], quantity: 1, purchasePrice: 49.99, purchaseDate: "2024-02-01", notes: nil, createdAt: now),
+            SealedInventoryItem(id: "demo-si-3", product: sealedProducts[4], quantity: 5, purchasePrice: 4.99, purchaseDate: "2025-01-20", notes: "Target restock", createdAt: now)
+        ]
+
+        // Transactions
+        transactions = [
+            Transaction(id: "demo-txn-1", type: "purchase", cardName: "Charizard ex", tcg: "pokemon", quantity: 1, amount: 8.99, currency: "USD", platform: "Local", notes: "Pulled from pack", date: now),
+            Transaction(id: "demo-txn-2", type: "purchase", cardName: "Lightning Bolt", tcg: "magic", quantity: 3, amount: 3.75, currency: "USD", platform: "TCGPlayer", notes: nil, date: now),
+            Transaction(id: "demo-txn-3", type: "sale", cardName: "Pikachu VMAX", tcg: "pokemon", quantity: 1, amount: 15.00, currency: "USD", platform: "eBay", notes: "Sold in lot", date: now),
+            Transaction(id: "demo-txn-4", type: "purchase", cardName: "Blue-Eyes White Dragon", tcg: "yugioh", quantity: 1, amount: 4.50, currency: "USD", platform: "CardMarket", notes: nil, date: now),
+            Transaction(id: "demo-txn-5", type: "sale", cardName: "Mewtwo GX", tcg: "pokemon", quantity: 2, amount: 22.50, currency: "USD", platform: "TCGPlayer", notes: nil, date: now)
+        ]
+    }
+
+    // MARK: - Wishlist Accessors
+
+    func getWishlists() -> [Wishlist] { wishlists }
+
+    func getWishlist(id: String) throws -> Wishlist {
+        guard let wl = wishlists.first(where: { $0.id == id }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        return wl
+    }
+
+    func createWishlist(name: String, description: String?, colorHex: String?) -> Wishlist {
+        let now = DemoStore.isoFormatter.string(from: Date())
+        let wl = Wishlist(id: "demo-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now)
+        nextWishlistId += 1
+        wishlists.insert(wl, at: 0)
+        return wl
+    }
+
+    func deleteWishlist(id: String) {
+        wishlists.removeAll { $0.id == id }
+    }
+
+    func addCardToWishlist(wishlistId: String, card: Card) throws -> WishlistCard {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        let now = DemoStore.isoFormatter.string(from: Date())
+        let wc = WishlistCard(id: "demo-wc-\(Int.random(in: 100...9999))", externalId: card.id, tcg: card.tcg, name: card.name, setCode: card.setCode, setName: card.setName, rarity: card.rarity, imageUrl: card.imageUrl, imageUrlSmall: card.imageUrlSmall, setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: card.collectorNumber, notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
+        var wl = wishlists[idx]
+        var cards = wl.cards
+        cards.append(wc)
+        wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+        return wc
+    }
+
+    func removeCardFromWishlist(wishlistId: String, cardId: String) {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else { return }
+        var wl = wishlists[idx]
+        var cards = wl.cards.filter { $0.id != cardId }
+        let now = DemoStore.isoFormatter.string(from: Date())
+        wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+    }
+
+    // MARK: - Sealed Accessors
+
+    func getSealedProducts() -> [SealedProduct] { sealedProducts }
+    func getSealedInventory() -> [SealedInventoryItem] { sealedInventory }
+
+    func addSealedInventory(productId: String, quantity: Int, purchasePrice: Double?) -> SealedInventoryItem? {
+        guard let product = sealedProducts.first(where: { $0.id == productId }) else { return nil }
+        let now = DemoStore.isoFormatter.string(from: Date())
+        let item = SealedInventoryItem(id: "demo-si-\(Int.random(in: 100...9999))", product: product, quantity: quantity, purchasePrice: purchasePrice, purchaseDate: now, notes: nil, createdAt: now)
+        sealedInventory.insert(item, at: 0)
+        return item
+    }
+
+    func deleteSealedInventory(itemId: String) {
+        sealedInventory.removeAll { $0.id == itemId }
+    }
+
+    // MARK: - Finance Accessors
+
+    func getTransactions() -> [Transaction] { transactions }
+
+    func getFinanceSummary() -> FinanceSummary {
+        let spent = transactions.filter { $0.type == "purchase" }.reduce(0.0) { $0 + $1.amount }
+        let earned = transactions.filter { $0.type == "sale" }.reduce(0.0) { $0 + $1.amount }
+        return FinanceSummary(totalSpent: spent, totalEarned: earned, profitLoss: earned - spent, transactionCount: transactions.count)
+    }
+
+    func createTransaction(type: String, cardName: String?, tcg: String?, quantity: Int, amount: Double, platform: String?, notes: String?) -> Transaction {
+        let now = DemoStore.isoFormatter.string(from: Date())
+        let txn = Transaction(id: "demo-txn-\(nextTransactionId)", type: type, cardName: cardName, tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform, notes: notes, date: now)
+        nextTransactionId += 1
+        transactions.insert(txn, at: 0)
+        return txn
+    }
+
+    func deleteTransaction(id: String) {
+        transactions.removeAll { $0.id == id }
     }
 }
