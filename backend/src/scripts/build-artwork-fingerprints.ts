@@ -171,9 +171,17 @@ async function buildFromApi(tcg: string, dataDir: string): Promise<void> {
       if (!response.ok) { errors++; continue; }
 
       const imageBuffer = Buffer.from(await response.arrayBuffer());
+      // Compute HSV on artwork region only (same crop as fingerprint) for consistency
+      const imgMeta = await (await import('sharp')).default(imageBuffer).metadata();
+      const iw = imgMeta.width ?? 0, ih = imgMeta.height ?? 0;
+      const artCropBuf = iw > 0 && ih > 0
+        ? await (await import('sharp')).default(imageBuffer)
+            .extract({ left: Math.round(iw * 0.05), top: Math.round(ih * 0.08), width: Math.round(iw * 0.90), height: Math.round(ih * 0.47) })
+            .toBuffer()
+        : imageBuffer;
       const [fp, hsv] = await Promise.all([
         computeArtworkFingerprint(imageBuffer, tcg),
-        computeHsvHistogram(imageBuffer),
+        computeHsvHistogram(artCropBuf),
       ]);
 
       entries.push({
