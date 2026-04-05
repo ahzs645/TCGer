@@ -6,12 +6,93 @@ import {
   buildHashDatabase,
   getHashDatabaseStats,
 } from '../../modules/card-scan';
+import {
+  CARD_SCAN_DEBUG_FEEDBACK_STATUSES,
+  createCardScanDebugCapture,
+  listCardScanDebugCaptures,
+  updateCardScanDebugCapture,
+  type CardScanDebugFeedbackStatus,
+} from '../../modules/card-scan/debug-captures.service';
 import { uploadImages } from '../../utils/upload';
 import { asyncHandler } from '../../utils/async-handler';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
+
+function parseBooleanLike(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function resolveRequestOrigin(req: AuthRequest): string | null {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const protoHeader = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+  const hostHeader = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
+  const protocol = protoHeader?.split(',')[0]?.trim() || req.protocol;
+  const host = hostHeader?.split(',')[0]?.trim() || req.get('host');
+
+  if (!host) {
+    return null;
+  }
+
+  return `${protocol}://${host}`;
+}
+
+function serializeDebugCapture(
+  capture: {
+    id: string;
+    requestedTcg: string | null;
+    captureSource: string | null;
+    sourceImagePath: string;
+    bestMatchExternalId: string | null;
+    bestMatchName: string | null;
+    bestMatchTcg: string | null;
+    bestMatchConfidence: number | null;
+    bestMatchDistance: number | null;
+    feedbackStatus: string;
+    notes: string | null;
+    expectedExternalId: string | null;
+    expectedName: string | null;
+    expectedTcg: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  req: AuthRequest,
+) {
+  const origin = resolveRequestOrigin(req);
+  const sourceImageUrl = origin
+    ? new URL(capture.sourceImagePath, `${origin}/`).toString()
+    : capture.sourceImagePath;
+
+  return {
+    id: capture.id,
+    requestedTcg: capture.requestedTcg,
+    captureSource: capture.captureSource,
+    sourceImagePath: capture.sourceImagePath,
+    sourceImageUrl,
+    feedbackStatus: capture.feedbackStatus,
+    notes: capture.notes,
+    expectedExternalId: capture.expectedExternalId,
+    expectedName: capture.expectedName,
+    expectedTcg: capture.expectedTcg,
+    createdAt: capture.createdAt.toISOString(),
+    updatedAt: capture.updatedAt.toISOString(),
+    bestMatch: capture.bestMatchExternalId
+      ? {
+          externalId: capture.bestMatchExternalId,
+          name: capture.bestMatchName,
+          tcg: capture.bestMatchTcg,
+          confidence: capture.bestMatchConfidence,
+          distance: capture.bestMatchDistance,
+        }
+      : null,
+  };
+}
 
 /**
  * POST /cards/scan
@@ -24,6 +105,8 @@ scanRouter.post(
   '/',
   uploadImages.single('image'),
   asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const body = (req.body ?? {}) as Record<string, unknown>;
     const file = req.file;
     if (!file) {
       return res.status(400).json({
@@ -33,27 +116,53 @@ scanRouter.post(
     }
 
     const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
+    const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
+    const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
 
     // Read the uploaded file into a buffer for processing
     const fs = await import('node:fs');
     const imageBuffer = fs.readFileSync(file.path);
 
-    // Clean up the uploaded temp file (we only needed the buffer)
+    const result = await scanCardImage(imageBuffer, tcg);
+    let debugCapture = null;
+    let debugCaptureError: string | null = null;
+
+    if (saveDebugCapture) {
+      try {
+        const savedCapture = await createCardScanDebugCapture({
+          userId: authReq.user!.id,
+          file,
+          imageBuffer,
+          result,
+          requestedTcg: tcg,
+          captureSource,
+          notes: captureNotes,
+          userAgent: req.get('user-agent') ?? null,
+        });
+        debugCapture = serializeDebugCapture(savedCapture, authReq);
+      } catch (error) {
+        debugCaptureError =
+          error instanceof Error ? error.message : 'Unable to save the debug capture.';
+      }
+    }
+
+    // Clean up the uploaded temp file when it was not retained as a debug capture.
     try {
       fs.unlinkSync(file.path);
     } catch {
       // ignore cleanup errors
     }
 
-    const result = await scanCardImage(imageBuffer, tcg);
-
     res.json({
       match: result.bestMatch,
       candidates: result.candidates,
       hash: result.hashGenerated,
       meta: result.meta,
+      debugCapture,
+      debugCaptureError,
     });
-  })
+  }),
 );
 
 /**
@@ -77,7 +186,7 @@ scanRouter.get(
 
     const result = await getCardHashes(tcg, page, pageSize);
     res.json(result);
-  })
+  }),
 );
 
 /**
@@ -90,7 +199,83 @@ scanRouter.get(
   asyncHandler(async (_req, res) => {
     const stats = await getHashDatabaseStats();
     res.json(stats);
-  })
+  }),
+);
+
+scanRouter.get(
+  '/debug-captures',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const query = (req.query ?? {}) as Record<string, string | undefined>;
+    const scope = authReq.user?.isAdmin && query.scope === 'all' ? 'all' : 'mine';
+    const limit = Math.max(1, Number(query.limit) || 8);
+
+    const captures = await listCardScanDebugCaptures({
+      userId: authReq.user!.id,
+      isAdmin: authReq.user?.isAdmin ?? false,
+      scope,
+      limit,
+    });
+
+    res.json({
+      captures: captures.map((capture) => serializeDebugCapture(capture, authReq)),
+    });
+  }),
+);
+
+scanRouter.patch(
+  '/debug-captures/:captureId',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const params = (req.params ?? {}) as Record<string, string | undefined>;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const captureId = typeof params.captureId === 'string' ? params.captureId : '';
+    const rawStatus = typeof body.feedbackStatus === 'string' ? body.feedbackStatus : undefined;
+
+    if (
+      rawStatus &&
+      !CARD_SCAN_DEBUG_FEEDBACK_STATUSES.includes(rawStatus as CardScanDebugFeedbackStatus)
+    ) {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: `feedbackStatus must be one of: ${CARD_SCAN_DEBUG_FEEDBACK_STATUSES.join(', ')}`,
+      });
+    }
+
+    try {
+      const capture = await updateCardScanDebugCapture({
+        captureId,
+        userId: authReq.user!.id,
+        isAdmin: authReq.user?.isAdmin ?? false,
+        feedbackStatus: rawStatus as CardScanDebugFeedbackStatus | undefined,
+        notes: typeof body.notes === 'string' ? body.notes : undefined,
+        expectedExternalId:
+          typeof body.expectedExternalId === 'string' ? body.expectedExternalId : undefined,
+        expectedName: typeof body.expectedName === 'string' ? body.expectedName : undefined,
+        expectedTcg: typeof body.expectedTcg === 'string' ? body.expectedTcg : undefined,
+      });
+
+      res.json({
+        capture: serializeDebugCapture(capture, authReq),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NOT_FOUND') {
+        return res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Debug capture not found.',
+        });
+      }
+
+      if (error instanceof Error && error.message === 'FORBIDDEN') {
+        return res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'You do not have access to update this debug capture.',
+        });
+      }
+
+      throw error;
+    }
+  }),
 );
 
 /**
@@ -132,7 +317,11 @@ scanRouter.post(
     }
 
     // Run build in background — respond immediately
-    const buildPromise = buildHashDatabase(tcg as 'magic' | 'pokemon' | 'yugioh', { setCode, limit, force });
+    const buildPromise = buildHashDatabase(tcg as 'magic' | 'pokemon' | 'yugioh', {
+      setCode,
+      limit,
+      force,
+    });
 
     // Don't await — let it run in the background
     buildPromise.catch((err) => {
@@ -146,5 +335,5 @@ scanRouter.post(
       limit: limit ?? null,
       force: force ?? false,
     });
-  })
+  }),
 );
