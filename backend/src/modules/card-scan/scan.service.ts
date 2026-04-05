@@ -85,11 +85,23 @@ export async function scanCardImage(
     const { levenshtein } = await import('./card-detector');
     hashEntries = hashEntries.filter((entry) => {
       const firstName = entry.name.toLowerCase().split(/\s+/)[0] ?? '';
-      if (firstName.length < 3) return false; // skip single-letter names like "M", "N"
+      if (firstName.length < 3) return false;
       const trimmedHint = hint.slice(0, firstName.length + 2);
       return levenshtein(trimmedHint, firstName) <= 3;
     });
   }
+
+  // Artwork pre-filter: narrow pHash candidates to artwork top-N for speed.
+  // Artwork cosine similarity against 21,900 entries takes ~3ms vs pHash ~1500ms.
+  if (isArtworkDatabaseLoaded() && !options?.ocrNameHint && hashEntries.length > 100) {
+    try {
+      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      const artTop = matchArtwork(artFp, 50, tcgFilter);
+      const artIds = new Set(artTop.map((m) => m.externalId));
+      hashEntries = hashEntries.filter((entry) => artIds.has(entry.externalId));
+    } catch { /* fall through to full scan */ }
+  }
+
   const attemptedVariants: string[] = [];
   const allMatches = new Map<string, ScanMatch>();
   let bestAttempt: {

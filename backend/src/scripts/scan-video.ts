@@ -624,14 +624,17 @@ async function scanFrameProposalsWithDetector(
     // Detector gives high-confidence localization — use relaxed hash threshold
     const result = await scanCardImageFn(cropBuffer, tcg, { maxDistanceOverride: 320 });
 
-    // OCR-based narrowing: use tight crop (no expansion) for cleaner OCR
-    const tightCrop = await extractRotatedCrop(frameBuffer, {
-      ...det,
-      width: det.width / (1 + 0.08),
-      height: det.height / (1 + 0.08),
-    }, width, height);
+    // Skip OCR when artwork match is confident (saves ~1200ms per frame)
     let ocrText: string | null = null;
-    try { ocrText = await ocrCardTitle(tightCrop); } catch { /* ignore */ }
+    const artworkConfident = result.bestMatch && result.bestMatch.confidence > 0.96;
+    if (!artworkConfident) {
+      const tightCrop = await extractRotatedCrop(frameBuffer, {
+        ...det,
+        width: det.width / (1 + 0.08),
+        height: det.height / (1 + 0.08),
+      }, width, height);
+      try { ocrText = await ocrCardTitle(tightCrop); } catch { /* ignore */ }
+    }
 
     // Only use OCR for narrowing when the text looks plausible:
     // - mostly alphabetic (>70% alpha chars)

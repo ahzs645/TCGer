@@ -311,23 +311,23 @@ export async function ocrCardTitle(cardCropBuffer: Buffer): Promise<string | nul
       .grayscale().negate().normalize().sharpen({ sigma: 1.5 }).threshold(140).png().toBuffer(),
   ]);
 
+  // Run OCR on all variants in parallel for speed
+  const ocrResults = await Promise.all(
+    variants.map((v) => Tesseract.recognize(v, 'eng', { logger: () => {} }))
+  );
+
   let bestWord: string | null = null;
   let bestScore = 0;
 
-  for (const variant of variants) {
-    const result = await Tesseract.recognize(variant, 'eng', { logger: () => {} });
+  for (const result of ocrResults) {
     const words = result.data.text
       .split(/[\s|:,.\n]+/)
       .map((w: string) => w.replace(/[^a-zA-Z'-]/g, ''))
       .filter((w: string) => w.length >= 3);
 
     for (const word of words) {
-      // Plausibility: penalise words with repeated chars (like "rPrrYrrryl")
       const uniqueChars = new Set(word.toLowerCase()).size;
-      const repeatRatio = uniqueChars / word.length;
-      if (repeatRatio < 0.4) continue; // Too many repeated chars — likely noise
-
-      // Score: confidence first, reasonable length as tiebreaker
+      if (uniqueChars / word.length < 0.4) continue;
       const score = result.data.confidence * 100 + Math.min(word.length, 12);
       if (score > bestScore) {
         bestScore = score;
