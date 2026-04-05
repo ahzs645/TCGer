@@ -22,6 +22,11 @@ extension APIService {
         token: String,
         tcg: String? = nil
     ) async throws -> [SealedProduct] {
+        if config.isDemoMode {
+            let all = DemoStore.shared.getSealedProducts()
+            if let tcg { return all.filter { $0.tcg == tcg } }
+            return all
+        }
         let path = tcg != nil ? "sealed/products?tcg=\(tcg!)" : "sealed/products"
         let (data, response) = try await makeRequest(config: config, path: path, token: token)
 
@@ -40,6 +45,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [SealedInventoryItem] {
+        if config.isDemoMode { return DemoStore.shared.getSealedInventory() }
         let (data, response) = try await makeRequest(config: config, path: "sealed/inventory", token: token)
 
         guard response.statusCode == 200 else {
@@ -62,6 +68,12 @@ extension APIService {
         purchaseDate: String? = nil,
         notes: String? = nil
     ) async throws -> SealedInventoryItem {
+        if config.isDemoMode {
+            guard let item = DemoStore.shared.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
+                throw APIError.serverError(status: 404, message: "Product not found")
+            }
+            return item
+        }
         let body = AddSealedInventoryRequest(
             productId: productId,
             quantity: quantity,
@@ -119,6 +131,7 @@ extension APIService {
         token: String,
         itemId: String
     ) async throws {
+        if config.isDemoMode { DemoStore.shared.deleteSealedInventory(itemId: itemId); return }
         let (data, response) = try await makeRequest(
             config: config, path: "sealed/inventory/\(itemId)", method: "DELETE", token: token
         )
