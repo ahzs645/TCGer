@@ -7,6 +7,14 @@ import { promisify } from 'node:util';
 import sharp from 'sharp';
 
 import type { ScanMatch, ScanResult } from '../modules/card-scan';
+import {
+  initCardDetector,
+  detectCards,
+  detectionToExtractRegion,
+  extractRotatedCrop,
+  ocrCardTitle,
+  levenshtein,
+} from '../modules/card-scan/card-detector';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_CARD_ASPECT_RATIO = 0.714;
@@ -44,6 +52,8 @@ interface VideoScanOptions {
   trackTtlFrames: number;
   minStableFrames: number;
   keepFrames: boolean;
+  detectorModelPath?: string;
+  detectorInputSize: number;
 }
 
 interface FrameWindow {
@@ -75,6 +85,7 @@ interface FrameProposal {
   window: FrameWindow;
   result: ScanResult;
   score: number;
+  ocrText: string | null;
 }
 
 interface TrackCandidateEvidence {
@@ -196,6 +207,8 @@ function parseOptions(argv: string[]): VideoScanOptions {
     DEFAULT_CARD_ASPECT_RATIO
   );
   let keepFrames = process.env.CARD_SCAN_VIDEO_KEEP_FRAMES === '1';
+  let detectorModelPath: string | undefined = process.env.CARD_SCAN_DETECTOR_MODEL;
+  let detectorInputSize = parsePositiveNumber(process.env.CARD_SCAN_DETECTOR_INPUT_SIZE, 1088);
 
   while (args.length) {
     const token = args.shift();
@@ -263,6 +276,16 @@ function parseOptions(argv: string[]): VideoScanOptions {
       continue;
     }
 
+    if (token === '--detector') {
+      detectorModelPath = args.shift() ?? detectorModelPath;
+      continue;
+    }
+
+    if (token === '--detector-input-size') {
+      detectorInputSize = parsePositiveNumber(args.shift(), detectorInputSize);
+      continue;
+    }
+
     if (token === '--help' || token === '-h') {
       printUsage();
       process.exit(0);
@@ -286,6 +309,8 @@ function parseOptions(argv: string[]): VideoScanOptions {
     trackTtlFrames,
     minStableFrames,
     keepFrames,
+    detectorModelPath,
+    detectorInputSize,
   };
 }
 
@@ -551,8 +576,116 @@ async function scanFrameProposals(
       seconds,
       window,
       result,
+      ocrText: null,
       score,
     });
+  }
+
+  return filterDistinctProposals(proposals, maxProposals);
+}
+
+async function scanFrameProposalsWithDetector(
+  framePath: string,
+  frameIndex: number,
+  seconds: number,
+  tcg: SupportedTcg,
+  maxProposals: number,
+  scanCardImageFn: (imageBuffer: Buffer, tcgFilter?: string, options?: { maxDistanceOverride?: number }) => Promise<ScanResult>
+): Promise<FrameProposal[]> {
+  const frameBuffer = await readFile(framePath);
+  const frameImage = sharp(frameBuffer);
+  const metadata = await frameImage.metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  if (width <= 0 || height <= 0) {
+    return [];
+  }
+
+  const detections = await detectCards(frameBuffer, 0.25, 0.08);
+  if (!detections.length) {
+    return [];
+  }
+
+  const proposals: FrameProposal[] = [];
+
+  for (const det of detections) {
+    const region = detectionToExtractRegion(det, width, height);
+    const window: FrameWindow = {
+      left: region.left,
+      top: region.top,
+      width: region.width,
+      height: region.height,
+      centerX: det.cx / width,
+      centerY: det.cy / height,
+      heightRatio: region.height / height,
+    };
+
+    const cropBuffer = await extractRotatedCrop(frameBuffer, det, width, height);
+    // Detector gives high-confidence localization — use relaxed hash threshold
+    const result = await scanCardImageFn(cropBuffer, tcg, { maxDistanceOverride: 320 });
+
+    // OCR-based narrowing: use tight crop (no expansion) for cleaner OCR
+    const tightCrop = await extractRotatedCrop(frameBuffer, {
+      ...det,
+      width: det.width / (1 + 0.08),
+      height: det.height / (1 + 0.08),
+    }, width, height);
+    let ocrText: string | null = null;
+    try { ocrText = await ocrCardTitle(tightCrop); } catch { /* ignore */ }
+
+    // Only use OCR for narrowing when the text looks plausible:
+    // - mostly alphabetic (>70% alpha chars)
+    // - reasonable length (4-20 chars)
+    // - not all caps garbage
+    if (ocrText) {
+      const alphaRatio = (ocrText.match(/[a-zA-Z]/g)?.length ?? 0) / Math.max(1, ocrText.length);
+      const isPlausible = alphaRatio >= 0.7 && ocrText.length >= 4 && ocrText.length <= 20 && ocrText !== ocrText.toUpperCase();
+
+      if (isPlausible) {
+        const ocrFirst = ocrText.toLowerCase().split(/\s+/)[0] ?? '';
+        if (ocrFirst.length >= 3) {
+          console.error(`[detector-ocr] text="${ocrText}" → name filter (${ocrFirst})`);
+          const ocrResult = await scanCardImageFn(cropBuffer, tcg, {
+            maxDistanceOverride: 380,
+            ocrNameHint: ocrFirst,
+          });
+          if (ocrResult.candidates.length > 0) {
+            const reranked = [...ocrResult.candidates].sort((a, b) => {
+              const aName = a.name.toLowerCase().split(/\s+/)[0] ?? '';
+              const bName = b.name.toLowerCase().split(/\s+/)[0] ?? '';
+              const aLev = levenshtein(ocrFirst.slice(0, aName.length + 2), aName);
+              const bLev = levenshtein(ocrFirst.slice(0, bName.length + 2), bName);
+              const aNorm = aName.length > 0 ? aLev / aName.length : 1;
+              const bNorm = bName.length > 0 ? bLev / bName.length : 1;
+              if (Math.abs(aNorm - bNorm) > 0.1) return aNorm - bNorm;
+              return a.distance - b.distance;
+            });
+            const ocrBest = reranked[0]!;
+            // Check if OCR name is a strong match (low levenshtein to top candidate)
+            const ocrBestName = ocrBest.name.toLowerCase().split(/\s+/)[0] ?? '';
+            const ocrLev = levenshtein(ocrFirst.slice(0, ocrBestName.length + 2), ocrBestName);
+            const isExactNameMatch = ocrLev <= 1;
+
+            // Trust OCR when it's an exact name match, or when distance is close
+            if (isExactNameMatch || !result.bestMatch || ocrBest.distance <= result.bestMatch.distance + 30) {
+              result.bestMatch = ocrBest;
+              result.candidates = reranked;
+            }
+          }
+        }
+      } else {
+        // OCR text is garbage — still store it for multi-frame accumulation but don't use for filtering
+        ocrText = null;
+      }
+    }
+
+    const score = scoreScanResult(result);
+
+    if (!shouldKeepProposal(result, score)) {
+      continue;
+    }
+
+    proposals.push({ framePath, frameIndex, seconds, window, result, score, ocrText });
   }
 
   return filterDistinctProposals(proposals, maxProposals);
@@ -720,18 +853,50 @@ function updateCandidateScores(track: VideoTrack, proposal: FrameProposal): void
   }
 }
 
+function computeOcrConsensusScore(track: VideoTrack, candidateName: string): number {
+  const votes = track.ocrVotes.title;
+  if (votes.length === 0) return 0;
+
+  const candidateFirst = candidateName.toLowerCase().split(/\s+/)[0] ?? '';
+  if (candidateFirst.length < 2) return 0;
+
+  let totalScore = 0;
+  for (const vote of votes) {
+    const voteFirst = vote.split(/\s+/)[0] ?? '';
+    const truncated = voteFirst.slice(0, candidateFirst.length + 2);
+    const dist = levenshtein(truncated, candidateFirst);
+    const maxLen = Math.max(truncated.length, candidateFirst.length, 1);
+    totalScore += Math.max(0, 1 - dist / maxLen);
+  }
+
+  return totalScore / votes.length;
+}
+
 function rankTrackCandidates(track: VideoTrack): TrackRanking[] {
+  const hasOcrVotes = track.ocrVotes.title.length > 0;
+
   return Array.from(track.candidateScores.values())
     .map((evidence) => {
       const avgConfidence = evidence.totalConfidence / Math.max(1, evidence.observations);
       const distanceScore = Math.max(0, 1 - evidence.bestDistance / MATCH_DISTANCE_REFERENCE);
       const temporalConsistency = evidence.topWins / Math.max(1, track.observationCount);
       const cropQuality = evidence.totalCropQuality / Math.max(1, evidence.observations);
-      const score =
-        avgConfidence * 0.45 +
-        distanceScore * 0.3 +
-        temporalConsistency * 0.15 +
-        cropQuality * 0.1;
+
+      const score = hasOcrVotes
+        ? (() => {
+            const ocrScore = computeOcrConsensusScore(track, evidence.match.name);
+            return (
+              avgConfidence * 0.35 +
+              distanceScore * 0.25 +
+              temporalConsistency * 0.10 +
+              cropQuality * 0.10 +
+              ocrScore * 0.20
+            );
+          })()
+        : avgConfidence * 0.45 +
+          distanceScore * 0.3 +
+          temporalConsistency * 0.15 +
+          cropQuality * 0.1;
 
       return {
         key: evidence.key,
@@ -810,6 +975,10 @@ function updateTrack(
   track.stableFrameCount += 1;
   track.observationCount += 1;
   track.observations.push(observation);
+
+  if (proposal.ocrText) {
+    track.ocrVotes.title.push(proposal.ocrText.toLowerCase());
+  }
 
   const quality = proposal.result.meta.quality?.score ?? 0;
   if (
@@ -983,6 +1152,7 @@ function summarizeTrack(track: VideoTrack) {
     finalCardName: track.finalCardName,
     finalSetCode: track.finalSetCode,
     bestCropQuality: Number(track.bestCropQuality.toFixed(4)),
+    ocrVotes: track.ocrVotes.title.length > 0 ? track.ocrVotes : undefined,
     bestProposal: track.bestProposal,
     topCandidates: rankTrackCandidates(track).slice(0, 5).map((candidate) => ({
       externalId: candidate.evidence.match.externalId,
@@ -1007,6 +1177,13 @@ async function main(): Promise<void> {
   process.env.CARD_SCAN_STORE = 'file';
   const { scanCardImage } = await import('../modules/card-scan');
 
+  const useDetector = Boolean(options.detectorModelPath);
+  if (useDetector) {
+    console.error(`[scan-video] initialising detector: ${options.detectorModelPath}`);
+    await initCardDetector(options.detectorModelPath!, options.detectorInputSize);
+    console.error('[scan-video] detector ready');
+  }
+
   const framesDir = await mkdtemp(path.join(os.tmpdir(), 'tcger-video-scan-'));
   let nextTrackId = 1;
 
@@ -1024,16 +1201,25 @@ async function main(): Promise<void> {
 
     for (const [index, framePath] of frameFiles.entries()) {
       const seconds = options.offsetSeconds + index / options.fps;
-      const proposals = await scanFrameProposals(
-        framePath,
-        index,
-        seconds,
-        options.tcg,
-        options.cardAspectRatio,
-        options.maxWindows,
-        options.maxProposals,
-        scanCardImage
-      );
+      const proposals = useDetector
+        ? await scanFrameProposalsWithDetector(
+            framePath,
+            index,
+            seconds,
+            options.tcg,
+            options.maxProposals,
+            scanCardImage
+          )
+        : await scanFrameProposals(
+            framePath,
+            index,
+            seconds,
+            options.tcg,
+            options.cardAspectRatio,
+            options.maxWindows,
+            options.maxProposals,
+            scanCardImage
+          );
       const assignments = associateProposalsToTracks(activeTracks, proposals);
       const matchedTrackIds = new Set<number>();
       const summaryTrackIds = new Map<number, number>();
@@ -1136,9 +1322,10 @@ async function main(): Promise<void> {
           fps: options.fps,
           offsetSeconds: options.offsetSeconds,
           durationSeconds: options.durationSeconds ?? null,
+          detector: options.detectorModelPath ?? null,
           framesScanned: frameFiles.length,
           matchedFrames,
-          maxWindows: options.maxWindows,
+          maxWindows: useDetector ? null : options.maxWindows,
           maxProposals: options.maxProposals,
           trackTtlFrames: options.trackTtlFrames,
           minStableFrames: options.minStableFrames,
