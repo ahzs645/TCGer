@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import sharp from 'sharp';
@@ -91,25 +92,26 @@ async function buildDatasetRevision(filePath: string): Promise<DatasetRevision |
       return cached.revision;
     }
 
-    const raw = await readFile(filePath);
-    let version: number | null = null;
-    let total: number | null = null;
+    const hash = createHash('sha256');
+    let header = '';
 
-    try {
-      const parsed = JSON.parse(raw.toString('utf8')) as {
-        version?: number;
-        total?: number;
-        entries?: unknown[];
-      };
-      version = typeof parsed.version === 'number' ? parsed.version : null;
-      if (typeof parsed.total === 'number') {
-        total = parsed.total;
-      } else if (Array.isArray(parsed.entries)) {
-        total = parsed.entries.length;
+    for await (const chunk of createReadStream(filePath)) {
+      hash.update(chunk);
+
+      if (header.length >= 131072) {
+        continue;
       }
-    } catch {
-      // ignore JSON parse failures for revision metadata
+
+      const headerChunk = Buffer.isBuffer(chunk)
+        ? chunk.toString('utf8', 0, Math.min(chunk.length, 131072 - header.length))
+        : String(chunk).slice(0, 131072 - header.length);
+      header += headerChunk;
     }
+
+    const versionMatch = header.match(/"version"\s*:\s*(\d+)/);
+    const totalMatch = header.match(/"total"\s*:\s*(\d+)/);
+    const version = versionMatch ? Number(versionMatch[1]) : null;
+    const total = totalMatch ? Number(totalMatch[1]) : null;
 
     const revision: DatasetRevision = {
       path: filePath,
@@ -117,7 +119,7 @@ async function buildDatasetRevision(filePath: string): Promise<DatasetRevision |
       total,
       sizeBytes: fileStats.size,
       modifiedAt: fileStats.mtime.toISOString(),
-      revision: createHash('sha256').update(raw).digest('hex').slice(0, 16),
+      revision: hash.digest('hex').slice(0, 16),
     };
 
     datasetRevisionCache.set(filePath, {
