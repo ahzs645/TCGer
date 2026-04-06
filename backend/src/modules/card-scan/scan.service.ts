@@ -9,7 +9,6 @@ import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store
 import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
 import {
   computeArtworkFingerprint,
-  computeHsvHistogram,
   matchArtwork,
   loadArtworkDatabase,
   isArtworkDatabaseLoaded,
@@ -25,7 +24,7 @@ export interface ScanMatch {
   setName: string | null;
   rarity: string | null;
   imageUrl: string | null;
-  confidence: number;        // 0..1
+  confidence: number;        // 0..1 overall similarity score
   distance: number;          // raw combined Hamming distance
   fullDistance?: number;
   titleDistance?: number | null;
@@ -61,6 +60,7 @@ const STRICT_COMBINED_DISTANCE = 160;
 const MEDIUM_COMBINED_DISTANCE = 200;
 const SHORTLIST_MARGIN = 96;
 const SHORTLIST_LIMIT = 24;
+const LEGACY_CONFIDENCE_STRONG_MATCH = 0.72;
 type SupportedTcg = 'magic' | 'pokemon' | 'yugioh';
 
 /** Maximum number of candidates to return. */
@@ -364,7 +364,7 @@ function rankMatches(
         setName: candidate.entry.setName,
         rarity: candidate.entry.rarity,
         imageUrl: candidate.entry.imageUrl,
-        confidence: Math.max(0, 1 - candidate.scoreDistance / MAX_COMBINED_DISTANCE),
+        confidence: computePublicConfidence(candidate.scoreDistance, candidate.entry.hashSize),
         distance: Math.round(candidate.scoreDistance),
         fullDistance: candidate.fullDistance,
         titleDistance: candidate.titleDistance,
@@ -386,7 +386,11 @@ function isBetterAttempt(candidate: ScanMatch | null, current: ScanMatch | null)
 }
 
 function isStrongEnough(match: ScanMatch, maxDistance: number): boolean {
-  return match.distance === 0 || match.confidence >= 0.72 || match.distance <= Math.floor(maxDistance * 0.45);
+  return (
+    match.distance === 0 ||
+    computeLegacyThresholdConfidence(match.distance) >= LEGACY_CONFIDENCE_STRONG_MATCH ||
+    match.distance <= Math.floor(maxDistance * 0.45)
+  );
 }
 
 async function computeFeatureHashesByTcg(
@@ -443,6 +447,15 @@ function computeFeatureScore(
   }
 
   return score / weights;
+}
+
+function computePublicConfidence(scoreDistance: number, hashSize: number): number {
+  const totalBits = Math.max(1, hashSize * hashSize * 3);
+  return Math.max(0, Math.min(1, 1 - scoreDistance / totalBits));
+}
+
+function computeLegacyThresholdConfidence(scoreDistance: number): number {
+  return Math.max(0, 1 - scoreDistance / MAX_COMBINED_DISTANCE);
 }
 
 function pushShortlist(
