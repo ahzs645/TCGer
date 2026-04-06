@@ -49,7 +49,10 @@ final class BackendHashScannerStrategy: ScanStrategy {
             config: context.serverConfiguration,
             token: token,
             imageData: imageData,
-            tcg: context.mode.tcgGame
+            tcg: context.mode.tcgGame,
+            saveDebugCapture: context.saveDebugCapture,
+            captureSource: "ios-card-scanner",
+            captureNotes: context.captureNotes
         )
 
         let orderedMatches: [APIService.ScanMatchResponse] = {
@@ -93,7 +96,9 @@ final class BackendHashScannerStrategy: ScanStrategy {
             capturedImage: image,
             primary: primary,
             alternatives: alternatives,
-            elapsed: 0
+            elapsed: 0,
+            debugCapture: response.debugCapture,
+            debugCaptureError: response.debugCaptureError
         )
     }
 
@@ -135,7 +140,24 @@ final class BackendHashScannerStrategy: ScanStrategy {
             debugInfo["perspectiveCorrected"] = corrected ? "true" : "false"
         }
         if let quality = meta?.quality {
-            debugInfo["quality"] = String(format: "%.2f", quality)
+            if let score = quality.score {
+                debugInfo["quality"] = String(format: "%.0f%%", score * 100)
+            }
+            if let contrast = quality.contrast {
+                debugInfo["contrast"] = String(format: "%.2f", contrast)
+            }
+        }
+        if let contourConfidence = meta?.contourConfidence {
+            debugInfo["contourConfidence"] = String(format: "%.2f", contourConfidence)
+        }
+        if let cropAspectRatio = meta?.cropAspectRatio {
+            debugInfo["cropAspect"] = String(format: "%.3f", cropAspectRatio)
+        }
+        if let shortlistSize = meta?.shortlistSize {
+            debugInfo["shortlist"] = String(shortlistSize)
+        }
+        if let totalMs = meta?.timings?.totalMs {
+            debugInfo["totalMs"] = String(format: "%.0f", totalMs)
         }
 
         return CardScanCandidate(
