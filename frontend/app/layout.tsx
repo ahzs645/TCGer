@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Lexend } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
@@ -53,12 +54,12 @@ export default async function RootLayout({
           </ThemeProvider>
         </ConvexClientProvider>
 
-        <script
+        <Script
           src="/onlook-preload-script.js"
-          type="module"
+          strategy="afterInteractive"
           id="onlook-preload-script"
-          data-oid="h45ax8c">
-        </script>
+          data-oid="h45ax8c"
+        />
       </body>
     </html>);
 
