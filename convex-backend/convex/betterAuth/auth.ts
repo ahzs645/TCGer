@@ -23,12 +23,28 @@ const parseBooleanEnv = (value: string | undefined): boolean | undefined => {
   return undefined;
 };
 
+const parseOriginsEnv = (value: string | undefined): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const isNonEmptyString = (value: string | undefined): value is string => Boolean(value);
+
 export const authComponent = createClient<DataModel>(components.betterAuth, {
   verbose: false
 });
 
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   const siteUrl = process.env.SITE_URL;
+  const trustedOrigins = Array.from(
+    new Set([siteUrl, ...parseOriginsEnv(process.env.BETTER_AUTH_TRUSTED_ORIGINS)].filter(isNonEmptyString))
+  );
   const useSecureCookies =
     parseBooleanEnv(process.env.BETTER_AUTH_USE_SECURE_COOKIES) ??
     siteUrl?.startsWith("https://") ??
@@ -39,7 +55,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     baseURL: siteUrl,
     basePath: "/api/auth",
     secret: process.env.BETTER_AUTH_SECRET ?? fallbackSecret,
-    trustedOrigins: siteUrl ? [siteUrl] : undefined,
+    trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : undefined,
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true
