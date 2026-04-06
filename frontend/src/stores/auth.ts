@@ -1,17 +1,17 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-import { useModuleStore } from './preferences';
+import { useModuleStore } from "./preferences";
 
 const DEFAULT_DISPLAY_PREFERENCES = {
   showCardNumbers: true,
-  showPricing: true
+  showPricing: true,
 };
 
 const DEFAULT_ENABLED_GAMES = {
   enabledYugioh: true,
   enabledMagic: true,
-  enabledPokemon: true
+  enabledPokemon: true,
 };
 
 export interface AuthUser {
@@ -26,8 +26,8 @@ export interface AuthUser {
   enabledPokemon: boolean;
 }
 
-type DisplayPreferenceKeys = 'showCardNumbers' | 'showPricing';
-type EnabledGamesKeys = 'enabledYugioh' | 'enabledMagic' | 'enabledPokemon';
+type DisplayPreferenceKeys = "showCardNumbers" | "showPricing";
+type EnabledGamesKeys = "enabledYugioh" | "enabledMagic" | "enabledPokemon";
 
 interface AuthState {
   user: AuthUser | null;
@@ -38,7 +38,9 @@ interface AuthState {
   clearAuth: () => void;
   setSetupRequired: (required: boolean) => void;
   updateStoredPreferences: (
-    preferences: Partial<Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>>
+    preferences: Partial<
+      Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>
+    >,
   ) => void;
 }
 
@@ -49,25 +51,42 @@ function withDisplayDefaults(user: AuthUser | null): AuthUser | null {
 
   return {
     ...user,
-    showCardNumbers: user.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
+    showCardNumbers:
+      user.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
     showPricing: user.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
     enabledYugioh: user.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
     enabledMagic: user.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
-    enabledPokemon: user.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
+    enabledPokemon: user.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon,
   };
 }
 
 function syncDisplayPreferences(
-  preferences?: Partial<Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>>
+  preferences?: Partial<
+    Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>
+  >,
 ) {
-  const { setShowCardNumbers, setShowPricing, setGameEnabled } = useModuleStore.getState();
+  const { setShowCardNumbers, setShowPricing, setGameEnabled } =
+    useModuleStore.getState();
 
-  setShowCardNumbers(preferences?.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers);
-  setShowPricing(preferences?.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing);
+  setShowCardNumbers(
+    preferences?.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
+  );
+  setShowPricing(
+    preferences?.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
+  );
 
-  setGameEnabled('yugioh', preferences?.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh);
-  setGameEnabled('magic', preferences?.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic);
-  setGameEnabled('pokemon', preferences?.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon);
+  setGameEnabled(
+    "yugioh",
+    preferences?.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
+  );
+  setGameEnabled(
+    "magic",
+    preferences?.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
+  );
+  setGameEnabled(
+    "pokemon",
+    preferences?.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon,
+  );
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -84,7 +103,7 @@ export const useAuthStore = create<AuthState>()(
           user: normalizedUser,
           token: token ?? null,
           isAuthenticated: true,
-          setupRequired: false
+          setupRequired: false,
         });
 
         syncDisplayPreferences(normalizedUser ?? undefined);
@@ -94,13 +113,13 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           token: null,
           isAuthenticated: false,
-          setupRequired: null
+          setupRequired: null,
         });
         syncDisplayPreferences();
       },
       setSetupRequired: (required) =>
         set({
-          setupRequired: required
+          setupRequired: required,
         }),
       updateStoredPreferences: (preferences) => {
         const currentUser = get().user;
@@ -113,31 +132,41 @@ export const useAuthStore = create<AuthState>()(
         const updatedUser = {
           ...currentUser,
           showCardNumbers:
-            preferences.showCardNumbers ?? currentUser.showCardNumbers ?? DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
+            preferences.showCardNumbers ??
+            currentUser.showCardNumbers ??
+            DEFAULT_DISPLAY_PREFERENCES.showCardNumbers,
           showPricing:
-            preferences.showPricing ?? currentUser.showPricing ?? DEFAULT_DISPLAY_PREFERENCES.showPricing,
+            preferences.showPricing ??
+            currentUser.showPricing ??
+            DEFAULT_DISPLAY_PREFERENCES.showPricing,
           enabledYugioh:
-            preferences.enabledYugioh ?? currentUser.enabledYugioh ?? DEFAULT_ENABLED_GAMES.enabledYugioh,
+            preferences.enabledYugioh ??
+            currentUser.enabledYugioh ??
+            DEFAULT_ENABLED_GAMES.enabledYugioh,
           enabledMagic:
-            preferences.enabledMagic ?? currentUser.enabledMagic ?? DEFAULT_ENABLED_GAMES.enabledMagic,
+            preferences.enabledMagic ??
+            currentUser.enabledMagic ??
+            DEFAULT_ENABLED_GAMES.enabledMagic,
           enabledPokemon:
-            preferences.enabledPokemon ?? currentUser.enabledPokemon ?? DEFAULT_ENABLED_GAMES.enabledPokemon
+            preferences.enabledPokemon ??
+            currentUser.enabledPokemon ??
+            DEFAULT_ENABLED_GAMES.enabledPokemon,
         };
 
         set({ user: updatedUser });
         syncDisplayPreferences(updatedUser);
-      }
+      },
     }),
     {
-      name: 'tcg-auth-store',
+      name: "tcg-auth-store",
       partialize: (state) => ({
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
-        setupRequired: state.setupRequired
-      })
-    }
-  )
+        setupRequired: state.setupRequired,
+      }),
+    },
+  ),
 );
 
 syncDisplayPreferences();

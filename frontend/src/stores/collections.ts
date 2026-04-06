@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import * as collectionsApi from '@/lib/api/collections';
-import { useAuthStore } from '@/stores/auth';
+import { create } from "zustand";
+import * as collectionsApi from "@/lib/api/collections";
+import { useAuthStore } from "@/stores/auth";
 
-export type { Collection, CollectionCard } from '@/lib/api/collections';
+export type { Collection, CollectionCard } from "@/lib/api/collections";
 
 export interface CollectionsState {
   collections: collectionsApi.Collection[];
@@ -10,21 +10,32 @@ export interface CollectionsState {
   error: string | null;
   hasFetched: boolean;
   fetchCollections: (token: string) => Promise<void>;
-  addCollection: (token: string, input: { name: string; description?: string }) => Promise<string>;
+  addCollection: (
+    token: string,
+    input: { name: string; description?: string },
+  ) => Promise<string>;
   removeCollection: (token: string, id: string) => Promise<void>;
-  updateCollection: (token: string, id: string, input: { name?: string; description?: string; colorHex?: string }) => Promise<void>;
+  updateCollection: (
+    token: string,
+    id: string,
+    input: { name?: string; description?: string; colorHex?: string },
+  ) => Promise<void>;
   addCardToBinder: (
     token: string,
     binderId: string,
-    input: collectionsApi.AddCardToCollectionInput
+    input: collectionsApi.AddCardToCollectionInput,
   ) => Promise<void>;
   updateCollectionCard: (
     token: string,
     binderId: string,
     cardId: string,
-    input: collectionsApi.UpdateCollectionCardInput
+    input: collectionsApi.UpdateCollectionCardInput,
   ) => Promise<void>;
-  removeCollectionCard: (token: string, binderId: string, cardId: string) => Promise<void>;
+  removeCollectionCard: (
+    token: string,
+    binderId: string,
+    cardId: string,
+  ) => Promise<void>;
 }
 
 export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
@@ -36,32 +47,48 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   fetchCollections: async (token: string) => {
     set({ isLoading: true, error: null });
     try {
-      const collections = await collectionsApi.getCollections(token, useAuthStore.getState().user);
+      const collections = await collectionsApi.getCollections(
+        token,
+        useAuthStore.getState().user,
+      );
       set({ collections, isLoading: false, hasFetched: true });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to fetch collections',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch collections",
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       });
     }
   },
 
-  addCollection: async (token: string, input: { name: string; description?: string }) => {
+  addCollection: async (
+    token: string,
+    input: { name: string; description?: string },
+  ) => {
     set({ isLoading: true, error: null });
     try {
-      const newCollection = await collectionsApi.createCollection(token, input, useAuthStore.getState().user);
+      const newCollection = await collectionsApi.createCollection(
+        token,
+        input,
+        useAuthStore.getState().user,
+      );
       set((state) => ({
         collections: [...state.collections, newCollection],
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       }));
       return newCollection.id;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to create collection',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create collection",
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       });
       throw error;
     }
@@ -70,72 +97,128 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   removeCollection: async (token: string, id: string) => {
     set({ isLoading: true, error: null });
     try {
-      await collectionsApi.deleteCollection(token, id, useAuthStore.getState().user);
+      await collectionsApi.deleteCollection(
+        token,
+        id,
+        useAuthStore.getState().user,
+      );
       set((state) => ({
         collections: state.collections.filter((c) => c.id !== id),
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       }));
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to delete collection',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete collection",
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       });
       throw error;
     }
   },
 
-  updateCollection: async (token: string, id: string, input: { name?: string; description?: string; colorHex?: string }) => {
+  updateCollection: async (
+    token: string,
+    id: string,
+    input: { name?: string; description?: string; colorHex?: string },
+  ) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await collectionsApi.updateCollection(token, id, input, useAuthStore.getState().user);
+      const updated = await collectionsApi.updateCollection(
+        token,
+        id,
+        input,
+        useAuthStore.getState().user,
+      );
       set((state) => ({
         collections: state.collections.map((c) => (c.id === id ? updated : c)),
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       }));
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to update collection',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update collection",
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
       });
       throw error;
     }
   },
 
-  addCardToBinder: async (token: string, binderId: string, input: collectionsApi.AddCardToCollectionInput) => {
+  addCardToBinder: async (
+    token: string,
+    binderId: string,
+    input: collectionsApi.AddCardToCollectionInput,
+  ) => {
     try {
-      await collectionsApi.addCardToCollection(token, binderId, input, useAuthStore.getState().user);
+      await collectionsApi.addCardToCollection(
+        token,
+        binderId,
+        input,
+        useAuthStore.getState().user,
+      );
       await get().fetchCollections(token);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to add card to collection';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to add card to collection";
       set({ error: message, isLoading: false, hasFetched: true });
       throw error instanceof Error ? error : new Error(message);
     }
   },
 
-  updateCollectionCard: async (token: string, binderId: string, cardId: string, input: collectionsApi.UpdateCollectionCardInput) => {
+  updateCollectionCard: async (
+    token: string,
+    binderId: string,
+    cardId: string,
+    input: collectionsApi.UpdateCollectionCardInput,
+  ) => {
     try {
-      await collectionsApi.updateCollectionCard(token, binderId, cardId, input, useAuthStore.getState().user);
+      await collectionsApi.updateCollectionCard(
+        token,
+        binderId,
+        cardId,
+        input,
+        useAuthStore.getState().user,
+      );
       await get().fetchCollections(token);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update card in collection';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update card in collection";
       set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }
-  }
-  ,
+  },
 
-  removeCollectionCard: async (token: string, binderId: string, cardId: string) => {
+  removeCollectionCard: async (
+    token: string,
+    binderId: string,
+    cardId: string,
+  ) => {
     try {
-      await collectionsApi.removeCardFromCollection(token, binderId, cardId, useAuthStore.getState().user);
+      await collectionsApi.removeCardFromCollection(
+        token,
+        binderId,
+        cardId,
+        useAuthStore.getState().user,
+      );
       await get().fetchCollections(token);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to remove card from collection';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove card from collection";
       set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }
-  }
+  },
 }));

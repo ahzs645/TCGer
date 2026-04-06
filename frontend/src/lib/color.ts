@@ -2,12 +2,12 @@ export function normalizeHexColor(input?: string): string | undefined {
   if (!input) return undefined;
   const trimmed = input.trim();
   if (!trimmed) return undefined;
-  const withoutHash = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+  const withoutHash = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
   if (withoutHash.length === 3) {
     const expanded = withoutHash
-      .split('')
+      .split("")
       .map((char) => char + char)
-      .join('');
+      .join("");
     return `#${expanded.toUpperCase()}`;
   }
   if (withoutHash.length === 6) {

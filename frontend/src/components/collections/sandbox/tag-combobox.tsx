@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import type { CollectionTag } from '@/lib/api/collections';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import {
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Button } from "@/components/ui/button";
+import type { CollectionTag } from "@/lib/api/collections";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 interface TagComboboxProps {
   availableTags: CollectionTag[];
@@ -13,9 +19,14 @@ interface TagComboboxProps {
   onCreateTag: (label: string) => Promise<CollectionTag>;
 }
 
-export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreateTag }: TagComboboxProps) {
+export function TagCombobox({
+  availableTags,
+  selectedTags,
+  onToggleTag,
+  onCreateTag,
+}: TagComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const normalizedQuery = query.trim();
@@ -26,12 +37,15 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
       return [];
     }
     return availableTags.filter(
-      (tag) => !selectedTags.includes(tag.id) && tag.label.toLowerCase().includes(normalizedLower)
+      (tag) =>
+        !selectedTags.includes(tag.id) &&
+        tag.label.toLowerCase().includes(normalizedLower),
     );
   }, [availableTags, normalizedLower, normalizedQuery, selectedTags]);
 
   const canCreate =
-    normalizedQuery.length > 1 && !availableTags.some((tag) => tag.label.toLowerCase() === normalizedLower);
+    normalizedQuery.length > 1 &&
+    !availableTags.some((tag) => tag.label.toLowerCase() === normalizedLower);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -42,14 +56,14 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
     };
     const shouldListen = open;
     if (shouldListen) {
-      document.addEventListener('mousedown', handler);
+      document.addEventListener("mousedown", handler);
     }
-    return () => document.removeEventListener('mousedown', handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
   const handleSelectTag = (tagId: string) => {
     onToggleTag(tagId);
-    setQuery('');
+    setQuery("");
     setOpen(false);
   };
 
@@ -61,7 +75,7 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
       setIsCreating(true);
       const tag = await onCreateTag(normalizedQuery);
       onToggleTag(tag.id);
-      setQuery('');
+      setQuery("");
       setOpen(false);
     } finally {
       setIsCreating(false);
@@ -69,23 +83,23 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
+    if (event.key === "Enter") {
       event.preventDefault();
       if (filteredTags.length) {
         handleSelectTag(filteredTags[0].id);
       } else if (canCreate) {
         void handleCreateTag();
       }
-    } else if (event.key === 'Escape') {
+    } else if (event.key === "Escape") {
       setOpen(false);
-      setQuery('');
+      setQuery("");
     }
   };
 
   const showSuggestions = open;
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-2" data-oid="l9hodsd">
+      <div className="flex flex-wrap gap-2" data-oid="7zj3iu_">
         {selectedTags.length ? (
           selectedTags.map((tagId) => {
             const tag = availableTags.find((entry) => entry.id === tagId);
@@ -94,18 +108,21 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
               <Badge
                 key={tag.id}
                 className="cursor-pointer"
-                style={{ backgroundColor: tag.colorHex, color: '#0B1121' }}
+                style={{ backgroundColor: tag.colorHex, color: "#0B1121" }}
                 onClick={() => onToggleTag(tag.id)}
+                data-oid="igqmz.z"
               >
                 {tag.label}
               </Badge>
             );
           })
         ) : (
-          <Badge variant="outline">No tags yet</Badge>
+          <Badge variant="outline" data-oid="yym0v-4">
+            No tags yet
+          </Badge>
         )}
       </div>
-      <div className="relative" ref={containerRef}>
+      <div className="relative" ref={containerRef} data-oid="59gn962">
         <Input
           value={query}
           onChange={(event) => {
@@ -114,18 +131,33 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder={selectedTags.length ? 'Type to adjust tags' : 'Type to add tags'}
+          placeholder={
+            selectedTags.length ? "Type to adjust tags" : "Type to add tags"
+          }
+          data-oid="_y-9tx2"
         />
+
         {showSuggestions ? (
-          <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-lg">
+          <div
+            className="absolute z-20 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-lg"
+            data-oid="wx18719"
+          >
             {!normalizedQuery.length ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">Start typing to search existing tags.</p>
+              <p
+                className="px-3 py-2 text-xs text-muted-foreground"
+                data-oid="0x5t6n4"
+              >
+                Start typing to search existing tags.
+              </p>
             ) : (
               <>
                 {filteredTags.length ? (
-                  <ul className="max-h-48 overflow-y-auto py-1">
+                  <ul
+                    className="max-h-48 overflow-y-auto py-1"
+                    data-oid="c15t39y"
+                  >
                     {filteredTags.map((tag) => (
-                      <li key={tag.id}>
+                      <li key={tag.id} data-oid="1avczxa">
                         <button
                           type="button"
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
@@ -133,18 +165,28 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
                             event.preventDefault();
                             handleSelectTag(tag.id);
                           }}
+                          data-oid="uvvz-s9"
                         >
-                          <span className="inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: tag.colorHex }} />
-                          <span>{tag.label}</span>
+                          <span
+                            className="inline-flex h-2 w-2 rounded-full"
+                            style={{ backgroundColor: tag.colorHex }}
+                            data-oid="aoo-_yr"
+                          />
+                          <span data-oid="2zg0mvs">{tag.label}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-3 py-2 text-sm text-muted-foreground">No tags found.</p>
+                  <p
+                    className="px-3 py-2 text-sm text-muted-foreground"
+                    data-oid="9baf0i:"
+                  >
+                    No tags found.
+                  </p>
                 )}
                 {canCreate ? (
-                  <div className="border-t px-2 py-2">
+                  <div className="border-t px-2 py-2" data-oid="7xwczdv">
                     <Button
                       type="button"
                       variant="ghost"
@@ -153,8 +195,11 @@ export function TagCombobox({ availableTags, selectedTags, onToggleTag, onCreate
                       disabled={isCreating}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => void handleCreateTag()}
+                      data-oid="opg5cvw"
                     >
-                      {isCreating ? 'Creating...' : `Create "${normalizedQuery}"`}
+                      {isCreating
+                        ? "Creating..."
+                        : `Create "${normalizedQuery}"`}
                     </Button>
                   </div>
                 ) : null}

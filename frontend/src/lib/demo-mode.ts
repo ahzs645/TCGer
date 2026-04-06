@@ -12,17 +12,17 @@
  * back a real `Response` object.
  */
 
-import { handleDemoRequest } from './api/demo-adapter';
-import { API_BASE_URL as DEMO_API_BASE_URL } from './api/base-url';
+import { handleDemoRequest } from "./api/demo-adapter";
+import { API_BASE_URL as DEMO_API_BASE_URL } from "./api/base-url";
 
-const STORAGE_KEY = 'tcg-demo-mode';
+const STORAGE_KEY = "tcg-demo-mode";
 
 function isDemoPath(pathname: string | null | undefined): boolean {
-  return pathname === '/demo' || pathname?.startsWith('/demo/') === true;
+  return pathname === "/demo" || pathname?.startsWith("/demo/") === true;
 }
 
 function shouldStubBetterAuth(): boolean {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return false;
   }
 
@@ -34,14 +34,14 @@ function shouldStubBetterAuth(): boolean {
 /* ------------------------------------------------------------------ */
 
 export function isDemoMode(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(STORAGE_KEY) === 'true';
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(STORAGE_KEY) === "true";
 }
 
 export function setDemoMode(enabled: boolean): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   if (enabled) {
-    localStorage.setItem(STORAGE_KEY, 'true');
+    localStorage.setItem(STORAGE_KEY, "true");
     installInterceptor();
   } else {
     localStorage.removeItem(STORAGE_KEY);
@@ -59,13 +59,21 @@ function getFallbackFetch(): typeof globalThis.fetch {
   return realFetch ?? globalThis.fetch.bind(globalThis);
 }
 
-function maybeHandleDemoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> | null {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+function maybeHandleDemoFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> | null {
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : (input as Request).url;
 
   // Only intercept requests to our API base URL
   if (isDemoMode() && url.startsWith(DEMO_API_BASE_URL)) {
     const path = url.slice(DEMO_API_BASE_URL.length); // e.g. "/auth/login"
-    const method = init?.method?.toUpperCase() ?? 'GET';
+    const method = init?.method?.toUpperCase() ?? "GET";
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
     return handleDemoRequest(method, path, body);
   }
@@ -75,11 +83,11 @@ function maybeHandleDemoFetch(input: RequestInfo | URL, init?: RequestInit): Pro
   if (shouldStubBetterAuth()) {
     try {
       const parsed = new URL(url, window.location.origin);
-      if (parsed.pathname.startsWith('/api/auth/')) {
+      if (parsed.pathname.startsWith("/api/auth/")) {
         return handleBetterAuthDemo(parsed.pathname);
       }
     } catch {
-      if (url.startsWith('/api/auth/')) {
+      if (url.startsWith("/api/auth/")) {
         return handleBetterAuthDemo(url);
       }
     }
@@ -88,11 +96,17 @@ function maybeHandleDemoFetch(input: RequestInfo | URL, init?: RequestInit): Pro
   return null;
 }
 
-export function demoAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export function demoAwareFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
   return maybeHandleDemoFetch(input, init) ?? getFallbackFetch()(input, init);
 }
 
-function interceptedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+function interceptedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
   const demoResponse = maybeHandleDemoFetch(input, init);
   if (demoResponse) {
     return demoResponse;
@@ -112,11 +126,11 @@ function handleBetterAuthDemo(pathname: string): Promise<Response> {
     Promise.resolve(
       new Response(JSON.stringify(data), {
         status,
-        headers: { 'Content-Type': 'application/json' }
-      })
+        headers: { "Content-Type": "application/json" },
+      }),
     );
 
-  if (pathname.includes('get-session')) {
+  if (pathname.includes("get-session")) {
     return jsonResponse({ session: null, user: null });
   }
 
@@ -125,14 +139,14 @@ function handleBetterAuthDemo(pathname: string): Promise<Response> {
 }
 
 function installInterceptor(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   if (realFetch) return; // already installed
   realFetch = globalThis.fetch;
   globalThis.fetch = interceptedFetch;
 }
 
 function uninstallInterceptor(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   if (!realFetch) return;
   globalThis.fetch = realFetch;
   realFetch = null;
@@ -143,7 +157,10 @@ function uninstallInterceptor(): void {
  * the interceptor if the user was already in demo mode from a previous session.
  */
 export function ensureDemoInterceptor(): void {
-  if (typeof window !== 'undefined' && (isDemoMode() || isDemoPath(window.location.pathname))) {
+  if (
+    typeof window !== "undefined" &&
+    (isDemoMode() || isDemoPath(window.location.pathname))
+  ) {
     installInterceptor();
   }
 }

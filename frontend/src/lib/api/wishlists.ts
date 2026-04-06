@@ -4,39 +4,49 @@ import type {
   AddWishlistCardInput,
   AddWishlistCardsInput,
   WishlistResponse,
-  WishlistCardResponse
-} from '@tcg/api-types';
-import { API_BASE_URL } from './base-url';
+  WishlistCardResponse,
+} from "@tcg/api-types";
+import { API_BASE_URL } from "./base-url";
 
-export type { WishlistResponse, WishlistCardResponse, CreateWishlistInput, UpdateWishlistInput, AddWishlistCardInput, AddWishlistCardsInput };
+export type {
+  WishlistResponse,
+  WishlistCardResponse,
+  CreateWishlistInput,
+  UpdateWishlistInput,
+  AddWishlistCardInput,
+  AddWishlistCardsInput,
+};
 
 export async function getWishlists(token: string): Promise<WishlistResponse[]> {
   const response = await fetch(`${API_BASE_URL}/wishlists`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to fetch wishlists');
+    throw new Error(error.message || "Failed to fetch wishlists");
   }
 
   return response.json();
 }
 
-export async function getWishlist(token: string, wishlistId: string): Promise<WishlistResponse> {
+export async function getWishlist(
+  token: string,
+  wishlistId: string,
+): Promise<WishlistResponse> {
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to fetch wishlist');
+    throw new Error(error.message || "Failed to fetch wishlist");
   }
 
   return response.json();
@@ -44,20 +54,20 @@ export async function getWishlist(token: string, wishlistId: string): Promise<Wi
 
 export async function createWishlist(
   token: string,
-  data: CreateWishlistInput
+  data: CreateWishlistInput,
 ): Promise<WishlistResponse> {
   const response = await fetch(`${API_BASE_URL}/wishlists`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to create wishlist');
+    throw new Error(error.message || "Failed to create wishlist");
   }
 
   return response.json();
@@ -66,20 +76,20 @@ export async function createWishlist(
 export async function updateWishlist(
   token: string,
   wishlistId: string,
-  data: UpdateWishlistInput
+  data: UpdateWishlistInput,
 ): Promise<WishlistResponse> {
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to update wishlist');
+    throw new Error(error.message || "Failed to update wishlist");
   }
 
   return response.json();
@@ -87,38 +97,41 @@ export async function updateWishlist(
 
 export async function deleteWishlist(
   token: string,
-  wishlistId: string
+  wishlistId: string,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: {
-      'Authorization': `Bearer ${token}`
-    }
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to delete wishlist');
+    throw new Error(error.message || "Failed to delete wishlist");
   }
 }
 
 export async function addCardToWishlist(
   token: string,
   wishlistId: string,
-  data: AddWishlistCardInput
+  data: AddWishlistCardInput,
 ): Promise<WishlistCardResponse> {
-  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/cards`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/cards`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
     },
-    body: JSON.stringify(data)
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to add card to wishlist');
+    throw new Error(error.message || "Failed to add card to wishlist");
   }
 
   return response.json();
@@ -127,20 +140,23 @@ export async function addCardToWishlist(
 export async function addCardsToWishlist(
   token: string,
   wishlistId: string,
-  data: AddWishlistCardsInput
+  data: AddWishlistCardsInput,
 ): Promise<WishlistResponse> {
-  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/cards/batch`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/cards/batch`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
     },
-    body: JSON.stringify(data)
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to add cards to wishlist');
+    throw new Error(error.message || "Failed to add cards to wishlist");
   }
 
   return response.json();
@@ -149,20 +165,20 @@ export async function addCardsToWishlist(
 export async function removeCardFromWishlist(
   token: string,
   wishlistId: string,
-  cardId: string
+  cardId: string,
 ): Promise<void> {
   const response = await fetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards/${cardId}`,
     {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }
+        Authorization: `Bearer ${token}`,
+      },
+    },
   );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to remove card from wishlist');
+    throw new Error(error.message || "Failed to remove card from wishlist");
   }
 }

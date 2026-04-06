@@ -9,7 +9,7 @@ export type {
   PokemonFunctionalAbility,
   PokemonFunctionalGroup,
   CardPrintsResponse,
-  SearchCardsResponse
-} from '@tcg/api-types';
+  SearchCardsResponse,
+} from "@tcg/api-types";
 
-export type { CollectionCardCopy, CollectionCard } from '@/lib/api/collections';
+export type { CollectionCardCopy, CollectionCard } from "@/lib/api/collections";

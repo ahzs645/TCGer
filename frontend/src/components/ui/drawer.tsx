@@ -1,17 +1,22 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Drawer as DrawerPrimitive } from 'vaul';
+import * as React from "react";
+import { Drawer as DrawerPrimitive } from "vaul";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 const Drawer = ({
   shouldScaleBackground = true,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  <DrawerPrimitive.Root
+    shouldScaleBackground={shouldScaleBackground}
+    {...props}
+    data-oid="p0ub303"
+  />
 );
-Drawer.displayName = 'Drawer';
+
+Drawer.displayName = "Drawer";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
 
@@ -25,8 +30,9 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-black/40', className)}
+    className={cn("fixed inset-0 z-50 bg-black/40", className)}
     {...props}
+    data-oid="0n5x-vj"
   />
 ));
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
@@ -35,32 +41,52 @@ const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
+  <DrawerPortal data-oid="u7_iqq1">
+    <DrawerOverlay data-oid="12_w3uu" />
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-xl border bg-background',
-        className
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-xl border bg-background",
+        className,
       )}
       {...props}
+      data-oid="itm2e6t"
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      <div
+        className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted"
+        data-oid="5q:17pa"
+      />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
 ));
-DrawerContent.displayName = 'DrawerContent';
+DrawerContent.displayName = "DrawerContent";
 
-const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('grid gap-1.5 p-4 text-center sm:text-left', className)} {...props} />
+const DrawerHeader = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)}
+    {...props}
+    data-oid="h_3bc0l"
+  />
 );
-DrawerHeader.displayName = 'DrawerHeader';
 
-const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('mt-auto flex flex-col gap-2 p-4', className)} {...props} />
+DrawerHeader.displayName = "DrawerHeader";
+
+const DrawerFooter = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+    {...props}
+    data-oid="20_i47x"
+  />
 );
-DrawerFooter.displayName = 'DrawerFooter';
+
+DrawerFooter.displayName = "DrawerFooter";
 
 const DrawerTitle = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Title>,
@@ -68,8 +94,12 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+    className={cn(
+      "text-lg font-semibold leading-none tracking-tight",
+      className,
+    )}
     {...props}
+    data-oid="u46s4d-"
   />
 ));
 DrawerTitle.displayName = DrawerPrimitive.Title.displayName;
@@ -80,8 +110,9 @@ const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-muted-foreground', className)}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
+    data-oid="pl1ais2"
   />
 ));
 DrawerDescription.displayName = DrawerPrimitive.Description.displayName;
