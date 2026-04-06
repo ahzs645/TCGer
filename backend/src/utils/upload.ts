@@ -3,8 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import multer from 'multer';
 
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads', 'collection-images');
-const CARD_SCAN_DEBUG_DIR = path.resolve(process.cwd(), 'uploads', 'card-scan-debug');
+const UPLOADS_ROOT_DIR = path.resolve(
+  process.env.UPLOADS_DIR?.trim() || path.resolve(process.cwd(), 'uploads'),
+);
+const UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'collection-images');
+const CARD_SCAN_DEBUG_DIR = path.join(UPLOADS_ROOT_DIR, 'card-scan-debug');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -42,6 +45,10 @@ export const uploadImages = multer({
     files: 5,
   },
 });
+
+export function getUploadsRootDir(): string {
+  return UPLOADS_ROOT_DIR;
+}
 
 export function getImagePublicPath(filename: string): string {
   return `/uploads/collection-images/${filename}`;

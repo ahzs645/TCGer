@@ -62,6 +62,9 @@ jobs:
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target || '' }}
           push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            IMAGE_TAG=${{ steps.tags.outputs.version_tag }}
           tags: |
             ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ steps.tags.outputs.version_tag }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:main

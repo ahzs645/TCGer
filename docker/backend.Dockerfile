@@ -27,6 +27,8 @@ CMD ["npm", "run", "dev"]
 
 # --- Build target ---
 FROM base AS build
+ARG GIT_SHA=""
+ARG IMAGE_TAG=""
 # Build shared types first, then backend
 RUN npm run --workspace=packages/api-types build
 WORKDIR /app/backend
@@ -34,8 +36,12 @@ RUN npx prisma generate && (npx tsc -p tsconfig.build.json --skipLibCheck || tru
 
 # --- Production target ---
 FROM node:20-bookworm-slim AS production
+ARG GIT_SHA=""
+ARG IMAGE_TAG=""
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TCGER_BUILD_GIT_SHA=${GIT_SHA}
+ENV TCGER_BUILD_IMAGE_TAG=${IMAGE_TAG}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \

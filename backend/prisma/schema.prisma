@@ -310,6 +310,10 @@ model CardScanDebugCapture {
   requestedTcg        String?
   captureSource       String?
   sourceImagePath     String
+  correctedImagePath  String?
+  artworkImagePath    String?
+  titleImagePath      String?
+  footerImagePath     String?
   sourceFilename      String?
   sourceMimeType      String?
   sourceImageWidth    Int?
@@ -320,6 +324,7 @@ model CardScanDebugCapture {
   bestMatchConfidence Float?
   bestMatchDistance   Int?
   feedbackStatus      String   @default("unreviewed")
+  reviewTags          String[] @default([])
   notes               String?
   expectedExternalId  String?
   expectedName        String?

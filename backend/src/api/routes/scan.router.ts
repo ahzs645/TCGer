@@ -8,10 +8,12 @@ import {
 } from '../../modules/card-scan';
 import {
   CARD_SCAN_DEBUG_FEEDBACK_STATUSES,
+  CARD_SCAN_DEBUG_REVIEW_TAGS,
   createCardScanDebugCapture,
   listCardScanDebugCaptures,
   updateCardScanDebugCapture,
   type CardScanDebugFeedbackStatus,
+  type CardScanDebugReviewTag,
 } from '../../modules/card-scan/debug-captures.service';
 import { uploadImages } from '../../utils/upload';
 import { asyncHandler } from '../../utils/async-handler';
@@ -69,25 +71,54 @@ function serializeDebugCapture(
     requestedTcg: string | null;
     captureSource: string | null;
     sourceImagePath: string;
+    correctedImagePath: string | null;
+    artworkImagePath: string | null;
+    titleImagePath: string | null;
+    footerImagePath: string | null;
     bestMatchExternalId: string | null;
     bestMatchName: string | null;
     bestMatchTcg: string | null;
     bestMatchConfidence: number | null;
     bestMatchDistance: number | null;
     feedbackStatus: string;
+    reviewTags: string[];
     notes: string | null;
     expectedExternalId: string | null;
     expectedName: string | null;
     expectedTcg: string | null;
+    reviewedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+    debugPayload?: unknown;
   },
   req: AuthRequest,
 ) {
   const origin = resolveRequestOrigin(req);
+  const resolvePublicUrl = (publicPath: string | null) =>
+    publicPath
+      ? origin
+        ? new URL(publicPath, `${origin}/`).toString()
+        : publicPath
+      : null;
   const sourceImageUrl = origin
     ? new URL(capture.sourceImagePath, `${origin}/`).toString()
     : capture.sourceImagePath;
+  const debugPayload =
+    capture.debugPayload && typeof capture.debugPayload === 'object'
+      ? (capture.debugPayload as Record<string, unknown>)
+      : null;
+  const payloadMeta =
+    debugPayload?.meta && typeof debugPayload.meta === 'object'
+      ? (debugPayload.meta as Record<string, unknown>)
+      : null;
+  const payloadDiagnostics =
+    debugPayload?.diagnostics && typeof debugPayload.diagnostics === 'object'
+      ? (debugPayload.diagnostics as Record<string, unknown>)
+      : null;
+  const payloadPipeline =
+    debugPayload?.pipeline && typeof debugPayload.pipeline === 'object'
+      ? (debugPayload.pipeline as Record<string, unknown>)
+      : null;
 
   return {
     id: capture.id,
@@ -95,13 +126,59 @@ function serializeDebugCapture(
     captureSource: capture.captureSource,
     sourceImagePath: capture.sourceImagePath,
     sourceImageUrl,
+    artifactImages: {
+      correctedImagePath: capture.correctedImagePath,
+      correctedImageUrl: resolvePublicUrl(capture.correctedImagePath),
+      artworkImagePath: capture.artworkImagePath,
+      artworkImageUrl: resolvePublicUrl(capture.artworkImagePath),
+      titleImagePath: capture.titleImagePath,
+      titleImageUrl: resolvePublicUrl(capture.titleImagePath),
+      footerImagePath: capture.footerImagePath,
+      footerImageUrl: resolvePublicUrl(capture.footerImagePath),
+    },
     feedbackStatus: capture.feedbackStatus,
+    reviewTags: capture.reviewTags,
     notes: capture.notes,
     expectedExternalId: capture.expectedExternalId,
     expectedName: capture.expectedName,
     expectedTcg: capture.expectedTcg,
+    reviewedAt: capture.reviewedAt?.toISOString() ?? null,
     createdAt: capture.createdAt.toISOString(),
     updatedAt: capture.updatedAt.toISOString(),
+    pipeline: payloadPipeline,
+    diagnostics: {
+      timings: payloadDiagnostics?.timings ?? null,
+      attempts: Array.isArray(payloadDiagnostics?.attempts)
+        ? payloadDiagnostics?.attempts
+        : [],
+      rejectedNearMisses: Array.isArray(payloadDiagnostics?.rejectedNearMisses)
+        ? payloadDiagnostics?.rejectedNearMisses
+        : [],
+      artwork:
+        payloadDiagnostics?.artwork && typeof payloadDiagnostics.artwork === 'object'
+          ? payloadDiagnostics.artwork
+          : null,
+      ocr:
+        payloadDiagnostics?.ocr && typeof payloadDiagnostics.ocr === 'object'
+          ? payloadDiagnostics.ocr
+          : null,
+      geometry: payloadMeta
+        ? {
+            perspectiveCorrected: payloadMeta.perspectiveCorrected ?? null,
+            contourAreaRatio: payloadMeta.contourAreaRatio ?? null,
+            contourConfidence: payloadMeta.contourConfidence ?? null,
+            rotationAngle: payloadMeta.rotationAngle ?? null,
+            cropAspectRatio: payloadMeta.cropAspectRatio ?? null,
+            cropWidth: payloadMeta.cropWidth ?? null,
+            cropHeight: payloadMeta.cropHeight ?? null,
+            cropCandidateScore: payloadMeta.cropCandidateScore ?? null,
+            contourPoints: Array.isArray(payloadMeta.contourPoints)
+              ? payloadMeta.contourPoints
+              : [],
+            maskVariant: payloadMeta.maskVariant ?? null,
+          }
+        : null,
+    },
     bestMatch: capture.bestMatchExternalId
       ? {
           externalId: capture.bestMatchExternalId,
@@ -251,6 +328,9 @@ scanRouter.patch(
     const body = (req.body ?? {}) as Record<string, unknown>;
     const captureId = typeof params.captureId === 'string' ? params.captureId : '';
     const rawStatus = typeof body.feedbackStatus === 'string' ? body.feedbackStatus : undefined;
+    const rawReviewTags = Array.isArray(body.reviewTags)
+      ? body.reviewTags.filter((value): value is string => typeof value === 'string')
+      : undefined;
 
     if (
       rawStatus &&
@@ -262,12 +342,25 @@ scanRouter.patch(
       });
     }
 
+    if (
+      rawReviewTags &&
+      rawReviewTags.some(
+        (tag) => !CARD_SCAN_DEBUG_REVIEW_TAGS.includes(tag as CardScanDebugReviewTag),
+      )
+    ) {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: `reviewTags must be a subset of: ${CARD_SCAN_DEBUG_REVIEW_TAGS.join(', ')}`,
+      });
+    }
+
     try {
       const capture = await updateCardScanDebugCapture({
         captureId,
         viewerId: authReq.user!.id,
         isAdmin: authReq.user?.isAdmin ?? false,
         feedbackStatus: rawStatus as CardScanDebugFeedbackStatus | undefined,
+        reviewTags: rawReviewTags as CardScanDebugReviewTag[] | undefined,
         notes: typeof body.notes === 'string' ? body.notes : undefined,
         expectedExternalId:
           typeof body.expectedExternalId === 'string' ? body.expectedExternalId : undefined,

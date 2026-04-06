@@ -18,6 +18,7 @@ import {
   updateCardScanDebugCaptureApi,
   type CardScanDebugCaptureSummary,
   type CardScanMatch,
+  type CardScanReviewTag,
   type CardScanResponse,
   type CardScanStats,
 } from "@/lib/api/scan";
@@ -67,11 +68,31 @@ function confidenceTone(confidence: number): string {
   return "bg-rose-500/10 text-rose-700 border-rose-300";
 }
 
-function formatQuality(quality?: number): string | null {
-  if (quality === undefined || Number.isNaN(quality)) {
+const REVIEW_TAG_OPTIONS: Array<{
+  value: CardScanReviewTag;
+  label: string;
+}> = [
+  { value: "wrong_printing", label: "Wrong Printing" },
+  { value: "wrong_species", label: "Wrong Species" },
+  { value: "bad_crop", label: "Bad Crop" },
+  { value: "blur", label: "Blur" },
+  { value: "glare", label: "Glare" },
+  { value: "multiple_cards", label: "Multiple Cards" },
+  { value: "energy_or_trainer", label: "Energy / Trainer" },
+  { value: "no_card_present", label: "No Card Present" },
+];
+
+function formatQuality(
+  quality?: { score?: number | null } | null,
+): string | null {
+  if (
+    quality?.score === undefined ||
+    quality?.score === null ||
+    Number.isNaN(quality.score)
+  ) {
     return null;
   }
-  return `${Math.round(quality * 100)}%`;
+  return `${Math.round(quality.score * 100)}%`;
 }
 
 function feedbackTone(
@@ -107,6 +128,35 @@ function formatFeedbackLabel(
 function formatCaptureTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatDuration(value?: number | null): string | null {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return null;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)}s`;
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function formatReviewTag(tag: CardScanReviewTag): string {
+  return (
+    REVIEW_TAG_OPTIONS.find((entry) => entry.value === tag)?.label ??
+    tag.replace(/_/g, " ")
+  );
+}
+
+function formatRevision(
+  revision?: { revision: string; total: number | null } | null,
+): string {
+  if (!revision) {
+    return "unknown";
+  }
+
+  return revision.total !== null
+    ? `${revision.revision} · ${revision.total.toLocaleString()} entries`
+    : revision.revision;
 }
 
 export function CardScanPanel() {
@@ -504,9 +554,12 @@ export function CardScanPanel() {
     }
   };
 
-  const handleCaptureFeedback = async (
+  const handleCaptureUpdate = async (
     captureId: string,
-    feedbackStatus: CardScanDebugCaptureSummary["feedbackStatus"],
+    updates: {
+      feedbackStatus?: CardScanDebugCaptureSummary["feedbackStatus"];
+      reviewTags?: CardScanReviewTag[];
+    },
   ) => {
     if (!token) {
       return;
@@ -519,7 +572,8 @@ export function CardScanPanel() {
       const response = await updateCardScanDebugCaptureApi({
         captureId,
         token,
-        feedbackStatus,
+        feedbackStatus: updates.feedbackStatus,
+        reviewTags: updates.reviewTags,
       });
 
       setDebugCaptures((previous) =>
@@ -536,6 +590,24 @@ export function CardScanPanel() {
     } finally {
       setUpdatingCaptureId(null);
     }
+  };
+
+  const handleCaptureFeedback = async (
+    captureId: string,
+    feedbackStatus: CardScanDebugCaptureSummary["feedbackStatus"],
+  ) => {
+    await handleCaptureUpdate(captureId, { feedbackStatus });
+  };
+
+  const handleCaptureTagToggle = async (
+    capture: CardScanDebugCaptureSummary,
+    reviewTag: CardScanReviewTag,
+  ) => {
+    const nextTags = capture.reviewTags.includes(reviewTag)
+      ? capture.reviewTags.filter((tag) => tag !== reviewTag)
+      : [...capture.reviewTags, reviewTag];
+
+    await handleCaptureUpdate(capture.id, { reviewTags: nextTags });
   };
 
   const bestMatch = result?.match ?? null;
@@ -795,83 +867,366 @@ export function CardScanPanel() {
                 {debugCaptures.map((capture) => (
                   <div
                     key={capture.id}
-                    className="flex gap-3 rounded-lg border bg-background p-3"
+                    className="space-y-3 rounded-lg border bg-background p-3"
                   >
-                    <img
-                      src={capture.sourceImageUrl}
-                      alt={capture.bestMatch?.name ?? "Saved scan capture"}
-                      className="h-20 w-16 shrink-0 rounded-md border object-cover"
-                    />
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          className={cn(
-                            "border",
-                            feedbackTone(capture.feedbackStatus),
-                          )}
-                        >
-                          {formatFeedbackLabel(capture.feedbackStatus)}
-                        </Badge>
-                        {capture.bestMatch?.confidence !== null &&
-                        capture.bestMatch?.confidence !== undefined ? (
-                          <Badge variant="outline">
-                            {formatConfidence(capture.bestMatch.confidence)}
+                    <div className="flex gap-3">
+                      <img
+                        src={capture.sourceImageUrl}
+                        alt={capture.bestMatch?.name ?? "Saved scan capture"}
+                        className="h-20 w-16 shrink-0 rounded-md border object-cover"
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            className={cn(
+                              "border",
+                              feedbackTone(capture.feedbackStatus),
+                            )}
+                          >
+                            {formatFeedbackLabel(capture.feedbackStatus)}
                           </Badge>
-                        ) : null}
-                      </div>
-                      <div>
-                        <p className="truncate text-sm font-medium">
-                          {capture.bestMatch?.name ?? "No best match"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {capture.bestMatch?.tcg
-                            ? GAME_LABELS[capture.bestMatch.tcg]
-                            : "Unknown game"}
-                          {capture.bestMatch?.distance !== null &&
-                          capture.bestMatch?.distance !== undefined
-                            ? ` • Distance ${capture.bestMatch.distance}`
-                            : ""}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCaptureTime(capture.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={updatingCaptureId === capture.id}
-                          onClick={() =>
-                            handleCaptureFeedback(capture.id, "correct")
-                          }
-                        >
-                          Correct
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={updatingCaptureId === capture.id}
-                          onClick={() =>
-                            handleCaptureFeedback(capture.id, "incorrect")
-                          }
-                        >
-                          Wrong
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={updatingCaptureId === capture.id}
-                          onClick={() =>
-                            handleCaptureFeedback(capture.id, "unreviewed")
-                          }
-                        >
-                          Reset
-                        </Button>
+                          {capture.bestMatch?.confidence !== null &&
+                          capture.bestMatch?.confidence !== undefined ? (
+                            <Badge variant="outline">
+                              {formatConfidence(capture.bestMatch.confidence)}
+                            </Badge>
+                          ) : null}
+                          {capture.reviewTags.map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              {formatReviewTag(tag)}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div>
+                          <p className="truncate text-sm font-medium">
+                            {capture.bestMatch?.name ?? "No best match"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {capture.bestMatch?.tcg
+                              ? GAME_LABELS[capture.bestMatch.tcg]
+                              : "Unknown game"}
+                            {capture.bestMatch?.distance !== null &&
+                            capture.bestMatch?.distance !== undefined
+                              ? ` • Distance ${capture.bestMatch.distance}`
+                              : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCaptureTime(capture.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={updatingCaptureId === capture.id}
+                            onClick={() =>
+                              handleCaptureFeedback(capture.id, "correct")
+                            }
+                          >
+                            Correct
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={updatingCaptureId === capture.id}
+                            onClick={() =>
+                              handleCaptureFeedback(capture.id, "incorrect")
+                            }
+                          >
+                            Wrong
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingCaptureId === capture.id}
+                            onClick={() =>
+                              handleCaptureFeedback(capture.id, "unreviewed")
+                            }
+                          >
+                            Reset
+                          </Button>
+                        </div>
                       </div>
                     </div>
+
+                    <details className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                      <summary className="cursor-pointer select-none font-medium">
+                        Debug details
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <div className="space-y-2">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Derived crops
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              {
+                                label: "Corrected",
+                                url: capture.artifactImages.correctedImageUrl,
+                              },
+                              {
+                                label: "Artwork",
+                                url: capture.artifactImages.artworkImageUrl,
+                              },
+                              {
+                                label: "Title",
+                                url: capture.artifactImages.titleImageUrl,
+                              },
+                              {
+                                label: "Footer",
+                                url: capture.artifactImages.footerImageUrl,
+                              },
+                            ]
+                              .filter((artifact) => artifact.url)
+                              .map((artifact) => (
+                                <div
+                                  key={artifact.label}
+                                  className="space-y-1"
+                                >
+                                  <img
+                                    src={artifact.url ?? undefined}
+                                    alt={`${artifact.label} crop`}
+                                    className="h-16 w-16 rounded-md border object-cover"
+                                  />
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {artifact.label}
+                                  </p>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Issue tags
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {REVIEW_TAG_OPTIONS.map((tag) => {
+                              const selected = capture.reviewTags.includes(
+                                tag.value,
+                              );
+                              return (
+                                <Button
+                                  key={tag.value}
+                                  type="button"
+                                  size="sm"
+                                  variant={selected ? "secondary" : "outline"}
+                                  disabled={updatingCaptureId === capture.id}
+                                  onClick={() =>
+                                    handleCaptureTagToggle(capture, tag.value)
+                                  }
+                                >
+                                  {tag.label}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                          <p>
+                            Total{" "}
+                            {formatDuration(capture.diagnostics?.timings?.totalMs) ??
+                              "n/a"}
+                            {" · "}Preprocess{" "}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.preprocessMs,
+                            ) ?? "n/a"}
+                          </p>
+                          <p>
+                            Hash{" "}
+                            {formatDuration(capture.diagnostics?.timings?.hashMs) ??
+                              "n/a"}
+                            {" · "}Feature{" "}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.featureHashMs,
+                            ) ?? "n/a"}
+                          </p>
+                          <p>
+                            Ranking{" "}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.rankingMs,
+                            ) ?? "n/a"}
+                            {" · "}Artwork{" "}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.artworkRerankMs,
+                            ) ?? "n/a"}
+                          </p>
+                          <p>
+                            Angle{" "}
+                            {capture.diagnostics?.geometry?.rotationAngle !==
+                              undefined &&
+                            capture.diagnostics?.geometry?.rotationAngle !== null
+                              ? `${capture.diagnostics.geometry.rotationAngle.toFixed(1)}°`
+                              : "n/a"}
+                            {" · "}Aspect{" "}
+                            {capture.diagnostics?.geometry?.cropAspectRatio !==
+                              undefined &&
+                            capture.diagnostics?.geometry?.cropAspectRatio !== null
+                              ? capture.diagnostics.geometry.cropAspectRatio.toFixed(
+                                  3,
+                                )
+                              : "n/a"}
+                          </p>
+                          <p>
+                            Contour{" "}
+                            {capture.diagnostics?.geometry?.contourConfidence !==
+                              undefined &&
+                            capture.diagnostics?.geometry?.contourConfidence !==
+                              null
+                              ? `${Math.round(capture.diagnostics.geometry.contourConfidence * 100)}%`
+                              : "n/a"}
+                            {" · "}Score{" "}
+                            {capture.diagnostics?.geometry
+                              ?.cropCandidateScore !== undefined &&
+                            capture.diagnostics?.geometry
+                              ?.cropCandidateScore !== null
+                              ? `${Math.round(capture.diagnostics.geometry.cropCandidateScore * 100)}%`
+                              : "n/a"}
+                          </p>
+                          <p>
+                            Build{" "}
+                            {capture.pipeline?.build.gitSha
+                              ? capture.pipeline.build.gitSha.slice(0, 12)
+                              : "unknown"}
+                            {capture.pipeline?.build.imageTag
+                              ? ` · ${capture.pipeline.build.imageTag}`
+                              : ""}
+                          </p>
+                          <p>
+                            Hash DB{" "}
+                            {formatRevision(
+                              capture.pipeline?.hashDatabase?.dataset,
+                            )}
+                          </p>
+                          <p>
+                            Artwork DB{" "}
+                            {formatRevision(
+                              capture.pipeline?.artworkDatabase?.dataset,
+                            )}
+                          </p>
+                          <p>
+                            Mask{" "}
+                            {capture.diagnostics?.geometry?.maskVariant ?? "n/a"}
+                            {" · "}Points{" "}
+                            {capture.diagnostics?.geometry?.contourPoints
+                              ?.length ?? 0}
+                          </p>
+                        </div>
+
+                        {capture.diagnostics?.artwork ? (
+                          <div className="space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Artwork matches
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {capture.diagnostics.artwork.rerankTopMatches
+                                .slice(0, 3)
+                                .map((candidate) => (
+                                  <Badge
+                                    key={`${candidate.externalId}-rerank`}
+                                    variant="outline"
+                                  >
+                                    {candidate.name} ·{" "}
+                                    {Math.round(candidate.similarity * 100)}%
+                                  </Badge>
+                                ))}
+                              {!capture.diagnostics.artwork.rerankTopMatches
+                                .length &&
+                              capture.diagnostics.artwork.prefilterTopMatches
+                                .length
+                                ? capture.diagnostics.artwork.prefilterTopMatches
+                                    .slice(0, 3)
+                                    .map((candidate) => (
+                                      <Badge
+                                        key={`${candidate.externalId}-prefilter`}
+                                        variant="outline"
+                                      >
+                                        {candidate.name} ·{" "}
+                                        {Math.round(
+                                          candidate.similarity * 100,
+                                        )}
+                                        %
+                                      </Badge>
+                                    ))
+                                : null}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {capture.diagnostics?.ocr ? (
+                          <div className="space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              OCR
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {capture.diagnostics.ocr.attempted
+                                ? `OCR ${formatDuration(capture.diagnostics.ocr.durationMs) ?? "n/a"}`
+                                : "OCR not attempted"}
+                            </p>
+                            {capture.diagnostics.ocr.candidates.length ? (
+                              <div className="flex flex-wrap gap-2">
+                                {capture.diagnostics.ocr.candidates
+                                  .slice(0, 3)
+                                  .map((candidate, index) => (
+                                    <Badge
+                                      key={`${candidate.text}-${index}`}
+                                      variant="outline"
+                                    >
+                                      {candidate.text} ·{" "}
+                                      {Math.round(candidate.confidence)}
+                                    </Badge>
+                                  ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {capture.diagnostics?.attempts?.length ? (
+                          <div className="space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Variant attempts
+                            </p>
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              {capture.diagnostics.attempts
+                                .slice(0, 4)
+                                .map((attempt) => (
+                                  <p key={`${capture.id}-${attempt.variant}`}>
+                                    {attempt.variant} · threshold{" "}
+                                    {attempt.threshold} · shortlist{" "}
+                                    {attempt.shortlistSize} · hash{" "}
+                                    {formatDuration(attempt.hashMs) ?? "n/a"}
+                                  </p>
+                                ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {capture.diagnostics?.rejectedNearMisses?.length ? (
+                          <div className="space-y-1">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Near misses
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {capture.diagnostics.rejectedNearMisses.map(
+                                (candidate) => (
+                                  <Badge
+                                    key={`${candidate.tcg}:${candidate.externalId}`}
+                                    variant="outline"
+                                  >
+                                    {candidate.name} · {candidate.distance} ·{" "}
+                                    {Math.round(candidate.confidence * 100)}%
+                                  </Badge>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
                   </div>
                 ))}
               </div>
