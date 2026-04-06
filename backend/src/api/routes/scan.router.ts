@@ -29,6 +29,26 @@ function parseBooleanLike(value: unknown): boolean {
 }
 
 function resolveRequestOrigin(req: AuthRequest): string | null {
+  const originHeader = req.get('origin');
+  if (originHeader) {
+    try {
+      const originUrl = new URL(originHeader);
+      return originUrl.origin;
+    } catch {
+      // ignore malformed origin headers
+    }
+  }
+
+  const refererHeader = req.get('referer');
+  if (refererHeader) {
+    try {
+      const refererUrl = new URL(refererHeader);
+      return refererUrl.origin;
+    } catch {
+      // ignore malformed referer headers
+    }
+  }
+
   const forwardedProto = req.headers['x-forwarded-proto'];
   const forwardedHost = req.headers['x-forwarded-host'];
   const protoHeader = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
