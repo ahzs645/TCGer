@@ -3,8 +3,10 @@ import UIKit
 
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var selectedCardForBinder: Card?
+    @State private var showingRecentDebugCaptures = false
 
     var body: some View {
         ZStack {
@@ -64,6 +66,12 @@ struct CardScannerView: View {
                     isAltered: isAltered
                 )
             }
+        }
+        .sheet(isPresented: $showingRecentDebugCaptures) {
+            RecentDebugCapturesSheet(
+                color: accentColor(for: viewModel.selectedMode)
+            )
+            .environmentObject(environmentStore)
         }
         .alert(isPresented: Binding(
             get: { viewModel.errorMessage != nil },
@@ -185,6 +193,10 @@ struct CardScannerView: View {
                     .padding(.horizontal)
             }
 
+            if hasEnabledScanModes && isModeSupported {
+                debugCaptureControls
+            }
+
             Button(action: {
                 viewModel.capturePhoto()
             }) {
@@ -223,6 +235,64 @@ struct CardScannerView: View {
                     .padding(.horizontal)
             }
         }
+    }
+
+    private var debugCaptureControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: $viewModel.saveDebugCapture) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Save Debug Capture")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                    Text("Store the upload, derived crops, guess, timings, and pipeline metadata on the server.")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.82))
+                }
+            }
+            .tint(accentColor(for: viewModel.selectedMode))
+
+            if viewModel.saveDebugCapture {
+                TextField("Optional notes: lighting, timestamp, failure mode", text: $viewModel.captureNotes, axis: .vertical)
+                    .textInputAutocapitalization(.sentences)
+                    .disableAutocorrection(false)
+                    .padding(10)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .foregroundColor(.white)
+            }
+
+            HStack(spacing: 12) {
+                Button(showTestingTools ? "Hide Testing Tools" : "Show Testing Tools") {
+                    showTestingTools.toggle()
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(.white)
+
+                if showTestingTools {
+                    Button("Recent Debug Captures") {
+                        showingRecentDebugCaptures = true
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(accentColor(for: viewModel.selectedMode))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+
+            if showTestingTools {
+                Text("Testing tools stay hidden by default. Turn them off here once you’re done collecting samples.")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.78))
+            }
+        }
+        .padding(14)
+        .background(Color.black.opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
     }
 
     private func accentColor(for mode: ScanMode) -> Color {
@@ -338,6 +408,10 @@ private extension CardScannerView {
 private struct ScanResultSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var selectedCandidate: CardScanCandidate
+    @State private var debugCapture: APIService.ScanDebugCaptureResponse?
+    @State private var debugCaptureError: String?
+    @State private var isUpdatingDebugCapture = false
+
     let result: CardScanResult
     let color: Color
     let onAddToBinder: (CardScanCandidate) -> Void
@@ -351,6 +425,8 @@ private struct ScanResultSheet: View {
         self.color = color
         self.onAddToBinder = onAddToBinder
         _selectedCandidate = State(initialValue: result.primary)
+        _debugCapture = State(initialValue: result.debugCapture)
+        _debugCaptureError = State(initialValue: result.debugCaptureError)
     }
 
     var body: some View {
@@ -360,6 +436,9 @@ private struct ScanResultSheet: View {
                     headerSection
                     confidenceSection
                     matcherSection
+                    if debugCapture != nil || debugCaptureError != nil {
+                        debugCaptureSection
+                    }
                     if !result.alternatives.isEmpty {
                         alternativesSection
                     }
@@ -452,7 +531,7 @@ private struct ScanResultSheet: View {
 
     private var confidenceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Confidence")
+            Text("Match Score")
                 .font(.headline)
             Text(String(format: "%.0f%%", selectedCandidate.confidence.score * 100))
                 .font(.title2)
@@ -480,6 +559,213 @@ private struct ScanResultSheet: View {
                 if let value = selectedCandidate.debugInfo[key] {
                     ScanMetricRow(label: key, value: value)
                 }
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+
+    private var debugCaptureSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Debug Capture")
+                    .font(.headline)
+                Spacer()
+                if isUpdatingDebugCapture {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                }
+            }
+
+            if let debugCaptureError, !debugCaptureError.isEmpty {
+                Text(debugCaptureError)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+            }
+
+            if let capture = debugCapture {
+                HStack(spacing: 8) {
+                    statusBadge(for: capture.feedbackStatus)
+                    if let createdAt = formattedTimestamp(capture.createdAt) {
+                        Text(createdAt)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                ScanMetricRow(label: "Capture ID", value: shortIdentifier(capture.id))
+                if let captureSource = capture.captureSource, !captureSource.isEmpty {
+                    ScanMetricRow(label: "Source", value: captureSource)
+                }
+                if let notes = capture.notes, !notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Notes")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                        Text(notes)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                reviewStatusSection(capture: capture)
+                reviewTagsSection(capture: capture)
+
+                if hasArtifactImages(for: capture) {
+                    DisclosureGroup("Artifact Crops") {
+                        artifactImagesSection(capture: capture)
+                            .padding(.top, 8)
+                    }
+                }
+
+                if let timings = capture.diagnostics?.timings {
+                    DisclosureGroup("Timings") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(timingRows(for: timings), id: \.label) { row in
+                                ScanMetricRow(label: row.label, value: row.value)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let geometry = capture.diagnostics?.geometry {
+                    DisclosureGroup("Geometry") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(geometryRows(for: geometry), id: \.label) { row in
+                                ScanMetricRow(label: row.label, value: row.value)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let pipeline = capture.pipeline {
+                    DisclosureGroup("Pipeline") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ScanMetricRow(label: "Git SHA", value: shortIdentifier(pipeline.build.gitSha))
+                            if let imageTag = pipeline.build.imageTag, !imageTag.isEmpty {
+                                ScanMetricRow(label: "Image", value: imageTag)
+                            }
+                            if let backendMode = pipeline.build.backendMode, !backendMode.isEmpty {
+                                ScanMetricRow(label: "Backend", value: backendMode)
+                            }
+                            ScanMetricRow(label: "Hash DB", value: formatRevision(pipeline.hashDatabase.dataset))
+                            ScanMetricRow(label: "Artwork DB", value: formatRevision(pipeline.artworkDatabase.dataset))
+                            ScanMetricRow(label: "pHash", value: pipeline.matcher.phashVersion)
+                            ScanMetricRow(label: "Artwork", value: pipeline.matcher.artworkVersion)
+                            if let detectorModelVersion = pipeline.matcher.detectorModelVersion, !detectorModelVersion.isEmpty {
+                                ScanMetricRow(label: "Detector", value: detectorModelVersion)
+                            }
+                            if let ocrModelVersion = pipeline.matcher.ocrModelVersion, !ocrModelVersion.isEmpty {
+                                ScanMetricRow(label: "OCR", value: ocrModelVersion)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let artwork = capture.diagnostics?.artwork,
+                   !artwork.prefilterTopMatches.isEmpty || !artwork.rerankTopMatches.isEmpty {
+                    DisclosureGroup("Artwork Diagnostics") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if !artwork.prefilterTopMatches.isEmpty {
+                                diagnosticCandidateList(
+                                    title: artwork.prefilterApplied ? "Prefilter Top Matches" : "Artwork Top Matches",
+                                    rows: artwork.prefilterTopMatches.map {
+                                        DiagnosticRow(
+                                            title: $0.name,
+                                            subtitle: $0.setCode,
+                                            trailing: String(format: "%.3f", $0.similarity)
+                                        )
+                                    }
+                                )
+                            }
+                            if !artwork.rerankTopMatches.isEmpty {
+                                diagnosticCandidateList(
+                                    title: "Rerank Top Matches",
+                                    rows: artwork.rerankTopMatches.map {
+                                        DiagnosticRow(
+                                            title: $0.name,
+                                            subtitle: $0.setCode,
+                                            trailing: String(format: "%.3f", $0.similarity)
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let ocr = capture.diagnostics?.ocr, ocr.attempted || !ocr.candidates.isEmpty {
+                    DisclosureGroup("OCR Diagnostics") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ScanMetricRow(label: "Attempted", value: ocr.attempted ? "Yes" : "No")
+                            if let duration = formatDuration(ocr.durationMs) {
+                                ScanMetricRow(label: "OCR Time", value: duration)
+                            }
+                            ForEach(Array(ocr.candidates.prefix(5).enumerated()), id: \.offset) { entry in
+                                let candidate = entry.element
+                                ScanMetricRow(
+                                    label: candidate.text,
+                                    value: String(format: "%.2f", candidate.confidence)
+                                )
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let attempts = capture.diagnostics?.attempts, !attempts.isEmpty {
+                    DisclosureGroup("Variant Attempts") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(Array(attempts.prefix(4).enumerated()), id: \.offset) { entry in
+                                let attempt = entry.element
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(attempt.variant) · threshold \(attempt.threshold)")
+                                        .font(.subheadline.weight(.medium))
+                                    HStack(spacing: 12) {
+                                        if let hashMs = formatDuration(attempt.hashMs) {
+                                            Text("hash \(hashMs)")
+                                        }
+                                        if let rankingMs = formatDuration(attempt.rankingMs) {
+                                            Text("rank \(rankingMs)")
+                                        }
+                                        Text("shortlist \(attempt.shortlistSize)")
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }
+                                .padding(10)
+                                .background(Color(.tertiarySystemBackground))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+
+                if let nearMisses = capture.diagnostics?.rejectedNearMisses, !nearMisses.isEmpty {
+                    DisclosureGroup("Rejected Near Misses") {
+                        diagnosticCandidateList(
+                            title: nil,
+                            rows: nearMisses.prefix(6).map {
+                                DiagnosticRow(
+                                    title: $0.name,
+                                    subtitle: $0.setCode,
+                                    trailing: "d \($0.distance)"
+                                )
+                            }
+                        )
+                        .padding(.top, 8)
+                    }
+                }
+            } else {
+                Text("Enable Save Debug Capture before scanning to persist crops and diagnostics from the phone.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
@@ -528,6 +814,299 @@ private struct ScanResultSheet: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
+
+    private func reviewStatusSection(capture: APIService.ScanDebugCaptureResponse) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Review Status")
+                .font(.subheadline.weight(.medium))
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(reviewStatuses, id: \.rawValue) { status in
+                    Button {
+                        Task { await updateDebugCapture(feedbackStatus: status, reviewTags: nil) }
+                    } label: {
+                        Text(status.displayLabel)
+                            .font(.footnote.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(capture.feedbackStatus == status ? feedbackColor(for: status).opacity(0.18) : Color(.tertiarySystemBackground))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(capture.feedbackStatus == status ? feedbackColor(for: status) : Color.gray.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingDebugCapture)
+                }
+            }
+        }
+    }
+
+    private func reviewTagsSection(capture: APIService.ScanDebugCaptureResponse) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Failure Tags")
+                .font(.subheadline.weight(.medium))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+                ForEach(CardScanReviewTag.allCases) { tag in
+                    let isSelected = capture.reviewTags.contains(tag)
+                    Button {
+                        var nextTags = capture.reviewTags
+                        if isSelected {
+                            nextTags.removeAll { $0 == tag }
+                        } else {
+                            nextTags.append(tag)
+                        }
+                        Task { await updateDebugCapture(feedbackStatus: nil, reviewTags: nextTags) }
+                    } label: {
+                        Text(tag.displayLabel)
+                            .font(.caption.weight(.medium))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 9)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(isSelected ? color.opacity(0.16) : Color(.tertiarySystemBackground))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(isSelected ? color : Color.gray.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingDebugCapture)
+                }
+            }
+        }
+    }
+
+    private func artifactImagesSection(capture: APIService.ScanDebugCaptureResponse) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(artifactImageItems(for: capture), id: \.title) { item in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(item.title)
+                            .font(.caption.weight(.medium))
+                        CachedAsyncImage(url: item.url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .failure:
+                                Color.red.opacity(0.1)
+                                    .overlay(Image(systemName: "exclamationmark.triangle").foregroundColor(.red))
+                            default:
+                                Color.gray.opacity(0.12)
+                                    .overlay(ProgressView())
+                            }
+                        }
+                        .frame(width: 140, height: 196)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .frame(width: 140, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func diagnosticCandidateList(
+        title: String?,
+        rows: [DiagnosticRow]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let title {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+            }
+            ForEach(Array(rows.enumerated()), id: \.offset) { entry in
+                let row = entry.element
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(row.title)
+                            .font(.subheadline)
+                        Spacer()
+                        Text(row.trailing)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    if let subtitle = row.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(10)
+                .background(Color(.tertiarySystemBackground))
+                .cornerRadius(10)
+            }
+        }
+    }
+
+    private func updateDebugCapture(
+        feedbackStatus: CardScanDebugFeedbackStatus?,
+        reviewTags: [CardScanReviewTag]?
+    ) async {
+        guard let capture = debugCapture else { return }
+        guard let token = environmentStore.authToken else {
+            debugCaptureError = "You need to be logged in to update debug captures."
+            return
+        }
+
+        isUpdatingDebugCapture = true
+        defer { isUpdatingDebugCapture = false }
+
+        do {
+            let updatedCapture = try await APIService().updateScanDebugCapture(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                captureId: capture.id,
+                feedbackStatus: feedbackStatus,
+                reviewTags: reviewTags
+            )
+            debugCapture = updatedCapture
+            debugCaptureError = nil
+        } catch {
+            debugCaptureError = error.localizedDescription
+        }
+    }
+
+    private var reviewStatuses: [CardScanDebugFeedbackStatus] {
+        [.correct, .incorrect, .needsReview, .unreviewed]
+    }
+
+    private func statusBadge(for status: CardScanDebugFeedbackStatus) -> some View {
+        Text(status.displayLabel)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(feedbackColor(for: status).opacity(0.14))
+            .foregroundColor(feedbackColor(for: status))
+            .clipShape(Capsule())
+    }
+
+    private func feedbackColor(for status: CardScanDebugFeedbackStatus) -> Color {
+        switch status {
+        case .correct:
+            return .green
+        case .incorrect:
+            return .red
+        case .needsReview:
+            return .orange
+        case .unreviewed:
+            return .secondary
+        }
+    }
+
+    private func hasArtifactImages(for capture: APIService.ScanDebugCaptureResponse) -> Bool {
+        !artifactImageItems(for: capture).isEmpty
+    }
+
+    private func artifactImageItems(
+        for capture: APIService.ScanDebugCaptureResponse
+    ) -> [ArtifactImageItem] {
+        [
+            ArtifactImageItem(title: "Original", url: URL(string: capture.sourceImageUrl)),
+            ArtifactImageItem(title: "Corrected", url: URL(string: capture.artifactImages.correctedImageUrl ?? "")),
+            ArtifactImageItem(title: "Artwork", url: URL(string: capture.artifactImages.artworkImageUrl ?? "")),
+            ArtifactImageItem(title: "Title", url: URL(string: capture.artifactImages.titleImageUrl ?? "")),
+            ArtifactImageItem(title: "Footer", url: URL(string: capture.artifactImages.footerImageUrl ?? ""))
+        ]
+        .filter { $0.url != nil }
+    }
+
+    private func timingRows(
+        for timings: APIService.ScanTimingMetricsResponse
+    ) -> [MetricRowValue] {
+        let entries: [(String, Double?)] = [
+            ("Preprocess", timings.preprocessMs),
+            ("Perspective", timings.perspectiveCorrectionMs),
+            ("Quality", timings.qualityMs),
+            ("Hash", timings.hashMs),
+            ("Feature Hash", timings.featureHashMs),
+            ("Ranking", timings.rankingMs),
+            ("Artwork Prefilter", timings.artworkPrefilterMs),
+            ("Artwork Rerank", timings.artworkRerankMs),
+            ("OCR", timings.ocrMs),
+            ("Total", timings.totalMs)
+        ]
+
+        return entries.compactMap { entry in
+            guard let value = formatDuration(entry.1) else { return nil }
+            return MetricRowValue(label: entry.0, value: value)
+        }
+    }
+
+    private func geometryRows(
+        for geometry: APIService.ScanGeometryResponse
+    ) -> [MetricRowValue] {
+        var rows: [MetricRowValue] = []
+        if let corrected = geometry.perspectiveCorrected {
+            rows.append(MetricRowValue(label: "Perspective", value: corrected ? "Corrected" : "Raw"))
+        }
+        if let contourAreaRatio = geometry.contourAreaRatio {
+            rows.append(MetricRowValue(label: "Contour Area", value: String(format: "%.3f", contourAreaRatio)))
+        }
+        if let contourConfidence = geometry.contourConfidence {
+            rows.append(MetricRowValue(label: "Contour Confidence", value: String(format: "%.3f", contourConfidence)))
+        }
+        if let rotationAngle = geometry.rotationAngle {
+            rows.append(MetricRowValue(label: "Rotation", value: String(format: "%.1f°", rotationAngle)))
+        }
+        if let cropAspectRatio = geometry.cropAspectRatio {
+            rows.append(MetricRowValue(label: "Crop Aspect", value: String(format: "%.3f", cropAspectRatio)))
+        }
+        if let cropWidth = geometry.cropWidth, let cropHeight = geometry.cropHeight {
+            rows.append(MetricRowValue(label: "Crop Size", value: "\(Int(cropWidth))×\(Int(cropHeight))"))
+        }
+        if let cropCandidateScore = geometry.cropCandidateScore {
+            rows.append(MetricRowValue(label: "Crop Score", value: String(format: "%.3f", cropCandidateScore)))
+        }
+        if let maskVariant = geometry.maskVariant, !maskVariant.isEmpty {
+            rows.append(MetricRowValue(label: "Mask", value: maskVariant))
+        }
+        return rows
+    }
+
+    private func formattedTimestamp(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let formatter = ISO8601DateFormatter()
+        let date = formatter.date(from: value)
+        if let date {
+            return date.formatted(date: .abbreviated, time: .shortened)
+        }
+        return value
+    }
+
+    private func shortIdentifier(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "unknown" }
+        if value.count <= 12 {
+            return value
+        }
+        return String(value.prefix(7))
+    }
+
+    private func formatRevision(_ revision: APIService.ScanDatasetRevisionResponse?) -> String {
+        guard let revision else { return "unknown" }
+        if let total = revision.total {
+            return "\(revision.revision) · \(total) entries"
+        }
+        return revision.revision
+    }
+
+    private func formatDuration(_ milliseconds: Double?) -> String? {
+        guard let milliseconds, milliseconds.isFinite else { return nil }
+        if milliseconds >= 1000 {
+            return String(format: "%.2fs", milliseconds / 1000)
+        }
+        return String(format: "%.0fms", milliseconds)
+    }
 }
 
 private extension ScanResultSheet {
@@ -536,6 +1115,22 @@ private extension ScanResultSheet {
             uiImage: UIImage(cgImage: result.capturedImage)
         )
     }
+}
+
+private struct ArtifactImageItem {
+    let title: String
+    let url: URL?
+}
+
+private struct DiagnosticRow {
+    let title: String
+    let subtitle: String?
+    let trailing: String
+}
+
+private struct MetricRowValue {
+    let label: String
+    let value: String
 }
 
 private struct ScanMetricRow: View {

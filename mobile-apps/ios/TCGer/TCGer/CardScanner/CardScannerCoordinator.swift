@@ -86,7 +86,9 @@ final class CardScannerCoordinator {
                         capturedImage: result.capturedImage,
                         primary: result.primary,
                         alternatives: result.alternatives,
-                        elapsed: elapsed
+                        elapsed: elapsed,
+                        debugCapture: result.debugCapture,
+                        debugCaptureError: result.debugCaptureError
                     )
                     return .success(result)
                 }

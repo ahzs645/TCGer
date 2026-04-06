@@ -101,6 +101,62 @@ struct CardScanConfidence: Hashable, Sendable {
     static let none = CardScanConfidence(score: 0, reason: nil)
 }
 
+enum CardScanDebugFeedbackStatus: String, CaseIterable, Identifiable, Codable, Sendable {
+    case unreviewed
+    case correct
+    case incorrect
+    case needsReview = "needs_review"
+
+    var id: String { rawValue }
+
+    var displayLabel: String {
+        switch self {
+        case .unreviewed:
+            return "Unreviewed"
+        case .correct:
+            return "Correct"
+        case .incorrect:
+            return "Wrong"
+        case .needsReview:
+            return "Needs Review"
+        }
+    }
+}
+
+enum CardScanReviewTag: String, CaseIterable, Identifiable, Codable, Sendable {
+    case wrongPrinting = "wrong_printing"
+    case wrongSpecies = "wrong_species"
+    case badCrop = "bad_crop"
+    case blur
+    case glare
+    case multipleCards = "multiple_cards"
+    case energyOrTrainer = "energy_or_trainer"
+    case noCardPresent = "no_card_present"
+
+    var id: String { rawValue }
+
+    var displayLabel: String {
+        switch self {
+        case .wrongPrinting:
+            return "Wrong Printing"
+        case .wrongSpecies:
+            return "Wrong Species"
+        case .badCrop:
+            return "Bad Crop"
+        case .blur:
+            return "Blur"
+        case .glare:
+            return "Glare"
+        case .multipleCards:
+            return "Multiple Cards"
+        case .energyOrTrainer:
+            return "Energy / Trainer"
+        case .noCardPresent:
+            return "No Card Present"
+        }
+    }
+}
+
 struct CardScanCandidate: Identifiable, Hashable, Sendable {
     let id: UUID
     let details: CardDetails
@@ -130,6 +186,8 @@ struct CardScanResult: Identifiable {
     let primary: CardScanCandidate
     let alternatives: [CardScanCandidate]
     let elapsed: TimeInterval
+    let debugCapture: APIService.ScanDebugCaptureResponse?
+    let debugCaptureError: String?
 
     init(
         id: UUID = UUID(),
@@ -137,7 +195,9 @@ struct CardScanResult: Identifiable {
         capturedImage: CGImage,
         primary: CardScanCandidate,
         alternatives: [CardScanCandidate],
-        elapsed: TimeInterval
+        elapsed: TimeInterval,
+        debugCapture: APIService.ScanDebugCaptureResponse? = nil,
+        debugCaptureError: String? = nil
     ) {
         self.id = id
         self.mode = mode
@@ -145,6 +205,8 @@ struct CardScanResult: Identifiable {
         self.primary = primary
         self.alternatives = alternatives
         self.elapsed = elapsed
+        self.debugCapture = debugCapture
+        self.debugCaptureError = debugCaptureError
     }
 }
 
@@ -160,6 +222,8 @@ struct CardScannerContext: Sendable {
     let serverConfiguration: ServerConfiguration
     let authToken: String?
     let showPricing: Bool
+    let saveDebugCapture: Bool
+    let captureNotes: String?
 }
 
 enum ScanInvocationKind: Sendable {

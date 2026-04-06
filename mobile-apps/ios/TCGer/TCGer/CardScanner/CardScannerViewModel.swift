@@ -24,6 +24,12 @@ final class CardScannerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
+    @Published var saveDebugCapture = true {
+        didSet { rebuildContext() }
+    }
+    @Published var captureNotes = "" {
+        didSet { rebuildContext() }
+    }
 
     let cameraController = CardScannerCameraController()
     private let coordinator: CardScannerCoordinator
@@ -145,7 +151,11 @@ final class CardScannerViewModel: ObservableObject {
             mode: selectedMode,
             serverConfiguration: environmentStore.serverConfiguration,
             authToken: environmentStore.authToken,
-            showPricing: environmentStore.showPricing
+            showPricing: environmentStore.showPricing,
+            saveDebugCapture: saveDebugCapture,
+            captureNotes: captureNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? nil
+                : captureNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         lastAnalysisDate = .distantPast
     }
