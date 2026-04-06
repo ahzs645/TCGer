@@ -131,7 +131,7 @@ scanRouter.post(
     if (saveDebugCapture) {
       try {
         const savedCapture = await createCardScanDebugCapture({
-          userId: authReq.user!.id,
+          viewerId: authReq.user!.id,
           file,
           imageBuffer,
           result,
@@ -211,7 +211,7 @@ scanRouter.get(
     const limit = Math.max(1, Number(query.limit) || 8);
 
     const captures = await listCardScanDebugCaptures({
-      userId: authReq.user!.id,
+      viewerId: authReq.user!.id,
       isAdmin: authReq.user?.isAdmin ?? false,
       scope,
       limit,
@@ -245,7 +245,7 @@ scanRouter.patch(
     try {
       const capture = await updateCardScanDebugCapture({
         captureId,
-        userId: authReq.user!.id,
+        viewerId: authReq.user!.id,
         isAdmin: authReq.user?.isAdmin ?? false,
         feedbackStatus: rawStatus as CardScanDebugFeedbackStatus | undefined,
         notes: typeof body.notes === 'string' ? body.notes : undefined,
