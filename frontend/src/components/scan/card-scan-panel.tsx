@@ -951,7 +951,7 @@ export function CardScanPanel() {
                 <Badge
                   className={cn("border", confidenceTone(bestMatch.confidence))}
                 >
-                  {formatConfidence(bestMatch.confidence)} confidence
+                  {formatConfidence(bestMatch.confidence)} match score
                 </Badge>
                 <Badge variant="outline">{GAME_LABELS[bestMatch.tcg]}</Badge>
                 <Badge variant="outline">Distance {bestMatch.distance}</Badge>
@@ -1004,7 +1004,7 @@ export function CardScanPanel() {
                       value={bestMatch.setCode ?? "N/A"}
                     />
                     <ScanFact
-                      label="Confidence"
+                      label="Match Score"
                       value={formatConfidence(bestMatch.confidence)}
                     />
                     {scanMeta?.variantUsed ? (
