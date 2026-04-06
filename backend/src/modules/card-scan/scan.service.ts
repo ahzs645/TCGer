@@ -3,12 +3,20 @@
  * and matches it against the configured card hash store.
  */
 
+import { performance } from 'node:perf_hooks';
+
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
 import { computeCardFeatureHashes, getStoredCardFeatureHashes, type CardFeatureHashes } from './feature-hashes';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
-import { prepareRuntimeScanImage, type ScanQualityMetrics, type ScanRuntimeVariant } from './preprocess';
+import {
+  prepareRuntimeScanImage,
+  type CardPoint,
+  type ScanQualityMetrics,
+  type ScanRuntimeVariant,
+} from './preprocess';
 import {
   computeArtworkFingerprint,
+  type ArtworkMatch,
   matchArtwork,
   loadArtworkDatabase,
   isArtworkDatabaseLoaded,
@@ -31,6 +39,56 @@ export interface ScanMatch {
   footerDistance?: number | null;
 }
 
+export interface ScanDiagnosticCandidate extends ScanMatch {
+  scoreDistance: number;
+  passedThreshold: boolean;
+}
+
+export interface ScanTimingMetrics {
+  preprocessMs: number;
+  perspectiveCorrectionMs: number;
+  qualityMs: number;
+  hashMs: number;
+  featureHashMs: number;
+  rankingMs: number;
+  artworkPrefilterMs: number | null;
+  artworkRerankMs: number | null;
+  ocrMs: number | null;
+  totalMs: number;
+}
+
+export interface ScanAttemptDiagnostic {
+  variant: string;
+  threshold: number;
+  hashMs: number;
+  featureHashMs: number;
+  rankingMs: number;
+  rerankUsed: boolean;
+  shortlistSize: number;
+  acceptedCandidates: ScanDiagnosticCandidate[];
+  rejectedNearMisses: ScanDiagnosticCandidate[];
+}
+
+export interface ScanDebugData {
+  artifacts: {
+    selectedVariantImage: Buffer;
+    correctedSourceImage: Buffer | null;
+  };
+  timings: ScanTimingMetrics;
+  attempts: ScanAttemptDiagnostic[];
+  rejectedNearMisses: ScanDiagnosticCandidate[];
+  artwork: {
+    prefilterApplied: boolean;
+    prefilterTopMatches: ArtworkMatch[];
+    rerankTopMatches: ArtworkMatch[];
+  };
+  ocr: {
+    attempted: boolean;
+    durationMs: number | null;
+    candidates: Array<{ text: string; confidence: number }>;
+  };
+}
+
 export interface ScanResult {
   bestMatch: ScanMatch | null;
   candidates: ScanMatch[];
@@ -42,9 +100,19 @@ export interface ScanResult {
     variantsTried: string[];
     perspectiveCorrected: boolean;
     contourAreaRatio: number | null;
+    contourConfidence?: number | null;
+    rotationAngle?: number | null;
+    cropAspectRatio?: number | null;
+    cropWidth?: number | null;
+    cropHeight?: number | null;
+    cropCandidateScore?: number | null;
+    contourPoints?: CardPoint[] | null;
+    maskVariant?: string | null;
     rerankUsed: boolean;
     shortlistSize: number;
+    timings?: ScanTimingMetrics;
   };
+  debug?: ScanDebugData;
 }
 
 // ---------- configuration ----------
@@ -76,8 +144,25 @@ export async function scanCardImage(
   tcgFilter?: string,
   options?: { maxDistanceOverride?: number; ocrNameHint?: string }
 ): Promise<ScanResult> {
+  const scanStartedAt = performance.now();
   const runtimeScan = await prepareRuntimeScanImage(imageBuffer);
+  const timings: ScanTimingMetrics = {
+    preprocessMs: runtimeScan.timings.totalMs,
+    perspectiveCorrectionMs: runtimeScan.timings.perspectiveCorrectionMs,
+    qualityMs: runtimeScan.timings.qualityMs,
+    hashMs: 0,
+    featureHashMs: 0,
+    rankingMs: 0,
+    artworkPrefilterMs: null,
+    artworkRerankMs: null,
+    ocrMs: null,
+    totalMs: 0,
+  };
   let hashEntries = await getAllCardHashes(tcgFilter ? { tcg: tcgFilter } : {});
+  let artworkFingerprint: Awaited<ReturnType<typeof computeArtworkFingerprint>> | null = null;
+  let artworkPrefilterApplied = false;
+  let artworkPrefilterTopMatches: ArtworkMatch[] = [];
+  let artworkRerankTopMatches: ArtworkMatch[] = [];
 
   // OCR name hint: fuzzy-filter hash entries to matching card names
   if (options?.ocrNameHint) {
@@ -94,15 +179,20 @@ export async function scanCardImage(
   // Artwork pre-filter: narrow pHash candidates to artwork top-N for speed.
   // Artwork cosine similarity against 21,900 entries takes ~3ms vs pHash ~1500ms.
   if (isArtworkDatabaseLoaded() && !options?.ocrNameHint && hashEntries.length > 100) {
+    const artworkPrefilterStartedAt = performance.now();
     try {
-      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
-      const artTop = matchArtwork(artFp, 50, tcgFilter);
+      artworkFingerprint = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      const artTop = matchArtwork(artworkFingerprint, 50, tcgFilter);
+      artworkPrefilterTopMatches = artTop.slice(0, MAX_CANDIDATES);
       const artIds = new Set(artTop.map((m) => m.externalId));
       hashEntries = hashEntries.filter((entry) => artIds.has(entry.externalId));
+      artworkPrefilterApplied = true;
     } catch { /* fall through to full scan */ }
+    timings.artworkPrefilterMs = performance.now() - artworkPrefilterStartedAt;
   }
 
   const attemptedVariants: string[] = [];
+  const attemptDiagnostics: ScanAttemptDiagnostic[] = [];
   const allMatches = new Map<string, ScanMatch>();
   let bestAttempt: {
     hash: RGBHash;
@@ -111,6 +201,10 @@ export async function scanCardImage(
     shortlistSize: number;
     rerankUsed: boolean;
     match: ScanMatch | null;
+    diagnostics: RankMatchesDiagnostics;
+    hashMs: number;
+    featureHashMs: number;
+    rankingMs: number;
   } | null = null;
 
   const passes = buildScanPasses(runtimeScan.variants, options?.maxDistanceOverride);
@@ -118,12 +212,44 @@ export async function scanCardImage(
   for (const pass of passes) {
     for (const variant of pass.variants) {
       attemptedVariants.push(variant.name);
+      const hashStartedAt = performance.now();
       const [hash, featureHashesByTcg] = await Promise.all([
-        computeRGBHash(variant.image),
-        computeFeatureHashesByTcg(variant.image, hashEntries, tcgFilter),
+        computeRGBHash(variant.image).then((value) => {
+          const duration = performance.now() - hashStartedAt;
+          timings.hashMs += duration;
+          return { value, duration };
+        }),
+        (() => {
+          const featureHashStartedAt = performance.now();
+          return computeFeatureHashesByTcg(variant.image, hashEntries, tcgFilter).then((value) => {
+            const duration = performance.now() - featureHashStartedAt;
+            timings.featureHashMs += duration;
+            return { value, duration };
+          });
+        })(),
       ]);
-      const rankedCandidates = rankMatches(hashEntries, hash, featureHashesByTcg, pass.maxDistance);
-      const matches = rankedCandidates.slice(0, MAX_CANDIDATES).map(({ match }) => match);
+      const rankingStartedAt = performance.now();
+      const rankedCandidates = rankMatches(
+        hashEntries,
+        hash.value,
+        featureHashesByTcg.value,
+        pass.maxDistance,
+      );
+      const rankingMs = performance.now() - rankingStartedAt;
+      timings.rankingMs += rankingMs;
+      const matches = rankedCandidates.accepted.slice(0, MAX_CANDIDATES).map(({ match }) => match);
+
+      attemptDiagnostics.push({
+        variant: variant.name,
+        threshold: pass.maxDistance,
+        hashMs: hash.duration,
+        featureHashMs: featureHashesByTcg.duration,
+        rankingMs,
+        rerankUsed: rankedCandidates.accepted.some(({ reranked }) => reranked),
+        shortlistSize: rankedCandidates.diagnostics.shortlistedCandidates.length,
+        acceptedCandidates: rankedCandidates.diagnostics.acceptedCandidates.slice(0, MAX_CANDIDATES),
+        rejectedNearMisses: rankedCandidates.diagnostics.rejectedNearMisses.slice(0, MAX_CANDIDATES),
+      });
 
       for (const match of matches) {
         const key = `${match.tcg}:${match.externalId}`;
@@ -136,12 +262,16 @@ export async function scanCardImage(
       const bestMatch = matches[0] ?? null;
       if (!bestAttempt || isBetterAttempt(bestMatch, bestAttempt.match)) {
         bestAttempt = {
-          hash,
+          hash: hash.value,
           variant,
           threshold: pass.maxDistance,
-          shortlistSize: rankedCandidates.length,
-          rerankUsed: rankedCandidates.some(({ reranked }) => reranked),
+          shortlistSize: rankedCandidates.accepted.length,
+          rerankUsed: rankedCandidates.accepted.some(({ reranked }) => reranked),
           match: bestMatch,
+          diagnostics: rankedCandidates.diagnostics,
+          hashMs: hash.duration,
+          featureHashMs: featureHashesByTcg.duration,
+          rankingMs,
         };
       }
 
@@ -158,11 +288,13 @@ export async function scanCardImage(
   // Artwork fingerprint matching: boost candidates that also match visually
   // Skip when OCR name hint is active — the hash entries are already filtered by name
   if (isArtworkDatabaseLoaded() && !options?.ocrNameHint) {
+    const artworkRerankStartedAt = performance.now();
     try {
-      const artFp = await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      const artFp = artworkFingerprint ?? await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
       // HSV disabled: adds noise on video crops even at low weight.
       // Artwork color grid alone produces better results (79% vs 71% with HSV).
-      const artMatches = matchArtwork(artFp, 3, tcgFilter);
+      const artMatches = matchArtwork(artFp, 5, tcgFilter);
+      artworkRerankTopMatches = artMatches.slice(0, MAX_CANDIDATES);
 
       if (artMatches.length > 0) {
         const topArt = artMatches[0]!;
@@ -201,6 +333,7 @@ export async function scanCardImage(
         }
       }
     } catch { /* artwork matching unavailable, continue without */ }
+    timings.artworkRerankMs = performance.now() - artworkRerankStartedAt;
   }
 
   // Try loading artwork database lazily on first scan
@@ -214,6 +347,7 @@ export async function scanCardImage(
   const candidates = Array.from(allMatches.values())
     .sort((left, right) => left.distance - right.distance)
     .slice(0, MAX_CANDIDATES);
+  timings.totalMs = performance.now() - scanStartedAt;
 
   return {
     bestMatch: candidates[0] ?? null,
@@ -226,8 +360,36 @@ export async function scanCardImage(
       variantsTried: Array.from(new Set(attemptedVariants)),
       perspectiveCorrected: runtimeScan.perspectiveCorrection.applied,
       contourAreaRatio: runtimeScan.perspectiveCorrection.contourAreaRatio,
+      contourConfidence: runtimeScan.perspectiveCorrection.contourConfidence,
+      rotationAngle: runtimeScan.perspectiveCorrection.rotationAngle,
+      cropAspectRatio: runtimeScan.perspectiveCorrection.cropAspectRatio,
+      cropWidth: runtimeScan.perspectiveCorrection.cropWidth,
+      cropHeight: runtimeScan.perspectiveCorrection.cropHeight,
+      cropCandidateScore: runtimeScan.perspectiveCorrection.candidateScore,
+      contourPoints: runtimeScan.perspectiveCorrection.contourPoints,
+      maskVariant: runtimeScan.perspectiveCorrection.maskVariant,
       rerankUsed: bestAttempt?.rerankUsed ?? false,
       shortlistSize: bestAttempt?.shortlistSize ?? 0,
+      timings,
+    },
+    debug: {
+      artifacts: {
+        selectedVariantImage: bestAttempt?.variant.image ?? runtimeScan.primaryVariant.image,
+        correctedSourceImage: runtimeScan.artifacts.correctedSourceImage,
+      },
+      timings,
+      attempts: attemptDiagnostics,
+      rejectedNearMisses: bestAttempt?.diagnostics.rejectedNearMisses.slice(0, MAX_CANDIDATES) ?? [],
+      artwork: {
+        prefilterApplied: artworkPrefilterApplied,
+        prefilterTopMatches: artworkPrefilterTopMatches,
+        rerankTopMatches: artworkRerankTopMatches,
+      },
+      ocr: {
+        attempted: false,
+        durationMs: null,
+        candidates: [],
+      },
     },
   };
 }
@@ -281,12 +443,23 @@ interface RankedCandidate {
   reranked: boolean;
 }
 
+interface RankMatchesDiagnostics {
+  shortlistedCandidates: ScanDiagnosticCandidate[];
+  acceptedCandidates: ScanDiagnosticCandidate[];
+  rejectedNearMisses: ScanDiagnosticCandidate[];
+}
+
+interface RankMatchesResult {
+  accepted: RankedCandidate[];
+  diagnostics: RankMatchesDiagnostics;
+}
+
 function rankMatches(
   hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
   hashGenerated: RGBHash,
   featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>,
   maxDistance: number
-): RankedCandidate[] {
+): RankMatchesResult {
   const shortlist: Array<{
     entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
     fullDistance: number;
@@ -344,8 +517,7 @@ function rankMatches(
     });
   }
 
-  return shortlist
-    .filter((candidate) => candidate.scoreDistance <= maxDistance)
+  const sortedShortlist = shortlist
     .sort((left, right) => {
       return (
         left.scoreDistance - right.scoreDistance ||
@@ -353,24 +525,29 @@ function rankMatches(
         left.entry.name.localeCompare(right.entry.name)
       );
     })
-    .slice(0, SHORTLIST_LIMIT)
-    .map((candidate) => ({
-      reranked: candidate.reranked,
-      match: {
-        externalId: candidate.entry.externalId,
-        tcg: candidate.entry.tcg,
-        name: candidate.entry.name,
-        setCode: candidate.entry.setCode,
-        setName: candidate.entry.setName,
-        rarity: candidate.entry.rarity,
-        imageUrl: candidate.entry.imageUrl,
-        confidence: computePublicConfidence(candidate.scoreDistance, candidate.entry.hashSize),
-        distance: Math.round(candidate.scoreDistance),
-        fullDistance: candidate.fullDistance,
-        titleDistance: candidate.titleDistance,
-        footerDistance: candidate.footerDistance,
-      },
-    }));
+    .slice(0, SHORTLIST_LIMIT);
+
+  const shortlistedCandidates = sortedShortlist.map((candidate) =>
+    buildDiagnosticCandidate(candidate, candidate.scoreDistance <= maxDistance),
+  );
+  const acceptedCandidates = shortlistedCandidates.filter((candidate) => candidate.passedThreshold);
+  const rejectedNearMisses = shortlistedCandidates
+    .filter((candidate) => !candidate.passedThreshold)
+    .slice(0, MAX_CANDIDATES);
+
+  return {
+    accepted: sortedShortlist
+      .filter((candidate) => candidate.scoreDistance <= maxDistance)
+      .map((candidate) => ({
+        reranked: candidate.reranked,
+        match: buildScanMatch(candidate),
+      })),
+    diagnostics: {
+      shortlistedCandidates,
+      acceptedCandidates,
+      rejectedNearMisses,
+    },
+  };
 }
 
 function isBetterAttempt(candidate: ScanMatch | null, current: ScanMatch | null): boolean {
@@ -456,6 +633,46 @@ function computePublicConfidence(scoreDistance: number, hashSize: number): numbe
 
 function computeLegacyThresholdConfidence(scoreDistance: number): number {
   return Math.max(0, 1 - scoreDistance / MAX_COMBINED_DISTANCE);
+}
+
+function buildScanMatch(candidate: {
+  entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
+  fullDistance: number;
+  titleDistance: number | null;
+  footerDistance: number | null;
+  scoreDistance: number;
+}): ScanMatch {
+  return {
+    externalId: candidate.entry.externalId,
+    tcg: candidate.entry.tcg,
+    name: candidate.entry.name,
+    setCode: candidate.entry.setCode,
+    setName: candidate.entry.setName,
+    rarity: candidate.entry.rarity,
+    imageUrl: candidate.entry.imageUrl,
+    confidence: computePublicConfidence(candidate.scoreDistance, candidate.entry.hashSize),
+    distance: Math.round(candidate.scoreDistance),
+    fullDistance: candidate.fullDistance,
+    titleDistance: candidate.titleDistance,
+    footerDistance: candidate.footerDistance,
+  };
+}
+
+function buildDiagnosticCandidate(
+  candidate: {
+    entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
+    fullDistance: number;
+    titleDistance: number | null;
+    footerDistance: number | null;
+    scoreDistance: number;
+  },
+  passedThreshold: boolean,
+): ScanDiagnosticCandidate {
+  return {
+    ...buildScanMatch(candidate),
+    scoreDistance: candidate.scoreDistance,
+    passedThreshold,
+  };
 }
 
 function pushShortlist(

@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { createRequire } from 'node:module';
+import { performance } from 'node:perf_hooks';
 
 /**
  * Normalize card images into a stable input for perceptual hashing.
@@ -32,13 +33,39 @@ export interface ScanQualityMetrics {
   contrast: number;
 }
 
+export interface CardPoint {
+  x: number;
+  y: number;
+}
+
+export interface PerspectiveCorrectionDiagnostics {
+  contourAreaRatio: number | null;
+  contourConfidence: number | null;
+  rotationAngle: number | null;
+  cropAspectRatio: number | null;
+  cropWidth: number | null;
+  cropHeight: number | null;
+  candidateScore: number | null;
+  contourPoints: CardPoint[] | null;
+  maskVariant: string | null;
+}
+
 export interface RuntimeScanPreparation {
   primaryVariant: ScanRuntimeVariant;
   variants: ScanRuntimeVariant[];
   quality: ScanQualityMetrics | null;
-  perspectiveCorrection: {
+  perspectiveCorrection: PerspectiveCorrectionDiagnostics & {
     applied: boolean;
-    contourAreaRatio: number | null;
+  };
+  timings: {
+    perspectiveCorrectionMs: number;
+    baseNormalizationMs: number;
+    correctedNormalizationMs: number | null;
+    qualityMs: number;
+    totalMs: number;
+  };
+  artifacts: {
+    correctedSourceImage: Buffer | null;
   };
 }
 
@@ -116,13 +143,30 @@ async function normalizeCardImage(imageBuffer: Buffer): Promise<Buffer> {
 
 export async function prepareRuntimeScanImage(imageBuffer: Buffer): Promise<RuntimeScanPreparation> {
   debugScan('prepare:start');
+  const prepareStartedAt = performance.now();
+
+  const perspectiveStartedAt = performance.now();
   const corrected = await tryPerspectiveCorrectCard(imageBuffer);
+  const perspectiveCorrectionMs = performance.now() - perspectiveStartedAt;
   debugScan('prepare:corrected', corrected ? { contourAreaRatio: corrected.contourAreaRatio } : null);
+
+  const baseNormalizationStartedAt = performance.now();
   const baseImage = await preprocessCardImage(imageBuffer);
+  const baseNormalizationMs = performance.now() - baseNormalizationStartedAt;
   debugScan('prepare:base-ready');
-  const correctedImage = corrected ? await preprocessCardImage(corrected.buffer) : null;
+
+  let correctedNormalizationMs: number | null = null;
+  let correctedImage: Buffer | null = null;
+  if (corrected) {
+    const correctedNormalizationStartedAt = performance.now();
+    correctedImage = await preprocessCardImage(corrected.buffer);
+    correctedNormalizationMs = performance.now() - correctedNormalizationStartedAt;
+  }
   debugScan('prepare:corrected-ready', Boolean(correctedImage));
+
+  const qualityStartedAt = performance.now();
   const quality = await computeScanQuality(corrected?.buffer ?? imageBuffer);
+  const qualityMs = performance.now() - qualityStartedAt;
   debugScan('prepare:quality', quality);
 
   const variants: ScanRuntimeVariant[] = [];
@@ -168,6 +212,24 @@ export async function prepareRuntimeScanImage(imageBuffer: Buffer): Promise<Runt
     perspectiveCorrection: {
       applied: corrected !== null,
       contourAreaRatio: corrected?.contourAreaRatio ?? null,
+      contourConfidence: corrected?.contourConfidence ?? null,
+      rotationAngle: corrected?.rotationAngle ?? null,
+      cropAspectRatio: corrected?.aspectRatio ?? null,
+      cropWidth: corrected?.width ?? null,
+      cropHeight: corrected?.height ?? null,
+      candidateScore: corrected?.score ?? null,
+      contourPoints: corrected?.points ?? null,
+      maskVariant: corrected?.maskVariant ?? null,
+    },
+    timings: {
+      perspectiveCorrectionMs,
+      baseNormalizationMs,
+      correctedNormalizationMs,
+      qualityMs,
+      totalMs: performance.now() - prepareStartedAt,
+    },
+    artifacts: {
+      correctedSourceImage: corrected?.buffer ?? null,
     },
   };
 }
@@ -286,6 +348,14 @@ export async function computeScanQuality(imageBuffer: Buffer): Promise<ScanQuali
 interface PerspectiveCorrectionResult {
   buffer: Buffer;
   contourAreaRatio: number;
+  contourConfidence: number;
+  rotationAngle: number;
+  aspectRatio: number;
+  width: number;
+  height: number;
+  score: number;
+  points: CardPoint[];
+  maskVariant: string | null;
 }
 
 async function tryPerspectiveCorrectCard(
@@ -395,6 +465,14 @@ async function tryPerspectiveCorrectCard(
       return {
         buffer,
         contourAreaRatio: bestCandidate.areaRatio,
+        contourConfidence: bestCandidate.confidence,
+        rotationAngle: bestCandidate.rotationAngle,
+        aspectRatio: bestCandidate.aspectRatio,
+        width: bestCandidate.width,
+        height: bestCandidate.height,
+        score: bestCandidate.score,
+        points: bestCandidate.points,
+        maskVariant: bestCandidate.maskVariant,
       };
     } finally {
       srcPoints.delete();
@@ -411,17 +489,17 @@ async function tryPerspectiveCorrectCard(
   }
 }
 
-interface CardPoint {
-  x: number;
-  y: number;
-}
-
 interface CardQuadrilateral {
   points: CardPoint[];
   width: number;
   height: number;
   areaRatio: number;
+  aspectRatio: number;
+  aspectErrorRatio: number;
+  rotationAngle: number;
+  confidence: number;
   score: number;
+  maskVariant: string | null;
 }
 
 function findBestCardQuadrilateral(
@@ -518,7 +596,10 @@ function findBestCardQuadrilateralFromVariants(
         const candidate = findBestCardQuadrilateral(cv, contours, imageArea);
         debugScan(`perspective:variant:${name}`, candidate);
         if (candidate && (!bestCandidate || candidate.score > bestCandidate.score)) {
-          bestCandidate = candidate;
+          bestCandidate = {
+            ...candidate,
+            maskVariant: name,
+          };
         }
       } finally {
         contours.delete();
@@ -564,13 +645,28 @@ function buildQuadrilateralCandidate(
     return null;
   }
 
+  const rotationAngle = Math.atan2(
+    ordered[1]!.y - ordered[0]!.y,
+    ordered[1]!.x - ordered[0]!.x,
+  ) * (180 / Math.PI);
+  const areaConfidence = normalizeScore(areaRatio, MIN_CARD_AREA_RATIO, 0.65);
+  const aspectConfidence = 1 - Math.min(1, aspectError / MAX_ASPECT_ERROR_RATIO);
+  const confidence = Math.max(
+    0,
+    Math.min(1, areaConfidence * 0.55 + aspectConfidence * 0.45),
+  );
   const score = areaRatio * 2 + (1 - Math.min(1, aspectError));
   return {
     points: ordered,
     width,
     height,
     areaRatio,
+    aspectRatio,
+    aspectErrorRatio: aspectError,
+    rotationAngle,
+    confidence,
     score,
+    maskVariant: null,
   };
 }
 

@@ -6,10 +6,10 @@ import { computeRGBHash, type RGBHash } from './phash';
 const HASH_CANVAS_SIZE = 1024;
 const CARD_ASPECT_RATIO = 0.714;
 
-type SupportedTcg = 'magic' | 'pokemon' | 'yugioh';
-type RegionName = 'title' | 'footer';
+export type SupportedTcg = 'magic' | 'pokemon' | 'yugioh';
+export type RegionName = 'title' | 'footer';
 
-interface RegionSpec {
+export interface RegionSpec {
   name: RegionName;
   left: number;
   top: number;
@@ -37,7 +37,11 @@ const REGION_SPECS: Record<SupportedTcg, RegionSpec[]> = {
   ],
 };
 
-function resolveCardRect(size: number) {
+export const FEATURE_REGION_SPECS = REGION_SPECS;
+export const NORMALIZED_CARD_CANVAS_SIZE = HASH_CANVAS_SIZE;
+export const NORMALIZED_CARD_ASPECT_RATIO = CARD_ASPECT_RATIO;
+
+export function resolveCardRect(size: number) {
   const width = Math.round(size * CARD_ASPECT_RATIO);
   const left = Math.round((size - width) / 2);
 
@@ -57,6 +61,22 @@ async function extractRegionBuffer(
   normalizedImage: Buffer,
   spec: RegionSpec
 ): Promise<Buffer | null> {
+  return extractNormalizedCardRegionBuffer(normalizedImage, spec, {
+    resizeTo: 256,
+    fit: 'contain',
+    background: { r: 255, g: 255, b: 255, alpha: 1 },
+  });
+}
+
+export async function extractNormalizedCardRegionBuffer(
+  normalizedImage: Buffer,
+  spec: Pick<RegionSpec, 'left' | 'top' | 'width' | 'height'>,
+  options?: {
+    resizeTo?: number | null;
+    fit?: keyof sharp.FitEnum;
+    background?: sharp.Color;
+  }
+): Promise<Buffer | null> {
   const cardRect = resolveCardRect(HASH_CANVAS_SIZE);
   const left = clampRegionBounds(
     Math.round(cardRect.left + cardRect.width * spec.left),
@@ -75,14 +95,15 @@ async function extractRegionBuffer(
     return null;
   }
 
-  return sharp(normalizedImage)
-    .extract({ left, top, width, height })
-    .resize(256, 256, {
-      fit: 'contain',
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    })
-    .removeAlpha()
-    .toBuffer();
+  let image = sharp(normalizedImage).extract({ left, top, width, height });
+  if (options?.resizeTo) {
+    image = image.resize(options.resizeTo, options.resizeTo, {
+      fit: options.fit ?? 'contain',
+      background: options.background ?? { r: 255, g: 255, b: 255, alpha: 1 },
+    });
+  }
+
+  return image.removeAlpha().toBuffer();
 }
 
 export async function computeCardFeatureHashes(

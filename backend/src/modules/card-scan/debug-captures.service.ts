@@ -8,6 +8,12 @@ import sharp from 'sharp';
 import { prisma } from '../../lib/prisma';
 import { getCardScanDebugPublicPath, getCardScanDebugUploadDir } from '../../utils/upload';
 import type { ScanResult } from './scan.service';
+import {
+  getDebugCapturePipelineSnapshot,
+  saveDebugCaptureDerivedImages,
+  type DebugCapturePipelineSnapshot,
+  type DebugDerivedImagePaths,
+} from './debug-capture-diagnostics';
 
 export const CARD_SCAN_DEBUG_FEEDBACK_STATUSES = [
   'unreviewed',
@@ -16,7 +22,19 @@ export const CARD_SCAN_DEBUG_FEEDBACK_STATUSES = [
   'needs_review',
 ] as const;
 
+export const CARD_SCAN_DEBUG_REVIEW_TAGS = [
+  'wrong_printing',
+  'wrong_species',
+  'bad_crop',
+  'blur',
+  'glare',
+  'multiple_cards',
+  'energy_or_trainer',
+  'no_card_present',
+] as const;
+
 export type CardScanDebugFeedbackStatus = (typeof CARD_SCAN_DEBUG_FEEDBACK_STATUSES)[number];
+export type CardScanDebugReviewTag = (typeof CARD_SCAN_DEBUG_REVIEW_TAGS)[number];
 
 interface CreateCardScanDebugCaptureInput {
   viewerId: string;
@@ -41,6 +59,7 @@ interface UpdateCardScanDebugCaptureInput {
   viewerId: string;
   isAdmin: boolean;
   feedbackStatus?: CardScanDebugFeedbackStatus;
+  reviewTags?: CardScanDebugReviewTag[];
   notes?: string;
   expectedExternalId?: string;
   expectedName?: string;
@@ -78,17 +97,31 @@ function resolveImageExtension(file: Express.Multer.File): string {
 
 function buildDebugPayload(
   result: ScanResult,
+  pipeline: DebugCapturePipelineSnapshot,
+  derivedImages: DebugDerivedImagePaths,
   requestedTcg?: string,
   captureSource?: string,
 ): Prisma.InputJsonValue {
   return JSON.parse(
     JSON.stringify({
+      version: 2,
       requestedTcg: requestedTcg ?? null,
       captureSource: captureSource ?? null,
       match: result.bestMatch,
       candidates: result.candidates,
       hash: result.hashGenerated,
       meta: result.meta,
+      pipeline,
+      derivedImages,
+      diagnostics: result.debug
+        ? {
+            timings: result.debug.timings,
+            attempts: result.debug.attempts,
+            rejectedNearMisses: result.debug.rejectedNearMisses,
+            artwork: result.debug.artwork,
+            ocr: result.debug.ocr,
+          }
+        : null,
     }),
   ) as Prisma.InputJsonValue;
 }
@@ -103,11 +136,16 @@ export async function createCardScanDebugCapture(
   const filename = `${randomUUID()}${extension}`;
   const destinationPath = path.join(debugDir, filename);
   const publicPath = getCardScanDebugPublicPath(filename);
+  const cleanupPaths: string[] = [destinationPath];
   const metadata = await sharp(input.imageBuffer)
     .metadata()
     .catch(() => null);
 
   await rename(input.file.path, destinationPath);
+  const [pipeline, derivedImages] = await Promise.all([
+    getDebugCapturePipelineSnapshot(),
+    saveDebugCaptureDerivedImages(input.result, input.requestedTcg, cleanupPaths),
+  ]);
 
   try {
     return await prisma.cardScanDebugCapture.create({
@@ -116,6 +154,10 @@ export async function createCardScanDebugCapture(
         requestedTcg: trimOptionalString(input.requestedTcg) ?? null,
         captureSource: trimOptionalString(input.captureSource) ?? null,
         sourceImagePath: publicPath,
+        correctedImagePath: derivedImages.correctedImagePath,
+        artworkImagePath: derivedImages.artworkImagePath,
+        titleImagePath: derivedImages.titleImagePath,
+        footerImagePath: derivedImages.footerImagePath,
         sourceFilename: trimOptionalString(input.file.originalname) ?? null,
         sourceMimeType: trimOptionalString(input.file.mimetype) ?? null,
         sourceImageWidth: metadata?.width ?? null,
@@ -125,13 +167,20 @@ export async function createCardScanDebugCapture(
         bestMatchTcg: input.result.bestMatch?.tcg ?? null,
         bestMatchConfidence: input.result.bestMatch?.confidence ?? null,
         bestMatchDistance: input.result.bestMatch?.distance ?? null,
+        reviewTags: [],
         notes: trimOptionalString(input.notes) ?? null,
         userAgent: trimOptionalString(input.userAgent) ?? null,
-        debugPayload: buildDebugPayload(input.result, input.requestedTcg, input.captureSource),
+        debugPayload: buildDebugPayload(
+          input.result,
+          pipeline,
+          derivedImages,
+          input.requestedTcg,
+          input.captureSource,
+        ),
       },
     });
   } catch (error) {
-    await unlink(destinationPath).catch(() => undefined);
+    await Promise.all(cleanupPaths.map((filePath) => unlink(filePath).catch(() => undefined)));
     throw error;
   }
 }
@@ -166,6 +215,10 @@ export async function updateCardScanDebugCapture(input: UpdateCardScanDebugCaptu
   if (input.feedbackStatus !== undefined) {
     data.feedbackStatus = input.feedbackStatus;
     data.reviewedAt = input.feedbackStatus === 'unreviewed' ? null : new Date();
+  }
+
+  if (input.reviewTags !== undefined) {
+    data.reviewTags = input.reviewTags;
   }
 
   if (input.notes !== undefined) {

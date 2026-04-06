@@ -19,13 +19,109 @@ export interface CardScanMatch {
   distance: number;
 }
 
+export interface CardScanDiagnosticCandidate extends CardScanMatch {
+  scoreDistance: number;
+  passedThreshold: boolean;
+}
+
+export interface CardScanTimingMetrics {
+  preprocessMs: number;
+  perspectiveCorrectionMs: number;
+  qualityMs: number;
+  hashMs: number;
+  featureHashMs: number;
+  rankingMs: number;
+  artworkPrefilterMs: number | null;
+  artworkRerankMs: number | null;
+  ocrMs: number | null;
+  totalMs: number;
+}
+
+export interface CardScanQualityMetrics {
+  score: number;
+  focusVariance: number;
+  edgeDensity: number;
+  contrast: number;
+}
+
 export interface CardScanMeta {
-  quality?: number;
+  quality?: CardScanQualityMetrics | null;
   thresholdUsed?: number;
   variantUsed?: string;
   variantsTried?: string[];
   perspectiveCorrected?: boolean;
   contourAreaRatio?: number;
+  contourConfidence?: number | null;
+  rotationAngle?: number | null;
+  cropAspectRatio?: number | null;
+  cropWidth?: number | null;
+  cropHeight?: number | null;
+  cropCandidateScore?: number | null;
+  contourPoints?: Array<{ x: number; y: number }> | null;
+  maskVariant?: string | null;
+  rerankUsed?: boolean;
+  shortlistSize?: number;
+  timings?: CardScanTimingMetrics | null;
+}
+
+export type CardScanReviewTag =
+  | "wrong_printing"
+  | "wrong_species"
+  | "bad_crop"
+  | "blur"
+  | "glare"
+  | "multiple_cards"
+  | "energy_or_trainer"
+  | "no_card_present";
+
+export interface CardScanArtworkDiagnostic {
+  externalId: string;
+  name: string;
+  setCode: string | null;
+  similarity: number;
+}
+
+export interface CardScanAttemptDiagnostic {
+  variant: string;
+  threshold: number;
+  hashMs: number;
+  featureHashMs: number;
+  rankingMs: number;
+  rerankUsed: boolean;
+  shortlistSize: number;
+  acceptedCandidates: CardScanDiagnosticCandidate[];
+  rejectedNearMisses: CardScanDiagnosticCandidate[];
+}
+
+export interface CardScanDatasetRevision {
+  path: string;
+  version: number | null;
+  total: number | null;
+  sizeBytes: number;
+  modifiedAt: string;
+  revision: string;
+}
+
+export interface CardScanPipelineSnapshot {
+  build: {
+    gitSha: string | null;
+    imageTag: string | null;
+    backendMode: string | null;
+  };
+  matcher: {
+    phashVersion: string;
+    artworkVersion: string;
+    featureHashVersion: string;
+    detectorModelVersion: string | null;
+    ocrModelVersion: string | null;
+  };
+  hashDatabase: {
+    storeMode: string;
+    dataset: CardScanDatasetRevision | null;
+  };
+  artworkDatabase: {
+    dataset: CardScanDatasetRevision | null;
+  };
 }
 
 export interface CardScanDebugCaptureSummary {
@@ -35,12 +131,52 @@ export interface CardScanDebugCaptureSummary {
   sourceImagePath: string;
   sourceImageUrl: string;
   feedbackStatus: "unreviewed" | "correct" | "incorrect" | "needs_review";
+  reviewTags: CardScanReviewTag[];
   notes?: string | null;
   expectedExternalId?: string | null;
   expectedName?: string | null;
   expectedTcg?: string | null;
+  reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  artifactImages: {
+    correctedImagePath?: string | null;
+    correctedImageUrl?: string | null;
+    artworkImagePath?: string | null;
+    artworkImageUrl?: string | null;
+    titleImagePath?: string | null;
+    titleImageUrl?: string | null;
+    footerImagePath?: string | null;
+    footerImageUrl?: string | null;
+  };
+  pipeline?: CardScanPipelineSnapshot | null;
+  diagnostics?: {
+    timings?: CardScanTimingMetrics | null;
+    attempts?: CardScanAttemptDiagnostic[];
+    rejectedNearMisses?: CardScanDiagnosticCandidate[];
+    artwork?: {
+      prefilterApplied: boolean;
+      prefilterTopMatches: CardScanArtworkDiagnostic[];
+      rerankTopMatches: CardScanArtworkDiagnostic[];
+    } | null;
+    ocr?: {
+      attempted: boolean;
+      durationMs: number | null;
+      candidates: Array<{ text: string; confidence: number }>;
+    } | null;
+    geometry?: {
+      perspectiveCorrected?: boolean | null;
+      contourAreaRatio?: number | null;
+      contourConfidence?: number | null;
+      rotationAngle?: number | null;
+      cropAspectRatio?: number | null;
+      cropWidth?: number | null;
+      cropHeight?: number | null;
+      cropCandidateScore?: number | null;
+      contourPoints?: Array<{ x: number; y: number }>;
+      maskVariant?: string | null;
+    } | null;
+  } | null;
   bestMatch: {
     externalId: string;
     name: string | null;
@@ -150,6 +286,7 @@ export async function updateCardScanDebugCaptureApi(params: {
   captureId: string;
   token: string;
   feedbackStatus?: CardScanDebugCaptureSummary["feedbackStatus"];
+  reviewTags?: CardScanReviewTag[];
   notes?: string;
   expectedExternalId?: string;
   expectedName?: string;
@@ -159,6 +296,7 @@ export async function updateCardScanDebugCaptureApi(params: {
     captureId,
     token,
     feedbackStatus,
+    reviewTags,
     notes,
     expectedExternalId,
     expectedName,
@@ -176,6 +314,7 @@ export async function updateCardScanDebugCaptureApi(params: {
       credentials: "include",
       body: JSON.stringify({
         feedbackStatus,
+        reviewTags,
         notes,
         expectedExternalId,
         expectedName,

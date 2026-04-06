@@ -60,7 +60,7 @@ const HSV_S_BINS = 32;
 const HSV_HIST_DIM = HSV_H_BINS * HSV_S_BINS; // 960
 
 /** TCG-specific artwork crop regions (fraction of card dimensions). */
-const ARTWORK_REGIONS: Record<string, { top: number; bottom: number; left: number; right: number }> = {
+export const ARTWORK_REGIONS: Record<string, { top: number; bottom: number; left: number; right: number }> = {
   pokemon: { top: 0.08, bottom: 0.55, left: 0.05, right: 0.95 },
   magic: { top: 0.12, bottom: 0.55, left: 0.07, right: 0.93 },
   yugioh: { top: 0.20, bottom: 0.60, left: 0.10, right: 0.90 },
