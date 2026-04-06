@@ -1,8 +1,8 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import type { SupportedGame } from '@/lib/utils';
+import type { SupportedGame } from "@/lib/utils";
 
-export type ManageableGame = Exclude<SupportedGame, 'all'>;
+export type ManageableGame = Exclude<SupportedGame, "all">;
 
 interface ModuleState {
   enabledGames: Record<ManageableGame, boolean>;
@@ -17,26 +17,31 @@ interface ModuleState {
 const initialState: Record<ManageableGame, boolean> = {
   yugioh: true,
   magic: true,
-  pokemon: true
+  pokemon: true,
 };
 
 export const useModuleStore = create<ModuleState>((set) => ({
   enabledGames: initialState,
   toggleGame: (game) =>
     set((state) => ({
-      enabledGames: { ...state.enabledGames, [game]: !state.enabledGames[game] }
+      enabledGames: {
+        ...state.enabledGames,
+        [game]: !state.enabledGames[game],
+      },
     })),
   setGameEnabled: (game, enabled) =>
     set((state) => ({
-      enabledGames: { ...state.enabledGames, [game]: enabled }
+      enabledGames: { ...state.enabledGames, [game]: enabled },
     })),
   showCardNumbers: true,
   setShowCardNumbers: (show) => set({ showCardNumbers: show }),
   showPricing: true,
-  setShowPricing: (show) => set({ showPricing: show })
+  setShowPricing: (show) => set({ showPricing: show }),
 }));
 
-export function getActiveGames(enabledGames: Record<ManageableGame, boolean>): ManageableGame[] {
+export function getActiveGames(
+  enabledGames: Record<ManageableGame, boolean>,
+): ManageableGame[] {
   return (Object.entries(enabledGames) as Array<[ManageableGame, boolean]>)
     .filter(([, enabled]) => enabled)
     .map(([game]) => game);

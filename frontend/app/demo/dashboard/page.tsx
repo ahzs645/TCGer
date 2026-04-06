@@ -1,5 +1,5 @@
-import { AppShell } from '@/components/layout/app-shell';
-import { DashboardContent } from '@/components/dashboard/dashboard-content';
+import { AppShell } from "@/components/layout/app-shell";
+import { DashboardContent } from "@/components/dashboard/dashboard-content";
 
 /**
  * Demo dashboard — renders the same dashboard as the root page so that the
@@ -9,8 +9,8 @@ import { DashboardContent } from '@/components/dashboard/dashboard-content';
  */
 export default function DemoDashboardPage() {
   return (
-    <AppShell>
-      <DashboardContent />
+    <AppShell data-oid="n2pwr3-">
+      <DashboardContent data-oid="807c8vx" />
     </AppShell>
   );
 }

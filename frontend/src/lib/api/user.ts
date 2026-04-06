@@ -1,17 +1,25 @@
-import type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/api-types';
-import { API_BASE_URL } from './base-url';
+import type {
+  UserProfile,
+  UpdateProfileInput,
+  ChangePasswordInput,
+} from "@tcg/api-types";
+import { API_BASE_URL } from "./base-url";
 
-export type { UserProfile, UpdateProfileInput, ChangePasswordInput } from '@tcg/api-types';
+export type {
+  UserProfile,
+  UpdateProfileInput,
+  ChangePasswordInput,
+} from "@tcg/api-types";
 
 export async function getUserProfile(token: string): Promise<UserProfile> {
   const response = await fetch(`${API_BASE_URL}/users/me`, {
     headers: {
-      Authorization: `Bearer ${token}`
-    }
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
-    throw new Error('Failed to load user profile');
+    throw new Error("Failed to load user profile");
   }
 
   return response.json();
@@ -19,20 +27,20 @@ export async function getUserProfile(token: string): Promise<UserProfile> {
 
 export async function updateUserProfile(
   data: UpdateProfileInput,
-  token: string
-): Promise<Omit<UserProfile, 'createdAt'>> {
+  token: string,
+): Promise<Omit<UserProfile, "createdAt">> {
   const response = await fetch(`${API_BASE_URL}/users/me`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to update profile');
+    throw new Error(error.message || "Failed to update profile");
   }
 
   return response.json();
@@ -40,20 +48,20 @@ export async function updateUserProfile(
 
 export async function changePassword(
   data: ChangePasswordInput,
-  token: string
+  token: string,
 ): Promise<{ success: boolean }> {
   const response = await fetch(`${API_BASE_URL}/users/me/change-password`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to change password');
+    throw new Error(error.message || "Failed to change password");
   }
 
   return response.json();

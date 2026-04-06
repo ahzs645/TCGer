@@ -1,17 +1,19 @@
-import type { UserPreferences } from '@tcg/api-types';
-import { API_BASE_URL } from './base-url';
+import type { UserPreferences } from "@tcg/api-types";
+import { API_BASE_URL } from "./base-url";
 
-export type { UserPreferences } from '@tcg/api-types';
+export type { UserPreferences } from "@tcg/api-types";
 
-export async function getUserPreferences(token: string): Promise<UserPreferences> {
+export async function getUserPreferences(
+  token: string,
+): Promise<UserPreferences> {
   const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
     headers: {
-      Authorization: `Bearer ${token}`
-    }
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
-    throw new Error('Failed to load user preferences');
+    throw new Error("Failed to load user preferences");
   }
 
   return response.json();
@@ -19,20 +21,20 @@ export async function getUserPreferences(token: string): Promise<UserPreferences
 
 export async function updateUserPreferences(
   data: Partial<UserPreferences>,
-  token: string
+  token: string,
 ): Promise<UserPreferences> {
   const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to update user preferences');
+    throw new Error(error.message || "Failed to update user preferences");
   }
 
   return response.json();

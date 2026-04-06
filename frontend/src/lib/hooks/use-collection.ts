@@ -1,19 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 
-import type { Collection as CollectionEntity } from '@/lib/api/collections';
-import { useCollectionsStore } from '@/stores/collections';
-import type { CollectionCard, TcgCode } from '@/types/card';
+import type { Collection as CollectionEntity } from "@/lib/api/collections";
+import { useCollectionsStore } from "@/stores/collections";
+import type { CollectionCard, TcgCode } from "@/types/card";
 
-export const ALL_COLLECTION_ID = '__all__';
+export const ALL_COLLECTION_ID = "__all__";
 
 interface UseCollectionOptions {
   collectionId: string;
   query: string;
-  game: TcgCode | 'all';
-  enabledGames: Record<'yugioh' | 'magic' | 'pokemon', boolean>;
+  game: TcgCode | "all";
+  enabledGames: Record<"yugioh" | "magic" | "pokemon", boolean>;
 }
 
-export function useCollectionData({ collectionId, query, game, enabledGames }: UseCollectionOptions) {
+export function useCollectionData({
+  collectionId,
+  query,
+  game,
+  enabledGames,
+}: UseCollectionOptions) {
   const collections = useCollectionsStore((state) => state.collections);
   const isAllCollections = collectionId === ALL_COLLECTION_ID;
   const aggregateCollection = useMemo<CollectionEntity | undefined>(() => {
@@ -26,8 +31,8 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
         ...card,
         binderId: card.binderId ?? entry.id,
         binderName: card.binderName ?? entry.name,
-        binderColorHex: card.binderColorHex ?? entry.colorHex
-      }))
+        binderColorHex: card.binderColorHex ?? entry.colorHex,
+      })),
     );
 
     const updatedTimestamps = collections
@@ -37,16 +42,20 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
       .map((entry) => new Date(entry.createdAt).getTime())
       .filter((value) => Number.isFinite(value));
 
-    const latestUpdated = updatedTimestamps.length ? Math.max(...updatedTimestamps) : Date.now();
-    const earliestCreated = createdTimestamps.length ? Math.min(...createdTimestamps) : latestUpdated;
+    const latestUpdated = updatedTimestamps.length
+      ? Math.max(...updatedTimestamps)
+      : Date.now();
+    const earliestCreated = createdTimestamps.length
+      ? Math.min(...createdTimestamps)
+      : latestUpdated;
 
     return {
       id: ALL_COLLECTION_ID,
-      name: 'All cards',
-      description: 'Combined view of every binder.',
+      name: "All cards",
+      description: "Combined view of every binder.",
       cards,
       createdAt: new Date(earliestCreated).toISOString(),
-      updatedAt: new Date(latestUpdated).toISOString()
+      updatedAt: new Date(latestUpdated).toISOString(),
     };
   }, [collections]);
 
@@ -54,7 +63,10 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
     if (isAllCollections) {
       return aggregateCollection;
     }
-    return collections.find((entry) => entry.id === collectionId) ?? (collections.length > 0 ? collections[0] : undefined);
+    return (
+      collections.find((entry) => entry.id === collectionId) ??
+      (collections.length > 0 ? collections[0] : undefined)
+    );
   }, [aggregateCollection, collections, collectionId, isAllCollections]);
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -66,9 +78,10 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
     return collection.cards
       .filter((card) => {
         if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
-        if (game !== 'all' && card.tcg !== game) return false;
+        if (game !== "all" && card.tcg !== game) return false;
         if (!normalizedQuery) return true;
-        const haystack = `${card.name} ${card.setName ?? ''} ${card.setCode ?? ''}`.toLowerCase();
+        const haystack =
+          `${card.name} ${card.setName ?? ""} ${card.setCode ?? ""}`.toLowerCase();
         return haystack.includes(normalizedQuery);
       })
       .map((card) => {
@@ -79,19 +92,26 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
           ...card,
           binderId: collection.id,
           binderName: collection.name,
-          binderColorHex: collection.colorHex ?? card.binderColorHex
+          binderColorHex: collection.colorHex ?? card.binderColorHex,
         };
       });
   }, [collection, enabledGames, game, isAllCollections, normalizedQuery]);
 
   const maxPrice = useMemo(() => {
-    return items.reduce((max, card) => (card.price && card.price > max ? card.price : max), 0);
+    return items.reduce(
+      (max, card) => (card.price && card.price > max ? card.price : max),
+      0,
+    );
   }, [items]);
 
-  const totalQuantity = useMemo(() => items.reduce((sum, card) => sum + card.quantity, 0), [items]);
+  const totalQuantity = useMemo(
+    () => items.reduce((sum, card) => sum + card.quantity, 0),
+    [items],
+  );
   const totalValue = useMemo(
-    () => items.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0),
-    [items]
+    () =>
+      items.reduce((sum, card) => sum + (card.price ?? 0) * card.quantity, 0),
+    [items],
   );
 
   return {
@@ -100,6 +120,6 @@ export function useCollectionData({ collectionId, query, game, enabledGames }: U
     isLoading: false,
     maxPrice,
     totalQuantity,
-    totalValue
+    totalValue,
   };
 }

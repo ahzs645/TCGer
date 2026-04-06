@@ -537,6 +537,7 @@ export function CardScanPanel() {
               (capture) => capture.id !== nextResult.debugCapture!.id,
             ),
           ];
+
           return nextItems.slice(0, 8);
         });
       }
@@ -622,19 +623,19 @@ export function CardScanPanel() {
     }) ?? [];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
-      <Card className="overflow-hidden border-dashed">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
+    <div className="grid gap-6 xl:grid-cols-[360px_1fr]" data-oid="w.4k983">
+      <Card className="overflow-hidden border-dashed" data-oid="yubn0jd">
+        <CardHeader data-oid="9_dwbwx">
+          <CardTitle className="flex items-center gap-2" data-oid=":1pdwa-">
+            <Camera className="h-5 w-5" data-oid="3975b91" />
             Scan Input
           </CardTitle>
-          <CardDescription>
+          <CardDescription data-oid="bojbjtr">
             Upload a card photo or open your phone camera. The server compares
             the image against the cached perceptual hash index.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-5" data-oid="4pm8r05">
           <input
             ref={inputRef}
             type="file"
@@ -642,10 +643,19 @@ export function CardScanPanel() {
             capture="environment"
             className="hidden"
             onChange={handleFileChange}
+            data-oid="znu93:2"
           />
-          <canvas ref={captureCanvasRef} className="hidden" />
 
-          <div className="overflow-hidden rounded-xl border bg-muted/40">
+          <canvas
+            ref={captureCanvasRef}
+            className="hidden"
+            data-oid="utydvu8"
+          />
+
+          <div
+            className="overflow-hidden rounded-xl border bg-muted/40"
+            data-oid="lkh4upk"
+          >
             {cameraMode === "live" ? (
               <video
                 ref={videoRef}
@@ -653,19 +663,32 @@ export function CardScanPanel() {
                 playsInline
                 autoPlay
                 className="h-72 w-full bg-black object-cover"
+                data-oid="yk7y1xt"
               />
             ) : previewUrl ? (
               <img
                 src={previewUrl}
                 alt="Selected card preview"
                 className="h-72 w-full object-contain bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(244,244,245,0.6)_55%,_rgba(228,228,231,0.9))] p-4"
+                data-oid="-3hfwqa"
               />
             ) : (
-              <div className="flex h-72 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(244,244,245,0.6)_55%,_rgba(228,228,231,0.9))] p-6 text-center">
-                <Camera className="h-10 w-10 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="font-medium">No photo selected</p>
-                  <p className="text-sm text-muted-foreground">
+              <div
+                className="flex h-72 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(244,244,245,0.6)_55%,_rgba(228,228,231,0.9))] p-6 text-center"
+                data-oid="0e2z9ok"
+              >
+                <Camera
+                  className="h-10 w-10 text-muted-foreground"
+                  data-oid="5y8z3d:"
+                />
+                <div className="space-y-1" data-oid="jpp63i-">
+                  <p className="font-medium" data-oid="pohdlwd">
+                    No photo selected
+                  </p>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-oid="m0iw_e_"
+                  >
                     Use a straight-on shot with the full card in frame for the
                     best first-pass match.
                   </p>
@@ -675,41 +698,63 @@ export function CardScanPanel() {
           </div>
 
           {(liveCameraUnavailableReason || cameraError) && (
-            <div className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+            <div
+              className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-950"
+              data-oid="kuo3q7w"
+            >
               {cameraError ?? liveCameraUnavailableReason}
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Scan Scope</label>
+          <div className="space-y-2" data-oid="3upg5jk">
+            <label className="text-sm font-medium" data-oid="v417g0p">
+              Scan Scope
+            </label>
             <Select
               value={scanFilter}
               onValueChange={(value) => setScanFilter(value as ScanFilter)}
+              data-oid="2u8za.7"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Auto-detect game" />
+              <SelectTrigger data-oid="dcufd50">
+                <SelectValue
+                  placeholder="Auto-detect game"
+                  data-oid="erop5k."
+                />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
+              <SelectContent data-oid="gf8lvss">
+                <SelectItem value="all" data-oid="k2qvbg:">
                   Auto-detect across all games
                 </SelectItem>
-                <SelectItem value="yugioh">{GAME_LABELS.yugioh}</SelectItem>
-                <SelectItem value="magic">{GAME_LABELS.magic}</SelectItem>
-                <SelectItem value="pokemon">{GAME_LABELS.pokemon}</SelectItem>
+                <SelectItem value="yugioh" data-oid="i4kpa4a">
+                  {GAME_LABELS.yugioh}
+                </SelectItem>
+                <SelectItem value="magic" data-oid="e_enddk">
+                  {GAME_LABELS.magic}
+                </SelectItem>
+                <SelectItem value="pokemon" data-oid="4:rkdzv">
+                  {GAME_LABELS.pokemon}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
+          <div
+            className="space-y-3 rounded-xl border bg-muted/30 p-4"
+            data-oid="pd_-8zj"
+          >
+            <div
+              className="flex items-start justify-between gap-4"
+              data-oid="x-:n7x."
+            >
+              <div className="space-y-1" data-oid="h:jcizy">
                 <Label
                   htmlFor="save-debug-capture"
                   className="text-sm font-medium"
+                  data-oid=":hhzg7c"
                 >
                   Save Debug Capture
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground" data-oid="::._ro7">
                   Store the uploaded image, server guess, candidates, and scan
                   metadata so you can build a training/debug dataset from your
                   phone.
@@ -719,14 +764,16 @@ export function CardScanPanel() {
                 id="save-debug-capture"
                 checked={saveDebugCapture}
                 onCheckedChange={setSaveDebugCapture}
+                data-oid="jhk.lk5"
               />
             </div>
 
             {saveDebugCapture ? (
-              <div className="space-y-2">
+              <div className="space-y-2" data-oid="skw:6i9">
                 <Label
                   htmlFor="capture-notes"
                   className="text-xs uppercase tracking-wide text-muted-foreground"
+                  data-oid="8aw2w8j"
                 >
                   Notes
                 </Label>
@@ -736,14 +783,20 @@ export function CardScanPanel() {
                   onChange={(event) => setCaptureNotes(event.target.value)}
                   placeholder="Optional context, such as video timestamp, lighting issue, or why this sample is interesting."
                   rows={3}
+                  data-oid="y8pugqw"
                 />
               </div>
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={handleChooseFile} className="gap-2">
-              <Camera className="h-4 w-4" />
+          <div className="flex flex-wrap gap-2" data-oid="f3yjbdg">
+            <Button
+              type="button"
+              onClick={handleChooseFile}
+              className="gap-2"
+              data-oid=".xlg8_s"
+            >
+              <Camera className="h-4 w-4" data-oid="0_7f298" />
               Take Photo / Upload
             </Button>
             {cameraMode === "live" ? (
@@ -753,14 +806,16 @@ export function CardScanPanel() {
                   variant="secondary"
                   onClick={handleCaptureFrame}
                   className="gap-2"
+                  data-oid="pgkv8t9"
                 >
-                  <Target className="h-4 w-4" />
+                  <Target className="h-4 w-4" data-oid=":-ugxbb" />
                   Capture Frame
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={stopLiveCamera}
+                  data-oid="j_wen7q"
                 >
                   Stop Camera
                 </Button>
@@ -772,11 +827,15 @@ export function CardScanPanel() {
                 onClick={handleStartLiveCamera}
                 disabled={!liveCameraSupported || cameraMode === "starting"}
                 className="gap-2"
+                data-oid="-2_6o1s"
               >
                 {cameraMode === "starting" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    data-oid="jw2cnae"
+                  />
                 ) : (
-                  <Video className="h-4 w-4" />
+                  <Video className="h-4 w-4" data-oid="7h:3.ro" />
                 )}
                 Live Camera
               </Button>
@@ -786,11 +845,12 @@ export function CardScanPanel() {
               variant="secondary"
               onClick={handleScan}
               disabled={isScanning || !selectedFile}
+              data-oid="l2oa4kg"
             >
               {isScanning ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" data-oid="7-:.eer" />
               ) : (
-                <Target className="h-4 w-4" />
+                <Target className="h-4 w-4" data-oid="c0cjouf" />
               )}
               Scan Card
             </Button>
@@ -799,23 +859,34 @@ export function CardScanPanel() {
               variant="outline"
               onClick={handleClear}
               disabled={!selectedFile && !result}
+              data-oid="na6ze-n"
             >
               Reset
             </Button>
           </div>
 
           {selectedFile && (
-            <div className="rounded-lg border bg-background px-3 py-2 text-sm">
-              <p className="font-medium">{selectedFile.name}</p>
-              <p className="text-muted-foreground">
+            <div
+              className="rounded-lg border bg-background px-3 py-2 text-sm"
+              data-oid="zl:uvlz"
+            >
+              <p className="font-medium" data-oid="c302d6t">
+                {selectedFile.name}
+              </p>
+              <p className="text-muted-foreground" data-oid="hnb5ow6">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
           )}
 
-          <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-            <p className="font-medium">Phone Testing Notes</p>
-            <p className="mt-1 text-muted-foreground">
+          <div
+            className="rounded-xl border bg-muted/30 p-4 text-sm"
+            data-oid="wmcahwd"
+          >
+            <p className="font-medium" data-oid="1_viq:t">
+              Phone Testing Notes
+            </p>
+            <p className="mt-1 text-muted-foreground" data-oid="invx4i3">
               Still-photo capture works on the current HTTP test stack. Live
               browser camera preview only becomes available on HTTPS or
               localhost because mobile browsers require a secure context for
@@ -823,85 +894,135 @@ export function CardScanPanel() {
             </p>
           </div>
 
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Hash Index</p>
-                <p className="text-xs text-muted-foreground">
+          <div
+            className="space-y-3 rounded-xl border bg-muted/30 p-4"
+            data-oid="us420sf"
+          >
+            <div
+              className="flex items-center justify-between"
+              data-oid="3w4bil9"
+            >
+              <div data-oid="g68f_9k">
+                <p className="text-sm font-medium" data-oid="u98memj">
+                  Hash Index
+                </p>
+                <p className="text-xs text-muted-foreground" data-oid="3_wwoh8">
                   Current server-side scan corpus
                 </p>
               </div>
               {isLoadingStats && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <Loader2
+                  className="h-4 w-4 animate-spin text-muted-foreground"
+                  data-oid="4ibfxfd"
+                />
               )}
             </div>
             {stats ? (
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">Magic {stats.magic}</Badge>
-                <Badge variant="outline">Pokémon {stats.pokemon}</Badge>
-                <Badge variant="outline">Yu-Gi-Oh! {stats.yugioh}</Badge>
-                <Badge variant="secondary">Store {stats.storeMode}</Badge>
+              <div className="flex flex-wrap gap-2" data-oid="hgqrshu">
+                <Badge variant="outline" data-oid="0r04xei">
+                  Magic {stats.magic}
+                </Badge>
+                <Badge variant="outline" data-oid="3z84p1c">
+                  Pokémon {stats.pokemon}
+                </Badge>
+                <Badge variant="outline" data-oid="0lrnfz7">
+                  Yu-Gi-Oh! {stats.yugioh}
+                </Badge>
+                <Badge variant="secondary" data-oid="_-h_g._">
+                  Store {stats.storeMode}
+                </Badge>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground" data-oid="iuvjywf">
                 {statsError ?? "Scan stats will load after sign-in."}
               </p>
             )}
           </div>
 
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Recent Debug Captures</p>
-                <p className="text-xs text-muted-foreground">
+          <div
+            className="space-y-3 rounded-xl border bg-muted/30 p-4"
+            data-oid="-126:3_"
+          >
+            <div
+              className="flex items-center justify-between"
+              data-oid="0aoswbj"
+            >
+              <div data-oid="k.3kfs8">
+                <p className="text-sm font-medium" data-oid="4v5:989">
+                  Recent Debug Captures
+                </p>
+                <p className="text-xs text-muted-foreground" data-oid="o8xoq_z">
                   Latest saved samples from this account
                 </p>
               </div>
               {isLoadingDebugCaptures && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <Loader2
+                  className="h-4 w-4 animate-spin text-muted-foreground"
+                  data-oid="91kcgeb"
+                />
               )}
             </div>
 
             {debugCaptures.length ? (
-              <div className="space-y-3">
+              <div className="space-y-3" data-oid="bmrlu5o">
                 {debugCaptures.map((capture) => (
                   <div
                     key={capture.id}
                     className="space-y-3 rounded-lg border bg-background p-3"
+                    data-oid="ulnok3v"
                   >
-                    <div className="flex gap-3">
+                    <div className="flex gap-3" data-oid="c8zz_ah">
                       <img
                         src={capture.sourceImageUrl}
                         alt={capture.bestMatch?.name ?? "Saved scan capture"}
                         className="h-20 w-16 shrink-0 rounded-md border object-cover"
+                        data-oid="mr9r.4i"
                       />
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
+
+                      <div
+                        className="min-w-0 flex-1 space-y-2"
+                        data-oid="a:nn6y8"
+                      >
+                        <div
+                          className="flex flex-wrap items-center gap-2"
+                          data-oid=":400faf"
+                        >
                           <Badge
                             className={cn(
                               "border",
                               feedbackTone(capture.feedbackStatus),
                             )}
+                            data-oid="ec28-0f"
                           >
                             {formatFeedbackLabel(capture.feedbackStatus)}
                           </Badge>
                           {capture.bestMatch?.confidence !== null &&
                           capture.bestMatch?.confidence !== undefined ? (
-                            <Badge variant="outline">
+                            <Badge variant="outline" data-oid="w277-qp">
                               {formatConfidence(capture.bestMatch.confidence)}
                             </Badge>
                           ) : null}
                           {capture.reviewTags.map((tag) => (
-                            <Badge key={tag} variant="secondary">
+                            <Badge
+                              key={tag}
+                              variant="secondary"
+                              data-oid=".fmzs9x"
+                            >
                               {formatReviewTag(tag)}
                             </Badge>
                           ))}
                         </div>
-                        <div>
-                          <p className="truncate text-sm font-medium">
+                        <div data-oid="42__82t">
+                          <p
+                            className="truncate text-sm font-medium"
+                            data-oid="vtgoevx"
+                          >
                             {capture.bestMatch?.name ?? "No best match"}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-oid="-pks-a4"
+                          >
                             {capture.bestMatch?.tcg
                               ? GAME_LABELS[capture.bestMatch.tcg]
                               : "Unknown game"}
@@ -910,11 +1031,17 @@ export function CardScanPanel() {
                               ? ` • Distance ${capture.bestMatch.distance}`
                               : ""}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p
+                            className="text-xs text-muted-foreground"
+                            data-oid="p3axb69"
+                          >
                             {formatCaptureTime(capture.createdAt)}
                           </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div
+                          className="flex flex-wrap gap-2"
+                          data-oid="bb2103:"
+                        >
                           <Button
                             type="button"
                             size="sm"
@@ -923,6 +1050,7 @@ export function CardScanPanel() {
                             onClick={() =>
                               handleCaptureFeedback(capture.id, "correct")
                             }
+                            data-oid="bi_kvgb"
                           >
                             Correct
                           </Button>
@@ -934,6 +1062,7 @@ export function CardScanPanel() {
                             onClick={() =>
                               handleCaptureFeedback(capture.id, "incorrect")
                             }
+                            data-oid="95dia9h"
                           >
                             Wrong
                           </Button>
@@ -945,6 +1074,7 @@ export function CardScanPanel() {
                             onClick={() =>
                               handleCaptureFeedback(capture.id, "unreviewed")
                             }
+                            data-oid="zuk:glk"
                           >
                             Reset
                           </Button>
@@ -952,16 +1082,28 @@ export function CardScanPanel() {
                       </div>
                     </div>
 
-                    <details className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                      <summary className="cursor-pointer select-none font-medium">
+                    <details
+                      className="rounded-md border bg-muted/20 px-3 py-2 text-sm"
+                      data-oid="y7y412u"
+                    >
+                      <summary
+                        className="cursor-pointer select-none font-medium"
+                        data-oid="nth1x.o"
+                      >
                         Debug details
                       </summary>
-                      <div className="mt-3 space-y-3">
-                        <div className="space-y-2">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      <div className="mt-3 space-y-3" data-oid="nsuybk_">
+                        <div className="space-y-2" data-oid="90j.fvx">
+                          <p
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            data-oid="9x:hgz:"
+                          >
                             Derived crops
                           </p>
-                          <div className="flex flex-wrap gap-2">
+                          <div
+                            className="flex flex-wrap gap-2"
+                            data-oid="cjjnna9"
+                          >
                             {[
                               {
                                 label: "Corrected",
@@ -985,13 +1127,19 @@ export function CardScanPanel() {
                                 <div
                                   key={artifact.label}
                                   className="space-y-1"
+                                  data-oid="cgzyoyr"
                                 >
                                   <img
                                     src={artifact.url ?? undefined}
                                     alt={`${artifact.label} crop`}
                                     className="h-16 w-16 rounded-md border object-cover"
+                                    data-oid="-6u2o6_"
                                   />
-                                  <p className="text-[11px] text-muted-foreground">
+
+                                  <p
+                                    className="text-[11px] text-muted-foreground"
+                                    data-oid="7iw2.c6"
+                                  >
                                     {artifact.label}
                                   </p>
                                 </div>
@@ -999,11 +1147,17 @@ export function CardScanPanel() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        <div className="space-y-2" data-oid="iag_iik">
+                          <p
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            data-oid="9:v-eob"
+                          >
                             Issue tags
                           </p>
-                          <div className="flex flex-wrap gap-2">
+                          <div
+                            className="flex flex-wrap gap-2"
+                            data-oid="7775kbn"
+                          >
                             {REVIEW_TAG_OPTIONS.map((tag) => {
                               const selected = capture.reviewTags.includes(
                                 tag.value,
@@ -1018,6 +1172,7 @@ export function CardScanPanel() {
                                   onClick={() =>
                                     handleCaptureTagToggle(capture, tag.value)
                                   }
+                                  data-oid="y3sbyq7"
                                 >
                                   {tag.label}
                                 </Button>
@@ -1026,26 +1181,31 @@ export function CardScanPanel() {
                           </div>
                         </div>
 
-                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                          <p>
+                        <div
+                          className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"
+                          data-oid="rnj0wfy"
+                        >
+                          <p data-oid="-g8v4ja">
                             Total{" "}
-                            {formatDuration(capture.diagnostics?.timings?.totalMs) ??
-                              "n/a"}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.totalMs,
+                            ) ?? "n/a"}
                             {" · "}Preprocess{" "}
                             {formatDuration(
                               capture.diagnostics?.timings?.preprocessMs,
                             ) ?? "n/a"}
                           </p>
-                          <p>
+                          <p data-oid="t6avq.a">
                             Hash{" "}
-                            {formatDuration(capture.diagnostics?.timings?.hashMs) ??
-                              "n/a"}
+                            {formatDuration(
+                              capture.diagnostics?.timings?.hashMs,
+                            ) ?? "n/a"}
                             {" · "}Feature{" "}
                             {formatDuration(
                               capture.diagnostics?.timings?.featureHashMs,
                             ) ?? "n/a"}
                           </p>
-                          <p>
+                          <p data-oid="m1aazvr">
                             Ranking{" "}
                             {formatDuration(
                               capture.diagnostics?.timings?.rankingMs,
@@ -1055,26 +1215,28 @@ export function CardScanPanel() {
                               capture.diagnostics?.timings?.artworkRerankMs,
                             ) ?? "n/a"}
                           </p>
-                          <p>
+                          <p data-oid="pdanqgy">
                             Angle{" "}
                             {capture.diagnostics?.geometry?.rotationAngle !==
                               undefined &&
-                            capture.diagnostics?.geometry?.rotationAngle !== null
+                            capture.diagnostics?.geometry?.rotationAngle !==
+                              null
                               ? `${capture.diagnostics.geometry.rotationAngle.toFixed(1)}°`
                               : "n/a"}
                             {" · "}Aspect{" "}
                             {capture.diagnostics?.geometry?.cropAspectRatio !==
                               undefined &&
-                            capture.diagnostics?.geometry?.cropAspectRatio !== null
+                            capture.diagnostics?.geometry?.cropAspectRatio !==
+                              null
                               ? capture.diagnostics.geometry.cropAspectRatio.toFixed(
                                   3,
                                 )
                               : "n/a"}
                           </p>
-                          <p>
+                          <p data-oid="r0djy80">
                             Contour{" "}
-                            {capture.diagnostics?.geometry?.contourConfidence !==
-                              undefined &&
+                            {capture.diagnostics?.geometry
+                              ?.contourConfidence !== undefined &&
                             capture.diagnostics?.geometry?.contourConfidence !==
                               null
                               ? `${Math.round(capture.diagnostics.geometry.contourConfidence * 100)}%`
@@ -1087,7 +1249,7 @@ export function CardScanPanel() {
                               ? `${Math.round(capture.diagnostics.geometry.cropCandidateScore * 100)}%`
                               : "n/a"}
                           </p>
-                          <p>
+                          <p data-oid="0nn1rsu">
                             Build{" "}
                             {capture.pipeline?.build.gitSha
                               ? capture.pipeline.build.gitSha.slice(0, 12)
@@ -1096,21 +1258,22 @@ export function CardScanPanel() {
                               ? ` · ${capture.pipeline.build.imageTag}`
                               : ""}
                           </p>
-                          <p>
+                          <p data-oid="97t5hfe">
                             Hash DB{" "}
                             {formatRevision(
                               capture.pipeline?.hashDatabase?.dataset,
                             )}
                           </p>
-                          <p>
+                          <p data-oid="a:.rnca">
                             Artwork DB{" "}
                             {formatRevision(
                               capture.pipeline?.artworkDatabase?.dataset,
                             )}
                           </p>
-                          <p>
+                          <p data-oid="f9:t:58">
                             Mask{" "}
-                            {capture.diagnostics?.geometry?.maskVariant ?? "n/a"}
+                            {capture.diagnostics?.geometry?.maskVariant ??
+                              "n/a"}
                             {" · "}Points{" "}
                             {capture.diagnostics?.geometry?.contourPoints
                               ?.length ?? 0}
@@ -1118,17 +1281,24 @@ export function CardScanPanel() {
                         </div>
 
                         {capture.diagnostics?.artwork ? (
-                          <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="space-y-1" data-oid="h6jxbaw">
+                            <p
+                              className="text-xs uppercase tracking-wide text-muted-foreground"
+                              data-oid="wpt-_wc"
+                            >
                               Artwork matches
                             </p>
-                            <div className="flex flex-wrap gap-2">
+                            <div
+                              className="flex flex-wrap gap-2"
+                              data-oid="u_1z6x."
+                            >
                               {capture.diagnostics.artwork.rerankTopMatches
                                 .slice(0, 3)
                                 .map((candidate) => (
                                   <Badge
                                     key={`${candidate.externalId}-rerank`}
                                     variant="outline"
+                                    data-oid="7jym7qr"
                                   >
                                     {candidate.name} ·{" "}
                                     {Math.round(candidate.similarity * 100)}%
@@ -1144,11 +1314,10 @@ export function CardScanPanel() {
                                       <Badge
                                         key={`${candidate.externalId}-prefilter`}
                                         variant="outline"
+                                        data-oid="ujywi1w"
                                       >
                                         {candidate.name} ·{" "}
-                                        {Math.round(
-                                          candidate.similarity * 100,
-                                        )}
+                                        {Math.round(candidate.similarity * 100)}
                                         %
                                       </Badge>
                                     ))
@@ -1158,23 +1327,33 @@ export function CardScanPanel() {
                         ) : null}
 
                         {capture.diagnostics?.ocr ? (
-                          <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="space-y-1" data-oid="__hw.u_">
+                            <p
+                              className="text-xs uppercase tracking-wide text-muted-foreground"
+                              data-oid="64xew0h"
+                            >
                               OCR
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-oid="fopx_1z"
+                            >
                               {capture.diagnostics.ocr.attempted
                                 ? `OCR ${formatDuration(capture.diagnostics.ocr.durationMs) ?? "n/a"}`
                                 : "OCR not attempted"}
                             </p>
                             {capture.diagnostics.ocr.candidates.length ? (
-                              <div className="flex flex-wrap gap-2">
+                              <div
+                                className="flex flex-wrap gap-2"
+                                data-oid="ywka8p1"
+                              >
                                 {capture.diagnostics.ocr.candidates
                                   .slice(0, 3)
                                   .map((candidate, index) => (
                                     <Badge
                                       key={`${candidate.text}-${index}`}
                                       variant="outline"
+                                      data-oid="-l_q04a"
                                     >
                                       {candidate.text} ·{" "}
                                       {Math.round(candidate.confidence)}
@@ -1186,15 +1365,24 @@ export function CardScanPanel() {
                         ) : null}
 
                         {capture.diagnostics?.attempts?.length ? (
-                          <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="space-y-1" data-oid="d_utktu">
+                            <p
+                              className="text-xs uppercase tracking-wide text-muted-foreground"
+                              data-oid="dnxwiv:"
+                            >
                               Variant attempts
                             </p>
-                            <div className="space-y-1 text-xs text-muted-foreground">
+                            <div
+                              className="space-y-1 text-xs text-muted-foreground"
+                              data-oid="aaavy7j"
+                            >
                               {capture.diagnostics.attempts
                                 .slice(0, 4)
                                 .map((attempt) => (
-                                  <p key={`${capture.id}-${attempt.variant}`}>
+                                  <p
+                                    key={`${capture.id}-${attempt.variant}`}
+                                    data-oid="r98oskr"
+                                  >
                                     {attempt.variant} · threshold{" "}
                                     {attempt.threshold} · shortlist{" "}
                                     {attempt.shortlistSize} · hash{" "}
@@ -1206,16 +1394,23 @@ export function CardScanPanel() {
                         ) : null}
 
                         {capture.diagnostics?.rejectedNearMisses?.length ? (
-                          <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          <div className="space-y-1" data-oid=".2u9att">
+                            <p
+                              className="text-xs uppercase tracking-wide text-muted-foreground"
+                              data-oid="fklw0ay"
+                            >
                               Near misses
                             </p>
-                            <div className="flex flex-wrap gap-2">
+                            <div
+                              className="flex flex-wrap gap-2"
+                              data-oid="qzyt7wy"
+                            >
                               {capture.diagnostics.rejectedNearMisses.map(
                                 (candidate) => (
                                   <Badge
                                     key={`${candidate.tcg}:${candidate.externalId}`}
                                     variant="outline"
+                                    data-oid="jzd8ex:"
                                   >
                                     {candidate.name} · {candidate.distance} ·{" "}
                                     {Math.round(candidate.confidence * 100)}%
@@ -1231,7 +1426,7 @@ export function CardScanPanel() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground" data-oid="4teyp.s">
                 {debugCapturesError ??
                   "Turn on Save Debug Capture and run a scan to start collecting samples."}
               </p>
@@ -1239,44 +1434,64 @@ export function CardScanPanel() {
           </div>
 
           {debugCapturesError && debugCaptures.length > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <div
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              data-oid="r1.719s"
+            >
               {debugCapturesError}
             </div>
           )}
 
           {(scanError || !isAuthenticated) && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <div
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              data-oid="1ytr-9o"
+            >
               {scanError ?? "Sign in to upload and scan card photos."}
             </div>
           )}
 
           {debugCaptureError && (
-            <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            <div
+              className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900"
+              data-oid="l534gkl"
+            >
               {debugCaptureError}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
+      <Card className="overflow-hidden" data-oid="72j0pz8">
+        <CardHeader className="border-b" data-oid="1lndgrv">
+          <CardTitle className="flex items-center gap-2" data-oid="b3ehj_a">
+            <Sparkles className="h-5 w-5" data-oid="w5md68-" />
             Scan Results
           </CardTitle>
-          <CardDescription>
+          <CardDescription data-oid="05rhy69">
             Best match first, followed by alternate candidates ranked by
             perceptual-hash distance.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 p-6">
+        <CardContent className="space-y-6 p-6" data-oid="k4b:av_">
           {!result && !isScanning ? (
-            <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
-              <div className="space-y-3">
-                <Target className="mx-auto h-10 w-10 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="font-medium">Ready to scan</p>
-                  <p className="max-w-xl text-sm text-muted-foreground">
+            <div
+              className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center"
+              data-oid="j2uxdtu"
+            >
+              <div className="space-y-3" data-oid="7u0rhby">
+                <Target
+                  className="mx-auto h-10 w-10 text-muted-foreground"
+                  data-oid="ynogg7a"
+                />
+                <div className="space-y-1" data-oid="o6xtfdh">
+                  <p className="font-medium" data-oid="s6tf2sr">
+                    Ready to scan
+                  </p>
+                  <p
+                    className="max-w-xl text-sm text-muted-foreground"
+                    data-oid="6ng4t5z"
+                  >
                     Upload a phone photo, screenshot, or cropped card image and
                     the matcher will compare it against the local hash map.
                   </p>
@@ -1286,12 +1501,23 @@ export function CardScanPanel() {
           ) : null}
 
           {isScanning ? (
-            <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
-              <div className="space-y-3">
-                <Loader2 className="mx-auto h-10 w-10 animate-spin text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="font-medium">Computing match candidates</p>
-                  <p className="text-sm text-muted-foreground">
+            <div
+              className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8 text-center"
+              data-oid="e950jsi"
+            >
+              <div className="space-y-3" data-oid="4zf8506">
+                <Loader2
+                  className="mx-auto h-10 w-10 animate-spin text-muted-foreground"
+                  data-oid="a70uv1z"
+                />
+                <div className="space-y-1" data-oid="yd7:l71">
+                  <p className="font-medium" data-oid="dob_4l8">
+                    Computing match candidates
+                  </p>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-oid="_xyyqiu"
+                  >
                     Preprocessing the upload, hashing it, and scoring it against
                     the cached index.
                   </p>
@@ -1301,30 +1527,48 @@ export function CardScanPanel() {
           ) : null}
 
           {!isScanning && result && bestMatch && (
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
+            <section className="space-y-4" data-oid="m54so8o">
+              <div
+                className="flex flex-wrap items-center gap-2"
+                data-oid="7rdterb"
+              >
                 <Badge
                   className={cn("border", confidenceTone(bestMatch.confidence))}
+                  data-oid="gr8d::3"
                 >
                   {formatConfidence(bestMatch.confidence)} match score
                 </Badge>
-                <Badge variant="outline">{GAME_LABELS[bestMatch.tcg]}</Badge>
-                <Badge variant="outline">Distance {bestMatch.distance}</Badge>
+                <Badge variant="outline" data-oid=".u4yp8g">
+                  {GAME_LABELS[bestMatch.tcg]}
+                </Badge>
+                <Badge variant="outline" data-oid="om7_npv">
+                  Distance {bestMatch.distance}
+                </Badge>
                 {scanMeta?.perspectiveCorrected ? (
-                  <Badge variant="secondary">Perspective corrected</Badge>
+                  <Badge variant="secondary" data-oid=":queaa3">
+                    Perspective corrected
+                  </Badge>
                 ) : null}
                 {formatQuality(scanMeta?.quality) ? (
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" data-oid="48o0rkx">
                     Quality {formatQuality(scanMeta?.quality)}
                   </Badge>
                 ) : null}
                 {isResolvingCards && (
-                  <Badge variant="secondary">Refreshing card details…</Badge>
+                  <Badge variant="secondary" data-oid="dumky8h">
+                    Refreshing card details…
+                  </Badge>
                 )}
               </div>
 
-              <div className="grid gap-4 rounded-2xl border bg-muted/20 p-4 lg:grid-cols-[220px_1fr]">
-                <div className="overflow-hidden rounded-xl border bg-background">
+              <div
+                className="grid gap-4 rounded-2xl border bg-muted/20 p-4 lg:grid-cols-[220px_1fr]"
+                data-oid="h47a2qs"
+              >
+                <div
+                  className="overflow-hidden rounded-xl border bg-background"
+                  data-oid="psdydw2"
+                >
                   <img
                     src={
                       bestMatchCard?.imageUrlSmall ??
@@ -1333,17 +1577,27 @@ export function CardScanPanel() {
                     }
                     alt={bestMatch.name}
                     className="h-full w-full object-cover"
+                    data-oid="3i.wxyj"
                   />
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                <div className="space-y-3" data-oid=":2v_pf0">
+                  <div data-oid="-7-v20c">
+                    <p
+                      className="text-sm font-medium text-muted-foreground"
+                      data-oid="3ts4mtk"
+                    >
                       Best Match
                     </p>
-                    <h2 className="text-2xl font-heading font-semibold">
+                    <h2
+                      className="text-2xl font-heading font-semibold"
+                      data-oid="xllop8v"
+                    >
                       {bestMatchCard?.name ?? bestMatch.name}
                     </h2>
-                    <p className="text-sm text-muted-foreground">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      data-oid="271t8ya"
+                    >
                       {bestMatchCard?.setName ??
                         bestMatch.setName ??
                         bestMatch.setCode ??
@@ -1351,27 +1605,41 @@ export function CardScanPanel() {
                       {bestMatch.rarity ? ` • ${bestMatch.rarity}` : ""}
                     </p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <ScanFact label="Card ID" value={bestMatch.externalId} />
-                    <ScanFact label="Game" value={GAME_LABELS[bestMatch.tcg]} />
+                  <div className="grid gap-3 sm:grid-cols-2" data-oid="ldw-ulb">
+                    <ScanFact
+                      label="Card ID"
+                      value={bestMatch.externalId}
+                      data-oid="88q-57b"
+                    />
+                    <ScanFact
+                      label="Game"
+                      value={GAME_LABELS[bestMatch.tcg]}
+                      data-oid="3oqevrg"
+                    />
                     <ScanFact
                       label="Set Code"
                       value={bestMatch.setCode ?? "N/A"}
+                      data-oid="7-y9f5j"
                     />
+
                     <ScanFact
                       label="Match Score"
                       value={formatConfidence(bestMatch.confidence)}
+                      data-oid="mb9oh9r"
                     />
+
                     {scanMeta?.variantUsed ? (
                       <ScanFact
                         label="Scan Variant"
                         value={scanMeta.variantUsed}
+                        data-oid="oq5zm2."
                       />
                     ) : null}
                     {scanMeta?.thresholdUsed ? (
                       <ScanFact
                         label="Threshold"
                         value={String(scanMeta.thresholdUsed)}
+                        data-oid="pnjrbc0"
                       />
                     ) : null}
                   </div>
@@ -1381,12 +1649,20 @@ export function CardScanPanel() {
           )}
 
           {!isScanning && result && !bestMatch && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="font-medium">No confident match yet</p>
-                  <p className="mt-1 text-sm">
+            <div
+              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"
+              data-oid="6v3-x69"
+            >
+              <div className="flex items-start gap-3" data-oid="qm:3_xw">
+                <AlertCircle
+                  className="mt-0.5 h-5 w-5 shrink-0"
+                  data-oid="mhr.-4."
+                />
+                <div data-oid="dc18rk5">
+                  <p className="font-medium" data-oid="dityhqv">
+                    No confident match yet
+                  </p>
+                  <p className="mt-1 text-sm" data-oid="1-0mo_l">
                     The current upload did not land under the confidence
                     threshold. Try a tighter crop, flatter angle, or choose a
                     specific game before rescanning.
@@ -1397,16 +1673,19 @@ export function CardScanPanel() {
           )}
 
           {!isScanning && otherCandidates.length > 0 && (
-            <section className="space-y-3">
-              <div>
-                <h3 className="text-lg font-heading font-semibold">
+            <section className="space-y-3" data-oid="3lym7:_">
+              <div data-oid="imhvb7w">
+                <h3
+                  className="text-lg font-heading font-semibold"
+                  data-oid="cov_36d"
+                >
                   Alternate Candidates
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground" data-oid="wox9nc-">
                   Useful when the top match is close but not definitive.
                 </p>
               </div>
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2" data-oid="4xeooof">
                 {otherCandidates.map((candidate) => {
                   const candidateCard = resolvedCards[resultKey(candidate)];
                   const imageSrc =
@@ -1418,17 +1697,25 @@ export function CardScanPanel() {
                     <div
                       key={resultKey(candidate)}
                       className="flex gap-4 rounded-xl border bg-background p-3"
+                      data-oid="xyqnj_h"
                     >
-                      <div className="h-32 w-24 shrink-0 overflow-hidden rounded-lg border bg-muted/30">
+                      <div
+                        className="h-32 w-24 shrink-0 overflow-hidden rounded-lg border bg-muted/30"
+                        data-oid="b1w2m:t"
+                      >
                         <img
                           src={imageSrc}
                           alt={candidate.name}
                           className="h-full w-full object-cover"
+                          data-oid="4y9v7wc"
                         />
                       </div>
-                      <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">
+                      <div className="min-w-0 space-y-2" data-oid="84-pd48">
+                        <div
+                          className="flex flex-wrap items-center gap-2"
+                          data-oid="196b7-9"
+                        >
+                          <Badge variant="outline" data-oid="s6q_2-d">
                             {GAME_LABELS[candidate.tcg]}
                           </Badge>
                           <Badge
@@ -1436,22 +1723,32 @@ export function CardScanPanel() {
                               "border",
                               confidenceTone(candidate.confidence),
                             )}
+                            data-oid="00qykdu"
                           >
                             {formatConfidence(candidate.confidence)}
                           </Badge>
                         </div>
-                        <div>
-                          <p className="truncate font-semibold">
+                        <div data-oid="i8r0ii3">
+                          <p
+                            className="truncate font-semibold"
+                            data-oid="cljrk0b"
+                          >
                             {candidateCard?.name ?? candidate.name}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p
+                            className="text-sm text-muted-foreground"
+                            data-oid="pa576m3"
+                          >
                             {candidateCard?.setName ??
                               candidate.setName ??
                               candidate.setCode ??
                               "Set unknown"}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p
+                          className="text-xs text-muted-foreground"
+                          data-oid=".lantkk"
+                        >
                           Distance {candidate.distance}
                         </p>
                       </div>
@@ -1469,11 +1766,19 @@ export function CardScanPanel() {
 
 function ScanFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border bg-background px-3 py-2">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+    <div
+      className="rounded-lg border bg-background px-3 py-2"
+      data-oid=":iio_.w"
+    >
+      <p
+        className="text-xs uppercase tracking-wide text-muted-foreground"
+        data-oid="b6c130m"
+      >
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium">{value}</p>
+      <p className="mt-1 text-sm font-medium" data-oid="b_hp1tg">
+        {value}
+      </p>
     </div>
   );
 }

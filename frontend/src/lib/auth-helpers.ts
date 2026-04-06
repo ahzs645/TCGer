@@ -1,4 +1,4 @@
-import type { AuthUser } from '@/stores/auth';
+import type { AuthUser } from "@/stores/auth";
 
 /**
  * Extract AuthUser from a Better Auth user response object.
@@ -14,6 +14,6 @@ export function toAuthUser(user: Record<string, unknown>): AuthUser {
     showPricing: (user.showPricing as boolean) ?? true,
     enabledYugioh: (user.enabledYugioh as boolean) ?? true,
     enabledMagic: (user.enabledMagic as boolean) ?? true,
-    enabledPokemon: (user.enabledPokemon as boolean) ?? true
+    enabledPokemon: (user.enabledPokemon as boolean) ?? true,
   };
 }

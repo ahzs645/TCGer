@@ -1,37 +1,37 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export const GAME_LABELS = {
-  all: 'All Games',
-  yugioh: 'Yu-Gi-Oh!',
-  magic: 'Magic: The Gathering',
-  pokemon: 'Pokémon'
+  all: "All Games",
+  yugioh: "Yu-Gi-Oh!",
+  magic: "Magic: The Gathering",
+  pokemon: "Pokémon",
 } as const;
 
 export type SupportedGame = keyof typeof GAME_LABELS;
 
 const CARD_BACK_IMAGES: Record<string, string> = {
-  pokemon: '/images/pokemon-card-back.png',
-  magic: '/images/mtg-card-back.png',
-  yugioh: '/images/yugioh-card-back.png'
+  pokemon: "/images/pokemon-card-back.png",
+  magic: "/images/mtg-card-back.png",
+  yugioh: "/images/yugioh-card-back.png",
 };
 
-const DEFAULT_CARD_BACK = '/images/pokemon-card-back.png';
+const DEFAULT_CARD_BACK = "/images/pokemon-card-back.png";
 
 export function getCardBackImage(tcg?: string): string {
   return (tcg && CARD_BACK_IMAGES[tcg]) || DEFAULT_CARD_BACK;
 }
 
 function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, '');
+  return value.replace(/\/+$/, "");
 }
 
 function getBrowserOrigin(): string | undefined {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return undefined;
   }
 
@@ -54,17 +54,17 @@ const internalApiBase = process.env.BACKEND_API_ORIGIN
   ? trimTrailingSlash(process.env.BACKEND_API_ORIGIN)
   : undefined;
 const browserApiBase =
-  typeof window !== 'undefined'
-    ? trimTrailingSlash(new URL('/api', window.location.origin).toString())
+  typeof window !== "undefined"
+    ? trimTrailingSlash(new URL("/api", window.location.origin).toString())
     : undefined;
 
 export const DEFAULT_API_BASE_URL =
-  typeof window === 'undefined'
-    ? internalApiBase ?? publicApiBase ?? 'http://localhost:3004'
-    : publicApiBase ?? browserApiBase ?? 'http://localhost:3004';
+  typeof window === "undefined"
+    ? (internalApiBase ?? publicApiBase ?? "http://localhost:3004")
+    : (publicApiBase ?? browserApiBase ?? "http://localhost:3004");
 
 export function resolvePublicSiteOrigin(): string {
-  return publicSiteOrigin ?? getBrowserOrigin() ?? 'http://localhost:3003';
+  return publicSiteOrigin ?? getBrowserOrigin() ?? "http://localhost:3003";
 }
 
 export function resolvePublicConvexOrigin(): string {
@@ -74,10 +74,10 @@ export function resolvePublicConvexOrigin(): string {
 
   const browserOrigin = getBrowserOrigin();
   if (!browserOrigin) {
-    return 'http://localhost:3210';
+    return "http://localhost:3210";
   }
 
-  return replaceOriginPort(browserOrigin, '3210');
+  return replaceOriginPort(browserOrigin, "3210");
 }
 
 export function resolvePublicConvexSiteOrigin(): string {
@@ -87,8 +87,8 @@ export function resolvePublicConvexSiteOrigin(): string {
 
   const browserOrigin = getBrowserOrigin();
   if (!browserOrigin) {
-    return 'http://localhost:3211';
+    return "http://localhost:3211";
   }
 
-  return replaceOriginPort(browserOrigin, '3211');
+  return replaceOriginPort(browserOrigin, "3211");
 }

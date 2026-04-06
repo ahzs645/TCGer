@@ -1,7 +1,7 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import { GAME_LABELS, type SupportedGame } from '@/lib/utils';
-import { useModuleStore } from '@/stores/preferences';
+import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
+import { useModuleStore } from "@/stores/preferences";
 
 interface GameFilterState {
   selectedGame: SupportedGame;
@@ -9,23 +9,33 @@ interface GameFilterState {
 }
 
 export const useGameFilterStore = create<GameFilterState>((set) => ({
-  selectedGame: 'all',
-  setGame: (game) => set({ selectedGame: game })
+  selectedGame: "all",
+  setGame: (game) => set({ selectedGame: game }),
 }));
 
-export const supportedGames: SupportedGame[] = ['all', 'yugioh', 'magic', 'pokemon'];
-export const supportedGameOptions = supportedGames.map((value) => ({ value, label: GAME_LABELS[value] }));
+export const supportedGames: SupportedGame[] = [
+  "all",
+  "yugioh",
+  "magic",
+  "pokemon",
+];
+export const supportedGameOptions = supportedGames.map((value) => ({
+  value,
+  label: GAME_LABELS[value],
+}));
 
 useModuleStore.subscribe((state) => {
-  const enabledEntries = Object.entries(state.enabledGames) as Array<[Exclude<SupportedGame, 'all'>, boolean]>;
+  const enabledEntries = Object.entries(state.enabledGames) as Array<
+    [Exclude<SupportedGame, "all">, boolean]
+  >;
   const activeGames = new Set(
-    enabledEntries.filter(([, enabled]) => enabled).map(([game]) => game)
+    enabledEntries.filter(([, enabled]) => enabled).map(([game]) => game),
   );
 
   const { selectedGame, setGame } = useGameFilterStore.getState();
 
-  if (selectedGame !== 'all' && !activeGames.has(selectedGame)) {
+  if (selectedGame !== "all" && !activeGames.has(selectedGame)) {
     const fallback = enabledEntries.find(([, enabled]) => enabled)?.[0];
-    setGame(fallback ?? 'all');
+    setGame(fallback ?? "all");
   }
 });

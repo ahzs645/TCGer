@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { ConvexBetterAuthProvider } from '@convex-dev/better-auth/react';
-import { ConvexReactClient } from 'convex/react';
+import React from "react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { ConvexReactClient } from "convex/react";
 
-import { authClient, useSession } from '@/lib/auth-client';
-import { toAuthUser } from '@/lib/auth-helpers';
-import { ensureDemoInterceptor, isDemoMode } from '@/lib/demo-mode';
-import { resolvePublicConvexOrigin } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth';
+import { authClient, useSession } from "@/lib/auth-client";
+import { toAuthUser } from "@/lib/auth-helpers";
+import { ensureDemoInterceptor, isDemoMode } from "@/lib/demo-mode";
+import { resolvePublicConvexOrigin } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
 
 function AuthSessionSync() {
   ensureDemoInterceptor();
@@ -24,8 +24,9 @@ function AuthSessionSync() {
     }
 
     const onDemoRoute =
-      typeof window !== 'undefined' &&
-      (window.location.pathname === '/demo' || window.location.pathname.startsWith('/demo/'));
+      typeof window !== "undefined" &&
+      (window.location.pathname === "/demo" ||
+        window.location.pathname.startsWith("/demo/"));
 
     if (onDemoRoute || isDemoMode()) {
       return;
@@ -49,14 +50,14 @@ function AuthSessionSync() {
 
 export function ConvexClientProvider({
   children,
-  initialToken
+  initialToken,
 }: {
   children: React.ReactNode;
   initialToken?: string | null;
 }) {
   ensureDemoInterceptor();
   const [convexClient] = React.useState(
-    () => new ConvexReactClient(resolvePublicConvexOrigin())
+    () => new ConvexReactClient(resolvePublicConvexOrigin()),
   );
 
   return (
@@ -64,8 +65,9 @@ export function ConvexClientProvider({
       client={convexClient}
       authClient={authClient}
       initialToken={initialToken}
+      data-oid="40dpbt1"
     >
-      <AuthSessionSync />
+      <AuthSessionSync data-oid="l8vquw2" />
       {children}
     </ConvexBetterAuthProvider>
   );

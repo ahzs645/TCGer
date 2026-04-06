@@ -1,8 +1,10 @@
-import { convexBetterAuthNextJs } from '@convex-dev/better-auth/nextjs';
+import { convexBetterAuthNextJs } from "@convex-dev/better-auth/nextjs";
 
-const convexUrl = process.env.CONVEX_URL_INTERNAL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
+const convexUrl =
+  process.env.CONVEX_URL_INTERNAL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
 const convexSiteUrl =
-  process.env.CONVEX_SITE_URL_INTERNAL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+  process.env.CONVEX_SITE_URL_INTERNAL ??
+  process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
 
 export const {
   handler,
@@ -11,8 +13,8 @@ export const {
   getToken,
   fetchAuthQuery,
   fetchAuthMutation,
-  fetchAuthAction
+  fetchAuthAction,
 } = convexBetterAuthNextJs({
-  convexUrl: convexUrl ?? 'http://localhost:3210',
-  convexSiteUrl: convexSiteUrl ?? 'http://localhost:3211'
+  convexUrl: convexUrl ?? "http://localhost:3210",
+  convexSiteUrl: convexSiteUrl ?? "http://localhost:3211",
 });
