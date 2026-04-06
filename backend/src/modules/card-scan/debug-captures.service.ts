@@ -19,7 +19,7 @@ export const CARD_SCAN_DEBUG_FEEDBACK_STATUSES = [
 export type CardScanDebugFeedbackStatus = (typeof CARD_SCAN_DEBUG_FEEDBACK_STATUSES)[number];
 
 interface CreateCardScanDebugCaptureInput {
-  userId: string;
+  viewerId: string;
   file: Express.Multer.File;
   imageBuffer: Buffer;
   result: ScanResult;
@@ -30,7 +30,7 @@ interface CreateCardScanDebugCaptureInput {
 }
 
 interface ListCardScanDebugCapturesInput {
-  userId: string;
+  viewerId: string;
   isAdmin: boolean;
   scope?: 'all' | 'mine';
   limit?: number;
@@ -38,7 +38,7 @@ interface ListCardScanDebugCapturesInput {
 
 interface UpdateCardScanDebugCaptureInput {
   captureId: string;
-  userId: string;
+  viewerId: string;
   isAdmin: boolean;
   feedbackStatus?: CardScanDebugFeedbackStatus;
   notes?: string;
@@ -112,7 +112,7 @@ export async function createCardScanDebugCapture(
   try {
     return await prisma.cardScanDebugCapture.create({
       data: {
-        userId: input.userId,
+        userId: input.viewerId,
         requestedTcg: trimOptionalString(input.requestedTcg) ?? null,
         captureSource: trimOptionalString(input.captureSource) ?? null,
         sourceImagePath: publicPath,
@@ -141,7 +141,7 @@ export async function listCardScanDebugCaptures(input: ListCardScanDebugCaptures
   const scope = input.isAdmin && input.scope === 'all' ? 'all' : 'mine';
 
   return prisma.cardScanDebugCapture.findMany({
-    where: scope === 'all' ? undefined : { userId: input.userId },
+    where: scope === 'all' ? undefined : { userId: input.viewerId },
     orderBy: { createdAt: 'desc' },
     take: limit,
   });
@@ -157,7 +157,7 @@ export async function updateCardScanDebugCapture(input: UpdateCardScanDebugCaptu
     throw new Error('NOT_FOUND');
   }
 
-  if (!input.isAdmin && existing.userId !== input.userId) {
+  if (!input.isAdmin && existing.userId !== input.viewerId) {
     throw new Error('FORBIDDEN');
   }
 
