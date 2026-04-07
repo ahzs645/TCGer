@@ -34,6 +34,8 @@ export interface VideoTrack {
   id: number;
   proposal: VideoWindowProposal;
   overlayQuad: VideoQuad;
+  /** Smoothed quad for rendering (EMA-filtered to prevent jitter). */
+  smoothedQuad: VideoQuad;
   refinementMethod: string | null;
   isClipped: boolean;
   match: BrowserVideoScanCandidate;
@@ -41,6 +43,14 @@ export interface VideoTrack {
   seenFrames: number;
   stableFrames: number;
   missedFrames: number;
+  /** Accumulated match votes: externalId → { count, totalConfidence, bestMatch }. */
+  matchVotes: Map<string, MatchVote>;
+}
+
+export interface MatchVote {
+  count: number;
+  totalConfidence: number;
+  bestMatch: BrowserVideoScanCandidate;
 }
 
 export interface VideoOverlayItem {
