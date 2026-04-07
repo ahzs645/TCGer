@@ -7,6 +7,11 @@ import { ConvexReactClient } from "convex/react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { toAuthUser } from "@/lib/auth-helpers";
 import { ensureDemoInterceptor, isDemoMode } from "@/lib/demo-mode";
+import {
+  getSingleUserAuthUser,
+  isSingleUserModeEnabled,
+  SINGLE_USER_TOKEN,
+} from "@/lib/single-user-mode";
 import { resolvePublicConvexOrigin } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 
@@ -17,18 +22,24 @@ function AuthSessionSync() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setAuth = useAuthStore((state) => state.setAuth);
   const clearAuth = useAuthStore((state) => state.clearAuth);
+  const singleUserMode = isSingleUserModeEnabled();
 
   React.useEffect(() => {
-    if (isPending) {
-      return;
-    }
-
     const onDemoRoute =
       typeof window !== "undefined" &&
       (window.location.pathname === "/demo" ||
         window.location.pathname.startsWith("/demo/"));
 
     if (onDemoRoute || isDemoMode()) {
+      return;
+    }
+
+    if (singleUserMode) {
+      setAuth(getSingleUserAuthUser(), SINGLE_USER_TOKEN);
+      return;
+    }
+
+    if (isPending) {
       return;
     }
 
@@ -43,7 +54,7 @@ function AuthSessionSync() {
     }
 
     setAuth(toAuthUser(user), token);
-  }, [clearAuth, isAuthenticated, isPending, session, setAuth]);
+  }, [clearAuth, isAuthenticated, isPending, session, setAuth, singleUserMode]);
 
   return null;
 }

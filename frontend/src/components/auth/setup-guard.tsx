@@ -8,6 +8,7 @@ import { checkSetupRequired } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth-client";
 import { getSettings } from "@/lib/api/settings";
 import { ensureDemoInterceptor } from "@/lib/demo-mode";
+import { isSingleUserModeEnabled } from "@/lib/single-user-mode";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { LoginDialog } from "@/components/auth/login-dialog";
@@ -21,13 +22,14 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isPending: sessionPending } = useSession();
+  const singleUserMode = isSingleUserModeEnabled();
   const { isAuthenticated, token } = useAuthStore((state) => ({
     isAuthenticated: state.isAuthenticated,
     token: state.token,
   }));
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
-  const [loading, setLoading] = useState(true);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [loading, setLoading] = useState(!singleUserMode);
+  const [initialCheckDone, setInitialCheckDone] = useState(singleUserMode);
   const [shouldBlock, setShouldBlock] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);
 
@@ -51,6 +53,22 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setShouldBlock(false);
       setNeedsAuth(false);
+      return;
+    }
+
+    if (singleUserMode) {
+      setSetupRequired(false);
+      setNeedsAuth(false);
+
+      if (pathname === "/setup") {
+        router.replace("/");
+        setShouldBlock(true);
+      } else {
+        setShouldBlock(false);
+      }
+
+      setLoading(false);
+      setInitialCheckDone(true);
       return;
     }
 
@@ -158,9 +176,11 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
     };
   }, [
     hydrated,
+    initialCheckDone,
     pathname,
     router,
     sessionPending,
+    singleUserMode,
     setSetupRequired,
     isAuthenticated,
     token,
@@ -172,7 +192,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const isDemo = pathname?.startsWith("/demo");
 
   // Always render the same structure
-  if (loading || shouldBlock || (!isDemo && sessionPending)) {
+  if (loading || shouldBlock || (!isDemo && !singleUserMode && sessionPending)) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"

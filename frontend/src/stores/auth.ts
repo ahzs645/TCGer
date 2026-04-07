@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import {
+  getSingleUserAuthUser,
+  isSingleUserModeEnabled,
+  SINGLE_USER_TOKEN,
+} from "@/lib/single-user-mode";
+
 import { useModuleStore } from "./preferences";
 
 const DEFAULT_DISPLAY_PREFERENCES = {
@@ -42,6 +48,24 @@ interface AuthState {
       Pick<AuthUser, DisplayPreferenceKeys | EnabledGamesKeys>
     >,
   ) => void;
+}
+
+function getSingleUserAuthState() {
+  if (!isSingleUserModeEnabled()) {
+    return {
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      setupRequired: null,
+    };
+  }
+
+  return {
+    user: getSingleUserAuthUser(),
+    token: SINGLE_USER_TOKEN,
+    isAuthenticated: true,
+    setupRequired: false,
+  };
 }
 
 function withDisplayDefaults(user: AuthUser | null): AuthUser | null {
@@ -92,10 +116,7 @@ function syncDisplayPreferences(
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      setupRequired: null,
+      ...getSingleUserAuthState(),
       setAuth: (user, token) => {
         const normalizedUser = withDisplayDefaults(user);
 
@@ -109,6 +130,13 @@ export const useAuthStore = create<AuthState>()(
         syncDisplayPreferences(normalizedUser ?? undefined);
       },
       clearAuth: () => {
+        if (isSingleUserModeEnabled()) {
+          const singleUserState = getSingleUserAuthState();
+          set(singleUserState);
+          syncDisplayPreferences(singleUserState.user ?? undefined);
+          return;
+        }
+
         set({
           user: null,
           token: null,
@@ -159,6 +187,19 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "tcg-auth-store",
+      merge: (persistedState, currentState) => {
+        if (isSingleUserModeEnabled()) {
+          return {
+            ...currentState,
+            ...getSingleUserAuthState(),
+          };
+        }
+
+        return {
+          ...currentState,
+          ...(persistedState as Partial<AuthState>),
+        };
+      },
       partialize: (state) => ({
         user: state.user,
         token: state.token,
