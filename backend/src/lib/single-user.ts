@@ -88,14 +88,7 @@ async function ensureSingleUserRecord(): Promise<SessionUserLike> {
       id: env.SINGLE_USER_ID,
       email: env.SINGLE_USER_EMAIL,
       username: env.SINGLE_USER_USERNAME,
-      name: env.SINGLE_USER_USERNAME,
-      displayUsername: env.SINGLE_USER_USERNAME,
-      isAdmin: true,
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true
+      isAdmin: true
     },
     select: {
       id: true,
