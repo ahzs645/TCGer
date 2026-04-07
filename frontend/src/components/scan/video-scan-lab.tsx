@@ -67,7 +67,6 @@ import {
   drawVideoFrameToCanvas,
   ensureVideoMetadata,
   getTargetFrameLongSide,
-  scheduleNextFrame,
   seekVideo,
   yieldToBrowser,
 } from "./video-scan-video-utils";
@@ -375,9 +374,9 @@ export function VideoScanLab() {
   };
 
   /**
-   * Live detection mode: play the video and run quad detection on every
-   * rendered frame using requestVideoFrameCallback (or rAF fallback).
-   * No hash matching — just outlines.
+   * Live detection mode: runs a persistent rAF loop that detects card quads
+   * whenever the video frame changes — during playback, manual seeking, or
+   * scrubbing. Stops only when the user clicks Stop.
    */
   const handleLiveDetection = async () => {
     if (!selectedVideo || !videoRef.current || !frameCanvasRef.current) {
@@ -395,48 +394,53 @@ export function VideoScanLab() {
     try {
       await ensureVideoMetadata(video);
 
-      setHashStatus("Live detection: playing video with real-time card outlines.");
+      setHashStatus(
+        "Live detection active — play, pause, or scrub the video. Outlines update in real time.",
+      );
       let processedFrames = 0;
-
-      // Start playback
-      video.currentTime = 0;
-      await video.play();
+      let lastProcessedTime = -1;
 
       const processFrame = () => {
-        if (stopRequestedRef.current || video.paused || video.ended) {
-          video.pause();
+        if (stopRequestedRef.current) {
           setIsProcessing(false);
           setHashStatus(
-            `Live detection ended after ${processedFrames} frames.`,
+            `Live detection stopped after ${processedFrames} frames.`,
           );
           return;
         }
 
-        const { width, height } = drawVideoFrameToCanvas(
-          video,
-          frameCanvas,
-          720,
-        );
-        setVideoMetadata({ duration: video.duration, width, height });
+        // Only re-process when the video time actually changed
+        // (avoids burning CPU while paused on the same frame).
+        const currentTime = video.currentTime;
+        if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
+          lastProcessedTime = currentTime;
 
-        const nextFrameState: VideoScanFrameState = {
-          timestampSeconds: video.currentTime,
-          ...scanVideoFrameCanvasInBrowser({
+          const { width, height } = drawVideoFrameToCanvas(
+            video,
             frameCanvas,
-            hashEntries: [],
-            tcgFilter: scanFilter,
-            detectionOnly: true,
-          }),
-        };
+            720,
+          );
+          setVideoMetadata({ duration: video.duration, width, height });
 
-        setFrameState(nextFrameState);
-        processedFrames++;
-        setProgress({ processed: processedFrames, total: 0 });
+          const nextFrameState: VideoScanFrameState = {
+            timestampSeconds: currentTime,
+            ...scanVideoFrameCanvasInBrowser({
+              frameCanvas,
+              hashEntries: [],
+              tcgFilter: scanFilter,
+              detectionOnly: true,
+            }),
+          };
 
-        scheduleNextFrame(video, processFrame);
+          setFrameState(nextFrameState);
+          processedFrames++;
+          setProgress({ processed: processedFrames, total: 0 });
+        }
+
+        requestAnimationFrame(processFrame);
       };
 
-      scheduleNextFrame(video, processFrame);
+      requestAnimationFrame(processFrame);
     } catch (processingError) {
       setError(
         processingError instanceof Error
@@ -449,10 +453,6 @@ export function VideoScanLab() {
 
   const handleStop = () => {
     stopRequestedRef.current = true;
-    // Also pause the video if in live detection mode
-    if (detectionOnly && videoRef.current) {
-      videoRef.current.pause();
-    }
   };
 
   // ---------- render ----------

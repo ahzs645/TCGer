@@ -75,17 +75,18 @@ export function scanVideoFrameCanvasInBrowser(params: {
       isClipped = refinement.isClipped;
     }
 
-    // Detection-only: skip hash matching, always report the quad.
-    // Show the refined quad when found, raw proposal window otherwise.
+    // Detection-only: skip hash matching, only report refined quads.
     if (detectionOnly) {
-      rawProposalMatches.push({
-        proposal,
-        overlayQuad,
-        refinementMethod,
-        isClipped,
-        bestMatch: null,
-        candidates: [],
-      });
+      if (refinement) {
+        rawProposalMatches.push({
+          proposal,
+          overlayQuad,
+          refinementMethod,
+          isClipped,
+          bestMatch: null,
+          candidates: [],
+        });
+      }
       continue;
     }
 
@@ -142,10 +143,9 @@ export function scanVideoFrameCanvasInBrowser(params: {
     }
   }
 
-  // In detection-only mode, skip NMS (no bestMatch to compare) and return
-  // all proposals that found a refined quad.
+  // In detection-only mode, deduplicate overlapping refined quads via NMS.
   const proposalMatches = detectionOnly
-    ? rawProposalMatches
+    ? selectDistinctDetections(rawProposalMatches)
     : selectDistinctProposalMatches(rawProposalMatches);
   const mergedCandidates = new Map<string, BrowserVideoScanCandidate>();
 
@@ -179,6 +179,91 @@ export function scanVideoFrameCanvasInBrowser(params: {
     candidates,
     proposalMatches,
   };
+}
+
+/** Max detections shown in detection-only mode. */
+const MAX_DETECTION_OVERLAYS = 2;
+/** Stricter IOU threshold for detection-only NMS (same card = suppress). */
+const DETECTION_NMS_IOU = 0.15;
+
+/**
+ * NMS for detection-only mode.
+ * Keeps only the best non-overlapping refined quads, preferring
+ * observed > inferred and non-clipped > clipped.
+ * Uses a stricter IOU threshold than matching mode to suppress
+ * duplicate quads from overlapping proposals on the same card.
+ */
+function selectDistinctDetections(
+  proposalMatches: BrowserVideoProposalMatch[],
+): BrowserVideoProposalMatch[] {
+  const sorted = [...proposalMatches].sort((a, b) => {
+    // Prefer observed over inferred
+    const aObs = a.refinementMethod === "observed" ? 0 : 1;
+    const bObs = b.refinementMethod === "observed" ? 0 : 1;
+    if (aObs !== bObs) return aObs - bObs;
+    // Prefer non-clipped
+    if (a.isClipped !== b.isClipped) return a.isClipped ? 1 : -1;
+    return 0;
+  });
+
+  const selected: BrowserVideoProposalMatch[] = [];
+  for (const pm of sorted) {
+    // Suppress if the quad's bounding box overlaps a previously selected one.
+    const pmBox = quadBoundingBox(pm.overlayQuad);
+    const overlaps = selected.some((existing) => {
+      // Check both proposal IOU and quad bounding box IOU
+      if (windowIou(existing.proposal, pm.proposal) >= DETECTION_NMS_IOU) {
+        return true;
+      }
+      const existingBox = quadBoundingBox(existing.overlayQuad);
+      return boxIou(pmBox, existingBox) >= DETECTION_NMS_IOU;
+    });
+
+    if (overlaps) {
+      continue;
+    }
+
+    selected.push(pm);
+    if (selected.length >= MAX_DETECTION_OVERLAYS) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
+function quadBoundingBox(quad: import("./scan-types").VideoQuad): {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+} {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of quad) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function boxIou(
+  a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number },
+): number {
+  const overlapW = Math.max(
+    0,
+    Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left),
+  );
+  const overlapH = Math.max(
+    0,
+    Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top),
+  );
+  const intersection = overlapW * overlapH;
+  if (intersection <= 0) return 0;
+  const union = a.width * a.height + b.width * b.height - intersection;
+  return union > 0 ? intersection / union : 0;
 }
 
 function selectDistinctProposalMatches(
