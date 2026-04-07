@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { CardScanPanel } from "@/components/scan/card-scan-panel";
+import { VideoScanLab } from "@/components/scan/video-scan-lab";
 import { Badge } from "@/components/ui/badge";
 
 export default function ScanPage() {
@@ -28,6 +29,19 @@ export default function ScanPage() {
           </p>
         </div>
         <CardScanPanel data-oid="ojjtkru" />
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-heading font-semibold">Video Scan</h2>
+            <Badge variant="secondary">Experimental</Badge>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Browser-side prototype for local video files. It downloads the card
+            hash corpus into the client, samples frames, draws the active crop
+            outline, and shows the current top guess without sending each frame
+            back to the server.
+          </p>
+        </div>
+        <VideoScanLab />
       </div>
     </AppShell>
   );
