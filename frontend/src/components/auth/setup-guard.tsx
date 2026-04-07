@@ -14,7 +14,12 @@ import { Button } from "@/components/ui/button";
 import { LoginDialog } from "@/components/auth/login-dialog";
 import { SignupDialog } from "@/components/auth/signup-dialog";
 
-export function SetupGuard({ children }: { children: React.ReactNode }) {
+interface SetupGuardProps {
+  children: React.ReactNode;
+  singleUserMode?: boolean;
+}
+
+export function SetupGuard({ children, singleUserMode: singleUserModeProp }: SetupGuardProps) {
   // Re-install demo fetch interceptor if user was already in demo mode
   // (e.g. returning from a page refresh). Must run before any API calls.
   ensureDemoInterceptor();
@@ -22,7 +27,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { isPending: sessionPending } = useSession();
-  const singleUserMode = isSingleUserModeEnabled();
+  const singleUserMode = singleUserModeProp ?? isSingleUserModeEnabled();
   const { isAuthenticated, token } = useAuthStore((state) => ({
     isAuthenticated: state.isAuthenticated,
     token: state.token,

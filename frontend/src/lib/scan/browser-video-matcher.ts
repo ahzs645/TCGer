@@ -1,3 +1,10 @@
+export {
+  computeArtworkFingerprintFromCanvas,
+  matchArtworkFingerprint,
+  parseArtworkDatabase,
+  type ArtworkFingerprintEntry,
+  type ArtworkMatch,
+} from "./artwork-fingerprint";
 export { buildVideoWindowProposals } from "./proposal-windows";
 export { refineCardQuadInImageData } from "./quad-refinement";
 export { scanVideoFrameCanvasInBrowser } from "./scan-frame";

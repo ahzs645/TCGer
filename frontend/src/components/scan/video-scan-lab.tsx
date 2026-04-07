@@ -15,8 +15,11 @@ import {
   getCardScanHashesPageApi,
   type CardScanHashEntry,
 } from "@/lib/api/scan";
+import { API_BASE_URL } from "@/lib/api/base-url";
 import {
+  parseArtworkDatabase,
   scanVideoFrameCanvasInBrowser,
+  type ArtworkFingerprintEntry,
   type BrowserVideoFrameScanResult,
   type BrowserVideoProposalMatch,
   type BrowserVideoScanCandidate,
@@ -135,6 +138,7 @@ export function VideoScanLab() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
+  const artworkDbRef = useRef<ArtworkFingerprintEntry[] | null>(null);
   const stopRequestedRef = useRef(false);
   const trackStateRef = useRef<VideoTrack[]>([]);
   const nextTrackIdRef = useRef(1);
@@ -355,9 +359,32 @@ export function VideoScanLab() {
       }
 
       hashCacheRef.current.set(cacheKey, entries);
-      setHashStatus(
-        `Loaded ${entries.length.toLocaleString()} hashes for ${requestedFilter === "all" ? "all games" : GAME_LABELS[requestedFilter]}.`,
-      );
+
+      // Load artwork fingerprint DB in background (non-blocking)
+      if (!artworkDbRef.current) {
+        try {
+          const artworkRes = await fetch(
+            `${API_BASE_URL}/cards/scan/artwork-fingerprints`,
+            { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+          );
+          if (artworkRes.ok) {
+            const artworkJson = await artworkRes.json();
+            const tcgCode = requestedFilter === "all" ? "pokemon" : requestedFilter;
+            artworkDbRef.current = parseArtworkDatabase(artworkJson, tcgCode);
+            setHashStatus(
+              `Loaded ${entries.length.toLocaleString()} hashes + ${artworkDbRef.current.length.toLocaleString()} artwork fingerprints.`,
+            );
+          }
+        } catch {
+          // Artwork DB is optional — fall back to pHash-only matching
+        }
+      }
+
+      if (!artworkDbRef.current) {
+        setHashStatus(
+          `Loaded ${entries.length.toLocaleString()} hashes for ${requestedFilter === "all" ? "all games" : GAME_LABELS[requestedFilter]}.`,
+        );
+      }
 
       return entries;
     } finally {
@@ -426,6 +453,7 @@ export function VideoScanLab() {
           ...scanVideoFrameCanvasInBrowser({
             frameCanvas,
             hashEntries,
+            artworkDb: artworkDbRef.current ?? undefined,
             tcgFilter: scanFilter,
           }),
         };

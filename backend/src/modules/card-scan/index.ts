@@ -6,3 +6,4 @@ export { scanVideoFrameImage } from './video-scan.service';
 export type { VideoFrameScanResult } from './video-scan.service';
 export { buildHashDatabase, getHashDatabaseStats } from './hash-builder.service';
 export { getCardHashStoreMode } from './hash-store';
+export { loadArtworkDatabase, isArtworkDatabaseLoaded } from './artwork-matcher';

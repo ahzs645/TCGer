@@ -82,7 +82,7 @@ export function AppShell({ children }: AppShellProps) {
                 width={32}
                 height={32}
                 priority
-                className="dark:invert"
+                className="h-8 w-8 dark:invert"
                 data-oid=".i3qz._"
               />
               TCGer

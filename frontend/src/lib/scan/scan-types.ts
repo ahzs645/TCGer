@@ -50,6 +50,7 @@ export interface BrowserVideoScanCandidate extends CardScanMatch {
   titleDistance: number | null;
   footerDistance: number | null;
   proposalLabel: string;
+  artworkSimilarity?: number | null;
 }
 
 export interface BrowserVideoProposalMatch {
