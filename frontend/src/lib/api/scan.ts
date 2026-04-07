@@ -7,6 +7,34 @@ export interface CardScanHash {
   b: string;
 }
 
+export interface CardScanHashEntry {
+  tcg: TcgCode;
+  externalId: string;
+  name: string;
+  setCode: string | null;
+  setName: string | null;
+  rarity: string | null;
+  imageUrl: string | null;
+  rHash: string;
+  gHash: string;
+  bHash: string;
+  titleRHash?: string | null;
+  titleGHash?: string | null;
+  titleBHash?: string | null;
+  footerRHash?: string | null;
+  footerGHash?: string | null;
+  footerBHash?: string | null;
+  hashSize: number;
+}
+
+export interface CardScanHashPageResponse {
+  entries: CardScanHashEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface CardScanMatch {
   externalId: string;
   tcg: TcgCode;
@@ -251,6 +279,37 @@ export async function scanCardImageApi(params: {
   });
 
   return handleResponse<CardScanResponse>(response);
+}
+
+export async function getCardScanHashesPageApi(params: {
+  token: string;
+  tcg?: TcgCode | "all";
+  page?: number;
+  pageSize?: number;
+}): Promise<CardScanHashPageResponse> {
+  const { token, tcg, page, pageSize } = params;
+  const searchParams = new URLSearchParams();
+
+  if (tcg && tcg !== "all") {
+    searchParams.set("tcg", tcg);
+  }
+  if (page && page > 0) {
+    searchParams.set("page", String(page));
+  }
+  if (pageSize && pageSize > 0) {
+    searchParams.set("pageSize", String(pageSize));
+  }
+
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  const response = await fetch(`${API_BASE_URL}/cards/scan/hashes${suffix}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  return handleResponse<CardScanHashPageResponse>(response);
 }
 
 export async function getCardScanDebugCapturesApi(params: {
