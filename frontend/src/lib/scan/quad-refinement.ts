@@ -194,28 +194,73 @@ function computeGradientMaps(imageData: ImageDataLike): {
 } {
   const { width, height, data } = imageData;
   const pixelCount = width * height;
-  const luma = new Float32Array(pixelCount);
 
+  // 1. Convert to luma
+  const rawLuma = new Float32Array(pixelCount);
   for (let index = 0; index < pixelCount; index += 1) {
     const dataIndex = index * 4;
     const r = Number(data[dataIndex] ?? 0);
     const g = Number(data[dataIndex + 1] ?? 0);
     const b = Number(data[dataIndex + 2] ?? 0);
-    luma[index] = r * 0.299 + g * 0.587 + b * 0.114;
+    rawLuma[index] = r * 0.299 + g * 0.587 + b * 0.114;
   }
 
-  const verticalScores = new Float32Array(pixelCount);
-  const horizontalScores = new Float32Array(pixelCount);
+  // 2. Gaussian blur (5x5, sigma ≈ 1.0) — suppresses noise before gradients
+  const luma = gaussianBlur5x5(rawLuma, width, height);
 
+  // 3. Sobel gradients (3x3 kernel, stronger than simple differences)
+  const gx = new Float32Array(pixelCount);
+  const gy = new Float32Array(pixelCount);
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const index = y * width + x;
-      const gx = (luma[index + 1] ?? 0) - (luma[index - 1] ?? 0);
-      const gy = (luma[index + width] ?? 0) - (luma[index - width] ?? 0);
-      const absGx = Math.abs(gx);
-      const absGy = Math.abs(gy);
-      verticalScores[index] = Math.max(0, absGx - absGy * 0.35);
-      horizontalScores[index] = Math.max(0, absGy - absGx * 0.35);
+      // Sobel X: [-1 0 1; -2 0 2; -1 0 1]
+      gx[index] =
+        -(luma[index - width - 1] ?? 0) +
+        (luma[index - width + 1] ?? 0) -
+        2 * (luma[index - 1] ?? 0) +
+        2 * (luma[index + 1] ?? 0) -
+        (luma[index + width - 1] ?? 0) +
+        (luma[index + width + 1] ?? 0);
+      // Sobel Y: [-1 -2 -1; 0 0 0; 1 2 1]
+      gy[index] =
+        -(luma[index - width - 1] ?? 0) -
+        2 * (luma[index - width] ?? 0) -
+        (luma[index - width + 1] ?? 0) +
+        (luma[index + width - 1] ?? 0) +
+        2 * (luma[index + width] ?? 0) +
+        (luma[index + width + 1] ?? 0);
+    }
+  }
+
+  // 4. Compute directional edge scores with non-maximum suppression.
+  //    NMS thins edges to 1px along the gradient direction.
+  const verticalScores = new Float32Array(pixelCount);
+  const horizontalScores = new Float32Array(pixelCount);
+
+  for (let y = 2; y < height - 2; y += 1) {
+    for (let x = 2; x < width - 2; x += 1) {
+      const index = y * width + x;
+      const absGx = Math.abs(gx[index]!);
+      const absGy = Math.abs(gy[index]!);
+
+      // Vertical edge score (strong horizontal gradient)
+      const vScore = Math.max(0, absGx - absGy * 0.35);
+      if (vScore > 0) {
+        // NMS: suppress if not a local max horizontally
+        const left = Math.max(0, Math.abs(gx[index - 1]!) - Math.abs(gy[index - 1]!) * 0.35);
+        const right = Math.max(0, Math.abs(gx[index + 1]!) - Math.abs(gy[index + 1]!) * 0.35);
+        verticalScores[index] = vScore >= left && vScore >= right ? vScore : 0;
+      }
+
+      // Horizontal edge score (strong vertical gradient)
+      const hScore = Math.max(0, absGy - absGx * 0.35);
+      if (hScore > 0) {
+        // NMS: suppress if not a local max vertically
+        const above = Math.max(0, Math.abs(gy[index - width]!) - Math.abs(gx[index - width]!) * 0.35);
+        const below = Math.max(0, Math.abs(gy[index + width]!) - Math.abs(gx[index + width]!) * 0.35);
+        horizontalScores[index] = hScore >= above && hScore >= below ? hScore : 0;
+      }
     }
   }
 
@@ -225,6 +270,57 @@ function computeGradientMaps(imageData: ImageDataLike): {
     verticalScores,
     horizontalScores,
   };
+}
+
+/**
+ * 5x5 Gaussian blur (sigma ≈ 1.0).
+ * Kernel: [1 4 6 4 1] / 256 (separable, applied as two 1D passes).
+ */
+function gaussianBlur5x5(
+  input: Float32Array,
+  width: number,
+  height: number,
+): Float32Array {
+  const temp = new Float32Array(input.length);
+  const output = new Float32Array(input.length);
+
+  // Horizontal pass
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x;
+      const x0 = Math.max(0, x - 2);
+      const x1 = Math.max(0, x - 1);
+      const x3 = Math.min(width - 1, x + 1);
+      const x4 = Math.min(width - 1, x + 2);
+      temp[index] =
+        (input[y * width + x0]! * 1 +
+          input[y * width + x1]! * 4 +
+          input[index]! * 6 +
+          input[y * width + x3]! * 4 +
+          input[y * width + x4]! * 1) /
+        16;
+    }
+  }
+
+  // Vertical pass
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x;
+      const y0 = Math.max(0, y - 2);
+      const y1 = Math.max(0, y - 1);
+      const y3 = Math.min(height - 1, y + 1);
+      const y4 = Math.min(height - 1, y + 2);
+      output[index] =
+        (temp[y0 * width + x]! * 1 +
+          temp[y1 * width + x]! * 4 +
+          temp[index]! * 6 +
+          temp[y3 * width + x]! * 4 +
+          temp[y4 * width + x]! * 1) /
+        16;
+    }
+  }
+
+  return output;
 }
 
 function collectBorderPoints(
