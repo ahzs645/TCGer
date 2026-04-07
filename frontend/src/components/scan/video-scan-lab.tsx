@@ -82,6 +82,13 @@ interface VideoOverlayItem {
   style: CSSProperties;
 }
 
+interface VideoViewportRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 const HASH_PAGE_SIZE = 2000;
 const MAX_TIMELINE_ITEMS = 24;
 const DEFAULT_SAMPLE_FPS = 1;
@@ -89,6 +96,8 @@ const DEFAULT_MAX_FRAMES = 60;
 const MAX_FRAME_LONG_SIDE = 960;
 const TRACK_ASSOCIATION_IOU = 0.25;
 const TRACK_MISS_TTL = 2;
+const MIN_TRACK_STABLE_FRAMES = 2;
+const MIN_IMMEDIATE_TRACK_CONFIDENCE = 0.84;
 
 function formatSeconds(seconds: number): string {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
@@ -143,6 +152,7 @@ export function VideoScanLab() {
     width: number;
     height: number;
   } | null>(null);
+  const [videoViewportRect, setVideoViewportRect] = useState<VideoViewportRect | null>(null);
   const [frameState, setFrameState] = useState<VideoScanFrameState | null>(null);
   const [activeTracks, setActiveTracks] = useState<VideoTrack[]>([]);
   const [timeline, setTimeline] = useState<VideoTimelineItem[]>([]);
@@ -162,28 +172,40 @@ export function VideoScanLab() {
   const progressPercent =
     progress.total > 0 ? Math.min(100, (progress.processed / progress.total) * 100) : 0;
   const hashScopeLabel = scanFilter === "all" ? "all games" : GAME_LABELS[scanFilter];
-  const primaryTrack = activeTracks[0] ?? null;
-  const primaryCandidate = primaryTrack?.match ?? frameState?.bestMatch ?? null;
+  const visibleTracks = useMemo(
+    () =>
+      activeTracks.filter(
+        (track) =>
+          track.match.passedThreshold &&
+          (track.stableFrames >= MIN_TRACK_STABLE_FRAMES ||
+            track.match.confidence >= MIN_IMMEDIATE_TRACK_CONFIDENCE),
+      ),
+    [activeTracks],
+  );
+  const primaryTrack = visibleTracks[0] ?? null;
+  const primaryCandidate = primaryTrack?.match ?? null;
 
   const overlayItems = useMemo<VideoOverlayItem[]>(() => {
-    if (!videoMetadata) {
+    if (!videoMetadata || !videoViewportRect) {
       return [];
     }
 
-    const proposalMatches = frameState?.proposalMatches ?? [];
-
-    return proposalMatches.map((proposalMatch, index) => ({
-      key: `${proposalMatch.proposal.label}:${proposalMatch.bestMatch?.externalId ?? "none"}:${index}`,
-      proposal: proposalMatch.proposal,
-      match: proposalMatch.bestMatch,
+    return visibleTracks.map((track, index) => ({
+      key: `${track.id}:${track.match.externalId}:${index}`,
+      proposal: track.proposal,
+      match: track.match,
       style: {
-        left: `${(proposalMatch.proposal.left / videoMetadata.width) * 100}%`,
-        top: `${(proposalMatch.proposal.top / videoMetadata.height) * 100}%`,
-        width: `${(proposalMatch.proposal.width / videoMetadata.width) * 100}%`,
-        height: `${(proposalMatch.proposal.height / videoMetadata.height) * 100}%`,
+        left:
+          videoViewportRect.left +
+          (track.proposal.left / videoMetadata.width) * videoViewportRect.width,
+        top:
+          videoViewportRect.top +
+          (track.proposal.top / videoMetadata.height) * videoViewportRect.height,
+        width: (track.proposal.width / videoMetadata.width) * videoViewportRect.width,
+        height: (track.proposal.height / videoMetadata.height) * videoViewportRect.height,
       },
     }));
-  }, [frameState?.proposalMatches, videoMetadata]);
+  }, [videoMetadata, videoViewportRect, visibleTracks]);
 
   useEffect(() => {
     return () => {
@@ -194,8 +216,34 @@ export function VideoScanLab() {
     };
   }, [videoUrl]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    const updateViewport = () => {
+      const nextRect = computeContainedVideoRect(video, videoMetadata);
+      setVideoViewportRect(nextRect);
+    };
+
+    updateViewport();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateViewport();
+    });
+    resizeObserver.observe(video);
+    window.addEventListener("resize", updateViewport);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [videoMetadata, videoUrl]);
+
   const resetRunState = () => {
     setFrameState(null);
+    setVideoViewportRect(null);
     setActiveTracks([]);
     setTimeline([]);
     setProgress({ processed: 0, total: 0 });
@@ -640,8 +688,8 @@ export function VideoScanLab() {
                 <div>
                   <p className="text-sm font-medium">Active Tracks</p>
                   <p className="text-xs text-muted-foreground">
-                    Tracks persist across sampled frames instead of collapsing to
-                    one best crop.
+                    Overlays appear only after a track stabilizes or is very
+                    confident.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -650,7 +698,7 @@ export function VideoScanLab() {
                       {formatSeconds(frameState.timestampSeconds)}
                     </Badge>
                   ) : null}
-                  <Badge variant="secondary">{activeTracks.length}</Badge>
+                  <Badge variant="secondary">{visibleTracks.length}</Badge>
                 </div>
               </div>
 
@@ -707,11 +755,11 @@ export function VideoScanLab() {
                     </div>
                   </div>
 
-                  {activeTracks.length ? (
+                  {visibleTracks.length ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Current Track Guesses</p>
+                      <p className="text-sm font-medium">Visible Track Guesses</p>
                       <div className="space-y-2">
-                        {activeTracks.map((track) => (
+                        {visibleTracks.map((track) => (
                           <div
                             key={track.id}
                             className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-sm"
@@ -737,8 +785,8 @@ export function VideoScanLab() {
                 </div>
               ) : (
                 <div className="rounded-xl border bg-background px-4 py-6 text-sm text-muted-foreground">
-                  Track summaries will appear here once sampled frames start
-                  matching against the downloaded hash corpus.
+                  No stable track is visible yet. This is intentional; weak
+                  one-frame guesses are kept out of the overlay.
                 </div>
               )}
             </div>
@@ -910,6 +958,51 @@ async function yieldToBrowser(): Promise<void> {
   });
 }
 
+function computeContainedVideoRect(
+  video: HTMLVideoElement,
+  metadata: { width: number; height: number } | null,
+): VideoViewportRect | null {
+  const containerWidth = video.clientWidth;
+  const containerHeight = video.clientHeight;
+
+  if (
+    !metadata ||
+    metadata.width <= 0 ||
+    metadata.height <= 0 ||
+    containerWidth <= 0 ||
+    containerHeight <= 0
+  ) {
+    return null;
+  }
+
+  const sourceAspect = metadata.width / metadata.height;
+  const containerAspect = containerWidth / containerHeight;
+
+  if (!Number.isFinite(sourceAspect) || !Number.isFinite(containerAspect)) {
+    return null;
+  }
+
+  if (sourceAspect > containerAspect) {
+    const width = containerWidth;
+    const height = width / sourceAspect;
+    return {
+      left: 0,
+      top: (containerHeight - height) / 2,
+      width,
+      height,
+    };
+  }
+
+  const height = containerHeight;
+  const width = height * sourceAspect;
+  return {
+    left: (containerWidth - width) / 2,
+    top: 0,
+    width,
+    height,
+  };
+}
+
 function getTargetFrameLongSide(sampleFps: number): number {
   if (sampleFps >= 6) {
     return 640;
@@ -956,7 +1049,7 @@ function reconcileVideoTracks(
     .filter(
       (proposalMatch): proposalMatch is BrowserVideoProposalMatch & {
         bestMatch: BrowserVideoScanCandidate;
-      } => proposalMatch.bestMatch !== null,
+      } => proposalMatch.bestMatch !== null && proposalMatch.bestMatch.passedThreshold,
     )
     .sort((left, right) => {
       return (
