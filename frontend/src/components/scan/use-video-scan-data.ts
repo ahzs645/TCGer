@@ -12,6 +12,50 @@ import {
 
 import { HASH_PAGE_SIZE, type ScanFilter } from "./video-scan-types";
 
+// ---------- IndexedDB helpers ----------
+
+const IDB_NAME = "tcger-scan-cache";
+const IDB_VERSION = 1;
+const HASH_STORE = "hashEntries";
+const ARTWORK_STORE = "artworkDb";
+
+function openCache(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(HASH_STORE)) {
+        db.createObjectStore(HASH_STORE);
+      }
+      if (!db.objectStoreNames.contains(ARTWORK_STORE)) {
+        db.createObjectStore(ARTWORK_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGet<T>(db: IDBDatabase, store: string, key: string): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(db: IDBDatabase, store: string, key: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ---------- hook ----------
+
 export interface VideoScanDataCallbacks {
   onHashStatus: (status: string) => void;
   onHashCount: (count: number) => void;
@@ -20,9 +64,7 @@ export interface VideoScanDataCallbacks {
 
 /**
  * Hook that manages hash index + artwork fingerprint loading for the video scanner.
- *
- * Returns a function that loads (or returns cached) hash entries for a given filter,
- * and maintains the artwork DB ref.
+ * Data is cached in IndexedDB so subsequent loads are instant.
  */
 export function useVideoScanData(
   token: string | null,
@@ -39,20 +81,62 @@ export function useVideoScanData(
         );
       }
 
+      // 1. Check in-memory cache
       const cacheKey = requestedFilter;
-      const cached = hashCacheRef.current.get(cacheKey);
-      if (cached) {
-        callbacks.onHashCount(cached.length);
+      const memCached = hashCacheRef.current.get(cacheKey);
+      if (memCached) {
+        callbacks.onHashCount(memCached.length);
         callbacks.onHashStatus(
-          `Loaded ${cached.length.toLocaleString()} hashes (cached).`,
+          `Loaded ${memCached.length.toLocaleString()} hashes (memory cache).`,
         );
-        return cached;
+        return memCached;
       }
 
       callbacks.onLoadingChange(true);
-      callbacks.onHashStatus("Loading hash index into the browser...");
 
       try {
+        // 2. Check IndexedDB cache
+        let db: IDBDatabase | null = null;
+        try {
+          db = await openCache();
+        } catch {
+          // IndexedDB unavailable — fall through to network
+        }
+
+        if (db) {
+          const idbHashes = await idbGet<CardScanHashEntry[]>(
+            db,
+            HASH_STORE,
+            cacheKey,
+          );
+          if (idbHashes && idbHashes.length > 0) {
+            hashCacheRef.current.set(cacheKey, idbHashes);
+            callbacks.onHashCount(idbHashes.length);
+            callbacks.onHashStatus(
+              `Loaded ${idbHashes.length.toLocaleString()} hashes (local cache).`,
+            );
+
+            // Also restore artwork DB from IndexedDB
+            if (!artworkDbRef.current) {
+              const idbArtwork = await idbGet<ArtworkFingerprintEntry[]>(
+                db,
+                ARTWORK_STORE,
+                cacheKey,
+              );
+              if (idbArtwork && idbArtwork.length > 0) {
+                artworkDbRef.current = idbArtwork;
+                callbacks.onHashStatus(
+                  `Loaded ${idbHashes.length.toLocaleString()} hashes + ${idbArtwork.length.toLocaleString()} artwork fingerprints (local cache).`,
+                );
+              }
+            }
+
+            return idbHashes;
+          }
+        }
+
+        // 3. Fetch from server
+        callbacks.onHashStatus("Downloading hash index from server...");
         const entries: CardScanHashEntry[] = [];
         let page = 1;
         let totalPages = 1;
@@ -71,15 +155,23 @@ export function useVideoScanData(
           totalEntries = response.total;
           callbacks.onHashCount(entries.length);
           callbacks.onHashStatus(
-            `Loading hash index: ${entries.length.toLocaleString()} / ${totalEntries.toLocaleString()} entries.`,
+            `Downloading: ${entries.length.toLocaleString()} / ${totalEntries.toLocaleString()} hashes.`,
           );
           page += 1;
         }
 
         hashCacheRef.current.set(cacheKey, entries);
 
-        // Load artwork fingerprint DB in background (non-blocking)
+        // Save to IndexedDB for next time
+        if (db) {
+          idbPut(db, HASH_STORE, cacheKey, entries).catch(() => {});
+        }
+
+        // 4. Load artwork fingerprints
         if (!artworkDbRef.current) {
+          callbacks.onHashStatus(
+            `Loaded ${entries.length.toLocaleString()} hashes. Downloading artwork fingerprints...`,
+          );
           try {
             const artworkRes = await fetch(
               `${API_BASE_URL}/cards/scan/artwork-fingerprints`,
@@ -95,20 +187,25 @@ export function useVideoScanData(
                 artworkJson,
                 tcgCode,
               );
-              callbacks.onHashStatus(
-                `Loaded ${entries.length.toLocaleString()} hashes + ${artworkDbRef.current.length.toLocaleString()} artwork fingerprints.`,
-              );
+
+              // Save artwork to IndexedDB
+              if (db) {
+                idbPut(db, ARTWORK_STORE, cacheKey, artworkDbRef.current).catch(
+                  () => {},
+                );
+              }
             }
           } catch {
-            // Artwork DB is optional — fall back to pHash-only matching
+            // Artwork DB is optional
           }
         }
 
-        if (!artworkDbRef.current) {
-          callbacks.onHashStatus(
-            `Loaded ${entries.length.toLocaleString()} hashes.`,
-          );
-        }
+        const artCount = artworkDbRef.current?.length ?? 0;
+        callbacks.onHashStatus(
+          artCount > 0
+            ? `Ready: ${entries.length.toLocaleString()} hashes + ${artCount.toLocaleString()} artwork fingerprints (saved locally).`
+            : `Ready: ${entries.length.toLocaleString()} hashes (saved locally).`,
+        );
 
         return entries;
       } finally {
@@ -121,9 +218,17 @@ export function useVideoScanData(
   return {
     ensureHashIndex,
     artworkDbRef,
-    clearCache: useCallback(() => {
+    clearCache: useCallback(async () => {
       hashCacheRef.current.clear();
       artworkDbRef.current = null;
+      try {
+        const db = await openCache();
+        const tx = db.transaction([HASH_STORE, ARTWORK_STORE], "readwrite");
+        tx.objectStore(HASH_STORE).clear();
+        tx.objectStore(ARTWORK_STORE).clear();
+      } catch {
+        // IndexedDB unavailable
+      }
     }, []),
   };
 }

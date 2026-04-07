@@ -326,19 +326,34 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         "YOLO + matching active — play, pause, or scrub. Cards are identified in real time.",
       );
       let processedFrames = 0;
+      let skippedFrames = 0;
       let lastProcessedTime = -1;
+      let processing = false; // busy flag — skip frames while matching
 
       const processFrame = () => {
         if (stopRequestedRef.current) {
           callbacks.onProcessing(false);
+          const skipNote =
+            skippedFrames > 0 ? ` (${skippedFrames} skipped)` : "";
           callbacks.onStatus(
-            `YOLO + matching stopped after ${processedFrames} frames.`,
+            `YOLO + matching stopped after ${processedFrames} frames${skipNote}.`,
           );
           return;
         }
 
         const currentTime = video.currentTime;
-        if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
+        const timeChanged =
+          Math.abs(currentTime - lastProcessedTime) > 0.01;
+
+        // Skip this frame if we're still matching the previous one
+        if (timeChanged && processing) {
+          skippedFrames++;
+          requestAnimationFrame(processFrame);
+          return;
+        }
+
+        if (timeChanged) {
+          processing = true;
           lastProcessedTime = currentTime;
 
           const { width, height } = drawVideoFrameToCanvas(
@@ -378,6 +393,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
 
           processedFrames++;
           callbacks.onProgress({ processed: processedFrames, total: 0 });
+          processing = false;
         }
 
         requestAnimationFrame(processFrame);
