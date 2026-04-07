@@ -54,6 +54,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var credentials: LoginCredentials
     @Published var isAuthenticated: Bool
     @Published var authToken: String?
+    @Published var isUsingSingleUserMode: Bool
     @Published var currentUser: User?
     @Published var appSettings: AppSettings?
     @Published var isServerVerified: Bool
@@ -78,6 +79,7 @@ final class EnvironmentStore: ObservableObject {
         static let credentials = "tcg.manager.credentials"
         static let authenticated = "tcg.manager.authenticated"
         static let token = "tcg.manager.auth.token"
+        static let singleUserMode = "tcg.manager.auth.singleUserMode"
         static let verified = "tcg.manager.server.verified"
         static let enabledYugioh = "enabledYugioh"
         static let enabledMagic = "enabledMagic"
@@ -100,6 +102,10 @@ final class EnvironmentStore: ObservableObject {
         static let username = "Demo User"
     }
 
+    private enum SingleUserDefaults {
+        static let token = "single-user-token-static"
+    }
+
     init() {
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
@@ -119,6 +125,11 @@ final class EnvironmentStore: ObservableObject {
         let legacyToken = storage.string(forKey: Keys.token)
         let keychainToken = KeychainTokenStore.loadToken()
         authToken = keychainToken ?? legacyToken
+        isUsingSingleUserMode =
+            (storage.object(forKey: Keys.singleUserMode) as? Bool)
+            ?? ((keychainToken ?? legacyToken) == SingleUserDefaults.token)
+        currentUser = nil
+        appSettings = nil
         if keychainToken == nil, let legacyToken {
             KeychainTokenStore.saveToken(legacyToken)
             storage.removeObject(forKey: Keys.token)
@@ -228,6 +239,13 @@ final class EnvironmentStore: ObservableObject {
                     KeychainTokenStore.deleteToken()
                     self?.authToken = nil
                 }
+            }
+            .store(in: &cancellables)
+
+        $isUsingSingleUserMode
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.singleUserMode)
             }
             .store(in: &cancellables)
 
@@ -397,6 +415,7 @@ final class EnvironmentStore: ObservableObject {
     }
 
     func signOut() {
+        isUsingSingleUserMode = false
         isAuthenticated = false
         authToken = nil
         currentUser = nil
@@ -425,6 +444,7 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
+        storage.removeObject(forKey: Keys.singleUserMode)
         KeychainTokenStore.deleteToken()
         storage.set(false, forKey: Keys.authenticated)
         storage.set(false, forKey: Keys.verified)
@@ -486,6 +506,8 @@ final class EnvironmentStore: ObservableObject {
     func enableDemoSession(force: Bool) {
         guard serverConfiguration.isDemoMode else { return }
 
+        isUsingSingleUserMode = false
+
         if force || authToken == nil {
             storeToken(DemoDefaults.token)
         }
@@ -524,6 +546,29 @@ final class EnvironmentStore: ObservableObject {
 
         isServerVerified = true
         storage.set(true, forKey: Keys.verified)
+    }
+
+    func enableSingleUserSession(profile: APIService.UserProfile) {
+        credentials = LoginCredentials(
+            username: profile.username ?? credentials.username,
+            password: ""
+        )
+        currentUser = User(
+            id: profile.id,
+            email: profile.email,
+            name: profile.username,
+            username: profile.username,
+            isAdmin: profile.isAdmin,
+            showCardNumbers: profile.showCardNumbers,
+            showPricing: profile.showPricing,
+            enabledYugioh: enabledYugioh,
+            enabledMagic: enabledMagic,
+            enabledPokemon: enabledPokemon,
+            defaultGame: defaultGame
+        )
+        isUsingSingleUserMode = true
+        storeToken(SingleUserDefaults.token)
+        isAuthenticated = true
     }
 }
 
