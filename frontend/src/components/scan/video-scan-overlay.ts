@@ -160,7 +160,8 @@ export function buildTrackOverlayItems(
   viewportRect: VideoViewportRect,
 ): VideoOverlayItem[] {
   return tracks.map((track, index) => {
-    const quad = mapQuadToViewport(track.overlayQuad, metadata, viewportRect);
+    // Use the smoothed quad for rendering (EMA-filtered, no jitter)
+    const quad = mapQuadToViewport(track.smoothedQuad, metadata, viewportRect);
     const palette = getOverlayPalette(track.match);
     const labelPoint = quad[0] ?? { x: 0, y: 0 };
 
