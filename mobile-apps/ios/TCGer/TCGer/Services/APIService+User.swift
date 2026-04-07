@@ -13,7 +13,7 @@ extension APIService {
 
     func getUserProfile(
         config: ServerConfiguration,
-        token: String
+        token: String? = nil
     ) async throws -> UserProfile {
         if config.isDemoMode {
             return DemoStore.shared.getUserProfile()

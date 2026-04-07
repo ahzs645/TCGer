@@ -213,6 +213,7 @@ struct RootView: View {
             username: fallbackUsername ?? response.user.username ?? "",
             password: ""
         )
+        environmentStore.isUsingSingleUserMode = false
         environmentStore.applyAuthUser(response.user)
         environmentStore.storeToken(response.token)
         environmentStore.isAuthenticated = true
@@ -276,6 +277,81 @@ struct RootView: View {
             } else {
                 print("Failed to load app settings: \(error.localizedDescription)")
             }
+        }
+
+        await reconcileServerAccessMode()
+    }
+
+    @MainActor
+    private func reconcileServerAccessMode() async {
+        guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else {
+            return
+        }
+
+        guard setupRequired == false else {
+            showingSignup = false
+            environmentStore.signOut()
+            return
+        }
+
+        if environmentStore.serverConfiguration.isDemoMode {
+            return
+        }
+
+        if environmentStore.isUsingSingleUserMode {
+            if await probeSingleUserSession() {
+                return
+            }
+            environmentStore.signOut()
+        }
+
+        if let token = environmentStore.authToken, !environmentStore.isUsingSingleUserMode {
+            do {
+                let profile = try await apiService.getUserProfile(
+                    config: environmentStore.serverConfiguration,
+                    token: token
+                )
+                environmentStore.applyUserProfile(profile)
+                environmentStore.isAuthenticated = true
+                showingSignup = false
+                await fetchPreferences()
+                return
+            } catch let apiError as APIService.APIError {
+                if case .unauthorized = apiError {
+                    environmentStore.signOut()
+                } else {
+                    print("Failed to validate authenticated session: \(apiError.localizedDescription)")
+                    return
+                }
+            } catch {
+                print("Failed to validate authenticated session: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        _ = await probeSingleUserSession()
+    }
+
+    @MainActor
+    private func probeSingleUserSession() async -> Bool {
+        do {
+            let profile = try await apiService.getUserProfile(
+                config: environmentStore.serverConfiguration
+            )
+            environmentStore.enableSingleUserSession(profile: profile)
+            showingSignup = false
+            await fetchPreferences()
+            return true
+        } catch let apiError as APIService.APIError {
+            if case .unauthorized = apiError {
+                return false
+            }
+
+            print("Failed to probe single-user mode: \(apiError.localizedDescription)")
+            return false
+        } catch {
+            print("Failed to probe single-user mode: \(error.localizedDescription)")
+            return false
         }
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   AlertCircle,
   Cpu,
@@ -18,6 +18,7 @@ import {
 import {
   scanVideoFrameCanvasInBrowser,
   type BrowserVideoFrameScanResult,
+  type BrowserVideoProposalMatch,
   type BrowserVideoScanCandidate,
   type VideoWindowProposal,
 } from "@/lib/scan/browser-video-matcher";
@@ -58,9 +59,27 @@ interface VideoScanFrameState extends BrowserVideoFrameScanResult {
 
 interface VideoTimelineItem {
   id: string;
+  trackId: number;
   timestampSeconds: number;
   match: BrowserVideoScanCandidate;
   proposal: VideoWindowProposal | null;
+}
+
+interface VideoTrack {
+  id: number;
+  proposal: VideoWindowProposal;
+  match: BrowserVideoScanCandidate;
+  lastSeenSeconds: number;
+  seenFrames: number;
+  stableFrames: number;
+  missedFrames: number;
+}
+
+interface VideoOverlayItem {
+  key: string;
+  proposal: VideoWindowProposal;
+  match: BrowserVideoScanCandidate | null;
+  style: CSSProperties;
 }
 
 const HASH_PAGE_SIZE = 2000;
@@ -68,6 +87,8 @@ const MAX_TIMELINE_ITEMS = 24;
 const DEFAULT_SAMPLE_FPS = 1;
 const DEFAULT_MAX_FRAMES = 60;
 const MAX_FRAME_LONG_SIDE = 960;
+const TRACK_ASSOCIATION_IOU = 0.25;
+const TRACK_MISS_TTL = 2;
 
 function formatSeconds(seconds: number): string {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
@@ -99,7 +120,8 @@ export function VideoScanLab() {
   const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
   const stopRequestedRef = useRef(false);
-  const lastTimelineKeyRef = useRef<string | null>(null);
+  const trackStateRef = useRef<VideoTrack[]>([]);
+  const nextTrackIdRef = useRef(1);
 
   const { token, isAuthenticated } = useAuthStore((state) => ({
     token: state.token,
@@ -122,6 +144,7 @@ export function VideoScanLab() {
     height: number;
   } | null>(null);
   const [frameState, setFrameState] = useState<VideoScanFrameState | null>(null);
+  const [activeTracks, setActiveTracks] = useState<VideoTrack[]>([]);
   const [timeline, setTimeline] = useState<VideoTimelineItem[]>([]);
   const [progress, setProgress] = useState<VideoScanProgress>({
     processed: 0,
@@ -139,21 +162,28 @@ export function VideoScanLab() {
   const progressPercent =
     progress.total > 0 ? Math.min(100, (progress.processed / progress.total) * 100) : 0;
   const hashScopeLabel = scanFilter === "all" ? "all games" : GAME_LABELS[scanFilter];
-  const activeCandidate = frameState?.bestMatch ?? null;
-  const activeProposal = frameState?.activeProposal ?? null;
+  const primaryTrack = activeTracks[0] ?? null;
+  const primaryCandidate = primaryTrack?.match ?? frameState?.bestMatch ?? null;
 
-  const overlayStyle = useMemo(() => {
-    if (!activeProposal || !videoMetadata) {
-      return null;
+  const overlayItems = useMemo<VideoOverlayItem[]>(() => {
+    if (!videoMetadata) {
+      return [];
     }
 
-    return {
-      left: `${(activeProposal.left / videoMetadata.width) * 100}%`,
-      top: `${(activeProposal.top / videoMetadata.height) * 100}%`,
-      width: `${(activeProposal.width / videoMetadata.width) * 100}%`,
-      height: `${(activeProposal.height / videoMetadata.height) * 100}%`,
-    };
-  }, [activeProposal, videoMetadata]);
+    const proposalMatches = frameState?.proposalMatches ?? [];
+
+    return proposalMatches.map((proposalMatch, index) => ({
+      key: `${proposalMatch.proposal.label}:${proposalMatch.bestMatch?.externalId ?? "none"}:${index}`,
+      proposal: proposalMatch.proposal,
+      match: proposalMatch.bestMatch,
+      style: {
+        left: `${(proposalMatch.proposal.left / videoMetadata.width) * 100}%`,
+        top: `${(proposalMatch.proposal.top / videoMetadata.height) * 100}%`,
+        width: `${(proposalMatch.proposal.width / videoMetadata.width) * 100}%`,
+        height: `${(proposalMatch.proposal.height / videoMetadata.height) * 100}%`,
+      },
+    }));
+  }, [frameState?.proposalMatches, videoMetadata]);
 
   useEffect(() => {
     return () => {
@@ -166,10 +196,12 @@ export function VideoScanLab() {
 
   const resetRunState = () => {
     setFrameState(null);
+    setActiveTracks([]);
     setTimeline([]);
     setProgress({ processed: 0, total: 0 });
     setError(null);
-    lastTimelineKeyRef.current = null;
+    trackStateRef.current = [];
+    nextTrackIdRef.current = 1;
   };
 
   const handleChooseVideo = () => {
@@ -212,29 +244,6 @@ export function VideoScanLab() {
     if (inputRef.current) {
       inputRef.current.value = "";
     }
-  };
-
-  const appendTimelineItem = (
-    timestampSeconds: number,
-    match: BrowserVideoScanCandidate,
-    proposal: VideoWindowProposal | null,
-  ) => {
-    const key = `${match.tcg}:${match.externalId}`;
-    if (key === lastTimelineKeyRef.current) {
-      return;
-    }
-
-    lastTimelineKeyRef.current = key;
-    setTimeline((previous) => {
-      const nextItem: VideoTimelineItem = {
-        id: `${key}:${timestampSeconds.toFixed(2)}`,
-        timestampSeconds,
-        match,
-        proposal,
-      };
-
-      return [nextItem, ...previous].slice(0, MAX_TIMELINE_ITEMS);
-    });
   };
 
   const ensureHashIndex = async (
@@ -327,7 +336,7 @@ export function VideoScanLab() {
 
       setProgress({ processed: 0, total: timestamps.length });
       setHashStatus(
-        `Running ${timestamps.length} sampled frames locally in the browser against ${hashEntries.length.toLocaleString()} hashes.`,
+        `Running ${timestamps.length} sampled frames locally in the browser against ${hashEntries.length.toLocaleString()} hashes at ${sampleFps.toFixed(1)} fps.`,
       );
 
       for (const [index, timestampSeconds] of timestamps.entries()) {
@@ -336,7 +345,11 @@ export function VideoScanLab() {
         }
 
         await seekVideo(video, timestampSeconds);
-        const { width, height } = drawVideoFrameToCanvas(video, frameCanvas);
+        const { width, height } = drawVideoFrameToCanvas(
+          video,
+          frameCanvas,
+          getTargetFrameLongSide(sampleFps),
+        );
         const nextMetadata = {
           duration: video.duration,
           width,
@@ -354,14 +367,21 @@ export function VideoScanLab() {
         };
 
         setFrameState(nextFrameState);
+        const trackUpdate = reconcileVideoTracks(
+          trackStateRef.current,
+          nextFrameState.proposalMatches,
+          timestampSeconds,
+          nextTrackIdRef.current,
+        );
+        trackStateRef.current = trackUpdate.tracks;
+        nextTrackIdRef.current = trackUpdate.nextTrackId;
+        setActiveTracks(trackUpdate.tracks);
         setProgress({ processed: index + 1, total: timestamps.length });
         processedFrames = index + 1;
 
-        if (nextFrameState.bestMatch) {
-          appendTimelineItem(
-            timestampSeconds,
-            nextFrameState.bestMatch,
-            nextFrameState.activeProposal,
+        if (trackUpdate.timelineEntries.length) {
+          setTimeline((previous) =>
+            [...trackUpdate.timelineEntries, ...previous].slice(0, MAX_TIMELINE_ITEMS),
           );
         }
 
@@ -442,16 +462,20 @@ export function VideoScanLab() {
               <Label>Sample Rate</Label>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>{sampleFps.toFixed(1)} fps</span>
-                <span>Lower is faster</span>
+                <span>Higher is heavier</span>
               </div>
             </div>
             <Slider
               value={sampleFpsValue}
               min={2}
-              max={20}
+              max={80}
               step={1}
               onValueChange={setSampleFpsValue}
             />
+            <p className="text-xs text-muted-foreground">
+              Higher sample rates automatically downscale frames to keep browser
+              runs usable.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -581,12 +605,21 @@ export function VideoScanLab() {
                     });
                   }}
                 />
-                {overlayStyle ? (
+                {overlayItems.map((overlay, index) => (
                   <div
-                    className="pointer-events-none absolute border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(15,23,42,0.08)]"
-                    style={overlayStyle}
-                  />
-                ) : null}
+                    key={overlay.key}
+                    className={cn(
+                      "pointer-events-none absolute border-2 shadow-[0_0_0_9999px_rgba(15,23,42,0.06)]",
+                      getOverlayTone(overlay.match),
+                    )}
+                    style={overlay.style}
+                  >
+                    <div className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      #{index + 1}
+                      {overlay.match ? ` · ${overlay.match.name}` : ""}
+                    </div>
+                  </div>
+                ))}
               </>
             ) : (
               <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_rgba(2,6,23,0.9)_55%,_rgba(2,6,23,1))] p-6 text-center text-white/80">
@@ -605,40 +638,44 @@ export function VideoScanLab() {
             <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Active Guess</p>
+                  <p className="text-sm font-medium">Active Tracks</p>
                   <p className="text-xs text-muted-foreground">
-                    Updates as sampled frames are processed locally.
+                    Tracks persist across sampled frames instead of collapsing to
+                    one best crop.
                   </p>
                 </div>
-                {frameState ? (
-                  <Badge variant="outline">
-                    {formatSeconds(frameState.timestampSeconds)}
-                  </Badge>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {frameState ? (
+                    <Badge variant="outline">
+                      {formatSeconds(frameState.timestampSeconds)}
+                    </Badge>
+                  ) : null}
+                  <Badge variant="secondary">{activeTracks.length}</Badge>
+                </div>
               </div>
 
-              {activeCandidate ? (
+              {primaryCandidate ? (
                 <div className="space-y-3">
                   <div
                     className={cn(
                       "rounded-xl border px-4 py-3",
-                      getCandidateTone(activeCandidate),
+                      getCandidateTone(primaryCandidate),
                     )}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <p className="font-semibold">{activeCandidate.name}</p>
+                        <p className="font-semibold">{primaryCandidate.name}</p>
                         <p className="text-sm opacity-80">
-                          {GAME_LABELS[activeCandidate.tcg]} ·{" "}
-                          {activeCandidate.setCode ?? "unknown set"}
+                          {GAME_LABELS[primaryCandidate.tcg]} ·{" "}
+                          {primaryCandidate.setCode ?? "unknown set"}
                         </p>
                       </div>
                       <Badge
                         variant={
-                          activeCandidate.passedThreshold ? "default" : "outline"
+                          primaryCandidate.passedThreshold ? "default" : "outline"
                         }
                       >
-                        {formatConfidence(activeCandidate.confidence)}
+                        {formatConfidence(primaryCandidate.confidence)}
                       </Badge>
                     </div>
                   </div>
@@ -648,43 +685,49 @@ export function VideoScanLab() {
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">
                         Distance
                       </div>
-                      <div className="font-medium">{activeCandidate.distance}</div>
+                      <div className="font-medium">{primaryCandidate.distance}</div>
                     </div>
                     <div className="rounded-lg border bg-background px-3 py-2">
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Proposal
+                        Tracked
                       </div>
-                      <div className="font-medium">{activeCandidate.proposalLabel}</div>
+                      <div className="font-medium">
+                        {primaryTrack?.stableFrames ?? 1} stable frames
+                      </div>
                     </div>
                     <div className="rounded-lg border bg-background px-3 py-2">
                       <div className="text-xs uppercase tracking-wide text-muted-foreground">
                         Status
                       </div>
                       <div className="font-medium">
-                        {activeCandidate.passedThreshold
+                        {primaryCandidate.passedThreshold
                           ? "Within threshold"
                           : "Low confidence"}
                       </div>
                     </div>
                   </div>
 
-                  {frameState?.candidates.length ? (
+                  {activeTracks.length ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Current Candidates</p>
+                      <p className="text-sm font-medium">Current Track Guesses</p>
                       <div className="space-y-2">
-                        {frameState.candidates.map((candidate) => (
+                        {activeTracks.map((track) => (
                           <div
-                            key={`${candidate.tcg}:${candidate.externalId}:${candidate.proposalLabel}`}
+                            key={track.id}
                             className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-sm"
                           >
                             <div className="space-y-0.5">
-                              <p className="font-medium">{candidate.name}</p>
+                              <p className="font-medium">
+                                #{track.id} · {track.match.name}
+                              </p>
                               <p className="text-xs text-muted-foreground">
-                                {candidate.proposalLabel} · {candidate.distance}
+                                {track.match.proposalLabel} ·{" "}
+                                {GAME_LABELS[track.match.tcg]} ·{" "}
+                                {formatSeconds(track.lastSeenSeconds)}
                               </p>
                             </div>
                             <Badge variant="outline">
-                              {formatConfidence(candidate.confidence)}
+                              {formatConfidence(track.match.confidence)}
                             </Badge>
                           </div>
                         ))}
@@ -694,7 +737,7 @@ export function VideoScanLab() {
                 </div>
               ) : (
                 <div className="rounded-xl border bg-background px-4 py-6 text-sm text-muted-foreground">
-                  The active guess will appear here once sampled frames start
+                  Track summaries will appear here once sampled frames start
                   matching against the downloaded hash corpus.
                 </div>
               )}
@@ -705,7 +748,7 @@ export function VideoScanLab() {
                 <div>
                   <p className="text-sm font-medium">Timeline</p>
                   <p className="text-xs text-muted-foreground">
-                    New entries are added when the guessed card changes.
+                    New entries are added when a track locks onto a new guess.
                   </p>
                 </div>
                 <Badge variant="secondary">{timeline.length}</Badge>
@@ -720,7 +763,9 @@ export function VideoScanLab() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-0.5">
-                          <p className="font-medium">{item.match.name}</p>
+                          <p className="font-medium">
+                            #{item.trackId} · {item.match.name}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {GAME_LABELS[item.match.tcg]} ·{" "}
                             {item.match.setCode ?? "unknown set"}
@@ -735,8 +780,8 @@ export function VideoScanLab() {
                 </div>
               ) : (
                 <div className="rounded-lg border bg-background px-3 py-6 text-sm text-muted-foreground">
-                  The timeline will start filling in after the first confident
-                  guess lands.
+                  The timeline will start filling in after the first track lands
+                  on a confident guess.
                 </div>
               )}
             </div>
@@ -813,9 +858,10 @@ async function seekVideo(
 function drawVideoFrameToCanvas(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
+  targetLongSide = MAX_FRAME_LONG_SIDE,
 ): { width: number; height: number } {
   const longestSide = Math.max(video.videoWidth, video.videoHeight);
-  const scale = longestSide > MAX_FRAME_LONG_SIDE ? MAX_FRAME_LONG_SIDE / longestSide : 1;
+  const scale = longestSide > targetLongSide ? targetLongSide / longestSide : 1;
   const width = Math.max(1, Math.round(video.videoWidth * scale));
   const height = Math.max(1, Math.round(video.videoHeight * scale));
 
@@ -862,4 +908,180 @@ async function yieldToBrowser(): Promise<void> {
   await new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
   });
+}
+
+function getTargetFrameLongSide(sampleFps: number): number {
+  if (sampleFps >= 6) {
+    return 640;
+  }
+
+  if (sampleFps >= 4) {
+    return 720;
+  }
+
+  if (sampleFps >= 2) {
+    return 840;
+  }
+
+  return MAX_FRAME_LONG_SIDE;
+}
+
+function getOverlayTone(match: BrowserVideoScanCandidate | null): string {
+  if (!match) {
+    return "border-slate-300";
+  }
+
+  if (match.passedThreshold && match.confidence >= 0.8) {
+    return "border-emerald-400";
+  }
+
+  if (match.passedThreshold) {
+    return "border-amber-400";
+  }
+
+  return "border-rose-400";
+}
+
+function reconcileVideoTracks(
+  existingTracks: VideoTrack[],
+  proposalMatches: BrowserVideoProposalMatch[],
+  timestampSeconds: number,
+  nextTrackId: number,
+): {
+  tracks: VideoTrack[];
+  timelineEntries: VideoTimelineItem[];
+  nextTrackId: number;
+} {
+  const detections = proposalMatches
+    .filter(
+      (proposalMatch): proposalMatch is BrowserVideoProposalMatch & {
+        bestMatch: BrowserVideoScanCandidate;
+      } => proposalMatch.bestMatch !== null,
+    )
+    .sort((left, right) => {
+      return (
+        right.bestMatch.confidence - left.bestMatch.confidence ||
+        left.bestMatch.scoreDistance - right.bestMatch.scoreDistance
+      );
+    });
+
+  const tracks = existingTracks.map((track) => ({
+    ...track,
+    missedFrames: track.missedFrames + 1,
+  }));
+  const assignedTrackIds = new Set<number>();
+  const timelineEntries: VideoTimelineItem[] = [];
+  let currentNextTrackId = nextTrackId;
+
+  for (const detection of detections) {
+    const detectionKey = `${detection.bestMatch.tcg}:${detection.bestMatch.externalId}`;
+    let bestTrackIndex = -1;
+    let bestAssociationScore = -1;
+
+    for (const [index, track] of tracks.entries()) {
+      if (assignedTrackIds.has(track.id)) {
+        continue;
+      }
+
+      const iou = computeProposalIou(track.proposal, detection.proposal);
+      if (iou < TRACK_ASSOCIATION_IOU) {
+        continue;
+      }
+
+      const trackKey = `${track.match.tcg}:${track.match.externalId}`;
+      const associationScore = iou + (trackKey === detectionKey ? 0.25 : 0);
+      if (associationScore > bestAssociationScore) {
+        bestAssociationScore = associationScore;
+        bestTrackIndex = index;
+      }
+    }
+
+    if (bestTrackIndex >= 0) {
+      const track = tracks[bestTrackIndex]!;
+      const previousKey = `${track.match.tcg}:${track.match.externalId}`;
+
+      tracks[bestTrackIndex] = {
+        ...track,
+        proposal: detection.proposal,
+        match: detection.bestMatch,
+        lastSeenSeconds: timestampSeconds,
+        seenFrames: track.seenFrames + 1,
+        stableFrames: previousKey === detectionKey ? track.stableFrames + 1 : 1,
+        missedFrames: 0,
+      };
+
+      assignedTrackIds.add(track.id);
+
+      if (previousKey !== detectionKey && detection.bestMatch.passedThreshold) {
+        timelineEntries.push({
+          id: `${track.id}:${detectionKey}:${timestampSeconds.toFixed(2)}`,
+          trackId: track.id,
+          timestampSeconds,
+          match: detection.bestMatch,
+          proposal: detection.proposal,
+        });
+      }
+
+      continue;
+    }
+
+    const newTrack: VideoTrack = {
+      id: currentNextTrackId++,
+      proposal: detection.proposal,
+      match: detection.bestMatch,
+      lastSeenSeconds: timestampSeconds,
+      seenFrames: 1,
+      stableFrames: 1,
+      missedFrames: 0,
+    };
+    tracks.push(newTrack);
+    assignedTrackIds.add(newTrack.id);
+
+    if (detection.bestMatch.passedThreshold) {
+      timelineEntries.push({
+        id: `${newTrack.id}:${detectionKey}:${timestampSeconds.toFixed(2)}`,
+        trackId: newTrack.id,
+        timestampSeconds,
+        match: detection.bestMatch,
+        proposal: detection.proposal,
+      });
+    }
+  }
+
+  return {
+    tracks: tracks
+      .filter((track) => track.missedFrames <= TRACK_MISS_TTL)
+      .sort((left, right) => {
+        return (
+          right.match.confidence - left.match.confidence ||
+          right.stableFrames - left.stableFrames ||
+          right.lastSeenSeconds - left.lastSeenSeconds
+        );
+      }),
+    timelineEntries,
+    nextTrackId: currentNextTrackId,
+  };
+}
+
+function computeProposalIou(
+  left: VideoWindowProposal,
+  right: VideoWindowProposal,
+): number {
+  const leftRight = left.left + left.width;
+  const rightRight = right.left + right.width;
+  const leftBottom = left.top + left.height;
+  const rightBottom = right.top + right.height;
+
+  const overlapWidth =
+    Math.max(0, Math.min(leftRight, rightRight) - Math.max(left.left, right.left));
+  const overlapHeight =
+    Math.max(0, Math.min(leftBottom, rightBottom) - Math.max(left.top, right.top));
+  const intersection = overlapWidth * overlapHeight;
+
+  if (intersection <= 0) {
+    return 0;
+  }
+
+  const union = left.width * left.height + right.width * right.height - intersection;
+  return union > 0 ? intersection / union : 0;
 }

@@ -36,10 +36,17 @@ export interface BrowserVideoScanCandidate extends CardScanMatch {
   proposalLabel: string;
 }
 
+export interface BrowserVideoProposalMatch {
+  proposal: VideoWindowProposal;
+  bestMatch: BrowserVideoScanCandidate | null;
+  candidates: BrowserVideoScanCandidate[];
+}
+
 export interface BrowserVideoFrameScanResult {
   activeProposal: VideoWindowProposal | null;
   bestMatch: BrowserVideoScanCandidate | null;
   candidates: BrowserVideoScanCandidate[];
+  proposalMatches: BrowserVideoProposalMatch[];
 }
 
 const DEFAULT_HASH_SIZE = 16;
@@ -49,13 +56,22 @@ const MAX_DISTANCE = 320;
 const SHORTLIST_MARGIN = 96;
 const SHORTLIST_LIMIT = 24;
 const MAX_CANDIDATES = 5;
+const MAX_ACTIVE_PROPOSALS = 4;
+const PROPOSAL_NMS_IOU = 0.4;
 
 const PORTRAIT_WINDOW_PRESETS = [
-  { label: "portrait-center-90", scale: 0.9, anchorX: 0.5, anchorY: 0.55 },
-  { label: "portrait-center-75", scale: 0.75, anchorX: 0.5, anchorY: 0.55 },
-  { label: "portrait-right-75", scale: 0.75, anchorX: 0.65, anchorY: 0.55 },
-  { label: "portrait-right-60", scale: 0.6, anchorX: 0.74, anchorY: 0.55 },
-  { label: "portrait-left-75", scale: 0.75, anchorX: 0.35, anchorY: 0.55 },
+  { label: "portrait-center-xl", scale: 0.9, anchorX: 0.5, anchorY: 0.53 },
+  { label: "portrait-center-lg", scale: 0.78, anchorX: 0.5, anchorY: 0.53 },
+  { label: "portrait-left-lg", scale: 0.78, anchorX: 0.3, anchorY: 0.53 },
+  { label: "portrait-right-lg", scale: 0.78, anchorX: 0.7, anchorY: 0.53 },
+  { label: "portrait-left-upper-md", scale: 0.62, anchorX: 0.24, anchorY: 0.34 },
+  { label: "portrait-center-upper-md", scale: 0.62, anchorX: 0.5, anchorY: 0.34 },
+  { label: "portrait-right-upper-md", scale: 0.62, anchorX: 0.76, anchorY: 0.34 },
+  { label: "portrait-left-lower-md", scale: 0.62, anchorX: 0.24, anchorY: 0.7 },
+  { label: "portrait-center-lower-md", scale: 0.62, anchorX: 0.5, anchorY: 0.7 },
+  { label: "portrait-right-lower-md", scale: 0.62, anchorX: 0.76, anchorY: 0.7 },
+  { label: "portrait-left-sm", scale: 0.5, anchorX: 0.18, anchorY: 0.53 },
+  { label: "portrait-right-sm", scale: 0.5, anchorX: 0.82, anchorY: 0.53 },
 ] as const;
 
 const FEATURE_REGION_SPECS: Record<
@@ -151,6 +167,7 @@ export function scanVideoFrameCanvasInBrowser(params: {
       activeProposal: null,
       bestMatch: null,
       candidates: [],
+      proposalMatches: [],
     };
   }
 
@@ -158,7 +175,7 @@ export function scanVideoFrameCanvasInBrowser(params: {
     frameCanvas.width,
     frameCanvas.height,
   );
-  const mergedCandidates = new Map<string, BrowserVideoScanCandidate>();
+  const rawProposalMatches: BrowserVideoProposalMatch[] = [];
   let bestProposal: VideoWindowProposal | null = null;
   let bestProposalMatch: BrowserVideoScanCandidate | null = null;
 
@@ -171,8 +188,30 @@ export function scanVideoFrameCanvasInBrowser(params: {
       tcgFilter,
     );
     const ranked = rankMatches(hashEntries, fullHash, featureHashesByTcg, proposal);
+    const topCandidate = ranked[0] ?? null;
+    rawProposalMatches.push({
+      proposal,
+      bestMatch: topCandidate,
+      candidates: ranked,
+    });
 
-    for (const candidate of ranked) {
+    if (topCandidate) {
+      if (
+        !bestProposalMatch ||
+        topCandidate.scoreDistance < bestProposalMatch.scoreDistance ||
+        topCandidate.fullDistance < bestProposalMatch.fullDistance
+      ) {
+        bestProposal = proposal;
+        bestProposalMatch = topCandidate;
+      }
+    }
+  }
+
+  const proposalMatches = selectDistinctProposalMatches(rawProposalMatches);
+  const mergedCandidates = new Map<string, BrowserVideoScanCandidate>();
+
+  for (const proposalMatch of proposalMatches) {
+    for (const candidate of proposalMatch.candidates) {
       const key = `${candidate.tcg}:${candidate.externalId}`;
       const existing = mergedCandidates.get(key);
       if (
@@ -182,20 +221,6 @@ export function scanVideoFrameCanvasInBrowser(params: {
       ) {
         mergedCandidates.set(key, candidate);
       }
-    }
-
-    const topCandidate = ranked[0] ?? null;
-    if (!topCandidate) {
-      continue;
-    }
-
-    if (
-      !bestProposalMatch ||
-      topCandidate.scoreDistance < bestProposalMatch.scoreDistance ||
-      topCandidate.fullDistance < bestProposalMatch.fullDistance
-    ) {
-      bestProposal = proposal;
-      bestProposalMatch = topCandidate;
     }
   }
 
@@ -213,7 +238,86 @@ export function scanVideoFrameCanvasInBrowser(params: {
     activeProposal: bestProposal,
     bestMatch: bestProposalMatch,
     candidates,
+    proposalMatches,
   };
+}
+
+function selectDistinctProposalMatches(
+  proposalMatches: BrowserVideoProposalMatch[],
+): BrowserVideoProposalMatch[] {
+  const selected: BrowserVideoProposalMatch[] = [];
+
+  for (const proposalMatch of [...proposalMatches].sort(compareProposalMatches)) {
+    if (!proposalMatch.bestMatch) {
+      continue;
+    }
+
+    if (
+      selected.some(
+        (existing) =>
+          windowIou(existing.proposal, proposalMatch.proposal) >= PROPOSAL_NMS_IOU,
+      )
+    ) {
+      continue;
+    }
+
+    selected.push(proposalMatch);
+    if (selected.length >= MAX_ACTIVE_PROPOSALS) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
+function compareProposalMatches(
+  left: BrowserVideoProposalMatch,
+  right: BrowserVideoProposalMatch,
+): number {
+  if (left.bestMatch && right.bestMatch) {
+    return (
+      left.bestMatch.scoreDistance - right.bestMatch.scoreDistance ||
+      left.bestMatch.fullDistance - right.bestMatch.fullDistance ||
+      left.bestMatch.name.localeCompare(right.bestMatch.name)
+    );
+  }
+
+  if (left.bestMatch) {
+    return -1;
+  }
+
+  if (right.bestMatch) {
+    return 1;
+  }
+
+  return left.proposal.label.localeCompare(right.proposal.label);
+}
+
+function windowIou(left: VideoWindowProposal, right: VideoWindowProposal): number {
+  const leftRight = left.left + left.width;
+  const rightRight = right.left + right.width;
+  const leftBottom = left.top + left.height;
+  const rightBottom = right.top + right.height;
+
+  const overlapWidth =
+    Math.max(0, Math.min(leftRight, rightRight) - Math.max(left.left, right.left));
+  const overlapHeight =
+    Math.max(0, Math.min(leftBottom, rightBottom) - Math.max(left.top, right.top));
+  const intersection = overlapWidth * overlapHeight;
+
+  if (intersection <= 0) {
+    return 0;
+  }
+
+  const leftArea = left.width * left.height;
+  const rightArea = right.width * right.height;
+  const union = leftArea + rightArea - intersection;
+
+  if (union <= 0) {
+    return 0;
+  }
+
+  return intersection / union;
 }
 
 function extractProposalCanvas(
