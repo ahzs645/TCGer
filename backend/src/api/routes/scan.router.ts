@@ -5,6 +5,8 @@ import {
   getCardHashes,
   buildHashDatabase,
   getHashDatabaseStats,
+  loadArtworkDatabase,
+  isArtworkDatabaseLoaded,
 } from '../../modules/card-scan';
 import {
   CARD_SCAN_DEBUG_FEEDBACK_STATUSES,
@@ -448,5 +450,44 @@ scanRouter.post(
       limit: limit ?? null,
       force: force ?? false,
     });
+  }),
+);
+
+/**
+ * GET /cards/scan/artwork-fingerprints
+ *
+ * Serve the artwork fingerprint database for browser-side matching.
+ * Returns the raw JSON file from disk (base64-encoded fingerprints).
+ * Optional query param: ?tcg=pokemon (default: pokemon)
+ */
+scanRouter.get(
+  '/artwork-fingerprints',
+  asyncHandler(async (req, res) => {
+    const dataDir = process.env.CARD_SCAN_DATA_DIR;
+    if (!dataDir) {
+      return res.status(503).json({
+        error: 'NOT_CONFIGURED',
+        message: 'CARD_SCAN_DATA_DIR is not set.',
+      });
+    }
+
+    const filePath = require('node:path').join(dataDir, 'artwork-fingerprints.json');
+    try {
+      await require('node:fs').promises.access(filePath);
+    } catch {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Artwork fingerprint database has not been built yet.',
+      });
+    }
+
+    // Ensure artwork DB is loaded for future scan requests too
+    if (!isArtworkDatabaseLoaded()) {
+      loadArtworkDatabase(dataDir).catch(() => {});
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    require('node:fs').createReadStream(filePath).pipe(res);
   }),
 );

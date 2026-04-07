@@ -1,3 +1,8 @@
+import {
+  computeArtworkFingerprintFromCanvas,
+  matchArtworkFingerprint,
+  type ArtworkFingerprintEntry,
+} from "./artwork-fingerprint";
 import { computeFeatureHashesByTcg } from "./feature-hashes";
 import {
   buildVideoWindowProposals,
@@ -24,9 +29,10 @@ import type {
 export function scanVideoFrameCanvasInBrowser(params: {
   frameCanvas: HTMLCanvasElement;
   hashEntries: CardScanHashEntry[];
+  artworkDb?: ArtworkFingerprintEntry[];
   tcgFilter?: TcgCode | "all";
 }): BrowserVideoFrameScanResult {
-  const { frameCanvas, hashEntries, tcgFilter } = params;
+  const { frameCanvas, hashEntries, artworkDb, tcgFilter } = params;
 
   if (!hashEntries.length) {
     return {
@@ -52,6 +58,7 @@ export function scanVideoFrameCanvasInBrowser(params: {
       hashEntries,
       proposal.label,
       tcgFilter,
+      artworkDb,
     );
     let ranked = rawRanked.ranked;
     let overlayQuad = proposalToQuad(proposal);
@@ -70,6 +77,7 @@ export function scanVideoFrameCanvasInBrowser(params: {
         hashEntries,
         proposal.label,
         tcgFilter,
+        artworkDb,
       );
       overlayQuad = offsetQuad(
         refinement.quad,
@@ -199,11 +207,19 @@ function compareProposalMatches(
   return left.proposal.label.localeCompare(right.proposal.label);
 }
 
+/** Number of top artwork matches to use as pHash pre-filter. */
+const ARTWORK_PREFILTER_TOP_N = 50;
+/** Artwork similarity threshold below which we don't trust the match. */
+const ARTWORK_MIN_SIMILARITY = 0.90;
+/** Artwork similarity margin over #2 to inject without pHash confirmation. */
+const ARTWORK_INJECT_MARGIN = 0.005;
+
 function rankProposalCanvas(
   cropCanvas: HTMLCanvasElement,
   hashEntries: CardScanHashEntry[],
   proposalLabel: string,
   tcgFilter?: TcgCode | "all",
+  artworkDb?: ArtworkFingerprintEntry[],
 ): { ranked: BrowserVideoScanCandidate[] } {
   const fullHash = computeRGBHashFromCanvas(cropCanvas);
   const featureHashesByTcg = computeFeatureHashesByTcg(
@@ -212,6 +228,52 @@ function rankProposalCanvas(
     tcgFilter,
   );
 
+  // When artwork DB is available, use artwork as primary signal
+  if (artworkDb && artworkDb.length > 0) {
+    const tcgForArtwork =
+      tcgFilter && tcgFilter !== "all" ? tcgFilter : "pokemon";
+    const artworkFp = computeArtworkFingerprintFromCanvas(
+      cropCanvas,
+      tcgForArtwork as "pokemon" | "magic" | "yugioh",
+    );
+    const artworkMatches = matchArtworkFingerprint(
+      artworkFp,
+      artworkDb,
+      ARTWORK_PREFILTER_TOP_N,
+      tcgFilter,
+    );
+
+    if (artworkMatches.length > 0) {
+      // Pre-filter hash entries to artwork top-N for faster pHash
+      const artworkIds = new Set(artworkMatches.map((m) => m.externalId));
+      const filteredEntries = hashEntries.filter((e) =>
+        artworkIds.has(e.externalId),
+      );
+
+      // Run pHash on pre-filtered set
+      const pHashRanked =
+        filteredEntries.length > 0
+          ? rankMatches(
+              filteredEntries,
+              fullHash,
+              featureHashesByTcg,
+              proposalLabel,
+            )
+          : [];
+
+      // Build artwork-based candidates and merge with pHash results
+      const merged = mergeArtworkAndPHashCandidates(
+        artworkMatches,
+        pHashRanked,
+        hashEntries,
+        proposalLabel,
+      );
+
+      return { ranked: merged };
+    }
+  }
+
+  // Fallback: pure pHash ranking (original path)
   return {
     ranked: rankMatches(
       hashEntries,
@@ -220,6 +282,93 @@ function rankProposalCanvas(
       proposalLabel,
     ),
   };
+}
+
+/**
+ * Merge artwork similarity matches with pHash candidates.
+ * Artwork is the primary signal; pHash refines the ranking.
+ */
+function mergeArtworkAndPHashCandidates(
+  artworkMatches: Array<{
+    externalId: string;
+    tcg: TcgCode;
+    name: string;
+    setCode: string | null;
+    similarity: number;
+  }>,
+  pHashCandidates: BrowserVideoScanCandidate[],
+  hashEntries: CardScanHashEntry[],
+  proposalLabel: string,
+): BrowserVideoScanCandidate[] {
+  const candidateMap = new Map<string, BrowserVideoScanCandidate>();
+
+  // Add pHash candidates first
+  for (const candidate of pHashCandidates) {
+    candidateMap.set(`${candidate.tcg}:${candidate.externalId}`, candidate);
+  }
+
+  // Inject top artwork matches that aren't already pHash candidates
+  const topArtwork = artworkMatches.slice(0, MAX_CANDIDATES);
+  const secondBest = artworkMatches[1]?.similarity ?? 0;
+
+  for (const artwork of topArtwork) {
+    const key = `${artwork.tcg}:${artwork.externalId}`;
+    const existing = candidateMap.get(key);
+
+    if (existing) {
+      // Enrich existing pHash candidate with artwork similarity
+      existing.artworkSimilarity = artwork.similarity;
+      continue;
+    }
+
+    // Inject artwork match only if it's confident enough
+    if (
+      artwork.similarity >= ARTWORK_MIN_SIMILARITY &&
+      (artwork === topArtwork[0] ||
+        artwork.similarity - secondBest >= ARTWORK_INJECT_MARGIN)
+    ) {
+      const entry = hashEntries.find(
+        (e) => e.externalId === artwork.externalId && e.tcg === artwork.tcg,
+      );
+
+      // Convert artwork similarity to a synthetic scoreDistance for ranking
+      // Lower scoreDistance = better match. Map similarity [0.9, 1.0] → distance [240, 0]
+      const syntheticDistance = Math.round((1 - artwork.similarity) * 240 * 1.5);
+
+      candidateMap.set(key, {
+        externalId: artwork.externalId,
+        tcg: artwork.tcg,
+        name: artwork.name,
+        setCode: artwork.setCode,
+        setName: entry?.setName ?? null,
+        rarity: entry?.rarity ?? null,
+        imageUrl: entry?.imageUrl ?? null,
+        confidence: artwork.similarity,
+        distance: syntheticDistance,
+        scoreDistance: syntheticDistance,
+        passedThreshold: artwork.similarity >= ARTWORK_MIN_SIMILARITY,
+        fullDistance: syntheticDistance,
+        titleDistance: null,
+        footerDistance: null,
+        proposalLabel,
+        artworkSimilarity: artwork.similarity,
+      });
+    }
+  }
+
+  return Array.from(candidateMap.values())
+    .sort((a, b) => {
+      // Prefer candidates with artwork similarity, then by score
+      const aArt = a.artworkSimilarity ?? 0;
+      const bArt = b.artworkSimilarity ?? 0;
+      if (aArt > ARTWORK_MIN_SIMILARITY && bArt <= ARTWORK_MIN_SIMILARITY)
+        return -1;
+      if (bArt > ARTWORK_MIN_SIMILARITY && aArt <= ARTWORK_MIN_SIMILARITY)
+        return 1;
+      if (aArt > 0 && bArt > 0) return bArt - aArt;
+      return a.scoreDistance - b.scoreDistance;
+    })
+    .slice(0, MAX_CANDIDATES);
 }
 
 function shouldUseRefinedRanking(

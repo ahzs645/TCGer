@@ -9,7 +9,7 @@ import {
   Sun,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 
@@ -41,6 +41,27 @@ export function UserMenu() {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const singleUserMode = isSingleUserModeEnabled();
+
+  // Defer auth-dependent rendering until after hydration so the server
+  // and client first-paint match (zustand persisted state isn't available
+  // during SSR, so isAuthenticated would be false on the server but true
+  // on the client after localStorage hydration).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="rounded-full border"
+        disabled
+        data-oid="ogpramd"
+      >
+        <User className="h-5 w-5" data-oid="4bk7dkw" />
+      </Button>
+    );
+  }
 
   const handleLogout = async () => {
     if (singleUserMode) {

@@ -62,15 +62,16 @@ export default async function RootLayout({
         <ConvexClientProvider initialToken={token} data-oid=".wkkdfy">
           <ThemeProvider data-oid="jr5d..d">
             <QueryProvider data-oid="iu_0g7w">
-              <SetupGuard data-oid="6n258ug">{children}</SetupGuard>
+              <SetupGuard singleUserMode={singleUserConfig.enabled} data-oid="6n258ug">{children}</SetupGuard>
             </QueryProvider>
           </ThemeProvider>
         </ConvexClientProvider>
 
         <Script
           src="/onlook-preload-script.js"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
           id="onlook-preload-script"
+          type="module"
           data-oid="h45ax8c"
         />
       </body>
