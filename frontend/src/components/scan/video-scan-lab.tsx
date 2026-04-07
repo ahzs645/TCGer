@@ -15,6 +15,12 @@ import {
   scanVideoFrameCanvasInBrowser,
   type BrowserVideoScanCandidate,
 } from "@/lib/scan/browser-video-matcher";
+import {
+  detectCards,
+  ensureYoloModel,
+  isYoloModelReady,
+  type OBBDetection,
+} from "@/lib/scan/yolo-detector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +76,9 @@ import {
   seekVideo,
   yieldToBrowser,
 } from "./video-scan-video-utils";
+
+/** Frame size for YOLO detection (matches model input expectation). */
+const MODEL_FRAME_SIZE = 640;
 
 export function VideoScanLab() {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -374,9 +383,10 @@ export function VideoScanLab() {
   };
 
   /**
-   * Live detection mode: runs a persistent rAF loop that detects card quads
-   * whenever the video frame changes — during playback, manual seeking, or
-   * scrubbing. Stops only when the user clicks Stop.
+   * Live detection mode using YOLO11n-OBB.
+   * Loads the model on first run, then runs a persistent rAF loop that
+   * detects cards whenever the video frame changes — during playback,
+   * manual seeking, or scrubbing.
    */
   const handleLiveDetection = async () => {
     if (!selectedVideo || !videoRef.current || !frameCanvasRef.current) {
@@ -394,8 +404,13 @@ export function VideoScanLab() {
     try {
       await ensureVideoMetadata(video);
 
+      // Load YOLO model if not ready
+      if (!isYoloModelReady()) {
+        await ensureYoloModel((msg) => setHashStatus(msg));
+      }
+
       setHashStatus(
-        "Live detection active — play, pause, or scrub the video. Outlines update in real time.",
+        "YOLO detection active — play, pause, or scrub. Outlines update in real time.",
       );
       let processedFrames = 0;
       let lastProcessedTime = -1;
@@ -404,13 +419,11 @@ export function VideoScanLab() {
         if (stopRequestedRef.current) {
           setIsProcessing(false);
           setHashStatus(
-            `Live detection stopped after ${processedFrames} frames.`,
+            `YOLO detection stopped after ${processedFrames} frames.`,
           );
           return;
         }
 
-        // Only re-process when the video time actually changed
-        // (avoids burning CPU while paused on the same frame).
         const currentTime = video.currentTime;
         if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
           lastProcessedTime = currentTime;
@@ -418,18 +431,33 @@ export function VideoScanLab() {
           const { width, height } = drawVideoFrameToCanvas(
             video,
             frameCanvas,
-            720,
+            MODEL_FRAME_SIZE,
           );
           setVideoMetadata({ duration: video.duration, width, height });
 
+          // Run YOLO detection
+          const detections = detectCards(frameCanvas);
+
+          // Convert YOLO detections to the overlay format
           const nextFrameState: VideoScanFrameState = {
             timestampSeconds: currentTime,
-            ...scanVideoFrameCanvasInBrowser({
-              frameCanvas,
-              hashEntries: [],
-              tcgFilter: scanFilter,
-              detectionOnly: true,
-            }),
+            activeProposal: null,
+            bestMatch: null,
+            candidates: [],
+            proposalMatches: detections.map((det) => ({
+              proposal: {
+                label: `yolo ${(det.confidence * 100).toFixed(0)}%`,
+                left: det.cx - det.width / 2,
+                top: det.cy - det.height / 2,
+                width: det.width,
+                height: det.height,
+              },
+              overlayQuad: det.quad,
+              refinementMethod: "yolo-obb",
+              isClipped: false,
+              bestMatch: null,
+              candidates: [],
+            })),
           };
 
           setFrameState(nextFrameState);
@@ -445,7 +473,7 @@ export function VideoScanLab() {
       setError(
         processingError instanceof Error
           ? processingError.message
-          : "Live detection failed.",
+          : "YOLO detection failed.",
       );
       setIsProcessing(false);
     }
