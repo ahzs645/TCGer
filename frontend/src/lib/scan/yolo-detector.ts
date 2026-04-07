@@ -100,28 +100,24 @@ export function detectCards(
   const srcW = frameCanvas.width;
   const srcH = frameCanvas.height;
 
-  // Letterbox preprocessing: pad to square, resize to 640x640
+  // Letterbox: pad to square (bottom-right), then resize to 640x640.
+  // Padding is top-left aligned so offset in model space is 0.
   const maxDim = Math.max(srcW, srcH);
   const scale = MODEL_INPUT_SIZE / maxDim;
-  const newW = Math.round(srcW * scale);
-  const newH = Math.round(srcH * scale);
-  const padX = Math.round((MODEL_INPUT_SIZE - newW) / 2);
-  const padY = Math.round((MODEL_INPUT_SIZE - newH) / 2);
 
   const inputTensor = tfjs.tidy(() => {
-    const img = tfjs.browser.fromPixels(frameCanvas); // [H, W, 3]
+    const img = tfjs.browser.fromPixels(frameCanvas); // [H, W, 3] uint8
 
-    // Pad to square
+    // Pad to square with gray (114) then resize to 640x640
     const padded = img.pad(
       [
         [0, maxDim - srcH],
         [0, maxDim - srcW],
         [0, 0],
       ],
-      114 / 255, // gray padding (normalized)
+      114, // gray padding in 0-255 space
     );
 
-    // Resize to model input and normalize
     return tfjs.image
       .resizeBilinear(padded as import("@tensorflow/tfjs").Tensor3D, [
         MODEL_INPUT_SIZE,
@@ -154,10 +150,7 @@ export function detectCards(
     dims,
     srcW,
     srcH,
-    maxDim,
     scale,
-    padX,
-    padY,
   );
 
   // NMS
@@ -171,10 +164,7 @@ function parseRawDetections(
   dims: number[],
   srcW: number,
   srcH: number,
-  maxDim: number,
   scale: number,
-  padX: number,
-  padY: number,
 ): OBBDetection[] {
   const detections: OBBDetection[] = [];
 
@@ -185,18 +175,14 @@ function parseRawDetections(
       const conf = data[4 * N + i]!;
       if (conf < CONFIDENCE_THRESHOLD) continue;
 
-      // Map from letterbox (640x640) back to original frame coords
-      const rawCx = data[i]!;
-      const rawCy = data[N + i]!;
-      const rawW = data[2 * N + i]!;
-      const rawH = data[3 * N + i]!;
+      // Model outputs pixel coords in 640x640 space.
+      // Divide by scale to map back to original frame coords.
+      // (Padding is bottom-right so no offset to subtract.)
+      const cx = data[i]! / scale;
+      const cy = data[N + i]! / scale;
+      const w = data[2 * N + i]! / scale;
+      const h = data[3 * N + i]! / scale;
       const angle = data[5 * N + i] ?? 0;
-
-      // Scale from 640 space to padded-square space, then to original
-      const cx = (rawCx / MODEL_INPUT_SIZE) * maxDim;
-      const cy = (rawCy / MODEL_INPUT_SIZE) * maxDim;
-      const w = (rawW / MODEL_INPUT_SIZE) * maxDim;
-      const h = (rawH / MODEL_INPUT_SIZE) * maxDim;
 
       if (cx < 0 || cy < 0 || cx > srcW || cy > srcH) continue;
       if (w < 20 || h < 20) continue;
