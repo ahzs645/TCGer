@@ -86,6 +86,10 @@ export function VideoScanLab() {
   }));
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
 
+  // Defer auth-dependent rendering to avoid SSR/client hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [scanFilter, setScanFilter] = useState<ScanFilter>(
     selectedGame === "all" ? "pokemon" : selectedGame,
   );
@@ -645,7 +649,7 @@ export function VideoScanLab() {
             )}
           </div>
 
-          {(error || !isAuthenticated) && (
+          {mounted && (error || !isAuthenticated) && (
             <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
