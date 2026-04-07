@@ -35,6 +35,12 @@ export default async function RootLayout({
 
 }: {children: React.ReactNode;}) {
   const token = await getToken().catch(() => null);
+  const singleUserConfig = {
+    enabled: process.env.SINGLE_USER_MODE === "true",
+    id: process.env.SINGLE_USER_ID ?? "single-user",
+    email: process.env.SINGLE_USER_EMAIL ?? "local@tcger.test",
+    username: process.env.SINGLE_USER_USERNAME ?? "tcger-local",
+  };
 
   return (
     <html lang="en" suppressHydrationWarning data-oid="zox-:z5">
@@ -45,6 +51,13 @@ export default async function RootLayout({
           lexend.variable
         )}
         data-oid="4lnnwrh">
+        <Script
+          id="tcger-single-user-config"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.__TCGER_SINGLE_USER__ = ${JSON.stringify(singleUserConfig)};`,
+          }}
+        />
 
         <ConvexClientProvider initialToken={token} data-oid=".wkkdfy">
           <ThemeProvider data-oid="jr5d..d">

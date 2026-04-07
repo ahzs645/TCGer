@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 
 import { env } from '../../config/env';
+import { getSingleUserSessionUser } from '../../lib/single-user';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -38,6 +39,10 @@ function buildSessionHeaders(req: Request) {
 }
 
 export async function getSessionUserFromRequest(req: Request): Promise<SessionUser | null> {
+  if (env.SINGLE_USER_MODE) {
+    return getSingleUserSessionUser();
+  }
+
   const response = await fetch(new URL('/api/auth/get-session', env.CONVEX_HTTP_ORIGIN), {
     method: 'GET',
     headers: buildSessionHeaders(req)

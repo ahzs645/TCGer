@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth-client";
 import { isDemoMode, setDemoMode } from "@/lib/demo-mode";
+import { isSingleUserModeEnabled } from "@/lib/single-user-mode";
 import { useAuthStore } from "@/stores/auth";
 
 export function UserMenu() {
@@ -39,8 +40,13 @@ export function UserMenu() {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const singleUserMode = isSingleUserModeEnabled();
 
   const handleLogout = async () => {
+    if (singleUserMode) {
+      return;
+    }
+
     const wasDemo = isDemoMode();
     try {
       await signOut();
@@ -155,10 +161,16 @@ export function UserMenu() {
             {isDark ? "Light mode" : "Dark mode"}
           </DropdownMenuItem>
           <DropdownMenuSeparator data-oid="97qi70-" />
-          <DropdownMenuItem onSelect={handleLogout} data-oid="5fzf95k">
-            <LogOut className="mr-2 h-4 w-4" data-oid="vugobq7" />
-            Sign out
-          </DropdownMenuItem>
+          {singleUserMode ? (
+            <DropdownMenuItem disabled data-oid="5fzf95k">
+              Single-user testing mode
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onSelect={handleLogout} data-oid="5fzf95k">
+              <LogOut className="mr-2 h-4 w-4" data-oid="vugobq7" />
+              Sign out
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <ProfileDialog
