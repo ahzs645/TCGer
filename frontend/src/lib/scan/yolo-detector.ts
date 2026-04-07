@@ -88,6 +88,60 @@ export function isYoloModelReady(): boolean {
 }
 
 /**
+ * Extract a de-rotated card crop from the frame canvas using an OBB detection.
+ * Returns a new canvas containing just the card, axis-aligned.
+ */
+export function extractCardCrop(
+  frameCanvas: HTMLCanvasElement,
+  det: OBBDetection,
+): HTMLCanvasElement {
+  const cardW = Math.round(det.width);
+  const cardH = Math.round(det.height);
+  if (cardW < 10 || cardH < 10) {
+    // Too small — return a tiny canvas
+    const c = document.createElement("canvas");
+    c.width = 1;
+    c.height = 1;
+    return c;
+  }
+
+  // Canvas large enough to hold the rotated card
+  const diag = Math.ceil(Math.hypot(cardW, cardH));
+  const bufferSize = diag + 20;
+  const buffer = document.createElement("canvas");
+  buffer.width = bufferSize;
+  buffer.height = bufferSize;
+  const bCtx = buffer.getContext("2d")!;
+
+  // Translate to center, rotate to undo card angle, draw source
+  const bcx = bufferSize / 2;
+  const bcy = bufferSize / 2;
+  bCtx.translate(bcx, bcy);
+  bCtx.rotate(-det.angle);
+  bCtx.drawImage(frameCanvas, -det.cx, -det.cy);
+  bCtx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Extract the card rectangle from the center of the rotated buffer
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = cardW;
+  cropCanvas.height = cardH;
+  const cropCtx = cropCanvas.getContext("2d")!;
+  cropCtx.drawImage(
+    buffer,
+    bcx - cardW / 2,
+    bcy - cardH / 2,
+    cardW,
+    cardH,
+    0,
+    0,
+    cardW,
+    cardH,
+  );
+
+  return cropCanvas;
+}
+
+/**
  * Run YOLO detection on a canvas frame.
  * Returns oriented bounding box detections with corner quads.
  */

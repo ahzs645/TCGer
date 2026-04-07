@@ -113,8 +113,13 @@ export function VideoScanLab() {
     }),
     [],
   );
-  const { processBatch, processLiveDetection, requestStop, resetTracking } =
-    useVideoScanProcessor(processorCallbacks);
+  const {
+    processBatch,
+    processLiveDetection,
+    processYoloWithMatching,
+    requestStop,
+    resetTracking,
+  } = useVideoScanProcessor(processorCallbacks);
 
   // ---------- derived ----------
 
@@ -240,18 +245,16 @@ export function VideoScanLab() {
     setHashStatus(null);
     try {
       const hashEntries = await ensureHashIndex(scanFilter);
-      await processBatch({
+      // Use YOLO + matching for live card identification
+      await processYoloWithMatching({
         video: videoRef.current,
         frameCanvas: frameCanvasRef.current,
         hashEntries,
         artworkDb: artworkDbRef.current ?? undefined,
         scanFilter,
-        sampleFps,
-        maxFrames,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Processing failed.");
-    } finally {
       setIsProcessing(false);
     }
   };
