@@ -38,3 +38,6 @@ backend/prisma/dev.db
 Reference frontend
 .env
 tmp/
+
+# Local research artifacts
+research/
