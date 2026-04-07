@@ -131,15 +131,8 @@ export function VideoScanLab() {
 
   const visibleTracks = useMemo(
     () =>
-      activeTracks.filter((track) => {
-        if (!track.match.passedThreshold) return false;
-        if (detectionOnly) return true;
-        return (
-          track.stableFrames >= MIN_TRACK_STABLE_FRAMES ||
-          track.match.confidence >= MIN_IMMEDIATE_TRACK_CONFIDENCE
-        );
-      }),
-    [activeTracks, detectionOnly],
+      activeTracks.filter((track) => track.match.passedThreshold),
+    [activeTracks],
   );
   const primaryTrack = visibleTracks[0] ?? null;
   const primaryCandidate = primaryTrack?.match ?? null;

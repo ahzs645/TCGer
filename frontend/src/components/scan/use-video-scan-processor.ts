@@ -522,22 +522,23 @@ function matchDetection(
     }
   }
 
-  // If still no match, create a synthetic detection-only entry
+  // If matching didn't identify the card, still show the YOLO detection.
+  // The outline should always appear — only the card name is uncertain.
   if (!bestMatch) {
     const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
     bestMatch = {
       externalId: `yolo-${spatialKey}`,
       tcg: scanFilter === "all" ? "pokemon" : scanFilter,
-      name: `Unmatched card (${(det.confidence * 100).toFixed(0)}%)`,
+      name: `Detected card`,
       setCode: null,
       setName: null,
       rarity: null,
       imageUrl: null,
-      confidence: det.confidence * 0.3,
-      distance: 999,
-      scoreDistance: 999,
-      passedThreshold: false,
-      fullDistance: 999,
+      confidence: det.confidence,
+      distance: 0,
+      scoreDistance: 0,
+      passedThreshold: det.confidence >= 0.5,
+      fullDistance: 0,
       titleDistance: null,
       footerDistance: null,
       proposalLabel: "yolo",
