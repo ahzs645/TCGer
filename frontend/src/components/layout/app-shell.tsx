@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -76,13 +75,13 @@ export function AppShell({ children }: AppShellProps) {
               className="flex items-center gap-2 text-lg font-heading font-semibold"
               data-oid="vv0.7_x"
             >
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src="/logo.svg"
                 alt="TCGer logo"
                 width={32}
                 height={32}
-                priority
-                className="h-8 w-8 dark:invert"
+                className="dark:invert"
                 data-oid=".i3qz._"
               />
               TCGer

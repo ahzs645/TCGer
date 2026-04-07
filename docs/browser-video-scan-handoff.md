@@ -40,13 +40,16 @@ Current module layout:
 - `frontend/src/lib/scan/browser-video-matcher.ts`
   Thin export layer for compatibility.
 - `frontend/src/lib/scan/scan-frame.ts`
-  Main `scanVideoFrameCanvasInBrowser()` flow.
+  Main `scanVideoFrameCanvasInBrowser()` flow. Supports `detectionOnly` mode.
 - `frontend/src/lib/scan/proposal-windows.ts`
   Portrait proposal generation, padded crop extraction, quad offset helpers.
 - `frontend/src/lib/scan/quad-refinement.ts`
   Gradient sampling, border fitting, quad inference, clipped-card detection.
 - `frontend/src/lib/scan/quad-warp.ts`
   Perspective warp helpers.
+- `frontend/src/lib/scan/artwork-fingerprint.ts`
+  Histogram-equalised 8x8 color grid fingerprints, cosine similarity matching.
+  Ported from backend `artwork-matcher.ts`.
 - `frontend/src/lib/scan/rgb-hash.ts`
   Browser RGB perceptual hash generation and Hamming distance.
 - `frontend/src/lib/scan/feature-hashes.ts`

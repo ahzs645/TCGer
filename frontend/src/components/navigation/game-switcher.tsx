@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
@@ -61,12 +59,13 @@ export function GameSwitcher() {
             className="flex min-w-[3rem] items-center gap-2"
             data-oid="d3w.0o-"
           >
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={iconPath}
               alt={GAME_LABELS[game]}
               width={16}
               height={16}
-              className={`h-4 w-4 transition-all ${
+              className={`transition-all ${
                 isSelected
                   ? "opacity-100 invert dark:invert-0 dark:brightness-0"
                   : "opacity-70 dark:opacity-100 dark:invert"

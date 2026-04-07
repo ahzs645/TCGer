@@ -67,13 +67,6 @@ export default async function RootLayout({
           </ThemeProvider>
         </ConvexClientProvider>
 
-        <Script
-          src="/onlook-preload-script.js"
-          strategy="lazyOnload"
-          id="onlook-preload-script"
-          type="module"
-          data-oid="h45ax8c"
-        />
       </body>
     </html>);
 
