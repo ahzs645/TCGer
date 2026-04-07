@@ -75,18 +75,17 @@ export function scanVideoFrameCanvasInBrowser(params: {
       isClipped = refinement.isClipped;
     }
 
-    // Detection-only: skip hash matching, just report the quad
+    // Detection-only: skip hash matching, always report the quad.
+    // Show the refined quad when found, raw proposal window otherwise.
     if (detectionOnly) {
-      if (refinement) {
-        rawProposalMatches.push({
-          proposal,
-          overlayQuad,
-          refinementMethod,
-          isClipped,
-          bestMatch: null,
-          candidates: [],
-        });
-      }
+      rawProposalMatches.push({
+        proposal,
+        overlayQuad,
+        refinementMethod,
+        isClipped,
+        bestMatch: null,
+        candidates: [],
+      });
       continue;
     }
 
@@ -143,7 +142,11 @@ export function scanVideoFrameCanvasInBrowser(params: {
     }
   }
 
-  const proposalMatches = selectDistinctProposalMatches(rawProposalMatches);
+  // In detection-only mode, skip NMS (no bestMatch to compare) and return
+  // all proposals that found a refined quad.
+  const proposalMatches = detectionOnly
+    ? rawProposalMatches
+    : selectDistinctProposalMatches(rawProposalMatches);
   const mergedCandidates = new Map<string, BrowserVideoScanCandidate>();
 
   for (const proposalMatch of proposalMatches) {

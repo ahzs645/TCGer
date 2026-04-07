@@ -112,39 +112,63 @@ export function getOverlayPalette(
 
 // ---------- overlay item builders ----------
 
+/** Max detection overlays shown at once. */
+const MAX_DETECTION_OVERLAYS = 6;
+
 /**
  * Build overlay items for detection-only mode (no matching, just quads).
+ *
+ * Refined quads are shown in blue; raw (unrefined) proposals are shown in
+ * faint gray so the user can see what regions the system is scanning.
  */
 export function buildDetectionOverlayItems(
   frameState: VideoScanFrameState,
   metadata: { width: number; height: number },
   viewportRect: VideoViewportRect,
 ): VideoOverlayItem[] {
-  return frameState.proposalMatches.map(
+  // Sort: refined first, then raw proposals
+  const sorted = [...frameState.proposalMatches].sort((a, b) => {
+    if (a.refinementMethod && !b.refinementMethod) return -1;
+    if (!a.refinementMethod && b.refinementMethod) return 1;
+    return 0;
+  });
+
+  return sorted.slice(0, MAX_DETECTION_OVERLAYS).map(
     (pm: BrowserVideoProposalMatch, index: number) => {
       const quad = mapQuadToViewport(pm.overlayQuad, metadata, viewportRect);
       const labelPoint = quad[0] ?? { x: 0, y: 0 };
-      const methodLabel = pm.refinementMethod
+      const isRefined = pm.refinementMethod !== null;
+      const methodLabel = isRefined
         ? `${pm.refinementMethod}${pm.isClipped ? " (clipped)" : ""}`
-        : "proposal";
+        : pm.proposal.label;
+
+      // Refined quads: blue/yellow. Raw proposals: faint gray.
+      let strokeColor: string;
+      let fillColor: string;
+      if (!isRefined) {
+        strokeColor = "rgba(148, 163, 184, 0.4)";
+        fillColor = "rgba(148, 163, 184, 0.03)";
+      } else if (pm.isClipped) {
+        strokeColor = "rgba(251, 191, 36, 0.95)";
+        fillColor = "rgba(251, 191, 36, 0.08)";
+      } else {
+        strokeColor = "rgba(96, 165, 250, 0.95)";
+        fillColor = "rgba(96, 165, 250, 0.08)";
+      }
 
       return {
         key: `detect:${index}`,
         polygonPoints: quad
           .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
           .join(" "),
-        label: `#${index + 1} · ${methodLabel}`,
+        label: isRefined ? `${methodLabel}` : "",
         labelStyle: {
           left: labelPoint.x + 8,
           top: Math.max(6, labelPoint.y - 22),
         },
         match: null,
-        strokeColor: pm.isClipped
-          ? "rgba(251, 191, 36, 0.95)"
-          : "rgba(96, 165, 250, 0.95)",
-        fillColor: pm.isClipped
-          ? "rgba(251, 191, 36, 0.08)"
-          : "rgba(96, 165, 250, 0.08)",
+        strokeColor,
+        fillColor,
       };
     },
   );
