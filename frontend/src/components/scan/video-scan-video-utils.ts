@@ -140,6 +140,23 @@ export async function yieldToBrowser(): Promise<void> {
 }
 
 /**
+ * Schedule a callback for the next video frame.
+ *
+ * Uses `requestVideoFrameCallback` when available (syncs to actual decoded
+ * frames), falling back to `requestAnimationFrame` (syncs to display refresh).
+ */
+export function scheduleNextFrame(
+  video: HTMLVideoElement,
+  callback: () => void,
+): void {
+  if ("requestVideoFrameCallback" in video) {
+    (video as any).requestVideoFrameCallback(callback);
+  } else {
+    requestAnimationFrame(callback);
+  }
+}
+
+/**
  * Pick a target frame long side based on sample rate (higher fps → smaller frames).
  */
 export function getTargetFrameLongSide(sampleFps: number): number {

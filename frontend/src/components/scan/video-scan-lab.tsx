@@ -67,6 +67,7 @@ import {
   drawVideoFrameToCanvas,
   ensureVideoMetadata,
   getTargetFrameLongSide,
+  scheduleNextFrame,
   seekVideo,
   yieldToBrowser,
 } from "./video-scan-video-utils";
@@ -261,7 +262,11 @@ export function VideoScanLab() {
   };
 
   const handleProcess = async () => {
-    if (!detectionOnly && (!isAuthenticated || !token)) {
+    if (detectionOnly) {
+      return handleLiveDetection();
+    }
+
+    if (!isAuthenticated || !token) {
       setError(
         "Sign in is required before you can run the browser-side video scan.",
       );
@@ -279,9 +284,7 @@ export function VideoScanLab() {
     setHashStatus(null);
 
     try {
-      const hashEntries = detectionOnly
-        ? []
-        : await ensureHashIndex(scanFilter);
+      const hashEntries = await ensureHashIndex(scanFilter);
       const video = videoRef.current;
       const frameCanvas = frameCanvasRef.current;
       let processedFrames = 0;
@@ -299,9 +302,7 @@ export function VideoScanLab() {
 
       setProgress({ processed: 0, total: timestamps.length });
       setHashStatus(
-        detectionOnly
-          ? `Detection only: running ${timestamps.length} frames at ${sampleFps.toFixed(1)} fps (no matching).`
-          : `Running ${timestamps.length} sampled frames against ${hashEntries.length.toLocaleString()} hashes at ${sampleFps.toFixed(1)} fps.`,
+        `Running ${timestamps.length} sampled frames against ${hashEntries.length.toLocaleString()} hashes at ${sampleFps.toFixed(1)} fps.`,
       );
 
       for (const [index, timestampSeconds] of timestamps.entries()) {
@@ -322,11 +323,8 @@ export function VideoScanLab() {
           ...scanVideoFrameCanvasInBrowser({
             frameCanvas,
             hashEntries,
-            artworkDb: detectionOnly
-              ? undefined
-              : (artworkDbRef.current ?? undefined),
+            artworkDb: artworkDbRef.current ?? undefined,
             tcgFilter: scanFilter,
-            detectionOnly,
           }),
         };
 
@@ -372,8 +370,85 @@ export function VideoScanLab() {
     }
   };
 
+  /**
+   * Live detection mode: play the video and run quad detection on every
+   * rendered frame using requestVideoFrameCallback (or rAF fallback).
+   * No hash matching — just outlines.
+   */
+  const handleLiveDetection = async () => {
+    if (!selectedVideo || !videoRef.current || !frameCanvasRef.current) {
+      setError("Choose a local video file first.");
+      return;
+    }
+
+    const video = videoRef.current;
+    const frameCanvas = frameCanvasRef.current;
+
+    stopRequestedRef.current = false;
+    resetRunState();
+    setIsProcessing(true);
+
+    try {
+      await ensureVideoMetadata(video);
+
+      setHashStatus("Live detection: playing video with real-time card outlines.");
+      let processedFrames = 0;
+
+      // Start playback
+      video.currentTime = 0;
+      await video.play();
+
+      const processFrame = () => {
+        if (stopRequestedRef.current || video.paused || video.ended) {
+          video.pause();
+          setIsProcessing(false);
+          setHashStatus(
+            `Live detection ended after ${processedFrames} frames.`,
+          );
+          return;
+        }
+
+        const { width, height } = drawVideoFrameToCanvas(
+          video,
+          frameCanvas,
+          720,
+        );
+        setVideoMetadata({ duration: video.duration, width, height });
+
+        const nextFrameState: VideoScanFrameState = {
+          timestampSeconds: video.currentTime,
+          ...scanVideoFrameCanvasInBrowser({
+            frameCanvas,
+            hashEntries: [],
+            tcgFilter: scanFilter,
+            detectionOnly: true,
+          }),
+        };
+
+        setFrameState(nextFrameState);
+        processedFrames++;
+        setProgress({ processed: processedFrames, total: 0 });
+
+        scheduleNextFrame(video, processFrame);
+      };
+
+      scheduleNextFrame(video, processFrame);
+    } catch (processingError) {
+      setError(
+        processingError instanceof Error
+          ? processingError.message
+          : "Live detection failed.",
+      );
+      setIsProcessing(false);
+    }
+  };
+
   const handleStop = () => {
     stopRequestedRef.current = true;
+    // Also pause the video if in live detection mode
+    if (detectionOnly && videoRef.current) {
+      videoRef.current.pause();
+    }
   };
 
   // ---------- render ----------
@@ -425,37 +500,41 @@ export function VideoScanLab() {
             </p>
           </div>
 
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <div className="space-y-1">
-              <Label>Sample Rate</Label>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{sampleFps.toFixed(1)} fps</span>
-                <span>Higher is heavier</span>
+          {!detectionOnly && (
+            <>
+              <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+                <div className="space-y-1">
+                  <Label>Sample Rate</Label>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{sampleFps.toFixed(1)} fps</span>
+                    <span>Higher is heavier</span>
+                  </div>
+                </div>
+                <Slider
+                  value={sampleFpsValue}
+                  min={2}
+                  max={80}
+                  step={1}
+                  onValueChange={setSampleFpsValue}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Higher sample rates automatically downscale frames to keep
+                  browser runs usable.
+                </p>
               </div>
-            </div>
-            <Slider
-              value={sampleFpsValue}
-              min={2}
-              max={80}
-              step={1}
-              onValueChange={setSampleFpsValue}
-            />
-            <p className="text-xs text-muted-foreground">
-              Higher sample rates automatically downscale frames to keep browser
-              runs usable.
-            </p>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="video-max-frames">Max Frames</Label>
-            <Input
-              id="video-max-frames"
-              inputMode="numeric"
-              value={maxFrames}
-              onChange={(event) => setMaxFrames(event.target.value)}
-              placeholder={String(DEFAULT_MAX_FRAMES)}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="video-max-frames">Max Frames</Label>
+                <Input
+                  id="video-max-frames"
+                  inputMode="numeric"
+                  value={maxFrames}
+                  onChange={(event) => setMaxFrames(event.target.value)}
+                  placeholder={String(DEFAULT_MAX_FRAMES)}
+                />
+              </div>
+            </>
+          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -499,7 +578,7 @@ export function VideoScanLab() {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                Process In Browser
+                {detectionOnly ? "Start Live Detection" : "Process In Browser"}
               </Button>
             )}
             <Button
@@ -549,16 +628,21 @@ export function VideoScanLab() {
             <div className="flex items-center justify-between">
               <span className="font-medium">Progress</span>
               <span className="text-muted-foreground">
-                {progress.processed.toLocaleString()} /{" "}
-                {progress.total.toLocaleString()}
+                {progress.total > 0
+                  ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()}`
+                  : progress.processed > 0
+                    ? `${progress.processed.toLocaleString()} frames (live)`
+                    : "—"}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            {progress.total > 0 && (
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            )}
           </div>
 
           {(error || !isAuthenticated) && (
@@ -664,15 +748,17 @@ function VideoPlayerWithOverlay({
             />
           ))}
         </svg>
-        {overlayItems.map((overlay) => (
-          <div
-            key={`${overlay.key}:label`}
-            className="absolute rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
-            style={overlay.labelStyle}
-          >
-            {overlay.label}
-          </div>
-        ))}
+        {overlayItems
+          .filter((overlay) => overlay.label)
+          .map((overlay) => (
+            <div
+              key={`${overlay.key}:label`}
+              className="absolute rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
+              style={overlay.labelStyle}
+            >
+              {overlay.label}
+            </div>
+          ))}
       </div>
     </div>
   );
