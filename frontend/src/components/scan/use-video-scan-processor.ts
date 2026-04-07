@@ -1,15 +1,23 @@
 import { useCallback, useRef } from "react";
 
 import {
+  computeArtworkFingerprintFromCanvas,
+  matchArtworkFingerprint,
   scanVideoFrameCanvasInBrowser,
   type ArtworkFingerprintEntry,
   type BrowserVideoScanCandidate,
   type BrowserVideoProposalMatch,
+  type CardScanHashEntry,
 } from "@/lib/scan/browser-video-matcher";
+import { computeRGBHashFromCanvas } from "@/lib/scan/rgb-hash";
+import { computeFeatureHashesByTcg } from "@/lib/scan/feature-hashes";
+import { rankMatches } from "@/lib/scan/rank-matches";
 import {
   detectCards,
   ensureYoloModel,
+  extractCardCrop,
   isYoloModelReady,
+  type OBBDetection,
 } from "@/lib/scan/yolo-detector";
 
 import {
@@ -290,10 +298,249 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
     [callbacks, updateTracks],
   );
 
+  /**
+   * YOLO + matching: detect cards with YOLO, crop & de-rotate,
+   * then run artwork fingerprint + pHash matching to identify each card.
+   * Runs as a live rAF loop like detection-only mode.
+   */
+  const processYoloWithMatching = useCallback(
+    async (params: {
+      video: HTMLVideoElement;
+      frameCanvas: HTMLCanvasElement;
+      hashEntries: CardScanHashEntry[];
+      artworkDb: ArtworkFingerprintEntry[] | undefined;
+      scanFilter: ScanFilter;
+    }) => {
+      const { video, frameCanvas, hashEntries, artworkDb, scanFilter } =
+        params;
+
+      stopRequestedRef.current = false;
+
+      await ensureVideoMetadata(video);
+
+      if (!isYoloModelReady()) {
+        await ensureYoloModel((msg) => callbacks.onStatus(msg));
+      }
+
+      callbacks.onStatus(
+        "YOLO + matching active — play, pause, or scrub. Cards are identified in real time.",
+      );
+      let processedFrames = 0;
+      let lastProcessedTime = -1;
+
+      const processFrame = () => {
+        if (stopRequestedRef.current) {
+          callbacks.onProcessing(false);
+          callbacks.onStatus(
+            `YOLO + matching stopped after ${processedFrames} frames.`,
+          );
+          return;
+        }
+
+        const currentTime = video.currentTime;
+        if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
+          lastProcessedTime = currentTime;
+
+          const { width, height } = drawVideoFrameToCanvas(
+            video,
+            frameCanvas,
+            MODEL_FRAME_SIZE,
+          );
+          callbacks.onMetadata({ duration: video.duration, width, height });
+
+          // 1. YOLO detection
+          const detections = detectCards(frameCanvas);
+
+          // 2. For each detection, crop & match
+          const proposalMatches = detections.map((det) =>
+            matchDetection(
+              det,
+              frameCanvas,
+              hashEntries,
+              artworkDb,
+              scanFilter,
+            ),
+          );
+
+          const bestPm = proposalMatches[0];
+          const nextFrameState: VideoScanFrameState = {
+            timestampSeconds: currentTime,
+            activeProposal: bestPm?.proposal ?? null,
+            bestMatch: bestPm?.bestMatch ?? null,
+            candidates: proposalMatches
+              .map((pm) => pm.bestMatch!)
+              .filter(Boolean),
+            proposalMatches,
+          };
+
+          callbacks.onFrameState(nextFrameState);
+          updateTracks(nextFrameState.proposalMatches, currentTime);
+
+          processedFrames++;
+          callbacks.onProgress({ processed: processedFrames, total: 0 });
+        }
+
+        requestAnimationFrame(processFrame);
+      };
+
+      requestAnimationFrame(processFrame);
+    },
+    [callbacks, updateTracks],
+  );
+
   return {
     processBatch,
     processLiveDetection,
+    processYoloWithMatching,
     requestStop,
     resetTracking,
   };
 }
+
+// ---------- matching helper ----------
+
+/** Top-N artwork candidates to pre-filter pHash against. */
+const ARTWORK_TOP_N = 50;
+/** Minimum artwork similarity to trust the result. */
+const ARTWORK_MIN_SIM = 0.90;
+
+/**
+ * Given a YOLO detection, extract the de-rotated card crop and run
+ * artwork fingerprint + pHash matching to identify the card.
+ */
+function matchDetection(
+  det: OBBDetection,
+  frameCanvas: HTMLCanvasElement,
+  hashEntries: CardScanHashEntry[],
+  artworkDb: ArtworkFingerprintEntry[] | undefined,
+  scanFilter: ScanFilter,
+): BrowserVideoProposalMatch {
+  const cropCanvas = extractCardCrop(frameCanvas, det);
+  const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
+
+  let bestMatch: BrowserVideoScanCandidate | null = null;
+  let candidates: BrowserVideoScanCandidate[] = [];
+
+  // Try artwork fingerprint matching first (primary signal)
+  if (artworkDb && artworkDb.length > 0) {
+    const fp = computeArtworkFingerprintFromCanvas(
+      cropCanvas,
+      tcg as "pokemon" | "magic" | "yugioh",
+    );
+    const artworkMatches = matchArtworkFingerprint(
+      fp,
+      artworkDb,
+      ARTWORK_TOP_N,
+      scanFilter,
+    );
+
+    if (artworkMatches.length > 0 && artworkMatches[0]!.similarity >= ARTWORK_MIN_SIM) {
+      const top = artworkMatches[0]!;
+      const entry = hashEntries.find(
+        (e) => e.externalId === top.externalId && e.tcg === top.tcg,
+      );
+
+      bestMatch = {
+        externalId: top.externalId,
+        tcg: top.tcg,
+        name: top.name,
+        setCode: top.setCode,
+        setName: entry?.setName ?? null,
+        rarity: entry?.rarity ?? null,
+        imageUrl: entry?.imageUrl ?? null,
+        confidence: top.similarity,
+        distance: Math.round((1 - top.similarity) * 240),
+        scoreDistance: Math.round((1 - top.similarity) * 240),
+        passedThreshold: true,
+        fullDistance: Math.round((1 - top.similarity) * 240),
+        titleDistance: null,
+        footerDistance: null,
+        proposalLabel: `yolo+artwork`,
+        artworkSimilarity: top.similarity,
+      };
+
+      candidates = artworkMatches.slice(0, 5).map((m) => {
+        const e = hashEntries.find(
+          (h) => h.externalId === m.externalId && h.tcg === m.tcg,
+        );
+        return {
+          externalId: m.externalId,
+          tcg: m.tcg,
+          name: m.name,
+          setCode: m.setCode,
+          setName: e?.setName ?? null,
+          rarity: e?.rarity ?? null,
+          imageUrl: e?.imageUrl ?? null,
+          confidence: m.similarity,
+          distance: Math.round((1 - m.similarity) * 240),
+          scoreDistance: Math.round((1 - m.similarity) * 240),
+          passedThreshold: m.similarity >= ARTWORK_MIN_SIM,
+          fullDistance: Math.round((1 - m.similarity) * 240),
+          titleDistance: null,
+          footerDistance: null,
+          proposalLabel: `yolo+artwork`,
+          artworkSimilarity: m.similarity,
+        };
+      });
+    }
+  }
+
+  // Fallback: pHash matching if artwork didn't produce a confident result
+  if (!bestMatch && hashEntries.length > 0) {
+    const fullHash = computeRGBHashFromCanvas(cropCanvas);
+    const featureHashes = computeFeatureHashesByTcg(
+      cropCanvas,
+      hashEntries,
+      scanFilter,
+    );
+    const pHashCandidates = rankMatches(
+      hashEntries,
+      fullHash,
+      featureHashes,
+      "yolo+phash",
+    );
+
+    if (pHashCandidates.length > 0) {
+      bestMatch = pHashCandidates[0]!;
+      candidates = pHashCandidates;
+    }
+  }
+
+  // If still no match, create a synthetic detection-only entry
+  if (!bestMatch) {
+    const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
+    bestMatch = {
+      externalId: `yolo-${spatialKey}`,
+      tcg: scanFilter === "all" ? "pokemon" : scanFilter,
+      name: `Unmatched card (${(det.confidence * 100).toFixed(0)}%)`,
+      setCode: null,
+      setName: null,
+      rarity: null,
+      imageUrl: null,
+      confidence: det.confidence * 0.3,
+      distance: 999,
+      scoreDistance: 999,
+      passedThreshold: false,
+      fullDistance: 999,
+      titleDistance: null,
+      footerDistance: null,
+      proposalLabel: "yolo",
+    };
+  }
+
+  return {
+    proposal: {
+      label: bestMatch.proposalLabel,
+      left: det.cx - det.width / 2,
+      top: det.cy - det.height / 2,
+      width: det.width,
+      height: det.height,
+    },
+    overlayQuad: det.quad,
+    refinementMethod: "yolo-obb",
+    isClipped: false,
+    bestMatch,
+    candidates,
+  };
+}
+
