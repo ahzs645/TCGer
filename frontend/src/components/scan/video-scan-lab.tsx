@@ -20,6 +20,7 @@ import {
   type BrowserVideoFrameScanResult,
   type BrowserVideoProposalMatch,
   type BrowserVideoScanCandidate,
+  type VideoQuad,
   type VideoWindowProposal,
 } from "@/lib/scan/browser-video-matcher";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,9 @@ interface VideoTimelineItem {
 interface VideoTrack {
   id: number;
   proposal: VideoWindowProposal;
+  overlayQuad: VideoQuad;
+  refinementMethod: string | null;
+  isClipped: boolean;
   match: BrowserVideoScanCandidate;
   lastSeenSeconds: number;
   seenFrames: number;
@@ -77,9 +81,12 @@ interface VideoTrack {
 
 interface VideoOverlayItem {
   key: string;
-  proposal: VideoWindowProposal;
+  polygonPoints: string;
+  label: string;
+  labelStyle: CSSProperties;
   match: BrowserVideoScanCandidate | null;
-  style: CSSProperties;
+  strokeColor: string;
+  fillColor: string;
 }
 
 interface VideoViewportRect {
@@ -106,7 +113,7 @@ function formatSeconds(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function formatConfidence(confidence: number): string {
+function formatMatchScore(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
@@ -190,21 +197,30 @@ export function VideoScanLab() {
       return [];
     }
 
-    return visibleTracks.map((track, index) => ({
-      key: `${track.id}:${track.match.externalId}:${index}`,
-      proposal: track.proposal,
-      match: track.match,
-      style: {
-        left:
-          videoViewportRect.left +
-          (track.proposal.left / videoMetadata.width) * videoViewportRect.width,
-        top:
-          videoViewportRect.top +
-          (track.proposal.top / videoMetadata.height) * videoViewportRect.height,
-        width: (track.proposal.width / videoMetadata.width) * videoViewportRect.width,
-        height: (track.proposal.height / videoMetadata.height) * videoViewportRect.height,
-      },
-    }));
+    return visibleTracks.map((track, index) => {
+      const quad = mapQuadToViewport(
+        track.overlayQuad,
+        videoMetadata,
+        videoViewportRect,
+      );
+      const palette = getOverlayPalette(track.match);
+      const labelPoint = quad[0] ?? { x: 0, y: 0 };
+
+      return {
+        key: `${track.id}:${track.match.externalId}:${index}`,
+        polygonPoints: quad
+          .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+          .join(" "),
+        label: `#${index + 1}${track.match ? ` · ${track.match.name}` : ""}`,
+        labelStyle: {
+          left: labelPoint.x + 8,
+          top: Math.max(6, labelPoint.y - 22),
+        },
+        match: track.match,
+        strokeColor: palette.strokeColor,
+        fillColor: palette.fillColor,
+      };
+    });
   }, [videoMetadata, videoViewportRect, visibleTracks]);
 
   useEffect(() => {
@@ -468,8 +484,9 @@ export function VideoScanLab() {
         <CardDescription>
           Import a video from your computer, download the scan hash corpus into
           the browser, and step through sampled frames with a live guess panel.
-          The outline is currently driven by portrait crop proposals rather than
-          the backend detector.
+          The browser overlay now tries to refine card borders inside each
+          portrait proposal, but it is still a heuristic fallback rather than
+          the real detector path, so scores remain conservative on hard frames.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 xl:grid-cols-[380px_1fr]">
@@ -653,21 +670,29 @@ export function VideoScanLab() {
                     });
                   }}
                 />
-                {overlayItems.map((overlay, index) => (
-                  <div
-                    key={overlay.key}
-                    className={cn(
-                      "pointer-events-none absolute border-2 shadow-[0_0_0_9999px_rgba(15,23,42,0.06)]",
-                      getOverlayTone(overlay.match),
-                    )}
-                    style={overlay.style}
-                  >
-                    <div className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                      #{index + 1}
-                      {overlay.match ? ` · ${overlay.match.name}` : ""}
+                <div className="pointer-events-none absolute inset-0">
+                  <svg className="absolute inset-0 h-full w-full overflow-visible">
+                    {overlayItems.map((overlay) => (
+                      <polygon
+                        key={overlay.key}
+                        points={overlay.polygonPoints}
+                        fill={overlay.fillColor}
+                        stroke={overlay.strokeColor}
+                        strokeWidth={2}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                  </svg>
+                  {overlayItems.map((overlay) => (
+                    <div
+                      key={`${overlay.key}:label`}
+                      className="absolute rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
+                      style={overlay.labelStyle}
+                    >
+                      {overlay.label}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </>
             ) : (
               <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_rgba(2,6,23,0.9)_55%,_rgba(2,6,23,1))] p-6 text-center text-white/80">
@@ -689,7 +714,8 @@ export function VideoScanLab() {
                   <p className="text-sm font-medium">Active Tracks</p>
                   <p className="text-xs text-muted-foreground">
                     Overlays appear only after a track stabilizes or is very
-                    confident.
+                    confident. Scores are rough crop-match signals, not
+                    calibrated probabilities.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -723,9 +749,15 @@ export function VideoScanLab() {
                           primaryCandidate.passedThreshold ? "default" : "outline"
                         }
                       >
-                        {formatConfidence(primaryCandidate.confidence)}
+                        {formatMatchScore(primaryCandidate.confidence)}
                       </Badge>
                     </div>
+                  </div>
+
+                  <div className="rounded-lg border border-dashed bg-background px-3 py-2 text-xs text-muted-foreground">
+                    Match score is conservative in browser mode. A sleeved card,
+                    fingers over the border, glare, or a loose crop proposal can
+                    push the score down even when the top guess is still right.
                   </div>
 
                   <div className="grid gap-2 text-sm sm:grid-cols-3">
@@ -750,14 +782,14 @@ export function VideoScanLab() {
                       <div className="font-medium">
                         {primaryCandidate.passedThreshold
                           ? "Within threshold"
-                          : "Low confidence"}
+                          : "Outside threshold"}
                       </div>
                     </div>
                   </div>
 
                   {visibleTracks.length ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Visible Track Guesses</p>
+                      <p className="text-sm font-medium">Visible Track Matches</p>
                       <div className="space-y-2">
                         {visibleTracks.map((track) => (
                           <div
@@ -770,12 +802,13 @@ export function VideoScanLab() {
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {track.match.proposalLabel} ·{" "}
-                                {GAME_LABELS[track.match.tcg]} ·{" "}
+                                {GAME_LABELS[track.match.tcg]}
+                                {track.isClipped ? " · clipped inference" : ""} ·{" "}
                                 {formatSeconds(track.lastSeenSeconds)}
                               </p>
                             </div>
                             <Badge variant="outline">
-                              {formatConfidence(track.match.confidence)}
+                              {formatMatchScore(track.match.confidence)}
                             </Badge>
                           </div>
                         ))}
@@ -1019,20 +1052,48 @@ function getTargetFrameLongSide(sampleFps: number): number {
   return MAX_FRAME_LONG_SIDE;
 }
 
-function getOverlayTone(match: BrowserVideoScanCandidate | null): string {
+function mapQuadToViewport(
+  quad: VideoQuad,
+  metadata: { width: number; height: number },
+  viewportRect: VideoViewportRect,
+): VideoQuad {
+  return quad.map((point) => ({
+    x: viewportRect.left + (point.x / metadata.width) * viewportRect.width,
+    y: viewportRect.top + (point.y / metadata.height) * viewportRect.height,
+  })) as VideoQuad;
+}
+
+function getOverlayPalette(
+  match: BrowserVideoScanCandidate | null,
+): {
+  strokeColor: string;
+  fillColor: string;
+} {
   if (!match) {
-    return "border-slate-300";
+    return {
+      strokeColor: "rgba(203, 213, 225, 0.95)",
+      fillColor: "rgba(148, 163, 184, 0.08)",
+    };
   }
 
   if (match.passedThreshold && match.confidence >= 0.8) {
-    return "border-emerald-400";
+    return {
+      strokeColor: "rgba(74, 222, 128, 0.98)",
+      fillColor: "rgba(74, 222, 128, 0.12)",
+    };
   }
 
   if (match.passedThreshold) {
-    return "border-amber-400";
+    return {
+      strokeColor: "rgba(251, 191, 36, 0.98)",
+      fillColor: "rgba(251, 191, 36, 0.12)",
+    };
   }
 
-  return "border-rose-400";
+  return {
+    strokeColor: "rgba(251, 113, 133, 0.98)",
+    fillColor: "rgba(251, 113, 133, 0.1)",
+  };
 }
 
 function reconcileVideoTracks(
@@ -1096,6 +1157,9 @@ function reconcileVideoTracks(
       tracks[bestTrackIndex] = {
         ...track,
         proposal: detection.proposal,
+        overlayQuad: detection.overlayQuad,
+        refinementMethod: detection.refinementMethod,
+        isClipped: detection.isClipped,
         match: detection.bestMatch,
         lastSeenSeconds: timestampSeconds,
         seenFrames: track.seenFrames + 1,
@@ -1121,6 +1185,9 @@ function reconcileVideoTracks(
     const newTrack: VideoTrack = {
       id: currentNextTrackId++,
       proposal: detection.proposal,
+      overlayQuad: detection.overlayQuad,
+      refinementMethod: detection.refinementMethod,
+      isClipped: detection.isClipped,
       match: detection.bestMatch,
       lastSeenSeconds: timestampSeconds,
       seenFrames: 1,
