@@ -31,10 +31,12 @@ export function scanVideoFrameCanvasInBrowser(params: {
   hashEntries: CardScanHashEntry[];
   artworkDb?: ArtworkFingerprintEntry[];
   tcgFilter?: TcgCode | "all";
+  detectionOnly?: boolean;
 }): BrowserVideoFrameScanResult {
-  const { frameCanvas, hashEntries, artworkDb, tcgFilter } = params;
+  const { frameCanvas, hashEntries, artworkDb, tcgFilter, detectionOnly } =
+    params;
 
-  if (!hashEntries.length) {
+  if (!detectionOnly && !hashEntries.length) {
     return {
       activeProposal: null,
       bestMatch: null,
@@ -52,6 +54,43 @@ export function scanVideoFrameCanvasInBrowser(params: {
   let bestProposalMatch: BrowserVideoScanCandidate | null = null;
 
   for (const proposal of proposals) {
+    let overlayQuad = proposalToQuad(proposal);
+    let refinementMethod: string | null = null;
+    let isClipped = false;
+
+    // Always try quad refinement (detection)
+    const refinementExtraction = extractProposalCanvas(
+      frameCanvas,
+      proposal,
+      PROPOSAL_REFINEMENT_PADDING_RATIO,
+    );
+    const refinement = refineProposalCanvas(refinementExtraction.canvas);
+    if (refinement) {
+      overlayQuad = offsetQuad(
+        refinement.quad,
+        refinementExtraction.sourceWindow.left,
+        refinementExtraction.sourceWindow.top,
+      );
+      refinementMethod = refinement.method;
+      isClipped = refinement.isClipped;
+    }
+
+    // Detection-only: skip hash matching, just report the quad
+    if (detectionOnly) {
+      if (refinement) {
+        rawProposalMatches.push({
+          proposal,
+          overlayQuad,
+          refinementMethod,
+          isClipped,
+          bestMatch: null,
+          candidates: [],
+        });
+      }
+      continue;
+    }
+
+    // Full matching path
     const rawExtraction = extractProposalCanvas(frameCanvas, proposal);
     const rawRanked = rankProposalCanvas(
       rawExtraction.canvas,
@@ -61,16 +100,7 @@ export function scanVideoFrameCanvasInBrowser(params: {
       artworkDb,
     );
     let ranked = rawRanked.ranked;
-    let overlayQuad = proposalToQuad(proposal);
-    let refinementMethod: string | null = null;
-    let isClipped = false;
 
-    const refinementExtraction = extractProposalCanvas(
-      frameCanvas,
-      proposal,
-      PROPOSAL_REFINEMENT_PADDING_RATIO,
-    );
-    const refinement = refineProposalCanvas(refinementExtraction.canvas);
     if (refinement) {
       const refinedRanked = rankProposalCanvas(
         refinement.warpedCanvas,
@@ -79,13 +109,6 @@ export function scanVideoFrameCanvasInBrowser(params: {
         tcgFilter,
         artworkDb,
       );
-      overlayQuad = offsetQuad(
-        refinement.quad,
-        refinementExtraction.sourceWindow.left,
-        refinementExtraction.sourceWindow.top,
-      );
-      refinementMethod = refinement.method;
-      isClipped = refinement.isClipped;
 
       if (
         shouldUseRefinedRanking(
