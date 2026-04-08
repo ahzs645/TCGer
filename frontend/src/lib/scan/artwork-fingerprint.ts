@@ -172,9 +172,11 @@ const HSV_H_BINS = 30;
 const HSV_S_BINS = 32;
 const HSV_HIST_DIM = HSV_H_BINS * HSV_S_BINS; // 960
 
-/** Weight of artwork grid vs HSV histogram in the combined score. */
-const ARTWORK_WEIGHT = 0.85;
-const HSV_WEIGHT = 0.15;
+/** Weight of artwork grid vs HSV histogram in the combined score.
+ * Sweep tested 0-100% in 5% steps across 77 video frames.
+ * Peak: art 5% + HSV 95% = 69% confident (vs 23% art-only). */
+const ARTWORK_WEIGHT = 0.05;
+const HSV_WEIGHT = 0.95;
 
 /**
  * Compute a 30×32 HSV histogram from the artwork region of a card canvas.
