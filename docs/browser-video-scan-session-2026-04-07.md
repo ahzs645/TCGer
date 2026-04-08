@@ -609,6 +609,11 @@ The MTG Scanner approach is the gold standard: **capture fast, detect smart.**
 | Simplified pHash tiebreaker | 93% override rate (harmful) | Average hash on video crops too noisy; doesn't match stored DCT hashes |
 | Larger grid (12×12, 16×16) | Same ambiguity (77-81%) | Captures more noise alongside more detail; net effect ~zero |
 | Orientation search (4 rotations) | 79% ambiguous (worse) | YOLO OBB already handles rotation; extra rotations add false matches |
+| DCT pHash tiebreaker (proper) | 79% ambiguous (no change) | Even with matching hex hashes, distance too noisy on video crops |
+| Gradient histogram (ORB-like) | Can't test | No precomputed DB; would need 25min build per technique |
+| Sub-region color profiles | Can't test | No precomputed DB |
+| Multi-scale gradient (AKAZE-like) | Can't test | No precomputed DB |
+| Edge density profile | Can't test | No precomputed DB |
 | Gradient-based edge detection | Poor quad outlines | Noise from artwork texture, no blur/NMS |
 | 2-triangle affine warp | Perspective errors | Not enough triangles for real perspective |
 | Histogram eq on pHash only | Worse distances | One-sided equalization diverges from DB |
@@ -725,5 +730,91 @@ The MTG Scanner approach is the gold standard: **capture fast, detect smart.**
 | Pokemon-TCGP-Card-Scanner | YOLO11n-OBB model (TF.js format), detection pipeline |
 | Riftbound Scanner | Artwork color grid matching approach, ONNX detection pattern |
 | Scanic | Canny edge detection analysis (not adopted — YOLO is better) |
-| MTG-Card-Scanner-Sorter | EMA tracking, quad smoothing, composite scoring analysis |
+| MTG-Card-Scanner-Sorter | EMA tracking, quad smoothing, HSV histogram matching, composite scoring |
 | pokemon-card-recognizer | Confidence integral / vote accumulation concept |
+
+---
+
+## Complete Experiment Log
+
+All 11 experiments run during this session, in order:
+
+| # | Experiment | Ambiguity | vs Baseline | Verdict |
+|---|-----------|-----------|-------------|---------|
+| 1 | LAB + CLAHE | 52% agree | harmful | SKIP |
+| 2 | Simplified pHash tiebreaker | 93% harmful overrides | harmful | SKIP |
+| 3 | 12×12 grid | 81% | +4pts worse | SKIP |
+| 4 | 16×16 grid | 78% | +1pt worse | SKIP |
+| 5 | Orientation search (4 rotations) | 79% | +2pts worse | SKIP |
+| 6 | Hash ensemble aHash+dHash (60/40) | 68% | -9pts better | PROMISING but noisy |
+| 7 | Proper DCT pHash tiebreaker | 77% | no change | SKIP |
+| 8 | **HSV histogram 15%** | **53%** | **-24pts better** | **BEST — SHIPPED** |
+| 9 | **Uint8 HSV quantization** | 98.7% identical | 130→51MB | **SHIPPED** |
+| 10 | Combo artwork+DCT+HSV (80/10/10) | 58% | -19pts | worse than HSV alone |
+| 11 | DCT pHash on art+HSV baseline | 79% | no change | SKIP |
+
+**Final state: artwork 85% + HSV 15% = 53% ambiguity (best achievable with existing data)**
+
+### What Would Move The Needle Further
+
+The color grid + HSV approach has been exhaustively tested. Further
+improvement requires fundamentally different signals:
+
+1. **CLIP ViT-B/32 embeddings** — 512-dim semantic vectors, captures visual
+   meaning not just color. Requires: ONNX model (~100MB), embedding DB build,
+   browser ONNX inference. From: spell-coven-mono (Repo 20).
+
+2. **OCR tiebreaker** — Read card name or collector number directly from the
+   YOLO crop. Orthogonal to visual matching. Requires: Tesseract.js in browser
+   (already available). From: mtgscan-main (Repo 3), tcg-ocr-scanner (Repo 8).
+
+3. **New precomputed feature databases** — Gradient histograms, edge profiles,
+   sub-region color, AKAZE descriptors. Each requires ~25 min build on K8s
+   cluster. Techniques 2-5 from the final test could not be evaluated without
+   these databases.
+
+4. **Better crop quality** — Tighter artwork-only crop (excluding fingers/
+   background at card edges), motion blur detection (skip blurry frames).
+   Addresses the root cause: noisy input to the matching pipeline.
+
+---
+
+## In Progress / Blocked
+
+### Feature Database Build (4 new feature types)
+
+Job manifest: `personalprox/k8s/tcger/features-build-job.yaml`
+
+Builds gradient histogram, sub-region color, multi-scale gradient, and edge
+profile databases for all 21,900 cards. **Blocked by disk pressure** on the
+K8s node (38GB disk, 82% used). The features job was killed when a pytorch
+image pull for the CLIP job filled the remaining space.
+
+To resume once disk pressure clears:
+```bash
+KUBECONFIG=kubeconfig.yml kubectl apply -f k8s/tcger/features-build-job.yaml
+KUBECONFIG=kubeconfig.yml kubectl logs -f job/tcger-features-build -n tcger
+```
+
+### CLIP Embedding Build
+
+Job manifest: `personalprox/k8s/tcger/clip-build-job.yaml`
+
+**Blocked:** The pytorch/pytorch image (~8GB) doesn't fit on the 38GB disk.
+Options:
+1. Build locally on Mac with port-forward (torch already installed)
+2. Expand the K8s node disk
+3. Use a smaller CLIP runtime (ONNX instead of PyTorch, ~500MB vs 8GB)
+
+CLIP test showed 30-93ms per image inference on Mac CPU. Embedding DB for
+21,900 cards would be ~11MB (int8) or ~43MB (float32).
+
+### iOS Port
+
+Not started. Requires:
+- CoreML conversion of YOLO11n-OBB model
+- Swift implementation of artwork+HSV matching
+- Camera/video overlay UI
+- Bundling the quantized DB (51MB) in the app
+
+Should be scoped as a separate session.

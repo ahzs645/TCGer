@@ -38,6 +38,7 @@ final class CardScannerCoordinator {
 
     static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {
         let strategies: [ScanStrategy] = [
+            ArtworkFingerprintScannerStrategy(),
             BackendHashScannerStrategy(),
             BoardCardEmbeddingScannerStrategy(),
             PokemonTextScannerStrategy(),
