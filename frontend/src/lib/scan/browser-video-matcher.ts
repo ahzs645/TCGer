@@ -1,5 +1,6 @@
 export {
   computeArtworkFingerprintFromCanvas,
+  computeHSVHistogramFromCanvas,
   matchArtworkFingerprint,
   parseArtworkDatabase,
   type ArtworkFingerprintEntry,

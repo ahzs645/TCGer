@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 
 import {
   computeArtworkFingerprintFromCanvas,
+  computeHSVHistogramFromCanvas,
   matchArtworkFingerprint,
   scanVideoFrameCanvasInBrowser,
   type ArtworkFingerprintEntry,
@@ -437,17 +438,17 @@ function matchDetection(
   let bestMatch: BrowserVideoScanCandidate | null = null;
   let candidates: BrowserVideoScanCandidate[] = [];
 
-  // Try artwork fingerprint matching first (primary signal)
+  // Try artwork fingerprint + HSV histogram matching (primary signal)
   if (artworkDb && artworkDb.length > 0) {
-    const fp = computeArtworkFingerprintFromCanvas(
-      cropCanvas,
-      tcg as "pokemon" | "magic" | "yugioh",
-    );
+    const tcgKey = tcg as "pokemon" | "magic" | "yugioh";
+    const fp = computeArtworkFingerprintFromCanvas(cropCanvas, tcgKey);
+    const hsvHist = computeHSVHistogramFromCanvas(cropCanvas, tcgKey);
     const artworkMatches = matchArtworkFingerprint(
       fp,
       artworkDb,
       ARTWORK_TOP_N,
       scanFilter,
+      hsvHist,
     );
 
     if (artworkMatches.length > 0 && artworkMatches[0]!.similarity >= ARTWORK_MIN_SIM) {

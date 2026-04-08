@@ -1,5 +1,6 @@
 import {
   computeArtworkFingerprintFromCanvas,
+  computeHSVHistogramFromCanvas,
   matchArtworkFingerprint,
   type ArtworkFingerprintEntry,
 } from "./artwork-fingerprint";
@@ -343,15 +344,15 @@ function rankProposalCanvas(
   if (artworkDb && artworkDb.length > 0) {
     const tcgForArtwork =
       tcgFilter && tcgFilter !== "all" ? tcgFilter : "pokemon";
-    const artworkFp = computeArtworkFingerprintFromCanvas(
-      cropCanvas,
-      tcgForArtwork as "pokemon" | "magic" | "yugioh",
-    );
+    const tcgKey = tcgForArtwork as "pokemon" | "magic" | "yugioh";
+    const artworkFp = computeArtworkFingerprintFromCanvas(cropCanvas, tcgKey);
+    const hsvHist = computeHSVHistogramFromCanvas(cropCanvas, tcgKey);
     const artworkMatches = matchArtworkFingerprint(
       artworkFp,
       artworkDb,
       ARTWORK_PREFILTER_TOP_N,
       tcgFilter,
+      hsvHist,
     );
 
     if (artworkMatches.length > 0) {
