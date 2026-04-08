@@ -215,6 +215,7 @@ enum ScanStrategyKind: String, Sendable {
     case perceptualHash
     case mlDetector
     case serverHash
+    case artworkFingerprint
 }
 
 struct CardScannerContext: Sendable {
