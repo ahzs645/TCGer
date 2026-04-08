@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Coins, Library, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -112,6 +112,10 @@ export function DashboardContent() {
     }));
   const { token, isAuthenticated } = useAuthStore();
 
+  // Defer auth-dependent rendering to avoid SSR/client hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const noGamesEnabled =
     !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
   const selectedGameDisabled =
@@ -153,7 +157,7 @@ export function DashboardContent() {
     () => buildDashboardStats(filteredCards, showPricing),
     [filteredCards, showPricing],
   );
-  const loading = isAuthenticated && !hasFetched;
+  const loading = mounted && isAuthenticated && !hasFetched;
   const hasNoCards = !loading && stats.totalCopies === 0;
 
   if (loading) {
