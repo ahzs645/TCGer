@@ -53,8 +53,8 @@ interface ArtworkDatabaseJson {
 
 // ---------- constants ----------
 
-const GRID_SIZE = 8;
-const FINGERPRINT_DIM = GRID_SIZE * GRID_SIZE * 3; // 192
+const DEFAULT_GRID_SIZE = 8;
+const FINGERPRINT_DIM_8 = DEFAULT_GRID_SIZE * DEFAULT_GRID_SIZE * 3; // 192
 const HSV_H_BINS = 30;
 const HSV_S_BINS = 32;
 const HSV_HIST_DIM = HSV_H_BINS * HSV_S_BINS; // 960
@@ -74,15 +74,18 @@ let artworkDb: ArtworkFingerprintEntry[] | null = null;
 
 /**
  * Compute the artwork fingerprint for a card image.
+ * @param gridSize Grid resolution (8=192 dims, 12=432 dims, 16=768 dims)
  */
 export async function computeArtworkFingerprint(
   imageBuffer: Buffer,
-  tcg = 'pokemon'
+  tcg = 'pokemon',
+  gridSize = DEFAULT_GRID_SIZE,
 ): Promise<ArtworkFingerprint> {
   const region = ARTWORK_REGIONS[tcg] ?? ARTWORK_REGIONS.pokemon!;
   const meta = await sharp(imageBuffer).metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
+  const fpDim = gridSize * gridSize * 3;
 
   // Crop to artwork region
   const cropLeft = Math.round(w * region.left);
@@ -91,7 +94,7 @@ export async function computeArtworkFingerprint(
   const cropHeight = Math.round(h * (region.bottom - region.top));
 
   if (cropWidth <= 0 || cropHeight <= 0) {
-    return new Float32Array(FINGERPRINT_DIM);
+    return new Float32Array(fpDim);
   }
 
   // Read artwork at intermediate resolution for histogram equalisation
@@ -130,16 +133,17 @@ export async function computeArtworkFingerprint(
 
   // Resize equalised artwork to grid size
   const grid = await sharp(equalized, { raw: { width: eqSize, height: eqSize, channels: 3 } })
-    .resize(GRID_SIZE, GRID_SIZE, { fit: 'fill', kernel: 'cubic' })
+    .resize(gridSize, gridSize, { fit: 'fill', kernel: 'cubic' })
     .raw()
     .toBuffer();
 
   // Pack into Float32Array normalised to [0,1]
-  const fp = new Float32Array(FINGERPRINT_DIM);
-  for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-    fp[i] = grid[i * 3]! / 255;                                // R
-    fp[GRID_SIZE * GRID_SIZE + i] = grid[i * 3 + 1]! / 255;    // G
-    fp[2 * GRID_SIZE * GRID_SIZE + i] = grid[i * 3 + 2]! / 255; // B
+  const cells = gridSize * gridSize;
+  const fp = new Float32Array(fpDim);
+  for (let i = 0; i < cells; i++) {
+    fp[i] = grid[i * 3]! / 255;                  // R
+    fp[cells + i] = grid[i * 3 + 1]! / 255;      // G
+    fp[2 * cells + i] = grid[i * 3 + 2]! / 255;  // B
   }
 
   return fp;
@@ -325,19 +329,22 @@ export interface ArtworkBuildEntry {
 
 /**
  * Build artwork fingerprints for a batch of card images and save to disk.
+ * @param gridSize Grid resolution (default 8). Use 12 or 16 for higher discrimination.
  */
 export async function buildArtworkDatabase(
   entries: ArtworkBuildEntry[],
   tcg: string,
-  outputDir: string
+  outputDir: string,
+  gridSize = DEFAULT_GRID_SIZE,
 ): Promise<number> {
+  const fpDim = gridSize * gridSize * 3;
   const results: ArtworkDatabaseJson['entries'] = [];
 
   for (const entry of entries) {
     try {
       const imageBuffer = await readFile(entry.imagePath);
       const [fp, hsv] = await Promise.all([
-        computeArtworkFingerprint(imageBuffer, tcg),
+        computeArtworkFingerprint(imageBuffer, tcg, gridSize),
         computeHsvHistogram(imageBuffer),
       ]);
       results.push({
@@ -355,13 +362,15 @@ export async function buildArtworkDatabase(
   const output: ArtworkDatabaseJson = {
     version: 1,
     tcg,
-    gridSize: GRID_SIZE,
-    dimensions: FINGERPRINT_DIM,
+    gridSize,
+    dimensions: fpDim,
     total: results.length,
     entries: results,
   };
 
-  const outputPath = path.join(outputDir, 'artwork-fingerprints.json');
+  // Use grid-size-specific filename so multiple versions can coexist
+  const suffix = gridSize === DEFAULT_GRID_SIZE ? '' : `-${gridSize}x${gridSize}`;
+  const outputPath = path.join(outputDir, `artwork-fingerprints${suffix}.json`);
   await writeFile(outputPath, JSON.stringify(output));
   console.error(`[artwork-matcher] built ${results.length} fingerprints → ${outputPath}`);
   return results.length;

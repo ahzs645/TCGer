@@ -40,6 +40,8 @@ export interface ArtworkFingerprintEntry {
   setCode: string | null;
   fingerprint: Float32Array; // 192 elements
   norm: number; // pre-computed L2 norm
+  hsvHist: Float32Array | null; // 960 elements (30 hue × 32 sat bins)
+  hsvNorm: number; // pre-computed L2 norm for HSV
 }
 
 export interface ArtworkMatch {
@@ -164,22 +166,105 @@ function equalizeChannelInPlace(
   }
 }
 
+// ---------- HSV histogram ----------
+
+const HSV_H_BINS = 30;
+const HSV_S_BINS = 32;
+const HSV_HIST_DIM = HSV_H_BINS * HSV_S_BINS; // 960
+
+/** Weight of artwork grid vs HSV histogram in the combined score. */
+const ARTWORK_WEIGHT = 0.85;
+const HSV_WEIGHT = 0.15;
+
+/**
+ * Compute a 30×32 HSV histogram from the artwork region of a card canvas.
+ * Matches the backend's computeHsvHistogram format.
+ */
+export function computeHSVHistogramFromCanvas(
+  cardCanvas: HTMLCanvasElement,
+  tcg: SupportedTcg = "pokemon",
+): Float32Array {
+  const region = ARTWORK_REGIONS[tcg];
+  const w = cardCanvas.width;
+  const h = cardCanvas.height;
+
+  const cropLeft = clamp(Math.round(w * region.left), 0, w - 1);
+  const cropTop = clamp(Math.round(h * region.top), 0, h - 1);
+  const cropWidth = clamp(
+    Math.round(w * (region.right - region.left)),
+    1,
+    w - cropLeft,
+  );
+  const cropHeight = clamp(
+    Math.round(h * (region.bottom - region.top)),
+    1,
+    h - cropTop,
+  );
+
+  const artCanvas = createCanvas(cropWidth, cropHeight);
+  const artCtx = getContext2d(artCanvas);
+  artCtx.drawImage(
+    cardCanvas,
+    cropLeft, cropTop, cropWidth, cropHeight,
+    0, 0, cropWidth, cropHeight,
+  );
+  const imageData = artCtx.getImageData(0, 0, cropWidth, cropHeight);
+  const data = imageData.data;
+  const pixels = cropWidth * cropHeight;
+
+  const hist = new Float32Array(HSV_HIST_DIM);
+
+  for (let i = 0; i < pixels; i++) {
+    const r = data[i * 4]! / 255;
+    const g = data[i * 4 + 1]! / 255;
+    const b = data[i * 4 + 2]! / 255;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const d = mx - mn;
+
+    let hue = 0;
+    if (d > 0) {
+      if (mx === r) hue = 60 * (((g - b) / d) % 6);
+      else if (mx === g) hue = 60 * ((b - r) / d + 2);
+      else hue = 60 * ((r - g) / d + 4);
+    }
+    if (hue < 0) hue += 360;
+    const sat = mx > 0 ? d / mx : 0;
+
+    const hBin = Math.min(HSV_H_BINS - 1, Math.floor((hue / 360) * HSV_H_BINS));
+    const sBin = Math.min(HSV_S_BINS - 1, Math.floor(sat * HSV_S_BINS));
+    hist[hBin * HSV_S_BINS + sBin]++;
+  }
+
+  // Normalize to sum=1
+  let sum = 0;
+  for (let i = 0; i < hist.length; i++) sum += hist[i]!;
+  if (sum > 0) for (let i = 0; i < hist.length; i++) hist[i] /= sum;
+
+  return hist;
+}
+
 // ---------- matching ----------
 
 /**
- * Match an artwork fingerprint against a database of pre-computed fingerprints.
- * Returns top-N matches sorted by cosine similarity (descending).
+ * Match artwork fingerprint + HSV histogram against database.
+ * Combined score: 85% artwork cosine similarity + 15% HSV cosine similarity.
+ * Returns top-N matches sorted by combined score (descending).
  */
 export function matchArtworkFingerprint(
   queryFp: Float32Array,
   database: ArtworkFingerprintEntry[],
   topN: number,
   tcgFilter?: TcgCode | "all",
+  queryHSV?: Float32Array | null,
 ): ArtworkMatch[] {
   const queryNorm = l2Norm(queryFp);
   if (queryNorm < 1e-8) {
     return [];
   }
+
+  const queryHSVNorm = queryHSV ? l2Norm(queryHSV) : 0;
+  const hasHSV = queryHSV && queryHSVNorm > 1e-8;
 
   const results: ArtworkMatch[] = [];
 
@@ -192,8 +277,17 @@ export function matchArtworkFingerprint(
       continue;
     }
 
-    const dot = dotProduct(queryFp, entry.fingerprint);
-    const similarity = dot / (queryNorm * entry.norm);
+    const artDot = dotProduct(queryFp, entry.fingerprint);
+    const artSim = artDot / (queryNorm * entry.norm);
+
+    let similarity: number;
+    if (hasHSV && entry.hsvHist && entry.hsvNorm > 1e-8) {
+      const hsvDot = dotProduct(queryHSV, entry.hsvHist);
+      const hsvSim = hsvDot / (queryHSVNorm * entry.hsvNorm);
+      similarity = ARTWORK_WEIGHT * artSim + HSV_WEIGHT * hsvSim;
+    } else {
+      similarity = artSim;
+    }
 
     if (results.length < topN) {
       results.push({
@@ -238,6 +332,7 @@ export function parseArtworkDatabase(
       name: string;
       setCode: string | null;
       fingerprint: string; // base64-encoded Float32Array
+      hsvHist?: string; // base64-encoded Float32Array (optional)
     }>;
     tcg?: string;
   },
@@ -245,6 +340,9 @@ export function parseArtworkDatabase(
 ): ArtworkFingerprintEntry[] {
   return json.entries.map((entry) => {
     const fp = base64ToFloat32Array(entry.fingerprint);
+    const hsv = entry.hsvHist
+      ? base64ToFloat32Array(entry.hsvHist)
+      : null;
     return {
       externalId: entry.externalId,
       tcg,
@@ -252,6 +350,8 @@ export function parseArtworkDatabase(
       setCode: entry.setCode,
       fingerprint: fp,
       norm: l2Norm(fp),
+      hsvHist: hsv,
+      hsvNorm: hsv ? l2Norm(hsv) : 0,
     };
   });
 }

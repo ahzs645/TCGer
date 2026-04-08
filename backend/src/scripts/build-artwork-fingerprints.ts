@@ -123,7 +123,7 @@ async function fetchPokemonTcgApiCards(apiBaseUrl: string): Promise<ApiCard[]> {
   return cards;
 }
 
-async function buildFromApi(tcg: string, dataDir: string): Promise<void> {
+async function buildFromApi(tcg: string, dataDir: string, gridSize = 8): Promise<void> {
   const apiBaseUrl =
     tcg === 'pokemon'
       ? process.env.POKEMON_API_BASE_URL ?? process.env.TCGDEX_API_BASE_URL
@@ -180,7 +180,7 @@ async function buildFromApi(tcg: string, dataDir: string): Promise<void> {
             .toBuffer()
         : imageBuffer;
       const [fp, hsv] = await Promise.all([
-        computeArtworkFingerprint(imageBuffer, tcg),
+        computeArtworkFingerprint(imageBuffer, tcg, gridSize),
         computeHsvHistogram(artCropBuf),
       ]);
 
@@ -204,20 +204,21 @@ async function buildFromApi(tcg: string, dataDir: string): Promise<void> {
   const output = {
     version: 1,
     tcg,
-    gridSize: 8,
-    dimensions: 192,
+    gridSize,
+    dimensions: gridSize * gridSize * 3,
     total: entries.length,
     entries,
   };
 
-  const outputPath = path.join(dataDir, 'artwork-fingerprints.json');
+  const suffix = gridSize === 8 ? '' : `-${gridSize}x${gridSize}`;
+  const outputPath = path.join(dataDir, `artwork-fingerprints${suffix}.json`);
   await writeFile(outputPath, JSON.stringify(output));
-  console.error(`[build-artwork] done: ${entries.length} fingerprints → ${outputPath} (${errors} errors)`);
+  console.error(`[build-artwork] done: ${entries.length} fingerprints (${gridSize}x${gridSize}) → ${outputPath} (${errors} errors)`);
 }
 
 // ---------- Local file mode ----------
 
-async function buildFromLocalFiles(tcg: string, dataDir: string): Promise<void> {
+async function buildFromLocalFiles(tcg: string, dataDir: string, gridSize = 8): Promise<void> {
   const imagesDir = path.join(dataDir, 'images');
   console.error(`[build-artwork] scanning ${imagesDir} for ${tcg} card images...`);
 
@@ -249,7 +250,7 @@ async function buildFromLocalFiles(tcg: string, dataDir: string): Promise<void> 
   } catch { /* no hashes.json */ }
 
   console.error(`[build-artwork] found ${entries.length} card images across ${setDirs.length} sets`);
-  const count = await buildArtworkDatabase(entries, tcg, dataDir);
+  const count = await buildArtworkDatabase(entries, tcg, dataDir, gridSize);
   console.error(`[build-artwork] done — ${count} fingerprints built`);
 }
 
@@ -263,15 +264,20 @@ async function main(): Promise<void> {
   let tcg = 'pokemon';
   let fromApi = false;
 
+  let gridSize = 8;
+
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--tcg' && args[i + 1]) tcg = args[i + 1]!;
     if (args[i] === '--from-api') fromApi = true;
+    if (args[i] === '--grid-size' && args[i + 1]) gridSize = Number.parseInt(args[i + 1]!, 10);
   }
 
+  console.error(`[build-artwork] grid size: ${gridSize}x${gridSize} (${gridSize * gridSize * 3} dimensions)`);
+
   if (fromApi) {
-    await buildFromApi(tcg, dataDir);
+    await buildFromApi(tcg, dataDir, gridSize);
   } else {
-    await buildFromLocalFiles(tcg, dataDir);
+    await buildFromLocalFiles(tcg, dataDir, gridSize);
   }
 }
 
