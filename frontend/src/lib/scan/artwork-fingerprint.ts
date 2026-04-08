@@ -332,17 +332,30 @@ export function parseArtworkDatabase(
       name: string;
       setCode: string | null;
       fingerprint: string; // base64-encoded Float32Array
-      hsvHist?: string; // base64-encoded Float32Array (optional)
+      hsvHist?: string; // base64 Float32Array OR base64 Uint8Array (if quantized)
+      hsvScale?: number; // present when hsvHist is uint8-quantized
     }>;
     tcg?: string;
+    hsvQuantized?: boolean;
   },
   tcg: TcgCode = "pokemon",
 ): ArtworkFingerprintEntry[] {
+  const isQuantized = json.hsvQuantized === true;
+
   return json.entries.map((entry) => {
     const fp = base64ToFloat32Array(entry.fingerprint);
-    const hsv = entry.hsvHist
-      ? base64ToFloat32Array(entry.hsvHist)
-      : null;
+    let hsv: Float32Array | null = null;
+
+    if (entry.hsvHist) {
+      if (isQuantized && entry.hsvScale) {
+        // Uint8 quantized: decode and rescale back to float
+        hsv = base64Uint8ToFloat32Array(entry.hsvHist, entry.hsvScale);
+      } else {
+        // Float32 original format
+        hsv = base64ToFloat32Array(entry.hsvHist);
+      }
+    }
+
     return {
       externalId: entry.externalId,
       tcg,
@@ -382,4 +395,18 @@ function base64ToFloat32Array(base64: string): Float32Array {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return new Float32Array(bytes.buffer);
+}
+
+/** Decode a base64-encoded Uint8Array and rescale back to float using hsvScale. */
+function base64Uint8ToFloat32Array(
+  base64: string,
+  scale: number,
+): Float32Array {
+  const binaryString = atob(base64);
+  const result = new Float32Array(binaryString.length);
+  const invScale = scale / 255;
+  for (let i = 0; i < binaryString.length; i++) {
+    result[i] = binaryString.charCodeAt(i) * invScale;
+  }
+  return result;
 }
