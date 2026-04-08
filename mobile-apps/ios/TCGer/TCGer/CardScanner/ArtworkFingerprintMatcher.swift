@@ -21,8 +21,10 @@ struct ArtworkFingerprintMatcher {
     private static let hsvHBins = 30
     private static let hsvSBins = 32
     private static let hsvHistDim = hsvHBins * hsvSBins  // 960
-    private static let artworkWeight: Float = 0.85
-    private static let hsvWeight: Float = 0.15
+    /// Sweep tested 0-100% in 5% steps across 77 video frames.
+    /// Peak: art 5% + HSV 95% = 69% confident (vs 23% art-only).
+    private static let artworkWeight: Float = 0.05
+    private static let hsvWeight: Float = 0.95
 
     /// TCG-specific artwork crop regions (fraction of card dimensions).
     static let artworkRegions: [String: (top: Float, bottom: Float, left: Float, right: Float)] = [
