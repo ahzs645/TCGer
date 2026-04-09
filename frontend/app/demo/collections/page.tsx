@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+
 import { AppShell } from "@/components/layout/app-shell";
 import { CollectionView } from "@/components/collections/sandbox/collection-view";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +26,15 @@ export default function CollectionsPage() {
             Per-copy inventory manager powered by your live binder data.
           </p>
         </div>
-        <CollectionView data-oid="58pyumo" />
+        <Suspense
+          fallback={
+            <div className="rounded-xl border bg-background p-6 text-sm text-muted-foreground">
+              Loading collections...
+            </div>
+          }
+        >
+          <CollectionView data-oid="58pyumo" />
+        </Suspense>
       </div>
     </AppShell>
   );

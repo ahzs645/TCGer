@@ -43,6 +43,8 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
         source: ScanInvocationKind,
         apiService: APIService
     ) async throws -> CardScanResult? {
+        let start = Date()
+
         guard supports(context.mode) else {
             throw CardScannerError.ineligibleMode
         }
@@ -74,32 +76,7 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             return nil
         }
 
-        // Step 4: Build result
-        let gap = matches.count >= 2
-            ? best.similarity - matches[1].similarity
-            : 1.0
-
-        let confidence = CardScanConfidence(
-            score: Double(best.similarity),
-            reason: "Artwork+HSV sim=\(String(format: "%.4f", best.similarity)) gap=\(String(format: "%.4f", gap))"
-        )
-
-        let identity = CardIdentity(
-            id: best.externalId,
-            name: best.name,
-            game: context.mode.tcgGame,
-            setCode: best.setCode,
-            setName: nil
-        )
-
-        let details = CardDetails(
-            identity: identity,
-            rarity: nil,
-            imageURL: nil,
-            price: nil,
-            sourceCard: nil
-        )
-
+        // Step 4: Build result candidates
         var candidates = [CardScanCandidate]()
         for match in matches {
             let cIdentity = CardIdentity(
@@ -126,10 +103,15 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             ))
         }
 
+        let primary = candidates[0]
+        let alternatives = Array(candidates.dropFirst())
+
         return CardScanResult(
-            bestCandidate: candidates.first!,
-            alternativeCandidates: Array(candidates.dropFirst()),
-            strategyUsed: kind
+            mode: context.mode,
+            capturedImage: cropped,
+            primary: primary,
+            alternatives: alternatives,
+            elapsed: Date().timeIntervalSince(start)
         )
     }
 
