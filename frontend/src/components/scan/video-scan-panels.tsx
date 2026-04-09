@@ -264,7 +264,7 @@ export function VideoPlayerWithOverlay({
   overlayItems,
   onMetadataLoaded,
 }: {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  videoRef: React.RefObject<HTMLVideoElement>;
   videoUrl: string | null;
   overlayItems: VideoOverlayItem[];
   onMetadataLoaded: (meta: {
@@ -273,9 +273,6 @@ export function VideoPlayerWithOverlay({
     height: number;
   }) => void;
 }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ref = videoRef as any;
-
   if (!videoUrl) {
     return (
       <div className="relative overflow-hidden rounded-xl border bg-black">
@@ -295,7 +292,7 @@ export function VideoPlayerWithOverlay({
   return (
     <div className="relative overflow-hidden rounded-xl border bg-black">
       <video
-        ref={ref}
+        ref={videoRef}
         src={videoUrl}
         controls
         preload="metadata"

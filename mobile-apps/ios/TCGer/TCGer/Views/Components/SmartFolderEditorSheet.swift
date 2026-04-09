@@ -84,7 +84,7 @@ struct SmartFolderEditorSheet: View {
                         let folder = SmartFolder(
                             id: existingFolder?.id ?? UUID(),
                             name: name,
-                            colorHex: selectedColor.toHex() ?? "4A90D9",
+                            colorHex: selectedColor.toHex(),
                             rules: rules,
                             matchMode: matchMode
                         )

@@ -1181,7 +1181,7 @@ final class DemoStore {
         }
         let now = DemoStore.isoFormatter.string(from: Date())
         let wc = WishlistCard(id: "demo-wc-\(Int.random(in: 100...9999))", externalId: card.id, tcg: card.tcg, name: card.name, setCode: card.setCode, setName: card.setName, rarity: card.rarity, imageUrl: card.imageUrl, imageUrlSmall: card.imageUrlSmall, setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: card.collectorNumber, notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
-        var wl = wishlists[idx]
+        let wl = wishlists[idx]
         var cards = wl.cards
         cards.append(wc)
         wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
@@ -1190,8 +1190,8 @@ final class DemoStore {
 
     func removeCardFromWishlist(wishlistId: String, cardId: String) {
         guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else { return }
-        var wl = wishlists[idx]
-        var cards = wl.cards.filter { $0.id != cardId }
+        let wl = wishlists[idx]
+        let cards = wl.cards.filter { $0.id != cardId }
         let now = DemoStore.isoFormatter.string(from: Date())
         wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
     }

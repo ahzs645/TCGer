@@ -155,7 +155,7 @@ struct ImageUploadSheet: View {
                 }
 
                 let filename = "photo_\(index).jpg"
-                try await apiService.uploadImage(
+                _ = try await apiService.uploadImage(
                     config: environmentStore.serverConfiguration,
                     token: token,
                     binderId: binderId,
