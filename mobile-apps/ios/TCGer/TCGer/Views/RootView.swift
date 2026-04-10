@@ -23,7 +23,7 @@ struct RootView: View {
                         isChecking: isVerifyingServer,
                         currentURL: environmentStore.serverConfiguration.baseURL,
                         retryAction: { Task { await verifyServerConnection() } },
-                        changeServerAction: { environmentStore.serverConfiguration = .empty }
+                        changeServerAction: resetServerSelection
                     )
                     .task(id: environmentStore.serverConfiguration.baseURL) {
                         await verifyServerConnection()
@@ -37,7 +37,8 @@ struct RootView: View {
                         onCreateAdmin: { email, password, username in
                             Task { await createInitialAdmin(email: email, password: password, username: username) }
                         },
-                        onRefreshStatus: { Task { await refreshBootstrapState(force: true) } }
+                        onRefreshStatus: { Task { await refreshBootstrapState(force: true) } },
+                        onChangeServer: resetServerSelection
                     )
                 } else if !environmentStore.isAuthenticated && shouldRequireAuthentication {
                     if showingSignup {
@@ -128,6 +129,16 @@ struct RootView: View {
         setupRequired = nil
         environmentStore.appSettings = nil
         errorMessage = "Unable to reach the server. Try using the backend address (e.g., port 3000 or /api)."
+    }
+
+    @MainActor
+    private func resetServerSelection() {
+        setupRequired = nil
+        showingSignup = false
+        errorMessage = nil
+        environmentStore.appSettings = nil
+        environmentStore.serverConfiguration = .empty
+        environmentStore.signOut()
     }
 
     @MainActor

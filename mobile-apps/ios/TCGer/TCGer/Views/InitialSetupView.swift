@@ -5,6 +5,7 @@ struct InitialSetupView: View {
 
     let onCreateAdmin: (_ email: String, _ password: String, _ username: String) -> Void
     let onRefreshStatus: () -> Void
+    let onChangeServer: () -> Void
 
     @State private var email = ""
     @State private var username = ""
@@ -57,6 +58,9 @@ struct InitialSetupView: View {
                 .disabled(isSubmitting)
 
                 Button("Re-check Setup Status", action: onRefreshStatus)
+                    .disabled(isSubmitting)
+
+                Button("Choose Different Server", role: .cancel, action: onChangeServer)
                     .disabled(isSubmitting)
             }
         }
