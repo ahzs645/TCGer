@@ -47,12 +47,15 @@ final class CardScannerCoordinator {
         return CardScannerCoordinator(strategies: strategies, apiService: apiService)
     }
 
-    func canScan(mode: ScanMode) -> Bool {
-        !(supportedModes[mode] ?? []).isEmpty
+    func canScan(mode: ScanMode, preferredEngine: ScanEnginePreference = .automatic) -> Bool {
+        !eligibleStrategies(for: mode, source: .photoCapture, preferredEngine: preferredEngine).isEmpty
     }
 
-    func supportsLiveScanning(for mode: ScanMode) -> Bool {
-        (supportedModes[mode] ?? []).contains { $0.supportsLiveScanning }
+    func supportsLiveScanning(
+        for mode: ScanMode,
+        preferredEngine: ScanEnginePreference = .automatic
+    ) -> Bool {
+        !eligibleStrategies(for: mode, source: .livePreview, preferredEngine: preferredEngine).isEmpty
     }
 
     func scan(
@@ -60,14 +63,11 @@ final class CardScannerCoordinator {
         context: CardScannerContext,
         source: ScanInvocationKind
     ) async -> Result<CardScanResult, CardScannerError> {
-        let eligibleStrategies = (supportedModes[context.mode] ?? []).filter { strategy in
-            switch source {
-            case .livePreview:
-                return strategy.supportsLiveScanning
-            case .photoCapture:
-                return true
-            }
-        }
+        let eligibleStrategies = eligibleStrategies(
+            for: context.mode,
+            source: source,
+            preferredEngine: context.enginePreference
+        )
         guard !eligibleStrategies.isEmpty else {
             return .failure(.ineligibleMode)
         }
@@ -101,5 +101,30 @@ final class CardScannerCoordinator {
         }
 
         return .failure(.noMatch)
+    }
+
+    private func eligibleStrategies(
+        for mode: ScanMode,
+        source: ScanInvocationKind,
+        preferredEngine: ScanEnginePreference
+    ) -> [ScanStrategy] {
+        let strategiesForMode = (supportedModes[mode] ?? []).filter { strategy in
+            switch source {
+            case .livePreview:
+                return strategy.supportsLiveScanning
+            case .photoCapture:
+                return true
+            }
+        }
+
+        guard preferredEngine.requiresServerOnlyFlow else {
+            return strategiesForMode
+        }
+
+        guard source == .photoCapture else {
+            return []
+        }
+
+        return strategiesForMode.filter { $0.kind == .serverHash }
     }
 }

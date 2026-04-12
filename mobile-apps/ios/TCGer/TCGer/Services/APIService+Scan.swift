@@ -65,6 +65,7 @@ extension APIService {
     }
 
     struct ScanMetaResponse: Decodable, Sendable {
+        let engine: String?
         let quality: ScanQualityResponse?
         let thresholdUsed: Int?
         let variantUsed: String?
@@ -310,6 +311,7 @@ extension APIService {
         token: String,
         imageData: Data,
         tcg: TCGGame,
+        scanEngine: String? = nil,
         saveDebugCapture: Bool = false,
         captureSource: String? = nil,
         captureNotes: String? = nil
@@ -332,6 +334,9 @@ extension APIService {
         var body = Data()
         if saveDebugCapture {
             appendMultipartField(named: "saveDebugCapture", value: "1", to: &body, boundary: boundary)
+        }
+        if let scanEngine, !scanEngine.isEmpty {
+            appendMultipartField(named: "scanEngine", value: scanEngine, to: &body, boundary: boundary)
         }
         if let captureSource, !captureSource.isEmpty {
             appendMultipartField(named: "captureSource", value: captureSource, to: &body, boundary: boundary)

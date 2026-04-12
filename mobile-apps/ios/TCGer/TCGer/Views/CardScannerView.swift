@@ -185,6 +185,16 @@ struct CardScannerView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
+
+                if availableScanEngines.count > 1 {
+                    Picker("Matcher", selection: $viewModel.selectedEngine) {
+                        ForEach(availableScanEngines) { engine in
+                            Text(engine.displayName).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                }
             } else {
                 Text("Turn on at least one game module in Settings to access scanning.")
                     .font(.footnote)
@@ -228,7 +238,7 @@ struct CardScannerView: View {
             .padding(.bottom, 12)
 
             if hasEnabledScanModes && isModeSupported {
-                Text("Live preview uses on-device strategies. The shutter runs the full backend scan for the selected game.")
+                Text(scanEngineDescription)
                     .font(.footnote)
                     .foregroundColor(.white.opacity(0.88))
                     .multilineTextAlignment(.center)
@@ -367,6 +377,10 @@ private extension CardScannerView {
         ScanMode.allCases.filter { environmentStore.isGameEnabled($0.tcgGame) }
     }
 
+    var availableScanEngines: [ScanEnginePreference] {
+        ScanEnginePreference.allCases.filter { $0.supports(viewModel.selectedMode) }
+    }
+
     var hasEnabledScanModes: Bool {
         !availableScanModes.isEmpty
     }
@@ -402,6 +416,17 @@ private extension CardScannerView {
             return true
         }
         return false
+    }
+
+    var scanEngineDescription: String {
+        switch viewModel.selectedEngine {
+        case .automatic:
+            return "Live preview stays on-device. The shutter keeps the current automatic fallback order for the selected game."
+        case .serverHash:
+            return "Live preview is disabled for this mode. The shutter sends the capture to the server hash matcher."
+        case .serverEmbedding:
+            return "Live preview is disabled for this mode. The shutter sends the capture to the server embedding matcher."
+        }
     }
 }
 
@@ -552,7 +577,7 @@ private struct ScanResultSheet: View {
             Text("Matcher")
                 .font(.headline)
 
-            ScanMetricRow(label: "Strategy", value: selectedCandidate.originatingStrategy.rawValue)
+            ScanMetricRow(label: "Strategy", value: selectedCandidate.originatingStrategy.displayName)
             ScanMetricRow(label: "Elapsed", value: String(format: "%.2fs", result.elapsed))
 
             ForEach(selectedCandidate.debugInfo.keys.sorted(), id: \.self) { key in

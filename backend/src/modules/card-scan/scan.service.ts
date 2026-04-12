@@ -8,6 +8,7 @@ import { performance } from 'node:perf_hooks';
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
 import { computeCardFeatureHashes, getStoredCardFeatureHashes, type CardFeatureHashes } from './feature-hashes';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
+import { scanCardImageWithEmbedding } from './embedding-scan.service';
 import {
   prepareRuntimeScanImage,
   type CardPoint,
@@ -57,6 +58,9 @@ export interface ScanTimingMetrics {
   totalMs: number;
 }
 
+export type ScanEngine = 'automatic' | 'phash' | 'embedding';
+export type ScanExecutionEngine = 'phash' | 'embedding';
+
 export interface ScanAttemptDiagnostic {
   variant: string;
   threshold: number;
@@ -94,6 +98,7 @@ export interface ScanResult {
   candidates: ScanMatch[];
   hashGenerated: RGBHash;
   meta: {
+    engine: ScanExecutionEngine;
     quality: ScanQualityMetrics | null;
     thresholdUsed: number;
     variantUsed: string;
@@ -142,8 +147,12 @@ const MAX_CANDIDATES = 5;
 export async function scanCardImage(
   imageBuffer: Buffer,
   tcgFilter?: string,
-  options?: { maxDistanceOverride?: number; ocrNameHint?: string }
+  options?: { maxDistanceOverride?: number; ocrNameHint?: string; engine?: ScanEngine }
 ): Promise<ScanResult> {
+  if (options?.engine === 'embedding') {
+    return scanCardImageWithEmbedding(imageBuffer, tcgFilter);
+  }
+
   const scanStartedAt = performance.now();
   const runtimeScan = await prepareRuntimeScanImage(imageBuffer);
   const timings: ScanTimingMetrics = {
@@ -354,6 +363,7 @@ export async function scanCardImage(
     candidates,
     hashGenerated: bestAttempt?.hash ?? (await computeRGBHash(runtimeScan.primaryVariant.image)),
     meta: {
+      engine: 'phash',
       quality: runtimeScan.quality,
       thresholdUsed: bestAttempt?.threshold ?? MAX_COMBINED_DISTANCE,
       variantUsed: bestAttempt?.variant.name ?? runtimeScan.primaryVariant.name,

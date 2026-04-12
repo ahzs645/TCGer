@@ -44,6 +44,65 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case serverHash
+    case serverEmbedding
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic:
+            return "Automatic"
+        case .serverHash:
+            return "Hash"
+        case .serverEmbedding:
+            return "Embedding"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .automatic:
+            return "Keep the current local-first scan flow and fall back through the existing strategies."
+        case .serverHash:
+            return "Send the captured photo to the server pHash matcher only."
+        case .serverEmbedding:
+            return "Send the captured photo to the server embedding matcher derived from the Trading-Card-Scanner pipeline."
+        }
+    }
+
+    var apiValue: String? {
+        switch self {
+        case .automatic:
+            return nil
+        case .serverHash:
+            return "phash"
+        case .serverEmbedding:
+            return "embedding"
+        }
+    }
+
+    var requiresServerOnlyFlow: Bool {
+        switch self {
+        case .automatic:
+            return false
+        case .serverHash, .serverEmbedding:
+            return true
+        }
+    }
+
+    func supports(_ mode: ScanMode) -> Bool {
+        switch self {
+        case .automatic, .serverHash:
+            return true
+        case .serverEmbedding:
+            return mode == .pokemon
+        }
+    }
+}
+
 struct CardIdentity: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
@@ -215,11 +274,30 @@ enum ScanStrategyKind: String, Sendable {
     case perceptualHash
     case mlDetector
     case serverHash
+    case serverEmbedding
     case artworkFingerprint
+
+    var displayName: String {
+        switch self {
+        case .textOCR:
+            return "Text OCR"
+        case .perceptualHash:
+            return "Perceptual Hash"
+        case .mlDetector:
+            return "Board Embedding"
+        case .serverHash:
+            return "Server Hash"
+        case .serverEmbedding:
+            return "Server Embedding"
+        case .artworkFingerprint:
+            return "Artwork Fingerprint"
+        }
+    }
 }
 
 struct CardScannerContext: Sendable {
     let mode: ScanMode
+    let enginePreference: ScanEnginePreference
     let serverConfiguration: ServerConfiguration
     let authToken: String?
     let showPricing: Bool

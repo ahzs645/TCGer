@@ -7,6 +7,7 @@ import {
   getHashDatabaseStats,
   loadArtworkDatabase,
   isArtworkDatabaseLoaded,
+  type ScanEngine,
 } from '../../modules/card-scan';
 import {
   CARD_SCAN_DEBUG_FEEDBACK_STATUSES,
@@ -30,6 +31,19 @@ function parseBooleanLike(value: unknown): boolean {
   }
 
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function parseScanEngine(value: unknown): ScanEngine | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'automatic' || normalized === 'phash' || normalized === 'embedding') {
+    return normalized;
+  }
+
+  return null;
 }
 
 function resolveRequestOrigin(req: AuthRequest): string | null {
@@ -218,12 +232,43 @@ scanRouter.post(
     const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
     const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
     const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
+    const scanEngine = parseScanEngine(body.scanEngine);
+
+    if (body.scanEngine !== undefined && !scanEngine) {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: 'scanEngine must be one of: automatic, phash, embedding',
+      });
+    }
+
+    if (scanEngine === 'embedding' && tcg && tcg !== 'pokemon') {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: 'Embedding scan mode currently supports only pokemon.',
+      });
+    }
 
     // Read the uploaded file into a buffer for processing
     const fs = await import('node:fs');
     const imageBuffer = fs.readFileSync(file.path);
 
-    const result = await scanCardImage(imageBuffer, tcg);
+    let result;
+    try {
+      result = await scanCardImage(imageBuffer, tcg, { engine: scanEngine ?? 'automatic' });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name === 'EmbeddingScanConfigurationError' ||
+          error.message.includes('Embedding scan mode is not configured'))
+      ) {
+        return res.status(503).json({
+          error: 'NOT_CONFIGURED',
+          message: error.message,
+        });
+      }
+
+      throw error;
+    }
     let debugCapture = null;
     let debugCaptureError: string | null = null;
 

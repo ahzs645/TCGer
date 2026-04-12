@@ -18,7 +18,16 @@ final class CardScannerViewModel: ObservableObject {
 
     @Published var state: ViewState = .idle
     @Published var selectedMode: ScanMode = .pokemon {
-        didSet { rebuildContext() }
+        didSet {
+            normalizeSelectedEngine()
+            rebuildContext()
+        }
+    }
+    @Published var selectedEngine: ScanEnginePreference = .automatic {
+        didSet {
+            normalizeSelectedEngine()
+            rebuildContext()
+        }
     }
     @Published var latestResult: CardScanResult?
     @Published var errorMessage: String?
@@ -149,6 +158,7 @@ final class CardScannerViewModel: ObservableObject {
         guard let environmentStore else { return }
         context = CardScannerContext(
             mode: selectedMode,
+            enginePreference: selectedEngine,
             serverConfiguration: environmentStore.serverConfiguration,
             authToken: environmentStore.authToken,
             showPricing: environmentStore.showPricing,
@@ -209,7 +219,7 @@ final class CardScannerViewModel: ObservableObject {
         guard !isProcessingPhoto else { return }
         guard latestResult == nil else { return }
         guard let context, context.authToken != nil else { return }
-        guard coordinator.supportsLiveScanning(for: context.mode) else { return }
+        guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
 
         let now = Date()
         guard now.timeIntervalSince(lastAnalysisDate) >= analysisInterval else { return }
@@ -249,11 +259,18 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     func isModeSupported(_ mode: ScanMode) -> Bool {
-        coordinator.canScan(mode: mode)
+        coordinator.canScan(mode: mode, preferredEngine: selectedEngine)
     }
 
     func supportsLivePreview(_ mode: ScanMode) -> Bool {
-        coordinator.supportsLiveScanning(for: mode)
+        coordinator.supportsLiveScanning(for: mode, preferredEngine: selectedEngine)
+    }
+
+    private func normalizeSelectedEngine() {
+        guard !selectedEngine.supports(selectedMode) else { return }
+        if selectedEngine != .automatic {
+            selectedEngine = .automatic
+        }
     }
 
     private func makeCGImage(from photo: AVCapturePhoto) -> CGImage? {
