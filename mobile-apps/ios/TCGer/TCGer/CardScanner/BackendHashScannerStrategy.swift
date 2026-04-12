@@ -50,6 +50,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
             token: token,
             imageData: imageData,
             tcg: context.mode.tcgGame,
+            scanEngine: context.enginePreference.apiValue,
             saveDebugCapture: context.saveDebugCapture,
             captureSource: "ios-card-scanner",
             captureNotes: context.captureNotes
@@ -78,7 +79,11 @@ final class BackendHashScannerStrategy: ScanStrategy {
         }
 
         let candidates = orderedMatches.map { payload in
-            makeCandidate(from: payload, meta: response.meta)
+            makeCandidate(
+                from: payload,
+                meta: response.meta,
+                requestedEngine: context.enginePreference
+            )
         }
 
         guard let primary = candidates.first(where: {
@@ -104,8 +109,15 @@ final class BackendHashScannerStrategy: ScanStrategy {
 
     private func makeCandidate(
         from payload: APIService.ScanMatchResponse,
-        meta: APIService.ScanMetaResponse?
+        meta: APIService.ScanMetaResponse?,
+        requestedEngine: ScanEnginePreference
     ) -> CardScanCandidate {
+        let resolvedStrategy: ScanStrategyKind = {
+            if meta?.engine == "embedding" || requestedEngine == .serverEmbedding {
+                return .serverEmbedding
+            }
+            return kind
+        }()
         let details = CardDetails(
             identity: CardIdentity(
                 id: payload.externalId,
@@ -119,17 +131,26 @@ final class BackendHashScannerStrategy: ScanStrategy {
             price: nil
         )
 
-        var reasonParts = ["Server pHash distance \(payload.distance)"]
+        var reasonParts: [String] = []
+        switch resolvedStrategy {
+        case .serverEmbedding:
+            reasonParts.append(String(format: "Server embedding score %.3f", payload.confidence))
+        default:
+            reasonParts.append("Server pHash distance \(payload.distance)")
+        }
         if let variant = meta?.variantUsed, !variant.isEmpty {
             reasonParts.append(variant)
         }
-        if let threshold = meta?.thresholdUsed {
+        if resolvedStrategy == .serverHash, let threshold = meta?.thresholdUsed {
             reasonParts.append("threshold \(threshold)")
         }
 
         var debugInfo: [String: String] = [
             "distance": String(payload.distance)
         ]
+        if let engine = meta?.engine {
+            debugInfo["engine"] = engine
+        }
         if let variant = meta?.variantUsed {
             debugInfo["variant"] = variant
         }
@@ -163,7 +184,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
         return CardScanCandidate(
             details: details,
             confidence: CardScanConfidence(score: payload.confidence, reason: reasonParts.joined(separator: " • ")),
-            originatingStrategy: kind,
+            originatingStrategy: resolvedStrategy,
             debugInfo: debugInfo
         )
     }
