@@ -32,7 +32,7 @@ PNG_TARGETS = {
     REPO_ROOT / "frontend" / "app" / "icon.png": 32,
 }
 
-APP_ICON_PADDING = 96
+APP_ICON_PADDING = 176
 
 
 def render_svg(source: Path, size: int, padding: int = APP_ICON_PADDING) -> Image.Image:
