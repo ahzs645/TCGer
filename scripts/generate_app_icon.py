@@ -1,6 +1,5 @@
 import argparse
 import json
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -36,29 +35,22 @@ APP_ICON_PADDING = 176
 
 
 def render_svg(source: Path, size: int, padding: int = APP_ICON_PADDING) -> Image.Image:
-    qlmanage = shutil.which("qlmanage")
-    if not qlmanage:
-        raise RuntimeError("qlmanage is required to rasterize SVG app icons on macOS.")
-
     art_size = size - (padding * 2)
     if art_size <= 0:
         raise ValueError("padding leaves no drawable area")
 
     with tempfile.TemporaryDirectory() as tmp:
         output_dir = Path(tmp)
+        rendered = output_dir / "icon.png"
         subprocess.run(
-            [qlmanage, "-t", "-s", str(art_size), "-o", str(output_dir), str(source)],
+            ["sips", "-s", "format", "png", str(source), "--out", str(rendered)],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
-        rendered = output_dir / f"{source.name}.png"
         if not rendered.exists():
-            matches = list(output_dir.glob("*.png"))
-            if not matches:
-                raise RuntimeError(f"qlmanage did not produce a PNG for {source}")
-            rendered = matches[0]
+            raise RuntimeError(f"sips did not produce a PNG for {source}")
 
         image = Image.open(rendered).convert("RGBA")
 
