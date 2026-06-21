@@ -41,3 +41,17 @@ tmp/
 
 # Local research artifacts
 research/
+
+# Local recognition eval data (real user captures — do not commit)
+backend/eval-data/
+mobile-apps/ios/scripts/.venv-coreml/
+mobile-apps/ios/TCGer/build/
+mobile-apps/ios/scripts/__pycache__/
+
+# Generated scanner model/index artifacts (large, reproducible via build
+# scripts; the web index is CDN-hosted — see the READMEs in these dirs).
+frontend/public/scan-index/*.json
+frontend/public/scan-index/*.bin
+mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.mlpackage
+mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.bin
+mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.json

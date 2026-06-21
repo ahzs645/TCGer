@@ -25,6 +25,20 @@ struct CardCropper {
     }
 
     func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {
+        let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
+
+        // Primary: VNDetectDocumentSegmentationRequest — ANE-accelerated,
+        // real-time, iOS 15+. Returns a VNRectangleObservation with corners, so
+        // makeNormalizedCrop works unchanged. NOTE: trained on paper documents —
+        // validate against glossy foils / full-art that it doesn't crop inside
+        // the card edge before trusting it exclusively.
+        let documentRequest = VNDetectDocumentSegmentationRequest()
+        try? handler.perform([documentRequest])
+        if let documents = documentRequest.results, !documents.isEmpty {
+            return documents
+        }
+
+        // Fallback: classic rectangle detector (robust on odd foils/full-art).
         let request = VNDetectRectanglesRequest()
         request.maximumObservations = Configuration.maximumObservations
         request.minimumConfidence = Configuration.minimumConfidence
@@ -32,7 +46,6 @@ struct CardCropper {
         request.maximumAspectRatio = Configuration.maximumAspectRatio
         request.minimumSize = Configuration.minimumSize
 
-        let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
         try handler.perform([request])
         return request.results ?? []
     }

@@ -10,9 +10,23 @@ import {
   type BrowserVideoProposalMatch,
   type CardScanHashEntry,
 } from "@/lib/scan/browser-video-matcher";
-import { computeRGBHashFromCanvas } from "@/lib/scan/rgb-hash";
-import { computeFeatureHashesByTcg } from "@/lib/scan/feature-hashes";
-import { rankMatches } from "@/lib/scan/rank-matches";
+import {
+  computeEmbeddingFromCanvas,
+  ensureEmbeddingModel,
+  matchEmbeddingTopK,
+  type EmbeddingIndex,
+} from "@/lib/scan/embedding-matcher";
+import {
+  assessCropSharpness,
+  assessFrameMotion,
+  DEFAULT_QUALITY_GATE,
+} from "@/lib/scan/quality-gate";
+import {
+  ensureOcrWorker,
+  fuseOcrWithShortlist,
+  OcrVoteTracker,
+  readFooterText,
+} from "@/lib/scan/collector-ocr";
 import {
   detectCards,
   ensureYoloModel,
@@ -68,6 +82,8 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
   const stopRequestedRef = useRef(false);
   const trackStateRef = useRef<VideoTrack[]>([]);
   const nextTrackIdRef = useRef(1);
+  /** Previous frame grayscale for the stillness gate (embedding mode). */
+  const prevFrameGrayRef = useRef<Float32Array | null>(null);
 
   const resetTracking = useCallback(() => {
     trackStateRef.current = [];
@@ -405,10 +421,143 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
     [callbacks, updateTracks],
   );
 
+  /**
+   * YOLO + client-side embedding: detect cards with YOLO, crop & de-rotate,
+   * embed each crop with the on-device CLIP model, and match against the
+   * client-side embedding index (brute-force int8 cosine top-K). Fully
+   * server-free. Embedding inference is async, so frames are skipped while a
+   * previous frame is still being identified.
+   */
+  const processYoloWithEmbedding = useCallback(
+    async (params: {
+      video: HTMLVideoElement;
+      frameCanvas: HTMLCanvasElement;
+      embeddingIndex: EmbeddingIndex;
+      scanFilter: ScanFilter;
+    }) => {
+      const { video, frameCanvas, embeddingIndex, scanFilter } = params;
+
+      stopRequestedRef.current = false;
+
+      await ensureVideoMetadata(video);
+
+      if (!isYoloModelReady()) {
+        await ensureYoloModel((msg) => callbacks.onStatus(msg));
+      }
+      await ensureEmbeddingModel({
+        model: embeddingIndex.model,
+        dtype: embeddingIndex.dtype,
+        encoder: embeddingIndex.encoder,
+        onStatus: (msg) => callbacks.onStatus(msg),
+      });
+      // Warm the OCR worker in the background; it's only invoked when the
+      // embedding shortlist is ambiguous (likely twins).
+      void ensureOcrWorker();
+      const ocrTracker = new OcrVoteTracker();
+
+      callbacks.onStatus(
+        "YOLO + embedding active — play, pause, or scrub. Cards are identified on-device.",
+      );
+      prevFrameGrayRef.current = null;
+      let processedFrames = 0;
+      let skippedFrames = 0;
+      let blurredFrames = 0;
+      let movingFrames = 0;
+      let lastProcessedTime = -1;
+      let processing = false;
+
+      const processFrame = async () => {
+        if (stopRequestedRef.current) {
+          callbacks.onProcessing(false);
+          const notes: string[] = [];
+          if (skippedFrames > 0) notes.push(`${skippedFrames} busy`);
+          if (movingFrames > 0) notes.push(`${movingFrames} moving`);
+          if (blurredFrames > 0) notes.push(`${blurredFrames} blurry`);
+          const skipNote = notes.length ? ` (${notes.join(", ")} skipped)` : "";
+          callbacks.onStatus(
+            `YOLO + embedding stopped after ${processedFrames} frames${skipNote}.`,
+          );
+          return;
+        }
+
+        const currentTime = video.currentTime;
+        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
+
+        if (timeChanged && processing) {
+          skippedFrames++;
+          requestAnimationFrame(() => void processFrame());
+          return;
+        }
+
+        if (timeChanged) {
+          processing = true;
+          lastProcessedTime = currentTime;
+
+          const { width, height } = drawVideoFrameToCanvas(
+            video,
+            frameCanvas,
+            MODEL_FRAME_SIZE,
+          );
+          callbacks.onMetadata({ duration: video.duration, width, height });
+
+          const detections = detectCards(frameCanvas);
+
+          // Stillness gate: if the camera/card is moving, skip embedding this
+          // frame and just show outlines — keep accumulating until it settles.
+          const motion = assessFrameMotion(
+            frameCanvas,
+            prevFrameGrayRef.current,
+            DEFAULT_QUALITY_GATE,
+          );
+          prevFrameGrayRef.current = motion.gray;
+          if (!motion.still) movingFrames++;
+
+          const proposalMatches: BrowserVideoProposalMatch[] = [];
+          for (const det of detections) {
+            const pm = await matchDetectionEmbedding(
+              det,
+              frameCanvas,
+              embeddingIndex,
+              scanFilter,
+              motion.still,
+              ocrTracker,
+            );
+            if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
+            proposalMatches.push(pm);
+          }
+
+          const bestPm = proposalMatches[0];
+          const nextFrameState: VideoScanFrameState = {
+            timestampSeconds: currentTime,
+            activeProposal: bestPm?.proposal ?? null,
+            bestMatch: bestPm?.bestMatch ?? null,
+            candidates: proposalMatches
+              .map((pm) => pm.bestMatch!)
+              .filter(Boolean),
+            proposalMatches,
+          };
+
+          callbacks.onFrameState(nextFrameState);
+          updateTracks(nextFrameState.proposalMatches, currentTime);
+
+          processedFrames++;
+          callbacks.onProgress({ processed: processedFrames, total: 0 });
+          processing = false;
+        }
+
+        requestAnimationFrame(() => void processFrame());
+      };
+
+      requestAnimationFrame(() => void processFrame());
+    },
+    [callbacks, updateTracks],
+  );
+
   return {
     processBatch,
     processLiveDetection,
     processYoloWithMatching,
+    processYoloWithEmbedding,
     requestStop,
     resetTracking,
   };
@@ -502,26 +651,11 @@ function matchDetection(
     }
   }
 
-  // Fallback: pHash matching if artwork didn't produce a confident result
-  if (!bestMatch && hashEntries.length > 0) {
-    const fullHash = computeRGBHashFromCanvas(cropCanvas);
-    const featureHashes = computeFeatureHashesByTcg(
-      cropCanvas,
-      hashEntries,
-      scanFilter,
-    );
-    const pHashCandidates = rankMatches(
-      hashEntries,
-      fullHash,
-      featureHashes,
-      "yolo+phash",
-    );
-
-    if (pHashCandidates.length > 0) {
-      bestMatch = pHashCandidates[0]!;
-      candidates = pHashCandidates;
-    }
-  }
+  // DCT pHash fallback intentionally dropped from the matching path: it gives
+  // effectively random distances on handheld/compressed crops (verified — see
+  // docs/client-side-scanner-options.md), producing confidently-wrong guesses.
+  // Artwork color-grid + HSV above is the matcher/offline fallback; if it isn't
+  // confident we show the detection unidentified rather than guess.
 
   // If matching didn't identify the card, still show the YOLO detection.
   // The outline should always appear — only the card name is uncertain.
@@ -543,6 +677,116 @@ function matchDetection(
       titleDistance: null,
       footerDistance: null,
       proposalLabel: "yolo",
+    };
+  }
+
+  return {
+    proposal: {
+      label: bestMatch.proposalLabel,
+      left: det.cx - det.width / 2,
+      top: det.cy - det.height / 2,
+      width: det.width,
+      height: det.height,
+    },
+    overlayQuad: det.quad,
+    refinementMethod: "yolo-obb",
+    isClipped: false,
+    bestMatch,
+    candidates,
+  };
+}
+
+/**
+ * Given a YOLO detection, extract the de-rotated card crop, embed it with the
+ * on-device CLIP model, and brute-force int8 cosine top-K against the
+ * client-side embedding index. The embedding produces a shortlist only;
+ * near-identical cards are disambiguated downstream by collector-number OCR.
+ */
+/** Run the collector-number OCR tiebreaker only when the embedding top-2 are
+ *  this close (ambiguous — likely twins / same-art reprints). */
+const OCR_MARGIN_THRESHOLD = 0.1;
+
+async function matchDetectionEmbedding(
+  det: OBBDetection,
+  frameCanvas: HTMLCanvasElement,
+  embeddingIndex: EmbeddingIndex,
+  scanFilter: ScanFilter,
+  frameStill: boolean,
+  ocrTracker: OcrVoteTracker | null,
+): Promise<BrowserVideoProposalMatch> {
+  const cropCanvas = extractCardCrop(frameCanvas, det);
+
+  let bestMatch: BrowserVideoScanCandidate | null = null;
+  let candidates: BrowserVideoScanCandidate[] = [];
+
+  // Quality gate: only embed sharp crops from still frames. Blurry/moving
+  // frames embed poorly (the backbone's worst case), so skip them and let the
+  // next frame try — multi-frame accumulation does the rest.
+  let skipLabel: string | null = null;
+  if (!frameStill) {
+    skipLabel = "yolo-motion";
+  } else if (!assessCropSharpness(cropCanvas, DEFAULT_QUALITY_GATE).sharp) {
+    skipLabel = "yolo-blur";
+  }
+
+  if (!skipLabel) {
+    const embedding = await computeEmbeddingFromCanvas(cropCanvas);
+    if (embedding) {
+      candidates = matchEmbeddingTopK(embedding, embeddingIndex, {
+        topK: 5,
+        tcgFilter: scanFilter,
+        proposalLabel: "yolo+embedding",
+      });
+
+      // Tiebreaker: when the top-2 are close (twins), read the footer collector
+      // number and intersect it with the shortlist's known numbers, voting
+      // across frames. The embedding alone can't split same-art reprints.
+      const margin =
+        candidates.length >= 2
+          ? candidates[0]!.confidence - candidates[1]!.confidence
+          : 1;
+      if (ocrTracker && candidates.length >= 2 && margin < OCR_MARGIN_THRESHOLD) {
+        const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
+        try {
+          const reading = await readFooterText(cropCanvas, tcg);
+          ocrTracker.add(reading);
+          const fusion = fuseOcrWithShortlist(
+            candidates,
+            ocrTracker.consensus(),
+            tcg,
+          );
+          if (fusion.matched) candidates = fusion.candidates;
+        } catch {
+          // OCR is best-effort; fall back to the embedding ranking.
+        }
+      }
+
+      if (candidates.length > 0) {
+        bestMatch = candidates[0]!;
+      }
+    }
+  }
+
+  // If gated or unidentified, still show the YOLO detection outline (the card
+  // location is certain; only the identity is deferred to a better frame).
+  if (!bestMatch) {
+    const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
+    bestMatch = {
+      externalId: `yolo-${spatialKey}`,
+      tcg: scanFilter === "all" ? "pokemon" : scanFilter,
+      name: `Detected card`,
+      setCode: null,
+      setName: null,
+      rarity: null,
+      imageUrl: null,
+      confidence: det.confidence,
+      distance: 0,
+      scoreDistance: 0,
+      passedThreshold: det.confidence >= 0.5,
+      fullDistance: 0,
+      titleDistance: null,
+      footerDistance: null,
+      proposalLabel: skipLabel ?? "yolo",
     };
   }
 

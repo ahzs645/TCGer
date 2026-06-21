@@ -7,6 +7,7 @@ import { ConvexClientProvider } from "@/components/providers/convex-client-provi
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { SetupGuard } from "@/components/auth/setup-guard";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { getToken } from "@/lib/auth-server";
 import { cn } from "@/lib/utils";
 
@@ -16,16 +17,23 @@ const lexend = Lexend({ subsets: ["latin"], variable: "--font-heading" });
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1
+  maximumScale: 1,
+  themeColor: "#0b0b0f"
 };
 
 export const metadata: Metadata = {
   title: "TCGer",
   description: "Unified hub for Yu-Gi-Oh!, Magic, and Pokémon collections.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TCGer"
+  },
   icons: {
     icon: "/logo.svg",
     shortcut: "/logo.svg",
-    apple: "/logo.svg"
+    apple: "/pwa-192.png"
   }
 };
 
@@ -66,6 +74,7 @@ export default async function RootLayout({
             </QueryProvider>
           </ThemeProvider>
         </ConvexClientProvider>
+        <ServiceWorkerRegister />
 
       </body>
     </html>);
