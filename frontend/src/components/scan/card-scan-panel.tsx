@@ -43,6 +43,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { useCollectionsStore } from "@/stores/collections";
 import { useGameFilterStore } from "@/stores/game-filter";
 import type { Card as CardType, TcgCode } from "@/types/card";
 
@@ -1645,6 +1646,11 @@ export function CardScanPanel() {
                   </div>
                 </div>
               </div>
+
+              <AddScanMatchToCollection
+                match={bestMatch}
+                card={bestMatchCard}
+              />
             </section>
           )}
 
@@ -1779,6 +1785,149 @@ function ScanFact({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-medium" data-oid="b_hp1tg">
         {value}
       </p>
+    </div>
+  );
+}
+
+/**
+ * Save a confirmed scan match into one of the user's binders. Mirrors the
+ * add-to-binder flow in card-preview so a scanned card can actually be logged.
+ */
+function AddScanMatchToCollection({
+  match,
+  card,
+}: {
+  match: CardScanMatch;
+  card: CardType | null;
+}) {
+  const { token, isAuthenticated } = useAuthStore((state) => ({
+    token: state.token,
+    isAuthenticated: state.isAuthenticated,
+  }));
+  const { collections, addCardToBinder, fetchCollections, hasFetched, isLoading } =
+    useCollectionsStore((state) => ({
+      collections: state.collections,
+      addCardToBinder: state.addCardToBinder,
+      fetchCollections: state.fetchCollections,
+      hasFetched: state.hasFetched,
+      isLoading: state.isLoading,
+    }));
+
+  const [binderId, setBinderId] = useState("");
+  const [status, setStatus] = useState<"idle" | "pending" | "success" | "error">(
+    "idle",
+  );
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated && token && !hasFetched && !isLoading) {
+      void fetchCollections(token);
+    }
+  }, [isAuthenticated, token, hasFetched, isLoading, fetchCollections]);
+
+  useEffect(() => {
+    if (!collections.length) {
+      setBinderId("");
+      return;
+    }
+    if (!binderId || !collections.some((b) => b.id === binderId)) {
+      setBinderId(collections[0].id);
+    }
+  }, [collections, binderId]);
+
+  // Reset transient status when the scanned card changes.
+  useEffect(() => {
+    setStatus("idle");
+    setMessage(null);
+  }, [match.externalId]);
+
+  if (!isAuthenticated) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Sign in to add this card to your collection.
+      </p>
+    );
+  }
+
+  const showEmptyBinders = hasFetched && collections.length === 0;
+
+  const handleAdd = async () => {
+    if (!token || !binderId) return;
+    setStatus("pending");
+    setMessage(null);
+    try {
+      await addCardToBinder(token, binderId, {
+        cardId: card?.id ?? match.externalId,
+        quantity: 1,
+        cardData: {
+          name: card?.name ?? match.name,
+          tcg: match.tcg,
+          externalId: match.externalId,
+          setCode: card?.setCode ?? match.setCode ?? undefined,
+          setName: card?.setName ?? match.setName ?? undefined,
+          rarity: card?.rarity ?? match.rarity ?? undefined,
+          imageUrl: card?.imageUrl ?? match.imageUrl ?? undefined,
+          imageUrlSmall: card?.imageUrlSmall ?? undefined,
+        },
+      });
+      setStatus("success");
+      setMessage("Added to your collection.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to add card to your collection.",
+      );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border bg-background p-4 sm:flex-row sm:items-end">
+      <div className="flex-1 space-y-1.5">
+        <Label htmlFor="scan-add-binder">Add to binder</Label>
+        {showEmptyBinders ? (
+          <p className="text-sm text-muted-foreground">
+            You don&apos;t have any binders yet. Create one on the Collections
+            page first.
+          </p>
+        ) : (
+          <Select
+            value={binderId}
+            onValueChange={setBinderId}
+            disabled={!collections.length || status === "pending"}
+          >
+            <SelectTrigger id="scan-add-binder" className="sm:max-w-xs">
+              <SelectValue placeholder="Select a binder" />
+            </SelectTrigger>
+            <SelectContent>
+              {collections.map((binder) => (
+                <SelectItem key={binder.id} value={binder.id}>
+                  {binder.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {message ? (
+          <p
+            className={cn(
+              "text-sm",
+              status === "error" ? "text-destructive" : "text-green-600",
+            )}
+          >
+            {message}
+          </p>
+        ) : null}
+      </div>
+      <Button
+        onClick={handleAdd}
+        disabled={
+          showEmptyBinders || !binderId || status === "pending" || isLoading
+        }
+      >
+        {status === "pending" ? "Adding…" : "Add to collection"}
+      </Button>
     </div>
   );
 }

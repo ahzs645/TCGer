@@ -24,8 +24,9 @@ export default function ScanPage() {
             className="max-w-3xl text-sm text-muted-foreground"
             data-oid="ce33h2j"
           >
-            Switch between still-image scan and local video scan. Video mode is
-            the default for now while we tune multi-frame recognition.
+            Switch between still-image scan and local video scan. Video mode
+            defaults to a fully on-device model (DINOv2) — no sign-in or server
+            needed (Pokémon today).
           </p>
         </div>
         <Tabs defaultValue="video" className="space-y-4">
@@ -41,10 +42,10 @@ export default function ScanPage() {
                 <Badge variant="secondary">Experimental</Badge>
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
-                Browser-side prototype for local video files. It downloads the
-                card hash corpus into the client, samples frames, draws live
-                track overlays, and shows the current best match without sending
-                each frame back to the server.
+                Browser-side scanner for local video files. By default it runs
+                the on-device DINOv2 embedding model — fully client-side, no
+                sign-in — drawing live track overlays and the current best match
+                without sending any frame to the server.
               </p>
             </div>
             <VideoScanLab />

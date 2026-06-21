@@ -33,7 +33,9 @@ final class CardScannerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
-    @Published var saveDebugCapture = true {
+    // Off by default: debug captures upload the scan image + crops for training.
+    // Opt-in via the testing tools rather than silently shipping every scan.
+    @Published var saveDebugCapture = false {
         didSet { rebuildContext() }
     }
     @Published var captureNotes = "" {

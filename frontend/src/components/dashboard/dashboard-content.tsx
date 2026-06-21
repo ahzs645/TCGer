@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAppRoute } from "@/lib/app-routes";
 import { GAME_LABELS } from "@/lib/utils";
@@ -103,12 +104,13 @@ export function DashboardContent() {
     enabledGames: state.enabledGames,
     showPricing: state.showPricing,
   }));
-  const { collections, fetchCollections, isLoading, hasFetched } =
+  const { collections, fetchCollections, isLoading, hasFetched, error } =
     useCollectionsStore((state) => ({
       collections: state.collections,
       fetchCollections: state.fetchCollections,
       isLoading: state.isLoading,
       hasFetched: state.hasFetched,
+      error: state.error,
     }));
   const { token, isAuthenticated } = useAuthStore();
 
@@ -158,7 +160,8 @@ export function DashboardContent() {
     [filteredCards, showPricing],
   );
   const loading = mounted && isAuthenticated && !hasFetched;
-  const hasNoCards = !loading && stats.totalCopies === 0;
+  const loadFailed = mounted && isAuthenticated && hasFetched && !!error;
+  const hasNoCards = !loading && !loadFailed && stats.totalCopies === 0;
 
   if (loading) {
     return (
@@ -206,7 +209,26 @@ export function DashboardContent() {
         </div>
       )}
 
-      {hasNoCards && !noGamesEnabled ? (
+      {loadFailed && (
+        <Card data-oid="dash-load-error">
+          <CardHeader>
+            <CardTitle>Couldn&apos;t load your collection</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => token && void fetchCollections(token)}
+            >
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loadFailed &&
+        (hasNoCards && !noGamesEnabled ? (
         <Card data-oid="kfwfwwg">
           <CardHeader data-oid="-qmjorv">
             <CardTitle data-oid=":-yd9fk">Welcome to your dashboard</CardTitle>
@@ -257,9 +279,9 @@ export function DashboardContent() {
             data-oid="1bq2zrz"
           />
         </div>
-      )}
+        ))}
 
-      {!hasNoCards && (
+      {!loadFailed && !hasNoCards && (
         <GameBreakdown
           byGame={stats.byGame}
           totalCopies={stats.totalCopies}
@@ -267,7 +289,7 @@ export function DashboardContent() {
         />
       )}
 
-      {!hasNoCards && (
+      {!loadFailed && !hasNoCards && (
         <RecentActivity items={stats.recentActivity} data-oid="2rew8b1" />
       )}
     </div>

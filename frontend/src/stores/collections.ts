@@ -9,6 +9,7 @@ export interface CollectionsState {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
+  clearError: () => void;
   fetchCollections: (token: string) => Promise<void>;
   addCollection: (
     token: string,
@@ -43,6 +44,8 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   isLoading: false,
   error: null,
   hasFetched: false,
+
+  clearError: () => set({ error: null }),
 
   fetchCollections: async (token: string) => {
     set({ isLoading: true, error: null });

@@ -91,12 +91,43 @@ struct CardScannerView: View {
     private var topStatusOverlay: some View {
         switch viewModel.state {
         case .unauthorized:
-            Text("Camera access is required. Enable it in Settings to scan cards.")
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(12)
-                .background(Color.black.opacity(0.6))
-                .cornerRadius(12)
+            VStack(spacing: 12) {
+                Text("Camera access is required to scan cards.")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 10) {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("Open Settings")
+                            .font(.callout.weight(.semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.white)
+                            .foregroundColor(.black)
+                            .cornerRadius(10)
+                    }
+                    Button {
+                        viewModel.prepareCameraIfPossible()
+                    } label: {
+                        Text("Try Again")
+                            .font(.callout.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.black.opacity(0.6))
+            .cornerRadius(12)
         case .processing:
             HStack(spacing: 8) {
                 ProgressView()

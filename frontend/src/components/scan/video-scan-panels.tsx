@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   AlertCircle,
   Cpu,
@@ -12,7 +11,6 @@ import {
 import type { BrowserVideoScanCandidate } from "@/lib/scan/browser-video-matcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -21,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { cn, GAME_LABELS } from "@/lib/utils";
 
 import {
@@ -33,20 +30,13 @@ import {
   type VideoScanFrameState,
   type VideoTimelineItem,
   type VideoTrack,
-  type VideoViewportRect,
 } from "./video-scan-types";
-import { computeContainedVideoRect } from "./video-scan-overlay";
 
 // ---------- Controls Sidebar ----------
 
 export interface ScanControlsProps {
   scanFilter: ScanFilter;
   onScanFilterChange: (filter: ScanFilter) => void;
-  sampleFpsValue: number[];
-  onSampleFpsChange: (value: number[]) => void;
-  sampleFps: number;
-  maxFrames: string;
-  onMaxFramesChange: (value: string) => void;
   detectionOnly: boolean;
   onDetectionOnlyChange: (value: boolean) => void;
   embeddingMode: boolean;
@@ -100,41 +90,25 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
         </p>
       </div>
 
-      {!props.detectionOnly && (
-        <>
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <div className="space-y-1">
-              <Label>Sample Rate</Label>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{props.sampleFps.toFixed(1)} fps</span>
-                <span>Higher is heavier</span>
-              </div>
-            </div>
-            <Slider
-              value={props.sampleFpsValue}
-              min={2}
-              max={80}
-              step={1}
-              onValueChange={props.onSampleFpsChange}
-            />
-            <p className="text-xs text-muted-foreground">
-              Higher sample rates automatically downscale frames to keep
-              browser runs usable.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="video-max-frames">Max Frames</Label>
-            <Input
-              id="video-max-frames"
-              inputMode="numeric"
-              value={props.maxFrames}
-              onChange={(e) => props.onMaxFramesChange(e.target.value)}
-              placeholder="60"
-            />
-          </div>
-        </>
-      )}
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={props.embeddingMode}
+            onChange={(e) => props.onEmbeddingModeChange(e.target.checked)}
+            disabled={props.detectionOnly}
+            className="rounded border-gray-300"
+          />
+          On-device model (DINOv2)
+          <Badge variant="secondary" className="ml-1">
+            Recommended
+          </Badge>
+        </label>
+        <p className="pl-6 text-xs text-muted-foreground">
+          Runs fully in your browser — no sign-in or server needed. Best
+          accuracy. Pokémon index available today.
+        </p>
+      </div>
 
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -143,18 +117,7 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
           onChange={(e) => props.onDetectionOnlyChange(e.target.checked)}
           className="rounded border-gray-300"
         />
-        Detection only (skip matching)
-      </label>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={props.embeddingMode}
-          onChange={(e) => props.onEmbeddingModeChange(e.target.checked)}
-          disabled={props.detectionOnly}
-          className="rounded border-gray-300"
-        />
-        Client-side embedding (on-device, no server)
+        Detection only (outlines, skip matching)
       </label>
 
       <div className="flex flex-wrap gap-2">
