@@ -13,6 +13,18 @@ const distDir = process.env.NEXT_DIST_DIR || '.next';
 const nextConfig = {
   distDir,
   outputFileTracingRoot: path.join(__dirname, '..'),
+  // @huggingface/transformers (client-side embedding scanner) conditionally
+  // requires Node-only packages. Exclude them from the browser bundle so the
+  // ONNX Runtime Web (WASM/WebGPU) path is used instead.
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      sharp$: false,
+      'onnxruntime-node$': false,
+    };
+    return config;
+  },
   ...(isDemoExport
     ? {
         output: 'export',

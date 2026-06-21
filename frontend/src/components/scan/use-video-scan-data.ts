@@ -9,15 +9,20 @@ import {
   parseArtworkDatabase,
   type ArtworkFingerprintEntry,
 } from "@/lib/scan/browser-video-matcher";
+import {
+  parseEmbeddingIndex,
+  type EmbeddingIndex,
+} from "@/lib/scan/embedding-matcher";
 
 import { HASH_PAGE_SIZE, type ScanFilter } from "./video-scan-types";
 
 // ---------- IndexedDB helpers ----------
 
 const IDB_NAME = "tcger-scan-cache";
-const IDB_VERSION = 1;
+const IDB_VERSION = 2;
 const HASH_STORE = "hashEntries";
 const ARTWORK_STORE = "artworkDb";
+const EMBEDDING_STORE = "embeddingIndex";
 
 function openCache(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -29,6 +34,9 @@ function openCache(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(ARTWORK_STORE)) {
         db.createObjectStore(ARTWORK_STORE);
+      }
+      if (!db.objectStoreNames.contains(EMBEDDING_STORE)) {
+        db.createObjectStore(EMBEDDING_STORE);
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -72,6 +80,100 @@ export function useVideoScanData(
 ) {
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
   const artworkDbRef = useRef<ArtworkFingerprintEntry[] | null>(null);
+  const embeddingIndexRef = useRef<EmbeddingIndex | null>(null);
+
+  /**
+   * Load the client-side embedding index for the given filter from a static,
+   * versioned artifact. Version-aware: fetches the tiny scan-index manifest
+   * (network-first), serves the IndexedDB-cached index when its version matches,
+   * re-downloads only when the version changed, and falls back to the cache when
+   * offline. No server is required in the recognition path.
+   */
+  const ensureEmbeddingIndex = useCallback(
+    async (requestedFilter: ScanFilter): Promise<EmbeddingIndex | null> => {
+      const tcg = requestedFilter === "all" ? "pokemon" : requestedFilter;
+
+      if (embeddingIndexRef.current && embeddingIndexRef.current.tcg === tcg) {
+        return embeddingIndexRef.current;
+      }
+
+      let db: IDBDatabase | null = null;
+      try {
+        db = await openCache();
+      } catch {
+        // IndexedDB unavailable — fall through to network
+      }
+
+      // 1. Fetch the version manifest (tiny, network-first). Null when offline.
+      let entry: { file: string; version: number; total: number } | null = null;
+      try {
+        const res = await fetch("/scan-index/manifest.json", {
+          cache: "no-cache",
+        });
+        if (res.ok) {
+          const manifest = await res.json();
+          entry = manifest?.indexes?.[tcg] ?? null;
+        }
+      } catch {
+        // offline — rely on cache below
+      }
+
+      // 2. Serve the cached index when fresh (or when offline and present).
+      if (db) {
+        const cached = await idbGet<{ version: number; index: EmbeddingIndex }>(
+          db,
+          EMBEDDING_STORE,
+          tcg,
+        );
+        if (cached?.index?.total) {
+          const fresh = !entry || cached.version === entry.version;
+          if (fresh) {
+            embeddingIndexRef.current = cached.index;
+            callbacks.onHashStatus(
+              `Loaded ${cached.index.total.toLocaleString()} embeddings (cache, v${cached.version}).`,
+            );
+            return cached.index;
+          }
+        }
+      }
+
+      if (!entry) {
+        callbacks.onHashStatus(
+          `No cached embedding index for ${tcg} (offline?).`,
+        );
+        return null;
+      }
+
+      // 3. Download the (new) versioned index artifact.
+      callbacks.onHashStatus("Downloading embedding index…");
+      try {
+        const res = await fetch(`/scan-index/${entry.file}`, {
+          cache: "force-cache",
+        });
+        if (!res.ok) {
+          callbacks.onHashStatus(`No embedding index published for ${tcg} yet.`);
+          return null;
+        }
+        const artifact = await res.json();
+        const index = parseEmbeddingIndex(artifact, tcg);
+        embeddingIndexRef.current = index;
+        if (db) {
+          idbPut(db, EMBEDDING_STORE, tcg, {
+            version: entry.version,
+            index,
+          }).catch(() => {});
+        }
+        callbacks.onHashStatus(
+          `Ready: ${index.total.toLocaleString()} embeddings (v${entry.version}, saved locally).`,
+        );
+        return index;
+      } catch {
+        callbacks.onHashStatus("Embedding index unavailable.");
+        return null;
+      }
+    },
+    [callbacks],
+  );
 
   const ensureHashIndex = useCallback(
     async (requestedFilter: ScanFilter): Promise<CardScanHashEntry[]> => {
@@ -217,15 +319,22 @@ export function useVideoScanData(
 
   return {
     ensureHashIndex,
+    ensureEmbeddingIndex,
     artworkDbRef,
+    embeddingIndexRef,
     clearCache: useCallback(async () => {
       hashCacheRef.current.clear();
       artworkDbRef.current = null;
+      embeddingIndexRef.current = null;
       try {
         const db = await openCache();
-        const tx = db.transaction([HASH_STORE, ARTWORK_STORE], "readwrite");
+        const tx = db.transaction(
+          [HASH_STORE, ARTWORK_STORE, EMBEDDING_STORE],
+          "readwrite",
+        );
         tx.objectStore(HASH_STORE).clear();
         tx.objectStore(ARTWORK_STORE).clear();
+        tx.objectStore(EMBEDDING_STORE).clear();
       } catch {
         // IndexedDB unavailable
       }

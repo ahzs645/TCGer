@@ -59,6 +59,7 @@ export function VideoScanLab() {
   ]);
   const [maxFrames, setMaxFrames] = useState("60");
   const [detectionOnly, setDetectionOnly] = useState(false);
+  const [embeddingMode, setEmbeddingMode] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<{
@@ -95,10 +96,8 @@ export function VideoScanLab() {
     }),
     [],
   );
-  const { ensureHashIndex, artworkDbRef } = useVideoScanData(
-    token,
-    dataCallbacks,
-  );
+  const { ensureHashIndex, ensureEmbeddingIndex, artworkDbRef } =
+    useVideoScanData(token, dataCallbacks);
 
   const processorCallbacks = useMemo(
     () => ({
@@ -117,6 +116,7 @@ export function VideoScanLab() {
     processBatch,
     processLiveDetection,
     processYoloWithMatching,
+    processYoloWithEmbedding,
     requestStop,
     resetTracking,
   } = useVideoScanProcessor(processorCallbacks);
@@ -228,6 +228,35 @@ export function VideoScanLab() {
       return;
     }
 
+    // Client-side embedding mode is fully server-free (static index + on-device
+    // CLIP), so it does not require sign-in.
+    if (embeddingMode) {
+      resetRunState();
+      setIsProcessing(true);
+      setHashStatus(null);
+      try {
+        const index = await ensureEmbeddingIndex(scanFilter);
+        if (!index) {
+          const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
+          setError(`No embedding index published for ${tcg} yet.`);
+          setIsProcessing(false);
+          return;
+        }
+        await processYoloWithEmbedding({
+          video: videoRef.current,
+          frameCanvas: frameCanvasRef.current,
+          embeddingIndex: index,
+          scanFilter,
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Embedding scan failed.",
+        );
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     if (!isAuthenticated || !token) {
       setError("Sign in is required.");
       return;
@@ -287,6 +316,8 @@ export function VideoScanLab() {
             onMaxFramesChange={setMaxFrames}
             detectionOnly={detectionOnly}
             onDetectionOnlyChange={setDetectionOnly}
+            embeddingMode={embeddingMode}
+            onEmbeddingModeChange={setEmbeddingMode}
             isProcessing={isProcessing}
             isLoadingIndex={isLoadingIndex}
             hasVideo={!!selectedVideo}

@@ -7,6 +7,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         static let minimumScore: Double = 0.15
         static let confidentScore: Double = 0.85
         static let distanceFloor: Double = 1e-4
+        /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
+        static let ocrMargin: Double = 0.1
     }
 
     let kind: ScanStrategyKind = .mlDetector
@@ -16,17 +18,20 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let encoder: CardEmbeddingEncoder
     private let indexStore: ANNIndexProviding
     private let metadataStore: CardIndexMetadataStore
+    private let ocr: CollectorNumberOCR
 
     init(
         cropper: CardCropper = CardCropper(),
         encoder: CardEmbeddingEncoder = CardEmbeddingEncoder(),
         indexStore: ANNIndexProviding = AnnoyIndexStore(),
-        metadataStore: CardIndexMetadataStore = .shared
+        metadataStore: CardIndexMetadataStore = .shared,
+        ocr: CollectorNumberOCR = CollectorNumberOCR()
     ) {
         self.cropper = cropper
         self.encoder = encoder
         self.indexStore = indexStore
         self.metadataStore = metadataStore
+        self.ocr = ocr
     }
 
     func supports(_ mode: ScanMode) -> Bool {
@@ -79,8 +84,26 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             candidates.append(candidate)
         }
 
-        guard let primary = candidates.max(by: { $0.confidence.score < $1.confidence.score }) else {
+        let ranked = candidates.sorted { $0.confidence.score > $1.confidence.score }
+        guard var primary = ranked.first else {
             return nil
+        }
+
+        // Collector-number OCR tiebreaker: when the top-2 are close (likely
+        // near twins / same-art reprints), read the footer collector number and
+        // promote the shortlist candidate it confirms. The embedding alone can't
+        // split twins; only a clean "NNN/NNN" pair overrides it.
+        if ranked.count >= 2,
+           (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin {
+            let pairNumbers = Set(ocr.readPairNumbers(from: cropped))
+            if !pairNumbers.isEmpty,
+               let matched = ranked.first(where: { candidate in
+                   guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                   else { return false }
+                   return pairNumbers.contains(cn)
+               }) {
+                primary = matched
+            }
         }
 
         let alternatives = candidates.filter { $0.id != primary.id }

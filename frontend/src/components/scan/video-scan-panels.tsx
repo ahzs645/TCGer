@@ -49,6 +49,8 @@ export interface ScanControlsProps {
   onMaxFramesChange: (value: string) => void;
   detectionOnly: boolean;
   onDetectionOnlyChange: (value: boolean) => void;
+  embeddingMode: boolean;
+  onEmbeddingModeChange: (value: boolean) => void;
   isProcessing: boolean;
   isLoadingIndex: boolean;
   hasVideo: boolean;
@@ -142,6 +144,17 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
           className="rounded border-gray-300"
         />
         Detection only (skip matching)
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={props.embeddingMode}
+          onChange={(e) => props.onEmbeddingModeChange(e.target.checked)}
+          disabled={props.detectionOnly}
+          className="rounded border-gray-300"
+        />
+        Client-side embedding (on-device, no server)
       </label>
 
       <div className="flex flex-wrap gap-2">
