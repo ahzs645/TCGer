@@ -241,6 +241,14 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
           return;
         }
 
+        if (video.ended) {
+          callbacks.onProcessing(false);
+          callbacks.onStatus(
+            `YOLO detection finished — ${processedFrames} frames processed.`,
+          );
+          return;
+        }
+
         const currentTime = video.currentTime;
         if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
           lastProcessedTime = currentTime;
@@ -354,6 +362,16 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
             skippedFrames > 0 ? ` (${skippedFrames} skipped)` : "";
           callbacks.onStatus(
             `YOLO + matching stopped after ${processedFrames} frames${skipNote}.`,
+          );
+          return;
+        }
+
+        if (video.ended && !processing) {
+          callbacks.onProcessing(false);
+          const skipNote =
+            skippedFrames > 0 ? ` (${skippedFrames} skipped)` : "";
+          callbacks.onStatus(
+            `YOLO + matching finished — ${processedFrames} frames${skipNote}.`,
           );
           return;
         }
@@ -476,6 +494,19 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
           const skipNote = notes.length ? ` (${notes.join(", ")} skipped)` : "";
           callbacks.onStatus(
             `YOLO + embedding stopped after ${processedFrames} frames${skipNote}.`,
+          );
+          return;
+        }
+
+        if (video.ended && !processing) {
+          callbacks.onProcessing(false);
+          const notes: string[] = [];
+          if (skippedFrames > 0) notes.push(`${skippedFrames} busy`);
+          if (movingFrames > 0) notes.push(`${movingFrames} moving`);
+          if (blurredFrames > 0) notes.push(`${blurredFrames} blurry`);
+          const skipNote = notes.length ? ` (${notes.join(", ")} skipped)` : "";
+          callbacks.onStatus(
+            `YOLO + embedding finished — ${processedFrames} frames${skipNote}.`,
           );
           return;
         }

@@ -15,7 +15,6 @@ import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
 
 import {
-  DEFAULT_SAMPLE_FPS,
   MIN_IMMEDIATE_TRACK_CONFIDENCE,
   MIN_TRACK_STABLE_FRAMES,
   type ScanFilter,
@@ -54,12 +53,11 @@ export function VideoScanLab() {
   const [scanFilter, setScanFilter] = useState<ScanFilter>(
     selectedGame === "all" ? "pokemon" : selectedGame,
   );
-  const [sampleFpsValue, setSampleFpsValue] = useState<number[]>([
-    DEFAULT_SAMPLE_FPS * 10,
-  ]);
-  const [maxFrames, setMaxFrames] = useState("60");
   const [detectionOnly, setDetectionOnly] = useState(false);
-  const [embeddingMode, setEmbeddingMode] = useState(false);
+  // Default to the on-device DINOv2 embedding model: fully client-side, no
+  // sign-in, and the highest-accuracy path. Users can switch to the
+  // hash/artwork matcher or detection-only below.
+  const [embeddingMode, setEmbeddingMode] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<{
@@ -113,7 +111,6 @@ export function VideoScanLab() {
     [],
   );
   const {
-    processBatch,
     processLiveDetection,
     processYoloWithMatching,
     processYoloWithEmbedding,
@@ -123,7 +120,6 @@ export function VideoScanLab() {
 
   // ---------- derived ----------
 
-  const sampleFps = sampleFpsValue[0] / 10;
   const progressPercent =
     progress.total > 0
       ? Math.min(100, (progress.processed / progress.total) * 100)
@@ -309,11 +305,6 @@ export function VideoScanLab() {
           <ScanControlsSidebar
             scanFilter={scanFilter}
             onScanFilterChange={setScanFilter}
-            sampleFpsValue={sampleFpsValue}
-            onSampleFpsChange={setSampleFpsValue}
-            sampleFps={sampleFps}
-            maxFrames={maxFrames}
-            onMaxFramesChange={setMaxFrames}
             detectionOnly={detectionOnly}
             onDetectionOnlyChange={setDetectionOnly}
             embeddingMode={embeddingMode}

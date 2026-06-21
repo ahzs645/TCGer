@@ -11,6 +11,7 @@ export interface WishlistsState {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
+  clearError: () => void;
   fetchWishlists: (token: string) => Promise<void>;
   addWishlist: (
     token: string,
@@ -44,6 +45,8 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   isLoading: false,
   error: null,
   hasFetched: false,
+
+  clearError: () => set({ error: null }),
 
   fetchWishlists: async (token: string) => {
     set({ isLoading: true, error: null });

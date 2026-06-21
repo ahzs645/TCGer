@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   TrendingUp,
@@ -10,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,343 +20,531 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getCollectionValueHistory,
+  getCollectionValueBreakdown,
+  getCollectionDistribution,
+} from "@/lib/api/analytics";
+import { getPriceMovers } from "@/lib/api/pricing";
+import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
+import { useModuleStore } from "@/stores/preferences";
+import { useGameFilterStore } from "@/stores/game-filter";
 
 /* ------------------------------------------------------------------ */
-/*  Fake analytics data                                                */
+/*  Constants                                                           */
 /* ------------------------------------------------------------------ */
 
-const MONTHLY_VALUES = [
-  { month: "Oct", value: 1420 },
-  { month: "Nov", value: 1580 },
-  { month: "Dec", value: 1750 },
-  { month: "Jan", value: 1690 },
-  { month: "Feb", value: 1830 },
-  { month: "Mar", value: 2045 },
-];
+const PERIODS = [
+  { label: "7D", value: "7d", days: 7 },
+  { label: "30D", value: "30d", days: 30 },
+  { label: "90D", value: "90d", days: 90 },
+  { label: "1Y", value: "1y", days: 365 },
+] as const;
 
-const TOP_GAINERS = [
-  { name: "Charizard ex", tcg: "Pokemon", change: +18.5, price: 85.0 },
-  {
-    name: "Ragavan, Nimble Pilferer",
-    tcg: "Magic",
-    change: +12.3,
-    price: 68.4,
-  },
-  { name: "Pot of Prosperity", tcg: "Yu-Gi-Oh!", change: +8.7, price: 22.5 },
-  { name: "Umbreon ex", tcg: "Pokemon", change: +6.2, price: 42.0 },
-  { name: "Wrenn and Six", tcg: "Magic", change: +5.1, price: 55.0 },
-];
+type PeriodValue = (typeof PERIODS)[number]["value"];
 
-const TOP_LOSERS = [
-  { name: "Fury", tcg: "Magic", change: -15.2, price: 12.0 },
-  { name: "Grief", tcg: "Magic", change: -11.8, price: 8.5 },
-  { name: "Mewtwo VSTAR", tcg: "Pokemon", change: -7.3, price: 7.5 },
-  { name: "Pikachu VMAX", tcg: "Pokemon", change: -4.1, price: 24.5 },
-  { name: "Mirror Force", tcg: "Yu-Gi-Oh!", change: -3.5, price: 4.0 },
-];
+const TCG_BAR_COLORS: Record<string, string> = {
+  yugioh: "#ef4444",
+  magic: "#8b5cf6",
+  pokemon: "#f59e0b",
+};
 
-const GAME_BREAKDOWN = [
-  { game: "Yu-Gi-Oh!", cards: 38, value: 412.5, color: "#ef4444" },
-  { game: "Magic: The Gathering", cards: 52, value: 890.25, color: "#8b5cf6" },
-  { game: "Pokemon", cards: 45, value: 742.75, color: "#f59e0b" },
-];
+function tcgLabel(tcg: string): string {
+  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+}
 
-const RARITY_DIST = [
-  { rarity: "Common / Uncommon", count: 32, pct: 24 },
-  { rarity: "Rare", count: 28, pct: 21 },
-  { rarity: "Ultra / Secret Rare", count: 41, pct: 30 },
-  { rarity: "Mythic / Special Art", count: 34, pct: 25 },
-];
+function currency(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
 export default function AnalyticsPage() {
-  const totalValue = GAME_BREAKDOWN.reduce((s, g) => s + g.value, 0);
-  const totalCards = GAME_BREAKDOWN.reduce((s, g) => s + g.cards, 0);
-  const maxBarValue = Math.max(...MONTHLY_VALUES.map((m) => m.value));
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
-    <AppShell data-oid="kxzjafg">
-      <div className="space-y-6" data-oid="kv65:1o">
-        <div data-oid="uc4::7z">
-          <h1
-            className="text-3xl font-heading font-semibold"
-            data-oid="-fpec6g"
-          >
-            Analytics
-          </h1>
-          <p className="text-sm text-muted-foreground" data-oid="17hs4e7">
-            Collection value trends, price movers, and distribution breakdowns.
-          </p>
-        </div>
+  const [period, setPeriod] = useState<PeriodValue>("30d");
+  const periodDays =
+    PERIODS.find((p) => p.value === period)?.days ?? 30;
 
-        {/* Summary stats */}
-        <div
-          className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4"
-          data-oid="m.:8m4d"
-        >
-          <StatCard
-            title="Total Value"
-            value={`$${totalValue.toFixed(2)}`}
-            icon={<DollarSign className="h-5 w-5" data-oid="cgn-ohi" />}
-            sub="Across all games"
-            data-oid="2_y21a7"
-          />
-          <StatCard
-            title="Total Cards"
-            value={totalCards}
-            icon={<Layers className="h-5 w-5" data-oid="8f.vs53" />}
-            sub="135 unique cards"
-            data-oid="3qohwki"
-          />
-          <StatCard
-            title="30-Day Change"
-            value="+$215.00"
-            icon={<TrendingUp className="h-5 w-5" data-oid="_z69w5q" />}
-            sub="+11.7% this month"
-            positive
-            data-oid="mpfe2ie"
-          />
-          <StatCard
-            title="Avg Card Value"
-            value={`$${(totalValue / totalCards).toFixed(2)}`}
-            icon={<BarChart3 className="h-5 w-5" data-oid="hivsxp7" />}
-            sub="Per card average"
-            data-oid="9-pje._"
-          />
-        </div>
+  const { token, isAuthenticated } = useAuthStore();
+  const selectedGame = useGameFilterStore((state) => state.selectedGame);
+  const { enabledGames, showPricing } = useModuleStore((state) => ({
+    enabledGames: state.enabledGames,
+    showPricing: state.showPricing,
+  }));
 
-        {/* Value over time chart (simple bar chart) */}
-        <Card data-oid="l7bb1b-">
-          <CardHeader data-oid="jrmhu9k">
-            <CardTitle className="flex items-center gap-2" data-oid="04phdlg">
-              <Calendar className="h-5 w-5" data-oid="kky.bjp" />
-              Collection Value Over Time
-            </CardTitle>
-            <CardDescription data-oid="-zq9xy2">
-              Monthly estimated total value (last 6 months).
+  const noGamesEnabled =
+    !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+
+  const ready = mounted && isAuthenticated && !!token;
+
+  const historyQuery = useQuery({
+    queryKey: ["analytics", "value", period],
+    queryFn: () => getCollectionValueHistory(token!, period),
+    enabled: ready && showPricing,
+    staleTime: 1000 * 60 * 5,
+  });
+  const breakdownQuery = useQuery({
+    queryKey: ["analytics", "breakdown"],
+    queryFn: () => getCollectionValueBreakdown(token!),
+    enabled: ready,
+    staleTime: 1000 * 60 * 5,
+  });
+  const rarityQuery = useQuery({
+    queryKey: ["analytics", "distribution", "rarity"],
+    queryFn: () => getCollectionDistribution(token!, "rarity"),
+    enabled: ready,
+    staleTime: 1000 * 60 * 5,
+  });
+  const moversQuery = useQuery({
+    queryKey: ["analytics", "movers", selectedGame, periodDays],
+    queryFn: () =>
+      getPriceMovers(
+        token!,
+        selectedGame === "all" ? undefined : selectedGame,
+        periodDays,
+      ),
+    enabled: ready && showPricing,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  /* ---------------- gate states ---------------- */
+
+  if (!mounted) {
+    return (
+      <AppShell>
+        <AnalyticsSkeleton />
+      </AppShell>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <AppShell>
+        <PageHeader />
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign in required</CardTitle>
+            <CardDescription>
+              Sign in to view analytics for your collection.
             </CardDescription>
           </CardHeader>
-          <CardContent data-oid="m04c0be">
-            <div className="flex items-end gap-3 h-48" data-oid="c-l76s8">
-              {MONTHLY_VALUES.map((m) => (
-                <div
-                  key={m.month}
-                  className="flex flex-1 flex-col items-center gap-1"
-                  data-oid="lip:rih"
-                >
-                  <span
-                    className="text-xs text-muted-foreground font-medium"
-                    data-oid="ktq:.nk"
-                  >
-                    ${m.value}
-                  </span>
-                  <div
-                    className="w-full rounded-t bg-primary/80 transition-all"
-                    style={{ height: `${(m.value / maxBarValue) * 100}%` }}
-                    data-oid="i_zkzt6"
-                  />
+        </Card>
+      </AppShell>
+    );
+  }
 
-                  <span
-                    className="text-xs text-muted-foreground"
-                    data-oid="n-b899q"
-                  >
-                    {m.month}
-                  </span>
-                </div>
-              ))}
-            </div>
+  if (noGamesEnabled) {
+    return (
+      <AppShell>
+        <PageHeader />
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          All modules are disabled. Enable at least one trading card game in
+          account settings to view analytics.
+        </div>
+      </AppShell>
+    );
+  }
+
+  const isLoading =
+    breakdownQuery.isLoading ||
+    rarityQuery.isLoading ||
+    (showPricing && historyQuery.isLoading);
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <PageHeader />
+        <AnalyticsSkeleton />
+      </AppShell>
+    );
+  }
+
+  const loadError =
+    breakdownQuery.error ?? rarityQuery.error ?? historyQuery.error;
+  if (loadError) {
+    return (
+      <AppShell>
+        <PageHeader />
+        <Card>
+          <CardHeader>
+            <CardTitle>Couldn&apos;t load analytics</CardTitle>
+            <CardDescription>
+              {(loadError as Error).message ||
+                "Something went wrong while fetching your analytics."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void breakdownQuery.refetch();
+                void rarityQuery.refetch();
+                void historyQuery.refetch();
+                void moversQuery.refetch();
+              }}
+            >
+              Try again
+            </Button>
           </CardContent>
         </Card>
+      </AppShell>
+    );
+  }
 
-        <div className="grid gap-6 lg:grid-cols-2" data-oid="6oz.npy">
-          {/* Top gainers */}
-          <Card data-oid=".._ajkf">
-            <CardHeader data-oid="sgg3k86">
-              <CardTitle className="flex items-center gap-2" data-oid="20-.29f">
-                <TrendingUp
-                  className="h-5 w-5 text-green-500"
-                  data-oid="temkgj8"
-                />
-                Top Gainers (30 days)
-              </CardTitle>
-            </CardHeader>
-            <CardContent data-oid="b5-l6bu">
-              <div className="space-y-3" data-oid="puux_06">
-                {TOP_GAINERS.map((c) => (
-                  <div
-                    key={c.name}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                    data-oid="h4i1jjz"
-                  >
-                    <div data-oid="xd2o5j2">
-                      <p className="text-sm font-medium" data-oid="l_4u2pq">
-                        {c.name}
-                      </p>
-                      <p
-                        className="text-xs text-muted-foreground"
-                        data-oid="6gt03ik"
-                      >
-                        {c.tcg}
-                      </p>
-                    </div>
-                    <div className="text-right" data-oid="fljcdm1">
-                      <p className="text-sm font-semibold" data-oid="n7s:jko">
-                        ${c.price.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-green-500" data-oid="ay0780w">
-                        +{c.change}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+  /* ---------------- derive data ---------------- */
 
-          {/* Top losers */}
-          <Card data-oid="ndk2pu5">
-            <CardHeader data-oid="2olaixu">
-              <CardTitle className="flex items-center gap-2" data-oid="gdcqlxr">
-                <TrendingDown
-                  className="h-5 w-5 text-red-500"
-                  data-oid="fo0.ei0"
-                />
-                Top Losers (30 days)
-              </CardTitle>
-            </CardHeader>
-            <CardContent data-oid="cbme:5d">
-              <div className="space-y-3" data-oid="1dfwt-y">
-                {TOP_LOSERS.map((c) => (
-                  <div
-                    key={c.name}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                    data-oid="br:cm7f"
-                  >
-                    <div data-oid="dyjzci-">
-                      <p className="text-sm font-medium" data-oid="_o-sltb">
-                        {c.name}
-                      </p>
-                      <p
-                        className="text-xs text-muted-foreground"
-                        data-oid="5jbn1r2"
-                      >
-                        {c.tcg}
-                      </p>
-                    </div>
-                    <div className="text-right" data-oid="1jik6b:">
-                      <p className="text-sm font-semibold" data-oid="_167p:6">
-                        ${c.price.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-red-500" data-oid="_nr8fx-">
-                        {c.change}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+  const breakdown = breakdownQuery.data;
+  const history = historyQuery.data;
+  const rarity = rarityQuery.data;
+  const movers = moversQuery.data;
+
+  const visibleTcg = (breakdown?.byTcg ?? []).filter((entry) => {
+    if (enabledGames[entry.tcg as keyof typeof enabledGames] === false)
+      return false;
+    if (selectedGame !== "all" && entry.tcg !== selectedGame) return false;
+    return true;
+  });
+
+  const totalValue = visibleTcg.reduce((s, g) => s + g.value, 0);
+  const totalCards = visibleTcg.reduce((s, g) => s + g.cardCount, 0);
+
+  const hasNoCards = totalCards === 0;
+  if (hasNoCards) {
+    return (
+      <AppShell>
+        <PageHeader />
+        <Card>
+          <CardHeader>
+            <CardTitle>No cards to analyze yet</CardTitle>
+            <CardDescription>
+              Add cards to a binder and your value trends, price movers, and
+              distribution breakdowns will appear here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  const maxBarValue = Math.max(1, ...(history?.history ?? []).map((m) => m.value));
+
+  const gainers = (movers?.gainers ?? []).filter(
+    (c) => enabledGames[c.tcg as keyof typeof enabledGames] !== false,
+  );
+  const losers = (movers?.losers ?? []).filter(
+    (c) => enabledGames[c.tcg as keyof typeof enabledGames] !== false,
+  );
+
+  return (
+    <AppShell>
+      <div className="space-y-6">
+        <PageHeader />
+
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
+          <StatCard
+            title="Total Cards"
+            value={totalCards.toLocaleString()}
+            icon={<Layers className="h-5 w-5" />}
+            sub={
+              selectedGame === "all"
+                ? "Across all games"
+                : tcgLabel(selectedGame)
+            }
+          />
+          {showPricing && (
+            <StatCard
+              title="Total Value"
+              value={currency(totalValue)}
+              icon={<DollarSign className="h-5 w-5" />}
+              sub="Estimated collection value"
+            />
+          )}
+          {showPricing && history && selectedGame === "all" && (
+            <StatCard
+              title={`${period.toUpperCase()} Change`}
+              value={`${history.changePercent >= 0 ? "+" : ""}${history.changePercent.toFixed(1)}%`}
+              icon={
+                history.changePercent >= 0 ? (
+                  <TrendingUp className="h-5 w-5" />
+                ) : (
+                  <TrendingDown className="h-5 w-5" />
+                )
+              }
+              sub={`Now ${currency(history.currentValue)}`}
+              positive={history.changePercent >= 0}
+              negative={history.changePercent < 0}
+            />
+          )}
+          {showPricing && (
+            <StatCard
+              title="Avg Card Value"
+              value={currency(totalCards > 0 ? totalValue / totalCards : 0)}
+              icon={<BarChart3 className="h-5 w-5" />}
+              sub="Per card average"
+            />
+          )}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2" data-oid="fzqa.-9">
-          {/* Game breakdown */}
-          <Card data-oid="6ilri-j">
-            <CardHeader data-oid="-8u48d1">
-              <CardTitle data-oid="ci9dxj6">Value by Game</CardTitle>
-              <CardDescription data-oid="m3j9wdw">
-                How your collection value is distributed across TCGs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent data-oid="y__x4-2">
-              <div className="space-y-4" data-oid="2ss5pbk">
-                {GAME_BREAKDOWN.map((g) => {
-                  const pct = Math.round((g.value / totalValue) * 100);
-                  return (
-                    <div key={g.game} className="space-y-2" data-oid="ewm:6op">
-                      <div
-                        className="flex items-center justify-between text-sm"
-                        data-oid="aw-uo6t"
-                      >
-                        <span className="font-medium" data-oid="94c.o.:">
-                          {g.game}
-                        </span>
-                        <span
-                          className="text-muted-foreground"
-                          data-oid="zj48zo2"
-                        >
-                          ${g.value.toFixed(2)} ({pct}%)
-                        </span>
-                      </div>
-                      <div
-                        className="h-3 rounded-full bg-muted"
-                        data-oid="c:1n8ap"
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${pct}%`, backgroundColor: g.color }}
-                          data-oid=":vzh1bn"
-                        />
-                      </div>
-                      <p
-                        className="text-xs text-muted-foreground"
-                        data-oid="2rtstj_"
-                      >
-                        {g.cards} cards
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+        {!showPricing && (
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+            Pricing is hidden in your preferences, so value trends and price
+            movers are not shown. Enable pricing from the account menu to see
+            them.
+          </div>
+        )}
 
-          {/* Rarity distribution */}
-          <Card data-oid="ef7p6w7">
-            <CardHeader data-oid="bhtbl06">
-              <CardTitle data-oid="cq73c26">Rarity Distribution</CardTitle>
-              <CardDescription data-oid="9ywfr_r">
-                Breakdown of your collection by rarity tier.
-              </CardDescription>
-            </CardHeader>
-            <CardContent data-oid="louq.8b">
-              <div className="space-y-4" data-oid="61h:2on">
-                {RARITY_DIST.map((r) => (
-                  <div key={r.rarity} className="space-y-2" data-oid="oeql4ep">
-                    <div
-                      className="flex items-center justify-between text-sm"
-                      data-oid="jtngv2c"
-                    >
-                      <span className="font-medium" data-oid="73ft44s">
-                        {r.rarity}
-                      </span>
-                      <span
-                        className="text-muted-foreground"
-                        data-oid="gpy5w50"
-                      >
-                        {r.count} cards ({r.pct}%)
-                      </span>
-                    </div>
-                    <div
-                      className="h-3 rounded-full bg-muted"
-                      data-oid="kubyuji"
-                    >
-                      <div
-                        className="h-full rounded-full bg-primary/70"
-                        style={{ width: `${r.pct}%` }}
-                        data-oid=":4n3i54"
-                      />
-                    </div>
-                  </div>
+        {/* Value over time chart */}
+        {showPricing && (
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Collection Value Over Time
+                </CardTitle>
+                <CardDescription>
+                  Estimated total value across the selected period.
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                {PERIODS.map((p) => (
+                  <Button
+                    key={p.value}
+                    size="sm"
+                    variant={period === p.value ? "default" : "ghost"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setPeriod(p.value)}
+                  >
+                    {p.label}
+                  </Button>
                 ))}
               </div>
+            </CardHeader>
+            <CardContent>
+              {history && history.history.length > 0 ? (
+                <div
+                  className="flex items-end gap-1.5 h-48"
+                  role="img"
+                  aria-label={`Collection value over the selected period, currently ${currency(history.currentValue)}`}
+                >
+                  {history.history.map((m) => (
+                    <div
+                      key={m.date}
+                      className="flex flex-1 flex-col items-center gap-1"
+                      title={`${new Date(m.date).toLocaleDateString()}: ${currency(m.value)}`}
+                    >
+                      <div
+                        className="w-full rounded-t bg-primary/80 transition-all"
+                        style={{
+                          height: `${Math.max(2, (m.value / maxBarValue) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Not enough history yet to chart value over time.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Movers */}
+        {showPricing && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <MoverCard
+              title="Top Gainers"
+              period={periodDays}
+              icon={<TrendingUp className="h-5 w-5 text-green-500" />}
+              cards={gainers}
+              positive
+            />
+            <MoverCard
+              title="Top Losers"
+              period={periodDays}
+              icon={<TrendingDown className="h-5 w-5 text-red-500" />}
+              cards={losers}
+              positive={false}
+            />
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Value by game */}
+          {showPricing && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Value by Game</CardTitle>
+                <CardDescription>
+                  How your collection value is distributed across TCGs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {visibleTcg.map((g) => {
+                    const pct =
+                      totalValue > 0
+                        ? Math.round((g.value / totalValue) * 100)
+                        : 0;
+                    return (
+                      <div key={g.tcg} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{tcgLabel(g.tcg)}</span>
+                          <span className="text-muted-foreground">
+                            {currency(g.value)} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="h-3 rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor:
+                                TCG_BAR_COLORS[g.tcg] ?? "hsl(var(--primary))",
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {g.cardCount} cards
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rarity distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Rarity Distribution</CardTitle>
+              <CardDescription>
+                Breakdown of your collection by rarity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {rarity && rarity.entries.length > 0 ? (
+                <div className="space-y-4">
+                  {rarity.entries.map((r) => (
+                    <div key={r.label} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium capitalize">
+                          {r.label || "Unknown"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {r.count} cards ({Math.round(r.percentage)}%)
+                        </span>
+                      </div>
+                      <div className="h-3 rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary/70"
+                          style={{ width: `${Math.round(r.percentage)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No rarity data available.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
     </AppShell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sub-components                                                      */
+/* ------------------------------------------------------------------ */
+
+function PageHeader() {
+  return (
+    <div>
+      <h1 className="text-3xl font-heading font-semibold">Analytics</h1>
+      <p className="text-sm text-muted-foreground">
+        Collection value trends, price movers, and distribution breakdowns.
+      </p>
+    </div>
+  );
+}
+
+function MoverCard({
+  title,
+  period,
+  icon,
+  cards,
+  positive,
+}: {
+  title: string;
+  period: number;
+  icon: React.ReactNode;
+  cards: Array<{
+    externalId: string;
+    tcg: string;
+    name: string;
+    percentChange: number;
+    currentPrice: number;
+  }>;
+  positive: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {icon}
+          {title} ({period} days)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {cards.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            No {positive ? "gainers" : "losers"} in this period.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {cards.slice(0, 5).map((c) => (
+              <div
+                key={`${c.tcg}:${c.externalId}`}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">{c.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tcgLabel(c.tcg)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold">
+                    {currency(c.currentPrice)}
+                  </p>
+                  <p
+                    className={`text-xs ${positive ? "text-green-500" : "text-red-500"}`}
+                  >
+                    {c.percentChange >= 0 ? "+" : ""}
+                    {c.percentChange.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -363,43 +554,60 @@ function StatCard({
   icon,
   sub,
   positive,
+  negative,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   sub: string;
   positive?: boolean;
+  negative?: boolean;
 }) {
   return (
-    <Card data-oid="z:ozfvl">
-      <CardHeader
-        className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-4"
-        data-oid="6hjn4ud"
-      >
-        <CardTitle
-          className="text-xs md:text-sm font-medium text-muted-foreground"
-          data-oid="zh0hg-_"
-        >
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-4">
+        <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        <span className="text-muted-foreground" data-oid="3n708sm">
-          {icon}
-        </span>
+        <span className="text-muted-foreground">{icon}</span>
       </CardHeader>
-      <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid="amjxd8k">
+      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
         <div
-          className={`text-xl md:text-3xl font-semibold tracking-tight ${positive ? "text-green-500" : ""}`}
-          data-oid="iyv.xjc"
+          className={`text-xl md:text-3xl font-semibold tracking-tight ${
+            positive ? "text-green-500" : negative ? "text-red-500" : ""
+          }`}
         >
           {value}
         </div>
-        <p
-          className="mt-1 md:mt-2 text-xs md:text-sm text-muted-foreground"
-          data-oid="p8ihgxg"
-        >
+        <p className="mt-1 md:mt-2 text-xs md:text-sm text-muted-foreground">
           {sub}
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <Card key={idx}>
+            <CardHeader className="p-3 md:p-6">
+              <Skeleton className="h-4 w-20 md:w-32" />
+              <Skeleton className="h-6 md:h-8 w-16 md:w-24" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <Skeleton className="h-8 md:h-12 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Skeleton className="h-56 w-full" />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
@@ -473,6 +474,33 @@ struct SettingsView: View {
                     Button("Reset All Settings", role: .destructive) {
                         showingResetAlert = true
                     }
+                }
+
+                // Scanner Tools (Developer) Section
+                Section {
+                    NavigationLink {
+                        ScannerDebugView()
+                            .environmentObject(environmentStore)
+                    } label: {
+                        HStack {
+                            Image(systemName: "ladybug")
+                                .foregroundColor(.purple)
+                            Text("Live Scanner Debug")
+                        }
+                    }
+
+                    Toggle(isOn: $showScannerTestingTools) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Scanner Testing Tools")
+                            Text("Show diagnostics and debug-capture controls in the scanner")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Scanner Tools")
+                } footer: {
+                    Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time.")
                 }
 
                 // App Info Section

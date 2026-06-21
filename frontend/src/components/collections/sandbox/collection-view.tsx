@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,16 +175,22 @@ export function CollectionView() {
     updateCollectionCard,
     addCollection,
     updateCollection,
+    removeCollection,
     hasFetched,
     isLoading,
+    error,
+    clearError,
   } = useCollectionsStore((state) => ({
     collections: state.collections,
     fetchCollections: state.fetchCollections,
     updateCollectionCard: state.updateCollectionCard,
     addCollection: state.addCollection,
     updateCollection: state.updateCollection,
+    removeCollection: state.removeCollection,
     hasFetched: state.hasFetched,
     isLoading: state.isLoading,
+    error: state.error,
+    clearError: state.clearError,
   }));
   const { tags, fetchTags, addTag } = useTagsStore();
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
@@ -810,6 +816,25 @@ export function CollectionView() {
     setIsEditBinderColorOpen(true);
   };
 
+  const handleDeleteBinder = async (binderId: string) => {
+    if (!token) return;
+    const binder = binders.find((b) => b.id === binderId);
+    if (!binder) return;
+    if (
+      !window.confirm(
+        `Delete binder "${binder.name}" and all of its cards? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await removeCollection(token, binderId);
+      if (binderFilter === binderId) setBinderFilter("all");
+    } catch {
+      // Surfaced via the error banner.
+    }
+  };
+
   const closeEditBinderDialog = () => {
     setIsEditBinderOpen(false);
     setIsEditBinderColorOpen(false);
@@ -883,6 +908,19 @@ export function CollectionView() {
 
   return (
     <div className="space-y-6" data-oid="bclo5-9">
+      {error && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={clearError}
+            className="shrink-0 text-destructive/80 hover:text-destructive"
+            aria-label="Dismiss error"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <Card data-oid=".w1l6u0">
         <CardHeader className="gap-1 sm:gap-2 pb-2 sm:pb-6" data-oid="14.62_5">
           <CardTitle
@@ -969,6 +1007,7 @@ export function CollectionView() {
             }
             onEditBinder={token ? handleEditBinder : undefined}
             onEditBinderColor={token ? handleEditBinderColor : undefined}
+            onDeleteBinder={token ? handleDeleteBinder : undefined}
             data-oid="5zjh1dp"
           />
         </CardContent>

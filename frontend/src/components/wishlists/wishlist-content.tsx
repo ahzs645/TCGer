@@ -68,6 +68,8 @@ export function WishlistContent() {
     removeCardFromWishlist,
     isLoading,
     hasFetched,
+    error,
+    clearError,
   } = useWishlistsStore();
   const [activeWishlistId, setActiveWishlistId] = useState<string | null>(null);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
@@ -182,6 +184,14 @@ export function WishlistContent() {
 
   const handleDeleteWishlist = async (wishlistId: string) => {
     if (!token) return;
+    const target = wishlists.find((w) => w.id === wishlistId);
+    if (
+      !window.confirm(
+        `Delete wishlist "${target?.name ?? "this wishlist"}"? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
     try {
       await removeWishlist(token, wishlistId);
       if (activeWishlistId === wishlistId) {
@@ -190,7 +200,7 @@ export function WishlistContent() {
         if (!next) setMobileView("list");
       }
     } catch {
-      // Error handled in store
+      // Surfaced via the store error banner.
     }
   };
 
@@ -612,6 +622,20 @@ export function WishlistContent() {
 
   return (
     <>
+      {error && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={clearError}
+            className="shrink-0 text-destructive/80 hover:text-destructive"
+            aria-label="Dismiss error"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Create Wishlist Dialog */}
       <Dialog
         open={isCreateDialogOpen}

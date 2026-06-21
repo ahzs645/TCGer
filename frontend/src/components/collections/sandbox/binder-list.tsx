@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Palette, Pencil, Plus } from "lucide-react";
+import { ChevronDown, Palette, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,7 @@ interface BinderListProps {
   onAddBinder?: () => void;
   onEditBinder?: (binderId: string) => void;
   onEditBinderColor?: (binderId: string) => void;
+  onDeleteBinder?: (binderId: string) => void;
 }
 
 function normalizeColor(hex?: string) {
@@ -41,6 +42,7 @@ export function BinderList({
   onAddBinder,
   onEditBinder,
   onEditBinderColor,
+  onDeleteBinder,
 }: BinderListProps) {
   const totals = binders.reduce(
     (acc, binder) => {
@@ -186,6 +188,18 @@ export function BinderList({
                         data-oid=":em9fw4"
                       >
                         <Palette className="h-3 w-3" data-oid="18-t3lp" />
+                      </button>
+                    )}
+                    {onDeleteBinder && (
+                      <button
+                        className="h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted hidden group-focus/item:flex group-hover/item:flex"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteBinder(binder.id);
+                        }}
+                        aria-label={`Delete binder ${binder.name}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     )}
                     <span
