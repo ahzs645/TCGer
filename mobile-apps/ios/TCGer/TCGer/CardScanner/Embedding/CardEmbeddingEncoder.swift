@@ -8,11 +8,24 @@ protocol CardEmbeddingModelLoading {
 }
 
 struct CardEmbeddingEncoder {
-    enum EncoderError: Error {
+    enum EncoderError: Error, LocalizedError {
         case modelUnavailable
         case imageConstraintUnavailable
         case featureValueCreationFailed
         case embeddingMissing
+
+        var errorDescription: String? {
+            switch self {
+            case .modelUnavailable:
+                return "CardEmbeddings.mlmodelc is missing from the app bundle. Generate the iOS scan resources, then rebuild and reinstall the app."
+            case .imageConstraintUnavailable:
+                return "CardEmbeddings.mlmodelc does not expose an image input named \"image\"."
+            case .featureValueCreationFailed:
+                return "Could not create the Core ML image input for CardEmbeddings.mlmodelc."
+            case .embeddingMissing:
+                return "CardEmbeddings.mlmodelc did not return an output named \"embedding\"."
+            }
+        }
     }
 
     private let modelLoader: CardEmbeddingModelLoading
