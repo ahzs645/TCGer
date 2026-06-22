@@ -23,7 +23,7 @@ cd backend && npx tsx src/scripts/build-ios-index.ts \
   --index ../frontend/public/scan-index/pokemon-embeddings.json
 ```
 
-**Parity note:** the model bakes ImageNet normalization but assumes the caller
-resizes the crop straight to 224×224, whereas the web index is built with the HF
-processor (resize 256 → center-crop 224). Validate web↔iOS top-K agreement on
-real crops before trusting iOS accuracy (the doc's #1 preprocessing-parity item).
+**Parity note:** the model bakes ImageNet normalization. `CardEmbeddingEncoder`
+matches the web HF processor's geometry before inference (resize shortest edge
+to 256 → center-crop 224). Validate web↔iOS top-K agreement on real crops when
+refreshing either model or index artifact.

@@ -7,14 +7,11 @@ Produces CardEmbeddings.mlpackage with:
   - output "embedding" : 384-d L2-normalised CLS token
 
 ImageNet normalisation is baked into the model (a Normalize front layer +
-ct.ImageType scale=1/255), so the iOS side only needs to hand it a 224x224 RGB
-crop — matching CardEmbeddingEncoder.swift.
+ct.ImageType scale=1/255), so the iOS side hands it a 224x224 RGB crop.
 
 PARITY NOTE: the browser index is built with the HF DINOv2 image processor
-(resize shortest-edge 256 → center-crop 224 → ImageNet norm). This model assumes
-the caller resizes the crop straight to 224. The normalisation matches exactly;
-the resize/crop step differs slightly — VALIDATE web↔iOS top-K agreement on real
-crops before trusting iOS accuracy (the doc's #1 preprocessing-parity item).
+(resize shortest-edge 256 → center-crop 224 → ImageNet norm). Keep
+CardEmbeddingEncoder.swift aligned with that resize/crop step before inference.
 
 Usage: python3 convert-dinov2-coreml.py [--model facebook/dinov2-small] [--out <dir>]
 """

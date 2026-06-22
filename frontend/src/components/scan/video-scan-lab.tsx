@@ -15,7 +15,6 @@ import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
 
 import {
-  MIN_IMMEDIATE_TRACK_CONFIDENCE,
   MIN_TRACK_STABLE_FRAMES,
   type ScanFilter,
   type VideoScanFrameState,
@@ -26,7 +25,10 @@ import {
 } from "./video-scan-types";
 import { useVideoScanData } from "./use-video-scan-data";
 import { useVideoScanProcessor } from "./use-video-scan-processor";
-import { buildTrackOverlayItems, computeContainedVideoRect } from "./video-scan-overlay";
+import {
+  buildTrackOverlayItems,
+  computeContainedVideoRect,
+} from "./video-scan-overlay";
 import {
   ActiveTracksPanel,
   ScanControlsSidebar,
@@ -127,7 +129,11 @@ export function VideoScanLab() {
 
   const visibleTracks = useMemo(
     () =>
-      activeTracks.filter((track) => track.match.passedThreshold),
+      activeTracks.filter(
+        (track) =>
+          track.match.passedThreshold &&
+          track.stableFrames >= MIN_TRACK_STABLE_FRAMES,
+      ),
     [activeTracks],
   );
   const primaryTrack = visibleTracks[0] ?? null;
@@ -136,7 +142,11 @@ export function VideoScanLab() {
   const overlayItems = useMemo(
     () =>
       videoMetadata && videoViewportRect
-        ? buildTrackOverlayItems(visibleTracks, videoMetadata, videoViewportRect)
+        ? buildTrackOverlayItems(
+            visibleTracks,
+            videoMetadata,
+            videoViewportRect,
+          )
         : [],
     [videoMetadata, videoViewportRect, visibleTracks],
   );
@@ -245,9 +255,7 @@ export function VideoScanLab() {
           scanFilter,
         });
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Embedding scan failed.",
-        );
+        setError(err instanceof Error ? err.message : "Embedding scan failed.");
         setIsProcessing(false);
       }
       return;

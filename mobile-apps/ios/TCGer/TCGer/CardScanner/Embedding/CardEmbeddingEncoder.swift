@@ -82,8 +82,68 @@ struct BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     }
 }
 
+private enum DINOv2Preprocessing {
+    static let resizedShortestEdge = 256
+}
+
 private extension CGImage {
     func pixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
+        guard let preprocessed = centerCroppedAfterResize(
+            shortestEdge: DINOv2Preprocessing.resizedShortestEdge,
+            cropWidth: width,
+            cropHeight: height
+        ) else {
+            return nil
+        }
+        return preprocessed.renderedPixelBuffer(width: width, height: height)
+    }
+
+    func centerCroppedAfterResize(shortestEdge: Int, cropWidth: Int, cropHeight: Int) -> CGImage? {
+        guard width > 0,
+              height > 0,
+              shortestEdge > 0,
+              cropWidth > 0,
+              cropHeight > 0
+        else { return nil }
+
+        let sourceShortestEdge = min(width, height)
+        let scale = max(
+            CGFloat(shortestEdge) / CGFloat(sourceShortestEdge),
+            CGFloat(cropWidth) / CGFloat(width),
+            CGFloat(cropHeight) / CGFloat(height)
+        )
+        let resizedWidth = Int((CGFloat(width) * scale).rounded(.up))
+        let resizedHeight = Int((CGFloat(height) * scale).rounded(.up))
+
+        guard let resized = resized(width: resizedWidth, height: resizedHeight) else {
+            return nil
+        }
+
+        let cropX = max(0, (resized.width - cropWidth) / 2)
+        let cropY = max(0, (resized.height - cropHeight) / 2)
+        let cropRect = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
+        return resized.cropping(to: cropRect)
+    }
+
+    func resized(width: Int, height: Int) -> CGImage? {
+        guard width > 0, height > 0 else { return nil }
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        ) else {
+            return nil
+        }
+        context.interpolationQuality = .high
+        context.draw(self, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    func renderedPixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
         var pixelBuffer: CVPixelBuffer?
         let attrs: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: true,

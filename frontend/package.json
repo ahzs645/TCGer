@@ -35,6 +35,8 @@
     "@tanstack/react-query-devtools": "^4.33.0",
     "@tcg/api-types": "*",
     "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgpu": "^4.22.0",
     "better-auth": "^1.5.6",
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.3.2",

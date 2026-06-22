@@ -67,11 +67,7 @@ export function reconcileVideoTracks(
   let currentNextTrackId = nextTrackId;
 
   for (const detection of detections) {
-    const bestTrackIndex = findBestTrack(
-      tracks,
-      detection,
-      assignedTrackIds,
-    );
+    const bestTrackIndex = findBestTrack(tracks, detection, assignedTrackIds);
 
     if (bestTrackIndex >= 0) {
       const track = tracks[bestTrackIndex]!;
@@ -82,10 +78,7 @@ export function reconcileVideoTracks(
       const newLeader = getVoteLeader(track.matchVotes);
 
       // Smooth the quad position (EMA + hysteresis)
-      const smoothed = smoothQuad(
-        track.smoothedQuad,
-        detection.overlayQuad,
-      );
+      const smoothed = smoothQuad(track.smoothedQuad, detection.overlayQuad);
 
       tracks[bestTrackIndex] = {
         ...track,
@@ -107,12 +100,13 @@ export function reconcileVideoTracks(
 
       assignedTrackIds.add(track.id);
 
-      // Timeline: emit when the vote leader changes
+      // Timeline: emit only once the vote leader has enough repeated evidence.
       if (
         newLeader &&
-        previousLeader &&
-        newLeader.externalId !== previousLeader.externalId &&
-        newLeader.passedThreshold
+        (!previousLeader ||
+          newLeader.externalId !== previousLeader.externalId) &&
+        newLeader.passedThreshold &&
+        isRecognizedMatch(newLeader)
       ) {
         timelineEntries.push({
           id: `${track.id}:${newLeader.tcg}:${newLeader.externalId}:${timestampSeconds.toFixed(2)}`,
@@ -146,16 +140,6 @@ export function reconcileVideoTracks(
     };
     tracks.push(newTrack);
     assignedTrackIds.add(newTrack.id);
-
-    if (detection.bestMatch.passedThreshold) {
-      timelineEntries.push({
-        id: `${newTrack.id}:${detection.bestMatch.tcg}:${detection.bestMatch.externalId}:${timestampSeconds.toFixed(2)}`,
-        trackId: newTrack.id,
-        timestampSeconds,
-        match: detection.bestMatch,
-        proposal: detection.proposal,
-      });
-    }
   }
 
   return {
@@ -170,6 +154,13 @@ export function reconcileVideoTracks(
     timelineEntries,
     nextTrackId: currentNextTrackId,
   };
+}
+
+function isRecognizedMatch(match: BrowserVideoScanCandidate): boolean {
+  return (
+    !match.externalId.startsWith("yolo-") &&
+    !["yolo", "yolo-motion", "yolo-blur"].includes(match.proposalLabel ?? "")
+  );
 }
 
 // ---------- track association ----------
@@ -294,7 +285,6 @@ function computeProposalIou(
   );
   const inter = overlapW * overlapH;
   if (inter <= 0) return 0;
-  const union =
-    left.width * left.height + right.width * right.height - inter;
+  const union = left.width * left.height + right.width * right.height - inter;
   return union > 0 ? inter / union : 0;
 }

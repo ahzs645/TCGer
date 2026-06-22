@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "kind": "video-recognition-ground-truth",
+  "name": "Sinnoh Pokemon TCG First Partner Pack opening",
+  "tcg": "pokemon",
+  "video": {
+    "sourcePath": "/Users/ahmadjalil/Downloads/YTDown_YouTube_Sinnoh-Pokemon-TCG-First-Partner-Pack-Op_Media_wH1JUdnkKHA_001_1080p60.mp4",
+    "durationSeconds": 879.271
+  },
+  "notes": [
+    "Windows are coarse human-labeled reveal intervals from a 5-second timeline grid.",
+    "The first three entries are jumbo First Partner cards and are out-of-distribution for the normal card index.",
+    "Repeated cards intentionally have multiple windows so stream tracking/recovery can be scored."
+  ],
+  "windows": [
+    { "id": "jumbo-turtwig", "startSeconds": 125, "endSeconds": 133, "name": "Turtwig", "tags": ["jumbo", "first-partner"] },
+    { "id": "jumbo-chimchar", "startSeconds": 132, "endSeconds": 138, "name": "Chimchar", "tags": ["jumbo", "first-partner"] },
+    { "id": "jumbo-piplup", "startSeconds": 138, "endSeconds": 143, "name": "Piplup", "tags": ["jumbo", "first-partner"] },
+
+    { "id": "swsh-base-maractus", "startSeconds": 185, "endSeconds": 202, "name": "Maractus", "expectedExternalIds": ["swsh1-7"] },
+    { "id": "swsh-base-galarian-meowth-a", "startSeconds": 203, "endSeconds": 209, "name": "Galarian Meowth", "expectedExternalIds": ["swsh1-127"] },
+    { "id": "swsh-base-dubwool-a", "startSeconds": 208, "endSeconds": 213, "name": "Dubwool" },
+    { "id": "swsh-base-galarian-stunfisk", "startSeconds": 213, "endSeconds": 218, "name": "Galarian Stunfisk", "expectedExternalIds": ["swsh1-132"] },
+    { "id": "swsh-base-morpeko-v", "startSeconds": 220, "endSeconds": 232, "name": "Morpeko V", "expectedExternalIds": ["swsh1-79", "swsh4.5-37"] },
+
+    { "id": "chilling-reign-1-weedle", "startSeconds": 260, "endSeconds": 267, "name": "Weedle", "expectedExternalIds": ["swsh6-1"] },
+    { "id": "chilling-reign-1-galarian-farfetchd", "startSeconds": 267, "endSeconds": 273, "name": "Galarian Farfetch'd", "expectedExternalIds": ["swsh6-78"] },
+    { "id": "chilling-reign-1-sobble", "startSeconds": 273, "endSeconds": 278, "name": "Sobble", "expectedExternalIds": ["swsh6-41"] },
+    { "id": "chilling-reign-1-steenee", "startSeconds": 278, "endSeconds": 283, "name": "Steenee" },
+    { "id": "chilling-reign-1-shaymin", "startSeconds": 283, "endSeconds": 288, "name": "Shaymin", "expectedExternalIds": ["swsh6-123"] },
+    { "id": "chilling-reign-1-galarian-slowking-a", "startSeconds": 288, "endSeconds": 298, "name": "Galarian Slowking", "expectedExternalIds": ["swsh6-98"] },
+
+    { "id": "swsh-base-galarian-meowth-b", "startSeconds": 370, "endSeconds": 386, "name": "Galarian Meowth", "expectedExternalIds": ["swsh1-127"] },
+    { "id": "swsh-base-chinchou", "startSeconds": 388, "endSeconds": 393, "name": "Chinchou" },
+    { "id": "swsh-base-fighting-energy", "startSeconds": 393, "endSeconds": 398, "name": "Fighting Energy" },
+    { "id": "swsh-base-switch", "startSeconds": 398, "endSeconds": 403, "name": "Switch" },
+    { "id": "swsh-base-centiskorch", "startSeconds": 403, "endSeconds": 408, "name": "Centiskorch", "expectedExternalIds": ["swsh1-39"] },
+
+    { "id": "chilling-reign-2-mareep", "startSeconds": 438, "endSeconds": 443, "name": "Mareep" },
+    { "id": "chilling-reign-2-grookey", "startSeconds": 443, "endSeconds": 448, "name": "Grookey", "expectedExternalIds": ["swsh6-16"] },
+    { "id": "chilling-reign-2-kakuna", "startSeconds": 448, "endSeconds": 453, "name": "Kakuna", "expectedExternalIds": ["swsh6-2"] },
+    { "id": "chilling-reign-2-path-to-the-peak", "startSeconds": 453, "endSeconds": 458, "name": "Path to the Peak", "expectedExternalIds": ["swsh6-148"] },
+    { "id": "chilling-reign-2-koffing", "startSeconds": 458, "endSeconds": 463, "name": "Koffing", "expectedExternalIds": ["swsh6-94"] },
+    { "id": "chilling-reign-2-sandaconda-v-a", "startSeconds": 465, "endSeconds": 478, "name": "Sandaconda V", "expectedExternalIds": ["swsh6-89"] },
+
+    { "id": "swsh-base-wooloo-a", "startSeconds": 538, "endSeconds": 548, "name": "Wooloo", "expectedExternalIds": ["swsh1-153"] },
+    { "id": "swsh-base-yamper", "startSeconds": 548, "endSeconds": 553, "name": "Yamper", "expectedExternalIds": ["swsh1-74"] },
+    { "id": "swsh-base-qwilfish", "startSeconds": 553, "endSeconds": 558, "name": "Qwilfish", "expectedExternalIds": ["swsh1-51"] },
+    { "id": "swsh-base-gossifleur", "startSeconds": 558, "endSeconds": 563, "name": "Gossifleur" },
+    { "id": "swsh-base-inteleon", "startSeconds": 563, "endSeconds": 568, "name": "Inteleon", "expectedExternalIds": ["swsh1-59"] },
+
+    { "id": "chilling-reign-3-spheal-a", "startSeconds": 593, "endSeconds": 598, "name": "Spheal", "expectedExternalIds": ["swsh6-37"] },
+    { "id": "chilling-reign-3-golett", "startSeconds": 598, "endSeconds": 603, "name": "Golett", "expectedExternalIds": ["swsh6-65"] },
+    { "id": "chilling-reign-3-thwackey", "startSeconds": 603, "endSeconds": 608, "name": "Thwackey", "expectedExternalIds": ["swsh6-17"] },
+    { "id": "chilling-reign-3-froslass-a", "startSeconds": 608, "endSeconds": 613, "name": "Froslass", "expectedExternalIds": ["swsh6-36"] },
+    { "id": "chilling-reign-3-seviper", "startSeconds": 613, "endSeconds": 618, "name": "Seviper", "expectedExternalIds": ["swsh6-102"] },
+
+    { "id": "swsh-base-blipbug", "startSeconds": 688, "endSeconds": 702, "name": "Blipbug", "expectedExternalIds": ["swsh1-17"] },
+    { "id": "swsh-base-wooloo-b", "startSeconds": 703, "endSeconds": 708, "name": "Wooloo", "expectedExternalIds": ["swsh1-153"] },
+    { "id": "swsh-base-dubwool-b", "startSeconds": 708, "endSeconds": 713, "name": "Dubwool" },
+    { "id": "swsh-base-heatmor", "startSeconds": 713, "endSeconds": 718, "name": "Heatmor" },
+    { "id": "swsh-base-drampa", "startSeconds": 718, "endSeconds": 723, "name": "Drampa", "expectedExternalIds": ["swsh1-149"] },
+
+    { "id": "chilling-reign-4-spheal-b", "startSeconds": 750, "endSeconds": 762, "name": "Spheal", "expectedExternalIds": ["swsh6-37"] },
+    { "id": "chilling-reign-4-castform-sunny-form", "startSeconds": 763, "endSeconds": 768, "name": "Castform Sunny Form", "expectedExternalIds": ["swsh6-22"] },
+    { "id": "chilling-reign-4-ledian", "startSeconds": 768, "endSeconds": 773, "name": "Ledian", "expectedExternalIds": ["swsh6-5"] },
+    { "id": "chilling-reign-4-slurpuff-a", "startSeconds": 775, "endSeconds": 782, "name": "Slurpuff", "expectedExternalIds": ["swsh6-68"] },
+
+    { "id": "chilling-reign-4-celebi-v", "startSeconds": 783, "endSeconds": 788, "name": "Celebi V", "expectedExternalIds": ["swsh6-7"] },
+    { "id": "chilling-reign-4-slurpuff-b", "startSeconds": 798, "endSeconds": 803, "name": "Slurpuff", "expectedExternalIds": ["swsh6-68"] },
+    { "id": "chilling-reign-4-froslass-b", "startSeconds": 803, "endSeconds": 808, "name": "Froslass", "expectedExternalIds": ["swsh6-36"] },
+    { "id": "chilling-reign-4-galarian-slowking-b", "startSeconds": 808, "endSeconds": 813, "name": "Galarian Slowking", "expectedExternalIds": ["swsh6-98"] },
+    { "id": "chilling-reign-4-sandaconda-v-b", "startSeconds": 818, "endSeconds": 823, "name": "Sandaconda V", "expectedExternalIds": ["swsh6-89"] }
+  ]
+}
