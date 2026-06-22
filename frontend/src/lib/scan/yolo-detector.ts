@@ -6,7 +6,7 @@
  * to detect card locations with oriented bounding boxes.
  */
 
-import type { VideoQuad, VideoQuadPoint } from "./scan-types";
+import type { VideoQuad } from "./scan-types";
 
 // Lazy-load TensorFlow.js to avoid SSR issues
 let tf: typeof import("@tensorflow/tfjs") | null = null;
@@ -15,8 +15,14 @@ const MODEL_INPUT_SIZE = 640;
 const CONFIDENCE_THRESHOLD = 0.25;
 const NMS_IOU_THRESHOLD = 0.45;
 const MODEL_URL = "/models/yolo-card-detector/model.json";
+const WASM_BACKEND_PATH =
+  "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.22.0/dist/";
+const PREFERRED_BACKENDS = ["webgpu", "webgl", "wasm", "cpu"] as const;
 
 // ---------- types ----------
+
+type TfBackendName = (typeof PREFERRED_BACKENDS)[number];
+type BackendAttemptStatus = "selected" | "failed" | "skipped";
 
 export interface OBBDetection {
   cx: number;
@@ -28,8 +34,27 @@ export interface OBBDetection {
   quad: VideoQuad;
 }
 
+export interface YoloBackendAttempt {
+  backend: TfBackendName;
+  status: BackendAttemptStatus;
+  message?: string;
+}
+
+export interface YoloRuntimeStatus {
+  tfjsLoaded: boolean;
+  modelLoaded: boolean;
+  warmedUp: boolean;
+  backendReady: boolean;
+  backendSelectionPending: boolean;
+  selectedBackend: string | null;
+  preferredBackends: TfBackendName[];
+  attempts: YoloBackendAttempt[];
+}
+
 interface YoloSession {
-  model: Awaited<ReturnType<typeof import("@tensorflow/tfjs")["loadGraphModel"]>>;
+  model: Awaited<
+    ReturnType<(typeof import("@tensorflow/tfjs"))["loadGraphModel"]>
+  >;
   warmedUp: boolean;
 }
 
@@ -37,6 +62,151 @@ interface YoloSession {
 
 let session: YoloSession | null = null;
 let loadingPromise: Promise<YoloSession> | null = null;
+let backendSelectionPromise: Promise<void> | null = null;
+let backendReady = false;
+let selectedBackend: string | null = null;
+let backendAttempts: YoloBackendAttempt[] = [];
+
+// ---------- backend selection / diagnostics ----------
+
+async function ensureTfBackend(
+  tfjs: typeof import("@tensorflow/tfjs"),
+  onProgress?: (message: string) => void,
+): Promise<void> {
+  if (backendReady) return;
+
+  backendSelectionPromise ??= selectTfBackend(tfjs, onProgress);
+  try {
+    await backendSelectionPromise;
+  } catch (error) {
+    backendSelectionPromise = null;
+    throw error;
+  }
+}
+
+async function selectTfBackend(
+  tfjs: typeof import("@tensorflow/tfjs"),
+  onProgress?: (message: string) => void,
+): Promise<void> {
+  backendAttempts = [];
+  backendReady = false;
+  selectedBackend = null;
+
+  for (const backend of PREFERRED_BACKENDS) {
+    try {
+      const skipReason = await prepareTfBackend(backend);
+      if (skipReason) {
+        backendAttempts.push({
+          backend,
+          status: "skipped",
+          message: skipReason,
+        });
+        continue;
+      }
+
+      onProgress?.(`Selecting TensorFlow.js ${backend} backend...`);
+      const ok = await tfjs.setBackend(backend);
+      await tfjs.ready();
+      const activeBackend = tfjs.getBackend();
+      if (!ok || activeBackend !== backend) {
+        throw new Error(
+          `tf.setBackend("${backend}") returned ${String(ok)}; active backend is "${activeBackend}".`,
+        );
+      }
+
+      selectedBackend = activeBackend;
+      backendReady = true;
+      backendAttempts.push({
+        backend,
+        status: "selected",
+        message: "Ready",
+      });
+      onProgress?.(`TensorFlow.js backend ready: ${activeBackend}.`);
+      return;
+    } catch (error) {
+      backendAttempts.push({
+        backend,
+        status: "failed",
+        message: getErrorMessage(error),
+      });
+    }
+  }
+
+  throw new Error(
+    `No usable TensorFlow.js backend found. Attempts: ${backendAttempts
+      .map((attempt) => `${attempt.backend}:${attempt.status}`)
+      .join(", ")}`,
+  );
+}
+
+async function prepareTfBackend(
+  backend: TfBackendName,
+): Promise<string | null> {
+  if (backend === "webgpu") {
+    if (typeof navigator === "undefined" || !("gpu" in navigator)) {
+      return "navigator.gpu is not available.";
+    }
+
+    await import("@tensorflow/tfjs-backend-webgpu");
+    return null;
+  }
+
+  if (backend === "webgl") {
+    if (typeof document === "undefined") {
+      return "document is not available.";
+    }
+
+    return null;
+  }
+
+  if (backend === "wasm") {
+    const wasm = await import("@tensorflow/tfjs-backend-wasm");
+    wasm.setWasmPaths(WASM_BACKEND_PATH, true);
+  }
+
+  return null;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getActiveTfBackend(): string | null {
+  if (!tf) return selectedBackend;
+
+  try {
+    return tf.getBackend() ?? selectedBackend;
+  } catch {
+    return selectedBackend;
+  }
+}
+
+/**
+ * Inspect the current TensorFlow.js / YOLO runtime state for diagnostics.
+ */
+export function getYoloRuntimeStatus(): YoloRuntimeStatus {
+  return {
+    tfjsLoaded: tf !== null,
+    modelLoaded: session !== null,
+    warmedUp: session?.warmedUp === true,
+    backendReady,
+    backendSelectionPending: backendSelectionPromise !== null && !backendReady,
+    selectedBackend: getActiveTfBackend(),
+    preferredBackends: [...PREFERRED_BACKENDS],
+    attempts: backendAttempts.map((attempt) => ({ ...attempt })),
+  };
+}
+
+/**
+ * Log the selected backend and backend-attempt history for diagnostics.
+ */
+export function logYoloRuntimeStatus(
+  logger: {
+    info: (message?: unknown, ...optionalParams: unknown[]) => void;
+  } = console,
+): void {
+  logger.info("[YOLO] TensorFlow.js runtime", getYoloRuntimeStatus());
+}
 
 /**
  * Load and warm up the YOLO model. Returns immediately if already loaded.
@@ -54,8 +224,9 @@ export async function ensureYoloModel(
     if (!tf) {
       onProgress?.("Loading TensorFlow.js...");
       tf = await import("@tensorflow/tfjs");
-      await tf.ready();
     }
+
+    await ensureTfBackend(tf, onProgress);
 
     onProgress?.("Loading YOLO model (~10 MB)...");
     const model = await tf.loadGraphModel(MODEL_URL);
@@ -77,7 +248,12 @@ export async function ensureYoloModel(
     return s;
   })();
 
-  await loadingPromise;
+  try {
+    await loadingPromise;
+  } catch (error) {
+    loadingPromise = null;
+    throw error;
+  }
 }
 
 /**
@@ -145,9 +321,9 @@ export function extractCardCrop(
  * Run YOLO detection on a canvas frame.
  * Returns oriented bounding box detections with corner quads.
  */
-export function detectCards(
+export async function detectCards(
   frameCanvas: HTMLCanvasElement,
-): OBBDetection[] {
+): Promise<OBBDetection[]> {
   if (!tf || !session) return [];
   const tfjs = tf; // local binding for closure narrowing
 
@@ -182,8 +358,16 @@ export function detectCards(
   });
 
   // Inference
-  const rawOutput = session.model.predict(inputTensor);
-  inputTensor.dispose();
+  let rawOutput:
+    | import("@tensorflow/tfjs").Tensor
+    | import("@tensorflow/tfjs").Tensor[];
+  try {
+    rawOutput = session.model.predict(inputTensor) as
+      | import("@tensorflow/tfjs").Tensor
+      | import("@tensorflow/tfjs").Tensor[];
+  } finally {
+    inputTensor.dispose();
+  }
 
   // Extract output data
   let outputTensor: import("@tensorflow/tfjs").Tensor;
@@ -194,18 +378,16 @@ export function detectCards(
     outputTensor = rawOutput as import("@tensorflow/tfjs").Tensor;
   }
 
-  const outputData = outputTensor.dataSync() as Float32Array;
   const dims = outputTensor.shape;
-  outputTensor.dispose();
+  let outputData: Float32Array;
+  try {
+    outputData = (await outputTensor.data()) as Float32Array;
+  } finally {
+    outputTensor.dispose();
+  }
 
   // Parse detections from [1, 6, 8400] channel-major format
-  const detections = parseRawDetections(
-    outputData,
-    dims,
-    srcW,
-    srcH,
-    scale,
-  );
+  const detections = parseRawDetections(outputData, dims, srcW, srcH, scale);
 
   // NMS
   return nmsOBB(detections);

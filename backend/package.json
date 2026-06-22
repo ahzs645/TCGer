@@ -10,6 +10,8 @@
     "build:hashes": "tsx src/scripts/build-card-hashes.ts",
     "backfill:hash-features": "tsx src/scripts/backfill-card-hash-features.ts",
     "scan:video": "tsx src/scripts/scan-video.ts",
+    "eval:video-stream": "tsx src/scripts/eval-video-stream.ts",
+    "scan:video-live-stream": "tsx src/scripts/live-video-stream-scan.ts",
     "probe:video-frame": "tsx src/scripts/probe-video-frame.ts",
     "probe:detector-handoff": "tsx src/scripts/probe-detector-handoff.ts",
     "build:artwork": "tsx src/scripts/build-artwork-fingerprints.ts",

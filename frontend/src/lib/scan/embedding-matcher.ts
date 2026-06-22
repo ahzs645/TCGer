@@ -138,7 +138,10 @@ type TransformersModule = {
     ) => Promise<unknown>;
   };
   CLIPVisionModelWithProjection: {
-    from_pretrained: (id: string, opts: { dtype: string; device?: string }) => Promise<unknown>;
+    from_pretrained: (
+      id: string,
+      opts: { dtype: string; device?: string },
+    ) => Promise<unknown>;
   };
   RawImage: new (
     data: Uint8ClampedArray | Uint8Array,
@@ -205,7 +208,9 @@ export async function ensureEmbeddingModel(
         ...device,
       })) as (
         inputs: Record<string, unknown>,
-      ) => Promise<{ last_hidden_state: { data: Float32Array; dims: number[] } }>;
+      ) => Promise<{
+        last_hidden_state: { data: Float32Array; dims: number[] };
+      }>;
       embedFn = async (image: unknown) => {
         const inputs = await proc(image);
         const out = await net(inputs);
@@ -218,12 +223,13 @@ export async function ensureEmbeddingModel(
       const proc = (await transformers.AutoProcessor.from_pretrained(
         model,
       )) as (image: unknown) => Promise<Record<string, unknown>>;
-      const net = (await transformers.CLIPVisionModelWithProjection.from_pretrained(
-        model,
-        { dtype, ...device },
-      )) as (
-        inputs: Record<string, unknown>,
-      ) => Promise<{ image_embeds: { data: Float32Array } }>;
+      const net =
+        (await transformers.CLIPVisionModelWithProjection.from_pretrained(
+          model,
+          { dtype, ...device },
+        )) as (
+          inputs: Record<string, unknown>,
+        ) => Promise<{ image_embeds: { data: Float32Array } }>;
       embedFn = async (image: unknown) => {
         const inputs = await proc(image);
         const { image_embeds } = await net(inputs);
@@ -276,14 +282,27 @@ function distanceFromSimilarity(similarity: number): number {
   return Math.round((1 - Math.max(0, Math.min(1, similarity))) * 1000);
 }
 
+export const DEFAULT_EMBEDDING_MATCH_THRESHOLDS = {
+  /** Direct visible-name acceptance threshold for raw embedding matches. */
+  minSimilarity: 0.72,
+  /** Lower bound reserved for candidates promoted by independent verification. */
+  minVerifiedSimilarity: 0.65,
+  /** Strong top1-top2 separation required for the verified lower-similarity path. */
+  minMargin: 0.08,
+} as const;
+
 export interface EmbeddingMatchOptions {
   topK?: number;
   tcgFilter?: TcgCode | "all";
   proposalLabel?: string;
-  /** Min top-1 similarity to mark a candidate as confident. */
+  /** Min top-1 similarity to mark a raw embedding candidate as confident. */
   minSimilarity?: number;
-  /** Min top1−top2 margin to mark the top candidate as confident. */
+  /** Lower similarity allowed only when independent verification can promote it. */
+  minVerifiedSimilarity?: number;
+  /** Min top1−top2 margin for optional verified lower-similarity acceptance. */
   minMargin?: number;
+  /** Keep false for raw embedding; OCR/downstream verification promotes later. */
+  allowVerifiedMarginAcceptance?: boolean;
 }
 
 /**
@@ -299,8 +318,10 @@ export function matchEmbeddingTopK(
     topK = 20,
     tcgFilter,
     proposalLabel = "embedding",
-    minSimilarity = 0.9,
-    minMargin = 0.02,
+    minSimilarity = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minSimilarity,
+    minVerifiedSimilarity = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minVerifiedSimilarity,
+    minMargin = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minMargin,
+    allowVerifiedMarginAcceptance = false,
   } = options;
 
   const { dimension, vectors, invNorms, entries, tcg } = index;
@@ -327,7 +348,8 @@ export function matchEmbeddingTopK(
     } else if (sim > worst) {
       // replace current worst
       let wi = 0;
-      for (let j = 1; j < bestSim.length; j++) if (bestSim[j]! < bestSim[wi]!) wi = j;
+      for (let j = 1; j < bestSim.length; j++)
+        if (bestSim[j]! < bestSim[wi]!) wi = j;
       bestIdx[wi] = i;
       bestSim[wi] = sim;
       worst = Math.min(...bestSim);
@@ -341,12 +363,19 @@ export function matchEmbeddingTopK(
 
   const top1 = order[0]?.sim ?? 0;
   const top2 = order[1]?.sim ?? 0;
-  const margin = top1 - top2;
+  const margin = order.length >= 2 ? top1 - top2 : 0;
 
   return order.map(({ idx, sim }, rank) => {
     const entry = entries[idx]!;
+    const passesDirectThreshold = sim >= minSimilarity;
+    const passesVerifiedMarginThreshold =
+      allowVerifiedMarginAcceptance &&
+      sim >= minVerifiedSimilarity &&
+      margin >= minMargin;
+    // Raw embedding never passes on margin alone; low-similarity matches need
+    // independent verification to opt into the lower threshold.
     const confident =
-      rank === 0 && (sim >= minSimilarity || margin >= minMargin);
+      rank === 0 && (passesDirectThreshold || passesVerifiedMarginThreshold);
     const distance = distanceFromSimilarity(sim);
     const candidate: BrowserVideoScanCandidate = {
       externalId: entry.externalId,

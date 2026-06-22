@@ -55,6 +55,7 @@ import {
 
 /** Frame size for YOLO detection. */
 const MODEL_FRAME_SIZE = 640;
+const EMBEDDING_SHORTLIST_SIZE = 20;
 
 export interface ProcessorCallbacks {
   onFrameState: (state: VideoScanFrameState) => void;
@@ -230,95 +231,119 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         "YOLO detection active — play, pause, or scrub. Outlines update in real time.",
       );
       let processedFrames = 0;
+      let skippedFrames = 0;
       let lastProcessedTime = -1;
+      let processing = false;
 
-      const processFrame = () => {
+      const processFrame = async () => {
         if (stopRequestedRef.current) {
           callbacks.onProcessing(false);
+          const skipNote =
+            skippedFrames > 0 ? ` (${skippedFrames} skipped)` : "";
           callbacks.onStatus(
-            `YOLO detection stopped after ${processedFrames} frames.`,
+            `YOLO detection stopped after ${processedFrames} frames${skipNote}.`,
           );
           return;
         }
 
-        if (video.ended) {
+        if (video.ended && !processing) {
           callbacks.onProcessing(false);
+          const skipNote =
+            skippedFrames > 0 ? ` (${skippedFrames} skipped)` : "";
           callbacks.onStatus(
-            `YOLO detection finished — ${processedFrames} frames processed.`,
+            `YOLO detection finished — ${processedFrames} frames${skipNote}.`,
           );
           return;
         }
 
         const currentTime = video.currentTime;
-        if (Math.abs(currentTime - lastProcessedTime) > 0.01) {
-          lastProcessedTime = currentTime;
-
-          const { width, height } = drawVideoFrameToCanvas(
-            video,
-            frameCanvas,
-            MODEL_FRAME_SIZE,
-          );
-          callbacks.onMetadata({ duration: video.duration, width, height });
-
-          const detections = detectCards(frameCanvas);
-
-          const proposalMatches = detections.map((det) => {
-            const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
-            const syntheticMatch: BrowserVideoScanCandidate = {
-              externalId: `yolo-${spatialKey}`,
-              tcg: scanFilter === "all" ? "pokemon" : scanFilter,
-              name: `Detected card (${(det.confidence * 100).toFixed(0)}%)`,
-              setCode: null,
-              setName: null,
-              rarity: null,
-              imageUrl: null,
-              confidence: det.confidence,
-              distance: 0,
-              scoreDistance: 0,
-              passedThreshold: det.confidence >= 0.5,
-              fullDistance: 0,
-              titleDistance: null,
-              footerDistance: null,
-              proposalLabel: `yolo ${(det.confidence * 100).toFixed(0)}%`,
-            };
-
-            return {
-              proposal: {
-                label: `yolo ${(det.confidence * 100).toFixed(0)}%`,
-                left: det.cx - det.width / 2,
-                top: det.cy - det.height / 2,
-                width: det.width,
-                height: det.height,
-              },
-              overlayQuad: det.quad,
-              refinementMethod: "yolo-obb" as string | null,
-              isClipped: false,
-              bestMatch: syntheticMatch,
-              candidates: [syntheticMatch],
-            };
-          });
-
-          const nextFrameState: VideoScanFrameState = {
-            timestampSeconds: currentTime,
-            activeProposal: proposalMatches[0]?.proposal ?? null,
-            bestMatch: proposalMatches[0]?.bestMatch ?? null,
-            candidates: proposalMatches
-              .map((pm) => pm.bestMatch!)
-              .filter(Boolean),
-            proposalMatches,
-          };
-
-          callbacks.onFrameState(nextFrameState);
-          updateTracks(nextFrameState.proposalMatches, currentTime);
-
-          processedFrames++;
-          callbacks.onProgress({ processed: processedFrames, total: 0 });
+        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
+        if (timeChanged && processing) {
+          skippedFrames++;
+          requestAnimationFrame(() => void processFrame());
+          return;
         }
 
-        requestAnimationFrame(processFrame);
+        if (timeChanged) {
+          processing = true;
+          lastProcessedTime = currentTime;
+
+          try {
+            const { width, height } = drawVideoFrameToCanvas(
+              video,
+              frameCanvas,
+              MODEL_FRAME_SIZE,
+            );
+            callbacks.onMetadata({ duration: video.duration, width, height });
+
+            const detections = await detectCards(frameCanvas);
+
+            const proposalMatches = detections.map((det) => {
+              const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
+              const syntheticMatch: BrowserVideoScanCandidate = {
+                externalId: `yolo-${spatialKey}`,
+                tcg: scanFilter === "all" ? "pokemon" : scanFilter,
+                name: `Detected card (${(det.confidence * 100).toFixed(0)}%)`,
+                setCode: null,
+                setName: null,
+                rarity: null,
+                imageUrl: null,
+                confidence: det.confidence,
+                distance: 0,
+                scoreDistance: 0,
+                passedThreshold: det.confidence >= 0.5,
+                fullDistance: 0,
+                titleDistance: null,
+                footerDistance: null,
+                proposalLabel: `yolo ${(det.confidence * 100).toFixed(0)}%`,
+              };
+
+              return {
+                proposal: {
+                  label: `yolo ${(det.confidence * 100).toFixed(0)}%`,
+                  left: det.cx - det.width / 2,
+                  top: det.cy - det.height / 2,
+                  width: det.width,
+                  height: det.height,
+                },
+                overlayQuad: det.quad,
+                refinementMethod: "yolo-obb" as string | null,
+                isClipped: false,
+                bestMatch: syntheticMatch,
+                candidates: [syntheticMatch],
+              };
+            });
+
+            const nextFrameState: VideoScanFrameState = {
+              timestampSeconds: currentTime,
+              activeProposal: proposalMatches[0]?.proposal ?? null,
+              bestMatch: proposalMatches[0]?.bestMatch ?? null,
+              candidates: proposalMatches
+                .map((pm) => pm.bestMatch!)
+                .filter(Boolean),
+              proposalMatches,
+            };
+
+            callbacks.onFrameState(nextFrameState);
+            updateTracks(nextFrameState.proposalMatches, currentTime);
+
+            processedFrames++;
+            callbacks.onProgress({ processed: processedFrames, total: 0 });
+          } catch (err) {
+            callbacks.onError(
+              err instanceof Error ? err.message : "YOLO detection failed.",
+            );
+            callbacks.onProcessing(false);
+            processing = false;
+            return;
+          }
+          processing = false;
+        }
+
+        requestAnimationFrame(() => void processFrame());
       };
 
-      requestAnimationFrame(processFrame);
+      requestAnimationFrame(() => void processFrame());
     },
     [callbacks, updateTracks],
   );
@@ -336,8 +361,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       artworkDb: ArtworkFingerprintEntry[] | undefined;
       scanFilter: ScanFilter;
     }) => {
-      const { video, frameCanvas, hashEntries, artworkDb, scanFilter } =
-        params;
+      const { video, frameCanvas, hashEntries, artworkDb, scanFilter } = params;
 
       stopRequestedRef.current = false;
 
@@ -355,7 +379,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       let lastProcessedTime = -1;
       let processing = false; // busy flag — skip frames while matching
 
-      const processFrame = () => {
+      const processFrame = async () => {
         if (stopRequestedRef.current) {
           callbacks.onProcessing(false);
           const skipNote =
@@ -377,13 +401,12 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         }
 
         const currentTime = video.currentTime;
-        const timeChanged =
-          Math.abs(currentTime - lastProcessedTime) > 0.01;
+        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
 
         // Skip this frame if we're still matching the previous one
         if (timeChanged && processing) {
           skippedFrames++;
-          requestAnimationFrame(processFrame);
+          requestAnimationFrame(() => void processFrame());
           return;
         }
 
@@ -399,42 +422,51 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
           callbacks.onMetadata({ duration: video.duration, width, height });
 
           // 1. YOLO detection
-          const detections = detectCards(frameCanvas);
+          try {
+            const detections = await detectCards(frameCanvas);
 
-          // 2. For each detection, crop & match
-          const proposalMatches = detections.map((det) =>
-            matchDetection(
-              det,
-              frameCanvas,
-              hashEntries,
-              artworkDb,
-              scanFilter,
-            ),
-          );
+            // 2. For each detection, crop & match
+            const proposalMatches = detections.map((det) =>
+              matchDetection(
+                det,
+                frameCanvas,
+                hashEntries,
+                artworkDb,
+                scanFilter,
+              ),
+            );
 
-          const bestPm = proposalMatches[0];
-          const nextFrameState: VideoScanFrameState = {
-            timestampSeconds: currentTime,
-            activeProposal: bestPm?.proposal ?? null,
-            bestMatch: bestPm?.bestMatch ?? null,
-            candidates: proposalMatches
-              .map((pm) => pm.bestMatch!)
-              .filter(Boolean),
-            proposalMatches,
-          };
+            const bestPm = proposalMatches[0];
+            const nextFrameState: VideoScanFrameState = {
+              timestampSeconds: currentTime,
+              activeProposal: bestPm?.proposal ?? null,
+              bestMatch: bestPm?.bestMatch ?? null,
+              candidates: proposalMatches
+                .map((pm) => pm.bestMatch!)
+                .filter(Boolean),
+              proposalMatches,
+            };
 
-          callbacks.onFrameState(nextFrameState);
-          updateTracks(nextFrameState.proposalMatches, currentTime);
+            callbacks.onFrameState(nextFrameState);
+            updateTracks(nextFrameState.proposalMatches, currentTime);
 
-          processedFrames++;
-          callbacks.onProgress({ processed: processedFrames, total: 0 });
+            processedFrames++;
+            callbacks.onProgress({ processed: processedFrames, total: 0 });
+          } catch (err) {
+            callbacks.onError(
+              err instanceof Error ? err.message : "YOLO matching failed.",
+            );
+            callbacks.onProcessing(false);
+            processing = false;
+            return;
+          }
           processing = false;
         }
 
-        requestAnimationFrame(processFrame);
+        requestAnimationFrame(() => void processFrame());
       };
 
-      requestAnimationFrame(processFrame);
+      requestAnimationFrame(() => void processFrame());
     },
     [callbacks, updateTracks],
   );
@@ -471,7 +503,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       // Warm the OCR worker in the background; it's only invoked when the
       // embedding shortlist is ambiguous (likely twins).
       void ensureOcrWorker();
-      const ocrTracker = new OcrVoteTracker();
+      const ocrTrackers = new Map<string, OcrVoteTracker>();
 
       callbacks.onStatus(
         "YOLO + embedding active — play, pause, or scrub. Cards are identified on-device.",
@@ -531,48 +563,58 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
           );
           callbacks.onMetadata({ duration: video.duration, width, height });
 
-          const detections = detectCards(frameCanvas);
+          try {
+            const detections = await detectCards(frameCanvas);
 
-          // Stillness gate: if the camera/card is moving, skip embedding this
-          // frame and just show outlines — keep accumulating until it settles.
-          const motion = assessFrameMotion(
-            frameCanvas,
-            prevFrameGrayRef.current,
-            DEFAULT_QUALITY_GATE,
-          );
-          prevFrameGrayRef.current = motion.gray;
-          if (!motion.still) movingFrames++;
-
-          const proposalMatches: BrowserVideoProposalMatch[] = [];
-          for (const det of detections) {
-            const pm = await matchDetectionEmbedding(
-              det,
+            // Stillness gate: if the camera/card is moving, skip embedding this
+            // frame and just show outlines — keep accumulating until it settles.
+            const motion = assessFrameMotion(
               frameCanvas,
-              embeddingIndex,
-              scanFilter,
-              motion.still,
-              ocrTracker,
+              prevFrameGrayRef.current,
+              DEFAULT_QUALITY_GATE,
             );
-            if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
-            proposalMatches.push(pm);
+            prevFrameGrayRef.current = motion.gray;
+            if (!motion.still) movingFrames++;
+
+            const proposalMatches: BrowserVideoProposalMatch[] = [];
+            for (const det of detections) {
+              const ocrTracker = getOcrTrackerForDetection(det, ocrTrackers);
+              const pm = await matchDetectionEmbedding(
+                det,
+                frameCanvas,
+                embeddingIndex,
+                scanFilter,
+                motion.still,
+                ocrTracker,
+              );
+              if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
+              proposalMatches.push(pm);
+            }
+
+            const bestPm = proposalMatches[0];
+            const nextFrameState: VideoScanFrameState = {
+              timestampSeconds: currentTime,
+              activeProposal: bestPm?.proposal ?? null,
+              bestMatch: bestPm?.bestMatch ?? null,
+              candidates: proposalMatches
+                .map((pm) => pm.bestMatch!)
+                .filter(Boolean),
+              proposalMatches,
+            };
+
+            callbacks.onFrameState(nextFrameState);
+            updateTracks(nextFrameState.proposalMatches, currentTime);
+
+            processedFrames++;
+            callbacks.onProgress({ processed: processedFrames, total: 0 });
+          } catch (err) {
+            callbacks.onError(
+              err instanceof Error ? err.message : "YOLO embedding failed.",
+            );
+            callbacks.onProcessing(false);
+            processing = false;
+            return;
           }
-
-          const bestPm = proposalMatches[0];
-          const nextFrameState: VideoScanFrameState = {
-            timestampSeconds: currentTime,
-            activeProposal: bestPm?.proposal ?? null,
-            bestMatch: bestPm?.bestMatch ?? null,
-            candidates: proposalMatches
-              .map((pm) => pm.bestMatch!)
-              .filter(Boolean),
-            proposalMatches,
-          };
-
-          callbacks.onFrameState(nextFrameState);
-          updateTracks(nextFrameState.proposalMatches, currentTime);
-
-          processedFrames++;
-          callbacks.onProgress({ processed: processedFrames, total: 0 });
           processing = false;
         }
 
@@ -599,7 +641,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
 /** Top-N artwork candidates to pre-filter pHash against. */
 const ARTWORK_TOP_N = 50;
 /** Minimum artwork similarity to trust the result. */
-const ARTWORK_MIN_SIM = 0.90;
+const ARTWORK_MIN_SIM = 0.9;
 
 /**
  * Given a YOLO detection, extract the de-rotated card crop and run
@@ -631,7 +673,10 @@ function matchDetection(
       hsvHist,
     );
 
-    if (artworkMatches.length > 0 && artworkMatches[0]!.similarity >= ARTWORK_MIN_SIM) {
+    if (
+      artworkMatches.length > 0 &&
+      artworkMatches[0]!.similarity >= ARTWORK_MIN_SIM
+    ) {
       const top = artworkMatches[0]!;
       const entry = hashEntries.find(
         (e) => e.externalId === top.externalId && e.tcg === top.tcg,
@@ -727,6 +772,19 @@ function matchDetection(
   };
 }
 
+function getOcrTrackerForDetection(
+  det: OBBDetection,
+  trackers: Map<string, OcrVoteTracker>,
+): OcrVoteTracker {
+  const key = `${Math.round(det.cx / 80)}:${Math.round(det.cy / 80)}`;
+  let tracker = trackers.get(key);
+  if (!tracker) {
+    tracker = new OcrVoteTracker();
+    trackers.set(key, tracker);
+  }
+  return tracker;
+}
+
 /**
  * Given a YOLO detection, extract the de-rotated card crop, embed it with the
  * on-device CLIP model, and brute-force int8 cosine top-K against the
@@ -764,7 +822,7 @@ async function matchDetectionEmbedding(
     const embedding = await computeEmbeddingFromCanvas(cropCanvas);
     if (embedding) {
       candidates = matchEmbeddingTopK(embedding, embeddingIndex, {
-        topK: 5,
+        topK: EMBEDDING_SHORTLIST_SIZE,
         tcgFilter: scanFilter,
         proposalLabel: "yolo+embedding",
       });
@@ -776,7 +834,11 @@ async function matchDetectionEmbedding(
         candidates.length >= 2
           ? candidates[0]!.confidence - candidates[1]!.confidence
           : 1;
-      if (ocrTracker && candidates.length >= 2 && margin < OCR_MARGIN_THRESHOLD) {
+      if (
+        ocrTracker &&
+        candidates.length >= 2 &&
+        margin < OCR_MARGIN_THRESHOLD
+      ) {
         const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
         try {
           const reading = await readFooterText(cropCanvas, tcg);
@@ -792,7 +854,7 @@ async function matchDetectionEmbedding(
         }
       }
 
-      if (candidates.length > 0) {
+      if (candidates.length > 0 && candidates[0]!.passedThreshold) {
         bestMatch = candidates[0]!;
       }
     }
@@ -836,4 +898,3 @@ async function matchDetectionEmbedding(
     candidates,
   };
 }
-
