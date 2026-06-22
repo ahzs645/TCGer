@@ -240,7 +240,7 @@ final class ScannerDebugViewModel: ObservableObject {
                     if case .noMatch = error {
                         self.log(.warn, "no match")
                     } else {
-                        self.log(.error, error.errorDescription ?? "scan failed")
+                        self.log(.error, error.errorDescription ?? error.localizedDescription)
                     }
                 }
 
