@@ -10,7 +10,8 @@ import Foundation
 ///   2. Histogram-equalise per RGB channel for lighting invariance
 ///   3. Resize to 8×8 grid → 192-dimensional fingerprint
 ///   4. Compute HSV histogram (30×32 bins) for color distribution
-///   5. Combined score: 85% artwork cosine similarity + 15% HSV cosine similarity
+///   5. Combined score: 5% artwork cosine similarity + 95% HSV cosine similarity
+///      (weights tuned by the frame sweep documented on `artworkWeight` below)
 struct ArtworkFingerprintMatcher {
 
     // MARK: - Configuration

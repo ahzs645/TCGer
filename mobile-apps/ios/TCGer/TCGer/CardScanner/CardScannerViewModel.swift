@@ -73,6 +73,11 @@ final class CardScannerViewModel: ObservableObject {
 
     func updateEnvironment(_ environment: EnvironmentStore) {
         environmentStore = environment
+        // In local (no-server) mode, default to the fully on-device engine so
+        // scanning never depends on a backend.
+        if environment.serverConfiguration.isDemoMode, selectedEngine == .automatic {
+            selectedEngine = .localOnly
+        }
         rebuildContext()
         prepareCameraIfPossible()
     }
@@ -128,7 +133,8 @@ final class CardScannerViewModel: ObservableObject {
             state = .error("\(selectedMode.displayName) scanning is not available yet.")
             return
         }
-        guard context?.authToken != nil else {
+        // Local mode needs no auth token; only require it when a backend is in use.
+        if context?.serverConfiguration.isDemoMode != true, context?.authToken == nil {
             state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
             return
         }
@@ -220,7 +226,8 @@ final class CardScannerViewModel: ObservableObject {
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
         guard latestResult == nil else { return }
-        guard let context, context.authToken != nil else { return }
+        guard let context else { return }
+        if !context.serverConfiguration.isDemoMode, context.authToken == nil { return }
         guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
 
         let now = Date()

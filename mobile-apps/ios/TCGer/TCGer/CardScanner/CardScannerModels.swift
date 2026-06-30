@@ -46,6 +46,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
 
 enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
     case automatic
+    case localOnly
     case serverHash
     case serverEmbedding
 
@@ -55,6 +56,8 @@ enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .automatic:
             return "Automatic"
+        case .localOnly:
+            return "On-Device"
         case .serverHash:
             return "Hash"
         case .serverEmbedding:
@@ -66,6 +69,8 @@ enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .automatic:
             return "Keep the current local-first scan flow and fall back through the existing strategies."
+        case .localOnly:
+            return "Match entirely on this phone with the bundled fingerprint and hash databases. No server or internet required."
         case .serverHash:
             return "Send the captured photo to the server pHash matcher only."
         case .serverEmbedding:
@@ -75,7 +80,7 @@ enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
 
     var apiValue: String? {
         switch self {
-        case .automatic:
+        case .automatic, .localOnly:
             return nil
         case .serverHash:
             return "phash"
@@ -86,16 +91,21 @@ enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
 
     var requiresServerOnlyFlow: Bool {
         switch self {
-        case .automatic:
+        case .automatic, .localOnly:
             return false
         case .serverHash, .serverEmbedding:
             return true
         }
     }
 
+    /// True for engines that never contact a server — usable with no backend.
+    var isLocalOnly: Bool {
+        self == .localOnly
+    }
+
     func supports(_ mode: ScanMode) -> Bool {
         switch self {
-        case .automatic, .serverHash:
+        case .automatic, .localOnly, .serverHash:
             return true
         case .serverEmbedding:
             return mode == .pokemon
