@@ -116,6 +116,9 @@ extension APIService {
         description: String? = nil,
         colorHex: String? = nil
     ) async throws -> Wishlist {
+        if config.isDemoMode {
+            return try DemoStore.shared.updateWishlist(id: id, name: name, description: description, colorHex: colorHex)
+        }
         let body = UpdateWishlistRequest(name: name, description: description, colorHex: colorHex)
         let (data, response) = try await makeRequest(
             config: config,

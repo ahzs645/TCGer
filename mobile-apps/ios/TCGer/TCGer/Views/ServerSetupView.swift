@@ -2,14 +2,14 @@ import SwiftUI
 
 struct ServerSetupView: View {
     private enum ConnectionMode: String, CaseIterable, Identifiable {
-        case local = "Local"
-        case demo = "Demo"
+        case onDevice = "This Phone"
+        case server = "Server"
 
         var id: String { rawValue }
     }
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
-    @State private var selectedMode: ConnectionMode = .local
+    @State private var selectedMode: ConnectionMode = .onDevice
     @State private var localInput: String = ServerConfiguration.defaultLocalBaseURL
 
     private var sanitizedLocalInput: String {
@@ -18,26 +18,26 @@ struct ServerSetupView: View {
 
     private var isValid: Bool {
         switch selectedMode {
-        case .local:
+        case .onDevice:
+            return true
+        case .server:
             guard !sanitizedLocalInput.isEmpty else { return false }
             return URL(string: sanitizedLocalInput) != nil
-        case .demo:
-            return true
         }
     }
 
     private var resolvedConfiguration: ServerConfiguration {
         switch selectedMode {
-        case .local:
-            return ServerConfiguration(baseURL: sanitizedLocalInput)
-        case .demo:
+        case .onDevice:
             return .demoLocal
+        case .server:
+            return ServerConfiguration(baseURL: sanitizedLocalInput)
         }
     }
 
     var body: some View {
         Form {
-            Section(header: Text("Connection Mode")) {
+            Section(header: Text("How do you want to use TCGer?")) {
                 Picker("Mode", selection: $selectedMode) {
                     ForEach(ConnectionMode.allCases) { mode in
                         Text(mode.rawValue).tag(mode)
@@ -46,46 +46,51 @@ struct ServerSetupView: View {
                 .pickerStyle(.segmented)
             }
 
-            if selectedMode == .local {
+            if selectedMode == .onDevice {
                 Section(
-                    header: Text("Local Server"),
-                    footer: Text("Examples: http://localhost:3001, http://10.1.15.216:3001, or the phone-test stack at http://192.168.1.50:31452")
+                    header: Text("On This Phone"),
+                    footer: Text("Keep your whole collection on this device. No account, server, or internet connection required — everything is stored locally and stays private to you.")
                 ) {
-                    TextField("Local API URL", text: $localInput)
+                    Label("No account or server needed", systemImage: "iphone")
+                        .foregroundColor(.secondary)
+                    Label("Works fully offline", systemImage: "wifi.slash")
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Section(
+                    header: Text("Server"),
+                    footer: Text("Connect to your own TCG Manager server to sync across devices. Examples: http://localhost:3001, http://10.1.15.216:3001, or http://192.168.1.50:31452")
+                ) {
+                    TextField("Server URL", text: $localInput)
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
-            } else {
-                Section(
-                    header: Text("Demo Environment"),
-                    footer: Text("Uses an in-app fake dataset and mocked API responses. Great for previews and testing UI flows.")
-                ) {
-                    Label("No network connection required", systemImage: "sparkles")
-                        .foregroundColor(.secondary)
-                }
             }
 
             Section {
                 Button(action: saveConfiguration) {
-                    Label("Save and Continue", systemImage: "checkmark.circle.fill")
+                    Label(
+                        selectedMode == .onDevice ? "Start on This Phone" : "Connect",
+                        systemImage: "checkmark.circle.fill"
+                    )
                 }
                 .disabled(!isValid)
             }
         }
-        .navigationTitle("Server Setup")
+        .navigationTitle("Get Started")
         .onAppear(perform: populateFromStore)
     }
 
     private func populateFromStore() {
         let stored = environmentStore.serverConfiguration.baseURL
-        if stored == ServerConfiguration.demoLocalBaseURL {
-            selectedMode = .demo
+        if stored == ServerConfiguration.demoLocalBaseURL || stored.isEmpty {
+            selectedMode = .onDevice
             localInput = ServerConfiguration.defaultLocalBaseURL
         } else {
-            selectedMode = .local
-            localInput = stored.isEmpty ? ServerConfiguration.defaultLocalBaseURL : stored
+            selectedMode = .server
+            localInput = stored
         }
     }
 
@@ -93,12 +98,12 @@ struct ServerSetupView: View {
         environmentStore.serverConfiguration = resolvedConfiguration
 
         switch selectedMode {
-        case .local:
+        case .onDevice:
+            environmentStore.enableDemoSession(force: true)
+        case .server:
             environmentStore.signOut()
             environmentStore.isServerVerified = false
             environmentStore.appSettings = nil
-        case .demo:
-            environmentStore.enableDemoSession(force: true)
         }
     }
 }

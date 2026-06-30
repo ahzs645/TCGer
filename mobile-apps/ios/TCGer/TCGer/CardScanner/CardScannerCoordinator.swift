@@ -72,6 +72,14 @@ final class CardScannerCoordinator {
             return .failure(.ineligibleMode)
         }
 
+        // A single strategy failing (e.g. a server matcher when there is no
+        // network) must not abort the whole chain — keep trying the remaining
+        // strategies so local matchers still get a turn. We only surface an
+        // error if every strategy failed AND none of them cleanly reported a
+        // "no match"; a clean no-match is preferred over a network error.
+        var firstError: CardScannerError?
+        var sawCleanNoMatch = false
+
         for strategy in eligibleStrategies {
             let start = Date()
             do {
@@ -93,14 +101,18 @@ final class CardScannerCoordinator {
                     )
                     return .success(result)
                 }
+                sawCleanNoMatch = true
             } catch let error as CardScannerError {
-                return .failure(error)
+                if firstError == nil { firstError = error }
             } catch {
-                return .failure(.underlying(error))
+                if firstError == nil { firstError = .underlying(error) }
             }
         }
 
-        return .failure(.noMatch)
+        if sawCleanNoMatch {
+            return .failure(.noMatch)
+        }
+        return .failure(firstError ?? .noMatch)
     }
 
     private func eligibleStrategies(
@@ -114,6 +126,20 @@ final class CardScannerCoordinator {
                 return strategy.supportsLiveScanning
             case .photoCapture:
                 return true
+            }
+        }
+
+        if preferredEngine.isLocalOnly {
+            // Only strategies that run entirely on-device: bundled artwork
+            // fingerprints, perceptual hashing, and the embedding detector.
+            // Text OCR and the server matchers need a backend, so drop them.
+            return strategiesForMode.filter { strategy in
+                switch strategy.kind {
+                case .artworkFingerprint, .perceptualHash, .mlDetector:
+                    return true
+                case .textOCR, .serverHash, .serverEmbedding:
+                    return false
+                }
             }
         }
 

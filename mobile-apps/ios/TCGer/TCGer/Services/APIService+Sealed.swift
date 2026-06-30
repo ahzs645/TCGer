@@ -105,6 +105,15 @@ extension APIService {
         purchaseDate: String? = nil,
         notes: String? = nil
     ) async throws -> SealedInventoryItem {
+        if config.isDemoMode {
+            return try DemoStore.shared.updateSealedInventory(
+                itemId: itemId,
+                quantity: quantity,
+                purchasePrice: purchasePrice,
+                purchaseDate: purchaseDate,
+                notes: notes
+            )
+        }
         let body = UpdateSealedInventoryRequest(
             quantity: quantity,
             purchasePrice: purchasePrice,
