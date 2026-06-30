@@ -25,7 +25,10 @@ final class PokemonTextScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
-        guard let token = context.authToken else {
+        // In local mode the catalog lookup runs against the on-device store and
+        // ignores the token, so only require auth when talking to a backend.
+        let token = context.authToken
+        if !context.serverConfiguration.isDemoMode, token == nil {
             throw CardScannerError.missingAuthToken
         }
 
@@ -43,7 +46,7 @@ final class PokemonTextScannerStrategy: ScanStrategy {
             do {
                 let searchResponse = try await apiService.searchCards(
                     config: context.serverConfiguration,
-                    token: token,
+                    token: token ?? "",
                     query: sanitized,
                     game: context.mode.tcgGame
                 )

@@ -79,7 +79,7 @@ extension APIService {
         tcg: String? = nil
     ) async throws -> [TcgSet] {
         if config.isDemoMode {
-            return []
+            return DemoStore.shared.getSets(tcg: tcg)
         }
 
         var path = "cards/sets"
@@ -110,7 +110,7 @@ extension APIService {
         setCode: String
     ) async throws -> [Card] {
         if config.isDemoMode {
-            return []
+            return DemoStore.shared.getSetCards(tcg: tcg, setCode: setCode)
         }
 
         let path = "cards/sets/\(tcg)/\(setCode)"

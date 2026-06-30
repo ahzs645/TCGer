@@ -25,6 +25,11 @@ struct SettingsView: View {
     @State private var exportData: Data?
     @State private var exportFilename: String?
 
+    /// True when running fully on-device with no backend server.
+    private var isLocalMode: Bool {
+        environmentStore.serverConfiguration.isDemoMode
+    }
+
     var body: some View {
         NavigationView {
             List {
@@ -116,24 +121,34 @@ struct SettingsView: View {
                     Text("Appearance")
                 }
 
-                // Server Section
+                // Connection Section
                 Section {
                     HStack {
-                        Text("Base URL")
+                        Text("Mode")
                         Spacer()
-                        Text(environmentStore.serverConfiguration.baseURL.isEmpty ? "Not set" : environmentStore.serverConfiguration.baseURL)
+                        Text(isLocalMode ? "On this phone" : "Server")
                             .foregroundColor(.secondary)
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(1)
                     }
-                    Button("Reconfigure Server") {
+                    if !isLocalMode {
+                        HStack {
+                            Text("Base URL")
+                            Spacer()
+                            Text(environmentStore.serverConfiguration.baseURL.isEmpty ? "Not set" : environmentStore.serverConfiguration.baseURL)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.trailing)
+                                .lineLimit(1)
+                        }
+                    }
+                    Button(isLocalMode ? "Connect to a Server" : "Reconfigure Connection") {
                         environmentStore.serverConfiguration = .empty
                         environmentStore.signOut()
                     }
                 } header: {
-                    Text("Server")
+                    Text("Connection")
                 } footer: {
-                    Text("Change your TCG Manager server connection")
+                    Text(isLocalMode
+                        ? "Your collection lives entirely on this phone. Connect to a TCG Manager server if you want to sync across devices."
+                        : "Change your TCG Manager server connection, or switch to keeping everything on this phone.")
                 }
 
                 // TCG Modules Section
@@ -341,90 +356,91 @@ struct SettingsView: View {
 
                 // Data & Sync Section
                 Section {
-                    Button(action: { Task { await refreshServerStatus() } }) {
-                        HStack {
-                            Text("Connection Status")
-                            Spacer()
-                            if serverStatus == .checking {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .scaleEffect(0.8)
-                            } else {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(serverStatus.color)
-                                        .frame(width: 8, height: 8)
-                                    Text(serverStatus.label)
-                                        .foregroundColor(.secondary)
-                                        .font(.caption)
+                    if !isLocalMode {
+                        Button(action: { Task { await refreshServerStatus() } }) {
+                            HStack {
+                                Text("Connection Status")
+                                Spacer()
+                                if serverStatus == .checking {
+                                    ProgressView()
+                                        .progressViewStyle(.circular)
+                                        .scaleEffect(0.8)
+                                } else {
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(serverStatus.color)
+                                            .frame(width: 8, height: 8)
+                                        Text(serverStatus.label)
+                                            .foregroundColor(.secondary)
+                                            .font(.caption)
+                                    }
                                 }
                             }
                         }
-                    }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
 
-                    Toggle(isOn: $environmentStore.offlineModeEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Offline Mode")
-                            Text("Cache data for offline viewing")
-                                .font(.caption)
+                        Toggle(isOn: $environmentStore.offlineModeEnabled) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Offline Mode")
+                                Text("Cache data for offline viewing")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .disabled(!environmentStore.isAuthenticated)
+
+                        if let lastSync = lastSyncDate {
+                            HStack {
+                                Text("Last Synced")
+                                Spacer()
+                                Text(lastSync, style: .relative)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        // Sync Now Button
+                        Button(action: { Task { await syncNow() } }) {
+                            HStack {
+                                Text(isSyncing ? "Syncing..." : "Sync Now")
+                                Spacer()
+                                if isSyncing {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                        .disabled(!environmentStore.isAuthenticated || serverStatus != .online || isSyncing)
+                    } else {
+                        HStack {
+                            Text("Storage")
+                            Spacer()
+                            Text("On this phone")
                                 .foregroundColor(.secondary)
+                                .font(.caption)
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
-
-                    Toggle(isOn: $environmentStore.autoSyncEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Auto-Sync")
-                            Text("Automatically sync when online")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .disabled(!environmentStore.isAuthenticated || !environmentStore.offlineModeEnabled)
 
                     // Cache Info
                     HStack {
-                        Text("Cache Size")
+                        Text("Image Cache")
                         Spacer()
                         Text(cacheSize)
                             .foregroundColor(.secondary)
                     }
 
-                    if let lastSync = lastSyncDate {
-                        HStack {
-                            Text("Last Synced")
-                            Spacer()
-                            Text(lastSync, style: .relative)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                    // Sync Now Button
-                    Button(action: { Task { await syncNow() } }) {
-                        HStack {
-                            Text(isSyncing ? "Syncing..." : "Sync Now")
-                            Spacer()
-                            if isSyncing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .foregroundColor(.accentColor)
-                            }
-                        }
-                    }
-                    .disabled(!environmentStore.isAuthenticated || serverStatus != .online || isSyncing)
-
                     // Clear Cache Button
-                    Button("Clear Cache", role: .destructive) {
+                    Button("Clear Image Cache", role: .destructive) {
                         showingClearCacheAlert = true
                     }
-                    .disabled(!environmentStore.isAuthenticated)
                 } header: {
                     Text("Data & Sync")
                 } footer: {
-                    Text("Offline mode downloads your collections for viewing without internet. Clear cache to free up storage.")
+                    Text(isLocalMode
+                        ? "Your collection is stored locally on this phone. Clearing the image cache only frees up downloaded artwork."
+                        : "Offline mode downloads your collections for viewing without internet. Clear cache to free up storage.")
                 }
 
                 // Export Section
@@ -466,17 +482,20 @@ struct SettingsView: View {
 
                 // Actions Section
                 Section {
-                    Button("Sign Out", role: .destructive) {
-                        environmentStore.signOut()
+                    if !isLocalMode {
+                        Button("Sign Out", role: .destructive) {
+                            environmentStore.signOut()
+                        }
+                        .disabled(!environmentStore.isAuthenticated)
                     }
-                    .disabled(!environmentStore.isAuthenticated)
 
                     Button("Reset All Settings", role: .destructive) {
                         showingResetAlert = true
                     }
                 }
 
-                // Scanner Tools (Developer) Section
+                // Scanner Tools (Developer) Section — debug builds only.
+                #if DEBUG
                 Section {
                     NavigationLink {
                         ScannerDebugView()
@@ -502,6 +521,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time.")
                 }
+                #endif
 
                 // App Info Section
                 Section {

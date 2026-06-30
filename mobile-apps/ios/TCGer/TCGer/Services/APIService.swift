@@ -112,6 +112,7 @@ final class DemoStore {
         static let userId = "demo-user-001"
         static let token = "demo-token-static"
         static let unsortedBinderId = "__library__"
+        static let storeFilename = "TCGerLocalStore.json"
     }
 
     private var user: User
@@ -188,6 +189,108 @@ final class DemoStore {
         self.transactions = []
         seedData()
         seedNewFeatureData()
+        loadPersistedState()
+    }
+
+    // MARK: - Persistence
+    //
+    // Local mode keeps everything the user creates on-device. The seed data
+    // above provides starter content on first launch; once the user changes
+    // anything we snapshot the mutable state to disk and restore it on the
+    // next launch so nothing is lost when the app is relaunched.
+
+    private struct PersistedState: Codable {
+        var collections: [Collection]
+        var tags: [CollectionCardTag]
+        var wishlists: [Wishlist]
+        var sealedInventory: [SealedInventoryItem]
+        var transactions: [Transaction]
+        var nextBinderId: Int
+        var nextCollectionCardId: Int
+        var nextCopyId: Int
+        var nextTagId: Int
+        var nextWishlistId: Int
+        var nextTransactionId: Int
+        var user: User?
+        var preferences: APIService.UserPreferences?
+        var appSettings: AppSettings?
+    }
+
+    private static var storeURL: URL? {
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documents.appendingPathComponent(Constants.storeFilename)
+    }
+
+    private func loadPersistedState() {
+        guard let url = DemoStore.storeURL,
+              FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let state = try? JSONDecoder().decode(PersistedState.self, from: data) else {
+            return
+        }
+
+        collections = state.collections
+        tags = state.tags
+        wishlists = state.wishlists
+        sealedInventory = state.sealedInventory
+        transactions = state.transactions
+        nextBinderId = state.nextBinderId
+        nextCollectionCardId = state.nextCollectionCardId
+        nextCopyId = state.nextCopyId
+        nextTagId = state.nextTagId
+        nextWishlistId = state.nextWishlistId
+        nextTransactionId = state.nextTransactionId
+        if let user = state.user { self.user = user }
+        if let preferences = state.preferences { self.preferences = preferences }
+        if let appSettings = state.appSettings { self.appSettings = appSettings }
+    }
+
+    private func persist() {
+        guard let url = DemoStore.storeURL else { return }
+        let state = PersistedState(
+            collections: collections,
+            tags: tags,
+            wishlists: wishlists,
+            sealedInventory: sealedInventory,
+            transactions: transactions,
+            nextBinderId: nextBinderId,
+            nextCollectionCardId: nextCollectionCardId,
+            nextCopyId: nextCopyId,
+            nextTagId: nextTagId,
+            nextWishlistId: nextWishlistId,
+            nextTransactionId: nextTransactionId,
+            user: user,
+            preferences: preferences,
+            appSettings: appSettings
+        )
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        try? data.write(to: url, options: [.atomic])
+    }
+
+    /// Erase persisted local data and restore the original seed content.
+    func resetLocalData() {
+        if let url = DemoStore.storeURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        collections = []
+        wishlists = []
+        sealedInventory = []
+        transactions = []
+        tags = [
+            CollectionCardTag(id: "demo-tag-1", label: "For Trade", colorHex: "4caf50"),
+            CollectionCardTag(id: "demo-tag-2", label: "PC", colorHex: "2196f3"),
+            CollectionCardTag(id: "demo-tag-3", label: "Needs Grading", colorHex: "ff9800")
+        ]
+        nextBinderId = 3
+        nextCollectionCardId = 100
+        nextCopyId = 1000
+        nextTagId = 4
+        nextWishlistId = 1
+        nextTransactionId = 1
+        seedData()
+        seedNewFeatureData()
     }
 
     func authenticate(username: String? = nil, email: String? = nil) -> AuthResponse {
@@ -207,6 +310,7 @@ final class DemoStore {
             enabledPokemon: preferences.enabledPokemon,
             defaultGame: nil
         )
+        persist()
         return AuthResponse(user: user, token: Constants.token)
     }
 
@@ -232,6 +336,7 @@ final class DemoStore {
             appName: appName ?? appSettings.appName,
             updatedAt: DemoStore.isoFormatter.string(from: Date())
         )
+        persist()
         return appSettings
     }
 
@@ -267,6 +372,7 @@ final class DemoStore {
             enabledPokemon: preferences.enabledPokemon,
             defaultGame: nil
         )
+        persist()
         return preferences
     }
 
@@ -302,6 +408,7 @@ final class DemoStore {
             defaultGame: nil
         )
 
+        persist()
         return APIService.UpdatedProfile(
             id: user.id,
             email: user.email,
@@ -322,7 +429,7 @@ final class DemoStore {
             return CardSearchResponse(cards: [], total: 0)
         }
 
-        let results = searchCatalog.filter { card in
+        let results = catalogCards().filter { card in
             let gameMatches = game == .all || card.tcg.lowercased() == game.rawValue
             guard gameMatches else { return false }
             return card.name.lowercased().contains(trimmed)
@@ -331,6 +438,117 @@ final class DemoStore {
         }
 
         return CardSearchResponse(cards: results, total: results.count)
+    }
+
+    /// The local card catalog available offline: the bundled seed catalog plus
+    /// every distinct card the user already owns. This keeps search and the set
+    /// browser reflecting what is actually on the phone instead of returning
+    /// nothing in local mode. A fuller bundled catalog can be merged here later.
+    private func catalogCards() -> [Card] {
+        var result = searchCatalog
+        var seenIds = Set(result.map { $0.id })
+        for collection in collections {
+            for cc in collection.cards {
+                let id = cc.externalId ?? cc.cardId
+                guard !seenIds.contains(id) else { continue }
+                seenIds.insert(id)
+                result.append(
+                    Card(
+                        id: id,
+                        name: cc.name,
+                        tcg: cc.tcg,
+                        setCode: cc.setCode,
+                        setName: cc.setName,
+                        rarity: cc.rarity,
+                        imageUrl: cc.imageUrl,
+                        imageUrlSmall: cc.imageUrlSmall,
+                        price: cc.price,
+                        collectorNumber: cc.collectorNumber,
+                        releasedAt: nil
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    func getSets(tcg: String?) -> [TcgSet] {
+        var sets: [String: TcgSet] = [:]
+        var counts: [String: Int] = [:]
+        for card in catalogCards() {
+            guard let code = card.setCode, !code.isEmpty else { continue }
+            if let tcg, card.tcg != tcg { continue }
+            let id = "\(card.tcg)-\(code)"
+            counts[id, default: 0] += 1
+            if sets[id] == nil {
+                sets[id] = TcgSet(
+                    code: code,
+                    name: card.setName ?? code,
+                    tcg: card.tcg,
+                    releaseDate: nil,
+                    totalCards: nil,
+                    iconUrl: nil,
+                    logoUrl: nil
+                )
+            }
+        }
+        return sets.values
+            .map { set in
+                TcgSet(
+                    code: set.code,
+                    name: set.name,
+                    tcg: set.tcg,
+                    releaseDate: set.releaseDate,
+                    totalCards: counts["\(set.tcg)-\(set.code)"],
+                    iconUrl: set.iconUrl,
+                    logoUrl: set.logoUrl
+                )
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    func getSetCards(tcg: String, setCode: String) -> [Card] {
+        catalogCards().filter { $0.tcg == tcg && $0.setCode == setCode }
+    }
+
+    func exportCollections(format: String) -> Data {
+        if format.lowercased() == "csv" {
+            return exportCollectionsCSV()
+        }
+        return (try? JSONEncoder().encode(collections)) ?? Data("[]".utf8)
+    }
+
+    private func exportCollectionsCSV() -> Data {
+        func escape(_ value: String?) -> String {
+            let raw = value ?? ""
+            guard raw.contains(",") || raw.contains("\"") || raw.contains("\n") else {
+                return raw
+            }
+            return "\"" + raw.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+
+        var rows = ["Binder,Name,TCG,SetCode,SetName,Rarity,CollectorNumber,Quantity,Condition,Language,Price,Notes"]
+        for collection in collections {
+            for card in collection.cards {
+                let price = card.price.map { String(format: "%.2f", $0) } ?? ""
+                let fields = [
+                    collection.name,
+                    card.name,
+                    card.tcg,
+                    card.setCode ?? "",
+                    card.setName ?? "",
+                    card.rarity ?? "",
+                    card.collectorNumber ?? "",
+                    String(card.quantity),
+                    card.condition ?? "",
+                    card.language ?? "",
+                    price,
+                    card.notes ?? ""
+                ]
+                rows.append(fields.map(escape).joined(separator: ","))
+            }
+        }
+        return Data(rows.joined(separator: "\n").utf8)
     }
 
     func getCardPrints(tcg: String, cardId: String) -> [Card] {
@@ -369,6 +587,7 @@ final class DemoStore {
         )
         nextBinderId += 1
         collections.append(collection)
+        persist()
         return collection
     }
 
@@ -392,6 +611,7 @@ final class DemoStore {
             colorHex: colorHex ?? existing.colorHex
         )
         collections[index] = updated
+        persist()
         return updated
     }
 
@@ -403,6 +623,7 @@ final class DemoStore {
             throw APIService.APIError.serverError(status: 404, message: "Collection not found")
         }
         collections.remove(at: index)
+        persist()
     }
 
     func getTags() -> [CollectionCardTag] {
@@ -417,6 +638,7 @@ final class DemoStore {
         )
         nextTagId += 1
         tags.append(newTag)
+        persist()
         return newTag
     }
 
@@ -512,6 +734,7 @@ final class DemoStore {
         }
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
+        persist()
     }
 
     func updateCardInBinder(
@@ -595,6 +818,7 @@ final class DemoStore {
             guard let updatedDestination = destinationCards.first(where: { $0.cardId == sourceCard.cardId }) else {
                 throw APIService.APIError.serverError(status: 500, message: "Failed to move card")
             }
+            persist()
             return updatedDestination
         }
 
@@ -695,6 +919,7 @@ final class DemoStore {
 
         sourceCards[sourceCardIndex] = updatedCard
         collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
+        persist()
         return updatedCard
     }
 
@@ -724,6 +949,7 @@ final class DemoStore {
         }
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
+        persist()
     }
 
     private static func cardBack(for tcg: String) -> String {
@@ -1168,11 +1394,35 @@ final class DemoStore {
         let wl = Wishlist(id: "demo-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now)
         nextWishlistId += 1
         wishlists.insert(wl, at: 0)
+        persist()
         return wl
+    }
+
+    func updateWishlist(id: String, name: String?, description: String?, colorHex: String?) throws -> Wishlist {
+        guard let idx = wishlists.firstIndex(where: { $0.id == id }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        let wl = wishlists[idx]
+        let updated = Wishlist(
+            id: wl.id,
+            name: name ?? wl.name,
+            description: description ?? wl.description,
+            colorHex: colorHex ?? wl.colorHex,
+            cards: wl.cards,
+            totalCards: wl.totalCards,
+            ownedCards: wl.ownedCards,
+            completionPercent: wl.completionPercent,
+            createdAt: wl.createdAt,
+            updatedAt: DemoStore.isoFormatter.string(from: Date())
+        )
+        wishlists[idx] = updated
+        persist()
+        return updated
     }
 
     func deleteWishlist(id: String) {
         wishlists.removeAll { $0.id == id }
+        persist()
     }
 
     func addCardToWishlist(wishlistId: String, card: Card) throws -> WishlistCard {
@@ -1185,6 +1435,7 @@ final class DemoStore {
         var cards = wl.cards
         cards.append(wc)
         wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+        persist()
         return wc
     }
 
@@ -1194,6 +1445,7 @@ final class DemoStore {
         let cards = wl.cards.filter { $0.id != cardId }
         let now = DemoStore.isoFormatter.string(from: Date())
         wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+        persist()
     }
 
     // MARK: - Sealed Accessors
@@ -1206,11 +1458,32 @@ final class DemoStore {
         let now = DemoStore.isoFormatter.string(from: Date())
         let item = SealedInventoryItem(id: "demo-si-\(Int.random(in: 100...9999))", product: product, quantity: quantity, purchasePrice: purchasePrice, purchaseDate: now, notes: nil, createdAt: now)
         sealedInventory.insert(item, at: 0)
+        persist()
         return item
+    }
+
+    func updateSealedInventory(itemId: String, quantity: Int?, purchasePrice: Double?, purchaseDate: String?, notes: String?) throws -> SealedInventoryItem {
+        guard let idx = sealedInventory.firstIndex(where: { $0.id == itemId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Inventory item not found")
+        }
+        let item = sealedInventory[idx]
+        let updated = SealedInventoryItem(
+            id: item.id,
+            product: item.product,
+            quantity: quantity ?? item.quantity,
+            purchasePrice: purchasePrice ?? item.purchasePrice,
+            purchaseDate: purchaseDate ?? item.purchaseDate,
+            notes: notes ?? item.notes,
+            createdAt: item.createdAt
+        )
+        sealedInventory[idx] = updated
+        persist()
+        return updated
     }
 
     func deleteSealedInventory(itemId: String) {
         sealedInventory.removeAll { $0.id == itemId }
+        persist()
     }
 
     // MARK: - Finance Accessors
@@ -1228,10 +1501,12 @@ final class DemoStore {
         let txn = Transaction(id: "demo-txn-\(nextTransactionId)", type: type, cardName: cardName, tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform, notes: notes, date: now)
         nextTransactionId += 1
         transactions.insert(txn, at: 0)
+        persist()
         return txn
     }
 
     func deleteTransaction(id: String) {
         transactions.removeAll { $0.id == id }
+        persist()
     }
 }

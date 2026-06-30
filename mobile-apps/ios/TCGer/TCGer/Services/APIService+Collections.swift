@@ -574,7 +574,7 @@ extension APIService {
         format: String = "json"
     ) async throws -> Data {
         if config.isDemoMode {
-            return Data("[]".utf8)
+            return DemoStore.shared.exportCollections(format: format)
         }
 
         let (data, response) = try await makeRequest(
@@ -603,6 +603,12 @@ extension APIService {
         imageData: Data,
         filename: String = "photo.jpg"
     ) async throws -> [String] {
+        if config.isDemoMode {
+            // Local mode has no image store; report no remote images rather than
+            // failing the whole add/edit flow.
+            return []
+        }
+
         guard let url = config.endpoint(path: "collections/\(binderId)/cards/\(collectionId)/images") else {
             throw APIError.invalidURL
         }
@@ -648,6 +654,10 @@ extension APIService {
         collectionId: String,
         imageIndex: Int
     ) async throws {
+        if config.isDemoMode {
+            return
+        }
+
         let (_, response) = try await makeRequest(
             config: config,
             path: "collections/\(binderId)/cards/\(collectionId)/images/\(imageIndex)",
