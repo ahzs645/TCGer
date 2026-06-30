@@ -7,8 +7,8 @@ import Foundation
 /// then computes artwork fingerprint + HSV histogram for identification against
 /// a preloaded database of 21,900 Pokemon card fingerprints.
 ///
-/// Combined score: 85% artwork cosine similarity + 15% HSV cosine similarity.
-/// Reduces matching ambiguity from 77% to 53% compared to artwork-only matching.
+/// Combined score: 5% artwork cosine similarity + 95% HSV cosine similarity
+/// (see `ArtworkFingerprintMatcher.artworkWeight` for the tuning sweep).
 final class ArtworkFingerprintScannerStrategy: ScanStrategy {
     private enum Config {
         static let minimumSimilarity: Float = 0.90

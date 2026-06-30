@@ -453,6 +453,8 @@ private extension CardScannerView {
         switch viewModel.selectedEngine {
         case .automatic:
             return "Live preview stays on-device. The shutter keeps the current automatic fallback order for the selected game."
+        case .localOnly:
+            return "Everything runs on this phone using the bundled fingerprint and hash databases. No server or internet required."
         case .serverHash:
             return "Live preview is disabled for this mode. The shutter sends the capture to the server hash matcher."
         case .serverEmbedding:

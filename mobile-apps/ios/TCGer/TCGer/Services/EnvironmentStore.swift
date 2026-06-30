@@ -109,9 +109,12 @@ final class EnvironmentStore: ObservableObject {
     init() {
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
-            serverConfiguration = decoded.baseURL.isEmpty ? .localDefault : decoded
+            // A previously-saved empty config falls back to on-device mode so a
+            // fresh launch lands in a working phone-only experience instead of a
+            // failed connection to a server that was never set up.
+            serverConfiguration = decoded.baseURL.isEmpty ? .demoLocal : decoded
         } else {
-            serverConfiguration = .localDefault
+            serverConfiguration = .demoLocal
         }
 
         if let data = storage.data(forKey: Keys.credentials),
