@@ -187,6 +187,54 @@ Perspective rectification (2026-07-02, "what people do online" applied):
   Energy Retrieval (0.69), Galarian Yamask (dark+glare, rank ~1 after rectify
   but ~0.61), Slowking-recap (fast flipping). All are title-OCR-rescuable.
 
+Technique survey round 2 (2026-07-02, user-driven):
+
+- Statistical acceptance (Magic Card Detector's 4-sigma rule) — TESTED, does
+  NOT transfer to DINOv2 cosine distributions: z-scores of junk (2.5-2.8) and
+  wrong matches (2.75) interleave with good matches (2.6-3.5). Fixed
+  threshold + gate stays. (z/margin could still be gate-v2 features.)
+- Track-level embedding averaging — TESTED offline, strong WHEN fused with
+  rectification and track purity: Energy Retrieval rank 23 -> 1, Morpeko V
+  rank 239 -> 2 (twin print), Spheal +0.055. Does not fix all-frames-glared
+  (Yamask) or mixed-card windows. PORTED TO BROWSER: `EmbeddingTrackAverager`
+  in use-video-scan-processor.ts (spatial-bucket tracks like the OCR voters,
+  sliding window 5, mean-normalized query once >=2 frames) + the rescue
+  cascade via `frontend/src/lib/scan/card-rectify.ts` (copy of the backend
+  module — keep in sync). Production build passes. The offline harness
+  remains per-frame (no tracker), so browser recall should now EXCEED the
+  benchmark numbers.
+- Still on the shelf, in rough priority: art-crop fallback index (occluded
+  cards; Magic detector future-work + our old artwork pipeline), ArcFace-style
+  fine-tuned embedding (Ximilar's approach — GT v2 + crop dataset now provide
+  the training data), rotation TTA in the cascade (for upside-down cards in
+  live use), alpha-QE query expansion (margin-gate it: blurs twins).
+
+Title-band OCR fallback (2026-07-02) — **100% window coverage reached**:
+
+- `backend/src/scripts/title-ocr.ts` + `--title-ocr` on the harness: when the
+  cascade still fails on a gate-approved card face, OCR the title band
+  (top 2-12% of the rectified/plain crop, 3x upscale), match the longest
+  index card name contained verbatim in the collapsed text, then let the
+  embedding pick the PRINT within that name's entries (restricted re-rank —
+  reliable even when the global rank is not; sanity floor 0.45).
+- Full Sinnoh video (1s, GT v2 = 94 windows): **91/91 scored windows
+  identified (100%)**, up from 87/91 with the cascade alone; the 4 gains are
+  exactly the prior misses (Chinchou, Energy Retrieval, Galarian Yamask,
+  Slowking-recap), 14 title-OCR observations, zero windows lost. Report:
+  `docs/benchmarks/2026-07-02-sinnoh-rectify/full-1s-titleocr.eval-v2-tol5.json`.
+- PITFALL FIXED: Stage-1/2 cards print "Evolves from <pre-evolution>" under
+  the title; when OCR reads that line but misses the stylized title, the
+  pre-evolution matches (observed: Slurpuff -> "Swirlix" x3). matchTitleText
+  strips `evolvesfrom<name>` before matching.
+- GOTCHA: terminate the Tesseract worker (`terminateTitleWorker`) or the
+  Node process never exits.
+- NOT yet in the browser: title-OCR port needs a letters-whitelist Tesseract
+  worker beside the digits one in collector-ocr.ts, plus the name index
+  (entries are already client-side). Basic-energy cards have no collector
+  number AND single-word names shorter than the 6-char floor ("Fire Energy"
+  passes; bare "Potion" would not) — keep the floor, it is the false-positive
+  guard.
+
 Remaining follow-ups:
 
 - Real-camera validation on a physical iPhone (still never done — no device).
