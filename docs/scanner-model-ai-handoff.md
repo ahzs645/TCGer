@@ -136,6 +136,16 @@ Highest-leverage next steps — ALL SHIPPED later the same day (session 2):
    (`eval-recognition.ts` metrics: ocrMatchedRate 0 → 0.5, exact-print top-1
    2/9 → 4/9 on that set).
 
+Sampling-rate finding (user-driven, 2026-07-01 late): cards in this video are
+on screen ~1.5-2.5s each during pack flips. At 2s sampling a card can land
+entirely on its transition frames (Sinistea at ~203s was missed this way; a
+0.5s rescan identifies it at 0.83 plus three more pack-1 cards every slower
+pass missed: Fire Energy, Dubwool, Lucky Egg — all now in GT v2). Rule of
+thumb: offline benchmarks of pack-opening content need >= 1 fps sampling; the
+live browser scanner is busy-loop paced (~2-5 fps effective) and is not
+affected. `--start-seconds/--end-seconds` on live-video-stream-scan.ts make
+segment rescans cheap.
+
 Remaining follow-ups:
 
 - Real-camera validation on a physical iPhone (still never done — no device).
