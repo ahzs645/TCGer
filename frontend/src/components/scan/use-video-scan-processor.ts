@@ -12,8 +12,11 @@ import {
 } from "@/lib/scan/browser-video-matcher";
 import {
   computeEmbeddingFromCanvas,
+  ensureCardFaceGate,
   ensureEmbeddingModel,
   matchEmbeddingTopK,
+  scoreCardFaceGate,
+  type CardFaceGate,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
 import {
@@ -55,6 +58,13 @@ import {
 
 /** Frame size for YOLO detection. */
 const MODEL_FRAME_SIZE = 640;
+/**
+ * Frame size for recognition crops. Detection runs on the 640px frame, but
+ * crops for embedding/OCR come from this higher-resolution capture of the same
+ * frame — crop resolution was the dominant accuracy lever in the offline
+ * benchmark (100% vs 85% committed-label precision on the Sinnoh video).
+ */
+const CROP_FRAME_SIZE = 1920;
 const EMBEDDING_SHORTLIST_SIZE = 20;
 
 export interface ProcessorCallbacks {
@@ -504,11 +514,18 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       // embedding shortlist is ambiguous (likely twins).
       void ensureOcrWorker();
       const ocrTrackers = new Map<string, OcrVoteTracker>();
+      // Open-set rejection gate (null = artifact missing or encoder mismatch;
+      // scanning proceeds ungated).
+      const cardFaceGate = await ensureCardFaceGate(embeddingIndex);
 
       callbacks.onStatus(
         "YOLO + embedding active — play, pause, or scrub. Cards are identified on-device.",
       );
       prevFrameGrayRef.current = null;
+      // Full-resolution capture of the same frame, taken at the same instant
+      // as the detection frame (the video advances during async detection, so
+      // cropping from the live element would misalign with the boxes).
+      const cropFrameCanvas = document.createElement("canvas");
       let processedFrames = 0;
       let skippedFrames = 0;
       let blurredFrames = 0;
@@ -561,6 +578,8 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
             frameCanvas,
             MODEL_FRAME_SIZE,
           );
+          drawVideoFrameToCanvas(video, cropFrameCanvas, CROP_FRAME_SIZE);
+          const cropScale = cropFrameCanvas.width / frameCanvas.width;
           callbacks.onMetadata({ duration: video.duration, width, height });
 
           try {
@@ -581,11 +600,13 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
               const ocrTracker = getOcrTrackerForDetection(det, ocrTrackers);
               const pm = await matchDetectionEmbedding(
                 det,
-                frameCanvas,
+                cropFrameCanvas,
+                cropScale,
                 embeddingIndex,
                 scanFilter,
                 motion.still,
                 ocrTracker,
+                cardFaceGate,
               );
               if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
               proposalMatches.push(pm);
@@ -797,13 +818,18 @@ const OCR_MARGIN_THRESHOLD = 0.1;
 
 async function matchDetectionEmbedding(
   det: OBBDetection,
-  frameCanvas: HTMLCanvasElement,
+  cropFrameCanvas: HTMLCanvasElement,
+  cropScale: number,
   embeddingIndex: EmbeddingIndex,
   scanFilter: ScanFilter,
   frameStill: boolean,
   ocrTracker: OcrVoteTracker | null,
+  cardFaceGate: CardFaceGate | null,
 ): Promise<BrowserVideoProposalMatch> {
-  const cropCanvas = extractCardCrop(frameCanvas, det);
+  // Crop at source resolution (detection coords are in 640px-frame space).
+  // The sharpness gate downsamples to 96px internally, so its calibration is
+  // unaffected by the higher-resolution crop.
+  const cropCanvas = extractCardCrop(cropFrameCanvas, det, cropScale);
 
   let bestMatch: BrowserVideoScanCandidate | null = null;
   let candidates: BrowserVideoScanCandidate[] = [];
@@ -820,7 +846,15 @@ async function matchDetectionEmbedding(
 
   if (!skipLabel) {
     const embedding = await computeEmbeddingFromCanvas(cropCanvas);
-    if (embedding) {
+    if (
+      embedding &&
+      cardFaceGate &&
+      scoreCardFaceGate(cardFaceGate, embedding) < cardFaceGate.threshold
+    ) {
+      // Open-set rejection: this crop is a pack/back/hand/bad crop — matching
+      // it against the index would just return the nearest wrong card.
+      skipLabel = "yolo-nonface";
+    } else if (embedding) {
       candidates = matchEmbeddingTopK(embedding, embeddingIndex, {
         topK: EMBEDDING_SHORTLIST_SIZE,
         tcgFilter: scanFilter,

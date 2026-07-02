@@ -1,6 +1,153 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-07-01
+Last updated: 2026-07-01 (evening session: ground truth v2, rejection gate, full-res crops)
+
+## Session Results 2026-07-01
+
+Headline: the recognition pipeline is far better than the old benchmark said.
+The v1 ground-truth fixture was systematically misaligned; 16/16 sampled
+"wrong" labels were verified frame-by-frame to be CORRECT scanner output,
+usually down to the exact collector number.
+
+Benchmark (Sinnoh video, 10s sampling, scored against ground truth v2 with
+`--tolerance-seconds 5`, jumbo excluded):
+
+| run | crops | gate | coverage | top-1 name | committed-label precision |
+|---|---|---|---|---|---|
+| baseline | 640px frames | off | 73.7% | 27.6% | 22/26 = 85% |
+| gated | 640px frames | 0.45 | 73.7% | 27.6% | 22/26 = 85% |
+| gated + full-res | 1080p frames | 0.45 | 85.5% | 35.5% | **31/31 = 100%** |
+
+Key takeaways:
+
+- Crop resolution was the dominant error source. Cropping from the full-res
+  frame (detect on 640, crop from source) removed every misidentification
+  (Morpeko V -> Pikachu ex/Pachirisu ex, Furfrou -> Shiftry were 640px-crop
+  confusions).
+- The rejection gate (logistic head on the existing DINOv2 embedding) rejects
+  ~66% of junk crops at 98.7% card-face recall on held-out video time. It did
+  not change top-1 on this video (all above-threshold errors were real card
+  faces), but it kills junk before retrieval and is the open-set safety net.
+- Low top-1-per-window is now mostly a sampling artifact: most reveal windows
+  are ~4s, so 10s sampling misses them entirely. Per-observation precision is
+  the honest runtime metric.
+- ffmpeg `fps=1/N` sampling has a phase offset of up to ~4s between different
+  N. Ground-truth windows are padded and the evaluator has
+  `--tolerance-seconds` for this. Do not compare runs at different sample
+  rates without tolerance.
+
+New artifacts and scripts (all in this repo):
+
+- `backend/fixtures/video-ground-truth/sinnoh-first-partner-pack.ground-truth.v2.json`
+  — rebuilt evidence-based ground truth: 79 windows (76 scored, 3 jumbo),
+  each tagged `verified-frame` (human/agent eyeballed the frame) or
+  `proposal` (pipeline-confident, sim >= 0.75). v1 kept for history; USE V2.
+- `backend/src/scripts/build-video-crop-dataset.ts` — auto-labeled crop
+  dataset from a video + ground truth (card-face / negative / uncertain by
+  window membership; ~650 crops from the Sinnoh video at 2s sampling).
+- `backend/src/scripts/train-rejection-gate.ts` — trains the card-face gate:
+  class-balanced logistic regression on the L2-normalized DINOv2 embedding,
+  time-based train/val split, threshold table + recommendation.
+- `backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json` — trained
+  gate artifact (384-d weights + bias + recommendedThreshold 0.45). Runtime
+  cost: one dot product. Portable to web and iOS as-is.
+- `backend/src/scripts/propose-video-ground-truth.ts` — dense full-res gated
+  pipeline pass that groups confident identifications into draft ground-truth
+  windows with per-window evidence frames (labeling tool, uses tfjs-node).
+- `live-video-stream-scan.ts` new flags: `--gate <artifact>`,
+  `--gate-threshold <x>`, `--full-res-crops`.
+- `eval-video-stream.ts` new flag: `--tolerance-seconds <n>`.
+- `docs/benchmarks/2026-07-01-sinnoh/` — the three eval reports above.
+
+Reproduce the best run:
+
+```bash
+cd /Users/ahmadjalil/github/TCGer
+# serve the YOLO model (any static server on 3003 works)
+(cd frontend/public && python3 -m http.server 3003 &)
+
+npm --prefix backend run scan:video-live-stream -- \
+  --video "/Users/ahmadjalil/Downloads/YTDown_YouTube_Sinnoh-Pokemon-TCG-First-Partner-Pack-Op_Media_wH1JUdnkKHA_001_1080p60.mp4" \
+  --sample-seconds 10 \
+  --gate backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json \
+  --full-res-crops \
+  --out-dir /tmp/tcger-live-fullres
+
+npm --prefix backend run eval:video-stream -- \
+  --ground-truth /Users/ahmadjalil/github/TCGer/backend/fixtures/video-ground-truth/sinnoh-first-partner-pack.ground-truth.v2.json \
+  --results /tmp/tcger-live-fullres/live-stream-results.json \
+  --exclude-tags jumbo --tolerance-seconds 5 \
+  --out /tmp/tcger-live-fullres/eval-report.json
+```
+
+Gotchas found this session:
+
+- npm scripts run with `backend/` as cwd; relative `--ground-truth` paths in
+  the older examples below resolve wrong. Pass absolute paths.
+- `@tensorflow/tfjs-node` breaks on Node >= 23 (`util.isNullOrUndefined`
+  removed); offline tools shim it (see build-video-crop-dataset.ts). Never
+  needed for runtime code.
+- tcgdex names differ from card wording in places ("Castform Rain Form" vs
+  "Castform Rainy Form") — ground truth uses `acceptedNames` for aliases.
+
+Highest-leverage next steps — ALL SHIPPED later the same day (session 2):
+
+1. DONE — full-res cropping in the browser scanner. `extractCardCrop` takes a
+   `sourceScale`; `processYoloWithEmbedding` captures a 1920px copy of each
+   frame at the same instant as the 640px detection frame and crops
+   embedding/OCR inputs from it (`CROP_FRAME_SIZE`). The sharpness gate
+   downsamples to 96px internally, so its calibration is unaffected.
+2. DONE — rejection gate wired into web AND iOS.
+   - Web: artifact served as `/scan-index/card-face-gate.json` (service worker
+     already caches that path). `embedding-matcher.ts` exports
+     `ensureCardFaceGate` (null on missing artifact or encoder/dimension
+     mismatch → gating disabled, never rejects) + `scoreCardFaceGate`;
+     enforced in `matchDetectionEmbedding` before top-K (skip label
+     `yolo-nonface`, outline still shown).
+   - iOS: `CardScanner/Embedding/CardFaceRejectionGate.swift` loads bundled
+     `Resources/ScanIndex/CardFaceGate.json`; `BoardCardEmbeddingScannerStrategy`
+     returns nil for gated crops. Simulator build green, artifact verified in
+     the .app bundle.
+   - NOTE: both runtime copies are gitignored (scan-index JSONs are generated
+     artifacts). The tracked canonical file is
+     `backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json`; on a
+     fresh checkout copy it to `frontend/public/scan-index/card-face-gate.json`
+     and `mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardFaceGate.json`.
+3. DONE — dense-sampling benchmark. `live-video-stream-scan.ts` gained
+   `--native-backend` (tfjs-node, accuracy runs only). 3s sampling + full-res
+   + gate on the Sinnoh video: coverage 85.5% → **98.7%** (75/76 windows),
+   top-1 name 53.9%, per-observation precision 87.9% (91 committed). The new
+   wrong labels are one-frame transition misreads; simulating the doc's
+   temporal rule (same name ≥2 observations within 9s) on the same results
+   gives **100% precision (50/50)**. At browser frame rates (~2-5 fps
+   effective vs 0.33 here) the 2-frame rule costs almost no coverage — the
+   offline 17% coverage under the vote is purely a sparse-sampling artifact.
+   Report: `docs/benchmarks/2026-07-01-sinnoh/gated-fullres-3s.eval-v2-tol5.json`.
+4. DONE — twin-print OCR: slash-less digit-run recovery. Real-video finding:
+   Tesseract reads the Morpeko V footer as "0079202" (= 079/202 with the
+   slash dropped), so the strict NNN/NNN pair rule abstained on every frame.
+   New conservative fallback in `collector-ocr.ts` (`runs` on OcrReading +
+   fusion), `eval-recognition.ts`, and iOS `CollectorNumberOCR.swift`
+   (`readFooter`, `extractDigitRuns`, `runsConfirm`): a 5-8 digit run counts
+   only if it is exactly `0-padded collector number + 2-3 digit denominator`
+   for EXACTLY ONE distinct shortlist number (ambiguity → abstain). Validated
+   on full-res Morpeko V crops: 4/6 frames resolve to the verified-correct
+   swsh1-79, zero false promotions, noisy reads abstain
+   (`eval-recognition.ts` metrics: ocrMatchedRate 0 → 0.5, exact-print top-1
+   2/9 → 4/9 on that set).
+
+Remaining follow-ups:
+
+- Real-camera validation on a physical iPhone (still never done — no device).
+- Web/iOS preprocessing parity (resize-256+crop vs resize-224) is still the
+  known top-1 gap on iOS; see earlier session notes.
+- Grow the crop dataset + retrain the gate on new eval videos (one command
+  each: build-video-crop-dataset.ts → train-rejection-gate.ts). If the
+  embedding model ever changes, the gate MUST be retrained (loaders check
+  model/dimension and disable gating on mismatch).
+- Browser track layer already accumulates per-track evidence; consider making
+  the 2-frame same-name agreement an explicit surfacing rule in
+  `video-scan-tracks.ts` to match the measured 100%-precision policy.
 
 ## Purpose
 

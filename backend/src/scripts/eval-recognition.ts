@@ -173,12 +173,13 @@ async function ocrFooter(
   worker: any,
   buf: Buffer,
   tcg: string,
-): Promise<{ pairs: string[]; numbers: string[]; raw: string }> {
+): Promise<{ pairs: string[]; numbers: string[]; runs: string[]; raw: string }> {
   const meta = await sharp(buf).metadata();
   const W = meta.width ?? 100;
   const H = meta.height ?? 140;
   const pairs: string[] = [];
   const numbers: string[] = [];
+  const runs: string[] = [];
   const raws: string[] = [];
   for (const [l, t, w, h] of FOOTER_REGIONS[tcg] ?? FOOTER_REGIONS.pokemon!) {
     const left = Math.max(0, Math.round(W * l));
@@ -197,8 +198,23 @@ async function ocrFooter(
     if (txt) raws.push(txt);
     for (const m of txt.matchAll(/(\d{1,4})\s*\/\s*(\d{1,4})/g)) pairs.push(norm(m[1]!));
     for (const m of txt.matchAll(/\d{1,5}/g)) numbers.push(norm(m[0]));
+    // Long digit runs: "079/202" read with the slash dropped/misread arrives
+    // as "079202" / "0079202". Kept separately for shape-constrained matching.
+    for (const m of txt.matchAll(/\d{5,8}/g)) runs.push(m[0]!);
   }
-  return { pairs, numbers, raw: raws.join(" | ") };
+  return { pairs, numbers, runs, raw: raws.join(" | ") };
+}
+
+/**
+ * Match a shortlist candidate's collector number against slash-less digit
+ * runs: the run must be exactly `0-padded number + 2-3 digit denominator`.
+ * Much stricter than bare-number matching (which caused false promotions):
+ * the run's shape encodes the full "NNN/NNN" footer, just missing the slash.
+ */
+function runsConfirmNumber(runs: string[], num: string): boolean {
+  if (!/^\d+$/.test(num)) return false;
+  const re = new RegExp(`^0{0,3}${num}\\d{2,3}$`);
+  return runs.some((run) => re.test(run));
 }
 
 // ---------- input collection ----------
@@ -289,18 +305,37 @@ async function main() {
         const reading = await ocrFooter(worker, item.buffer, opts.tcg);
         // Pairs-only override (bare numbers cause false matches on real frames).
         const ocrNums = new Set(reading.pairs);
-        const matched = ocrNums.size
+        let matched = ocrNums.size
           ? top.find((c) => {
               const cn = collectorNumber(c.externalId);
               return cn && ocrNums.has(cn);
             })
           : undefined;
+        // Fallback: slash-less digit-run match ("079202" = 079/202). Only
+        // accepted when it confirms exactly one distinct collector number in
+        // the shortlist — ambiguity means abstain, never guess.
+        let runMatched = false;
+        if (!matched && reading.runs.length) {
+          const confirmed = top.filter((c) => {
+            const cn = collectorNumber(c.externalId);
+            return cn !== null && runsConfirmNumber(reading.runs, cn);
+          });
+          const distinctNumbers = new Set(
+            confirmed.map((c) => collectorNumber(c.externalId)),
+          );
+          if (confirmed.length && distinctNumbers.size === 1) {
+            matched = confirmed[0];
+            runMatched = true;
+          }
+        }
         if (matched) finalId = matched.externalId;
         ocr = {
           triggered: true,
           raw: reading.raw,
           pairs: reading.pairs,
           numbers: reading.numbers,
+          runs: reading.runs,
+          runMatched,
           matchedExternalId: matched?.externalId ?? null,
         };
       }

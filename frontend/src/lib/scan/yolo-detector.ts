@@ -266,13 +266,22 @@ export function isYoloModelReady(): boolean {
 /**
  * Extract a de-rotated card crop from the frame canvas using an OBB detection.
  * Returns a new canvas containing just the card, axis-aligned.
+ *
+ * `sourceScale` maps detection coordinates (in `frameCanvas`'s space) into the
+ * source canvas's space: pass a higher-resolution capture of the same frame
+ * plus its size ratio to crop at source resolution. Crop resolution is the
+ * dominant recognition-accuracy lever (offline: 640px-frame crops caused every
+ * misidentification; full-res crops fixed all of them).
  */
 export function extractCardCrop(
   frameCanvas: HTMLCanvasElement,
   det: OBBDetection,
+  sourceScale = 1,
 ): HTMLCanvasElement {
-  const cardW = Math.round(det.width);
-  const cardH = Math.round(det.height);
+  const cx = det.cx * sourceScale;
+  const cy = det.cy * sourceScale;
+  const cardW = Math.round(det.width * sourceScale);
+  const cardH = Math.round(det.height * sourceScale);
   if (cardW < 10 || cardH < 10) {
     // Too small — return a tiny canvas
     const c = document.createElement("canvas");
@@ -294,7 +303,7 @@ export function extractCardCrop(
   const bcy = bufferSize / 2;
   bCtx.translate(bcx, bcy);
   bCtx.rotate(-det.angle);
-  bCtx.drawImage(frameCanvas, -det.cx, -det.cy);
+  bCtx.drawImage(frameCanvas, -cx, -cy);
   bCtx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Extract the card rectangle from the center of the rotated buffer
