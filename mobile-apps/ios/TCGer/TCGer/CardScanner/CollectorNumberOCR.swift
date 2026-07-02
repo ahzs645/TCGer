@@ -14,9 +14,23 @@ struct CollectorNumberOCR {
     private let footerHeight: CGFloat = 0.11
     private let upscale: CGFloat = 4
 
+    /// Footer OCR output: clean "NNN/NNN" pair numbers plus long digit runs
+    /// ("079/202" read with the slash dropped arrives as "079202").
+    struct FooterReading {
+        let pairNumbers: [String]
+        let digitRuns: [String]
+    }
+
     /// Returns normalised "NNN/NNN" collector numbers found in the footer.
     func readPairNumbers(from image: CGImage) -> [String] {
-        guard let footer = cropFooter(image) else { return [] }
+        readFooter(from: image).pairNumbers
+    }
+
+    /// Reads the footer once and extracts both pair numbers and digit runs.
+    func readFooter(from image: CGImage) -> FooterReading {
+        guard let footer = cropFooter(image) else {
+            return FooterReading(pairNumbers: [], digitRuns: [])
+        }
 
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
@@ -31,7 +45,10 @@ struct CollectorNumberOCR {
         let text = (request.results ?? [])
             .compactMap { $0.topCandidates(1).first?.string }
             .joined(separator: " ")
-        return Self.extractPairNumbers(text)
+        return FooterReading(
+            pairNumbers: Self.extractPairNumbers(text),
+            digitRuns: Self.extractDigitRuns(text)
+        )
     }
 
     private func cropFooter(_ image: CGImage) -> CGImage? {
@@ -72,6 +89,29 @@ struct CollectorNumberOCR {
             }
         }
         return results
+    }
+
+    /// Extract long digit runs (5-8 digits): slash-less footer reads.
+    static func extractDigitRuns(_ text: String) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: #"\d{5,8}"#) else { return [] }
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
+            .map { ns.substring(with: $0.range) }
+    }
+
+    /// True when a digit run has exactly the shape `0-padded number +
+    /// 2-3 digit denominator` for the given (normalised, numeric) collector
+    /// number — i.e. "NNN/NNN" with the slash dropped. Far stricter than a
+    /// bare-number match; callers must additionally require that only one
+    /// distinct shortlist number is confirmed before overriding the embedding.
+    static func runsConfirm(number: String, in runs: [String]) -> Bool {
+        guard !number.isEmpty, number.allSatisfy(\.isNumber) else { return false }
+        guard let regex = try? NSRegularExpression(pattern: "^0{0,3}\(number)\\d{2,3}$") else {
+            return false
+        }
+        return runs.contains { run in
+            regex.firstMatch(in: run, range: NSRange(location: 0, length: (run as NSString).length)) != nil
+        }
     }
 
     /// Strip leading zeros, lowercase — matches the index/externalId convention.

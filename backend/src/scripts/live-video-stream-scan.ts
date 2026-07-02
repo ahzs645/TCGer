@@ -37,6 +37,7 @@ type Candidate = {
 };
 
 type ProposalMatch = {
+  cardFaceScore?: number | null;
   proposal: {
     label: string;
     left: number;
@@ -49,6 +50,13 @@ type ProposalMatch = {
   isClipped: false;
   bestMatch: Candidate | null;
   candidates: Candidate[];
+};
+
+type RejectionGate = {
+  weights: number[];
+  bias: number;
+  threshold: number;
+  source: string;
 };
 
 type EmbeddingIndex = {
@@ -105,6 +113,10 @@ function parseArgs() {
     indexPath:
       args.get('index') ??
       path.resolve('..', 'frontend', 'public', 'scan-index', 'pokemon-embeddings.json'),
+    gatePath: args.get('gate') ?? null,
+    gateThreshold: args.has('gate-threshold') ? Number(args.get('gate-threshold')) : null,
+    fullResCrops: args.has('full-res-crops'),
+    nativeBackend: args.has('native-backend'),
   };
 }
 
@@ -117,7 +129,12 @@ Options:
   --max-frames <n>      stop after n frames, useful for smoke tests
   --out-dir <path>      output directory (default: /tmp/tcger-live-video-stream)
   --model-url <url>     YOLO TF.js model URL (default: frontend dev server)
-  --index <path>        embedding index JSON path`);
+  --index <path>        embedding index JSON path
+  --gate <path>         card-face rejection gate artifact (train-rejection-gate.ts output)
+  --gate-threshold <x>  override the gate's recommended acceptance threshold
+  --full-res-crops      detect on 640px frames but embed crops from the full-resolution frame
+  --native-backend      use @tensorflow/tfjs-node for ~10x faster detection. Accuracy
+                        runs only — timings no longer approximate any browser backend`);
 }
 
 function run(cmd: string, args: string[]) {
@@ -127,9 +144,18 @@ function run(cmd: string, args: string[]) {
   }
 }
 
-function extractFrames(video: string, outDir: string, sampleSeconds: number) {
+function extractFrames(
+  video: string,
+  outDir: string,
+  sampleSeconds: number,
+  fullResolution: boolean,
+) {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
+  const filters = [`fps=1/${sampleSeconds}`];
+  if (!fullResolution) {
+    filters.push(`scale='if(gt(iw,ih),640,-2)':'if(gt(iw,ih),-2,640)'`);
+  }
   run('ffmpeg', [
     '-hide_banner',
     '-loglevel',
@@ -137,7 +163,7 @@ function extractFrames(video: string, outDir: string, sampleSeconds: number) {
     '-i',
     video,
     '-vf',
-    `fps=1/${sampleSeconds},scale='if(gt(iw,ih),640,-2)':'if(gt(iw,ih),-2,640)'`,
+    filters.join(','),
     '-q:v',
     '2',
     path.join(outDir, 'frame-%05d.jpg'),
@@ -151,6 +177,17 @@ async function readRgbImage(file: string) {
   const height = meta.height ?? 0;
   const data = await image.removeAlpha().raw().toBuffer();
   return { data, width, height };
+}
+
+// tfjs-node still calls util.isNullOrUndefined, which Node >= 23 removed.
+function enableNativeBackend() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeUtil = require('node:util') as Record<string, unknown>;
+  if (typeof nodeUtil.isNullOrUndefined !== 'function') {
+    nodeUtil.isNullOrUndefined = (value: unknown) => value === null || value === undefined;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('@tensorflow/tfjs-node');
 }
 
 async function loadYolo(modelUrl: string) {
@@ -282,6 +319,25 @@ function loadEmbeddingIndex(file: string): EmbeddingIndex {
     vectors,
     invNorms,
   };
+}
+
+function loadRejectionGate(file: string, thresholdOverride: number | null): RejectionGate {
+  const artifact = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(artifact.weights) || typeof artifact.bias !== 'number') {
+    throw new Error(`Invalid rejection gate artifact: ${file}`);
+  }
+  return {
+    weights: artifact.weights,
+    bias: artifact.bias,
+    threshold: thresholdOverride ?? artifact.recommendedThreshold ?? 0.5,
+    source: file,
+  };
+}
+
+function gateScore(gate: RejectionGate, embedding: Float32Array) {
+  let z = gate.bias;
+  for (let k = 0; k < gate.weights.length; k++) z += gate.weights[k]! * embedding[k]!;
+  return 1 / (1 + Math.exp(-z));
 }
 
 async function loadEmbedder(index: EmbeddingIndex) {
@@ -429,8 +485,15 @@ async function main() {
   const framesDir = path.join(options.outDir, 'frames');
   mkdirSync(options.outDir, { recursive: true });
 
+  if (options.nativeBackend) {
+    enableNativeBackend();
+    console.warn(
+      'Native tfjs-node backend enabled: use for accuracy runs only, timings are not browser-representative.',
+    );
+  }
+
   const startedAt = performance.now();
-  extractFrames(options.video, framesDir, options.sampleSeconds);
+  extractFrames(options.video, framesDir, options.sampleSeconds, options.fullResCrops);
   let frames = readdirSync(framesDir)
     .filter((f) => f.endsWith('.jpg'))
     .sort();
@@ -446,12 +509,19 @@ async function main() {
   }
   const index = loadEmbeddingIndex(options.indexPath);
   const embed = await loadEmbedder(index);
+  const gate = options.gatePath
+    ? loadRejectionGate(options.gatePath, options.gateThreshold)
+    : null;
+  if (gate) {
+    console.log(`rejection gate: ${gate.source} (threshold ${gate.threshold})`);
+  }
 
   const observations = [];
   const timings = [];
   let detectedFrames = 0;
   let detectedBoxes = 0;
   let embeddedBoxes = 0;
+  let gateRejectedBoxes = 0;
 
   for (const [i, frameName] of frames.entries()) {
     const file = path.join(framesDir, frameName);
@@ -468,10 +538,20 @@ async function main() {
     const embedStart = performance.now();
     for (const box of detections.slice(0, 2)) {
       let candidates: Candidate[] = [];
+      let cardFaceScore: number | null = null;
       try {
         const crop = await cropDetection(file, box);
         const query = await embed(crop.rgba, crop.width, crop.height);
-        candidates = matchEmbedding(query, index, 5);
+        if (gate) {
+          cardFaceScore = gateScore(gate, query);
+          if (cardFaceScore < gate.threshold) {
+            gateRejectedBoxes++;
+          } else {
+            candidates = matchEmbedding(query, index, 5);
+          }
+        } else {
+          candidates = matchEmbedding(query, index, 5);
+        }
         embeddedBoxes++;
       } catch {
         candidates = [];
@@ -479,6 +559,7 @@ async function main() {
       const bestMatch =
         candidates[0]?.passedThreshold === true ? candidates[0] : yoloCandidate(box);
       proposalMatches.push({
+        cardFaceScore,
         proposal: {
           label: bestMatch.proposalLabel,
           left: box.cx - box.width / 2,
@@ -533,6 +614,10 @@ async function main() {
       minSimilarity: EMBEDDING_MIN_SIMILARITY,
       rawEmbeddingPassesOnMarginOnly: false,
     },
+    rejectionGate: gate
+      ? { source: gate.source, threshold: gate.threshold, rejectedBoxes: gateRejectedBoxes }
+      : null,
+    fullResCrops: options.fullResCrops,
     elapsedMs,
     effectiveFps: frames.length / (elapsedMs / 1000),
     detectedFrames,

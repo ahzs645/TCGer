@@ -18,19 +18,22 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let indexStore: ANNIndexProviding
     private let metadataStore: CardIndexMetadataStore
     private let ocr: CollectorNumberOCR
+    private let rejectionGate: CardFaceRejectionGate?
 
     init(
         cropper: CardCropper = CardCropper(),
         encoder: CardEmbeddingEncoder = CardEmbeddingEncoder(),
         indexStore: ANNIndexProviding = AnnoyIndexStore(),
         metadataStore: CardIndexMetadataStore = .shared,
-        ocr: CollectorNumberOCR = CollectorNumberOCR()
+        ocr: CollectorNumberOCR = CollectorNumberOCR(),
+        rejectionGate: CardFaceRejectionGate? = CardFaceRejectionGate.loadBundled()
     ) {
         self.cropper = cropper
         self.encoder = encoder
         self.indexStore = indexStore
         self.metadataStore = metadataStore
         self.ocr = ocr
+        self.rejectionGate = rejectionGate
     }
 
     func supports(_ mode: ScanMode) -> Bool {
@@ -53,6 +56,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let cropped = try cropper.bestCrop(from: image) ?? image
         let embedding = try await encoder.embedding(for: cropped)
         guard !embedding.isEmpty else { return nil }
+
+        // Open-set rejection: packs, card backs, hands, and bad crops must not
+        // be forced to the nearest card. A missing/mismatched gate disables
+        // gating rather than rejecting.
+        if let rejectionGate, rejectionGate.rejects(embedding) {
+            return nil
+        }
 
         let matches: [ANNVectorMatch]
         do {
@@ -104,13 +114,31 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 needsOCRVerification ||
                     (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
             }
-            let pairNumbers = Set(ocr.readPairNumbers(from: cropped))
-            if !pairNumbers.isEmpty,
-               let matched = ocrEligibleCandidates.first(where: { candidate in
-                   guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
-                   else { return false }
-                   return pairNumbers.contains(cn)
-               }) {
+            let reading = ocr.readFooter(from: cropped)
+            let pairNumbers = Set(reading.pairNumbers)
+            var matched = ocrEligibleCandidates.first { candidate in
+                guard !pairNumbers.isEmpty,
+                      let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                else { return false }
+                return pairNumbers.contains(cn)
+            }
+            // Fallback: slash-less digit runs ("079202" = 079/202). Accepted
+            // only when every confirmed candidate agrees on ONE collector
+            // number — ambiguity means abstain, never guess.
+            if matched == nil, !reading.digitRuns.isEmpty {
+                let confirmed = ocrEligibleCandidates.filter { candidate in
+                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                    else { return false }
+                    return CollectorNumberOCR.runsConfirm(number: cn, in: reading.digitRuns)
+                }
+                let distinctNumbers = Set(confirmed.compactMap {
+                    CollectorNumberOCR.collectorNumber(fromCardId: $0.details.identity.id)
+                })
+                if distinctNumbers.count == 1 {
+                    matched = confirmed.first
+                }
+            }
+            if let matched {
                 let collectorNumber = CollectorNumberOCR.collectorNumber(fromCardId: matched.details.identity.id)
                 primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
                 ocrVerified = true

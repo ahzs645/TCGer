@@ -126,6 +126,83 @@ export function parseEmbeddingIndex(
   };
 }
 
+// ---------- card-face rejection gate ----------
+
+/**
+ * Open-set rejection gate: a logistic head trained on the same L2-normalised
+ * embedding this module already computes (train-rejection-gate.ts). Crops that
+ * score below the threshold are packs / card backs / hands / bad crops and
+ * must not be matched against the index — the nearest card is meaningless for
+ * them. Runtime cost: one dot product.
+ */
+export interface CardFaceGate {
+  weights: Float32Array;
+  bias: number;
+  threshold: number;
+  model: string;
+  dimension: number;
+}
+
+const GATE_URL = "/scan-index/card-face-gate.json";
+
+let gatePromise: Promise<CardFaceGate | null> | null = null;
+
+/**
+ * Lazily fetch the rejection-gate artifact. Resolves null (gate disabled) when
+ * the artifact is missing or does not match the index's encoder — a stale gate
+ * from a different embedding model would reject arbitrarily.
+ */
+export function ensureCardFaceGate(
+  index: Pick<EmbeddingIndex, "model" | "dimension">,
+): Promise<CardFaceGate | null> {
+  gatePromise ??= (async () => {
+    try {
+      const res = await fetch(GATE_URL);
+      if (!res.ok) return null;
+      const artifact = (await res.json()) as {
+        model?: string;
+        dimension?: number;
+        weights?: number[];
+        bias?: number;
+        recommendedThreshold?: number;
+      };
+      if (
+        !Array.isArray(artifact.weights) ||
+        typeof artifact.bias !== "number"
+      ) {
+        return null;
+      }
+      return {
+        weights: Float32Array.from(artifact.weights),
+        bias: artifact.bias,
+        threshold: artifact.recommendedThreshold ?? 0.5,
+        model: artifact.model ?? "",
+        dimension: artifact.dimension ?? artifact.weights.length,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  return gatePromise.then((gate) => {
+    if (!gate) return null;
+    if (gate.dimension !== index.dimension) return null;
+    if (gate.model && gate.model !== index.model) return null;
+    return gate;
+  });
+}
+
+/** Card-face probability for an L2-normalised embedding (sigmoid of w·e+b). */
+export function scoreCardFaceGate(
+  gate: CardFaceGate,
+  embedding: Float32Array,
+): number {
+  let z = gate.bias;
+  for (let k = 0; k < gate.weights.length; k++)
+    z += gate.weights[k]! * embedding[k]!;
+  return 1 / (1 + Math.exp(-z));
+}
+
 // ---------- encoder (lazy-loaded Transformers.js) ----------
 
 type TransformersModule = {

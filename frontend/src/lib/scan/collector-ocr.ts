@@ -148,10 +148,19 @@ export interface OcrReading {
   pairs: Array<{ number: string; denominator: string }>;
   /** All bare numeric tokens (weaker signal). */
   numbers: string[];
+  /**
+   * Long digit runs (5-8 digits): a footer "079/202" whose slash Tesseract
+   * dropped/misread arrives as "079202" or "0079202". Matched against the
+   * shortlist by shape (padded number + 2-3 digit denominator), which is far
+   * stricter than bare numbers — verified to resolve the Morpeko V twin pair
+   * on real video crops with zero false promotions.
+   */
+  runs: string[];
 }
 
 const PAIR_RE = /(\d{1,4})\s*\/\s*(\d{1,4})/g;
 const NUM_RE = /\d{1,5}/g;
+const RUN_RE = /\d{5,8}/g;
 
 /** OCR each footer corner and extract collector-number candidates. */
 export async function readFooterText(
@@ -163,6 +172,7 @@ export async function readFooterText(
 
   const pairs: Array<{ number: string; denominator: string }> = [];
   const numbers: string[] = [];
+  const runs: string[] = [];
   const rawParts: string[] = [];
 
   for (const region of regions) {
@@ -179,9 +189,12 @@ export async function readFooterText(
     for (const m of raw.matchAll(NUM_RE)) {
       numbers.push(normalizeCollectorNumber(m[0]));
     }
+    for (const m of raw.matchAll(RUN_RE)) {
+      runs.push(m[0]);
+    }
   }
 
-  return { raw: rawParts.join(" | "), pairs, numbers };
+  return { raw: rawParts.join(" | "), pairs, numbers, runs };
 }
 
 // ---------- fusion ----------
@@ -193,10 +206,14 @@ export async function readFooterText(
  */
 export class OcrVoteTracker {
   private votes = new Map<string, { pair: number; bare: number }>();
+  private runVotes = new Map<string, number>();
 
   add(reading: OcrReading): void {
     for (const p of reading.pairs) this.bucket(p.number).pair += 1;
     for (const n of reading.numbers) this.bucket(n).bare += 1;
+    for (const r of reading.runs) {
+      this.runVotes.set(r, (this.runVotes.get(r) ?? 0) + 1);
+    }
   }
 
   private bucket(n: string): { pair: number; bare: number } {
@@ -215,12 +232,15 @@ export class OcrVoteTracker {
 
   reset(): void {
     this.votes.clear();
+    this.runVotes.clear();
   }
 
   /**
    * Consensus reading from the accumulated votes. A number is a trusted "pair"
    * once it has been read as a clean NNN/NNN at least once; bare numbers must
-   * recur (≥2) to count, filtering transient noise. Sorted by vote weight.
+   * recur (≥2) to count, filtering transient noise. Digit runs pass through
+   * once seen — their safety comes from shape+uniqueness checks at fusion
+   * time, not recurrence. Sorted by vote weight.
    */
   consensus(): OcrReading {
     const pairs: Array<{ number: string; denominator: string }> = [];
@@ -231,7 +251,10 @@ export class OcrVoteTracker {
     }
     pairs.sort((a, b) => this.score(b.number) - this.score(a.number));
     numbers.sort((a, b) => this.score(b) - this.score(a));
-    return { raw: "", pairs, numbers };
+    const runs = [...this.runVotes.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([run]) => run);
+    return { raw: "", pairs, numbers, runs };
   }
 }
 
@@ -262,18 +285,38 @@ export function fuseOcrWithShortlist(
   // fragment) was observed promoting a wrong same-number card over a confident
   // embedding. The doc's rule: trust OCR only when it strongly agrees.
   const pairNumbers = new Set(reading.pairs.map((p) => p.number));
-  if (pairNumbers.size === 0) {
-    return { candidates, matched: false, matchedExternalId: null, ocrNumber: null };
-  }
 
   let best: { idx: number; number: string } | null = null;
-  candidates.forEach((c, idx) => {
-    if (c.tcg !== tcg) return;
-    const { collectorNumber } = parseExternalId(c.externalId);
-    if (!collectorNumber || !pairNumbers.has(collectorNumber)) return;
-    // Highest-ranked (by embedding) candidate whose number the OCR confirms.
-    if (!best) best = { idx, number: collectorNumber };
-  });
+  if (pairNumbers.size > 0) {
+    candidates.forEach((c, idx) => {
+      if (c.tcg !== tcg) return;
+      const { collectorNumber } = parseExternalId(c.externalId);
+      if (!collectorNumber || !pairNumbers.has(collectorNumber)) return;
+      // Highest-ranked (by embedding) candidate whose number the OCR confirms.
+      if (!best) best = { idx, number: collectorNumber };
+    });
+  }
+
+  // Fallback: slash-less digit runs ("079202" = 079/202). A run confirms a
+  // candidate only when it is exactly `0-padded number + 2-3 digit
+  // denominator`; accepted only when all confirmed candidates agree on ONE
+  // collector number — ambiguity means abstain, never guess.
+  if (!best && reading.runs.length > 0) {
+    const confirmed: Array<{ idx: number; number: string }> = [];
+    candidates.forEach((c, idx) => {
+      if (c.tcg !== tcg) return;
+      const { collectorNumber } = parseExternalId(c.externalId);
+      if (!collectorNumber || !/^\d+$/.test(collectorNumber)) return;
+      const re = new RegExp(`^0{0,3}${collectorNumber}\\d{2,3}$`);
+      if (reading.runs.some((run) => re.test(run))) {
+        confirmed.push({ idx, number: collectorNumber });
+      }
+    });
+    const distinctNumbers = new Set(confirmed.map((c) => c.number));
+    if (confirmed.length > 0 && distinctNumbers.size === 1) {
+      best = confirmed[0]!;
+    }
+  }
 
   if (!best) {
     return { candidates, matched: false, matchedExternalId: null, ocrNumber: null };

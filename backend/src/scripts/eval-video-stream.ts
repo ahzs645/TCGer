@@ -82,6 +82,7 @@ interface EvalOptions {
   includeTags: Set<string>;
   excludeTags: Set<string>;
   includeProposals: boolean;
+  toleranceSeconds: number;
 }
 
 function parseArgs(argv: string[]): EvalOptions {
@@ -118,6 +119,7 @@ function parseArgs(argv: string[]): EvalOptions {
     includeTags: splitSet(get('--include-tags')),
     excludeTags: splitSet(get('--exclude-tags')),
     includeProposals: hasFlag('--include-proposals') || hasFlag('--proposals'),
+    toleranceSeconds: Number(get('--tolerance-seconds') ?? '0'),
   };
 }
 
@@ -129,7 +131,9 @@ Options:
   --out <path>            write the JSON report to a file
   --include-tags a,b      only score windows containing at least one listed tag
   --exclude-tags a,b      skip windows containing any listed tag
-  --include-proposals     also score proposalMatches/proposals (alias: --proposals)`);
+  --include-proposals     also score proposalMatches/proposals (alias: --proposals)
+  --tolerance-seconds <n> widen every window by n seconds on both sides to absorb
+                          frame-sampling phase offsets (default: 0)`);
 }
 
 function normalizeName(value: string | null | undefined): string {
@@ -175,8 +179,15 @@ function candidateMatchesExternalId(
   return acceptedIds.has(normalizeExternalId(candidate.externalId));
 }
 
-function inWindow(observation: Observation, window: GroundTruthWindow): boolean {
-  return observation.seconds >= window.startSeconds && observation.seconds <= window.endSeconds;
+function inWindow(
+  observation: Observation,
+  window: GroundTruthWindow,
+  toleranceSeconds: number,
+): boolean {
+  return (
+    observation.seconds >= window.startSeconds - toleranceSeconds &&
+    observation.seconds <= window.endSeconds + toleranceSeconds
+  );
 }
 
 function hasAnyTag(window: GroundTruthWindow, tags: Set<string>): boolean {
@@ -405,8 +416,14 @@ function extractBrowserFrameObservations(
   return observations;
 }
 
-function scoreWindow(window: GroundTruthWindow, observations: Observation[]): WindowScore {
-  const windowObservations = observations.filter((observation) => inWindow(observation, window));
+function scoreWindow(
+  window: GroundTruthWindow,
+  observations: Observation[],
+  toleranceSeconds: number,
+): WindowScore {
+  const windowObservations = observations.filter((observation) =>
+    inWindow(observation, window, toleranceSeconds),
+  );
   const detections = windowObservations.filter(
     (observation) => observation.bestMatch || observation.candidates.length,
   );
@@ -468,13 +485,14 @@ function chooseBestObservation(observations: Observation[]): Observation | null 
 function findFalsePositives(
   observations: Observation[],
   windows: GroundTruthWindow[],
+  toleranceSeconds: number,
 ): Observation[] {
   return observations.filter((observation) => {
     if (!observation.bestMatch) {
       return false;
     }
 
-    return !windows.some((window) => inWindow(observation, window));
+    return !windows.some((window) => inWindow(observation, window, toleranceSeconds));
   });
 }
 
@@ -490,8 +508,10 @@ function main(): void {
   const results = JSON.parse(readFileSync(resolve(options.resultsPath), 'utf8')) as unknown;
   const scoredWindows = manifest.windows.filter((window) => shouldScoreWindow(window, options));
   const observations = extractObservations(results, options);
-  const windowScores = scoredWindows.map((window) => scoreWindow(window, observations));
-  const falsePositives = findFalsePositives(observations, scoredWindows);
+  const windowScores = scoredWindows.map((window) =>
+    scoreWindow(window, observations, options.toleranceSeconds),
+  );
+  const falsePositives = findFalsePositives(observations, scoredWindows, options.toleranceSeconds);
 
   const summary = {
     manifest: manifest.name ?? null,
@@ -502,6 +522,7 @@ function main(): void {
     }).length,
     observations: observations.length,
     scoringMode: options.includeProposals ? 'best-observation+proposals' : 'best-observation',
+    toleranceSeconds: options.toleranceSeconds,
     coveredWindows: windowScores.filter((score) => score.detections > 0).length,
     top1NameHits: windowScores.filter((score) => score.top1NameHit).length,
     top1ExternalIdHits: windowScores.filter((score) => score.top1ExternalIdHit).length,
