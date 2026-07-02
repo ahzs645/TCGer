@@ -146,6 +146,47 @@ live browser scanner is busy-loop paced (~2-5 fps effective) and is not
 affected. `--start-seconds/--end-seconds` on live-video-stream-scan.ts make
 segment rescans cheap.
 
+Miss taxonomy (from the scan-review sessions, 2026-07-01 late — every missed
+card in the Sinnoh video falls into one of three classes):
+
+1. Threshold-line misses — correct card IS top-1 but sits just under 0.72
+   (Chinchou 0.715, energies/trainers 0.63-0.68). Recoverable: more frames,
+   or the verified path (>=0.65 + OCR agreement).
+2. Single-frame policy suppression — model right, smoothing hid it (Yamper,
+   Sinistea, Metal Energy). Fixed by print-consensus confirmation (top-2
+   candidates same name = self-confirming single frame); note an
+   evolution-line neighbor as #2 (Swirlix/Slurpuff) defeats consensus.
+3. Hard embedding failures — correct card not even in the top-20 shortlist,
+   so OCR fusion cannot rescue it (Galarian Yamask swsh6-82: dark art +
+   glare band → rank 46 @ 0.597 on a clean manual crop; index entry itself
+   verified healthy). Only fixes: a glare-free frame, glare/dark
+   augmentation at index build time, or a title-band OCR recognition path
+   independent of the embedding.
+
+Perspective rectification (2026-07-02, "what people do online" applied):
+
+- `backend/src/scripts/card-rectify.ts` — pure-TS quad refinement + homography
+  warp: Sobel edge scan per side -> RANSAC line fit (median rejection is NOT
+  enough; fingers create contiguous outlier blocks) with 30-degree orientation
+  constraint -> per-side detector-box fallback (max 1 side) -> DLT homography
+  -> bilinear warp to a flat 480px card.
+- Measured on the full Sinnoh video (1s sampling, GT v2 = 94 windows, tol 5):
+  - plain full-res crops:        275 committed, 93.8% precision, 85/91 windows
+  - BLANKET rectification:       252 committed, 91.7%, 81/91 — NET NEGATIVE
+    (warping already-good crops shifts sims; a holo Slowking started misreading)
+  - RESCUE CASCADE (`--rectify`): 287 committed, 93.0%, **87/91 windows,
+    zero windows lost** — plain crop first, warp only when top-1 fails the
+    threshold, keep whichever scores higher (65 rescues fired).
+- Contrast standardization measured HARMFUL for the embedding path
+  (normalise/CLAHE moved a hard case from rank 46 to rank 278-313; catalog
+  ranks unchanged on good crops). Keep contrast ops OCR-only.
+- Title-band OCR feasibility PROVEN for the dark-art class: Tesseract reads
+  "Basic, Galarian Yamask w60" verbatim off the rectified crop's title band.
+  The embedding-independent title fallback is the remaining rescue to build.
+- Still missed at 1 fps after cascade (4/91): Chinchou (0.70-0.72 line),
+  Energy Retrieval (0.69), Galarian Yamask (dark+glare, rank ~1 after rectify
+  but ~0.61), Slowking-recap (fast flipping). All are title-OCR-rescuable.
+
 Remaining follow-ups:
 
 - Real-camera validation on a physical iPhone (still never done — no device).
