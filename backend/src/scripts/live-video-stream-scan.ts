@@ -7,7 +7,13 @@ import sharp from 'sharp';
 import * as tf from '@tensorflow/tfjs';
 import { AutoImageProcessor, AutoModel, RawImage, env } from '@huggingface/transformers';
 
-import { rectifyCardCrop } from './card-rectify';
+import { rectifyCardCrop, type RgbaImage } from './card-rectify';
+import {
+  buildTitleNameIndex,
+  matchTitleText,
+  readTitleBand,
+  terminateTitleWorker,
+} from './title-ocr';
 
 type Box = {
   cx: number;
@@ -122,6 +128,7 @@ function parseArgs() {
     startSeconds: Number(args.get('start-seconds') ?? '0'),
     endSeconds: args.has('end-seconds') ? Number(args.get('end-seconds')) : null,
     rectify: args.has('rectify'),
+    titleOcr: args.has('title-ocr'),
   };
 }
 
@@ -143,7 +150,10 @@ Options:
   --start-seconds <n>   start sampling at this video timestamp (default: 0)
   --end-seconds <n>     stop sampling at this video timestamp (default: video end)
   --rectify             refine the card quad inside each box and warpPerspective the
-                        crop flat before embedding/OCR (falls back to the plain crop)`);
+                        crop flat before embedding/OCR (falls back to the plain crop)
+  --title-ocr           embedding-independent fallback: when the cascade still fails
+                        on a card-face crop, OCR the title band and match card names,
+                        letting the embedding pick the print within the matched name`);
 }
 
 function run(cmd: string, args: string[]) {
@@ -550,6 +560,8 @@ async function main() {
   let gateRejectedBoxes = 0;
   let rectifiedBoxes = 0;
   let rectifyFallbacks = 0;
+  let titleOcrHits = 0;
+  const titleNameIndex = options.titleOcr ? buildTitleNameIndex(index.entries) : null;
 
   for (const [i, frameName] of frames.entries()) {
     const file = path.join(framesDir, frameName);
@@ -586,6 +598,8 @@ async function main() {
         // that already match well, so warp only when the plain crop failed to
         // clear the threshold — strictly additive for coverage.
         const gated = cardFaceScore !== null && gate && cardFaceScore < gate.threshold;
+        let bestQuery = query;
+        let rectifiedImage: RgbaImage | null = null;
         if (options.rectify && !gated && candidates[0]?.passedThreshold !== true) {
           const padded = await cropDetection(file, box, 0.1);
           const rectified = rectifyCardCrop(
@@ -598,6 +612,7 @@ async function main() {
             },
           );
           if (rectified.method === 'quad') {
+            rectifiedImage = rectified.image;
             const rescueQuery = await embed(
               rectified.image.data,
               rectified.image.width,
@@ -609,11 +624,71 @@ async function main() {
               if ((rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)) {
                 rectifiedBoxes++;
                 candidates = rescue;
+                bestQuery = rescueQuery;
                 if (rescueGateScore !== null) cardFaceScore = rescueGateScore;
               }
             }
           } else {
             rectifyFallbacks++;
+          }
+        }
+
+        // Title-band OCR fallback: the embedding-independent path for crops
+        // the embedding cannot place (dark art + glare). Name comes from the
+        // printed title; the embedding only picks the print within that name.
+        if (
+          options.titleOcr &&
+          titleNameIndex &&
+          !gated &&
+          candidates[0]?.passedThreshold !== true &&
+          (cardFaceScore === null || cardFaceScore >= 0.55)
+        ) {
+          const source = rectifiedImage ?? { data: crop.rgba, width: crop.width, height: crop.height };
+          const text = await readTitleBand(source.data, source.width, source.height);
+          const matched = text ? matchTitleText(text, titleNameIndex) : null;
+          if (matched) {
+            let bestIdx = -1;
+            let bestSim = -Infinity;
+            for (const idx of matched.entryIndices) {
+              const inv = index.invNorms[idx]!;
+              if (inv === 0) continue;
+              const base = idx * index.dimension;
+              let dot = 0;
+              for (let k = 0; k < index.dimension; k++) {
+                dot += bestQuery[k]! * index.vectors[base + k]!;
+              }
+              const sim = dot * inv;
+              if (sim > bestSim) {
+                bestSim = sim;
+                bestIdx = idx;
+              }
+            }
+            if (bestIdx >= 0 && bestSim >= 0.45) {
+              titleOcrHits++;
+              const entry = index.entries[bestIdx]!;
+              const distance = Math.round((1 - Math.max(0, Math.min(1, bestSim))) * 1000);
+              candidates = [
+                {
+                  externalId: entry.externalId,
+                  tcg: 'pokemon',
+                  name: entry.name,
+                  setCode: entry.setCode,
+                  setName: entry.setName ?? null,
+                  rarity: entry.rarity ?? null,
+                  imageUrl: entry.imageUrl ?? null,
+                  confidence: Math.max(0, Math.min(1, bestSim)),
+                  distance,
+                  scoreDistance: distance,
+                  passedThreshold: true,
+                  fullDistance: distance,
+                  titleDistance: null,
+                  footerDistance: null,
+                  proposalLabel: 'yolo+title-ocr',
+                  artworkSimilarity: bestSim,
+                },
+                ...candidates,
+              ];
+            }
           }
         }
       } catch {
@@ -684,6 +759,7 @@ async function main() {
     rectify: options.rectify
       ? { rectifiedBoxes, fallbacks: rectifyFallbacks }
       : null,
+    titleOcr: options.titleOcr ? { hits: titleOcrHits } : null,
     elapsedMs,
     effectiveFps: frames.length / (elapsedMs / 1000),
     detectedFrames,
@@ -706,6 +782,7 @@ async function main() {
   const out = path.join(options.outDir, 'live-stream-results.json');
   writeFileSync(out, JSON.stringify(result, null, 2));
   console.log(JSON.stringify({ out, summary }, null, 2));
+  await terminateTitleWorker();
 }
 
 function average(values: number[]) {

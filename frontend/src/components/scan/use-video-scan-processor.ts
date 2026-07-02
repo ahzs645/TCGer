@@ -19,6 +19,7 @@ import {
   type CardFaceGate,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
+import { rectifyCardCrop } from "@/lib/scan/card-rectify";
 import {
   assessCropSharpness,
   assessFrameMotion,
@@ -514,6 +515,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       // embedding shortlist is ambiguous (likely twins).
       void ensureOcrWorker();
       const ocrTrackers = new Map<string, OcrVoteTracker>();
+      const embedAveragers = new Map<string, EmbeddingTrackAverager>();
       // Open-set rejection gate (null = artifact missing or encoder mismatch;
       // scanning proceeds ungated).
       const cardFaceGate = await ensureCardFaceGate(embeddingIndex);
@@ -598,6 +600,10 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
             const proposalMatches: BrowserVideoProposalMatch[] = [];
             for (const det of detections) {
               const ocrTracker = getOcrTrackerForDetection(det, ocrTrackers);
+              const embedAverager = getEmbedAveragerForDetection(
+                det,
+                embedAveragers,
+              );
               const pm = await matchDetectionEmbedding(
                 det,
                 cropFrameCanvas,
@@ -607,6 +613,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
                 motion.still,
                 ocrTracker,
                 cardFaceGate,
+                embedAverager,
               );
               if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
               proposalMatches.push(pm);
@@ -807,6 +814,130 @@ function getOcrTrackerForDetection(
 }
 
 /**
+ * Track-level embedding averaging: the mean of a track's recent sharp-frame
+ * embeddings denoises per-frame glare/tilt (measured offline: Energy
+ * Retrieval rank 23 -> 1, Morpeko V rank 239 -> 2). The window is short so a
+ * card swapped in place flushes out within a couple of frames; the quality
+ * gate upstream keeps transition frames from ever entering.
+ */
+const EMBED_TRACK_WINDOW = 5;
+
+class EmbeddingTrackAverager {
+  private recent: Float32Array[] = [];
+
+  add(embedding: Float32Array): void {
+    this.recent.push(embedding);
+    if (this.recent.length > EMBED_TRACK_WINDOW) this.recent.shift();
+  }
+
+  size(): number {
+    return this.recent.length;
+  }
+
+  /** L2-normalized mean of the window; null when empty. */
+  mean(): Float32Array | null {
+    if (this.recent.length === 0) return null;
+    const m = new Float32Array(this.recent[0]!.length);
+    for (const e of this.recent) {
+      for (let i = 0; i < m.length; i++) m[i]! += e[i]!;
+    }
+    let sq = 0;
+    for (const v of m) sq += v * v;
+    const norm = Math.sqrt(sq);
+    if (norm < 1e-8) return null;
+    for (let i = 0; i < m.length; i++) m[i]! /= norm;
+    return m;
+  }
+}
+
+function getEmbedAveragerForDetection(
+  det: OBBDetection,
+  averagers: Map<string, EmbeddingTrackAverager>,
+): EmbeddingTrackAverager {
+  const key = `${Math.round(det.cx / 80)}:${Math.round(det.cy / 80)}`;
+  let averager = averagers.get(key);
+  if (!averager) {
+    averager = new EmbeddingTrackAverager();
+    averagers.set(key, averager);
+  }
+  return averager;
+}
+
+/**
+ * Rescue cascade: when the plain crop fails the acceptance threshold, refine
+ * the card quad inside a padded region and embed the perspective-flattened
+ * crop instead. Blanket rectification measurably degrades good crops, so this
+ * runs ONLY on failures (offline: +2 recovered cards, zero lost).
+ */
+async function rescueWithRectify(
+  det: OBBDetection,
+  cropFrameCanvas: HTMLCanvasElement,
+  cropScale: number,
+  embeddingIndex: EmbeddingIndex,
+  scanFilter: ScanFilter,
+  cardFaceGate: CardFaceGate | null,
+): Promise<BrowserVideoScanCandidate[] | null> {
+  // The quad fit assumes near-axis card edges; heavily rotated boxes would
+  // fail it anyway, so skip the extra work.
+  if (Math.abs(det.angle) > (20 * Math.PI) / 180) return null;
+
+  const cx = det.cx * cropScale;
+  const cy = det.cy * cropScale;
+  const w = det.width * cropScale;
+  const h = det.height * cropScale;
+  const pad = 0.1;
+  const left = Math.max(0, Math.round(cx - w / 2 - w * pad));
+  const top = Math.max(0, Math.round(cy - h / 2 - h * pad));
+  const right = Math.min(cropFrameCanvas.width, Math.round(cx + w / 2 + w * pad));
+  const bottom = Math.min(cropFrameCanvas.height, Math.round(cy + h / 2 + h * pad));
+  if (right - left < 40 || bottom - top < 40) return null;
+
+  const ctx = cropFrameCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  const region = ctx.getImageData(left, top, right - left, bottom - top);
+
+  const rectified = rectifyCardCrop(
+    { data: region.data, width: region.width, height: region.height },
+    {
+      left: cx - w / 2 - left,
+      top: cy - h / 2 - top,
+      right: cx + w / 2 - left,
+      bottom: cy + h / 2 - top,
+    },
+  );
+  if (rectified.method !== "quad") return null;
+
+  const warpedCanvas = document.createElement("canvas");
+  warpedCanvas.width = rectified.image.width;
+  warpedCanvas.height = rectified.image.height;
+  const warpedCtx = warpedCanvas.getContext("2d");
+  if (!warpedCtx) return null;
+  warpedCtx.putImageData(
+    new ImageData(
+      rectified.image.data as Uint8ClampedArray<ArrayBuffer>,
+      rectified.image.width,
+      rectified.image.height,
+    ),
+    0,
+    0,
+  );
+
+  const embedding = await computeEmbeddingFromCanvas(warpedCanvas);
+  if (!embedding) return null;
+  if (
+    cardFaceGate &&
+    scoreCardFaceGate(cardFaceGate, embedding) < cardFaceGate.threshold
+  ) {
+    return null;
+  }
+  return matchEmbeddingTopK(embedding, embeddingIndex, {
+    topK: EMBEDDING_SHORTLIST_SIZE,
+    tcgFilter: scanFilter,
+    proposalLabel: "yolo+embedding+rectified",
+  });
+}
+
+/**
  * Given a YOLO detection, extract the de-rotated card crop, embed it with the
  * on-device CLIP model, and brute-force int8 cosine top-K against the
  * client-side embedding index. The embedding produces a shortlist only;
@@ -825,6 +956,7 @@ async function matchDetectionEmbedding(
   frameStill: boolean,
   ocrTracker: OcrVoteTracker | null,
   cardFaceGate: CardFaceGate | null,
+  embedAverager: EmbeddingTrackAverager | null,
 ): Promise<BrowserVideoProposalMatch> {
   // Crop at source resolution (detection coords are in 640px-frame space).
   // The sharpness gate downsamples to 96px internally, so its calibration is
@@ -855,11 +987,37 @@ async function matchDetectionEmbedding(
       // it against the index would just return the nearest wrong card.
       skipLabel = "yolo-nonface";
     } else if (embedding) {
-      candidates = matchEmbeddingTopK(embedding, embeddingIndex, {
+      // Track-level averaging: query with the mean of this track's recent
+      // sharp-frame embeddings once two or more have accumulated.
+      embedAverager?.add(embedding);
+      const query =
+        embedAverager && embedAverager.size() >= 2
+          ? (embedAverager.mean() ?? embedding)
+          : embedding;
+      candidates = matchEmbeddingTopK(query, embeddingIndex, {
         topK: EMBEDDING_SHORTLIST_SIZE,
         tcgFilter: scanFilter,
         proposalLabel: "yolo+embedding",
       });
+
+      // Rescue cascade: below-threshold plain result -> try the rectified
+      // (perspective-flattened) crop and keep whichever scores higher.
+      if (candidates[0]?.passedThreshold !== true) {
+        const rescue = await rescueWithRectify(
+          det,
+          cropFrameCanvas,
+          cropScale,
+          embeddingIndex,
+          scanFilter,
+          cardFaceGate,
+        );
+        if (
+          rescue &&
+          (rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)
+        ) {
+          candidates = rescue;
+        }
+      }
 
       // Tiebreaker: when the top-2 are close (twins), read the footer collector
       // number and intersect it with the shortlist's known numbers, voting
