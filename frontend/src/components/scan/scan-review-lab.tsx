@@ -119,30 +119,62 @@ interface IdSegment {
 }
 
 /**
- * Timestamps at which each (normalized) card name is "confirmed": seen in at
- * least two observations within a small neighborhood. This is the production
- * surfacing rule — on the Sinnoh benchmark it takes per-frame precision from
- * ~88% to 100% by suppressing one-frame transition misreads.
+ * Timestamps at which each (normalized) card name is "confirmed", via either:
+ *  - temporal agreement: the same name in >=2 observations within a small
+ *    neighborhood (suppresses one-frame transition misreads), or
+ *  - print consensus: the frame's top-2 candidates agree on the name (two
+ *    independent index prints of the same card). This rescues real cards that
+ *    get exactly one sampled frame (Yamper/Sinistea/Metal Energy at 1 fps),
+ *    while transition misreads keep disagreeing top-2 (Shinx vs Slowking,
+ *    Pikachu V-UNION vs Wigglytuff) and stay suppressed.
  */
 function buildConfirmation(results: ScanResults): Map<number, Set<string>> {
-  const window = Math.max(results.summary.sampleSeconds * 2, 2.5) + 0.6;
+  const window = Math.max(results.summary.sampleSeconds * 4, 4) + 0.6;
   const observations = results.frames
     .filter((f) => f.bestMatch)
     .map((f) => ({ t: f.timestampSeconds, name: normName(f.bestMatch!.name) }));
   const confirmed = new Map<number, Set<string>>();
+  const confirm = (t: number, name: string) => {
+    let set = confirmed.get(t);
+    if (!set) {
+      set = new Set();
+      confirmed.set(t, set);
+    }
+    set.add(name);
+  };
+
   for (const obs of observations) {
-    const support = observations.filter(
-      (other) => Math.abs(other.t - obs.t) <= window && other.name === obs.name,
-    ).length;
-    if (support >= 2) {
-      let set = confirmed.get(obs.t);
-      if (!set) {
-        set = new Set();
-        confirmed.set(obs.t, set);
-      }
-      set.add(obs.name);
+    const neighborhood = observations.filter(
+      (other) => Math.abs(other.t - obs.t) <= window,
+    );
+    const counts = new Map<string, number>();
+    for (const other of neighborhood) {
+      counts.set(other.name, (counts.get(other.name) ?? 0) + 1);
+    }
+    const support = counts.get(obs.name) ?? 0;
+    const rival = Math.max(
+      0,
+      ...[...counts.entries()]
+        .filter(([name]) => name !== obs.name)
+        .map(([, count]) => count),
+    );
+    // Needs repetition AND at-least-tied plurality: a recurring misread that
+    // interleaves with the true card (Shinx between Slowkings) is outvoted.
+    if (support >= 2 && support >= rival) confirm(obs.t, obs.name);
+  }
+
+  for (const frame of results.frames) {
+    const best = frame.bestMatch;
+    if (!best) continue;
+    const pm = frame.proposalMatches.find(
+      (p) => p.candidates[0]?.externalId === best.externalId,
+    );
+    const [top1, top2] = pm?.candidates ?? [];
+    if (top1 && top2 && normName(top1.name) === normName(top2.name)) {
+      confirm(frame.timestampSeconds, normName(best.name));
     }
   }
+
   return confirmed;
 }
 
@@ -393,12 +425,14 @@ export function ScanReviewLab() {
           ctx.setLineDash([]);
           label = `${pm.bestMatch.name} ${(pm.bestMatch.confidence * 100).toFixed(0)}%`;
         } else {
-          // One-frame blip: hold the surrounding stable identification if a
-          // smoothed segment covers this moment, else fall back to "detected".
+          // One-frame blip: hold the surrounding stable identification only
+          // when its segment truly SPANS this moment (blip inside a run, like
+          // Slowking–Shinx–Slowking). A neighboring segment that merely ends
+          // nearby must not bleed over a different card (Skorupi over Yamper).
           const held = segments.find(
             (s) =>
-              nearestFrame.timestampSeconds >= s.start - 2 &&
-              nearestFrame.timestampSeconds <= s.end + 2,
+              nearestFrame.timestampSeconds >= s.start &&
+              nearestFrame.timestampSeconds <= s.end,
           );
           if (held) {
             ctx.strokeStyle = `hsl(${hueFor(held.externalId)} 90% 55%)`;
