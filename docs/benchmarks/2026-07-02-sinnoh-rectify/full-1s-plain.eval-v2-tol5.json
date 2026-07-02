@@ -1,0 +1,2265 @@
+{
+  "summary": {
+    "manifest": "Sinnoh Pokemon TCG First Partner Pack opening",
+    "windows": 91,
+    "externalIdWindows": 82,
+    "observations": 275,
+    "scoringMode": "best-observation",
+    "toleranceSeconds": 5,
+    "coveredWindows": 91,
+    "top1NameHits": 85,
+    "top1ExternalIdHits": 74,
+    "candidateNameHits": 85,
+    "candidateExternalIdHits": 74,
+    "falsePositiveObservations": 10,
+    "coverageRate": 100,
+    "top1NameAccuracy": 93.4,
+    "top1ExternalIdAccuracy": 90.2,
+    "candidateNameRecall": 93.4,
+    "candidateExternalIdRecall": 90.2
+  },
+  "misses": [
+    {
+      "id": "p3-chinchou",
+      "expectedName": "Chinchou",
+      "startSeconds": 390,
+      "endSeconds": 393,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 395,
+        "name": "Rhyhorn",
+        "externalId": "swsh1-97",
+        "confidence": 0.8634246222610684,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-fighting-energy",
+      "expectedName": "Fighting Energy",
+      "startSeconds": 394,
+      "endSeconds": 399,
+      "tags": [
+        "verified-frame",
+        "below-threshold",
+        "energy"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-energy-retrieval",
+      "expectedName": "Energy Retrieval",
+      "startSeconds": 397,
+      "endSeconds": 400,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 7,
+      "detections": 7,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-galarian-yamask",
+      "expectedName": "Galarian Yamask",
+      "startSeconds": 763,
+      "endSeconds": 767,
+      "tags": [
+        "verified-frame",
+        "hard-miss",
+        "dark-art-glare"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-slurpuff-b",
+      "expectedName": "Slurpuff",
+      "startSeconds": 796,
+      "endSeconds": 803,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 2,
+      "detections": 2,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 806,
+        "name": "Froslass",
+        "externalId": "swsh6-36",
+        "confidence": 0.796378105498735,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-galarian-slowking-recap",
+      "expectedName": "Galarian Slowking",
+      "startSeconds": 808,
+      "endSeconds": 812,
+      "tags": [
+        "proposal",
+        "recap"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 813,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.8898383769692749,
+        "source": "frames.bestObservation"
+      }
+    }
+  ],
+  "windows": [
+    {
+      "id": "p1-maractus-a",
+      "expectedName": "Maractus",
+      "startSeconds": 179,
+      "endSeconds": 202,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 20,
+      "detections": 20,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 203,
+        "name": "Sinistea",
+        "externalId": "B2-074",
+        "confidence": 0.8473046033448127,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-sinistea",
+      "expectedName": "Sinistea",
+      "startSeconds": 201,
+      "endSeconds": 205,
+      "tags": [
+        "verified-frame",
+        "twin-print",
+        "footer-occluded"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 203,
+        "name": "Sinistea",
+        "externalId": "B2-074",
+        "confidence": 0.8473046033448127,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-scorbunny",
+      "expectedName": "Scorbunny",
+      "startSeconds": 202,
+      "endSeconds": 206,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 203,
+        "name": "Sinistea",
+        "externalId": "B2-074",
+        "confidence": 0.8473046033448127,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-galarian-meowth",
+      "expectedName": "Galarian Meowth",
+      "startSeconds": 204,
+      "endSeconds": 208,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 203,
+        "name": "Sinistea",
+        "externalId": "B2-074",
+        "confidence": 0.8473046033448127,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-croagunk",
+      "expectedName": "Croagunk",
+      "startSeconds": 206,
+      "endSeconds": 210,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-fire-energy",
+      "expectedName": "Fire Energy",
+      "startSeconds": 208,
+      "endSeconds": 212,
+      "tags": [
+        "proposal",
+        "energy"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-dubwool",
+      "expectedName": "Dubwool",
+      "startSeconds": 210,
+      "endSeconds": 214,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-lucky-egg",
+      "expectedName": "Lucky Egg",
+      "startSeconds": 211,
+      "endSeconds": 215,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-seaking",
+      "expectedName": "Seaking",
+      "startSeconds": 212,
+      "endSeconds": 216,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-galarian-stunfisk",
+      "expectedName": "Galarian Stunfisk",
+      "startSeconds": 214,
+      "endSeconds": 220,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p1-morpeko-v",
+      "expectedName": "Morpeko V",
+      "startSeconds": 218,
+      "endSeconds": 236,
+      "tags": [
+        "verified-frame",
+        "twin-print"
+      ],
+      "observations": 22,
+      "detections": 22,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 215,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8697459462895043,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-weedle",
+      "expectedName": "Weedle",
+      "startSeconds": 260,
+      "endSeconds": 272,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 276,
+        "name": "Larvesta",
+        "externalId": "swsh6-23",
+        "confidence": 0.8323484303301968,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-castform-rainy-form",
+      "expectedName": "Castform Rainy Form",
+      "startSeconds": 268,
+      "endSeconds": 276,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 16,
+      "detections": 16,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-galarian-farfetchd",
+      "expectedName": "Galarian Farfetch'd",
+      "startSeconds": 270,
+      "endSeconds": 274,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 276,
+        "name": "Larvesta",
+        "externalId": "swsh6-23",
+        "confidence": 0.8323484303301968,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-larvesta",
+      "expectedName": "Larvesta",
+      "startSeconds": 274,
+      "endSeconds": 278,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-sobble",
+      "expectedName": "Sobble",
+      "startSeconds": 275,
+      "endSeconds": 280,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-fighting-energy",
+      "expectedName": "Fighting Energy",
+      "startSeconds": 277,
+      "endSeconds": 281,
+      "tags": [
+        "verified-frame",
+        "energy"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-lairon",
+      "expectedName": "Lairon",
+      "startSeconds": 278,
+      "endSeconds": 282,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 9,
+      "detections": 9,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-steenee",
+      "expectedName": "Steenee",
+      "startSeconds": 280,
+      "endSeconds": 284,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-rugged-helmet",
+      "expectedName": "Rugged Helmet",
+      "startSeconds": 282,
+      "endSeconds": 286,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-shaymin",
+      "expectedName": "Shaymin",
+      "startSeconds": 284,
+      "endSeconds": 290,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 281,
+        "name": "Lairon",
+        "externalId": "swsh6-110",
+        "confidence": 0.8665707459516904,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p2-galarian-slowking",
+      "expectedName": "Galarian Slowking",
+      "startSeconds": 288,
+      "endSeconds": 298,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 284,
+        "name": "Rugged Helmet",
+        "externalId": "swsh6-152",
+        "confidence": 0.8149561399489198,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-galarian-meowth",
+      "expectedName": "Galarian Meowth",
+      "startSeconds": 368,
+      "endSeconds": 390,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 23,
+      "detections": 23,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 395,
+        "name": "Rhyhorn",
+        "externalId": "swsh1-97",
+        "confidence": 0.8634246222610684,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-croagunk",
+      "expectedName": "Croagunk",
+      "startSeconds": 386,
+      "endSeconds": 392,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 395,
+        "name": "Rhyhorn",
+        "externalId": "swsh1-97",
+        "confidence": 0.8634246222610684,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-rhyhorn",
+      "expectedName": "Rhyhorn",
+      "startSeconds": 388,
+      "endSeconds": 397,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-chinchou",
+      "expectedName": "Chinchou",
+      "startSeconds": 390,
+      "endSeconds": 393,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 395,
+        "name": "Rhyhorn",
+        "externalId": "swsh1-97",
+        "confidence": 0.8634246222610684,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-minccino",
+      "expectedName": "Minccino",
+      "startSeconds": 392,
+      "endSeconds": 395,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 7,
+      "detections": 7,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-fighting-energy",
+      "expectedName": "Fighting Energy",
+      "startSeconds": 394,
+      "endSeconds": 399,
+      "tags": [
+        "verified-frame",
+        "below-threshold",
+        "energy"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-energy-retrieval",
+      "expectedName": "Energy Retrieval",
+      "startSeconds": 397,
+      "endSeconds": 400,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 7,
+      "detections": 7,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-switch",
+      "expectedName": "Switch",
+      "startSeconds": 396,
+      "endSeconds": 402,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-dugtrio",
+      "expectedName": "Dugtrio",
+      "startSeconds": 399,
+      "endSeconds": 404,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 9,
+      "detections": 9,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-maractus-b",
+      "expectedName": "Maractus",
+      "startSeconds": 401,
+      "endSeconds": 407,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 400,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8689161500207679,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p3-centiskorch",
+      "expectedName": "Centiskorch",
+      "startSeconds": 406,
+      "endSeconds": 410,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 7,
+      "detections": 7,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 401,
+        "name": "Switch",
+        "externalId": "swsh1-183",
+        "confidence": 0.8667710784805449,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-mareep",
+      "expectedName": "Mareep",
+      "startSeconds": 436,
+      "endSeconds": 442,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 9,
+      "detections": 9,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 445,
+        "name": "Clobbopus",
+        "externalId": "swsh6-91",
+        "confidence": 0.8457805274055487,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-heracross",
+      "expectedName": "Heracross",
+      "startSeconds": 442,
+      "endSeconds": 446,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 449,
+        "name": "Sneasel",
+        "externalId": "swsh6-30",
+        "confidence": 0.84711222108807,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-grookey",
+      "expectedName": "Grookey",
+      "startSeconds": 444,
+      "endSeconds": 448,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 452,
+        "name": "Kakuna",
+        "externalId": "swsh6-2",
+        "confidence": 0.9022495774346267,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-sneasel",
+      "expectedName": "Sneasel",
+      "startSeconds": 446,
+      "endSeconds": 450,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 452,
+        "name": "Kakuna",
+        "externalId": "swsh6-2",
+        "confidence": 0.9022495774346267,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-psychic-energy",
+      "expectedName": "Psychic Energy",
+      "startSeconds": 448,
+      "endSeconds": 452,
+      "tags": [
+        "proposal",
+        "energy"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 452,
+        "name": "Kakuna",
+        "externalId": "swsh6-2",
+        "confidence": 0.9022495774346267,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-kakuna",
+      "expectedName": "Kakuna",
+      "startSeconds": 450,
+      "endSeconds": 454,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 452,
+        "name": "Kakuna",
+        "externalId": "swsh6-2",
+        "confidence": 0.9022495774346267,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-path-to-the-peak",
+      "expectedName": "Path to the Peak",
+      "startSeconds": 454,
+      "endSeconds": 460,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 452,
+        "name": "Kakuna",
+        "externalId": "swsh6-2",
+        "confidence": 0.9022495774346267,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-hattrem",
+      "expectedName": "Hattrem",
+      "startSeconds": 458,
+      "endSeconds": 462,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 467,
+        "name": "Sandaconda V",
+        "externalId": "swsh6-89",
+        "confidence": 0.840135527711024,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-koffing",
+      "expectedName": "Koffing",
+      "startSeconds": 460,
+      "endSeconds": 464,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 467,
+        "name": "Sandaconda V",
+        "externalId": "swsh6-89",
+        "confidence": 0.840135527711024,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p4-sandaconda-v",
+      "expectedName": "Sandaconda V",
+      "startSeconds": 464,
+      "endSeconds": 480,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 17,
+      "detections": 17,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 479,
+        "name": "Sandaconda V",
+        "externalId": "swsh6-89",
+        "confidence": 0.8743154740153048,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-wooloo",
+      "expectedName": "Wooloo",
+      "startSeconds": 544,
+      "endSeconds": 548,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-clobbopus",
+      "expectedName": "Clobbopus",
+      "startSeconds": 546,
+      "endSeconds": 550,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 15,
+      "detections": 15,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-skorupi",
+      "expectedName": "Skorupi",
+      "startSeconds": 548,
+      "endSeconds": 552,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-yamper",
+      "expectedName": "Yamper",
+      "startSeconds": 550,
+      "endSeconds": 554,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-goldeen",
+      "expectedName": "Goldeen",
+      "startSeconds": 551,
+      "endSeconds": 556,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 15,
+      "detections": 15,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-qwilfish",
+      "expectedName": "Qwilfish",
+      "startSeconds": 554,
+      "endSeconds": 558,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 558,
+        "name": "Sitrus Berry",
+        "externalId": "swsh1-182",
+        "confidence": 0.8838421969662618,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-sitrus-berry",
+      "expectedName": "Sitrus Berry",
+      "startSeconds": 556,
+      "endSeconds": 560,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 558,
+        "name": "Sitrus Berry",
+        "externalId": "swsh1-182",
+        "confidence": 0.8838421969662618,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-metal-energy",
+      "expectedName": "Metal Energy",
+      "startSeconds": 553,
+      "endSeconds": 557,
+      "tags": [
+        "verified-frame",
+        "energy"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 548,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.8944736410182692,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-pal-pad",
+      "expectedName": "Pal Pad",
+      "startSeconds": 558,
+      "endSeconds": 562,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 558,
+        "name": "Sitrus Berry",
+        "externalId": "swsh1-182",
+        "confidence": 0.8838421969662618,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-gossifleur",
+      "expectedName": "Gossifleur",
+      "startSeconds": 560,
+      "endSeconds": 564,
+      "tags": [
+        "verified-frame",
+        "below-threshold"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 558,
+        "name": "Sitrus Berry",
+        "externalId": "swsh1-182",
+        "confidence": 0.8838421969662618,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p5-inteleon",
+      "expectedName": "Inteleon",
+      "startSeconds": 562,
+      "endSeconds": 568,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 558,
+        "name": "Sitrus Berry",
+        "externalId": "swsh1-182",
+        "confidence": 0.8838421969662618,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-furfrou",
+      "expectedName": "Furfrou",
+      "startSeconds": 588,
+      "endSeconds": 597,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 9,
+      "detections": 9,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-spheal",
+      "expectedName": "Spheal",
+      "startSeconds": 595,
+      "endSeconds": 599,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-crabrawler",
+      "expectedName": "Crabrawler",
+      "startSeconds": 597,
+      "endSeconds": 601,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-golett",
+      "expectedName": "Golett",
+      "startSeconds": 598,
+      "endSeconds": 602,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-porygon2",
+      "expectedName": "Porygon2",
+      "startSeconds": 602,
+      "endSeconds": 606,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-thwackey",
+      "expectedName": "Thwackey",
+      "startSeconds": 604,
+      "endSeconds": 608,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-metal-energy",
+      "expectedName": "Metal Energy",
+      "startSeconds": 601,
+      "endSeconds": 605,
+      "tags": [
+        "verified-frame",
+        "energy"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-echoing-horn",
+      "expectedName": "Echoing Horn",
+      "startSeconds": 606,
+      "endSeconds": 610,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 601,
+        "name": "Golett",
+        "externalId": "swsh6-65",
+        "confidence": 0.8880648047973909,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-froslass",
+      "expectedName": "Froslass",
+      "startSeconds": 608,
+      "endSeconds": 616,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 605,
+        "name": "Porygon2",
+        "externalId": "swsh6-117",
+        "confidence": 0.8543852387457294,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p6-seviper",
+      "expectedName": "Seviper",
+      "startSeconds": 616,
+      "endSeconds": 620,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 9,
+      "detections": 9,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 618,
+        "name": "Seviper",
+        "externalId": "swsh6-102",
+        "confidence": 0.8078373827531842,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-blipbug",
+      "expectedName": "Blipbug",
+      "startSeconds": 688,
+      "endSeconds": 704,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 19,
+      "detections": 19,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-pincurchin",
+      "expectedName": "Pincurchin",
+      "startSeconds": 702,
+      "endSeconds": 706,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-wooloo",
+      "expectedName": "Wooloo",
+      "startSeconds": 703,
+      "endSeconds": 709,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 14,
+      "detections": 14,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-clobbopus",
+      "expectedName": "Clobbopus",
+      "startSeconds": 706,
+      "endSeconds": 710,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-psychic-energy",
+      "expectedName": "Psychic Energy",
+      "startSeconds": 708,
+      "endSeconds": 712,
+      "tags": [
+        "proposal",
+        "energy"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-dubwool",
+      "expectedName": "Dubwool",
+      "startSeconds": 710,
+      "endSeconds": 714,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-lucky-egg",
+      "expectedName": "Lucky Egg",
+      "startSeconds": 709,
+      "endSeconds": 716,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-seaking",
+      "expectedName": "Seaking",
+      "startSeconds": 714,
+      "endSeconds": 718,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 709,
+        "name": "Clobbopus",
+        "externalId": "swsh1-112",
+        "confidence": 0.9042270336793311,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-heatmor",
+      "expectedName": "Heatmor",
+      "startSeconds": 716,
+      "endSeconds": 722,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 716,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8798966584255198,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p7-drampa",
+      "expectedName": "Drampa",
+      "startSeconds": 720,
+      "endSeconds": 724,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 7,
+      "detections": 7,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 716,
+        "name": "Seaking",
+        "externalId": "swsh1-47",
+        "confidence": 0.8798966584255198,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-spheal",
+      "expectedName": "Spheal",
+      "startSeconds": 750,
+      "endSeconds": 762,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 13,
+      "detections": 13,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 766,
+        "name": "Castform Sunny Form",
+        "externalId": "swsh6-22",
+        "confidence": 0.8200603411778464,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-swirlix",
+      "expectedName": "Swirlix",
+      "startSeconds": 760,
+      "endSeconds": 764,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 766,
+        "name": "Castform Sunny Form",
+        "externalId": "swsh6-22",
+        "confidence": 0.8200603411778464,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-galarian-yamask",
+      "expectedName": "Galarian Yamask",
+      "startSeconds": 763,
+      "endSeconds": 767,
+      "tags": [
+        "verified-frame",
+        "hard-miss",
+        "dark-art-glare"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-castform-sunny-form",
+      "expectedName": "Castform Sunny Form",
+      "startSeconds": 764,
+      "endSeconds": 768,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-castform",
+      "expectedName": "Castform",
+      "startSeconds": 766,
+      "endSeconds": 770,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-psychic-energy",
+      "expectedName": "Psychic Energy",
+      "startSeconds": 768,
+      "endSeconds": 772,
+      "tags": [
+        "proposal",
+        "energy"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-ledian",
+      "expectedName": "Ledian",
+      "startSeconds": 770,
+      "endSeconds": 774,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-peonia",
+      "expectedName": "Peonia",
+      "startSeconds": 770,
+      "endSeconds": 777,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 11,
+      "detections": 11,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-honey",
+      "expectedName": "Honey",
+      "startSeconds": 774,
+      "endSeconds": 778,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 8,
+      "detections": 8,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 772,
+        "name": "Ledian",
+        "externalId": "swsh6-5",
+        "confidence": 0.8842742362791389,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-slurpuff-a",
+      "expectedName": "Slurpuff",
+      "startSeconds": 780,
+      "endSeconds": 786,
+      "tags": [
+        "proposal",
+        "twin-print"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 789,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.871945580858765,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-celebi-v-a",
+      "expectedName": "Celebi V",
+      "startSeconds": 784,
+      "endSeconds": 790,
+      "tags": [
+        "proposal"
+      ],
+      "observations": 6,
+      "detections": 6,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 789,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.871945580858765,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-slurpuff-b",
+      "expectedName": "Slurpuff",
+      "startSeconds": 796,
+      "endSeconds": 803,
+      "tags": [
+        "verified-frame"
+      ],
+      "observations": 2,
+      "detections": 2,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 806,
+        "name": "Froslass",
+        "externalId": "swsh6-36",
+        "confidence": 0.796378105498735,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-froslass-recap",
+      "expectedName": "Froslass",
+      "startSeconds": 804,
+      "endSeconds": 808,
+      "tags": [
+        "proposal",
+        "recap"
+      ],
+      "observations": 6,
+      "detections": 6,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 813,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.8898383769692749,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-galarian-slowking-recap",
+      "expectedName": "Galarian Slowking",
+      "startSeconds": 808,
+      "endSeconds": 812,
+      "tags": [
+        "proposal",
+        "recap"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": false,
+      "top1ExternalIdHit": false,
+      "candidateNameHit": false,
+      "candidateExternalIdHit": false,
+      "bestObservation": {
+        "seconds": 813,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.8898383769692749,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-celebi-v-recap",
+      "expectedName": "Celebi V",
+      "startSeconds": 808,
+      "endSeconds": 820,
+      "tags": [
+        "verified-frame",
+        "recap"
+      ],
+      "observations": 18,
+      "detections": 18,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 819,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.9247997768835926,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-sandaconda-v-recap",
+      "expectedName": "Sandaconda V",
+      "startSeconds": 820,
+      "endSeconds": 824,
+      "tags": [
+        "proposal",
+        "recap"
+      ],
+      "observations": 12,
+      "detections": 12,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 819,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.9247997768835926,
+        "source": "frames.bestObservation"
+      }
+    },
+    {
+      "id": "p8-morpeko-v-recap",
+      "expectedName": "Morpeko V",
+      "startSeconds": 822,
+      "endSeconds": 826,
+      "tags": [
+        "verified-frame",
+        "recap",
+        "twin-print"
+      ],
+      "observations": 10,
+      "detections": 10,
+      "top1NameHit": true,
+      "top1ExternalIdHit": true,
+      "candidateNameHit": true,
+      "candidateExternalIdHit": true,
+      "bestObservation": {
+        "seconds": 819,
+        "name": "Celebi V",
+        "externalId": "swsh6-7",
+        "confidence": 0.9247997768835926,
+        "source": "frames.bestObservation"
+      }
+    }
+  ],
+  "falsePositives": [
+    {
+      "seconds": 130,
+      "name": "Turtwig",
+      "externalId": "dp1-103",
+      "confidence": 0.7500501522064504,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 131,
+      "name": "Turtwig",
+      "externalId": "dp1-103",
+      "confidence": 0.7916835652476324,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 132,
+      "name": "Turtwig",
+      "externalId": "dp1-103",
+      "confidence": 0.7309294045685065,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 134,
+      "name": "Turtwig",
+      "externalId": "dp1-103",
+      "confidence": 0.7795263691920378,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 135,
+      "name": "Chimchar",
+      "externalId": "dp1-76",
+      "confidence": 0.7345949394163515,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 136,
+      "name": "Numel",
+      "externalId": "ex1-61",
+      "confidence": 0.7290394928998898,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 137,
+      "name": "Numel",
+      "externalId": "ex1-61",
+      "confidence": 0.7405448547994178,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 139,
+      "name": "Piplup",
+      "externalId": "dp1-93",
+      "confidence": 0.7595263337110768,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 140,
+      "name": "Cinccino",
+      "externalId": "P-A-031",
+      "confidence": 0.7486325039897211,
+      "source": "frames.bestObservation"
+    },
+    {
+      "seconds": 141,
+      "name": "Piplup",
+      "externalId": "dp1-93",
+      "confidence": 0.7831124223115008,
+      "source": "frames.bestObservation"
+    }
+  ]
+}

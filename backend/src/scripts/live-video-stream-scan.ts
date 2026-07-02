@@ -7,6 +7,8 @@ import sharp from 'sharp';
 import * as tf from '@tensorflow/tfjs';
 import { AutoImageProcessor, AutoModel, RawImage, env } from '@huggingface/transformers';
 
+import { rectifyCardCrop } from './card-rectify';
+
 type Box = {
   cx: number;
   cy: number;
@@ -119,6 +121,7 @@ function parseArgs() {
     nativeBackend: args.has('native-backend'),
     startSeconds: Number(args.get('start-seconds') ?? '0'),
     endSeconds: args.has('end-seconds') ? Number(args.get('end-seconds')) : null,
+    rectify: args.has('rectify'),
   };
 }
 
@@ -138,7 +141,9 @@ Options:
   --native-backend      use @tensorflow/tfjs-node for ~10x faster detection. Accuracy
                         runs only — timings no longer approximate any browser backend
   --start-seconds <n>   start sampling at this video timestamp (default: 0)
-  --end-seconds <n>     stop sampling at this video timestamp (default: video end)`);
+  --end-seconds <n>     stop sampling at this video timestamp (default: video end)
+  --rectify             refine the card quad inside each box and warpPerspective the
+                        crop flat before embedding/OCR (falls back to the plain crop)`);
 }
 
 function run(cmd: string, args: string[]) {
@@ -448,11 +453,13 @@ function chooseFrameBestMatch(proposalMatches: ProposalMatch[]): Candidate | nul
   return accepted[0] ?? null;
 }
 
-async function cropDetection(file: string, box: Box) {
-  const left = Math.max(0, Math.round(box.cx - box.width / 2));
-  const top = Math.max(0, Math.round(box.cy - box.height / 2));
-  const width = Math.max(1, Math.round(box.width));
-  const height = Math.max(1, Math.round(box.height));
+async function cropDetection(file: string, box: Box, paddingRatio = 0) {
+  const padX = box.width * paddingRatio;
+  const padY = box.height * paddingRatio;
+  const left = Math.max(0, Math.round(box.cx - box.width / 2 - padX));
+  const top = Math.max(0, Math.round(box.cy - box.height / 2 - padY));
+  const width = Math.max(1, Math.round(box.width + 2 * padX));
+  const height = Math.max(1, Math.round(box.height + 2 * padY));
   const image = sharp(file).rotate();
   const meta = await image.metadata();
   const safeWidth = Math.min(width, Math.max(1, (meta.width ?? left + width) - left));
@@ -466,6 +473,8 @@ async function cropDetection(file: string, box: Box) {
     rgba: new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
     width: info.width,
     height: info.height,
+    originLeft: left,
+    originTop: top,
   };
 }
 
@@ -539,6 +548,8 @@ async function main() {
   let detectedBoxes = 0;
   let embeddedBoxes = 0;
   let gateRejectedBoxes = 0;
+  let rectifiedBoxes = 0;
+  let rectifyFallbacks = 0;
 
   for (const [i, frameName] of frames.entries()) {
     const file = path.join(framesDir, frameName);
@@ -570,6 +581,41 @@ async function main() {
           candidates = matchEmbedding(query, index, 5);
         }
         embeddedBoxes++;
+
+        // Rescue cascade: blanket rectification measurably degrades crops
+        // that already match well, so warp only when the plain crop failed to
+        // clear the threshold — strictly additive for coverage.
+        const gated = cardFaceScore !== null && gate && cardFaceScore < gate.threshold;
+        if (options.rectify && !gated && candidates[0]?.passedThreshold !== true) {
+          const padded = await cropDetection(file, box, 0.1);
+          const rectified = rectifyCardCrop(
+            { data: padded.rgba, width: padded.width, height: padded.height },
+            {
+              left: box.cx - box.width / 2 - padded.originLeft,
+              top: box.cy - box.height / 2 - padded.originTop,
+              right: box.cx + box.width / 2 - padded.originLeft,
+              bottom: box.cy + box.height / 2 - padded.originTop,
+            },
+          );
+          if (rectified.method === 'quad') {
+            const rescueQuery = await embed(
+              rectified.image.data,
+              rectified.image.width,
+              rectified.image.height,
+            );
+            const rescueGateScore = gate ? gateScore(gate, rescueQuery) : null;
+            if (!gate || (rescueGateScore !== null && rescueGateScore >= gate.threshold)) {
+              const rescue = matchEmbedding(rescueQuery, index, 5);
+              if ((rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)) {
+                rectifiedBoxes++;
+                candidates = rescue;
+                if (rescueGateScore !== null) cardFaceScore = rescueGateScore;
+              }
+            }
+          } else {
+            rectifyFallbacks++;
+          }
+        }
       } catch {
         candidates = [];
       }
@@ -635,6 +681,9 @@ async function main() {
       ? { source: gate.source, threshold: gate.threshold, rejectedBoxes: gateRejectedBoxes }
       : null,
     fullResCrops: options.fullResCrops,
+    rectify: options.rectify
+      ? { rectifiedBoxes, fallbacks: rectifyFallbacks }
+      : null,
     elapsedMs,
     effectiveFps: frames.length / (elapsedMs / 1000),
     detectedFrames,

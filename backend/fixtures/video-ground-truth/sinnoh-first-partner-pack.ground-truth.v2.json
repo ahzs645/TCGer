@@ -104,6 +104,7 @@
 
     { "id": "p8-spheal", "startSeconds": 750, "endSeconds": 762, "name": "Spheal", "expectedExternalIds": ["swsh6-37"], "tags": ["proposal"] },
     { "id": "p8-swirlix", "startSeconds": 760, "endSeconds": 764, "name": "Swirlix", "expectedExternalIds": ["swsh6-67"], "tags": ["proposal"] },
+    { "id": "p8-galarian-yamask", "startSeconds": 763, "endSeconds": 767, "name": "Galarian Yamask", "expectedExternalIds": ["swsh6-82"], "tags": ["verified-frame", "hard-miss", "dark-art-glare"] },
     { "id": "p8-castform-sunny-form", "startSeconds": 764, "endSeconds": 768, "name": "Castform Sunny Form", "expectedExternalIds": ["swsh6-22"], "tags": ["proposal"] },
     { "id": "p8-castform", "startSeconds": 766, "endSeconds": 770, "name": "Castform", "expectedExternalIds": ["swsh6-121"], "tags": ["verified-frame"] },
     { "id": "p8-psychic-energy", "startSeconds": 768, "endSeconds": 772, "name": "Psychic Energy", "tags": ["proposal", "energy"] },
