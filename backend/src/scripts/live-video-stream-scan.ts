@@ -117,6 +117,8 @@ function parseArgs() {
     gateThreshold: args.has('gate-threshold') ? Number(args.get('gate-threshold')) : null,
     fullResCrops: args.has('full-res-crops'),
     nativeBackend: args.has('native-backend'),
+    startSeconds: Number(args.get('start-seconds') ?? '0'),
+    endSeconds: args.has('end-seconds') ? Number(args.get('end-seconds')) : null,
   };
 }
 
@@ -134,7 +136,9 @@ Options:
   --gate-threshold <x>  override the gate's recommended acceptance threshold
   --full-res-crops      detect on 640px frames but embed crops from the full-resolution frame
   --native-backend      use @tensorflow/tfjs-node for ~10x faster detection. Accuracy
-                        runs only — timings no longer approximate any browser backend`);
+                        runs only — timings no longer approximate any browser backend
+  --start-seconds <n>   start sampling at this video timestamp (default: 0)
+  --end-seconds <n>     stop sampling at this video timestamp (default: video end)`);
 }
 
 function run(cmd: string, args: string[]) {
@@ -149,6 +153,8 @@ function extractFrames(
   outDir: string,
   sampleSeconds: number,
   fullResolution: boolean,
+  startSeconds: number,
+  endSeconds: number | null,
 ) {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
@@ -156,10 +162,14 @@ function extractFrames(
   if (!fullResolution) {
     filters.push(`scale='if(gt(iw,ih),640,-2)':'if(gt(iw,ih),-2,640)'`);
   }
+  const seek = startSeconds > 0 ? ['-ss', String(startSeconds)] : [];
+  const stop = endSeconds !== null ? ['-to', String(endSeconds)] : [];
   run('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'error',
+    ...seek,
+    ...stop,
     '-i',
     video,
     '-vf',
@@ -493,7 +503,14 @@ async function main() {
   }
 
   const startedAt = performance.now();
-  extractFrames(options.video, framesDir, options.sampleSeconds, options.fullResCrops);
+  extractFrames(
+    options.video,
+    framesDir,
+    options.sampleSeconds,
+    options.fullResCrops,
+    options.startSeconds,
+    options.endSeconds,
+  );
   let frames = readdirSync(framesDir)
     .filter((f) => f.endsWith('.jpg'))
     .sort();
@@ -525,7 +542,7 @@ async function main() {
 
   for (const [i, frameName] of frames.entries()) {
     const file = path.join(framesDir, frameName);
-    const timestampSeconds = i * options.sampleSeconds;
+    const timestampSeconds = options.startSeconds + i * options.sampleSeconds;
     const image = await readRgbImage(file);
 
     const detectStart = performance.now();
