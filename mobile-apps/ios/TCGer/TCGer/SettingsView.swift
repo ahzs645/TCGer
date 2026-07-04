@@ -24,6 +24,7 @@ struct SettingsView: View {
     @State private var showingExportSheet = false
     @State private var exportData: Data?
     @State private var exportFilename: String?
+    @State private var gameDisableBlock: GameDisableBlock?
 
     /// True when running fully on-device with no backend server.
     private var isLocalMode: Bool {
@@ -165,7 +166,13 @@ struct SettingsView: View {
                     }
                     .disabled(!environmentStore.isAuthenticated)
                     .onChange(of: environmentStore.enabledYugioh) {
-                        Task { await updatePreferences(enabledYugioh: environmentStore.enabledYugioh) }
+                        Task {
+                            await handleGameToggle(
+                                game: "yugioh",
+                                displayName: "Yu-Gi-Oh!",
+                                isOn: environmentStore.enabledYugioh
+                            )
+                        }
                     }
 
                     Toggle(isOn: $environmentStore.enabledMagic) {
@@ -180,7 +187,13 @@ struct SettingsView: View {
                     }
                     .disabled(!environmentStore.isAuthenticated)
                     .onChange(of: environmentStore.enabledMagic) {
-                        Task { await updatePreferences(enabledMagic: environmentStore.enabledMagic) }
+                        Task {
+                            await handleGameToggle(
+                                game: "magic",
+                                displayName: "Magic: The Gathering",
+                                isOn: environmentStore.enabledMagic
+                            )
+                        }
                     }
 
                     Toggle(isOn: $environmentStore.enabledPokemon) {
@@ -195,12 +208,18 @@ struct SettingsView: View {
                     }
                     .disabled(!environmentStore.isAuthenticated)
                     .onChange(of: environmentStore.enabledPokemon) {
-                        Task { await updatePreferences(enabledPokemon: environmentStore.enabledPokemon) }
+                        Task {
+                            await handleGameToggle(
+                                game: "pokemon",
+                                displayName: "Pokémon",
+                                isOn: environmentStore.enabledPokemon
+                            )
+                        }
                     }
                 } header: {
                     Text("TCG Modules")
                 } footer: {
-                    Text("Enable or disable specific TCG games in search and analytics")
+                    Text("Enable or disable specific TCG games in search and analytics. A game can't be turned off while you still have its cards in a collection or wishlist.")
                 }
 
                 // Display Preferences Section
@@ -519,7 +538,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Scanner Tools")
                 } footer: {
-                    Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time.")
+                    Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time. Record a run to save every analyzed frame plus its results, then export them as a shareable bundle to re-analyze later.")
                 }
                 #endif
 
@@ -558,6 +577,18 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("This will remove all cached data. You'll need to sync again for offline access.")
+            }
+            .alert(
+                "Remove \(gameDisableBlock?.displayName ?? "") cards first",
+                isPresented: Binding(
+                    get: { gameDisableBlock != nil },
+                    set: { if !$0 { gameDisableBlock = nil } }
+                ),
+                presenting: gameDisableBlock
+            ) { _ in
+                Button("OK", role: .cancel) { gameDisableBlock = nil }
+            } message: { block in
+                Text(block.message)
             }
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
@@ -636,7 +667,112 @@ struct SettingsView: View {
     }
 }
 
+extension SettingsView {
+    struct GameDisableBlock: Identifiable {
+        let id = UUID()
+        let game: String
+        let displayName: String
+        let collectionCount: Int
+        let wishlistCount: Int
+
+        var message: String {
+            var parts: [String] = []
+            if collectionCount > 0 {
+                parts.append("\(collectionCount) in your collections")
+            }
+            if wishlistCount > 0 {
+                parts.append("\(wishlistCount) in your wishlists")
+            }
+            let where_ = parts.joined(separator: " and ")
+            return "You still have \(where_) for \(displayName). Remove those cards before turning this module off."
+        }
+    }
+}
+
 private extension SettingsView {
+    /// Persist an enable, or block a disable that would orphan owned/wishlisted
+    /// cards of that game.
+    func handleGameToggle(game: String, displayName: String, isOn: Bool) async {
+        guard !isApplyingRemotePreferences else { return }
+
+        // Enabling never needs a guard.
+        if isOn {
+            await updatePreferences(
+                enabledYugioh: game == "yugioh" ? true : nil,
+                enabledMagic: game == "magic" ? true : nil,
+                enabledPokemon: game == "pokemon" ? true : nil
+            )
+            return
+        }
+
+        let usage = await gameCardUsage(for: game)
+        if usage.collections + usage.wishlists > 0 {
+            await MainActor.run {
+                // Revert the toggle without re-triggering a server update.
+                isApplyingRemotePreferences = true
+                setGameEnabled(game, enabled: true)
+                gameDisableBlock = GameDisableBlock(
+                    game: game,
+                    displayName: displayName,
+                    collectionCount: usage.collections,
+                    wishlistCount: usage.wishlists
+                )
+                DispatchQueue.main.async { isApplyingRemotePreferences = false }
+            }
+            return
+        }
+
+        await updatePreferences(
+            enabledYugioh: game == "yugioh" ? false : nil,
+            enabledMagic: game == "magic" ? false : nil,
+            enabledPokemon: game == "pokemon" ? false : nil
+        )
+    }
+
+    func setGameEnabled(_ game: String, enabled: Bool) {
+        switch game {
+        case "yugioh": environmentStore.enabledYugioh = enabled
+        case "magic": environmentStore.enabledMagic = enabled
+        case "pokemon": environmentStore.enabledPokemon = enabled
+        default: break
+        }
+    }
+
+    /// Count cards of a game across collections and wishlists.
+    func gameCardUsage(for game: String) async -> (collections: Int, wishlists: Int) {
+        let api = APIService()
+        let target = game.lowercased()
+        var collectionCount = 0
+        var wishlistCount = 0
+
+        do {
+            let collections = try await api.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: environmentStore.authToken,
+                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
+            )
+            collectionCount = collections.reduce(0) { total, collection in
+                total + collection.cards.filter { $0.tcg.lowercased() == target }.count
+            }
+        } catch {
+            print("Game usage: failed to load collections: \(error)")
+        }
+
+        do {
+            let wishlists = try await api.getWishlists(
+                config: environmentStore.serverConfiguration,
+                token: environmentStore.authToken ?? ""
+            )
+            wishlistCount = wishlists.reduce(0) { total, wishlist in
+                total + wishlist.cards.filter { $0.tcg.lowercased() == target }.count
+            }
+        } catch {
+            print("Game usage: failed to load wishlists: \(error)")
+        }
+
+        return (collectionCount, wishlistCount)
+    }
+
     enum ServerStatusState: Equatable {
         case checking
         case online
