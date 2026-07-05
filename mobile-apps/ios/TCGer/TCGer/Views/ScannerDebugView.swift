@@ -13,8 +13,46 @@ import AVFoundation
 import Combine
 import CoreMedia
 import SwiftUI
+import UIKit
 import VideoToolbox
 @preconcurrency import Vision
+
+// MARK: - Recording model (exportable run for later re-analysis)
+
+/// One analyzed frame: the pipeline's decision plus a reference to the saved
+/// image, so a recorded run can be re-opened and reviewed off-device.
+struct RecordedScanFrame: Codable {
+    let index: Int
+    let timestampSeconds: Double
+    let mode: String
+    let pipeline: String
+    let elapsedMs: Double
+    let detectedCount: Int
+    let segmentationConfidence: Double?
+    /// Four normalized corners (Vision space, origin bottom-left): TL, TR, BR, BL.
+    let quad: [[Double]]?
+    let identified: Bool
+    let bestMatchName: String?
+    let bestMatchCardId: String?
+    let bestMatchSetCode: String?
+    let bestMatchSetName: String?
+    let confidence: Double?
+    let strategy: String?
+    let alternatives: [String]
+    let imageFile: String
+}
+
+struct RecordedScanBundle: Codable {
+    struct Summary: Codable {
+        let capturedAt: String
+        let frameCount: Int
+        let mode: String
+        let pipeline: String
+        let app: String
+    }
+    let summary: Summary
+    let frames: [RecordedScanFrame]
+}
 
 // MARK: - Log model
 
@@ -97,6 +135,16 @@ final class ScannerDebugViewModel: ObservableObject {
     @Published var embeddingOnly = true
     @Published var throttle: Double = 0.7
 
+    // ---- recording (exportable run) ----
+    @Published var isRecording = false
+    @Published var recordedFrameCount = 0
+
+    private var recordedFrames: [RecordedScanFrame] = []
+    private var recordingSessionDir: URL?
+    private var recordingStart = Date()
+    /// Cap retained frames so a long session can't fill disk.
+    private let maxRecordedFrames = 400
+
     private weak var environmentStore: EnvironmentStore?
     private var lastAnalysis = Date.distantPast
     private var isAnalyzing = false
@@ -164,6 +212,220 @@ final class ScannerDebugViewModel: ObservableObject {
         frameCount = 0
     }
 
+    // MARK: - Recording
+
+    func setRecording(_ on: Bool) {
+        isRecording = on
+        if on {
+            startNewRecordingSession()
+            log(.info, "Recording started — analyzed frames will be saved for export.")
+        } else {
+            log(.info, "Recording paused (\(recordedFrames.count) frames kept).")
+        }
+    }
+
+    func clearRecording() {
+        recordedFrames.removeAll()
+        recordedFrameCount = 0
+        if let dir = recordingSessionDir {
+            try? FileManager.default.removeItem(at: dir)
+        }
+        recordingSessionDir = nil
+    }
+
+    private func startNewRecordingSession() {
+        clearRecording()
+        recordingStart = Date()
+        _ = ensureRecordingSessionDir()
+    }
+
+    private func ensureRecordingSessionDir() -> URL? {
+        if let dir = recordingSessionDir { return dir }
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scan-debug-\(UUID().uuidString)", isDirectory: true)
+        let frames = base.appendingPathComponent("frames", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: frames, withIntermediateDirectories: true)
+            recordingSessionDir = base
+            return base
+        } catch {
+            log(.error, "Could not create recording folder: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func appendRecordedFrame(
+        jpeg: Data,
+        scan: Result<CardScanResult, CardScannerError>,
+        quad: DetectedQuad?,
+        detectedCount: Int,
+        segmentationConfidence: Float?,
+        elapsedMs: Double,
+        mode: String,
+        pipeline: String
+    ) {
+        guard recordedFrames.count < maxRecordedFrames else { return }
+        guard let dir = ensureRecordingSessionDir() else { return }
+
+        let index = recordedFrames.count + 1
+        let fileName = String(format: "frames/frame-%04d.jpg", index)
+        do {
+            try jpeg.write(to: dir.appendingPathComponent(fileName))
+        } catch {
+            log(.error, "Failed to save frame image: \(error.localizedDescription)")
+            return
+        }
+
+        var identified = false
+        var name: String?
+        var cardId: String?
+        var setCode: String?
+        var setName: String?
+        var confidence: Double?
+        var strategy: String?
+        var alternatives: [String] = []
+        if case .success(let result) = scan {
+            identified = true
+            let candidate = result.primary
+            name = candidate.details.identity.name
+            cardId = candidate.details.identity.id
+            setCode = candidate.details.identity.setCode
+            setName = candidate.details.identity.setName
+            confidence = candidate.confidence.score
+            strategy = candidate.originatingStrategy.displayName
+            alternatives = result.alternatives.prefix(5).map { $0.details.identity.name }
+        }
+
+        let quadPoints: [[Double]]? = quad.map { q in
+            [
+                [Double(q.topLeft.x), Double(q.topLeft.y)],
+                [Double(q.topRight.x), Double(q.topRight.y)],
+                [Double(q.bottomRight.x), Double(q.bottomRight.y)],
+                [Double(q.bottomLeft.x), Double(q.bottomLeft.y)],
+            ]
+        }
+
+        recordedFrames.append(
+            RecordedScanFrame(
+                index: index,
+                timestampSeconds: Date().timeIntervalSince(recordingStart),
+                mode: mode,
+                pipeline: pipeline,
+                elapsedMs: elapsedMs,
+                detectedCount: detectedCount,
+                segmentationConfidence: segmentationConfidence.map(Double.init),
+                quad: quadPoints,
+                identified: identified,
+                bestMatchName: name,
+                bestMatchCardId: cardId,
+                bestMatchSetCode: setCode,
+                bestMatchSetName: setName,
+                confidence: confidence,
+                strategy: strategy,
+                alternatives: alternatives,
+                imageFile: fileName
+            )
+        )
+        recordedFrameCount = recordedFrames.count
+    }
+
+    /// Write `results.json` into the session folder and zip the whole thing for
+    /// sharing. The returned URL is a `.zip` in the temporary directory.
+    func buildRecordingExport() throws -> URL {
+        guard !recordedFrames.isEmpty, let dir = recordingSessionDir else {
+            throw NSError(
+                domain: "ScannerDebug", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Nothing recorded yet — start recording and run the scanner first."]
+            )
+        }
+
+        let bundle = RecordedScanBundle(
+            summary: RecordedScanBundle.Summary(
+                capturedAt: ISO8601DateFormatter().string(from: recordingStart),
+                frameCount: recordedFrames.count,
+                mode: mode.displayName,
+                pipeline: embeddingOnly ? "embedding-only (DINOv2 + OCR)" : "full local-first",
+                app: "TCGer iOS Scanner Debug"
+            ),
+            frames: recordedFrames
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let jsonData = try encoder.encode(bundle)
+        try jsonData.write(to: dir.appendingPathComponent("results.json"))
+
+        return try ScannerDebugViewModel.zipDirectory(dir)
+    }
+
+    /// Zip a directory into a single `.zip` using the OS file coordinator.
+    nonisolated private static func zipDirectory(_ directory: URL) throws -> URL {
+        let coordinator = NSFileCoordinator()
+        var coordinatorError: NSError?
+        var result: Result<URL, Error>?
+
+        coordinator.coordinate(
+            readingItemAt: directory,
+            options: [.forUploading],
+            error: &coordinatorError
+        ) { zippedURL in
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(directory.lastPathComponent).zip")
+            do {
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.copyItem(at: zippedURL, to: destination)
+                result = .success(destination)
+            } catch {
+                result = .failure(error)
+            }
+        }
+
+        if let coordinatorError { throw coordinatorError }
+        switch result {
+        case .success(let url): return url
+        case .failure(let error): throw error
+        case .none:
+            throw NSError(
+                domain: "ScannerDebug", code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to package the recording."]
+            )
+        }
+    }
+
+    /// Encode a frame as JPEG, downscaled so exports stay reasonable in size.
+    nonisolated static func makeJPEG(
+        from cgImage: CGImage,
+        maxDimension: Int = 1280,
+        quality: CGFloat = 0.6
+    ) -> Data? {
+        let longest = max(cgImage.width, cgImage.height)
+        guard longest > maxDimension else {
+            return UIImage(cgImage: cgImage).jpegData(compressionQuality: quality)
+        }
+        let scale = CGFloat(maxDimension) / CGFloat(longest)
+        let width = Int(CGFloat(cgImage.width) * scale)
+        let height = Int(CGFloat(cgImage.height) * scale)
+        guard
+            let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else {
+            return UIImage(cgImage: cgImage).jpegData(compressionQuality: quality)
+        }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let scaled = context.makeImage() else {
+            return UIImage(cgImage: cgImage).jpegData(compressionQuality: quality)
+        }
+        return UIImage(cgImage: scaled).jpegData(compressionQuality: quality)
+    }
+
     func log(_ level: DebugLogLevel, _ message: String) {
         logs.append(DebugLogEntry(time: Date(), level: level, message: message))
         if logs.count > maxLogs {
@@ -191,6 +453,9 @@ final class ScannerDebugViewModel: ObservableObject {
         )
         let coordinator = embeddingOnly ? embeddingCoordinator : fullCoordinator
         let started = Date()
+        let recording = isRecording
+        let modeName = mode.displayName
+        let pipelineName = embeddingOnly ? "embedding-only (DINOv2 + OCR)" : "full local-first"
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let cgImage = ScannerDebugViewModel.makeCGImage(from: sampleBuffer) else {
@@ -209,6 +474,8 @@ final class ScannerDebugViewModel: ObservableObject {
             // 2. Identification (the real live-scan path).
             let scan = await coordinator.scan(image: cgImage, context: context, source: .livePreview)
             let elapsed = Date().timeIntervalSince(started)
+
+            let jpegData = recording ? ScannerDebugViewModel.makeJPEG(from: cgImage) : nil
 
             await MainActor.run {
                 guard let self else { return }
@@ -244,6 +511,19 @@ final class ScannerDebugViewModel: ObservableObject {
                     }
                 }
 
+                if recording, let jpegData {
+                    self.appendRecordedFrame(
+                        jpeg: jpegData,
+                        scan: scan,
+                        quad: quad,
+                        detectedCount: detectedCount,
+                        segmentationConfidence: bestConfidence,
+                        elapsedMs: elapsed * 1000,
+                        mode: modeName,
+                        pipeline: pipelineName
+                    )
+                }
+
                 self.isAnalyzing = false
             }
         }
@@ -264,6 +544,10 @@ struct ScannerDebugView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @StateObject private var viewModel = ScannerDebugViewModel()
 
+    @State private var exportURL: URL?
+    @State private var showingExport = false
+    @State private var exportError: String?
+
     var body: some View {
         VStack(spacing: 0) {
             cameraPane
@@ -277,6 +561,22 @@ struct ScannerDebugView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { viewModel.configure(environment: environmentStore) }
         .onDisappear { viewModel.stop() }
+        .sheet(isPresented: $showingExport) {
+            if let url = exportURL {
+                ScanDebugShareSheet(url: url)
+            }
+        }
+        .alert(
+            "Export Failed",
+            isPresented: Binding(
+                get: { exportError != nil },
+                set: { if !$0 { exportError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
     }
 
     private var cameraPane: some View {
@@ -357,12 +657,63 @@ struct ScannerDebugView: View {
                     .frame(width: 36, alignment: .trailing)
             }
 
+            recordingControls
+
             Text(viewModel.statusMessage)
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
+    }
+
+    private var recordingControls: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Button {
+                    viewModel.setRecording(!viewModel.isRecording)
+                } label: {
+                    Label(
+                        viewModel.isRecording ? "Recording" : "Record",
+                        systemImage: viewModel.isRecording ? "record.circle.fill" : "record.circle"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(viewModel.isRecording ? .red : .accentColor)
+
+                Button {
+                    exportRecording()
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.recordedFrameCount == 0)
+            }
+
+            HStack {
+                Text(viewModel.recordedFrameCount > 0
+                    ? "\(viewModel.recordedFrameCount) frame\(viewModel.recordedFrameCount == 1 ? "" : "s") saved · images + results"
+                    : "Record to save each analyzed frame and its result for later re-analysis.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if viewModel.recordedFrameCount > 0 {
+                    Button("Clear") { viewModel.clearRecording() }
+                        .font(.caption2)
+                }
+            }
+        }
+    }
+
+    private func exportRecording() {
+        do {
+            exportURL = try viewModel.buildRecordingExport()
+            showingExport = true
+        } catch {
+            exportError = error.localizedDescription
+        }
     }
 
     private var identificationPane: some View {
@@ -444,4 +795,18 @@ struct ScannerDebugView: View {
         f.dateFormat = "HH:mm:ss.SSS"
         return f
     }()
+}
+
+// MARK: - Share sheet
+
+/// Presents a recorded-run `.zip` via the system share sheet so it can be saved
+/// to Files, AirDropped, or sent off-device for later re-analysis.
+private struct ScanDebugShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
