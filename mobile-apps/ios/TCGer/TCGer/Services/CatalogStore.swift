@@ -120,9 +120,50 @@ final class CatalogStore: ObservableObject {
         let cards: [CatalogCardEntry]
     }
 
+    nonisolated private struct SetSearchMetadata: Sendable {
+        let name: String
+        let code: String
+
+        func contains(_ query: String) -> Bool {
+            name.contains(query) || code.contains(query)
+        }
+    }
+
+    nonisolated private struct LoadedCatalogPack: Sendable {
+        let pack: CatalogPack
+        let setSearchMetadata: [String: SetSearchMetadata]
+
+        init(pack: CatalogPack) {
+            self.pack = pack
+            setSearchMetadata = Dictionary(
+                pack.sets.map { set in
+                    (
+                        set.code,
+                        SetSearchMetadata(
+                            name: Self.normalize(set.name),
+                            code: Self.normalize(set.code)
+                        )
+                    )
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+        }
+
+        var version: Int { pack.version }
+        var sets: [CatalogSetEntry] { pack.sets }
+        var cards: [CatalogCardEntry] { pack.cards }
+
+        private static func normalize(_ value: String) -> String {
+            value.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: nil
+            )
+        }
+    }
+
     private let source: any CatalogSource
     private let defaults: UserDefaults
-    private var loadedPacks: [TCGGame: CatalogPack] = [:]
+    private var loadedPacks: [TCGGame: LoadedCatalogPack] = [:]
     private var enabledGames: Set<TCGGame> = []
 
     init(
@@ -261,13 +302,16 @@ final class CatalogStore: ObservableObject {
     func search(query: String, tcg: TCGGame, limit: Int) -> [CatalogEntry] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty, limit > 0 else { return [] }
+        let normalizedNeedle = needle.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: nil
+        )
 
         let packs = searchablePacks(for: tcg)
         var results: [CatalogEntry] = []
         results.reserveCapacity(min(limit, 200))
 
-        // Two passes keep all prefix matches ahead of other substring matches
-        // without allocating a second normalized-name index for large packs.
+        // Ordered passes rank name prefixes, then name substrings, then set metadata.
         for (game, pack) in packs {
             for card in pack.cards where name(card.name, hasPrefix: needle) {
                 results.append(CatalogEntry(tcg: game, card: card))
@@ -282,6 +326,21 @@ final class CatalogStore: ObservableObject {
                         of: needle,
                         options: [.caseInsensitive, .diacriticInsensitive]
                       ) != nil else {
+                    continue
+                }
+                results.append(CatalogEntry(tcg: game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        for (game, pack) in packs {
+            for card in pack.cards {
+                guard card.name.range(
+                    of: needle,
+                    options: [.caseInsensitive, .diacriticInsensitive]
+                ) == nil,
+                      let setCode = card.setCode,
+                      pack.setSearchMetadata[setCode]?.contains(normalizedNeedle) == true else {
                     continue
                 }
                 results.append(CatalogEntry(tcg: game, card: card))
@@ -362,7 +421,7 @@ final class CatalogStore: ObservableObject {
         "tcger.catalog.installedVersion.\(game.rawValue)"
     }
 
-    private func searchablePacks(for tcg: TCGGame) -> [(TCGGame, CatalogPack)] {
+    private func searchablePacks(for tcg: TCGGame) -> [(TCGGame, LoadedCatalogPack)] {
         if tcg == .all {
             return TCGGame.catalogGames.compactMap { game in
                 guard enabledGames.contains(game), let pack = loadedPacks[game] else { return nil }
@@ -402,7 +461,7 @@ final class CatalogStore: ObservableObject {
             throw StoreError.invalidPack(expected: game)
         }
 
-        loadedPacks[game] = pack
+        loadedPacks[game] = LoadedCatalogPack(pack: pack)
         installProgress[game] = 1
     }
 

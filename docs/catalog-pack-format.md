@@ -97,5 +97,8 @@ Magic includes every `default_cards` record whose `games` contains `paper`.
 Pure-digital records are excluded. Paper tokens, emblems, and art-series cards
 remain included because the backend Magic adapter does not exclude those classes.
 
-Version bumps: any regeneration that changes content bumps the game's `version`
-integer in the manifest. Clients compare versions to decide whether to reload.
+Version bumps are automatic: the builder compares each regenerated pack with the
+existing output manifest and pack. Unchanged content keeps the existing game's
+`version`; changed content increments it (or starts at `1` when no prior entry
+exists). The pack and manifest always carry the same version. Clients compare
+versions to decide whether to reload.

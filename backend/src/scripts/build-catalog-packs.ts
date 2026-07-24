@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   buildYugiohPrintingKey
@@ -48,14 +48,14 @@ interface CatalogCard {
 interface CatalogPack {
   formatVersion: 1;
   tcg: SupportedGame;
-  version: 1;
+  version: number;
   updatedAt: string;
   sets: CatalogSet[];
   cards: CatalogCard[];
 }
 
 interface ManifestGame {
-  version: 1;
+  version: number;
   cardCount: number;
   setCount: number;
   bytes: number;
@@ -518,21 +518,83 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
   };
 }
 
-async function writePack(outDir: string, pack: CatalogPack): Promise<ManifestGame> {
+async function loadExistingManifest(outDir: string): Promise<CatalogManifest | undefined> {
+  try {
+    return JSON.parse(
+      await readFile(resolve(outDir, 'manifest.json'), 'utf8')
+    ) as CatalogManifest;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function existingPackUpdatedAt(
+  outDir: string,
+  entry: ManifestGame
+): Promise<string | undefined> {
+  try {
+    const pack = JSON.parse(
+      await readFile(resolve(outDir, entry.file), 'utf8')
+    ) as Pick<CatalogPack, 'updatedAt'>;
+    return typeof pack.updatedAt === 'string' ? pack.updatedAt : undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function packSha256(contents: string): string {
+  return createHash('sha256').update(contents).digest('hex');
+}
+
+async function writePack(
+  outDir: string,
+  pack: CatalogPack,
+  existingEntry?: ManifestGame
+): Promise<ManifestGame> {
   const file = `${pack.tcg}.pack.json`;
-  const contents = JSON.stringify(pack);
+  const generatedAt = pack.updatedAt;
+  let contents: string | undefined;
+
+  if (existingEntry) {
+    const updatedAt = await existingPackUpdatedAt(outDir, existingEntry);
+    if (updatedAt) {
+      pack.version = existingEntry.version;
+      pack.updatedAt = updatedAt;
+      const comparisonContents = JSON.stringify(pack);
+      if (packSha256(comparisonContents) === existingEntry.sha256) {
+        contents = comparisonContents;
+      }
+    }
+  }
+
+  if (!contents) {
+    pack.version = existingEntry ? existingEntry.version + 1 : 1;
+    pack.updatedAt = generatedAt;
+    contents = JSON.stringify(pack);
+  }
+
   await writeFile(resolve(outDir, file), contents);
   return {
     version: pack.version,
     cardCount: pack.cards.length,
     setCount: pack.sets.length,
     bytes: Buffer.byteLength(contents),
-    sha256: createHash('sha256').update(contents).digest('hex'),
+    sha256: packSha256(contents),
     file
   };
 }
 
-async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<void> {
+async function syncOutputs(
+  outDir: string,
+  manifest: CatalogManifest,
+  builtGames: SupportedGame[]
+): Promise<void> {
   const destinations = [
     resolve(REPO_ROOT, 'frontend/public/catalog'),
     resolve(REPO_ROOT, 'mobile-apps/ios/TCGer/TCGer/Resources/Catalogs')
@@ -540,7 +602,7 @@ async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<v
   for (const destination of destinations) {
     await mkdir(destination, { recursive: true });
     await copyFile(resolve(outDir, 'manifest.json'), resolve(destination, 'manifest.json'));
-    for (const game of Object.keys(manifest.games) as SupportedGame[]) {
+    for (const game of builtGames) {
       const entry = manifest.games[game];
       if (entry) {
         await copyFile(resolve(outDir, entry.file), resolve(destination, entry.file));
@@ -557,10 +619,11 @@ async function main(): Promise<void> {
 
   await mkdir(options.outDir, { recursive: true });
   const generatedAt = new Date().toISOString();
+  const existingManifest = await loadExistingManifest(options.outDir);
   const manifest: CatalogManifest = {
     formatVersion: 1,
     generatedAt,
-    games: {}
+    games: { ...existingManifest?.games }
   };
 
   for (const game of options.games) {
@@ -571,7 +634,11 @@ async function main(): Promise<void> {
         : game === 'magic'
           ? await buildMagicPack(generatedAt, options.limit)
           : await buildYugiohPack(generatedAt, options.limit);
-    manifest.games[game] = await writePack(options.outDir, pack);
+    manifest.games[game] = await writePack(
+      options.outDir,
+      pack,
+      existingManifest?.games[game]
+    );
     console.log(JSON.stringify({ game, ...manifest.games[game] }));
   }
 
@@ -580,7 +647,7 @@ async function main(): Promise<void> {
     `${JSON.stringify(manifest, null, 2)}\n`
   );
   if (options.sync) {
-    await syncOutputs(options.outDir, manifest);
+    await syncOutputs(options.outDir, manifest, options.games);
     console.log('Synced catalog packs to web and iOS resources.');
   }
 }
