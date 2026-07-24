@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ChevronDown, Heart, Loader2, Minus, Plus } from "lucide-react";
 
@@ -46,6 +45,7 @@ import {
   isFoilFinish,
 } from "@/lib/pokemon-variants";
 import { getCardBackImage } from "@/lib/utils";
+import { CardImage } from "./card-image";
 import { SetSymbol } from "./set-symbol";
 
 const PRINT_SUPPORTED_GAMES: Card["tcg"][] = ["magic", "pokemon"];
@@ -108,9 +108,6 @@ export function CardPreview({ card }: CardPreviewProps) {
   );
   const activeCard = supportsPrintSelection ? selectedPrintCard : card;
   const cardBackImage = getCardBackImage(activeCard.tcg);
-  const [cardImageSrc, setCardImageSrc] = useState(
-    activeCard.imageUrlSmall || activeCard.imageUrl || cardBackImage,
-  );
   const existingEntry = selectedBinder?.cards.find(
     (binderCard: CollectionCard) => binderCard.cardId === activeCard.id,
   );
@@ -248,19 +245,6 @@ export function CardPreview({ card }: CardPreviewProps) {
   }, [selectedPrintCard]);
 
   useEffect(() => {
-    setCardImageSrc(
-      activeCard.imageUrlSmall ||
-        activeCard.imageUrl ||
-        getCardBackImage(activeCard.tcg),
-    );
-  }, [
-    activeCard.id,
-    activeCard.imageUrlSmall,
-    activeCard.imageUrl,
-    activeCard.tcg,
-  ]);
-
-  useEffect(() => {
     if (!supportsPrintSelection || !isPrintDialogOpen || printOptions) {
       return;
     }
@@ -304,22 +288,6 @@ export function CardPreview({ card }: CardPreviewProps) {
     selectedPrintCard.id,
     token,
   ]);
-
-  const handleCardImageError = useCallback(() => {
-    setCardImageSrc((currentSrc: string) => {
-      if (
-        currentSrc === activeCard.imageUrlSmall &&
-        activeCard.imageUrl &&
-        activeCard.imageUrl !== currentSrc
-      ) {
-        return activeCard.imageUrl;
-      }
-      if (currentSrc === cardBackImage) {
-        return currentSrc;
-      }
-      return cardBackImage;
-    });
-  }, [activeCard.imageUrl, activeCard.imageUrlSmall, cardBackImage]);
 
   const handleBinderChange = (binderId: string) => {
     setSelectedBinderId(binderId);
@@ -615,17 +583,15 @@ export function CardPreview({ card }: CardPreviewProps) {
                         }`}
                         data-oid="5xf3-pq"
                       >
-                        <Image
+                        <CardImage
                           src={print.imageUrlSmall ?? cardBackImage}
+                          fallbackSrc={print.imageUrl}
+                          tcg={print.tcg}
                           alt={print.name}
                           width={40}
                           height={56}
                           className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
                           loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.onerror = null;
-                            event.currentTarget.src = cardBackImage;
-                          }}
                           data-oid="s.dsk0e"
                         />
 
@@ -745,10 +711,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                           </SelectTrigger>
                           <SelectContent>
                             {finishOptions.map((finish) => (
-                              <SelectItem
-                                key={finish.code}
-                                value={finish.code}
-                              >
+                              <SelectItem key={finish.code} value={finish.code}>
                                 {finish.label}
                               </SelectItem>
                             ))}
@@ -880,17 +843,22 @@ export function CardPreview({ card }: CardPreviewProps) {
               onMouseLeave={handleMouseLeave}
               data-oid="7ar0m4q"
             >
-              <Image
+              <CardImage
                 draggable={false}
                 loading="lazy"
                 className="card-test"
                 alt={activeCard.name}
-                src={cardImageSrc}
+                src={
+                  activeCard.imageUrlSmall ||
+                  activeCard.imageUrl ||
+                  cardBackImage
+                }
+                fallbackSrc={activeCard.imageUrl}
+                tcg={activeCard.tcg}
                 width={320}
                 height={448}
                 sizes="(max-width: 640px) 45vw, 20vw"
                 style={cardStyle}
-                onError={handleCardImageError}
                 data-oid=":2n91gg"
               />
             </div>

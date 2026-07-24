@@ -15,12 +15,12 @@ export const GAME_LABELS = {
 export type SupportedGame = keyof typeof GAME_LABELS;
 
 const CARD_BACK_IMAGES: Record<string, string> = {
-  pokemon: "/images/pokemon-card-back.png",
-  magic: "/images/mtg-card-back.png",
-  yugioh: "/images/yugioh-card-back.png",
+  pokemon: "/card-backs/pokemon.png",
+  magic: "/card-backs/magic.png",
+  yugioh: "/card-backs/yugioh.png",
 };
 
-const DEFAULT_CARD_BACK = "/images/pokemon-card-back.png";
+const DEFAULT_CARD_BACK = "/card-backs/pokemon.png";
 
 export function getCardBackImage(tcg?: string): string {
   return (tcg && CARD_BACK_IMAGES[tcg]) || DEFAULT_CARD_BACK;

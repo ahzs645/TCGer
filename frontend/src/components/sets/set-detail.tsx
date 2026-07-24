@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +18,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardImage } from "@/components/cards/card-image";
 import {
   Card as UiCard,
   CardContent,
@@ -643,8 +643,10 @@ function SetCardEntry({
       <UiCard className={cn(owned && "border-emerald-500/40 bg-emerald-500/5")}>
         <CardContent className="flex items-center gap-4 p-3">
           <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded bg-muted">
-            <Image
+            <CardImage
               src={image}
+              fallbackSrc={card.imageUrl}
+              tcg={card.tcg}
               alt=""
               fill
               sizes="48px"
@@ -680,8 +682,10 @@ function SetCardEntry({
     >
       <CardContent className="space-y-3 p-3">
         <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
-          <Image
+          <CardImage
             src={image}
+            fallbackSrc={card.imageUrl}
+            tcg={card.tcg}
             alt={card.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
