@@ -9,11 +9,24 @@ import {
   previewCollectionImport,
   type CollectionImportPreview
 } from "./lib/collectionImport";
+import type { TcgCode } from "./lib/validators";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
 
 const LIBRARY_COLLECTION_ID = "__library__";
+const TCG_CODES: readonly TcgCode[] = [
+  "yugioh",
+  "magic",
+  "pokemon",
+  "onepiece",
+  "lorcana",
+  "dragonball"
+];
+
+function isTcgCode(value: unknown): value is TcgCode {
+  return typeof value === "string" && TCG_CODES.includes(value as TcgCode);
+}
 
 type BridgeIdentity = {
   subject: string;
@@ -40,7 +53,7 @@ type NativeEntry = {
     baseExternalId?: string;
     printingKey?: string;
     artworkId?: string;
-    tcg: "magic" | "pokemon" | "yugioh";
+    tcg: TcgCode;
     name: string;
     setCode?: string;
     setName?: string;
@@ -87,7 +100,7 @@ type NativeBinderDetail = {
   colorHex?: string;
   containerType?: string;
   imageUrl?: string;
-  associatedTcg?: "magic" | "pokemon" | "yugioh";
+  associatedTcg?: TcgCode;
   associatedSetCode?: string;
   associatedSetName?: string;
   entryCount: number;
@@ -102,7 +115,7 @@ type NativeWishlistCard = RichCardMetadata & {
   baseExternalId?: string;
   printingKey?: string;
   artworkId?: string;
-  tcg: "magic" | "pokemon" | "yugioh";
+  tcg: TcgCode;
   name: string;
   setCode?: string;
   setName?: string;
@@ -489,7 +502,7 @@ function previewBulkAddBody(body: any, binders: NativeBinderDetail[]) {
       !card.name.trim() ||
       typeof card.externalId !== "string" ||
       !card.externalId.trim() ||
-      !["yugioh", "magic", "pokemon"].includes(tcg)
+      !isTcgCode(tcg)
     ) {
       issues.push({
         rowId,
@@ -539,7 +552,7 @@ function previewBulkAddBody(body: any, binders: NativeBinderDetail[]) {
       valid: true,
       cardId: typeof source?.cardId === "string" ? source.cardId : "",
       name: typeof card?.name === "string" ? card.name : "Unknown card",
-      tcg: ["yugioh", "magic", "pokemon"].includes(tcg) ? tcg : "yugioh",
+      tcg: isTcgCode(tcg) ? tcg : "yugioh",
       setCode: typeof card?.setCode === "string" ? card.setCode : undefined,
       rarity: typeof card?.rarity === "string" ? card.rarity : undefined,
       binderId,
@@ -932,6 +945,17 @@ http.route({
     try {
       const identity = await requireBridgeIdentity(ctx, request);
       const body = await parseJsonBody(request);
+      if (
+        Object.prototype.hasOwnProperty.call(body, "defaultGame") &&
+        body.defaultGame !== null &&
+        !isTcgCode(body.defaultGame)
+      ) {
+        return errorJson(
+          400,
+          "VALIDATION_ERROR",
+          `defaultGame must be one of: ${TCG_CODES.join(", ")}, or null`
+        );
+      }
       const preferences = await ctx.runMutation(internal.bridge.updateViewerPreferences, {
         subject: identity.subject,
         showCardNumbers:
@@ -941,13 +965,14 @@ http.route({
         enabledMagic: typeof body.enabledMagic === "boolean" ? body.enabledMagic : undefined,
         enabledPokemon:
           typeof body.enabledPokemon === "boolean" ? body.enabledPokemon : undefined,
+        enabledOnepiece:
+          typeof body.enabledOnepiece === "boolean" ? body.enabledOnepiece : undefined,
+        enabledLorcana:
+          typeof body.enabledLorcana === "boolean" ? body.enabledLorcana : undefined,
+        enabledDragonball:
+          typeof body.enabledDragonball === "boolean" ? body.enabledDragonball : undefined,
         defaultGame:
-          body.defaultGame === null ||
-          body.defaultGame === "yugioh" ||
-          body.defaultGame === "magic" ||
-          body.defaultGame === "pokemon"
-            ? body.defaultGame
-            : undefined
+          body.defaultGame === null || isTcgCode(body.defaultGame) ? body.defaultGame : undefined
       });
       return json(preferences);
     } catch (error) {

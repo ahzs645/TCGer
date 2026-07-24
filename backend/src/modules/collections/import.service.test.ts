@@ -34,6 +34,21 @@ describe('collection CSV import', () => {
     );
   });
 
+  it.each(['onepiece', 'lorcana', 'dragonball'] as const)(
+    'accepts %s CSV imports',
+    (tcg) => {
+      const preview = previewCollectionImport(
+        `tcg,external_id,card_name,quantity\n${tcg},${tcg}-card,Example Card,1`,
+      );
+
+      expect(preview.valid).toBe(true);
+      expect(preview.rows[0]).toMatchObject({
+        tcg,
+        externalId: `${tcg}-card`,
+      });
+    },
+  );
+
   it('provides a valid machine-readable template header', () => {
     const template = collectionImportTemplate();
     expect(template).toContain('tcg,external_id,card_name');

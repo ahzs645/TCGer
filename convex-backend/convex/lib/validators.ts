@@ -4,8 +4,18 @@ import { richCardMetadataFields } from "./cardMetadata";
 export const tcgCodeValidator = v.union(
   v.literal("yugioh"),
   v.literal("magic"),
-  v.literal("pokemon")
+  v.literal("pokemon"),
+  v.literal("onepiece"),
+  v.literal("lorcana"),
+  v.literal("dragonball")
 );
+export type TcgCode =
+  | "yugioh"
+  | "magic"
+  | "pokemon"
+  | "onepiece"
+  | "lorcana"
+  | "dragonball";
 
 export const binderKindValidator = v.union(
   v.literal("binder"),
@@ -141,6 +151,9 @@ export const viewerValidator = v.object({
   enabledYugioh: v.boolean(),
   enabledMagic: v.boolean(),
   enabledPokemon: v.boolean(),
+  enabledOnepiece: v.boolean(),
+  enabledLorcana: v.boolean(),
+  enabledDragonball: v.boolean(),
   defaultGame: v.optional(tcgCodeValidator),
   libraryBinderId: v.id("binders"),
   createdAt: v.string(),
@@ -163,6 +176,9 @@ export const userPreferencesValidator = v.object({
   enabledYugioh: v.boolean(),
   enabledMagic: v.boolean(),
   enabledPokemon: v.boolean(),
+  enabledOnepiece: v.boolean(),
+  enabledLorcana: v.boolean(),
+  enabledDragonball: v.boolean(),
   defaultGame: v.union(tcgCodeValidator, v.null())
 });
 

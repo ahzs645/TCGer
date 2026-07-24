@@ -5,7 +5,14 @@ import { SetDetail } from "@/components/sets/set-detail";
 import { getStaticSetParams } from "@/lib/sets/static-params";
 import type { TcgCode } from "@tcg/api-types";
 
-const SUPPORTED_GAMES = new Set<TcgCode>(["yugioh", "magic", "pokemon"]);
+const SUPPORTED_GAMES = new Set<TcgCode>([
+  "yugioh",
+  "magic",
+  "pokemon",
+  "onepiece",
+  "lorcana",
+  "dragonball",
+]);
 
 export function generateStaticParams() {
   return getStaticSetParams();

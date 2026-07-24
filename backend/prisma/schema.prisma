@@ -21,6 +21,9 @@ model User {
   enabledYugioh            Boolean                   @default(true)
   enabledMagic             Boolean                   @default(true)
   enabledPokemon           Boolean                   @default(true)
+  enabledOnepiece          Boolean                   @default(false)
+  enabledLorcana           Boolean                   @default(false)
+  enabledDragonball        Boolean                   @default(false)
   defaultGame              String?
   sessions                 Session[]
   accounts                 Account[]
@@ -476,7 +479,7 @@ model Deck {
   userId      String
   name        String
   description String?
-  tcg         String // 'magic' | 'yugioh' | 'pokemon'
+  tcg         String // Canonical TCG code from @tcg/api-types
   format      String? // 'standard', 'modern', 'commander', etc.
   colorHex    String?
   isPublic    Boolean  @default(false)

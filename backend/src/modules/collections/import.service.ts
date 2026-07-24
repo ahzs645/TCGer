@@ -6,6 +6,7 @@ import type {
   CollectionImportRequest,
   CollectionImportResult,
 } from '@tcg/api-types';
+import { tcgCodeSchema } from '@tcg/api-types';
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
@@ -251,11 +252,11 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
     const cardName = source.card_name?.trim();
     const before = issues.length;
 
-    if (!['pokemon', 'magic', 'yugioh'].includes(tcg)) {
+    if (!tcgCodeSchema.safeParse(tcg).success) {
       issues.push({
         row: rowNumber,
         field: 'tcg',
-        message: 'must be pokemon, magic, or yugioh',
+        message: 'must be pokemon, magic, yugioh, onepiece, lorcana, or dragonball',
       });
     }
     if (!externalId) {

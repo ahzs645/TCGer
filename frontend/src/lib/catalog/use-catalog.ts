@@ -12,10 +12,17 @@ import {
   removeCatalog,
 } from "./catalog-client";
 import { getInstalledCatalogs, type InstalledCatalogPack } from "./catalog-db";
+import {
+  CATALOG_GAMES,
+  isCatalogGame,
+  type CatalogTcgCode,
+} from "./catalog-types";
+
+export { CATALOG_GAMES, isCatalogGame };
+export type { CatalogTcgCode };
 
 export const CATALOG_CHANGED_EVENT = "tcger:catalog-changed";
 export const CATALOG_PROMPT_EVENT = "tcger:catalog-prompt";
-export const CATALOG_GAMES: TcgCode[] = ["pokemon", "magic", "yugioh"];
 
 export type CatalogInstallStatus =
   | "not-installed"
@@ -29,9 +36,11 @@ export interface CatalogGameState {
   manifest?: CatalogManifestGame;
 }
 
-type CatalogGameStates = Record<TcgCode, CatalogGameState>;
-type CatalogProgressState = Partial<Record<TcgCode, CatalogDownloadProgress>>;
-type CatalogErrorState = Partial<Record<TcgCode, string>>;
+type CatalogGameStates = Record<CatalogTcgCode, CatalogGameState>;
+type CatalogProgressState = Partial<
+  Record<CatalogTcgCode, CatalogDownloadProgress>
+>;
+type CatalogErrorState = Partial<Record<CatalogTcgCode, string>>;
 
 const EMPTY_STATES: CatalogGameStates = {
   pokemon: { status: "unavailable" },
@@ -75,7 +84,7 @@ function dispatchCatalogChanged(): void {
 }
 
 export function requestCatalogPrompt(tcg: TcgCode): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !isCatalogGame(tcg)) return;
   window.dispatchEvent(
     new CustomEvent<TcgCode>(CATALOG_PROMPT_EVENT, { detail: tcg }),
   );
@@ -112,7 +121,7 @@ export function useCatalog() {
   }, [refresh]);
 
   const install = useCallback(
-    async (tcg: TcgCode) => {
+    async (tcg: CatalogTcgCode) => {
       setErrors((current) => ({ ...current, [tcg]: undefined }));
       setProgress((current) => ({
         ...current,
@@ -146,7 +155,7 @@ export function useCatalog() {
   );
 
   const remove = useCallback(
-    async (tcg: TcgCode) => {
+    async (tcg: CatalogTcgCode) => {
       setErrors((current) => ({ ...current, [tcg]: undefined }));
       try {
         await removeCatalog(tcg);

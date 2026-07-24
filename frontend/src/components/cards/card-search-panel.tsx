@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useCardSearch } from "@/lib/hooks/use-card-search";
-import { useGameFilterStore } from "@/stores/game-filter";
+import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
 import { useAuthStore } from "@/stores/auth";
@@ -55,8 +55,9 @@ export function CardSearchPanel() {
   const selectedGameDisabled =
     selectedGame !== "all" &&
     !enabledGames[selectedGame as keyof typeof enabledGames];
-  const noGamesEnabled =
-    !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+  const noGamesEnabled = Object.values(enabledGames).every(
+    (enabled) => !enabled,
+  );
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -134,27 +135,18 @@ export function CardSearchPanel() {
                   <SelectItem value="all" data-oid="20f.i-_">
                     All Games
                   </SelectItem>
-                  <SelectItem
-                    value="yugioh"
-                    disabled={!enabledGames.yugioh}
-                    data-oid="0v5hs8d"
-                  >
-                    Yu-Gi-Oh! {!enabledGames.yugioh && "(disabled)"}
-                  </SelectItem>
-                  <SelectItem
-                    value="magic"
-                    disabled={!enabledGames.magic}
-                    data-oid="bpj1cuz"
-                  >
-                    Magic: The Gathering {!enabledGames.magic && "(disabled)"}
-                  </SelectItem>
-                  <SelectItem
-                    value="pokemon"
-                    disabled={!enabledGames.pokemon}
-                    data-oid="ug:ep-w"
-                  >
-                    Pokémon {!enabledGames.pokemon && "(disabled)"}
-                  </SelectItem>
+                  {supportedGames
+                    .filter((game) => game !== "all")
+                    .map((game) => (
+                      <SelectItem
+                        key={game}
+                        value={game}
+                        disabled={!enabledGames[game]}
+                      >
+                        {GAME_LABELS[game]}{" "}
+                        {!enabledGames[game] && "(disabled)"}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

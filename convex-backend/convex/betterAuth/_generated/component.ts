@@ -38,6 +38,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   emailVerified: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -129,6 +132,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -326,6 +332,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -584,6 +593,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   emailVerified?: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -612,6 +624,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -835,6 +850,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   emailVerified?: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -863,6 +881,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:

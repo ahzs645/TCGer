@@ -6,7 +6,8 @@ import type {
   UpdateCardInput,
   CardDataPayload,
   CollectionCard,
-  CollectionCardCopy
+  CollectionCardCopy,
+  TcgCode
 } from '@tcg/api-types';
 
 import { prisma } from '../../lib/prisma';
@@ -440,7 +441,7 @@ function aggregateCollectionEntries(
         baseExternalId: card.baseExternalId ?? undefined,
         printingKey: card.printingKey ?? undefined,
         artworkId: card.artworkId ?? undefined,
-        tcg: card.tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
+        tcg: card.tcgGame.code as TcgCode,
         name: card.name,
         setCode: card.setCode ?? undefined,
         setName: card.setName ?? undefined,

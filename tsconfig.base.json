@@ -10,6 +10,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": ["node"],
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@tcg/api-types": ["packages/api-types/dist/index.d.ts"],
+      "@tcg/api-types/*": ["packages/api-types/dist/*"]
+    }
   }
 }

@@ -38,6 +38,9 @@ export const ensureCurrent = mutation({
         enabledYugioh: true,
         enabledMagic: true,
         enabledPokemon: true,
+        enabledOnepiece: false,
+        enabledLorcana: false,
+        enabledDragonball: false,
         createdAt: timestamp,
         updatedAt: timestamp
       });

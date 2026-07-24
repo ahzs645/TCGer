@@ -1,7 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
-type HttpError = Error & { status?: number; details?: unknown };
+type HttpError = Error & {
+  status?: number;
+  code?: string;
+  details?: unknown;
+};
 
 // Centralized error handler returning normalized payloads
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -15,7 +19,11 @@ export function errorHandler(err: HttpError, req: Request, res: Response, _next:
   }
 
   const status = err.status ?? 500;
-  const message = status >= 500 ? 'Internal server error' : err.message;
+  const isSafeConfigurationError = err.code === 'APITCG_NOT_CONFIGURED';
+  const message =
+    status >= 500 && !isSafeConfigurationError
+      ? 'Internal server error'
+      : err.message;
 
   if (status >= 500) {
     req.log.error({ err }, 'Unhandled application error');
@@ -24,7 +32,7 @@ export function errorHandler(err: HttpError, req: Request, res: Response, _next:
   }
 
   return res.status(status).json({
-    error: err.name || 'Error',
+    error: err.code ?? err.name ?? 'Error',
     message,
     details: err.details
   });

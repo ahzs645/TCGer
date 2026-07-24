@@ -1,3 +1,5 @@
+import { tcgCodeSchema, type TcgCode } from "@tcg/api-types";
+
 export type CollectionImportSourceFormat =
   | "csv"
   | "json"
@@ -18,7 +20,7 @@ export interface CollectionImportResolution {
 
 export interface NormalizedCollectionImportRow {
   sourceRow: number;
-  tcg: "pokemon" | "magic" | "yugioh";
+  tcg: TcgCode;
   externalId?: string;
   baseExternalId?: string;
   printingKey?: string;
@@ -63,7 +65,7 @@ export interface CollectionImportAmbiguity {
   code: "PRINTING_RESOLUTION_REQUIRED";
   message: string;
   query: {
-    tcg: "pokemon" | "magic" | "yugioh";
+    tcg: TcgCode;
     name: string;
     collectorNumber?: string;
     setCode?: string;
@@ -362,7 +364,7 @@ export function parseCollectionJson(
     const tcg = optionalString(source.tcg ?? source.game)?.toLowerCase();
     const cardName = optionalString(source.cardName ?? source.card_name ?? source.name);
     const quantity = integer(source.quantity ?? source.qty ?? 1);
-    if (!cardName || !quantity || !["pokemon", "magic", "yugioh"].includes(tcg ?? "")) {
+    if (!cardName || !quantity || !tcgCodeSchema.safeParse(tcg).success) {
       failures.push({
         sourceRow,
         code: "INVALID_FIELD",

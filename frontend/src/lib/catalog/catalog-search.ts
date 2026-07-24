@@ -1,4 +1,5 @@
-import type { Card, TcgCode, TcgSet } from "@tcg/api-types";
+import type { Card, TcgSet } from "@tcg/api-types";
+import type { CatalogTcgCode } from "./catalog-types";
 
 import {
   type CatalogCard,
@@ -25,7 +26,7 @@ interface SearchIndex {
   entries: SearchIndexEntry[];
 }
 
-const searchIndexes = new Map<TcgCode, SearchIndex>();
+const searchIndexes = new Map<CatalogTcgCode, SearchIndex>();
 
 export function normalizeCatalogText(value: string): string {
   return value
@@ -40,7 +41,7 @@ function encodePathSegment(value: string): string {
 }
 
 export function deriveCatalogImageUrls(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   card: CatalogCard,
   set?: CatalogSet,
 ): CatalogImageUrls {
@@ -92,7 +93,7 @@ function catalogCardAttributes(card: CatalogCard): Record<string, unknown> {
 }
 
 export function catalogCardToCard(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   card: CatalogCard,
   set?: CatalogSet,
 ): Card {
@@ -118,7 +119,7 @@ function makeSetMap(sets: CatalogSet[]): Map<string, CatalogSet> {
   );
 }
 
-async function buildSearchIndex(tcg: TcgCode): Promise<SearchIndex | null> {
+async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null> {
   const installed = await getInstalledCatalog(tcg);
   if (!installed) return null;
 
@@ -178,7 +179,7 @@ function rankEntry(entry: SearchIndexEntry, query: string): number | null {
 
 export async function searchCatalog(
   query: string,
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   limit = 100,
 ): Promise<Card[]> {
   const normalizedQuery = normalizeCatalogText(query);
@@ -197,7 +198,7 @@ export async function searchCatalog(
   return ranked.flat().slice(0, limit);
 }
 
-export async function getSets(tcg: TcgCode): Promise<TcgSet[]> {
+export async function getSets(tcg: CatalogTcgCode): Promise<TcgSet[]> {
   const installed = await getInstalledCatalog(tcg);
   if (!installed) return [];
   return installed.sets.map((set) => ({
@@ -210,7 +211,7 @@ export async function getSets(tcg: TcgCode): Promise<TcgSet[]> {
 }
 
 export async function getCardsInSet(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   setCode: string,
 ): Promise<Card[]> {
   const installed = await getInstalledCatalog(tcg);
@@ -224,7 +225,7 @@ export async function getCardsInSet(
   return catalogCards.map((card) => catalogCardToCard(tcg, card, set));
 }
 
-export function invalidateCatalogSearchIndex(tcg?: TcgCode): void {
+export function invalidateCatalogSearchIndex(tcg?: CatalogTcgCode): void {
   if (tcg) {
     searchIndexes.delete(tcg);
     return;

@@ -21,11 +21,12 @@ export function CardImage({
   ...props
 }: CardImageProps) {
   const cardBack = getCardBackImage(tcg);
-  const [currentSrc, setCurrentSrc] = useState(src || cardBack);
+  const resolvedFallback = fallbackSrc || cardBack;
+  const [currentSrc, setCurrentSrc] = useState(src || resolvedFallback);
 
   useEffect(() => {
-    setCurrentSrc(src || cardBack);
-  }, [cardBack, src]);
+    setCurrentSrc(src || resolvedFallback);
+  }, [resolvedFallback, src]);
 
   return (
     <Image
@@ -34,7 +35,7 @@ export function CardImage({
       src={currentSrc}
       style={{
         backgroundColor: "hsl(var(--muted))",
-        backgroundImage: `url("${cardBack}")`,
+        backgroundImage: `url("${resolvedFallback}")`,
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "contain",
@@ -42,10 +43,10 @@ export function CardImage({
       }}
       onError={() => {
         setCurrentSrc((value) => {
-          if (fallbackSrc && value !== fallbackSrc && value !== cardBack) {
+          if (fallbackSrc && value !== fallbackSrc) {
             return fallbackSrc;
           }
-          return cardBack;
+          return value === cardBack ? value : cardBack;
         });
       }}
     />

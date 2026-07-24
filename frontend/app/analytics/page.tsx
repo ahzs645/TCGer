@@ -49,6 +49,9 @@ const TCG_BAR_COLORS: Record<string, string> = {
   yugioh: "#ef4444",
   magic: "#8b5cf6",
   pokemon: "#f59e0b",
+  onepiece: "#0ea5e9",
+  lorcana: "#a855f7",
+  dragonball: "#f97316",
 };
 
 function tcgLabel(tcg: string): string {
@@ -78,8 +81,9 @@ export default function AnalyticsPage() {
     showPricing: state.showPricing,
   }));
 
-  const noGamesEnabled =
-    !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+  const noGamesEnabled = Object.values(enabledGames).every(
+    (enabled) => !enabled,
+  );
 
   const ready = mounted && isAuthenticated && !!token;
 

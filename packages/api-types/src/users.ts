@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tcgCodeSchema, type TcgCode } from './cards';
 
 // ---------------------------------------------------------------------------
 // Request schemas
@@ -11,7 +12,10 @@ export const updatePreferencesSchema = z
     enabledYugioh: z.boolean().optional(),
     enabledMagic: z.boolean().optional(),
     enabledPokemon: z.boolean().optional(),
-    defaultGame: z.string().nullable().optional()
+    enabledOnepiece: z.boolean().optional(),
+    enabledLorcana: z.boolean().optional(),
+    enabledDragonball: z.boolean().optional(),
+    defaultGame: tcgCodeSchema.nullable().optional()
   })
   .refine(
     (data) => Object.values(data).some((v) => v !== undefined),
@@ -56,5 +60,8 @@ export interface UserPreferences {
   enabledYugioh: boolean;
   enabledMagic: boolean;
   enabledPokemon: boolean;
-  defaultGame: string | null;
+  enabledOnepiece: boolean;
+  enabledLorcana: boolean;
+  enabledDragonball: boolean;
+  defaultGame: TcgCode | null;
 }

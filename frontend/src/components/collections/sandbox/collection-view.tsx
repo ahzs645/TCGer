@@ -65,7 +65,7 @@ import { useCollectionsStore } from "@/stores/collections";
 import { useTagsStore } from "@/stores/tags";
 import { useAuthStore } from "@/stores/auth";
 import { useModuleStore } from "@/stores/preferences";
-import { cn } from "@/lib/utils";
+import { cn, GAME_LABELS } from "@/lib/utils";
 import { getAppRoute } from "@/lib/app-routes";
 import type {
   Card as TcgCard,
@@ -106,12 +106,6 @@ const CONTAINER_TYPES = [
   { value: "album", label: "Album" },
   { value: "case", label: "Display case" },
 ] as const;
-
-const GAME_LABELS: Record<TcgCode, string> = {
-  magic: "Magic: The Gathering",
-  pokemon: "Pokémon",
-  yugioh: "Yu-Gi-Oh!",
-};
 
 function normalizeHex(value: string) {
   const trimmed = value.trim();
@@ -2191,11 +2185,13 @@ export function CollectionView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Any game</SelectItem>
-                    {Object.entries(GAME_LABELS).map(([code, label]) => (
-                      <SelectItem key={code} value={code}>
-                        {label}
-                      </SelectItem>
-                    ))}
+                    {Object.entries(GAME_LABELS)
+                      .filter(([code]) => code !== "all")
+                      .map(([code, label]) => (
+                        <SelectItem key={code} value={code}>
+                          {label}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <Input
@@ -2373,11 +2369,13 @@ export function CollectionView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Any game</SelectItem>
-                    {Object.entries(GAME_LABELS).map(([code, label]) => (
-                      <SelectItem key={code} value={code}>
-                        {label}
-                      </SelectItem>
-                    ))}
+                    {Object.entries(GAME_LABELS)
+                      .filter(([code]) => code !== "all")
+                      .map(([code, label]) => (
+                        <SelectItem key={code} value={code}>
+                          {label}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <Input

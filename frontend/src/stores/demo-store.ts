@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEMO_CARDS, type DemoCard, type DemoTcg } from "@/lib/data/demo-cards";
+import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
 import type {
   AddWishlistCardInput,
   CardDataPayload,
   CollectionCardCopy,
   UpdateCardInput,
+  TcgCode,
 } from "@tcg/api-types";
 
 /* ------------------------------------------------------------------ */
@@ -16,7 +17,7 @@ export interface DemoBinderCard {
   id: string;
   cardId: string; // references DemoCard.id
   name: string;
-  tcg: DemoTcg;
+  tcg: TcgCode;
   setCode: string;
   setName: string;
   rarity: string;
@@ -27,6 +28,8 @@ export interface DemoBinderCard {
   cardData?: CardDataPayload;
   copies?: CollectionCardCopy[];
 }
+
+export type DemoOwnedCard = Omit<DemoCard, "tcg"> & { tcg: TcgCode };
 
 export interface DemoBinder {
   id: string;
@@ -41,7 +44,7 @@ export interface DemoWishlistCard {
   id: string;
   cardId: string;
   name: string;
-  tcg: DemoTcg;
+  tcg: TcgCode;
   setCode: string;
   setName: string;
   rarity: string;
@@ -339,7 +342,7 @@ interface DemoState {
   renameBinder: (id: string, name: string) => void;
   addCardToBinder: (
     binderId: string,
-    card: DemoCard,
+    card: DemoOwnedCard,
     quantity?: number,
     details?: DemoCardPersistence,
   ) => void;
@@ -355,7 +358,7 @@ interface DemoState {
   removeWishlist: (id: string) => void;
   addCardToWishlist: (
     wishlistId: string,
-    card: DemoCard,
+    card: DemoOwnedCard,
     cardData?: AddWishlistCardInput,
   ) => void;
   removeCardFromWishlist: (wishlistId: string, cardInstanceId: string) => void;
@@ -617,7 +620,7 @@ export const useDemoStore = create<DemoState>()(
               ...current,
               cardId: override?.cardId ?? current.cardId,
               name: cardData?.name ?? current.name,
-              tcg: (cardData?.tcg as DemoTcg | undefined) ?? current.tcg,
+              tcg: (cardData?.tcg as TcgCode | undefined) ?? current.tcg,
               setCode: cardData?.setCode ?? current.setCode,
               setName: cardData?.setName ?? current.setName,
               rarity: cardData?.rarity ?? current.rarity,

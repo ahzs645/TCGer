@@ -15,5 +15,8 @@ export function toAuthUser(user: Record<string, unknown>): AuthUser {
     enabledYugioh: (user.enabledYugioh as boolean) ?? true,
     enabledMagic: (user.enabledMagic as boolean) ?? true,
     enabledPokemon: (user.enabledPokemon as boolean) ?? true,
+    enabledOnepiece: (user.enabledOnepiece as boolean) ?? false,
+    enabledLorcana: (user.enabledLorcana as boolean) ?? false,
+    enabledDragonball: (user.enabledDragonball as boolean) ?? false,
   };
 }

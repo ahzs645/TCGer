@@ -32,20 +32,24 @@ export async function setUserAsAdmin(userId: string): Promise<void> {
 }
 
 export async function getUserById(userId: string) {
+  const select = {
+    id: true,
+    email: true,
+    username: true,
+    isAdmin: true,
+    showCardNumbers: true,
+    showPricing: true,
+    enabledYugioh: true,
+    enabledMagic: true,
+    enabledPokemon: true,
+    enabledOnepiece: true,
+    enabledLorcana: true,
+    enabledDragonball: true,
+    createdAt: true
+  } as const;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      isAdmin: true,
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true,
-      createdAt: true
-    }
+    select
   });
 
   if (!user) {
@@ -56,16 +60,20 @@ export async function getUserById(userId: string) {
 }
 
 export async function getUserPreferences(userId: string) {
+  const select = {
+    showCardNumbers: true,
+    showPricing: true,
+    enabledYugioh: true,
+    enabledMagic: true,
+    enabledPokemon: true,
+    enabledOnepiece: true,
+    enabledLorcana: true,
+    enabledDragonball: true,
+    defaultGame: true
+  } as const;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true,
-      defaultGame: true
-    }
+    select
   });
 
   if (!user) {
@@ -76,17 +84,21 @@ export async function getUserPreferences(userId: string) {
 }
 
 export async function updateUserPreferences(userId: string, input: UpdatePreferencesInput) {
+  const select = {
+    showCardNumbers: true,
+    showPricing: true,
+    enabledYugioh: true,
+    enabledMagic: true,
+    enabledPokemon: true,
+    enabledOnepiece: true,
+    enabledLorcana: true,
+    enabledDragonball: true,
+    defaultGame: true
+  } as const;
   const user = await prisma.user.update({
     where: { id: userId },
     data: input,
-    select: {
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true,
-      defaultGame: true
-    }
+    select
   });
 
   return user;
@@ -113,20 +125,24 @@ export async function updateUserProfile(userId: string, input: UpdateProfileInpu
     }
   }
 
+  const select = {
+    id: true,
+    email: true,
+    username: true,
+    isAdmin: true,
+    showCardNumbers: true,
+    showPricing: true,
+    enabledYugioh: true,
+    enabledMagic: true,
+    enabledPokemon: true,
+    enabledOnepiece: true,
+    enabledLorcana: true,
+    enabledDragonball: true
+  } as const;
   const user = await prisma.user.update({
     where: { id: userId },
     data: input,
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      isAdmin: true,
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true
-    }
+    select
   });
 
   return user;

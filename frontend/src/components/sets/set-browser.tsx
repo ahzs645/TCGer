@@ -31,12 +31,14 @@ import {
 } from "@/components/ui/select";
 import { getSets } from "@/lib/api/cards";
 import { getAppRoute } from "@/lib/app-routes";
+import { isCatalogGame } from "@/lib/catalog/use-catalog";
+import { isDemoMode } from "@/lib/demo-mode";
 import { ALL_COLLECTION_ID } from "@/lib/hooks/use-collection";
 import { countOwnedPrintingsForSet, releaseYear } from "@/lib/sets/progress";
 import { cn, GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
-import { useGameFilterStore } from "@/stores/game-filter";
+import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import type { CollectionCard, TcgCode, TcgSet } from "@tcg/api-types";
 
@@ -229,8 +231,9 @@ export function SetBrowser() {
     );
   }
 
-  const noGamesEnabled =
-    !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+  const noGamesEnabled = Object.values(enabledGames).every(
+    (enabled) => !enabled,
+  );
 
   return (
     <div className="space-y-6">
@@ -266,7 +269,7 @@ export function SetBrowser() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All enabled games</SelectItem>
-              {(["pokemon", "magic", "yugioh"] as const).map((value) => (
+              {supportedGames.filter((value) => value !== "all").map((value) => (
                 <SelectItem
                   key={value}
                   value={value}
@@ -390,20 +393,27 @@ export function SetBrowser() {
                   ? Math.min(100, Math.round((owned / total) * 100))
                   : 0;
               const complete = total > 0 && owned >= total;
+              const isDemoExperience =
+                pathname === "/demo" ||
+                pathname.startsWith("/demo/") ||
+                (mounted && isDemoMode());
+              const canOpenSet =
+                !isDemoExperience || isCatalogGame(set.tcg);
               const href = getAppRoute(
                 `/sets/${set.tcg}/${encodeURIComponent(set.code)}`,
                 pathname,
               );
               const released = formatReleaseDate(set.releaseDate);
 
-              return (
-                <Link key={`${set.tcg}:${set.code}`} href={href}>
-                  <Card
-                    className={cn(
-                      "h-full transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md",
-                      complete && "border-emerald-500/50",
-                    )}
-                  >
+              const setCard = (
+                <Card
+                  className={cn(
+                    "h-full",
+                    canOpenSet &&
+                      "transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md",
+                    complete && "border-emerald-500/50",
+                  )}
+                >
                     <CardHeader className="flex flex-row items-start gap-3 space-y-0">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
                         {set.iconUrl || set.logoUrl ? (
@@ -468,8 +478,15 @@ export function SetBrowser() {
                         />
                       </div>
                     </CardContent>
-                  </Card>
+                </Card>
+              );
+
+              return canOpenSet ? (
+                <Link key={`${set.tcg}:${set.code}`} href={href}>
+                  {setCard}
                 </Link>
+              ) : (
+                <div key={`${set.tcg}:${set.code}`}>{setCard}</div>
               );
             })}
           </div>

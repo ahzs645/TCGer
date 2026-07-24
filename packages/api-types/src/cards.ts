@@ -5,7 +5,15 @@ import { pokemonFormatLegalitySchema, pokedexEntrySchema } from './pokemon';
 // Core enums & primitives
 // ---------------------------------------------------------------------------
 
-export const tcgCodeSchema = z.enum(['yugioh', 'magic', 'pokemon']);
+export const TCG_CODES = [
+  'yugioh',
+  'magic',
+  'pokemon',
+  'onepiece',
+  'lorcana',
+  'dragonball'
+] as const;
+export const tcgCodeSchema = z.enum(TCG_CODES);
 export type TcgCode = z.infer<typeof tcgCodeSchema>;
 
 /**

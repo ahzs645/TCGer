@@ -89,6 +89,9 @@ export declare const components: {
                   emailVerified: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -179,6 +182,9 @@ export declare const components: {
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -375,6 +381,9 @@ export declare const components: {
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -630,6 +639,9 @@ export declare const components: {
                   emailVerified?: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -658,6 +670,9 @@ export declare const components: {
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:
@@ -880,6 +895,9 @@ export declare const components: {
                   emailVerified?: boolean;
                   enabledMagic?: null | boolean;
                   enabledPokemon?: null | boolean;
+                  enabledOnepiece?: null | boolean;
+                  enabledLorcana?: null | boolean;
+                  enabledDragonball?: null | boolean;
                   enabledYugioh?: null | boolean;
                   image?: null | string;
                   isAdmin?: null | boolean;
@@ -908,6 +926,9 @@ export declare const components: {
                     | "enabledYugioh"
                     | "enabledMagic"
                     | "enabledPokemon"
+                    | "enabledOnepiece"
+                    | "enabledLorcana"
+                    | "enabledDragonball"
                     | "defaultGame"
                     | "_id";
                   operator?:

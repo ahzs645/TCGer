@@ -18,6 +18,9 @@ export const supportedGames: SupportedGame[] = [
   "yugioh",
   "magic",
   "pokemon",
+  "onepiece",
+  "lorcana",
+  "dragonball",
 ];
 export const supportedGameOptions = supportedGames.map((value) => ({
   value,

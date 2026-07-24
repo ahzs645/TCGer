@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 
 import {
   scanCardImage,
@@ -24,6 +24,20 @@ import { requireAuth, type AuthRequest } from '../middleware/auth';
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
+
+const SCANNER_TCGS = ['magic', 'pokemon', 'yugioh'] as const;
+type ScannerTcg = (typeof SCANNER_TCGS)[number];
+
+function isScannerTcg(value: string): value is ScannerTcg {
+  return SCANNER_TCGS.includes(value as ScannerTcg);
+}
+
+function unsupportedScannerTcg(res: Response) {
+  return res.status(400).json({
+    error: 'BAD_REQUEST',
+    message: 'Unsupported scanner TCG. Supported values: magic, pokemon, yugioh.',
+  });
+}
 
 function parseBooleanLike(value: unknown): boolean {
   if (typeof value !== 'string') {
@@ -220,6 +234,10 @@ scanRouter.post(
   asyncHandler(async (req, res) => {
     const authReq = req as AuthRequest;
     const body = (req.body ?? {}) as Record<string, unknown>;
+    const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    if (tcg && !isScannerTcg(tcg)) {
+      return unsupportedScannerTcg(res);
+    }
     const file = req.file;
     if (!file) {
       return res.status(400).json({
@@ -228,7 +246,6 @@ scanRouter.post(
       });
     }
 
-    const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
     const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
     const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
     const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
@@ -325,6 +342,9 @@ scanRouter.get(
   asyncHandler(async (req, res) => {
     const query = req.query as Record<string, string | undefined>;
     const tcg = typeof query.tcg === 'string' ? query.tcg : undefined;
+    if (tcg && !isScannerTcg(tcg)) {
+      return unsupportedScannerTcg(res);
+    }
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(2000, Math.max(1, Number(query.pageSize) || 500));
 
@@ -469,7 +489,7 @@ scanRouter.post(
       force?: boolean;
     };
 
-    if (!tcg || !['magic', 'pokemon', 'yugioh'].includes(tcg)) {
+    if (!tcg || !isScannerTcg(tcg)) {
       return res.status(400).json({
         error: 'BAD_REQUEST',
         message: 'tcg must be one of: magic, pokemon, yugioh',
@@ -477,7 +497,7 @@ scanRouter.post(
     }
 
     // Run build in background — respond immediately
-    const buildPromise = buildHashDatabase(tcg as 'magic' | 'pokemon' | 'yugioh', {
+    const buildPromise = buildHashDatabase(tcg, {
       setCode,
       limit,
       force,
@@ -508,6 +528,10 @@ scanRouter.post(
 scanRouter.get(
   '/artwork-fingerprints',
   asyncHandler(async (req, res) => {
+    const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    if (tcg && !isScannerTcg(tcg)) {
+      return unsupportedScannerTcg(res);
+    }
     const dataDir = process.env.CARD_SCAN_DATA_DIR;
     if (!dataDir) {
       return res.status(503).json({

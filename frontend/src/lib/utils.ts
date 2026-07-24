@@ -10,6 +10,9 @@ export const GAME_LABELS = {
   yugioh: "Yu-Gi-Oh!",
   magic: "Magic: The Gathering",
   pokemon: "Pokémon",
+  onepiece: "One Piece",
+  lorcana: "Disney Lorcana",
+  dragonball: "Dragon Ball Super",
 } as const;
 
 export type SupportedGame = keyof typeof GAME_LABELS;
@@ -20,11 +23,20 @@ const CARD_BACK_IMAGES: Record<string, string> = {
   yugioh: "/card-backs/yugioh.png",
 };
 
-const DEFAULT_CARD_BACK = "/card-backs/pokemon.png";
+export const GENERIC_CARD_PLACEHOLDER = "/images/card-placeholder.jpg";
 
 export function getCardBackImage(tcg?: string): string {
-  return (tcg && CARD_BACK_IMAGES[tcg]) || DEFAULT_CARD_BACK;
+  return (tcg && CARD_BACK_IMAGES[tcg]) || GENERIC_CARD_PLACEHOLDER;
 }
+
+export const ENABLED_PREFERENCE_KEY = {
+  yugioh: "enabledYugioh",
+  magic: "enabledMagic",
+  pokemon: "enabledPokemon",
+  onepiece: "enabledOnepiece",
+  lorcana: "enabledLorcana",
+  dragonball: "enabledDragonball",
+} as const;
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");

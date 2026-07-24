@@ -18,6 +18,9 @@ const initialState: Record<ManageableGame, boolean> = {
   yugioh: true,
   magic: true,
   pokemon: true,
+  onepiece: false,
+  lorcana: false,
+  dragonball: false,
 };
 
 export const useModuleStore = create<ModuleState>((set) => ({

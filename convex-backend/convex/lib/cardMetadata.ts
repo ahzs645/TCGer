@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { TcgCode } from "./validators";
 
 export const formatLegalityValidator = v.object({
   standard: v.optional(v.boolean()),
@@ -135,7 +136,7 @@ export type RichCardMetadata = {
 };
 
 export type RichCardSnapshot = RichCardMetadata & {
-  tcg: "yugioh" | "magic" | "pokemon";
+  tcg: TcgCode;
   externalId: string;
   baseExternalId?: string;
   printingKey?: string;

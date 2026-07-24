@@ -53,6 +53,7 @@ import { normalizeHexColor } from "@/lib/color";
 import { searchCardsApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth";
 import { useWishlistsStore } from "@/stores/wishlists";
+import { supportedGames } from "@/stores/game-filter";
 import type { WishlistCardResponse } from "@/stores/wishlists";
 import type { Card as CardType, TcgCode } from "@/types/card";
 
@@ -764,15 +765,13 @@ export function WishlistContent() {
                   <SelectItem value="all" data-oid="aqgu.0c">
                     All Games
                   </SelectItem>
-                  <SelectItem value="pokemon" data-oid="fks21t7">
-                    Pokemon
-                  </SelectItem>
-                  <SelectItem value="magic" data-oid="kojrklm">
-                    Magic
-                  </SelectItem>
-                  <SelectItem value="yugioh" data-oid="5h-.w:z">
-                    Yu-Gi-Oh!
-                  </SelectItem>
+                  {supportedGames
+                    .filter((game) => game !== "all")
+                    .map((game) => (
+                      <SelectItem key={game} value={game}>
+                        {GAME_LABELS[game]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Button type="submit" disabled={isSearching} data-oid="jw0dezj">

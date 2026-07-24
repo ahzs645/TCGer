@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react";
-import type { TcgCode } from "@tcg/api-types";
 
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import {
   CATALOG_GAMES,
+  type CatalogTcgCode,
   type CatalogInstallStatus,
   useCatalog,
 } from "@/lib/catalog/use-catalog";
@@ -33,9 +33,9 @@ function actionLabel(status: CatalogInstallStatus): string {
 export function CatalogManagementPanel() {
   const { states, progress, errors, isLoading, install, update, remove } =
     useCatalog();
-  const [removing, setRemoving] = useState<TcgCode | null>(null);
+  const [removing, setRemoving] = useState<CatalogTcgCode | null>(null);
 
-  const handleRemove = async (tcg: TcgCode) => {
+  const handleRemove = async (tcg: CatalogTcgCode) => {
     setRemoving(tcg);
     try {
       await remove(tcg);
@@ -46,7 +46,7 @@ export function CatalogManagementPanel() {
     }
   };
 
-  const handleInstall = async (tcg: TcgCode, isUpdate: boolean) => {
+  const handleInstall = async (tcg: CatalogTcgCode, isUpdate: boolean) => {
     try {
       await (isUpdate ? update(tcg) : install(tcg));
     } catch {

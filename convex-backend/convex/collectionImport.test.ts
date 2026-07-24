@@ -38,4 +38,15 @@ describe("collection CSV import parser", () => {
       "tcg,external_id,card_name,set_code",
     );
   });
+
+  test.each(["onepiece", "lorcana", "dragonball"] as const)(
+    "accepts %s collection rows",
+    (tcg) => {
+      const preview = previewCollectionImport(
+        `tcg,external_id,card_name\n${tcg},card-1,Example Card`,
+      );
+      expect(preview.valid).toBe(true);
+      expect(preview.rows[0]?.tcg).toBe(tcg);
+    },
+  );
 });

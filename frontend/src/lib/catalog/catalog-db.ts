@@ -1,4 +1,4 @@
-import type { TcgCode } from "@tcg/api-types";
+import type { CatalogTcgCode } from "./catalog-types";
 
 const DB_NAME = "tcger-catalog";
 const DB_VERSION = 1;
@@ -35,7 +35,7 @@ export interface CatalogCard {
 
 export interface CatalogPack {
   formatVersion: 1;
-  tcg: TcgCode;
+  tcg: CatalogTcgCode;
   version: number;
   updatedAt: string;
   sets: CatalogSet[];
@@ -43,7 +43,7 @@ export interface CatalogPack {
 }
 
 export interface InstalledCatalogPack {
-  tcg: TcgCode;
+  tcg: CatalogTcgCode;
   version: number;
   updatedAt: string;
   installedAt: string;
@@ -55,7 +55,7 @@ export interface InstalledCatalogPack {
 }
 
 interface StoredCatalogCard extends CatalogCard {
-  tcg: TcgCode;
+  tcg: CatalogTcgCode;
 }
 
 let databasePromise: Promise<IDBDatabase> | null = null;
@@ -133,12 +133,12 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function gameCardKeyRange(tcg: TcgCode): IDBKeyRange {
+function gameCardKeyRange(tcg: CatalogTcgCode): IDBKeyRange {
   return IDBKeyRange.bound([tcg], [tcg, []]);
 }
 
 export async function getInstalledCatalog(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
 ): Promise<InstalledCatalogPack | undefined> {
   const database = await openCatalogDatabase();
   const transaction = database.transaction(PACKS_STORE, "readonly");
@@ -157,7 +157,7 @@ export async function getInstalledCatalogs(): Promise<InstalledCatalogPack[]> {
   return requestResult(request);
 }
 
-export async function getCatalogCards(tcg: TcgCode): Promise<CatalogCard[]> {
+export async function getCatalogCards(tcg: CatalogTcgCode): Promise<CatalogCard[]> {
   const database = await openCatalogDatabase();
   const transaction = database.transaction(CARDS_STORE, "readonly");
   const request = transaction
@@ -168,7 +168,7 @@ export async function getCatalogCards(tcg: TcgCode): Promise<CatalogCard[]> {
 }
 
 export async function getCatalogCardsForSet(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   setCode: string,
 ): Promise<CatalogCard[]> {
   const database = await openCatalogDatabase();
@@ -215,7 +215,7 @@ export async function replaceCatalog(
   return installed;
 }
 
-export async function removeCatalog(tcg: TcgCode): Promise<void> {
+export async function removeCatalog(tcg: CatalogTcgCode): Promise<void> {
   const database = await openCatalogDatabase();
   const transaction = database.transaction(
     [PACKS_STORE, CARDS_STORE],

@@ -85,6 +85,34 @@ describe('Bulk Add validation and atomicity', () => {
     });
   });
 
+  it.each(['onepiece', 'lorcana', 'dragonball'] as const)(
+    'accepts %s cards in a bulk-add preview',
+    (tcg) => {
+      const request = bulkAddRequestSchema.parse({
+        defaults: { binderId: 'binder-1' },
+        rows: [{
+          rowId: tcg,
+          cardId: `${tcg}-card`,
+          cardData: {
+            ...CARD,
+            name: `${tcg} card`,
+            tcg,
+            externalId: `${tcg}-card`,
+            printingKey: `${tcg}:${tcg}-card`
+          }
+        }]
+      });
+
+      expect(buildBulkAddPreview(
+        request,
+        [{ id: 'binder-1', name: 'Main Binder' }]
+      )).toMatchObject({
+        valid: true,
+        rows: [{ rowId: tcg, tcg }]
+      });
+    }
+  );
+
   it('rejects duplicate row IDs, missing destinations, and repeated serials', () => {
     const parsed = bulkAddRequestSchema.safeParse({
       defaults: { quantity: 2, serialNumber: 'CERT-1' },

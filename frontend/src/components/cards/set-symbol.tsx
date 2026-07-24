@@ -37,6 +37,12 @@ const TCG_COLORS: Record<TcgCode, string> = {
     "bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700",
   yugioh:
     "bg-violet-500/15 text-violet-700 border-violet-300 dark:text-violet-400 dark:border-violet-700",
+  onepiece:
+    "bg-sky-500/15 text-sky-700 border-sky-300 dark:text-sky-400 dark:border-sky-700",
+  lorcana:
+    "bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-300 dark:text-fuchsia-400 dark:border-fuchsia-700",
+  dragonball:
+    "bg-orange-500/15 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700",
 };
 
 /**
