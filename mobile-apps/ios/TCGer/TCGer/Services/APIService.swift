@@ -146,6 +146,9 @@ final class DemoStore {
             enabledYugioh: true,
             enabledMagic: true,
             enabledPokemon: true,
+            enabledOnepiece: false,
+            enabledLorcana: false,
+            enabledDragonball: false,
             defaultGame: nil
         )
         self.user = User(
@@ -159,6 +162,9 @@ final class DemoStore {
             enabledYugioh: true,
             enabledMagic: true,
             enabledPokemon: true,
+            enabledOnepiece: false,
+            enabledLorcana: false,
+            enabledDragonball: false,
             defaultGame: nil
         )
         self.appSettings = AppSettings(
@@ -308,7 +314,10 @@ final class DemoStore {
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
             enabledPokemon: preferences.enabledPokemon,
-            defaultGame: nil
+            enabledOnepiece: preferences.enabledOnepiece,
+            enabledLorcana: preferences.enabledLorcana,
+            enabledDragonball: preferences.enabledDragonball,
+            defaultGame: preferences.defaultGame
         )
         persist()
         return AuthResponse(user: user, token: Constants.token)
@@ -349,7 +358,11 @@ final class DemoStore {
         showPricing: Bool?,
         enabledYugioh: Bool?,
         enabledMagic: Bool?,
-        enabledPokemon: Bool?
+        enabledPokemon: Bool?,
+        enabledOnepiece: Bool?,
+        enabledLorcana: Bool?,
+        enabledDragonball: Bool?,
+        defaultGame: String?
     ) -> APIService.UserPreferences {
         preferences = APIService.UserPreferences(
             showCardNumbers: showCardNumbers ?? preferences.showCardNumbers,
@@ -357,7 +370,10 @@ final class DemoStore {
             enabledYugioh: enabledYugioh ?? preferences.enabledYugioh,
             enabledMagic: enabledMagic ?? preferences.enabledMagic,
             enabledPokemon: enabledPokemon ?? preferences.enabledPokemon,
-            defaultGame: nil
+            enabledOnepiece: enabledOnepiece ?? preferences.enabledOnepiece,
+            enabledLorcana: enabledLorcana ?? preferences.enabledLorcana,
+            enabledDragonball: enabledDragonball ?? preferences.enabledDragonball,
+            defaultGame: defaultGame ?? preferences.defaultGame
         )
         user = User(
             id: user.id,
@@ -370,7 +386,10 @@ final class DemoStore {
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
             enabledPokemon: preferences.enabledPokemon,
-            defaultGame: nil
+            enabledOnepiece: preferences.enabledOnepiece,
+            enabledLorcana: preferences.enabledLorcana,
+            enabledDragonball: preferences.enabledDragonball,
+            defaultGame: preferences.defaultGame
         )
         persist()
         return preferences
@@ -405,7 +424,10 @@ final class DemoStore {
             enabledYugioh: preferences.enabledYugioh,
             enabledMagic: preferences.enabledMagic,
             enabledPokemon: preferences.enabledPokemon,
-            defaultGame: nil
+            enabledOnepiece: preferences.enabledOnepiece,
+            enabledLorcana: preferences.enabledLorcana,
+            enabledDragonball: preferences.enabledDragonball,
+            defaultGame: preferences.defaultGame
         )
 
         persist()
@@ -481,7 +503,9 @@ final class DemoStore {
         if let tcg, let game = TCGGame(rawValue: tcg) {
             requestedGames = [game]
         } else {
-            requestedGames = TCGGame.catalogGames.filter(store.isEnabled)
+            requestedGames = TCGGame.allCases.filter { game in
+                game != .all && store.isEnabled(game)
+            }
         }
 
         var setsByID: [String: TcgSet] = [:]
@@ -491,7 +515,7 @@ final class DemoStore {
                     let mapped = store.tcgSet(from: set, tcg: game)
                     setsByID[mapped.id] = mapped
                 }
-            } else {
+            } else if TCGGame.catalogGames.contains(game) {
                 addCardSets(
                     from: searchCatalog.filter { $0.tcg == game.rawValue },
                     to: &setsByID,
@@ -518,8 +542,10 @@ final class DemoStore {
         let base: [Card]
         if store.isLoaded(game) {
             base = store.cards(inSet: setCode, tcg: game).map(store.card(from:))
-        } else {
+        } else if TCGGame.catalogGames.contains(game) {
             base = searchCatalog.filter { $0.tcg == tcg && $0.setCode == setCode }
+        } else {
+            base = []
         }
         let owned = ownedCatalogCards().filter { $0.tcg == tcg && $0.setCode == setCode }
         return catalogCards(base: base, owned: owned)
@@ -1067,12 +1093,12 @@ final class DemoStore {
         persist()
     }
 
-    private static func cardBack(for tcg: String) -> String {
+    private static func cardBack(for tcg: String) -> String? {
         switch tcg {
         case "pokemon": return "PokemonCardBack"
         case "magic": return "MagicCardBack"
         case "yugioh": return "YugiohCardBack"
-        default: return "PokemonCardBack"
+        default: return nil
         }
     }
 

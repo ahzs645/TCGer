@@ -76,7 +76,57 @@ extension APIService {
         let enabledYugioh: Bool
         let enabledMagic: Bool
         let enabledPokemon: Bool
+        let enabledOnepiece: Bool
+        let enabledLorcana: Bool
+        let enabledDragonball: Bool
         let defaultGame: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case showCardNumbers
+            case showPricing
+            case enabledYugioh
+            case enabledMagic
+            case enabledPokemon
+            case enabledOnepiece
+            case enabledLorcana
+            case enabledDragonball
+            case defaultGame
+        }
+
+        init(
+            showCardNumbers: Bool,
+            showPricing: Bool,
+            enabledYugioh: Bool,
+            enabledMagic: Bool,
+            enabledPokemon: Bool,
+            enabledOnepiece: Bool,
+            enabledLorcana: Bool,
+            enabledDragonball: Bool,
+            defaultGame: String?
+        ) {
+            self.showCardNumbers = showCardNumbers
+            self.showPricing = showPricing
+            self.enabledYugioh = enabledYugioh
+            self.enabledMagic = enabledMagic
+            self.enabledPokemon = enabledPokemon
+            self.enabledOnepiece = enabledOnepiece
+            self.enabledLorcana = enabledLorcana
+            self.enabledDragonball = enabledDragonball
+            self.defaultGame = defaultGame
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            showCardNumbers = try container.decode(Bool.self, forKey: .showCardNumbers)
+            showPricing = try container.decode(Bool.self, forKey: .showPricing)
+            enabledYugioh = try container.decode(Bool.self, forKey: .enabledYugioh)
+            enabledMagic = try container.decode(Bool.self, forKey: .enabledMagic)
+            enabledPokemon = try container.decode(Bool.self, forKey: .enabledPokemon)
+            enabledOnepiece = try container.decodeIfPresent(Bool.self, forKey: .enabledOnepiece) ?? false
+            enabledLorcana = try container.decodeIfPresent(Bool.self, forKey: .enabledLorcana) ?? false
+            enabledDragonball = try container.decodeIfPresent(Bool.self, forKey: .enabledDragonball) ?? false
+            defaultGame = try container.decodeIfPresent(String.self, forKey: .defaultGame)
+        }
     }
 
     func getUserPreferences(
@@ -113,6 +163,9 @@ extension APIService {
         let enabledYugioh: Bool?
         let enabledMagic: Bool?
         let enabledPokemon: Bool?
+        let enabledOnepiece: Bool?
+        let enabledLorcana: Bool?
+        let enabledDragonball: Bool?
         let defaultGame: String?
     }
 
@@ -124,6 +177,9 @@ extension APIService {
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
         enabledPokemon: Bool? = nil,
+        enabledOnepiece: Bool? = nil,
+        enabledLorcana: Bool? = nil,
+        enabledDragonball: Bool? = nil,
         defaultGame: String? = nil
     ) async throws -> UserPreferences {
         if config.isDemoMode {
@@ -132,7 +188,11 @@ extension APIService {
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
-                enabledPokemon: enabledPokemon
+                enabledPokemon: enabledPokemon,
+                enabledOnepiece: enabledOnepiece,
+                enabledLorcana: enabledLorcana,
+                enabledDragonball: enabledDragonball,
+                defaultGame: defaultGame
             )
         }
 
@@ -142,6 +202,9 @@ extension APIService {
             enabledYugioh: enabledYugioh,
             enabledMagic: enabledMagic,
             enabledPokemon: enabledPokemon,
+            enabledOnepiece: enabledOnepiece,
+            enabledLorcana: enabledLorcana,
+            enabledDragonball: enabledDragonball,
             defaultGame: defaultGame
         )
 

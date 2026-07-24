@@ -17,11 +17,7 @@ struct CatalogInstallRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(game.cardBackAssetName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 42, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+            catalogImage
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(game.displayName)
@@ -62,6 +58,25 @@ struct CatalogInstallRow: View {
             }
         } message: {
             Text("Your saved cards will stay on this phone.")
+        }
+    }
+
+    @ViewBuilder
+    private var catalogImage: some View {
+        if let cardBackAssetName = game.cardBackAssetName {
+            Image(cardBackAssetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 42, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        } else {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.secondary.opacity(0.15))
+                .frame(width: 42, height: 60)
+                .overlay {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
         }
     }
 

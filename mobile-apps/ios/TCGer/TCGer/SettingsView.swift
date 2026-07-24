@@ -222,6 +222,48 @@ struct SettingsView: View {
                         }
                     }
                     catalogInstallProgress(for: .pokemon)
+
+                    Toggle(isOn: $environmentStore.enabledOnepiece) {
+                        Label("One Piece", systemImage: "sail.boat.fill")
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledOnepiece) {
+                        Task {
+                            await handleGameToggle(
+                                game: "onepiece",
+                                displayName: "One Piece",
+                                isOn: environmentStore.enabledOnepiece
+                            )
+                        }
+                    }
+
+                    Toggle(isOn: $environmentStore.enabledLorcana) {
+                        Label("Disney Lorcana", systemImage: "wand.and.stars")
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledLorcana) {
+                        Task {
+                            await handleGameToggle(
+                                game: "lorcana",
+                                displayName: "Disney Lorcana",
+                                isOn: environmentStore.enabledLorcana
+                            )
+                        }
+                    }
+
+                    Toggle(isOn: $environmentStore.enabledDragonball) {
+                        Label("Dragon Ball Super", systemImage: "flame.fill")
+                    }
+                    .disabled(!environmentStore.isAuthenticated)
+                    .onChange(of: environmentStore.enabledDragonball) {
+                        Task {
+                            await handleGameToggle(
+                                game: "dragonball",
+                                displayName: "Dragon Ball Super",
+                                isOn: environmentStore.enabledDragonball
+                            )
+                        }
+                    }
                 } header: {
                     Text("TCG Modules")
                 } footer: {
@@ -279,6 +321,9 @@ struct SettingsView: View {
                         Text("Yu-Gi-Oh!").tag("yugioh")
                         Text("Magic: The Gathering").tag("magic")
                         Text("Pokémon").tag("pokemon")
+                        Text("One Piece").tag("onepiece")
+                        Text("Disney Lorcana").tag("lorcana")
+                        Text("Dragon Ball Super").tag("dragonball")
                     }
                     .disabled(!environmentStore.isAuthenticated)
                 } header: {
@@ -751,10 +796,14 @@ private extension SettingsView {
             await updatePreferences(
                 enabledYugioh: game == "yugioh" ? true : nil,
                 enabledMagic: game == "magic" ? true : nil,
-                enabledPokemon: game == "pokemon" ? true : nil
+                enabledPokemon: game == "pokemon" ? true : nil,
+                enabledOnepiece: game == "onepiece" ? true : nil,
+                enabledLorcana: game == "lorcana" ? true : nil,
+                enabledDragonball: game == "dragonball" ? true : nil
             )
             if isLocalMode,
                let catalogGame = TCGGame(rawValue: game),
+               TCGGame.catalogGames.contains(catalogGame),
                case .notInstalled = catalogStore.installState(for: catalogGame),
                catalogStore.isAvailable(catalogGame) {
                 pendingCatalogInstall = catalogGame
@@ -782,7 +831,10 @@ private extension SettingsView {
         await updatePreferences(
             enabledYugioh: game == "yugioh" ? false : nil,
             enabledMagic: game == "magic" ? false : nil,
-            enabledPokemon: game == "pokemon" ? false : nil
+            enabledPokemon: game == "pokemon" ? false : nil,
+            enabledOnepiece: game == "onepiece" ? false : nil,
+            enabledLorcana: game == "lorcana" ? false : nil,
+            enabledDragonball: game == "dragonball" ? false : nil
         )
     }
 
@@ -791,6 +843,9 @@ private extension SettingsView {
         case "yugioh": environmentStore.enabledYugioh = enabled
         case "magic": environmentStore.enabledMagic = enabled
         case "pokemon": environmentStore.enabledPokemon = enabled
+        case "onepiece": environmentStore.enabledOnepiece = enabled
+        case "lorcana": environmentStore.enabledLorcana = enabled
+        case "dragonball": environmentStore.enabledDragonball = enabled
         default: break
         }
     }
@@ -1001,6 +1056,9 @@ private extension SettingsView {
         enabledYugioh: Bool? = nil,
         enabledMagic: Bool? = nil,
         enabledPokemon: Bool? = nil,
+        enabledOnepiece: Bool? = nil,
+        enabledLorcana: Bool? = nil,
+        enabledDragonball: Bool? = nil,
         defaultGame: String?? = nil
     ) async {
         guard !isApplyingRemotePreferences,
@@ -1021,6 +1079,9 @@ private extension SettingsView {
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
                 enabledPokemon: enabledPokemon,
+                enabledOnepiece: enabledOnepiece,
+                enabledLorcana: enabledLorcana,
+                enabledDragonball: enabledDragonball,
                 defaultGame: resolvedDefaultGame
             )
 

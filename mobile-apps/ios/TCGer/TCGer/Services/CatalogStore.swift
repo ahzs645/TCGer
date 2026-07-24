@@ -224,7 +224,7 @@ final class CatalogStore: ObservableObject {
             loadedPacks.removeValue(forKey: loadedGame)
         }
 
-        for game in games where isInstalled(game) {
+        for game in TCGGame.catalogGames where games.contains(game) && isInstalled(game) {
             await loadIfNeeded(game)
         }
     }
@@ -233,7 +233,7 @@ final class CatalogStore: ObservableObject {
         guard game != .all else { return }
         if enabled {
             enabledGames.insert(game)
-            guard isInstalled(game) else { return }
+            guard TCGGame.catalogGames.contains(game), isInstalled(game) else { return }
             Task(priority: .utility) {
                 await loadIfNeeded(game)
             }
@@ -274,7 +274,7 @@ final class CatalogStore: ObservableObject {
     }
 
     func loadIfNeeded(_ game: TCGGame) async {
-        guard game != .all,
+        guard TCGGame.catalogGames.contains(game),
               enabledGames.contains(game),
               loadedPacks[game] == nil,
               isInstalled(game),
@@ -399,7 +399,7 @@ final class CatalogStore: ObservableObject {
             guard let konamiId = entry.card.konamiId else { return nil }
             let directory = thumbnail ? "cards_small" : "cards"
             return URL(string: "https://images.ygoprodeck.com/images/\(directory)/\(konamiId).jpg")
-        case .all:
+        case .onepiece, .lorcana, .dragonball, .all:
             return nil
         }
     }
@@ -482,11 +482,12 @@ final class CatalogStore: ObservableObject {
 extension TCGGame {
     static let catalogGames: [TCGGame] = [.yugioh, .magic, .pokemon]
 
-    var cardBackAssetName: String {
+    var cardBackAssetName: String? {
         switch self {
         case .yugioh: return "YugiohCardBack"
         case .magic: return "MagicCardBack"
-        case .pokemon, .all: return "PokemonCardBack"
+        case .pokemon: return "PokemonCardBack"
+        case .onepiece, .lorcana, .dragonball, .all: return nil
         }
     }
 }

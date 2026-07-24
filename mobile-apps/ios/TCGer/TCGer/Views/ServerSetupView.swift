@@ -103,7 +103,7 @@ struct ServerSetupView: View {
         }
 
         Section {
-            ForEach(environmentStore.enabledGames) { game in
+            ForEach(TCGGame.catalogGames.filter(environmentStore.isGameEnabled)) { game in
                 CatalogInstallRow(game: game, catalogStore: catalogStore)
             }
         } header: {

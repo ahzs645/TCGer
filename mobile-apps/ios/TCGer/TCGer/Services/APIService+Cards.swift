@@ -81,7 +81,9 @@ extension APIService {
     ) async throws -> [TcgSet] {
         if config.isDemoMode {
             if let tcg, let game = TCGGame(rawValue: tcg) {
-                await CatalogStore.shared.loadIfNeeded(game)
+                if TCGGame.catalogGames.contains(game) {
+                    await CatalogStore.shared.loadIfNeeded(game)
+                }
             } else {
                 await prepareLocalCatalog(for: .all)
             }
@@ -116,7 +118,8 @@ extension APIService {
         setCode: String
     ) async throws -> [Card] {
         if config.isDemoMode {
-            if let game = TCGGame(rawValue: tcg) {
+            if let game = TCGGame(rawValue: tcg),
+               TCGGame.catalogGames.contains(game) {
                 await CatalogStore.shared.loadIfNeeded(game)
             }
             return DemoStore.shared.getSetCards(tcg: tcg, setCode: setCode)
@@ -148,7 +151,7 @@ private extension APIService {
             for catalogGame in TCGGame.catalogGames {
                 await CatalogStore.shared.loadIfNeeded(catalogGame)
             }
-        } else {
+        } else if TCGGame.catalogGames.contains(game) {
             await CatalogStore.shared.loadIfNeeded(game)
         }
     }

@@ -149,7 +149,7 @@ struct CardScannerView: View {
                 .cornerRadius(12)
         default:
             if !hasEnabledScanModes {
-                Text("Enable at least one TCG module in Settings to scan cards.")
+                Text("Enable at least one scanner-supported game in Settings to scan cards.")
                     .font(.subheadline)
                     .foregroundColor(.white)
                     .padding(12)

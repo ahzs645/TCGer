@@ -103,6 +103,9 @@ extension APIService {
             enabledYugioh: authResponse.user.enabledYugioh,
             enabledMagic: authResponse.user.enabledMagic,
             enabledPokemon: authResponse.user.enabledPokemon,
+            enabledOnepiece: authResponse.user.enabledOnepiece,
+            enabledLorcana: authResponse.user.enabledLorcana,
+            enabledDragonball: authResponse.user.enabledDragonball,
             defaultGame: authResponse.user.defaultGame
         )
         return AuthResponse(user: adminUser, token: authResponse.token)

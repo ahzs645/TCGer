@@ -61,6 +61,9 @@ final class EnvironmentStore: ObservableObject {
     @Published var enabledYugioh: Bool
     @Published var enabledMagic: Bool
     @Published var enabledPokemon: Bool
+    @Published var enabledOnepiece: Bool
+    @Published var enabledLorcana: Bool
+    @Published var enabledDragonball: Bool
     @Published var showCardNumbers: Bool
     @Published var showPricing: Bool
     @Published var defaultGame: String?
@@ -84,6 +87,9 @@ final class EnvironmentStore: ObservableObject {
         static let enabledYugioh = "enabledYugioh"
         static let enabledMagic = "enabledMagic"
         static let enabledPokemon = "enabledPokemon"
+        static let enabledOnepiece = "enabledOnepiece"
+        static let enabledLorcana = "enabledLorcana"
+        static let enabledDragonball = "enabledDragonball"
         static let showCardNumbers = "showCardNumbers"
         static let showPricing = "showPricing"
         static let defaultGame = "defaultGame"
@@ -157,6 +163,10 @@ final class EnvironmentStore: ObservableObject {
         } else {
             enabledPokemon = storage.bool(forKey: Keys.enabledPokemon)
         }
+
+        enabledOnepiece = storage.bool(forKey: Keys.enabledOnepiece)
+        enabledLorcana = storage.bool(forKey: Keys.enabledLorcana)
+        enabledDragonball = storage.bool(forKey: Keys.enabledDragonball)
 
         if storage.object(forKey: Keys.showCardNumbers) == nil {
             showCardNumbers = true
@@ -297,6 +307,39 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $enabledOnepiece
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledOnepiece)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .onepiece
+                )
+            }
+            .store(in: &cancellables)
+
+        $enabledLorcana
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledLorcana)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .lorcana
+                )
+            }
+            .store(in: &cancellables)
+
+        $enabledDragonball
+            .dropFirst()
+            .sink { [weak self] flag in
+                self?.storage.set(flag, forKey: Keys.enabledDragonball)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .dragonball
+                )
+            }
+            .store(in: &cancellables)
+
         $showCardNumbers
             .dropFirst()
             .sink { [weak self] flag in
@@ -378,6 +421,9 @@ final class EnvironmentStore: ObservableObject {
         if enabledYugioh { games.append(.yugioh) }
         if enabledMagic { games.append(.magic) }
         if enabledPokemon { games.append(.pokemon) }
+        if enabledOnepiece { games.append(.onepiece) }
+        if enabledLorcana { games.append(.lorcana) }
+        if enabledDragonball { games.append(.dragonball) }
         return games
     }
 
@@ -387,6 +433,9 @@ final class EnvironmentStore: ObservableObject {
         case .yugioh: return enabledYugioh
         case .magic: return enabledMagic
         case .pokemon: return enabledPokemon
+        case .onepiece: return enabledOnepiece
+        case .lorcana: return enabledLorcana
+        case .dragonball: return enabledDragonball
         }
     }
 
@@ -418,6 +467,16 @@ final class EnvironmentStore: ObservableObject {
         if let enabledPokemon = user.enabledPokemon {
             self.enabledPokemon = enabledPokemon
         }
+        if let enabledOnepiece = user.enabledOnepiece {
+            self.enabledOnepiece = enabledOnepiece
+        }
+        if let enabledLorcana = user.enabledLorcana {
+            self.enabledLorcana = enabledLorcana
+        }
+        if let enabledDragonball = user.enabledDragonball {
+            self.enabledDragonball = enabledDragonball
+        }
+        defaultGame = user.defaultGame
     }
 
     func applyUserProfile(_ profile: APIService.UserProfile) {
@@ -432,6 +491,9 @@ final class EnvironmentStore: ObservableObject {
             enabledYugioh: nil,
             enabledMagic: nil,
             enabledPokemon: nil,
+            enabledOnepiece: nil,
+            enabledLorcana: nil,
+            enabledDragonball: nil,
             defaultGame: nil
         )
     }
@@ -458,6 +520,9 @@ final class EnvironmentStore: ObservableObject {
         enabledYugioh = true
         enabledMagic = true
         enabledPokemon = true
+        enabledOnepiece = false
+        enabledLorcana = false
+        enabledDragonball = false
         showCardNumbers = true
         showPricing = true
         defaultGame = nil
@@ -491,6 +556,9 @@ final class EnvironmentStore: ObservableObject {
         enabledYugioh = preferences.enabledYugioh
         enabledMagic = preferences.enabledMagic
         enabledPokemon = preferences.enabledPokemon
+        enabledOnepiece = preferences.enabledOnepiece
+        enabledLorcana = preferences.enabledLorcana
+        enabledDragonball = preferences.enabledDragonball
         defaultGame = preferences.defaultGame
     }
 
@@ -550,7 +618,10 @@ final class EnvironmentStore: ObservableObject {
                 enabledYugioh: enabledYugioh,
                 enabledMagic: enabledMagic,
                 enabledPokemon: enabledPokemon,
-                defaultGame: nil
+                enabledOnepiece: enabledOnepiece,
+                enabledLorcana: enabledLorcana,
+                enabledDragonball: enabledDragonball,
+                defaultGame: defaultGame
             )
         }
 
@@ -590,6 +661,9 @@ final class EnvironmentStore: ObservableObject {
             enabledYugioh: enabledYugioh,
             enabledMagic: enabledMagic,
             enabledPokemon: enabledPokemon,
+            enabledOnepiece: enabledOnepiece,
+            enabledLorcana: enabledLorcana,
+            enabledDragonball: enabledDragonball,
             defaultGame: defaultGame
         )
         isUsingSingleUserMode = true

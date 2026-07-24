@@ -316,6 +316,13 @@ extension APIService {
         captureSource: String? = nil,
         captureNotes: String? = nil
     ) async throws -> ScanImageResponse {
+        guard tcg == .all || [.pokemon, .magic, .yugioh].contains(tcg) else {
+            throw APIError.serverError(
+                status: 400,
+                message: "\(tcg.displayName) is not supported by the card scanner."
+            )
+        }
+
         var path = "cards/scan"
         if tcg != .all {
             path += "?tcg=\(tcg.rawValue)"
