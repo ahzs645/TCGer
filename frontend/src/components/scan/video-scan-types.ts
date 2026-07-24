@@ -5,11 +5,11 @@ import type {
   VideoQuad,
   VideoWindowProposal,
 } from "@/lib/scan/browser-video-matcher";
-import type { TcgCode } from "@/types/card";
+import type { SupportedTcg } from "@/lib/scan/scan-types";
 
 // ---------- filter type ----------
 
-export type ScanFilter = TcgCode | "all";
+export type ScanFilter = SupportedTcg | "all";
 
 // ---------- state types ----------
 

@@ -85,6 +85,23 @@ describe("multi-format collection import parser", () => {
     ]);
   });
 
+  it.each(["onepiece", "lorcana", "dragonball"] as const)(
+    "accepts %s JSON import rows",
+    (tcg) => {
+      const result = parseCollectionJson(JSON.stringify([{
+        tcg,
+        externalId: `${tcg}-card`,
+        name: `${tcg} card`,
+      }]));
+
+      expect(result.failures).toEqual([]);
+      expect(result.rows[0]).toMatchObject({
+        tcg,
+        externalId: `${tcg}-card`,
+      });
+    },
+  );
+
   it("auto-detects JSON and exposes the PDF extraction boundary", () => {
     expect(parseCollectionImportSource({
       content: '[{"tcg":"magic","externalId":"abc","name":"Sol Ring"}]',

@@ -21,6 +21,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@tcg/api-types": [
+        "../packages/api-types/dist/index.d.ts"
+      ],
+      "@tcg/api-types/*": [
+        "../packages/api-types/dist/*.d.ts"
       ]
     },
     "plugins": [

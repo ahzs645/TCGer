@@ -1,3 +1,5 @@
+import type { TcgCode } from "./validators";
+
 export type CollectionImportIssue = {
   row: number;
   field?: string;
@@ -6,7 +8,7 @@ export type CollectionImportIssue = {
 
 export type CollectionImportRow = {
   row: number;
-  tcg: "pokemon" | "magic" | "yugioh";
+  tcg: TcgCode;
   externalId: string;
   cardName: string;
   setCode?: string;
@@ -261,11 +263,13 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
     const tcg = source.tcg?.trim().toLocaleLowerCase();
     const externalId = source.external_id?.trim();
     const cardName = source.card_name?.trim();
-    if (!["pokemon", "magic", "yugioh"].includes(tcg)) {
+    if (
+      !["pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball"].includes(tcg)
+    ) {
       issues.push({
         row: rowNumber,
         field: "tcg",
-        message: "must be pokemon, magic, or yugioh",
+        message: "must be pokemon, magic, yugioh, onepiece, lorcana, or dragonball",
       });
     }
     if (!externalId)

@@ -28,6 +28,9 @@ export const tables = {
     enabledYugioh: v.optional(v.union(v.null(), v.boolean())),
     enabledMagic: v.optional(v.union(v.null(), v.boolean())),
     enabledPokemon: v.optional(v.union(v.null(), v.boolean())),
+    enabledOnepiece: v.optional(v.union(v.null(), v.boolean())),
+    enabledLorcana: v.optional(v.union(v.null(), v.boolean())),
+    enabledDragonball: v.optional(v.union(v.null(), v.boolean())),
     defaultGame: v.optional(v.union(v.null(), v.string())),
   })
     .index("email_name", ["email","name"])

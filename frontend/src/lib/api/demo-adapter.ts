@@ -7,6 +7,7 @@ import {
   useDemoStore,
   type DemoBinder,
   type DemoBinderCard,
+  type DemoOwnedCard,
   type DemoWishlist,
   type DemoWishlistCard,
 } from "@/stores/demo-store";
@@ -16,6 +17,11 @@ import {
   type DemoCard,
 } from "@/lib/data/demo-cards";
 import { isCatalogInstalled } from "@/lib/catalog/catalog-client";
+import {
+  CATALOG_GAMES,
+  isCatalogGame,
+  type CatalogTcgCode,
+} from "@/lib/catalog/use-catalog";
 import {
   getCardsInSet as getCatalogCardsInSet,
   getSets as getCatalogSets,
@@ -75,6 +81,9 @@ function demoAuthUser() {
     enabledYugioh: true,
     enabledMagic: true,
     enabledPokemon: true,
+    enabledOnepiece: false,
+    enabledLorcana: false,
+    enabledDragonball: false,
   };
 }
 
@@ -178,7 +187,7 @@ function demoCardToSearchResult(dc: DemoCard) {
   };
 }
 
-const DEMO_TCGS: TcgCode[] = ["pokemon", "magic", "yugioh"];
+const DEMO_TCGS: readonly CatalogTcgCode[] = CATALOG_GAMES;
 
 function demoOwnedCards(tcg?: TcgCode): Card[] {
   const cards = new Map<string, Card>();
@@ -263,10 +272,28 @@ function demoSets(tcg?: TcgCode): TcgSet[] {
   );
 }
 
+function demoOwnedSets(tcg?: TcgCode): TcgSet[] {
+  const sets = new Map<string, TcgSet>();
+  for (const card of demoOwnedCards(tcg)) {
+    const code = ownedCardSetCode(card);
+    if (!code) continue;
+    const key = `${card.tcg}:${normalizeCatalogText(code)}`;
+    const existing = sets.get(key);
+    sets.set(key, {
+      code,
+      name: card.setName ?? code,
+      tcg: card.tcg,
+      totalCards: (existing?.totalCards ?? 0) + 1,
+    });
+  }
+  return Array.from(sets.values());
+}
+
 async function demoSearchCards(query: string, tcg?: TcgCode): Promise<Card[]> {
   const games = tcg ? [tcg] : DEMO_TCGS;
   const gameResults = await Promise.all(
     games.map(async (game) => {
+      if (!isCatalogGame(game)) return [];
       const installed = await isCatalogInstalled(game);
       if (installed) return searchCatalog(query, game);
       return searchDemoCards(query, game).map(demoCardToSearchResult);
@@ -279,24 +306,38 @@ async function demoSearchCards(query: string, tcg?: TcgCode): Promise<Card[]> {
 }
 
 async function demoCatalogSets(tcg?: TcgCode): Promise<TcgSet[]> {
-  const games = tcg ? [tcg] : DEMO_TCGS;
+  const games: readonly CatalogTcgCode[] = tcg
+    ? isCatalogGame(tcg)
+      ? [tcg]
+      : []
+    : DEMO_TCGS;
   const results = await Promise.all(
     games.map(async (game) =>
       (await isCatalogInstalled(game)) ? getCatalogSets(game) : demoSets(game),
     ),
   );
-  return results.flat();
+  const merged = new Map(
+    results
+      .flat()
+      .map((set) => [`${set.tcg}:${normalizeCatalogText(set.code)}`, set] as const),
+  );
+  for (const set of demoOwnedSets(tcg)) {
+    merged.set(`${set.tcg}:${normalizeCatalogText(set.code)}`, set);
+  }
+  return Array.from(merged.values());
 }
 
 async function demoCardsInSet(tcg: TcgCode, setCode: string): Promise<Card[]> {
   const normalizedSetCode = normalizeCatalogText(setCode);
-  const base = (await isCatalogInstalled(tcg))
-    ? await getCatalogCardsInSet(tcg, setCode)
-    : DEMO_CARDS.filter(
-        (card) =>
-          card.tcg === tcg &&
-          normalizeCatalogText(demoSetCode(card)) === normalizedSetCode,
-      ).map(demoCardToSearchResult);
+  const base = isCatalogGame(tcg)
+    ? (await isCatalogInstalled(tcg))
+      ? await getCatalogCardsInSet(tcg, setCode)
+      : DEMO_CARDS.filter(
+          (card) =>
+            card.tcg === tcg &&
+            normalizeCatalogText(demoSetCode(card)) === normalizedSetCode,
+        ).map(demoCardToSearchResult)
+    : [];
   const owned = demoOwnedCards(tcg).filter(
     (card) =>
       normalizeCatalogText(ownedCardSetCode(card)) === normalizedSetCode,
@@ -514,12 +555,12 @@ function handleCollections(
 
 function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
   const data = body as AddCardInput;
-  const demoCard =
+  const demoCard: DemoOwnedCard | null =
     DEMO_CARDS.find((c) => c.id === data.cardId) ||
     (data.cardData
       ? {
           id: data.cardData.externalId || data.cardId,
-          tcg: data.cardData.tcg as DemoCard["tcg"],
+          tcg: data.cardData.tcg,
           name: data.cardData.name,
           setCode: data.cardData.setCode || "",
           setName: data.cardData.setName || "",
@@ -616,11 +657,11 @@ function handleWishlists(
   // POST /wishlists/:id/cards
   if (segments[1] === "cards" && segments.length === 2 && method === "POST") {
     const data = body as AddWishlistCardInput;
-    const demoCard: DemoCard = DEMO_CARDS.find(
+    const demoCard: DemoOwnedCard = DEMO_CARDS.find(
       (c) => c.id === data.externalId,
     ) || {
       id: data.externalId,
-      tcg: data.tcg as DemoCard["tcg"],
+      tcg: data.tcg,
       name: data.name,
       setCode: data.setCode || "",
       setName: data.setName || "",
@@ -703,6 +744,9 @@ function handleUsers(
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: false,
+      enabledLorcana: false,
+      enabledDragonball: false,
     });
   }
 
@@ -719,6 +763,9 @@ function handleUsers(
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: false,
+      enabledLorcana: false,
+      enabledDragonball: false,
       ...data,
     });
   }

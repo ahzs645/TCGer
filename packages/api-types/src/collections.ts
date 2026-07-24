@@ -453,7 +453,7 @@ export interface CollectionImportAmbiguity {
   code: 'PRINTING_RESOLUTION_REQUIRED';
   message: string;
   query: {
-    tcg: 'pokemon' | 'magic' | 'yugioh';
+    tcg: TcgCode;
     name: string;
     collectorNumber?: string;
     setCode?: string;

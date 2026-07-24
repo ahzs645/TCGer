@@ -106,6 +106,21 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
           defaultValue: true,
           input: false
         },
+        enabledOnepiece: {
+          type: "boolean",
+          defaultValue: false,
+          input: false
+        },
+        enabledLorcana: {
+          type: "boolean",
+          defaultValue: false,
+          input: false
+        },
+        enabledDragonball: {
+          type: "boolean",
+          defaultValue: false,
+          input: false
+        },
         defaultGame: {
           type: "string",
           required: false,

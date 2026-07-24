@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
+import { isSupportedScannerTcg } from "@/lib/scan/scan-types";
 
 import {
   MIN_TRACK_STABLE_FRAMES,
@@ -53,7 +54,11 @@ export function VideoScanLab() {
   // ---------- state ----------
 
   const [scanFilter, setScanFilter] = useState<ScanFilter>(
-    selectedGame === "all" ? "pokemon" : selectedGame,
+    selectedGame === "all"
+      ? "pokemon"
+      : isSupportedScannerTcg(selectedGame)
+        ? selectedGame
+        : "all",
   );
   const [detectionOnly, setDetectionOnly] = useState(false);
   // Default to the on-device DINOv2 embedding model: fully client-side, no

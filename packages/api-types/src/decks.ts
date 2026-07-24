@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tcgCodeSchema } from './cards';
 
 export const yugiohDeckZoneSchema = z.enum(['main', 'extra', 'side']);
 export type YugiohDeckZone = z.infer<typeof yugiohDeckZoneSchema>;
@@ -10,7 +11,7 @@ export type YugiohDeckZone = z.infer<typeof yugiohDeckZoneSchema>;
 export const createDeckSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  tcg: z.enum(['magic', 'yugioh', 'pokemon']),
+  tcg: tcgCodeSchema,
   format: z.string().optional(),
   colorHex: z.string().optional(),
   isPublic: z.boolean().optional()
@@ -58,7 +59,7 @@ export const importDeckSchema = z.object({
   source: z.enum(['text', 'moxfield', 'archidekt', 'mtggoldfish', 'arena', 'ygoprodeck', 'ydk']),
   data: z.string().min(1),
   name: z.string().optional(),
-  tcg: z.enum(['magic', 'yugioh', 'pokemon']).optional(),
+  tcg: tcgCodeSchema.optional(),
   format: z.string().optional()
 });
 export type ImportDeckInput = z.infer<typeof importDeckSchema>;

@@ -66,7 +66,7 @@ type BridgeIdentity = {
 
 const cardSnapshotInput = v.object({
   name: v.string(),
-  tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
+  tcg: tcgCodeValidator,
   externalId: v.string(),
   baseExternalId: v.optional(v.string()),
   printingKey: v.optional(v.string()),
@@ -83,7 +83,7 @@ const cardSnapshotInput = v.object({
 
 const collectionImportRowInput = v.object({
   row: v.number(),
-  tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
+  tcg: tcgCodeValidator,
   externalId: v.string(),
   cardName: v.string(),
   setCode: v.optional(v.string()),
@@ -117,9 +117,7 @@ const collectionImportRowInput = v.object({
 
 const nullableString = v.union(v.string(), v.null());
 const nullableTcgCode = v.union(
-  v.literal("yugioh"),
-  v.literal("magic"),
-  v.literal("pokemon"),
+  tcgCodeValidator,
   v.null()
 );
 
@@ -147,7 +145,7 @@ const settingsUpdateInput = v.object({
 
 const wishlistCardInput = v.object({
   externalId: v.string(),
-  tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
+  tcg: tcgCodeValidator,
   name: v.string(),
   baseExternalId: v.optional(v.string()),
   printingKey: v.optional(v.string()),
@@ -174,6 +172,9 @@ type AuthUserDoc = {
   enabledYugioh?: boolean | null;
   enabledMagic?: boolean | null;
   enabledPokemon?: boolean | null;
+  enabledOnepiece?: boolean | null;
+  enabledLorcana?: boolean | null;
+  enabledDragonball?: boolean | null;
   defaultGame?: string | null;
   createdAt: number;
   updatedAt: number;
@@ -205,6 +206,9 @@ function toUserPreferences(viewer: Doc<"users">) {
     enabledYugioh: viewer.enabledYugioh,
     enabledMagic: viewer.enabledMagic,
     enabledPokemon: viewer.enabledPokemon,
+    enabledOnepiece: viewer.enabledOnepiece ?? false,
+    enabledLorcana: viewer.enabledLorcana ?? false,
+    enabledDragonball: viewer.enabledDragonball ?? false,
     defaultGame: viewer.defaultGame ?? null
   };
 }
@@ -441,6 +445,9 @@ async function ensureViewerBySubject(ctx: MutationCtx, identity: BridgeIdentity)
       enabledYugioh: true,
       enabledMagic: true,
       enabledPokemon: true,
+      enabledOnepiece: false,
+      enabledLorcana: false,
+      enabledDragonball: false,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -2059,6 +2066,9 @@ export const updateViewerPreferences = internalMutation({
     enabledYugioh: v.optional(v.boolean()),
     enabledMagic: v.optional(v.boolean()),
     enabledPokemon: v.optional(v.boolean()),
+    enabledOnepiece: v.optional(v.boolean()),
+    enabledLorcana: v.optional(v.boolean()),
+    enabledDragonball: v.optional(v.boolean()),
     defaultGame: v.optional(nullableTcgCode)
   },
   returns: userPreferencesValidator,
@@ -2071,6 +2081,9 @@ export const updateViewerPreferences = internalMutation({
       enabledYugioh: args.enabledYugioh,
       enabledMagic: args.enabledMagic,
       enabledPokemon: args.enabledPokemon,
+      enabledOnepiece: args.enabledOnepiece,
+      enabledLorcana: args.enabledLorcana,
+      enabledDragonball: args.enabledDragonball,
       defaultGame: args.defaultGame
     });
 
@@ -2080,6 +2093,9 @@ export const updateViewerPreferences = internalMutation({
       enabledYugioh: args.enabledYugioh ?? viewer.enabledYugioh,
       enabledMagic: args.enabledMagic ?? viewer.enabledMagic,
       enabledPokemon: args.enabledPokemon ?? viewer.enabledPokemon,
+      enabledOnepiece: args.enabledOnepiece ?? viewer.enabledOnepiece ?? false,
+      enabledLorcana: args.enabledLorcana ?? viewer.enabledLorcana ?? false,
+      enabledDragonball: args.enabledDragonball ?? viewer.enabledDragonball ?? false,
       defaultGame:
         args.defaultGame === undefined ? viewer.defaultGame : args.defaultGame ?? undefined,
       updatedAt: now()

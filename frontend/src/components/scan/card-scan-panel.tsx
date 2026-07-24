@@ -45,9 +45,13 @@ import { cn, GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { useGameFilterStore } from "@/stores/game-filter";
-import type { Card as CardType, TcgCode } from "@/types/card";
+import type { Card as CardType } from "@/types/card";
+import {
+  isSupportedScannerTcg,
+  type SupportedTcg,
+} from "@/lib/scan/scan-types";
 
-type ScanFilter = TcgCode | "all";
+type ScanFilter = SupportedTcg | "all";
 type ResolvedCards = Record<string, CardType | null>;
 type SelectedFileSource = "file-picker" | "live-camera-frame";
 
@@ -171,7 +175,9 @@ export function CardScanPanel() {
   }));
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const [scanFilter, setScanFilter] = useState<ScanFilter>(
-    selectedGame === "all" ? "all" : selectedGame,
+    selectedGame === "all" || !isSupportedScannerTcg(selectedGame)
+      ? "all"
+      : selectedGame,
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileSource, setSelectedFileSource] =
@@ -209,8 +215,10 @@ export function CardScanPanel() {
     useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedGame !== "all") {
+    if (selectedGame !== "all" && isSupportedScannerTcg(selectedGame)) {
       setScanFilter(selectedGame);
+    } else if (selectedGame !== "all") {
+      setScanFilter("all");
     }
   }, [selectedGame]);
 

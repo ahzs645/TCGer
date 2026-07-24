@@ -8,6 +8,7 @@ import type {
   CardDataPayload,
   TcgCode
 } from '@tcg/api-types';
+import { tcgCodeSchema } from '@tcg/api-types';
 
 import { prisma } from '../../lib/prisma';
 import {
@@ -76,7 +77,7 @@ export function buildBulkAddPreview(
       issues.push({
         rowId: row.rowId,
         field: 'cardData.tcg',
-        message: 'TCG must be yugioh, magic, or pokemon'
+        message: 'TCG must be yugioh, magic, pokemon, onepiece, lorcana, or dragonball'
       });
     }
     const existing = cardById.get(row.cardId);
@@ -250,7 +251,7 @@ function uniqueBinderIds(rows: ResolvedBulkAddRow[]): string[] {
 }
 
 function isTcgCode(value: string): value is TcgCode {
-  return value === 'yugioh' || value === 'magic' || value === 'pokemon';
+  return tcgCodeSchema.safeParse(value).success;
 }
 
 function inferFoil(finishCode?: string) {

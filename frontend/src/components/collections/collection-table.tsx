@@ -248,8 +248,9 @@ export function CollectionTable() {
   const selectedGameDisabled =
     selectedGame !== "all" &&
     !enabledGames[selectedGame as keyof typeof enabledGames];
-  const noGamesEnabled =
-    !enabledGames.yugioh && !enabledGames.magic && !enabledGames.pokemon;
+  const noGamesEnabled = Object.values(enabledGames).every(
+    (enabled) => !enabled,
+  );
 
   const defaultMaxPrice = useMemo(
     () => Math.max(Math.ceil(maxPrice || 50), 10),

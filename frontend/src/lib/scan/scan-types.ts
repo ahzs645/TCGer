@@ -6,6 +6,10 @@ import type { TcgCode } from "@/types/card";
 
 export type SupportedTcg = Extract<TcgCode, "magic" | "pokemon" | "yugioh">;
 
+export function isSupportedScannerTcg(value: TcgCode): value is SupportedTcg {
+  return value === "magic" || value === "pokemon" || value === "yugioh";
+}
+
 export interface RGBHash {
   r: string;
   g: string;

@@ -7,7 +7,14 @@ import {
 } from "./lib/auditValidators";
 
 const binderKind = v.union(v.literal("binder"), v.literal("library"));
-const tcgCode = v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon"));
+const tcgCode = v.union(
+  v.literal("yugioh"),
+  v.literal("magic"),
+  v.literal("pokemon"),
+  v.literal("onepiece"),
+  v.literal("lorcana"),
+  v.literal("dragonball")
+);
 
 export default defineSchema({
   users: defineTable({
@@ -21,6 +28,9 @@ export default defineSchema({
     enabledYugioh: v.boolean(),
     enabledMagic: v.boolean(),
     enabledPokemon: v.boolean(),
+    enabledOnepiece: v.optional(v.boolean()),
+    enabledLorcana: v.optional(v.boolean()),
+    enabledDragonball: v.optional(v.boolean()),
     defaultGame: v.optional(tcgCode),
     createdAt: v.number(),
     updatedAt: v.number()

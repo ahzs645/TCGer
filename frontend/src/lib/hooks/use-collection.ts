@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { Collection as CollectionEntity } from "@/lib/api/collections";
 import { useCollectionsStore } from "@/stores/collections";
 import type { CollectionCard, TcgCode } from "@/types/card";
+import type { ManageableGame } from "@/stores/preferences";
 
 export const ALL_COLLECTION_ID = "__all__";
 
@@ -10,7 +11,7 @@ interface UseCollectionOptions {
   collectionId: string;
   query: string;
   game: TcgCode | "all";
-  enabledGames: Record<"yugioh" | "magic" | "pokemon", boolean>;
+  enabledGames: Record<ManageableGame, boolean>;
 }
 
 export function useCollectionData({

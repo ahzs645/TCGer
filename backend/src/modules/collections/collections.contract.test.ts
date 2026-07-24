@@ -88,6 +88,27 @@ describe('rich collection contracts', () => {
     expect(input.pokemonPrint?.finishes).toEqual(['cosmos-holo']);
   });
 
+  it.each(['onepiece', 'lorcana', 'dragonball'] as const)(
+    'accepts %s across generic card, binder, and wishlist contracts',
+    (tcg) => {
+      expect(cardDataPayloadSchema.parse({
+        name: 'Example Card',
+        tcg,
+        externalId: `${tcg}-card`
+      }).tcg).toBe(tcg);
+      expect(addWishlistCardSchema.parse({
+        externalId: `${tcg}-card`,
+        printingKey: `${tcg}:${tcg}-card`,
+        tcg,
+        name: 'Example Card'
+      }).tcg).toBe(tcg);
+      expect(createBinderSchema.parse({
+        name: 'New Game Binder',
+        associatedTcg: tcg
+      }).associatedTcg).toBe(tcg);
+    }
+  );
+
   it('allows nullable string variant fields to be cleared on update', () => {
     expect(updateCardSchema.parse({
       finishCode: null,

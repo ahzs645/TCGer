@@ -21,6 +21,8 @@ tags:
     description: Authentication and initial setup
   - name: Cards
     description: Card search and details
+  - name: Scanner
+    description: Card scanner endpoints (Pokémon, Magic, and Yu-Gi-Oh only)
   - name: Collections
     description: Binder and card collection management (requires auth)
   - name: Wishlists
@@ -31,6 +33,38 @@ tags:
     description: Application settings
 
 paths:
+  /cards/scan:
+    post:
+      tags: [Scanner]
+      summary: Identify a card image
+      description: Scanner support is intentionally limited to Pokémon, Magic, and Yu-Gi-Oh.
+      operationId: scanCard
+      parameters:
+        - name: tcg
+          in: query
+          schema:
+            $ref: "#/components/schemas/ScannerTcgCode"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Scan result
+        "400":
+          description: Invalid image or unsupported scanner TCG
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ─── Health ──────────────────────────────────────────────────────────
   /health:
     get:
@@ -828,6 +862,9 @@ components:
     # ─── Enums & Primitives ──────────────────────────────────────────
     TcgCode:
       type: string
+      enum: [yugioh, magic, pokemon, onepiece, lorcana, dragonball]
+    ScannerTcgCode:
+      type: string
       enum: [yugioh, magic, pokemon]
 
     # ─── Error ───────────────────────────────────────────────────────
@@ -871,7 +908,7 @@ components:
 
     AuthUser:
       type: object
-      required: [id, email, isAdmin, showCardNumbers, showPricing, enabledYugioh, enabledMagic, enabledPokemon]
+      required: [id, email, isAdmin, showCardNumbers, showPricing, enabledYugioh, enabledMagic, enabledPokemon, enabledOnepiece, enabledLorcana, enabledDragonball]
       properties:
         id:
           type: string
@@ -891,6 +928,12 @@ components:
         enabledMagic:
           type: boolean
         enabledPokemon:
+          type: boolean
+        enabledOnepiece:
+          type: boolean
+        enabledLorcana:
+          type: boolean
+        enabledDragonball:
           type: boolean
 
     AuthResponse:
@@ -1504,7 +1547,7 @@ components:
 
     UserPreferences:
       type: object
-      required: [showCardNumbers, showPricing, enabledYugioh, enabledMagic, enabledPokemon]
+      required: [showCardNumbers, showPricing, enabledYugioh, enabledMagic, enabledPokemon, enabledOnepiece, enabledLorcana, enabledDragonball]
       properties:
         showCardNumbers:
           type: boolean
@@ -1516,6 +1559,16 @@ components:
           type: boolean
         enabledPokemon:
           type: boolean
+        enabledOnepiece:
+          type: boolean
+        enabledLorcana:
+          type: boolean
+        enabledDragonball:
+          type: boolean
+        defaultGame:
+          allOf:
+            - $ref: "#/components/schemas/TcgCode"
+          nullable: true
 
     UpdatePreferencesInput:
       type: object
@@ -1531,6 +1584,16 @@ components:
           type: boolean
         enabledPokemon:
           type: boolean
+        enabledOnepiece:
+          type: boolean
+        enabledLorcana:
+          type: boolean
+        enabledDragonball:
+          type: boolean
+        defaultGame:
+          allOf:
+            - $ref: "#/components/schemas/TcgCode"
+          nullable: true
 
     UpdateProfileInput:
       type: object

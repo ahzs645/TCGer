@@ -30,7 +30,10 @@ export const authUserSchema = z.object({
   showPricing: z.boolean(),
   enabledYugioh: z.boolean(),
   enabledMagic: z.boolean(),
-  enabledPokemon: z.boolean()
+  enabledPokemon: z.boolean(),
+  enabledOnepiece: z.boolean(),
+  enabledLorcana: z.boolean(),
+  enabledDragonball: z.boolean()
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 

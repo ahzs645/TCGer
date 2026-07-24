@@ -17,6 +17,7 @@ import { isDemoMode } from "@/lib/demo-mode";
 import {
   CATALOG_CHANGED_EVENT,
   CATALOG_PROMPT_EVENT,
+  isCatalogGame,
   useCatalog,
 } from "@/lib/catalog/use-catalog";
 import { GAME_LABELS } from "@/lib/utils";
@@ -51,7 +52,7 @@ export function CatalogDownloadPrompt() {
     const handlePrompt = (event: Event) => {
       if (!isDemoExperience() || !(event instanceof CustomEvent)) return;
       const game: unknown = event.detail;
-      if (game === "pokemon" || game === "magic" || game === "yugioh") {
+      if (isCatalogGame(game)) {
         setRequestedGame(game);
       }
     };
@@ -73,13 +74,17 @@ export function CatalogDownloadPrompt() {
     if (
       isDemoExperience() &&
       selectedGame !== "all" &&
+      isCatalogGame(selectedGame) &&
       states[selectedGame].status === "not-installed"
     ) {
       setRequestedGame(selectedGame);
     }
   }, [selectedGame, states]);
 
-  const state = requestedGame ? states[requestedGame] : null;
+  const state =
+    requestedGame && isCatalogGame(requestedGame)
+      ? states[requestedGame]
+      : null;
   const dismissed = useMemo(() => {
     if (!requestedGame || !state?.manifest || typeof window === "undefined") {
       return true;
@@ -95,8 +100,14 @@ export function CatalogDownloadPrompt() {
     Boolean(state?.manifest) &&
     state?.status === "not-installed" &&
     !dismissed;
-  const activeProgress = requestedGame ? progress[requestedGame] : undefined;
-  const error = requestedGame ? errors[requestedGame] : undefined;
+  const activeProgress =
+    requestedGame && isCatalogGame(requestedGame)
+      ? progress[requestedGame]
+      : undefined;
+  const error =
+    requestedGame && isCatalogGame(requestedGame)
+      ? errors[requestedGame]
+      : undefined;
 
   const dismiss = () => {
     if (requestedGame && state?.manifest) {
@@ -109,7 +120,9 @@ export function CatalogDownloadPrompt() {
   };
 
   const handleDownload = async () => {
-    if (!requestedGame || !state?.manifest) return;
+    if (!requestedGame || !isCatalogGame(requestedGame) || !state?.manifest) {
+      return;
+    }
     try {
       await install(requestedGame);
       localStorage.setItem(

@@ -50,14 +50,10 @@ import {
 } from "@/lib/api/collections";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
-import { cn } from "@/lib/utils";
+import { cn, GAME_LABELS } from "@/lib/utils";
+import { supportedGames } from "@/stores/game-filter";
 
 const INHERIT = "__inherit__";
-const GAME_LABELS: Record<TcgCode, string> = {
-  yugioh: "Yu-Gi-Oh!",
-  magic: "Magic",
-  pokemon: "Pokémon",
-};
 
 type StagedRow = {
   rowId: string;
@@ -338,9 +334,11 @@ export function BulkAddDialog() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(GAME_LABELS).map(([value, label]) => (
+                  {supportedGames
+                    .filter((value) => value !== "all")
+                    .map((value) => (
                     <SelectItem key={value} value={value}>
-                      {label}
+                      {GAME_LABELS[value]}
                     </SelectItem>
                   ))}
                 </SelectContent>

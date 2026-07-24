@@ -44,7 +44,7 @@ import {
 } from "@/lib/api/user-preferences";
 import { isDemoMode } from "@/lib/demo-mode";
 import { requestCatalogPrompt } from "@/lib/catalog/use-catalog";
-import { GAME_LABELS } from "@/lib/utils";
+import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 import { CatalogManagementPanel } from "./catalog-management-panel";
@@ -53,6 +53,9 @@ const iconPaths = {
   yugioh: "/icons/Yugioh.svg",
   magic: "/icons/MTG.svg",
   pokemon: "/icons/Pokemon.svg",
+  onepiece: "/icons/OnePiece.svg",
+  lorcana: "/icons/Lorcana.svg",
+  dragonball: "/icons/DragonBall.svg",
 };
 
 interface AccountSettingsDialogProps {
@@ -219,12 +222,9 @@ export function AccountSettingsDialog({
     setUpdatingGame(game);
     toggleGame(game);
 
-    const preferencePayload =
-      game === "yugioh"
-        ? { enabledYugioh: newValue }
-        : game === "magic"
-          ? { enabledMagic: newValue }
-          : { enabledPokemon: newValue };
+    const preferencePayload = {
+      [ENABLED_PREFERENCE_KEY[game]]: newValue,
+    };
 
     try {
       await updateUserPreferences(preferencePayload, token);
@@ -320,7 +320,7 @@ export function AccountSettingsDialog({
               </h3>
               <p className="text-sm text-muted-foreground" data-oid="a1rhplz">
                 Toggle which adapters are active in your dashboards and search.
-                ({activeCount}/3 enabled)
+                ({activeCount}/6 enabled)
               </p>
             </div>
             <ShieldCheck

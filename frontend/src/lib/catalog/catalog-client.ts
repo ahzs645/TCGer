@@ -1,5 +1,3 @@
-import type { TcgCode } from "@tcg/api-types";
-
 import {
   type CatalogCard,
   type CatalogPack,
@@ -9,9 +7,12 @@ import {
   replaceCatalog,
 } from "./catalog-db";
 import { invalidateCatalogSearchIndex } from "./catalog-search";
+import {
+  CATALOG_GAMES,
+  type CatalogTcgCode,
+} from "./catalog-types";
 
 const CATALOG_ROOT = "/catalog";
-const SUPPORTED_GAMES: TcgCode[] = ["pokemon", "magic", "yugioh"];
 
 export interface CatalogManifestGame {
   version: number;
@@ -25,7 +26,7 @@ export interface CatalogManifestGame {
 export interface CatalogManifest {
   formatVersion: 1;
   generatedAt: string;
-  games: Partial<Record<TcgCode, CatalogManifestGame>>;
+  games: Partial<Record<CatalogTcgCode, CatalogManifestGame>>;
 }
 
 export type CatalogDownloadPhase = "downloading" | "saving";
@@ -98,8 +99,8 @@ function parseCatalogManifest(value: unknown): CatalogManifest {
     throw new Error("The catalog manifest has an unsupported format.");
   }
 
-  const games: Partial<Record<TcgCode, CatalogManifestGame>> = {};
-  for (const tcg of SUPPORTED_GAMES) {
+  const games: Partial<Record<CatalogTcgCode, CatalogManifestGame>> = {};
+  for (const tcg of CATALOG_GAMES) {
     const entry = parseManifestGame(value.games[tcg]);
     if (entry) games[tcg] = entry;
   }
@@ -143,7 +144,7 @@ function isCatalogCard(value: unknown): value is CatalogCard {
   );
 }
 
-function parseCatalogPack(value: unknown, expectedTcg: TcgCode): CatalogPack {
+function parseCatalogPack(value: unknown, expectedTcg: CatalogTcgCode): CatalogPack {
   if (
     !isRecord(value) ||
     value.formatVersion !== 1 ||
@@ -235,7 +236,7 @@ export async function fetchCatalogManifest(): Promise<CatalogManifest> {
   return parseCatalogManifest(value);
 }
 
-export async function isCatalogInstalled(tcg: TcgCode): Promise<boolean> {
+export async function isCatalogInstalled(tcg: CatalogTcgCode): Promise<boolean> {
   try {
     return Boolean(await getInstalledCatalog(tcg));
   } catch {
@@ -244,7 +245,7 @@ export async function isCatalogInstalled(tcg: TcgCode): Promise<boolean> {
 }
 
 export async function downloadCatalog(
-  tcg: TcgCode,
+  tcg: CatalogTcgCode,
   onProgress?: CatalogProgressCallback,
 ): Promise<void> {
   const manifest = await fetchCatalogManifest();
@@ -287,7 +288,7 @@ export async function downloadCatalog(
   invalidateCatalogSearchIndex(tcg);
 }
 
-export async function removeCatalog(tcg: TcgCode): Promise<void> {
+export async function removeCatalog(tcg: CatalogTcgCode): Promise<void> {
   const installed = await getInstalledCatalog(tcg);
   await removeCatalogFromDatabase(tcg);
   invalidateCatalogSearchIndex(tcg);

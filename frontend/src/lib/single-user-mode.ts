@@ -39,6 +39,9 @@ export function getSingleUserAuthUser() {
     enabledYugioh: true,
     enabledMagic: true,
     enabledPokemon: true,
+    enabledOnepiece: false,
+    enabledLorcana: false,
+    enabledDragonball: false,
   };
 }
 

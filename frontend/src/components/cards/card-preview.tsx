@@ -44,17 +44,11 @@ import {
   getPokemonFinishOptions,
   isFoilFinish,
 } from "@/lib/pokemon-variants";
-import { getCardBackImage } from "@/lib/utils";
+import { GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import { CardImage } from "./card-image";
 import { SetSymbol } from "./set-symbol";
 
 const PRINT_SUPPORTED_GAMES: Card["tcg"][] = ["magic", "pokemon"];
-const GAME_LABELS: Record<Card["tcg"], string> = {
-  magic: "Magic: The Gathering",
-  pokemon: "Pokémon",
-  yugioh: "Yu-Gi-Oh!",
-};
-
 interface CardPreviewProps {
   card: Card;
 }

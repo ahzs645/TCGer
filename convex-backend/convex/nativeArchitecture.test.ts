@@ -18,10 +18,52 @@ describe("convex native architecture", () => {
 
     expect(viewer.authSubject).toBe("user_avery");
     expect(viewer.username).toBe("avery");
+    expect(viewer).toMatchObject({
+      enabledOnepiece: false,
+      enabledLorcana: false,
+      enabledDragonball: false
+    });
     expect(binders).toHaveLength(1);
     expect(binders[0]).toMatchObject({
       kind: "library",
       name: "Library"
+    });
+  });
+
+  test("normalizes missing new-game fields on pre-port native users", async () => {
+    const t = createTestConvex();
+    await t.run(async (ctx) => {
+      const timestamp = Date.now();
+      const userId = await ctx.db.insert("users", {
+        authSubject: "legacy_user",
+        email: "legacy@example.com",
+        name: "Legacy User",
+        isAdmin: false,
+        showCardNumbers: true,
+        showPricing: true,
+        enabledYugioh: true,
+        enabledMagic: true,
+        enabledPokemon: true,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      await ctx.db.insert("binders", {
+        userId,
+        kind: "library",
+        name: "Library",
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+    });
+
+    const viewer = await t
+      .withIdentity({ subject: "legacy_user", name: "Legacy User" })
+      .query(api.users.me);
+
+    expect(viewer).toMatchObject({
+      enabledOnepiece: false,
+      enabledLorcana: false,
+      enabledDragonball: false
     });
   });
 
@@ -744,19 +786,34 @@ describe("convex native architecture", () => {
       isAdmin: true
     });
 
-    const preferencesUpdateResponse = await t.fetch("/users/me/preferences", {
+    for (const [field, defaultGame] of [
+      ["enabledOnepiece", "onepiece"],
+      ["enabledLorcana", "lorcana"],
+      ["enabledDragonball", "dragonball"]
+    ] as const) {
+      const preferencesUpdateResponse = await t.fetch("/users/me/preferences", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          showPricing: false,
+          [field]: true,
+          defaultGame
+        })
+      });
+      expect(preferencesUpdateResponse.status).toBe(200);
+      expect(await preferencesUpdateResponse.json()).toMatchObject({
+        showPricing: false,
+        [field]: true,
+        defaultGame
+      });
+    }
+
+    const invalidDefaultResponse = await t.fetch("/users/me/preferences", {
       method: "PATCH",
       headers,
-      body: JSON.stringify({
-        showPricing: false,
-        defaultGame: "magic"
-      })
+      body: JSON.stringify({ defaultGame: "unsupported-game" })
     });
-    expect(preferencesUpdateResponse.status).toBe(200);
-    expect(await preferencesUpdateResponse.json()).toMatchObject({
-      showPricing: false,
-      defaultGame: "magic"
-    });
+    expect(invalidDefaultResponse.status).toBe(400);
 
     const settingsUpdateResponse = await t.fetch("/settings", {
       method: "PATCH",

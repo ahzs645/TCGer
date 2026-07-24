@@ -51,14 +51,27 @@ import type { Card as CardResult, YugiohDeckZone } from "@tcg/api-types";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
-import { useModuleStore } from "@/stores/preferences";
+import {
+  useModuleStore,
+  type ManageableGame,
+} from "@/stores/preferences";
 
 const TCG_COLORS: Record<string, string> = {
   yugioh: "#ef4444",
   magic: "#8b5cf6",
   pokemon: "#f59e0b",
+  onepiece: "#0ea5e9",
+  lorcana: "#a855f7",
+  dragonball: "#f97316",
 };
-const MANAGEABLE_GAMES = ["magic", "yugioh", "pokemon"] as const;
+const MANAGEABLE_GAMES: readonly ManageableGame[] = [
+  "magic",
+  "yugioh",
+  "pokemon",
+  "onepiece",
+  "lorcana",
+  "dragonball",
+];
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
@@ -789,7 +802,7 @@ function NewDeckDialog({
   onCreated: (deck: DeckResponse) => void;
 }) {
   const [name, setName] = useState("");
-  const [tcg, setTcg] = useState<(typeof MANAGEABLE_GAMES)[number]>("magic");
+  const [tcg, setTcg] = useState<ManageableGame>("magic");
   const [format, setFormat] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -852,7 +865,7 @@ function NewDeckDialog({
             <Select
               value={tcg}
               onValueChange={(v) =>
-                setTcg(v as (typeof MANAGEABLE_GAMES)[number])
+                setTcg(v as ManageableGame)
               }
             >
               <SelectTrigger id="deck-tcg">
