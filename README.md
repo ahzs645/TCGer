@@ -10,6 +10,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 - User preferences for enabled games and display options (card numbers, pricing).
 - Web dashboard, card explorer, and collection sandbox UI.
 - Optional local caches for Scryfall, YGO, and TCGdex to reduce external API calls.
+- Installable offline card catalogs for the PWA and the iOS local mode - full per-game search and set browsing without a server (see `docs/offline-catalogs.md`).
 
 ## Repo layout
 - `backend/` - Express + Prisma API service.
