@@ -2,9 +2,14 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { SetDetail } from "@/components/sets/set-detail";
+import { getStaticSetParams } from "@/lib/sets/static-params";
 import type { TcgCode } from "@tcg/api-types";
 
 const SUPPORTED_GAMES = new Set<TcgCode>(["yugioh", "magic", "pokemon"]);
+
+export function generateStaticParams() {
+  return getStaticSetParams();
+}
 
 interface DemoSetDetailPageProps {
   params: Promise<{
