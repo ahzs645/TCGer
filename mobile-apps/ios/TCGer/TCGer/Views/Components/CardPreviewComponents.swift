@@ -5,19 +5,6 @@ struct CardArtworkImage: View {
     let card: Card
     let useFullResolution: Bool
 
-    private var imageURL: URL? {
-        if useFullResolution, let highRes = card.imageUrl, let url = URL(string: highRes) {
-            return url
-        }
-        if let small = card.imageUrlSmall, let url = URL(string: small) {
-            return url
-        }
-        if let fallback = card.imageUrl, let url = URL(string: fallback) {
-            return url
-        }
-        return nil
-    }
-
     private var isLocalAsset: Bool {
         // Check if the imageUrl is a local asset name (doesn't start with http/https)
         guard let imageUrl = useFullResolution ? card.imageUrl : (card.imageUrlSmall ?? card.imageUrl) else {
@@ -39,7 +26,7 @@ struct CardArtworkImage: View {
                     .aspectRatio(contentMode: .fit)
             } else {
                 // Load from URL
-                CachedAsyncImage(url: imageURL) { phase in
+                CachedAsyncImage(card: card, thumbnail: !useFullResolution) { phase in
                     switch phase {
                     case .success(let image):
                         image

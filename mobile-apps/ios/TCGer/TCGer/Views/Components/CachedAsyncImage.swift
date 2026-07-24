@@ -4,12 +4,18 @@ import Combine
 
 struct CachedAsyncImage<Content: View>: View {
     private let url: URL?
+    private let fallbackAssetName: String?
     private let content: (AsyncImagePhase) -> Content
 
     @StateObject private var loader: CachedImageLoader
 
-    init(url: URL?, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+    init(
+        url: URL?,
+        fallbackAssetName: String? = nil,
+        @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
+    ) {
         self.url = url
+        self.fallbackAssetName = fallbackAssetName
         self.content = content
 
         let loader = CachedImageLoader()
@@ -20,11 +26,44 @@ struct CachedAsyncImage<Content: View>: View {
         _loader = StateObject(wrappedValue: loader)
     }
 
+    init(
+        card: Card,
+        thumbnail: Bool = true,
+        @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
+    ) {
+        let rawURL = thumbnail ? (card.imageUrlSmall ?? card.imageUrl) : (card.imageUrl ?? card.imageUrlSmall)
+        let remoteURL = rawURL
+            .flatMap(URL.init(string:))
+            .flatMap { $0.scheme == nil ? nil : $0 }
+        let fallback = TCGGame(rawValue: card.tcg)?.cardBackAssetName
+        self.init(url: remoteURL, fallbackAssetName: fallback, content: content)
+    }
+
+    init(
+        url: URL?,
+        tcg: String,
+        @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
+    ) {
+        let remoteURL = url?.scheme == nil ? nil : url
+        let fallback = TCGGame(rawValue: tcg)?.cardBackAssetName
+        self.init(url: remoteURL, fallbackAssetName: fallback, content: content)
+    }
+
     var body: some View {
-        content(loader.phase)
+        content(displayPhase)
             .task(id: url) {
                 await loader.load(for: url)
             }
+    }
+
+    private var displayPhase: AsyncImagePhase {
+        if case .success = loader.phase {
+            return loader.phase
+        }
+        if let fallbackAssetName {
+            return .success(Image(fallbackAssetName))
+        }
+        return loader.phase
     }
 }
 

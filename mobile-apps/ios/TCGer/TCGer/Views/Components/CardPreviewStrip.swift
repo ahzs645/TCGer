@@ -11,7 +11,7 @@ struct CardPreviewStrip: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Array(cards.prefix(maxPreview))) { card in
-                        CardPreviewImage(imageUrl: card.imageUrlSmall)
+                        CardPreviewImage(card: card)
                     }
 
                     if cards.count > maxPreview {
@@ -25,10 +25,13 @@ struct CardPreviewStrip: View {
 }
 
 struct CardPreviewImage: View {
-    let imageUrl: String?
+    let card: CollectionCard
 
     var body: some View {
-        CachedAsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+        CachedAsyncImage(
+            url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
+            tcg: card.tcg
+        ) { phase in
             switch phase {
             case .empty:
                 Rectangle()

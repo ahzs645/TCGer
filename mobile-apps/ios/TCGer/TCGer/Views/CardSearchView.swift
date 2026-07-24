@@ -429,7 +429,7 @@ private struct CardCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Card Image
-            CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+            CachedAsyncImage(card: card) { phase in
                 switch phase {
                 case .empty:
                     Rectangle()

@@ -16,7 +16,7 @@ struct MarkAsSoldSheet: View {
                 Section {
                     HStack(spacing: 12) {
                         if let url = card.imageUrlSmall ?? card.imageUrl, let imageURL = URL(string: url) {
-                            CachedAsyncImage(url: imageURL) { phase in
+                            CachedAsyncImage(url: imageURL, tcg: card.tcg) { phase in
                                 if case .success(let image) = phase {
                                     image.resizable().aspectRatio(contentMode: .fit)
                                 } else {

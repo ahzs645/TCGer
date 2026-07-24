@@ -31,7 +31,7 @@ struct CardImagePreviewView: View {
                 // Card image
                 Group {
                     if let url = imageURL {
-                        CachedAsyncImage(url: url) { phase in
+                        CachedAsyncImage(url: url, tcg: card.tcg) { phase in
                             switch phase {
                             case .success(let image):
                                 image

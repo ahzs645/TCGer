@@ -303,7 +303,7 @@ private struct CardPreviewRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+            CachedAsyncImage(card: card) { phase in
                 switch phase {
                 case .success(let image):
                     image

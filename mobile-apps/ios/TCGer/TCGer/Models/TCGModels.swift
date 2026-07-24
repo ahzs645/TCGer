@@ -723,7 +723,7 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
 }
 
 // MARK: - Game Filter
-enum TCGGame: String, CaseIterable, Identifiable {
+nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
     case all = "all"
     case yugioh = "yugioh"
     case magic = "magic"

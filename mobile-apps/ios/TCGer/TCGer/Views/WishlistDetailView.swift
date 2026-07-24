@@ -306,7 +306,10 @@ private struct WishlistCardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+            CachedAsyncImage(
+                url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
+                tcg: card.tcg
+            ) { phase in
                 switch phase {
                 case .success(let image):
                     image

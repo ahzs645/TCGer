@@ -9,6 +9,7 @@ struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var catalogStore = CatalogStore.shared
     @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
@@ -25,6 +26,8 @@ struct SettingsView: View {
     @State private var exportData: Data?
     @State private var exportFilename: String?
     @State private var gameDisableBlock: GameDisableBlock?
+    @State private var pendingCatalogInstall: TCGGame?
+    @State private var catalogInstallError: String?
 
     /// True when running fully on-device with no backend server.
     private var isLocalMode: Bool {
@@ -174,6 +177,7 @@ struct SettingsView: View {
                             )
                         }
                     }
+                    catalogInstallProgress(for: .yugioh)
 
                     Toggle(isOn: $environmentStore.enabledMagic) {
                         HStack {
@@ -195,6 +199,7 @@ struct SettingsView: View {
                             )
                         }
                     }
+                    catalogInstallProgress(for: .magic)
 
                     Toggle(isOn: $environmentStore.enabledPokemon) {
                         HStack {
@@ -216,10 +221,23 @@ struct SettingsView: View {
                             )
                         }
                     }
+                    catalogInstallProgress(for: .pokemon)
                 } header: {
                     Text("TCG Modules")
                 } footer: {
                     Text("Enable or disable specific TCG games in search and analytics. A game can't be turned off while you still have its cards in a collection or wishlist.")
+                }
+
+                if isLocalMode {
+                    Section {
+                        ForEach(TCGGame.catalogGames) { game in
+                            CatalogInstallRow(game: game, catalogStore: catalogStore)
+                        }
+                    } header: {
+                        Text("Card Catalogs")
+                    } footer: {
+                        Text("Catalogs are already bundled with this build, so installing is quick. Removing one frees its in-memory catalog and never removes your saved cards.")
+                    }
                 }
 
                 // Display Preferences Section
@@ -590,6 +608,39 @@ struct SettingsView: View {
             } message: { block in
                 Text(block.message)
             }
+            .alert(
+                pendingCatalogInstall.map {
+                    "Install the \($0.displayName) catalog (\(catalogPromptSize(for: $0)))?"
+                } ?? "Install catalog?",
+                isPresented: Binding(
+                    get: { pendingCatalogInstall != nil },
+                    set: { if !$0 { pendingCatalogInstall = nil } }
+                ),
+                presenting: pendingCatalogInstall
+            ) { game in
+                Button("Not Now", role: .cancel) {
+                    pendingCatalogInstall = nil
+                }
+                Button("Install") {
+                    pendingCatalogInstall = nil
+                    installCatalog(game)
+                }
+            } message: { game in
+                Text("The catalog is bundled with the app, so installation is quick and uses no network data.")
+            }
+            .alert(
+                "Catalog Installation Failed",
+                isPresented: Binding(
+                    get: { catalogInstallError != nil },
+                    set: { if !$0 { catalogInstallError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {
+                    catalogInstallError = nil
+                }
+            } message: {
+                Text(catalogInstallError ?? "The catalog could not be installed.")
+            }
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
                     .environmentObject(environmentStore)
@@ -702,6 +753,12 @@ private extension SettingsView {
                 enabledMagic: game == "magic" ? true : nil,
                 enabledPokemon: game == "pokemon" ? true : nil
             )
+            if isLocalMode,
+               let catalogGame = TCGGame(rawValue: game),
+               case .notInstalled = catalogStore.installState(for: catalogGame),
+               catalogStore.isAvailable(catalogGame) {
+                pendingCatalogInstall = catalogGame
+            }
             return
         }
 
@@ -735,6 +792,39 @@ private extension SettingsView {
         case "magic": environmentStore.enabledMagic = enabled
         case "pokemon": environmentStore.enabledPokemon = enabled
         default: break
+        }
+    }
+
+    @ViewBuilder
+    func catalogInstallProgress(for game: TCGGame) -> some View {
+        if catalogStore.installingGames.contains(game) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Installing \(game.displayName) catalog")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text((catalogStore.installProgress[game] ?? 0).formatted(.percent.precision(.fractionLength(0))))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(value: catalogStore.installProgress[game] ?? 0)
+            }
+        }
+    }
+
+    func catalogPromptSize(for game: TCGGame) -> String {
+        guard let metadata = catalogStore.metadata(for: game) else { return "size unavailable" }
+        return "~\(metadata.formattedCatalogSize)"
+    }
+
+    func installCatalog(_ game: TCGGame) {
+        Task {
+            do {
+                try await catalogStore.install(game)
+            } catch {
+                catalogInstallError = error.localizedDescription
+            }
         }
     }
 

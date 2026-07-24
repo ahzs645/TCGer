@@ -9,8 +9,10 @@ struct ServerSetupView: View {
     }
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @StateObject private var catalogStore = CatalogStore.shared
     @State private var selectedMode: ConnectionMode = .onDevice
     @State private var localInput: String = ServerConfiguration.defaultLocalBaseURL
+    @State private var showingCatalogSetup = false
 
     private var sanitizedLocalInput: String {
         ServerConfiguration.sanitized(localInput)
@@ -37,50 +39,92 @@ struct ServerSetupView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("How do you want to use TCGer?")) {
-                Picker("Mode", selection: $selectedMode) {
-                    ForEach(ConnectionMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            if selectedMode == .onDevice {
-                Section(
-                    header: Text("On This Phone"),
-                    footer: Text("Keep your whole collection on this device. No account, server, or internet connection required — everything is stored locally and stays private to you.")
-                ) {
-                    Label("No account or server needed", systemImage: "iphone")
-                        .foregroundColor(.secondary)
-                    Label("Works fully offline", systemImage: "wifi.slash")
-                        .foregroundColor(.secondary)
-                }
+            if showingCatalogSetup {
+                catalogSetup
             } else {
-                Section(
-                    header: Text("Server"),
-                    footer: Text("Connect to your own TCG Manager server to sync across devices. Examples: http://localhost:3001, http://10.1.15.216:3001, or http://192.168.1.50:31452")
-                ) {
-                    TextField("Server URL", text: $localInput)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                }
-            }
-
-            Section {
-                Button(action: saveConfiguration) {
-                    Label(
-                        selectedMode == .onDevice ? "Start on This Phone" : "Connect",
-                        systemImage: "checkmark.circle.fill"
-                    )
-                }
-                .disabled(!isValid)
+                connectionSetup
             }
         }
-        .navigationTitle("Get Started")
+        .navigationTitle(showingCatalogSetup ? "Offline Catalogs" : "Get Started")
         .onAppear(perform: populateFromStore)
+    }
+
+    @ViewBuilder
+    private var connectionSetup: some View {
+        Section(header: Text("How do you want to use TCGer?")) {
+            Picker("Mode", selection: $selectedMode) {
+                ForEach(ConnectionMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+
+        if selectedMode == .onDevice {
+            Section(
+                header: Text("On This Phone"),
+                footer: Text("Keep your whole collection on this device. No account, server, or internet connection required — everything is stored locally and stays private to you.")
+            ) {
+                Label("No account or server needed", systemImage: "iphone")
+                    .foregroundColor(.secondary)
+                Label("Works fully offline", systemImage: "wifi.slash")
+                    .foregroundColor(.secondary)
+            }
+        } else {
+            Section(
+                header: Text("Server"),
+                footer: Text("Connect to your own TCG Manager server to sync across devices. Examples: http://localhost:3001, http://10.1.15.216:3001, or http://192.168.1.50:31452")
+            ) {
+                TextField("Server URL", text: $localInput)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+            }
+        }
+
+        Section {
+            Button(action: saveConfiguration) {
+                Label(
+                    selectedMode == .onDevice ? "Start on This Phone" : "Connect",
+                    systemImage: "checkmark.circle.fill"
+                )
+            }
+            .disabled(!isValid)
+        }
+    }
+
+    @ViewBuilder
+    private var catalogSetup: some View {
+        Section {
+            Text("Add any bundled game catalogs you want for full offline card search and set browsing. Installation is quick and uses no network data.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+
+        Section {
+            ForEach(environmentStore.enabledGames) { game in
+                CatalogInstallRow(game: game, catalogStore: catalogStore)
+            }
+        } header: {
+            Text("Card Catalogs")
+        }
+
+        Section {
+            Button {
+                finishOnDeviceSetup()
+            } label: {
+                Label("Continue to TCGer", systemImage: "checkmark.circle.fill")
+            }
+
+            Button("Skip for Now") {
+                finishOnDeviceSetup()
+            }
+
+            Button("Back") {
+                showingCatalogSetup = false
+            }
+        }
     }
 
     private func populateFromStore() {
@@ -95,15 +139,19 @@ struct ServerSetupView: View {
     }
 
     private func saveConfiguration() {
-        environmentStore.serverConfiguration = resolvedConfiguration
-
         switch selectedMode {
         case .onDevice:
-            environmentStore.enableDemoSession(force: true)
+            showingCatalogSetup = true
         case .server:
+            environmentStore.serverConfiguration = resolvedConfiguration
             environmentStore.signOut()
             environmentStore.isServerVerified = false
             environmentStore.appSettings = nil
         }
+    }
+
+    private func finishOnDeviceSetup() {
+        environmentStore.serverConfiguration = .demoLocal
+        environmentStore.enableDemoSession(force: true)
     }
 }

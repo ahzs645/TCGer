@@ -45,6 +45,7 @@
 			membershipExceptions = (
 				plan.md,
 				CardScanner/README.md,
+				Resources/Catalogs/README.md,
 				Resources/ScanIndex/README.md,
 			);
 			target = C3C831E22EA9F37F007FE5BA /* TCGer */;

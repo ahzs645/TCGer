@@ -378,7 +378,7 @@ private struct CardCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                CachedAsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+                CachedAsyncImage(card: card) { phase in
                     switch phase {
                     case .empty:
                         Rectangle()

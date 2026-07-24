@@ -424,29 +424,32 @@ final class DemoStore {
     }
 
     func searchCards(query: String, game: TCGGame) -> CardSearchResponse {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return CardSearchResponse(cards: [], total: 0)
         }
 
-        let results = catalogCards().filter { card in
-            let gameMatches = game == .all || card.tcg.lowercased() == game.rawValue
-            guard gameMatches else { return false }
-            return card.name.lowercased().contains(trimmed)
-                || (card.setName?.lowercased().contains(trimmed) ?? false)
-                || (card.setCode?.lowercased().contains(trimmed) ?? false)
+        let store = CatalogStore.shared
+        var base = store.search(query: trimmed, tcg: game, limit: 200).map(store.card(from:))
+        base.append(contentsOf: searchCatalog.filter { card in
+            guard gameMatches(card.tcg, requested: game),
+                  !store.isLoaded(TCGGame(rawValue: card.tcg) ?? .all) else {
+                return false
+            }
+            return cardMatchesSearch(card, query: trimmed)
+        })
+
+        let owned = ownedCatalogCards().filter { card in
+            gameMatches(card.tcg, requested: game) && cardMatchesSearch(card, query: trimmed)
         }
+        let results = Array(catalogCards(base: base, owned: owned).prefix(200))
 
         return CardSearchResponse(cards: results, total: results.count)
     }
 
-    /// The local card catalog available offline: the bundled seed catalog plus
-    /// every distinct card the user already owns. This keeps search and the set
-    /// browser reflecting what is actually on the phone instead of returning
-    /// nothing in local mode. A fuller bundled catalog can be merged here later.
-    private func catalogCards() -> [Card] {
-        var result = searchCatalog
-        var seenIds = Set(result.map { $0.id })
+    private func ownedCatalogCards() -> [Card] {
+        var result: [Card] = []
+        var seenIds: Set<String> = []
         for collection in collections {
             for cc in collection.cards {
                 let id = cc.externalId ?? cc.cardId
@@ -473,42 +476,113 @@ final class DemoStore {
     }
 
     func getSets(tcg: String?) -> [TcgSet] {
-        var sets: [String: TcgSet] = [:]
-        var counts: [String: Int] = [:]
-        for card in catalogCards() {
-            guard let code = card.setCode, !code.isEmpty else { continue }
-            if let tcg, card.tcg != tcg { continue }
-            let id = "\(card.tcg)-\(code)"
-            counts[id, default: 0] += 1
-            if sets[id] == nil {
-                sets[id] = TcgSet(
-                    code: code,
-                    name: card.setName ?? code,
-                    tcg: card.tcg,
-                    releaseDate: nil,
-                    totalCards: nil,
-                    iconUrl: nil,
-                    logoUrl: nil
+        let store = CatalogStore.shared
+        let requestedGames: [TCGGame]
+        if let tcg, let game = TCGGame(rawValue: tcg) {
+            requestedGames = [game]
+        } else {
+            requestedGames = TCGGame.catalogGames.filter(store.isEnabled)
+        }
+
+        var setsByID: [String: TcgSet] = [:]
+        for game in requestedGames {
+            if store.isLoaded(game) {
+                for set in store.sets(tcg: game) {
+                    let mapped = store.tcgSet(from: set, tcg: game)
+                    setsByID[mapped.id] = mapped
+                }
+            } else {
+                addCardSets(
+                    from: searchCatalog.filter { $0.tcg == game.rawValue },
+                    to: &setsByID,
+                    preserveExisting: true
                 )
             }
         }
-        return sets.values
-            .map { set in
-                TcgSet(
-                    code: set.code,
-                    name: set.name,
-                    tcg: set.tcg,
-                    releaseDate: set.releaseDate,
-                    totalCards: counts["\(set.tcg)-\(set.code)"],
-                    iconUrl: set.iconUrl,
-                    logoUrl: set.logoUrl
-                )
-            }
-            .sorted { $0.name < $1.name }
+
+        addCardSets(
+            from: ownedCatalogCards().filter { card in
+                requestedGames.contains { $0.rawValue == card.tcg }
+            },
+            to: &setsByID,
+            preserveExisting: true
+        )
+        return setsByID.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     func getSetCards(tcg: String, setCode: String) -> [Card] {
-        catalogCards().filter { $0.tcg == tcg && $0.setCode == setCode }
+        guard let game = TCGGame(rawValue: tcg), CatalogStore.shared.isEnabled(game) else {
+            return []
+        }
+        let store = CatalogStore.shared
+        let base: [Card]
+        if store.isLoaded(game) {
+            base = store.cards(inSet: setCode, tcg: game).map(store.card(from:))
+        } else {
+            base = searchCatalog.filter { $0.tcg == tcg && $0.setCode == setCode }
+        }
+        let owned = ownedCatalogCards().filter { $0.tcg == tcg && $0.setCode == setCode }
+        return catalogCards(base: base, owned: owned)
+    }
+
+    private func gameMatches(_ cardTCG: String, requested game: TCGGame) -> Bool {
+        guard let cardGame = TCGGame(rawValue: cardTCG),
+              CatalogStore.shared.isEnabled(cardGame) else {
+            return false
+        }
+        return game == .all || cardGame == game
+    }
+
+    private func cardMatchesSearch(_ card: Card, query: String) -> Bool {
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        return card.name.range(of: query, options: options) != nil
+            || card.setName?.range(of: query, options: options) != nil
+            || card.setCode?.range(of: query, options: options) != nil
+    }
+
+    /// Merge a catalog slice with local collection cards. Catalog order is the
+    /// base, while an owned card with the same external id replaces that row.
+    private func catalogCards(base: [Card], owned: [Card]) -> [Card] {
+        var result = base
+        var indexByID = Dictionary(uniqueKeysWithValues: base.enumerated().map { ($1.id, $0) })
+        for card in owned {
+            if let index = indexByID[card.id] {
+                result[index] = card
+            } else {
+                indexByID[card.id] = result.count
+                result.append(card)
+            }
+        }
+        return result
+    }
+
+    private func addCardSets(
+        from cards: [Card],
+        to setsByID: inout [String: TcgSet],
+        preserveExisting: Bool
+    ) {
+        let grouped = Dictionary(grouping: cards) { card in
+            "\(card.tcg)-\(card.setCode ?? "")"
+        }
+        for cards in grouped.values {
+            guard let first = cards.first,
+                  let code = first.setCode,
+                  !code.isEmpty else {
+                continue
+            }
+            let set = TcgSet(
+                code: code,
+                name: first.setName ?? code,
+                tcg: first.tcg,
+                releaseDate: nil,
+                totalCards: cards.count,
+                iconUrl: nil,
+                logoUrl: nil
+            )
+            if !preserveExisting || setsByID[set.id] == nil {
+                setsByID[set.id] = set
+            }
+        }
     }
 
     func exportCollections(format: String) -> Data {

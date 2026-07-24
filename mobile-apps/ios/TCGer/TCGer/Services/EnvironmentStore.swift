@@ -220,6 +220,11 @@ final class EnvironmentStore: ObservableObject {
                 }
                 storage.set(false, forKey: Keys.verified)
                 self.isServerVerified = false
+                Task(priority: .utility) {
+                    await CatalogStore.shared.configure(
+                        enabledGames: configuration.isDemoMode ? self.enabledGames : []
+                    )
+                }
             }
             .store(in: &cancellables)
 
@@ -263,6 +268,10 @@ final class EnvironmentStore: ObservableObject {
             .dropFirst()
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledYugioh)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .yugioh
+                )
             }
             .store(in: &cancellables)
 
@@ -270,6 +279,10 @@ final class EnvironmentStore: ObservableObject {
             .dropFirst()
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledMagic)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .magic
+                )
             }
             .store(in: &cancellables)
 
@@ -277,6 +290,10 @@ final class EnvironmentStore: ObservableObject {
             .dropFirst()
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledPokemon)
+                CatalogStore.shared.setEnabled(
+                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    for: .pokemon
+                )
             }
             .store(in: &cancellables)
 
@@ -348,6 +365,12 @@ final class EnvironmentStore: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        Task(priority: .utility) {
+            await CatalogStore.shared.configure(
+                enabledGames: serverConfiguration.isDemoMode ? enabledGames : []
+            )
+        }
     }
 
     var enabledGames: [TCGGame] {
