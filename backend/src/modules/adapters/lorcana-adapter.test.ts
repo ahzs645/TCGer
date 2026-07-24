@@ -59,12 +59,13 @@ describe('LorcanaAdapter contract', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('maps results, nested digital images, nullable fields, and exact printing IDs', async () => {
+  test('maps results to retrievable external IDs while preserving opaque printing IDs', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ results: [card] }));
     const cards = await new LorcanaAdapter().searchCards('Elsa');
     expect(cards).toEqual([
       expect.objectContaining({
-        id: 'crd_elsa',
+        id: '11:125',
+        baseExternalId: '11:125',
         name: 'Elsa - Concerned Sister',
         printingKey: 'lorcana:crd_elsa',
         artworkId: 'crd_elsa',
@@ -75,6 +76,21 @@ describe('LorcanaAdapter contract', () => {
       })
     ]);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('unique=prints');
+  });
+
+  test('round-trips a search result through the documented set/collector route', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ results: [card] }))
+      .mockResolvedValueOnce(jsonResponse(card));
+
+    const [searchResult] = await new LorcanaAdapter().searchCards('Elsa');
+    await expect(new LorcanaAdapter().fetchCardById(searchResult.id)).resolves.toEqual(
+      expect.objectContaining({
+        id: searchResult.id,
+        printingKey: 'lorcana:crd_elsa'
+      })
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('/cards/11/125');
   });
 
   test('validates the documented results envelope', async () => {
@@ -90,9 +106,19 @@ describe('LorcanaAdapter contract', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/cards/11/125');
   });
 
-  test('does not call the undocumented opaque-ID route', async () => {
-    await expect(new LorcanaAdapter().fetchCardById('crd_elsa')).resolves.toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+  test('round-trips a legacy opaque ID through search and filters by exact ID', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ results: [{ ...card, id: 'crd_other' }, card] })
+    );
+    await expect(new LorcanaAdapter().fetchCardById('crd_elsa')).resolves.toEqual(
+      expect.objectContaining({
+        id: '11:125',
+        printingKey: 'lorcana:crd_elsa'
+      })
+    );
+    const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(requestUrl.pathname).toBe('/v0/cards/search');
+    expect(requestUrl.searchParams.get('q')).toBe('crd_elsa');
   });
 
   test('validates the sets results envelope', async () => {

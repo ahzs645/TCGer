@@ -138,7 +138,21 @@ export class LorcanaAdapter implements TcgAdapter {
 
   async fetchCardById(externalId: string): Promise<CardDTO | null> {
     const reference = externalId.trim().replace(/^lorcana:/, '');
-    if (!reference || reference.startsWith('crd_')) return null;
+    if (!reference) return null;
+
+    if (reference.startsWith('crd_')) {
+      const url = new URL(`${API_ROOT}/cards/search`);
+      url.searchParams.set('q', reference);
+      url.searchParams.set('unique', 'prints');
+      const response = await rateLimitedFetch(url.toString());
+      if (response.status === 404) return null;
+      if (!response.ok) throw upstreamError('legacy card lookup', response.status);
+      const card = parseSearch(await response.json(), 'legacy card lookup').find(
+        (candidate) => candidate.id === reference
+      );
+      return card ? this.mapCard(card) : null;
+    }
+
     const separator = reference.includes('/') ? '/' : ':';
     const [setCode, collectorNumber, ...extra] = reference.split(separator);
     if (!setCode || !collectorNumber || extra.length > 0) return null;
@@ -194,18 +208,22 @@ export class LorcanaAdapter implements TcgAdapter {
 
   private mapCard(card: LorcastCard): CardDTO {
     const images = card.image_uris?.digital ?? card.image_uris ?? {};
+    const setCode = card.set?.code?.trim();
+    const collectorNumber = card.collector_number?.trim();
+    const externalId =
+      setCode && collectorNumber ? `${setCode}:${collectorNumber}` : card.id;
     const printingKey = `lorcana:${card.id}`;
     return {
-      id: card.id,
+      id: externalId,
       tcg: this.game,
-      baseExternalId: card.id,
+      baseExternalId: externalId,
       printingKey,
       artworkId: card.id,
       name: card.version ? `${card.name} - ${card.version}` : card.name,
-      setCode: card.set?.code ?? undefined,
+      setCode: setCode ?? undefined,
       setName: card.set?.name ?? undefined,
       rarity: card.rarity ?? undefined,
-      collectorNumber: card.collector_number ?? undefined,
+      collectorNumber: collectorNumber ?? undefined,
       releasedAt: card.released_at ?? card.set?.released_at ?? undefined,
       language: card.lang ?? undefined,
       imageUrl: images.large ?? images.normal ?? images.small ?? undefined,

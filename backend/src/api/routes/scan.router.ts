@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { promises as fs } from 'node:fs';
 
 import {
   scanCardImage,
@@ -37,6 +38,17 @@ function unsupportedScannerTcg(res: Response) {
     error: 'BAD_REQUEST',
     message: 'Unsupported scanner TCG. Supported values: magic, pokemon, yugioh.',
   });
+}
+
+async function cleanupUploadedFile(file: { path: string } | undefined): Promise<void> {
+  if (!file) return;
+  try {
+    await fs.unlink(file.path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
 }
 
 function parseBooleanLike(value: unknown): boolean {
@@ -235,10 +247,11 @@ scanRouter.post(
     const authReq = req as AuthRequest;
     const body = (req.body ?? {}) as Record<string, unknown>;
     const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    const file = req.file;
     if (tcg && !isScannerTcg(tcg)) {
+      await cleanupUploadedFile(file);
       return unsupportedScannerTcg(res);
     }
-    const file = req.file;
     if (!file) {
       return res.status(400).json({
         error: 'BAD_REQUEST',
@@ -246,83 +259,78 @@ scanRouter.post(
       });
     }
 
-    const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
-    const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
-    const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
-    const scanEngine = parseScanEngine(body.scanEngine);
-
-    if (body.scanEngine !== undefined && !scanEngine) {
-      return res.status(400).json({
-        error: 'BAD_REQUEST',
-        message: 'scanEngine must be one of: automatic, phash, embedding',
-      });
-    }
-
-    if (scanEngine === 'embedding' && tcg && tcg !== 'pokemon') {
-      return res.status(400).json({
-        error: 'BAD_REQUEST',
-        message: 'Embedding scan mode currently supports only pokemon.',
-      });
-    }
-
-    // Read the uploaded file into a buffer for processing
-    const fs = await import('node:fs');
-    const imageBuffer = fs.readFileSync(file.path);
-
-    let result;
     try {
-      result = await scanCardImage(imageBuffer, tcg, { engine: scanEngine ?? 'automatic' });
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === 'EmbeddingScanConfigurationError' ||
-          error.message.includes('Embedding scan mode is not configured'))
-      ) {
-        return res.status(503).json({
-          error: 'NOT_CONFIGURED',
-          message: error.message,
+      const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
+      const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
+      const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
+      const scanEngine = parseScanEngine(body.scanEngine);
+
+      if (body.scanEngine !== undefined && !scanEngine) {
+        return res.status(400).json({
+          error: 'BAD_REQUEST',
+          message: 'scanEngine must be one of: automatic, phash, embedding',
         });
       }
 
-      throw error;
-    }
-    let debugCapture = null;
-    let debugCaptureError: string | null = null;
+      if (scanEngine === 'embedding' && tcg && tcg !== 'pokemon') {
+        return res.status(400).json({
+          error: 'BAD_REQUEST',
+          message: 'Embedding scan mode currently supports only pokemon.',
+        });
+      }
 
-    if (saveDebugCapture) {
+      const imageBuffer = await fs.readFile(file.path);
+
+      let result;
       try {
-        const savedCapture = await createCardScanDebugCapture({
-          viewerId: authReq.user!.id,
-          file,
-          imageBuffer,
-          result,
-          requestedTcg: tcg,
-          captureSource,
-          notes: captureNotes,
-          userAgent: req.get('user-agent') ?? null,
-        });
-        debugCapture = serializeDebugCapture(savedCapture, authReq);
+        result = await scanCardImage(imageBuffer, tcg, { engine: scanEngine ?? 'automatic' });
       } catch (error) {
-        debugCaptureError =
-          error instanceof Error ? error.message : 'Unable to save the debug capture.';
+        if (
+          error instanceof Error &&
+          (error.name === 'EmbeddingScanConfigurationError' ||
+            error.message.includes('Embedding scan mode is not configured'))
+        ) {
+          return res.status(503).json({
+            error: 'NOT_CONFIGURED',
+            message: error.message,
+          });
+        }
+
+        throw error;
       }
-    }
+      let debugCapture = null;
+      let debugCaptureError: string | null = null;
 
-    // Clean up the uploaded temp file when it was not retained as a debug capture.
-    try {
-      fs.unlinkSync(file.path);
-    } catch {
-      // ignore cleanup errors
-    }
+      if (saveDebugCapture) {
+        try {
+          const savedCapture = await createCardScanDebugCapture({
+            viewerId: authReq.user!.id,
+            file,
+            imageBuffer,
+            result,
+            requestedTcg: tcg,
+            captureSource,
+            notes: captureNotes,
+            userAgent: req.get('user-agent') ?? null,
+          });
+          debugCapture = serializeDebugCapture(savedCapture, authReq);
+        } catch (error) {
+          debugCaptureError =
+            error instanceof Error ? error.message : 'Unable to save the debug capture.';
+        }
+      }
 
-    res.json({
-      match: result.bestMatch,
-      candidates: result.candidates,
-      hash: result.hashGenerated,
-      meta: result.meta,
-      debugCapture,
-      debugCaptureError,
-    });
+      return res.json({
+        match: result.bestMatch,
+        candidates: result.candidates,
+        hash: result.hashGenerated,
+        meta: result.meta,
+        debugCapture,
+        debugCaptureError,
+      });
+    } finally {
+      await cleanupUploadedFile(file);
+    }
   }),
 );
 

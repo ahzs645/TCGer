@@ -36,6 +36,7 @@ import type {
   CollectionCardCopy,
   TcgSet,
   UpdateCardInput,
+  UserPreferences,
 } from "@tcg/api-types";
 
 /* ------------------------------------------------------------------ */
@@ -70,20 +71,13 @@ function notFound(msg = "Not found"): Promise<Response> {
 const DEMO_USER_ID = "demo-user-001";
 
 function demoAuthUser() {
-  const { profile } = store();
+  const { profile, getPreferences } = store();
   return {
     id: DEMO_USER_ID,
     email: profile.email,
     username: profile.username,
     isAdmin: true,
-    showCardNumbers: true,
-    showPricing: true,
-    enabledYugioh: true,
-    enabledMagic: true,
-    enabledPokemon: true,
-    enabledOnepiece: false,
-    enabledLorcana: false,
-    enabledDragonball: false,
+    ...getPreferences(),
   };
 }
 
@@ -738,16 +732,7 @@ function handleUsers(
     segments[1] === "preferences" &&
     method === "GET"
   ) {
-    return json({
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true,
-      enabledOnepiece: false,
-      enabledLorcana: false,
-      enabledDragonball: false,
-    });
+    return json(store().getPreferences());
   }
 
   // PATCH /users/me/preferences
@@ -756,18 +741,8 @@ function handleUsers(
     segments[1] === "preferences" &&
     method === "PATCH"
   ) {
-    const data = body as Record<string, unknown>;
-    return json({
-      showCardNumbers: true,
-      showPricing: true,
-      enabledYugioh: true,
-      enabledMagic: true,
-      enabledPokemon: true,
-      enabledOnepiece: false,
-      enabledLorcana: false,
-      enabledDragonball: false,
-      ...data,
-    });
+    const data = body as Partial<UserPreferences>;
+    return json(store().updatePreferences(data));
   }
 
   return notFound();

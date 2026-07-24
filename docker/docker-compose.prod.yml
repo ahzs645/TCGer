@@ -134,6 +134,10 @@ services:
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
       POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
+      ONEPIECE_API_BASE_URL: ${ONEPIECE_API_BASE_URL:-https://optcgapi.com/api}
+      LORCANA_API_BASE_URL: ${LORCANA_API_BASE_URL:-https://api.lorcast.com/v0}
+      APITCG_API_BASE_URL: ${APITCG_API_BASE_URL:-https://api.apitcg.com}
+      APITCG_API_KEY: ${APITCG_API_KEY:-}
     depends_on:
       convex-backend:
         condition: service_started

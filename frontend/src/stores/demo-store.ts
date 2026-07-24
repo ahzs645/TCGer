@@ -7,6 +7,7 @@ import type {
   CollectionCardCopy,
   UpdateCardInput,
   TcgCode,
+  UserPreferences,
 } from "@tcg/api-types";
 
 /* ------------------------------------------------------------------ */
@@ -92,6 +93,18 @@ export interface DemoProfile {
   username: string;
   email: string;
 }
+
+export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
+  showCardNumbers: true,
+  showPricing: true,
+  enabledYugioh: true,
+  enabledMagic: true,
+  enabledPokemon: true,
+  enabledOnepiece: false,
+  enabledLorcana: false,
+  enabledDragonball: false,
+  defaultGame: null,
+};
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -326,6 +339,7 @@ function seedWishlists(): DemoWishlist[] {
 interface DemoState {
   initialized: boolean;
   profile: DemoProfile;
+  preferences: UserPreferences;
   binders: DemoBinder[];
   wishlists: DemoWishlist[];
 
@@ -335,6 +349,8 @@ interface DemoState {
 
   // Profile
   updateProfile: (data: Partial<DemoProfile>) => void;
+  updatePreferences: (data: Partial<UserPreferences>) => UserPreferences;
+  getPreferences: () => UserPreferences;
 
   // Binders
   addBinder: (name: string, color?: string) => string;
@@ -377,6 +393,7 @@ export const useDemoStore = create<DemoState>()(
     (set, get) => ({
       initialized: false,
       profile: { username: "Demo User", email: "demo@tcger.app" },
+      preferences: DEFAULT_DEMO_PREFERENCES,
       binders: [],
       wishlists: [],
 
@@ -393,6 +410,7 @@ export const useDemoStore = create<DemoState>()(
         set({
           initialized: true,
           profile: { username: "Demo User", email: "demo@tcger.app" },
+          preferences: DEFAULT_DEMO_PREFERENCES,
           binders: seedBinders(),
           wishlists: seedWishlists(),
         });
@@ -403,6 +421,21 @@ export const useDemoStore = create<DemoState>()(
           profile: { ...state.profile, ...data },
         }));
       },
+
+      updatePreferences: (data) => {
+        const preferences = {
+          ...DEFAULT_DEMO_PREFERENCES,
+          ...get().preferences,
+          ...data,
+        };
+        set({ preferences });
+        return preferences;
+      },
+
+      getPreferences: () => ({
+        ...DEFAULT_DEMO_PREFERENCES,
+        ...get().preferences,
+      }),
 
       // ── Binders ──────────────────────────────────────────────────
       addBinder: (name, color) => {
