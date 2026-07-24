@@ -1,7 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
+import type { ParamsDictionary } from 'express-serve-static-core';
+import type { ParsedQs } from 'qs';
 
 export const asyncHandler =
-  <Params = unknown, ResBody = unknown, ReqBody = unknown, ReqQuery = unknown>(
+  <
+    Params = ParamsDictionary,
+    ResBody = unknown,
+    ReqBody = any,
+    ReqQuery = ParsedQs
+  >(
     handler: (
       req: Request<Params, ResBody, ReqBody, ReqQuery>,
       res: Response<ResBody>

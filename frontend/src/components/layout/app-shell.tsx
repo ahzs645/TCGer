@@ -7,6 +7,7 @@ import {
   Heart,
   LayoutDashboard,
   Search,
+  LibraryBig,
   Table,
   Layers,
   DollarSign,
@@ -20,6 +21,7 @@ import {
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
 export const secondaryNavigation = [
+  { href: "/sets", label: "Sets", icon: LibraryBig },
   { href: "/decks", label: "Decks", icon: Layers },
   { href: "/prices", label: "Prices", icon: DollarSign },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

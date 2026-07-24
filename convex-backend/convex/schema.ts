@@ -1,5 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { richCardMetadataFields } from "./lib/cardMetadata";
+import {
+  collectionEntryAuditSnapshotValidator,
+  collectionMutationKindValidator
+} from "./lib/auditValidators";
 
 const binderKind = v.union(v.literal("binder"), v.literal("library"));
 const tcgCode = v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon"));
@@ -45,6 +50,11 @@ export default defineSchema({
     name: v.string(),
     description: v.optional(v.string()),
     colorHex: v.optional(v.string()),
+    containerType: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    associatedTcg: v.optional(tcgCode),
+    associatedSetCode: v.optional(v.string()),
+    associatedSetName: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number()
   })
@@ -52,9 +62,23 @@ export default defineSchema({
     .index("by_user_kind", ["userId", "kind"])
     .index("by_user_name", ["userId", "name"]),
 
-  cards: defineTable({
+  cardIdentities: defineTable({
     tcg: tcgCode,
     externalId: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_tcg_external", ["tcg", "externalId"])
+    .index("by_name", ["name"]),
+
+  cards: defineTable({
+    tcg: tcgCode,
+    identityId: v.optional(v.id("cardIdentities")),
+    externalId: v.string(),
+    baseExternalId: v.optional(v.string()),
+    printingKey: v.optional(v.string()),
+    artworkId: v.optional(v.string()),
     name: v.string(),
     setCode: v.optional(v.string()),
     setName: v.optional(v.string()),
@@ -63,10 +87,15 @@ export default defineSchema({
     releasedAt: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     imageUrlSmall: v.optional(v.string()),
+    ...richCardMetadataFields,
     createdAt: v.number(),
     updatedAt: v.number()
   })
     .index("by_tcg_external", ["tcg", "externalId"])
+    .index("by_external_id", ["externalId"])
+    .index("by_identity", ["identityId"])
+    .index("by_tcg_base_external", ["tcg", "baseExternalId"])
+    .index("by_tcg_printing_key", ["tcg", "printingKey"])
     .index("by_name", ["name"]),
 
   tags: defineTable({
@@ -95,14 +124,17 @@ export default defineSchema({
     externalId: v.string(),
     tcg: tcgCode,
     name: v.string(),
+    baseExternalId: v.optional(v.string()),
+    printingKey: v.optional(v.string()),
+    artworkId: v.optional(v.string()),
     setCode: v.optional(v.string()),
     setName: v.optional(v.string()),
     rarity: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     imageUrlSmall: v.optional(v.string()),
-    setSymbolUrl: v.optional(v.string()),
-    setLogoUrl: v.optional(v.string()),
     collectorNumber: v.optional(v.string()),
+    releasedAt: v.optional(v.string()),
+    ...richCardMetadataFields,
     notes: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number()
@@ -123,8 +155,19 @@ export default defineSchema({
     serialNumber: v.optional(v.string()),
     acquiredAt: v.optional(v.string()),
     isFoil: v.optional(v.boolean()),
+    finishCode: v.optional(v.string()),
+    finishLabel: v.optional(v.string()),
+    edition: v.optional(v.string()),
+    stamp: v.optional(v.string()),
+    isSealedPromo: v.optional(v.boolean()),
+    isOversized: v.optional(v.boolean()),
+    isPeelOff: v.optional(v.boolean()),
     isSigned: v.optional(v.boolean()),
     isAltered: v.optional(v.boolean()),
+    gradingCompany: v.optional(v.string()),
+    gradingScore: v.optional(v.string()),
+    certNumber: v.optional(v.string()),
+    storageLocation: v.optional(v.string()),
     imageUrls: v.optional(v.array(v.string())),
     imageStorageIds: v.optional(v.array(v.id("_storage"))),
     createdAt: v.number(),
@@ -132,6 +175,7 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_binder", ["binderId"])
+    .index("by_binder_and_card", ["binderId", "cardId"])
     .index("by_user_card", ["userId", "cardId"]),
 
   collectionEntryTags: defineTable({
@@ -141,5 +185,24 @@ export default defineSchema({
   })
     .index("by_entry", ["entryId"])
     .index("by_tag", ["tagId"])
-    .index("by_entry_tag", ["entryId", "tagId"])
+    .index("by_entry_tag", ["entryId", "tagId"]),
+
+  collectionMutationAudits: defineTable({
+    userId: v.id("users"),
+    actorId: v.string(),
+    operationKind: collectionMutationKindValidator,
+    binderId: v.optional(v.id("binders")),
+    cardName: v.optional(v.string()),
+    affectedCopies: v.number(),
+    summary: v.string(),
+    beforeState: v.array(collectionEntryAuditSnapshotValidator),
+    afterState: v.array(collectionEntryAuditSnapshotValidator),
+    sourceAuditId: v.optional(v.id("collectionMutationAudits")),
+    idempotencyKey: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_operation_kind", ["userId", "operationKind"])
+    .index("by_source_audit", ["sourceAuditId"])
+    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"])
 });

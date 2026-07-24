@@ -1,5 +1,36 @@
 import Foundation
 
+enum JSONValue: Codable, Hashable, Sendable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: JSONValue])
+    case array([JSONValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        else if let value = try? container.decode(Double.self) { self = .number(value) }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let value = try? container.decode([String: JSONValue].self) { self = .object(value) }
+        else { self = .array(try container.decode([JSONValue].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .bool(let value): try container.encode(value)
+        case .object(let value): try container.encode(value)
+        case .array(let value): try container.encode(value)
+        case .null: try container.encodeNil()
+        }
+    }
+}
+
 // MARK: - Pokemon TCG Enums
 
 /// Pokemon TCG tournament format legality
@@ -139,6 +170,134 @@ struct PokedexEntry: Codable, Hashable, Sendable, Comparable {
     }
 }
 
+struct PokemonVariantFlags: Codable, Hashable, Sendable {
+    let normal: Bool?
+    let reverse: Bool?
+    let holo: Bool?
+    let firstEdition: Bool?
+}
+
+struct PokemonPrintMetadata: Codable, Hashable, Sendable {
+    let tcgdexId: String?
+    let tcgdexImage: String?
+    let variants: PokemonVariantFlags?
+    let finishes: [String]?
+    let category: String?
+    let regulationMark: String?
+    let language: String?
+    let formatLegality: PokemonFormatLegality?
+    let dexEntries: [PokedexEntry]?
+    let region: String?
+}
+
+struct PokemonFinishOption: Identifiable, Hashable, Sendable {
+    let code: String
+    let label: String
+    var id: String { code }
+
+    static let catalog: [PokemonFinishOption] = [
+        .init(code: "normal", label: "Non-Holo"),
+        .init(code: "holo", label: "Holofoil"),
+        .init(code: "reverse", label: "Reverse Holofoil"),
+        .init(code: "cosmos", label: "Cosmos Holofoil"),
+        .init(code: "crackedIce", label: "Cracked Ice Holofoil"),
+        .init(code: "confetti", label: "Confetti Holofoil"),
+        .init(code: "crosshatch", label: "Crosshatch Holofoil"),
+        .init(code: "mirror", label: "Mirror Holofoil"),
+        .init(code: "waterWeb", label: "Water Web Holofoil"),
+        .init(code: "galaxy", label: "Galaxy Holofoil"),
+        .init(code: "star", label: "Star Holofoil"),
+        .init(code: "stardust", label: "Stardust Holofoil"),
+        .init(code: "rainbow", label: "Rainbow Holofoil"),
+        .init(code: "shattered", label: "Shattered Holofoil"),
+        .init(code: "sunPillar", label: "Sun Pillar Holofoil"),
+        .init(code: "line", label: "Line Holofoil"),
+        .init(code: "vertical", label: "Vertical Holofoil"),
+        .init(code: "dot", label: "Dot Holofoil"),
+        .init(code: "pixel", label: "Pixel Holofoil"),
+        .init(code: "parallel", label: "Parallel Holofoil"),
+        .init(code: "pokeball", label: "Poké Ball Holofoil"),
+        .init(code: "masterball", label: "Master Ball Holofoil"),
+        .init(code: "etched", label: "Etched Foil"),
+        .init(code: "textured", label: "Textured Holofoil"),
+        .init(code: "glitter", label: "Glitter Holofoil")
+    ]
+
+    static func label(for code: String) -> String {
+        if let known = catalog.first(where: {
+            $0.code.caseInsensitiveCompare(code) == .orderedSame
+        }) {
+            return known.label
+        }
+        switch code.lowercased() {
+        case "nonholo": return "Non-Holo"
+        case "firstedition": return "1st Edition"
+        case "foil": return "Foil"
+        default:
+            return code
+                .replacingOccurrences(of: "_", with: " ")
+                .replacingOccurrences(of: "-", with: " ")
+                .capitalized
+        }
+    }
+
+    static func options(for card: Card, includeCatalog: Bool = false) -> [PokemonFinishOption] {
+        var options: [PokemonFinishOption] = []
+        func append(_ code: String) {
+            guard !options.contains(where: { $0.code.caseInsensitiveCompare(code) == .orderedSame }) else { return }
+            options.append(.init(code: code, label: label(for: code)))
+        }
+        card.pokemonPrint?.finishes?.forEach(append)
+        if card.pokemonPrint?.variants?.normal == true { append("normal") }
+        if card.pokemonPrint?.variants?.reverse == true { append("reverse") }
+        if card.pokemonPrint?.variants?.holo == true { append("holo") }
+        if includeCatalog {
+            catalog.forEach { append($0.code) }
+        }
+        return options
+    }
+
+    static func isFoil(_ code: String?) -> Bool {
+        guard let normalized = code?.lowercased(), !normalized.isEmpty else { return false }
+        return !["normal", "nonholo", "firstedition"].contains(normalized)
+    }
+}
+
+struct CardCopyVariant: Codable, Hashable, Sendable {
+    var finishCode: String?
+    var finishLabel: String?
+    var edition: String?
+    var stamp: String?
+    var isSealedPromo: Bool
+    var isOversized: Bool
+    var isPeelOff: Bool
+
+    nonisolated static let empty = CardCopyVariant(
+        finishCode: nil,
+        finishLabel: nil,
+        edition: nil,
+        stamp: nil,
+        isSealedPromo: false,
+        isOversized: false,
+        isPeelOff: false
+    )
+
+    var isFoil: Bool { PokemonFinishOption.isFoil(finishCode) }
+
+    var labels: [String] {
+        var values: [String] = []
+        if let finishCode {
+            values.append(finishLabel ?? PokemonFinishOption.label(for: finishCode))
+        }
+        if let edition, !edition.isEmpty { values.append(edition) }
+        if let stamp, !stamp.isEmpty { values.append("\(stamp) stamp") }
+        if isSealedPromo { values.append("Sealed promo") }
+        if isOversized { values.append("Oversized") }
+        if isPeelOff { values.append("Peel-off") }
+        return values
+    }
+}
+
 // MARK: - Card Number Parsing
 struct CardNumberInfo: Sendable {
     let cardNumber: String
@@ -234,6 +393,19 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     let formatLegality: PokemonFormatLegality?
     let dexEntries: [PokedexEntry]?
     let region: String?
+    let setSymbolUrl: String?
+    let setLogoUrl: String?
+    let regulationMark: String?
+    let language: String?
+    let pokemonPrint: PokemonPrintMetadata?
+    let attributes: [String: JSONValue]?
+    let provenance: JSONValue?
+    let legalityPeriods: [JSONValue]?
+    let evolution: JSONValue?
+    let functionalIdentity: JSONValue?
+    let baseExternalId: String?
+    let printingKey: String?
+    let artworkId: String?
 
     // Custom initializer with default values for Pokemon-specific fields
     init(
@@ -253,7 +425,20 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         types: [String]? = nil,
         formatLegality: PokemonFormatLegality? = nil,
         dexEntries: [PokedexEntry]? = nil,
-        region: String? = nil
+        region: String? = nil,
+        setSymbolUrl: String? = nil,
+        setLogoUrl: String? = nil,
+        regulationMark: String? = nil,
+        language: String? = nil,
+        pokemonPrint: PokemonPrintMetadata? = nil,
+        attributes: [String: JSONValue]? = nil,
+        provenance: JSONValue? = nil,
+        legalityPeriods: [JSONValue]? = nil,
+        evolution: JSONValue? = nil,
+        functionalIdentity: JSONValue? = nil,
+        baseExternalId: String? = nil,
+        printingKey: String? = nil,
+        artworkId: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -272,6 +457,19 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         self.formatLegality = formatLegality
         self.dexEntries = dexEntries
         self.region = region
+        self.setSymbolUrl = setSymbolUrl
+        self.setLogoUrl = setLogoUrl
+        self.regulationMark = regulationMark
+        self.language = language
+        self.pokemonPrint = pokemonPrint
+        self.attributes = attributes
+        self.provenance = provenance
+        self.legalityPeriods = legalityPeriods
+        self.evolution = evolution
+        self.functionalIdentity = functionalIdentity
+        self.baseExternalId = baseExternalId
+        self.printingKey = printingKey
+        self.artworkId = artworkId
     }
 
     var displayName: String {
@@ -376,6 +574,24 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let notes: String?
     let collectorNumber: String?
     let copies: [CollectionCardCopy]
+    var releasedAt: String? = nil
+    var setSymbolUrl: String? = nil
+    var setLogoUrl: String? = nil
+    var regulationMark: String? = nil
+    var languageCode: String? = nil
+    var supertype: String? = nil
+    var formatLegality: PokemonFormatLegality? = nil
+    var dexEntries: [PokedexEntry]? = nil
+    var region: String? = nil
+    var pokemonPrint: PokemonPrintMetadata? = nil
+    var attributes: [String: JSONValue]? = nil
+    var provenance: JSONValue? = nil
+    var legalityPeriods: [JSONValue]? = nil
+    var evolution: JSONValue? = nil
+    var functionalIdentity: JSONValue? = nil
+    var baseExternalId: String? = nil
+    var printingKey: String? = nil
+    var artworkId: String? = nil
 
     var supportsPrintSelection: Bool {
         switch tcg.lowercased() {
@@ -395,6 +611,13 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     let serialNumber: String?
     let acquiredAt: String?
     let isFoil: Bool?
+    var finishCode: String? = nil
+    var finishLabel: String? = nil
+    var edition: String? = nil
+    var stamp: String? = nil
+    var isSealedPromo: Bool? = nil
+    var isOversized: Bool? = nil
+    var isPeelOff: Bool? = nil
     let isSigned: Bool?
     let isAltered: Bool?
     let imageUrls: [String]?
@@ -403,6 +626,18 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     let certNumber: String?
     let storageLocation: String?
     let tags: [CollectionCardTag]
+
+    var collectibleVariant: CardCopyVariant {
+        CardCopyVariant(
+            finishCode: finishCode ?? (isFoil == true ? "foil" : nil),
+            finishLabel: finishLabel,
+            edition: edition,
+            stamp: stamp,
+            isSealedPromo: isSealedPromo ?? false,
+            isOversized: isOversized ?? false,
+            isPeelOff: isPeelOff ?? false
+        )
+    }
 }
 
 struct CollectionCardTag: Identifiable, Codable, Hashable, Sendable {
@@ -556,6 +791,22 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     let owned: Bool
     let ownedQuantity: Int
     let createdAt: String
+    var releasedAt: String? = nil
+    var regulationMark: String? = nil
+    var language: String? = nil
+    var supertype: String? = nil
+    var formatLegality: PokemonFormatLegality? = nil
+    var dexEntries: [PokedexEntry]? = nil
+    var region: String? = nil
+    var pokemonPrint: PokemonPrintMetadata? = nil
+    var attributes: [String: JSONValue]? = nil
+    var provenance: JSONValue? = nil
+    var legalityPeriods: [JSONValue]? = nil
+    var evolution: JSONValue? = nil
+    var functionalIdentity: JSONValue? = nil
+    var baseExternalId: String? = nil
+    var printingKey: String? = nil
+    var artworkId: String? = nil
 }
 
 // MARK: - Sealed Products
@@ -582,6 +833,34 @@ struct SealedInventoryItem: Identifiable, Codable, Hashable, Sendable {
     let purchaseDate: String?
     let notes: String?
     let createdAt: String
+}
+
+struct SealedLedgerCard: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let collectionId: String?
+    let externalId: String
+    let tcg: String
+    let cardName: String
+    let quantity: Int
+    let status: String
+    let liveValue: Double
+    let realizedProceeds: Double
+    let soldAt: String?
+}
+
+struct SealedOpeningLedger: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let inventoryId: String
+    let productName: String
+    let openedQuantity: Int
+    let openedAt: String
+    let invested: Double
+    let liveValue: Double
+    let realizedProceeds: Double
+    let profitLoss: Double
+    let activeCopies: Int
+    let soldCopies: Int
+    let cards: [SealedLedgerCard]
 }
 
 // MARK: - Finance / Transactions

@@ -1,5 +1,12 @@
 import { prisma } from '../../lib/prisma';
-import type { CreateSealedInventoryInput, UpdateSealedInventoryInput } from '@tcg/api-types';
+import type {
+  CreateSealedInventoryInput,
+  CreateSealedOpeningInput,
+  RecordOpenedCardSaleInput,
+  SealedOpeningLedger,
+  UpdateSealedInventoryInput
+} from '@tcg/api-types';
+import { isUsablePrice } from '../pricing/pricing.service';
 
 // ---------------------------------------------------------------------------
 // Sealed Products Catalog
@@ -83,13 +90,213 @@ export async function updateSealedInventory(userId: string, itemId: string, inpu
 }
 
 export async function deleteSealedInventory(userId: string, itemId: string) {
-  const existing = await prisma.sealedInventory.findFirst({ where: { id: itemId, userId } });
+  const existing = await prisma.sealedInventory.findFirst({
+    where: { id: itemId, userId },
+    include: { _count: { select: { openings: true } } },
+  });
   if (!existing) {
     const error = new Error('Sealed inventory item not found') as Error & { status: number };
     error.status = 404;
     throw error;
   }
+  if (existing._count.openings > 0) {
+    const error = new Error(
+      'Inventory with opening history cannot be deleted',
+    ) as Error & { status: number };
+    error.status = 409;
+    throw error;
+  }
   await prisma.sealedInventory.delete({ where: { id: itemId } });
+}
+
+function collectionLiveValue(collection: {
+  quantity: number;
+  price: unknown;
+  finishCode: string | null;
+  card: {
+    priceHistory: Array<{ price: unknown; finishCode: string | null }>;
+  };
+}) {
+  const manual = collection.price == null ? undefined : Number(collection.price);
+  if (isUsablePrice(manual)) return manual * collection.quantity;
+  const matching = collection.card.priceHistory.find(
+    (entry) => (entry.finishCode ?? null) === (collection.finishCode ?? null)
+  );
+  const matchingValue = matching?.price == null ? undefined : Number(matching.price);
+  if (isUsablePrice(matchingValue)) return matchingValue * collection.quantity;
+  const fallback = collection.card.priceHistory.find((entry) =>
+    isUsablePrice(Number(entry.price))
+  );
+  return fallback?.price == null ? 0 : Number(fallback.price) * collection.quantity;
+}
+
+export async function createSealedOpening(
+  userId: string,
+  inventoryId: string,
+  input: CreateSealedOpeningInput
+) {
+  return prisma.$transaction(async (tx) => {
+    const inventory = await tx.sealedInventory.findFirst({
+      where: { id: inventoryId, userId }
+    });
+    if (!inventory) {
+      const error = new Error('Sealed inventory item not found') as Error & { status: number };
+      error.status = 404;
+      throw error;
+    }
+    if (inventory.quantity < input.openedQuantity) {
+      const error = new Error('Opened quantity exceeds sealed inventory') as Error & {
+        status: number;
+      };
+      error.status = 409;
+      throw error;
+    }
+
+    const uniqueCollectionIds = [...new Set(input.collectionIds)];
+    const collections = uniqueCollectionIds.length
+      ? await tx.collection.findMany({
+          where: { id: { in: uniqueCollectionIds }, userId },
+          include: { card: { include: { tcgGame: true } }, sealedOpeningLinks: true }
+        })
+      : [];
+    if (collections.length !== uniqueCollectionIds.length) {
+      const error = new Error('One or more collection copies were not found') as Error & {
+        status: number;
+      };
+      error.status = 404;
+      throw error;
+    }
+    if (collections.some((collection) => collection.sealedOpeningLinks.length > 0)) {
+      const error = new Error('A collection copy is already linked to an opening') as Error & {
+        status: number;
+      };
+      error.status = 409;
+      throw error;
+    }
+
+    const opening = await tx.sealedOpening.create({
+      data: {
+        userId,
+        sealedInventoryId: inventoryId,
+        openedQuantity: input.openedQuantity,
+        openedAt: input.openedAt ? new Date(input.openedAt) : undefined,
+        notes: input.notes,
+        cards: {
+          create: collections.map((collection) => ({
+            collectionId: collection.id,
+            externalId: collection.card.externalId,
+            tcg: collection.card.tcgGame.code,
+            cardName: collection.card.name,
+            quantity: collection.quantity
+          }))
+        }
+      }
+    });
+    await tx.sealedInventory.update({
+      where: { id: inventoryId },
+      data: { quantity: { decrement: input.openedQuantity } }
+    });
+    return opening;
+  });
+}
+
+export async function recordOpenedCardSale(
+  userId: string,
+  openedCardId: string,
+  input: RecordOpenedCardSaleInput
+) {
+  const card = await prisma.sealedOpenedCard.findFirst({
+    where: { id: openedCardId, opening: { userId } }
+  });
+  if (!card) {
+    const error = new Error('Opened card ledger entry not found') as Error & {
+      status: number;
+    };
+    error.status = 404;
+    throw error;
+  }
+  return prisma.sealedOpenedCard.update({
+    where: { id: card.id },
+    data: {
+      status: 'sold',
+      realizedProceeds: input.proceeds,
+      soldAt: input.soldAt ? new Date(input.soldAt) : new Date()
+    }
+  });
+}
+
+export async function getSealedOpeningLedgers(
+  userId: string
+): Promise<SealedOpeningLedger[]> {
+  const openings = await prisma.sealedOpening.findMany({
+    where: { userId },
+    include: {
+      inventory: { include: { product: true } },
+      cards: {
+        include: {
+          collection: {
+            include: {
+              card: {
+                include: {
+                  priceHistory: {
+                    orderBy: { recordedAt: 'desc' },
+                    take: 20
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    orderBy: { openedAt: 'desc' }
+  });
+
+  return openings.map((opening) => {
+    const invested =
+      Number(opening.inventory.purchasePrice ?? 0) * opening.openedQuantity;
+    const cards = opening.cards.map((card) => {
+      const liveValue =
+        card.status === 'active' && card.collection
+          ? collectionLiveValue(card.collection)
+          : 0;
+      return {
+        id: card.id,
+        collectionId: card.collectionId ?? undefined,
+        externalId: card.externalId,
+        tcg: card.tcg,
+        cardName: card.cardName,
+        quantity: card.quantity,
+        status: card.status === 'sold' ? ('sold' as const) : ('active' as const),
+        liveValue,
+        realizedProceeds: Number(card.realizedProceeds ?? 0),
+        soldAt: card.soldAt?.toISOString()
+      };
+    });
+    const liveValue = cards.reduce((sum, card) => sum + card.liveValue, 0);
+    const realizedProceeds = cards.reduce(
+      (sum, card) => sum + card.realizedProceeds,
+      0
+    );
+    return {
+      id: opening.id,
+      inventoryId: opening.sealedInventoryId,
+      productName: opening.inventory.product.name,
+      openedQuantity: opening.openedQuantity,
+      openedAt: opening.openedAt.toISOString(),
+      invested,
+      liveValue,
+      realizedProceeds,
+      profitLoss: liveValue + realizedProceeds - invested,
+      activeCopies: cards
+        .filter((card) => card.status === 'active')
+        .reduce((sum, card) => sum + card.quantity, 0),
+      soldCopies: cards
+        .filter((card) => card.status === 'sold')
+        .reduce((sum, card) => sum + card.quantity, 0),
+      cards
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

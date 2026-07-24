@@ -7,8 +7,107 @@ import type {
   WishlistCardResponse
 } from '@tcg/api-types';
 import type { TcgCode } from '@tcg/api-types';
+import type { Prisma, WishlistCard } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
+
+const WISHLIST_CARD_SPECIFIC_FIELDS = [
+  'baseExternalId',
+  'printingKey',
+  'artworkId',
+  'releasedAt',
+  'regulationMark',
+  'language',
+  'supertype',
+  'formatLegality',
+  'dexEntries',
+  'region',
+  'pokemonPrint',
+  'attributes',
+  'provenance',
+  'legalityPeriods',
+  'evolution',
+  'functionalIdentity'
+] as const satisfies ReadonlyArray<keyof AddWishlistCardInput>;
+
+function compactJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function buildWishlistCardSpecificSnapshot(
+  input: AddWishlistCardInput
+): Prisma.InputJsonValue | undefined {
+  const snapshot: Partial<AddWishlistCardInput> = {};
+  for (const field of WISHLIST_CARD_SPECIFIC_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      Object.assign(snapshot, { [field]: value });
+    }
+  }
+  return Object.keys(snapshot).length ? compactJsonValue(snapshot) : undefined;
+}
+
+function asJsonObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function mergeWishlistCardSpecificSnapshot(
+  current: Prisma.JsonValue | null | undefined,
+  input: AddWishlistCardInput
+): Prisma.InputJsonValue | undefined {
+  const next = buildWishlistCardSpecificSnapshot(input);
+  if (!next) {
+    return current ? compactJsonValue(current) : undefined;
+  }
+  return compactJsonValue({
+    ...asJsonObject(current),
+    ...asJsonObject(next)
+  });
+}
+
+function mapWishlistCard(
+  card: WishlistCard,
+  ownedQuantity: number
+): WishlistCardResponse {
+  const metadata = asJsonObject(card.tcgSpecific);
+  return {
+    id: card.id,
+    externalId: card.externalId,
+    baseExternalId: metadata.baseExternalId as string | undefined,
+    printingKey: metadata.printingKey as string | undefined,
+    artworkId: metadata.artworkId as string | undefined,
+    tcg: card.tcg as TcgCode,
+    name: card.name,
+    setCode: card.setCode ?? undefined,
+    setName: card.setName ?? undefined,
+    rarity: card.rarity ?? undefined,
+    imageUrl: card.imageUrl ?? undefined,
+    imageUrlSmall: card.imageUrlSmall ?? undefined,
+    setSymbolUrl: card.setSymbolUrl ?? undefined,
+    setLogoUrl: card.setLogoUrl ?? undefined,
+    collectorNumber: card.collectorNumber ?? undefined,
+    releasedAt: metadata.releasedAt as string | undefined,
+    regulationMark: metadata.regulationMark as string | undefined,
+    language: metadata.language as string | undefined,
+    supertype: metadata.supertype as string | undefined,
+    formatLegality: metadata.formatLegality as WishlistCardResponse['formatLegality'],
+    dexEntries: metadata.dexEntries as WishlistCardResponse['dexEntries'],
+    region: metadata.region as string | undefined,
+    pokemonPrint: metadata.pokemonPrint as WishlistCardResponse['pokemonPrint'],
+    attributes: metadata.attributes as Record<string, unknown> | undefined,
+    provenance: metadata.provenance as WishlistCardResponse['provenance'],
+    legalityPeriods: metadata.legalityPeriods as WishlistCardResponse['legalityPeriods'],
+    evolution: metadata.evolution as WishlistCardResponse['evolution'],
+    functionalIdentity: metadata.functionalIdentity as WishlistCardResponse['functionalIdentity'],
+    notes: card.notes ?? undefined,
+    owned: ownedQuantity > 0,
+    ownedQuantity,
+    createdAt: card.createdAt.toISOString()
+  };
+}
 
 export async function getUserWishlists(userId: string): Promise<WishlistResponse[]> {
   const wishlists = await prisma.wishlist.findMany({
@@ -39,24 +138,7 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
     const cards: WishlistCardResponse[] = wishlist.cards.map((card) => {
       const ownershipKey = `${card.tcg}:${card.externalId}`;
       const ownedQuantity = ownershipMap.get(ownershipKey) ?? 0;
-      return {
-        id: card.id,
-        externalId: card.externalId,
-        tcg: card.tcg as TcgCode,
-        name: card.name,
-        setCode: card.setCode ?? undefined,
-        setName: card.setName ?? undefined,
-        rarity: card.rarity ?? undefined,
-        imageUrl: card.imageUrl ?? undefined,
-        imageUrlSmall: card.imageUrlSmall ?? undefined,
-        setSymbolUrl: card.setSymbolUrl ?? undefined,
-        setLogoUrl: card.setLogoUrl ?? undefined,
-        collectorNumber: card.collectorNumber ?? undefined,
-        notes: card.notes ?? undefined,
-        owned: ownedQuantity > 0,
-        ownedQuantity,
-        createdAt: card.createdAt.toISOString()
-      };
+      return mapWishlistCard(card, ownedQuantity);
     });
 
     const totalCards = cards.length;
@@ -108,24 +190,7 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
   const cards: WishlistCardResponse[] = wishlist.cards.map((card) => {
     const ownershipKey = `${card.tcg}:${card.externalId}`;
     const ownedQuantity = ownershipMap.get(ownershipKey) ?? 0;
-    return {
-      id: card.id,
-      externalId: card.externalId,
-      tcg: card.tcg as TcgCode,
-      name: card.name,
-      setCode: card.setCode ?? undefined,
-      setName: card.setName ?? undefined,
-      rarity: card.rarity ?? undefined,
-      imageUrl: card.imageUrl ?? undefined,
-      imageUrlSmall: card.imageUrlSmall ?? undefined,
-      setSymbolUrl: card.setSymbolUrl ?? undefined,
-      setLogoUrl: card.setLogoUrl ?? undefined,
-      collectorNumber: card.collectorNumber ?? undefined,
-      notes: card.notes ?? undefined,
-      owned: ownedQuantity > 0,
-      ownedQuantity,
-      createdAt: card.createdAt.toISOString()
-    };
+    return mapWishlistCard(card, ownedQuantity);
   });
 
   const totalCards = cards.length;
@@ -224,8 +289,38 @@ export async function addCardToWishlist(
     throw new Error('Wishlist not found');
   }
 
-  const card = await prisma.wishlistCard.create({
-    data: {
+  const existing = await prisma.wishlistCard.findUnique({
+    where: {
+      wishlistId_externalId_tcg: {
+        wishlistId,
+        externalId: input.externalId,
+        tcg: input.tcg
+      }
+    },
+    select: { tcgSpecific: true }
+  });
+  const card = await prisma.wishlistCard.upsert({
+    where: {
+      wishlistId_externalId_tcg: {
+        wishlistId,
+        externalId: input.externalId,
+        tcg: input.tcg
+      }
+    },
+    update: {
+      name: input.name,
+      setCode: input.setCode,
+      setName: input.setName,
+      rarity: input.rarity,
+      imageUrl: input.imageUrl,
+      imageUrlSmall: input.imageUrlSmall,
+      setSymbolUrl: input.setSymbolUrl,
+      setLogoUrl: input.setLogoUrl,
+      collectorNumber: input.collectorNumber,
+      tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, input),
+      notes: input.notes
+    },
+    create: {
       wishlistId,
       externalId: input.externalId,
       tcg: input.tcg,
@@ -238,6 +333,7 @@ export async function addCardToWishlist(
       setSymbolUrl: input.setSymbolUrl,
       setLogoUrl: input.setLogoUrl,
       collectorNumber: input.collectorNumber,
+      tcgSpecific: buildWishlistCardSpecificSnapshot(input),
       notes: input.notes
     }
   });
@@ -254,24 +350,7 @@ export async function addCardToWishlist(
     select: { quantity: true }
   });
 
-  return {
-    id: card.id,
-    externalId: card.externalId,
-    tcg: card.tcg as TcgCode,
-    name: card.name,
-    setCode: card.setCode ?? undefined,
-    setName: card.setName ?? undefined,
-    rarity: card.rarity ?? undefined,
-    imageUrl: card.imageUrl ?? undefined,
-    imageUrlSmall: card.imageUrlSmall ?? undefined,
-    setSymbolUrl: card.setSymbolUrl ?? undefined,
-    setLogoUrl: card.setLogoUrl ?? undefined,
-    collectorNumber: card.collectorNumber ?? undefined,
-    notes: card.notes ?? undefined,
-    owned: (owned?.quantity ?? 0) > 0,
-    ownedQuantity: owned?.quantity ?? 0,
-    createdAt: card.createdAt.toISOString()
-  };
+  return mapWishlistCard(card, owned?.quantity ?? 0);
 }
 
 export async function removeCardFromWishlist(
@@ -311,18 +390,36 @@ export async function addCardsToWishlist(
     throw new Error('Wishlist not found');
   }
 
-  // Insert cards in a transaction, skipping duplicates
-  await prisma.$transaction(
-    input.cards.map((card) =>
-      prisma.wishlistCard.upsert({
+  // Preserve rich fields that are omitted when a later import only refreshes
+  // the card's basic display snapshot.
+  await prisma.$transaction(async (tx) => {
+    for (const card of input.cards) {
+      const key = {
+        wishlistId,
+        externalId: card.externalId,
+        tcg: card.tcg
+      };
+      const existing = await tx.wishlistCard.findUnique({
+        where: { wishlistId_externalId_tcg: key },
+        select: { tcgSpecific: true }
+      });
+      await tx.wishlistCard.upsert({
         where: {
-          wishlistId_externalId_tcg: {
-            wishlistId,
-            externalId: card.externalId,
-            tcg: card.tcg
-          }
+          wishlistId_externalId_tcg: key
         },
-        update: {},
+        update: {
+          name: card.name,
+          setCode: card.setCode,
+          setName: card.setName,
+          rarity: card.rarity,
+          imageUrl: card.imageUrl,
+          imageUrlSmall: card.imageUrlSmall,
+          setSymbolUrl: card.setSymbolUrl,
+          setLogoUrl: card.setLogoUrl,
+          collectorNumber: card.collectorNumber,
+          tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, card),
+          notes: card.notes
+        },
         create: {
           wishlistId,
           externalId: card.externalId,
@@ -336,11 +433,12 @@ export async function addCardsToWishlist(
           setSymbolUrl: card.setSymbolUrl,
           setLogoUrl: card.setLogoUrl,
           collectorNumber: card.collectorNumber,
+          tcgSpecific: buildWishlistCardSpecificSnapshot(card),
           notes: card.notes
         }
-      })
-    )
-  );
+      });
+    }
+  });
 
   return getUserWishlist(userId, wishlistId);
 }

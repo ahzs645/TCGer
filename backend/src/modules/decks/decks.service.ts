@@ -1,5 +1,19 @@
 import { prisma } from '../../lib/prisma';
-import type { CreateDeckInput, UpdateDeckInput, AddDeckCardInput, UpdateDeckCardInput, DeckAnalysis } from '@tcg/api-types';
+import type { Prisma } from '@prisma/client';
+import type {
+  CreateDeckInput,
+  UpdateDeckInput,
+  AddDeckCardInput,
+  UpdateDeckCardInput,
+  DeckAnalysis,
+  DeckOwnershipResult
+} from '@tcg/api-types';
+import {
+  calculateMissingDeckCards,
+  inferYugiohZone,
+  resolveYugiohBaseId,
+  serializeYdk
+} from './yugioh-domain';
 
 // ---------------------------------------------------------------------------
 // Deck CRUD
@@ -17,7 +31,7 @@ export async function getUserDecks(userId: string) {
 export async function getDeck(userId: string, deckId: string) {
   const deck = await prisma.deck.findFirst({
     where: { id: deckId, userId },
-    include: { cards: { orderBy: { name: 'asc' } } }
+    include: { cards: { orderBy: [{ zone: 'asc' }, { name: 'asc' }] } }
   });
   if (!deck) {
     const error = new Error('Deck not found') as Error & { status: number };
@@ -69,13 +83,20 @@ export async function deleteDeck(userId: string, deckId: string) {
 // ---------------------------------------------------------------------------
 
 export async function addCardToDeck(userId: string, deckId: string, input: AddDeckCardInput) {
-  await getDeck(userId, deckId);
+  const deck = await getDeck(userId, deckId);
+  const zone =
+    input.zone ??
+    (deck.tcg === 'yugioh'
+      ? inferYugiohZone(input)
+      : input.isSideboard
+        ? 'side'
+        : 'main');
   const card = await prisma.deckCard.upsert({
     where: {
-      deckId_externalId_isSideboard: {
+      deckId_externalId_zone: {
         deckId,
         externalId: input.externalId,
-        isSideboard: input.isSideboard ?? false
+        zone
       }
     },
     create: {
@@ -84,13 +105,14 @@ export async function addCardToDeck(userId: string, deckId: string, input: AddDe
       tcg: input.tcg,
       name: input.name,
       quantity: input.quantity ?? 1,
+      zone,
       isCommander: input.isCommander ?? false,
-      isSideboard: input.isSideboard ?? false,
+      isSideboard: zone === 'side',
       imageUrl: input.imageUrl,
       imageUrlSmall: input.imageUrlSmall,
       setCode: input.setCode,
       setName: input.setName,
-      cardData: input.cardData ?? undefined
+      cardData: input.cardData as Prisma.InputJsonValue | undefined
     },
     update: {
       quantity: { increment: input.quantity ?? 1 }
@@ -101,19 +123,106 @@ export async function addCardToDeck(userId: string, deckId: string, input: AddDe
 
 export async function updateDeckCard(userId: string, deckId: string, cardId: string, input: UpdateDeckCardInput) {
   await getDeck(userId, deckId);
+  const existing = await prisma.deckCard.findFirst({ where: { id: cardId, deckId } });
+  if (!existing) {
+    const error = new Error('Deck card not found') as Error & { status: number };
+    error.status = 404;
+    throw error;
+  }
+  if (input.zone && input.zone !== existing.zone) {
+    const target = await prisma.deckCard.findUnique({
+      where: {
+        deckId_externalId_zone: {
+          deckId,
+          externalId: existing.externalId,
+          zone: input.zone
+        }
+      }
+    });
+    if (target) {
+      return prisma.$transaction(async (tx) => {
+        const merged = await tx.deckCard.update({
+          where: { id: target.id },
+          data: { quantity: { increment: input.quantity ?? existing.quantity } }
+        });
+        await tx.deckCard.delete({ where: { id: existing.id } });
+        return merged;
+      });
+    }
+  }
   return prisma.deckCard.update({
     where: { id: cardId },
     data: {
       ...(input.quantity !== undefined && { quantity: input.quantity }),
       ...(input.isCommander !== undefined && { isCommander: input.isCommander }),
-      ...(input.isSideboard !== undefined && { isSideboard: input.isSideboard })
+      ...(input.zone !== undefined && {
+        zone: input.zone,
+        isSideboard: input.zone === 'side'
+      }),
+      ...(input.zone === undefined && input.isSideboard !== undefined && {
+        isSideboard: input.isSideboard,
+        zone: input.isSideboard ? 'side' : existing.zone === 'side' ? 'main' : existing.zone
+      })
     }
   });
 }
 
 export async function removeDeckCard(userId: string, deckId: string, cardId: string) {
   await getDeck(userId, deckId);
-  await prisma.deckCard.delete({ where: { id: cardId } });
+  const result = await prisma.deckCard.deleteMany({ where: { id: cardId, deckId } });
+  if (!result.count) {
+    const error = new Error('Deck card not found') as Error & { status: number };
+    error.status = 404;
+    throw error;
+  }
+}
+
+export async function getDeckOwnership(
+  userId: string,
+  deckId: string
+): Promise<DeckOwnershipResult> {
+  const [deck, entries] = await Promise.all([
+    getDeck(userId, deckId),
+    prisma.collection.findMany({
+      where: { userId },
+      select: {
+        quantity: true,
+        card: {
+          select: {
+            externalId: true,
+            baseExternalId: true,
+            identity: { select: { externalId: true } }
+          }
+        }
+      }
+    })
+  ]);
+
+  const quantities = new Map<string, number>();
+  for (const entry of entries) {
+    const externalId =
+      entry.card.baseExternalId ?? entry.card.identity?.externalId ?? entry.card.externalId;
+    quantities.set(externalId, (quantities.get(externalId) ?? 0) + entry.quantity);
+  }
+  const owned = Array.from(quantities, ([externalId, quantity]) => ({ externalId, quantity }));
+  const missing = calculateMissingDeckCards(deck.cards, owned);
+  return {
+    owned,
+    missing,
+    missingCount: missing.reduce((sum, card) => sum + card.quantity, 0)
+  };
+}
+
+export async function exportDeckAsYdk(userId: string, deckId: string) {
+  const deck = await getDeck(userId, deckId);
+  if (deck.tcg !== 'yugioh') {
+    const error = new Error('YDK export is only available for Yu-Gi-Oh decks') as Error & {
+      status: number;
+    };
+    error.status = 400;
+    throw error;
+  }
+  return serializeYdk(deck.cards);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,14 +240,17 @@ export async function analyzeDeck(userId: string, deckId: string): Promise<DeckA
   let totalCmc = 0;
   let cmcCardCount = 0;
   let mainDeckCount = 0;
+  let extraDeckCount = 0;
   let sideboardCount = 0;
 
   for (const card of cards) {
     const qty = card.quantity;
     const data = (card.cardData as Record<string, unknown>) || {};
 
-    if (card.isSideboard) {
+    if (card.zone === 'side') {
       sideboardCount += qty;
+    } else if (card.zone === 'extra') {
+      extraDeckCount += qty;
     } else {
       mainDeckCount += qty;
     }
@@ -171,8 +283,9 @@ export async function analyzeDeck(userId: string, deckId: string): Promise<DeckA
   }
 
   return {
-    totalCards: mainDeckCount + sideboardCount,
+    totalCards: mainDeckCount + extraDeckCount + sideboardCount,
     mainDeckCount,
+    extraDeckCount,
     sideboardCount,
     manaCurve,
     colorDistribution,
@@ -201,6 +314,7 @@ function formatDeck(deck: any) {
       tcg: c.tcg,
       name: c.name,
       quantity: c.quantity,
+      zone: c.zone ?? (c.isSideboard ? 'side' : inferYugiohZone(c)),
       isCommander: c.isCommander,
       isSideboard: c.isSideboard,
       imageUrl: c.imageUrl,

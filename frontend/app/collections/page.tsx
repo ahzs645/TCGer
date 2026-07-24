@@ -4,6 +4,9 @@ import { Suspense } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CollectionView } from "@/components/collections/sandbox/collection-view";
+import { CollectionImportDialog } from "@/components/collections/collection-import-dialog";
+import { CollectionHistoryDialog } from "@/components/collections/collection-history-dialog";
+import { BulkAddDialog } from "@/components/collections/bulk-add-dialog";
 import { Badge } from "@/components/ui/badge";
 import { isConvexCollectionsBackend } from "@/lib/api/collections";
 
@@ -12,7 +15,7 @@ export default function CollectionsPage() {
     <AppShell data-oid="wa5m388">
       <div className="space-y-6" data-oid="14le6gh">
         <div className="space-y-2" data-oid="fgd97v.">
-          <div className="flex items-center gap-2" data-oid="miiae99">
+          <div className="flex flex-wrap items-center gap-2" data-oid="miiae99">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="atyfrma"
@@ -25,6 +28,11 @@ export default function CollectionsPage() {
             {isConvexCollectionsBackend && (
               <Badge data-oid="ejjsaov">Convex Native</Badge>
             )}
+            <div className="ml-auto flex items-center gap-2">
+              <BulkAddDialog />
+              <CollectionHistoryDialog />
+              <CollectionImportDialog />
+            </div>
           </div>
           <p className="text-sm text-muted-foreground" data-oid="sjfa4qn">
             Per-copy inventory manager powered by your live binder data.

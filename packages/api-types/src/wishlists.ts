@@ -1,5 +1,21 @@
 import { z } from 'zod';
-import type { TcgCode } from './cards';
+import { tcgCodeSchema, type TcgCode } from './cards';
+import {
+  cardFunctionalIdentitySchema,
+  cardLegalityPeriodSchema,
+  cardProvenanceSchema,
+  pokemonEvolutionSchema,
+  pokemonPrintMetadataSchema
+} from './cards';
+import { pokemonFormatLegalitySchema, pokedexEntrySchema } from './pokemon';
+import type {
+  CardFunctionalIdentity,
+  CardLegalityPeriod,
+  CardProvenance,
+  PokemonEvolution,
+  PokemonPrintMetadata
+} from './cards';
+import type { PokedexEntry, PokemonFormatLegality } from './pokemon';
 
 // ---------------------------------------------------------------------------
 // Request validation schemas
@@ -22,8 +38,11 @@ export const updateWishlistSchema = z.object({
 export type UpdateWishlistInput = z.infer<typeof updateWishlistSchema>;
 
 export const addWishlistCardSchema = z.object({
-  externalId: z.string().min(1, 'Card ID is required'),
-  tcg: z.string().min(1, 'TCG is required'),
+  externalId: z.string().trim().min(1, 'Card ID is required'),
+  baseExternalId: z.string().trim().min(1).optional(),
+  printingKey: z.string().trim().min(1).optional(),
+  artworkId: z.string().trim().min(1).optional(),
+  tcg: tcgCodeSchema,
   name: z.string().min(1, 'Card name is required'),
   setCode: z.string().optional(),
   setName: z.string().optional(),
@@ -33,6 +52,19 @@ export const addWishlistCardSchema = z.object({
   setSymbolUrl: z.string().optional(),
   setLogoUrl: z.string().optional(),
   collectorNumber: z.string().optional(),
+  releasedAt: z.string().optional(),
+  regulationMark: z.string().optional(),
+  language: z.string().optional(),
+  supertype: z.string().optional(),
+  formatLegality: pokemonFormatLegalitySchema.optional(),
+  dexEntries: z.array(pokedexEntrySchema).optional(),
+  region: z.string().optional(),
+  pokemonPrint: pokemonPrintMetadataSchema.optional(),
+  attributes: z.record(z.unknown()).optional(),
+  provenance: cardProvenanceSchema.optional(),
+  legalityPeriods: z.array(cardLegalityPeriodSchema).optional(),
+  evolution: pokemonEvolutionSchema.optional(),
+  functionalIdentity: cardFunctionalIdentitySchema.optional(),
   notes: z.string().optional()
 });
 export type AddWishlistCardInput = z.infer<typeof addWishlistCardSchema>;
@@ -49,6 +81,9 @@ export type AddWishlistCardsInput = z.infer<typeof addWishlistCardsSchema>;
 export interface WishlistCardResponse {
   id: string;
   externalId: string;
+  baseExternalId?: string;
+  printingKey?: string;
+  artworkId?: string;
   tcg: TcgCode;
   name: string;
   setCode?: string;
@@ -59,6 +94,19 @@ export interface WishlistCardResponse {
   setSymbolUrl?: string;
   setLogoUrl?: string;
   collectorNumber?: string;
+  releasedAt?: string;
+  regulationMark?: string;
+  language?: string;
+  supertype?: string;
+  formatLegality?: PokemonFormatLegality;
+  dexEntries?: PokedexEntry[];
+  region?: string;
+  pokemonPrint?: PokemonPrintMetadata;
+  attributes?: Record<string, unknown>;
+  provenance?: CardProvenance;
+  legalityPeriods?: CardLegalityPeriod[];
+  evolution?: PokemonEvolution;
+  functionalIdentity?: CardFunctionalIdentity;
   notes?: string;
   /** Whether this card exists in any of the user's collection binders */
   owned: boolean;

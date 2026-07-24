@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const createSealedInventorySchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().positive().default(1),
-  purchasePrice: z.number().optional(),
+  purchasePrice: z.number().finite().nonnegative().optional(),
   purchaseDate: z.string().datetime().optional(),
   notes: z.string().optional()
 });
@@ -15,13 +15,27 @@ export type CreateSealedInventoryInput = z.infer<typeof createSealedInventorySch
 
 export const updateSealedInventorySchema = z.object({
   quantity: z.number().int().positive().optional(),
-  purchasePrice: z.number().optional(),
+  purchasePrice: z.number().finite().nonnegative().optional(),
   purchaseDate: z.string().datetime().optional(),
   notes: z.string().optional()
 }).refine(data => Object.values(data).some(v => v !== undefined), {
   message: 'At least one field must be provided'
 });
 export type UpdateSealedInventoryInput = z.infer<typeof updateSealedInventorySchema>;
+
+export const createSealedOpeningSchema = z.object({
+  openedQuantity: z.number().int().positive().default(1),
+  collectionIds: z.array(z.string().uuid()).max(500).default([]),
+  openedAt: z.string().datetime().optional(),
+  notes: z.string().max(2_000).optional()
+});
+export type CreateSealedOpeningInput = z.infer<typeof createSealedOpeningSchema>;
+
+export const recordOpenedCardSaleSchema = z.object({
+  proceeds: z.number().finite().nonnegative(),
+  soldAt: z.string().datetime().optional()
+});
+export type RecordOpenedCardSaleInput = z.infer<typeof recordOpenedCardSaleSchema>;
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -61,4 +75,32 @@ export interface PackOpeningResult {
   }>;
   setCode: string;
   setName?: string;
+}
+
+export interface SealedLedgerCard {
+  id: string;
+  collectionId?: string;
+  externalId: string;
+  tcg: string;
+  cardName: string;
+  quantity: number;
+  status: 'active' | 'sold';
+  liveValue: number;
+  realizedProceeds: number;
+  soldAt?: string;
+}
+
+export interface SealedOpeningLedger {
+  id: string;
+  inventoryId: string;
+  productName: string;
+  openedQuantity: number;
+  openedAt: string;
+  invested: number;
+  liveValue: number;
+  realizedProceeds: number;
+  profitLoss: number;
+  activeCopies: number;
+  soldCopies: number;
+  cards: SealedLedgerCard[];
 }

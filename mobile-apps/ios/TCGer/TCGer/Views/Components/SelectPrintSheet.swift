@@ -142,6 +142,10 @@ private struct PrintRow: View {
             parts.append(rarity)
         }
 
+        if let regulationMark = print.regulationMark {
+            parts.append("Reg \(regulationMark)")
+        }
+
         if let releasedAt = print.releasedAt {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy"
@@ -168,6 +172,23 @@ private struct PrintRow: View {
                     Text(printDetails)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+
+                let finishes = PokemonFinishOption.options(for: print)
+                if !finishes.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(finishes) { finish in
+                                Text(finish.label)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.accentColor.opacity(0.12))
+                                    .foregroundColor(.accentColor)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
                 }
             }
 

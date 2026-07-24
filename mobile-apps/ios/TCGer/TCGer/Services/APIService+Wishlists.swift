@@ -18,6 +18,9 @@ extension APIService {
 
     private struct AddWishlistCardRequest: Encodable {
         let externalId: String
+        let baseExternalId: String?
+        let printingKey: String?
+        let artworkId: String?
         let tcg: String
         let name: String
         let setCode: String?
@@ -25,7 +28,22 @@ extension APIService {
         let rarity: String?
         let imageUrl: String?
         let imageUrlSmall: String?
+        let setSymbolUrl: String?
+        let setLogoUrl: String?
         let collectorNumber: String?
+        let releasedAt: String?
+        let regulationMark: String?
+        let language: String?
+        let supertype: String?
+        let formatLegality: PokemonFormatLegality?
+        let dexEntries: [PokedexEntry]?
+        let region: String?
+        let pokemonPrint: PokemonPrintMetadata?
+        let attributes: [String: JSONValue]?
+        let provenance: JSONValue?
+        let legalityPeriods: [JSONValue]?
+        let evolution: JSONValue?
+        let functionalIdentity: JSONValue?
         let notes: String?
     }
 
@@ -169,6 +187,9 @@ extension APIService {
         if config.isDemoMode { return try DemoStore.shared.addCardToWishlist(wishlistId: wishlistId, card: card) }
         let body = AddWishlistCardRequest(
             externalId: card.id,
+            baseExternalId: card.baseExternalId,
+            printingKey: card.printingKey,
+            artworkId: card.artworkId,
             tcg: card.tcg,
             name: card.name,
             setCode: card.setCode,
@@ -176,7 +197,22 @@ extension APIService {
             rarity: card.rarity,
             imageUrl: card.imageUrl,
             imageUrlSmall: card.imageUrlSmall,
+            setSymbolUrl: card.setSymbolUrl,
+            setLogoUrl: card.setLogoUrl,
             collectorNumber: card.collectorNumber,
+            releasedAt: card.releasedAt.map { ISO8601DateFormatter().string(from: $0) },
+            regulationMark: card.regulationMark,
+            language: card.language,
+            supertype: card.supertype,
+            formatLegality: card.formatLegality,
+            dexEntries: card.dexEntries,
+            region: card.region,
+            pokemonPrint: card.pokemonPrint,
+            attributes: card.attributes,
+            provenance: card.provenance,
+            legalityPeriods: card.legalityPeriods,
+            evolution: card.evolution,
+            functionalIdentity: card.functionalIdentity,
             notes: nil
         )
         let (data, response) = try await makeRequest(

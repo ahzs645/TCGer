@@ -12,6 +12,7 @@ struct EditCollectionCardSheet: View {
         let isFoil: Bool
         let isSigned: Bool
         let isAltered: Bool
+        let variant: CardCopyVariant
         let tags: [String]
         let selectedPrint: Card?
         let gradingCompany: String?
@@ -36,6 +37,12 @@ struct EditCollectionCardSheet: View {
     @State private var isFoil: Bool
     @State private var isSigned: Bool
     @State private var isAltered: Bool
+    @State private var finishCode: String
+    @State private var edition: String
+    @State private var stamp: String
+    @State private var isSealedPromo: Bool
+    @State private var isOversized: Bool
+    @State private var isPeelOff: Bool
     @State private var newTagLabel = ""
     @State private var isCreatingTag = false
     @State private var tagError: String?
@@ -51,6 +58,23 @@ struct EditCollectionCardSheet: View {
 
     private var supportsPrintSelection: Bool {
         card.supportsPrintSelection
+    }
+
+    private var finishOptions: [PokemonFinishOption] {
+        var options = PokemonFinishOption.catalog
+        if let selectedPrint {
+            for option in PokemonFinishOption.options(for: selectedPrint) where
+                !options.contains(where: { $0.code.caseInsensitiveCompare(option.code) == .orderedSame }) {
+                options.append(option)
+            }
+        }
+        if let metadata = card.pokemonPrint {
+            metadata.finishes?.forEach { code in
+                guard !options.contains(where: { $0.code.caseInsensitiveCompare(code) == .orderedSame }) else { return }
+                options.append(.init(code: code, label: PokemonFinishOption.label(for: code)))
+            }
+        }
+        return options
     }
 
     private var copyTitle: String? {
@@ -100,6 +124,12 @@ struct EditCollectionCardSheet: View {
         _isFoil = State(initialValue: copyDetails?.isFoil ?? false)
         _isSigned = State(initialValue: copyDetails?.isSigned ?? false)
         _isAltered = State(initialValue: copyDetails?.isAltered ?? false)
+        _finishCode = State(initialValue: copyDetails?.finishCode ?? (copyDetails?.isFoil == true ? "foil" : ""))
+        _edition = State(initialValue: copyDetails?.edition ?? "")
+        _stamp = State(initialValue: copyDetails?.stamp ?? "")
+        _isSealedPromo = State(initialValue: copyDetails?.isSealedPromo ?? false)
+        _isOversized = State(initialValue: copyDetails?.isOversized ?? false)
+        _isPeelOff = State(initialValue: copyDetails?.isPeelOff ?? false)
         _selectedTagIds = State(initialValue: Set(selectedTagIds))
         _localTags = State(initialValue: availableTags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending })
         _gradingCompany = State(initialValue: copyDetails?.gradingCompany ?? "")
@@ -187,7 +217,24 @@ struct EditCollectionCardSheet: View {
                                 imageUrlSmall: card.imageUrlSmall,
                                 price: card.price,
                                 collectorNumber: card.collectorNumber,
-                                releasedAt: nil
+                                releasedAt: nil,
+                                supertype: card.supertype,
+                                formatLegality: card.formatLegality,
+                                dexEntries: card.dexEntries,
+                                region: card.region,
+                                setSymbolUrl: card.setSymbolUrl,
+                                setLogoUrl: card.setLogoUrl,
+                                regulationMark: card.regulationMark,
+                                language: card.languageCode,
+                                pokemonPrint: card.pokemonPrint,
+                                attributes: card.attributes,
+                                provenance: card.provenance,
+                                legalityPeriods: card.legalityPeriods,
+                                evolution: card.evolution,
+                                functionalIdentity: card.functionalIdentity,
+                                baseExternalId: card.baseExternalId,
+                                printingKey: card.printingKey,
+                                artworkId: card.artworkId
                             )
                             showingPrintSelection = true
                         } label: {
@@ -240,8 +287,22 @@ struct EditCollectionCardSheet: View {
                 }
 
                 Section {
-                    Toggle(isOn: $isFoil) {
-                        Label("Foil", systemImage: "sparkles")
+                    if card.tcg.lowercased() == "pokemon" {
+                        Picker("Finish", selection: $finishCode) {
+                            Text("Not specified").tag("")
+                            ForEach(finishOptions) { finish in
+                                Text(finish.label).tag(finish.code)
+                            }
+                        }
+                        TextField("Edition (e.g. 1st Edition)", text: $edition)
+                        TextField("Stamp (e.g. Prerelease, Staff)", text: $stamp)
+                        Toggle("Sealed promo", isOn: $isSealedPromo)
+                        Toggle("Oversized", isOn: $isOversized)
+                        Toggle("Peel-off", isOn: $isPeelOff)
+                    } else {
+                        Toggle(isOn: $isFoil) {
+                            Label("Foil", systemImage: "sparkles")
+                        }
                     }
                     Toggle(isOn: $isSigned) {
                         Label("Signed", systemImage: "pencil.line")
@@ -365,14 +426,26 @@ struct EditCollectionCardSheet: View {
                         let gradingScoreTrimmed = gradingScore.trimmingCharacters(in: .whitespacesAndNewlines)
                         let certNumberTrimmed = certNumber.trimmingCharacters(in: .whitespacesAndNewlines)
                         let storageTrimmed = storageLocation.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let editionTrimmed = edition.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let stampTrimmed = stamp.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let variant = CardCopyVariant(
+                            finishCode: finishCode.isEmpty ? nil : finishCode,
+                            finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
+                            edition: editionTrimmed.isEmpty ? nil : editionTrimmed,
+                            stamp: stampTrimmed.isEmpty ? nil : stampTrimmed,
+                            isSealedPromo: isSealedPromo,
+                            isOversized: isOversized,
+                            isPeelOff: isPeelOff
+                        )
                         let payload = SavePayload(
                             quantity: quantityToSave,
                             condition: conditionToSave.isEmpty ? nil : conditionToSave,
                             language: languageToSave.isEmpty ? nil : languageToSave,
                             notes: notesToSave.isEmpty ? nil : notesToSave,
-                            isFoil: isFoil,
+                            isFoil: card.tcg.lowercased() == "pokemon" ? variant.isFoil : isFoil,
                             isSigned: isSigned,
                             isAltered: isAltered,
+                            variant: variant,
                             tags: selectedTagIds.sorted(),
                             selectedPrint: selectedPrintToSave,
                             gradingCompany: gradingCompanyTrimmed.isEmpty ? nil : gradingCompanyTrimmed,
@@ -397,6 +470,16 @@ struct EditCollectionCardSheet: View {
                     ))
                     .environmentObject(environmentStore)
                 }
+            }
+            .onChange(of: selectedPrint?.id) { _, _ in
+                guard let selectedPrint else { return }
+                let options = PokemonFinishOption.options(for: selectedPrint, includeCatalog: true)
+                if !options.contains(where: { $0.code == finishCode }) {
+                    finishCode = options.first?.code ?? ""
+                }
+                edition = selectedPrint.pokemonPrint?.variants?.firstEdition == true
+                    ? "1st Edition"
+                    : ""
             }
         }
     }

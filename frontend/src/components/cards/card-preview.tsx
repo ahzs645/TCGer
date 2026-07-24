@@ -6,6 +6,7 @@ import { ChevronDown, Heart, Loader2, Minus, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { fetchCardPrintsApi } from "@/lib/api-client";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
@@ -33,11 +36,15 @@ import type {
   Card,
   CardPrintsResponse,
   CollectionCard,
-  PokemonFinishType,
   PokemonFunctionalAttack,
   PokemonFunctionalGroup,
 } from "@/types/card";
 import { normalizeHexColor } from "@/lib/color";
+import {
+  formatFinishLabel,
+  getPokemonFinishOptions,
+  isFoilFinish,
+} from "@/lib/pokemon-variants";
 import { getCardBackImage } from "@/lib/utils";
 import { SetSymbol } from "./set-symbol";
 
@@ -90,6 +97,12 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isLoadingPrints, setIsLoadingPrints] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [selectedFinishCode, setSelectedFinishCode] = useState("");
+  const [edition, setEdition] = useState("");
+  const [stamp, setStamp] = useState("");
+  const [isSealedPromo, setIsSealedPromo] = useState(false);
+  const [isOversized, setIsOversized] = useState(false);
+  const [isPeelOff, setIsPeelOff] = useState(false);
   const selectedBinder = collections.find(
     (binder) => binder.id === selectedBinderId,
   );
@@ -107,13 +120,17 @@ export function CardPreview({ card }: CardPreviewProps) {
   const printOptions = printData?.prints ?? null;
   const pokemonFunctionalGroup: PokemonFunctionalGroup | null =
     printData?.mode === "pokemon-functional" ? printData.functionalGroup : null;
+  const finishOptions = getPokemonFinishOptions(selectedPrintCard, true);
+  const selectedFinish = finishOptions.find(
+    (finish) => finish.code === selectedFinishCode,
+  );
 
   const selectedPrintLabel = supportsPrintSelection
     ? `${selectedPrintCard.setName ?? selectedPrintCard.setCode ?? "Select a print"}${
         selectedPrintCard.collectorNumber
           ? ` · #${selectedPrintCard.collectorNumber}`
           : ""
-      }`
+      }${selectedFinish ? ` · ${selectedFinish.label}` : ""}`
     : "";
   const currentGameLabel = GAME_LABELS[card.tcg];
 
@@ -135,22 +152,6 @@ export function CardPreview({ card }: CardPreviewProps) {
       }
     }
     return parts.join(" • ");
-  };
-
-  const getFinishBadges = (print: Card): PokemonFinishType[] => {
-    if (print.pokemonPrint?.finishes?.length) {
-      return print.pokemonPrint.finishes;
-    }
-    const variants = print.pokemonPrint?.variants;
-    if (!variants) {
-      return [];
-    }
-    const finishes: PokemonFinishType[] = [];
-    if (variants.normal) finishes.push("normal");
-    if (variants.reverse) finishes.push("reverse");
-    if (variants.holo) finishes.push("holo");
-    if (variants.firstEdition) finishes.push("firstEdition");
-    return finishes;
   };
 
   const throttledSetPos = useRef(
@@ -233,6 +234,20 @@ export function CardPreview({ card }: CardPreviewProps) {
   }, [card]);
 
   useEffect(() => {
+    const options = getPokemonFinishOptions(selectedPrintCard);
+    setSelectedFinishCode(options[0]?.code ?? "");
+    setEdition(
+      selectedPrintCard.pokemonPrint?.variants?.firstEdition
+        ? "1st Edition"
+        : "",
+    );
+    setStamp("");
+    setIsSealedPromo(false);
+    setIsOversized(false);
+    setIsPeelOff(false);
+  }, [selectedPrintCard]);
+
+  useEffect(() => {
     setCardImageSrc(
       activeCard.imageUrlSmall ||
         activeCard.imageUrl ||
@@ -287,6 +302,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     card.tcg,
     card.id,
     selectedPrintCard.id,
+    token,
   ]);
 
   const handleCardImageError = useCallback(() => {
@@ -334,28 +350,61 @@ export function CardPreview({ card }: CardPreviewProps) {
     }
 
     const cardToPersist = supportsPrintSelection ? selectedPrintCard : card;
+    const finishLabel = selectedFinish?.label;
+    const isFoil = isFoilFinish(selectedFinishCode);
 
     setStatus("pending");
     setStatusMessage(null);
-    setOptimisticQuantity(1);
+    setOptimisticQuantity(serverQuantity + 1);
 
     try {
       await addCardToBinder(token, selectedBinderId, {
         cardId: cardToPersist.id,
         quantity: 1,
+        finishCode: selectedFinishCode || undefined,
+        finishLabel,
+        edition: edition.trim() || undefined,
+        stamp: stamp.trim() || undefined,
+        isSealedPromo,
+        isOversized,
+        isPeelOff,
+        isFoil,
         cardData: {
           name: cardToPersist.name,
           tcg: cardToPersist.tcg,
           externalId: cardToPersist.id,
+          baseExternalId: cardToPersist.baseExternalId,
+          printingKey: cardToPersist.printingKey,
+          artworkId: cardToPersist.artworkId,
           setCode: cardToPersist.setCode,
           setName: cardToPersist.setName,
           rarity: cardToPersist.rarity,
+          collectorNumber: cardToPersist.collectorNumber,
+          releasedAt: cardToPersist.releasedAt,
           imageUrl: cardToPersist.imageUrl,
           imageUrlSmall: cardToPersist.imageUrlSmall,
+          setSymbolUrl: cardToPersist.setSymbolUrl,
+          setLogoUrl: cardToPersist.setLogoUrl,
+          regulationMark: cardToPersist.regulationMark,
+          language: cardToPersist.language,
+          supertype: cardToPersist.supertype,
+          formatLegality: cardToPersist.formatLegality,
+          dexEntries: cardToPersist.dexEntries,
+          region: cardToPersist.region,
+          pokemonPrint: cardToPersist.pokemonPrint,
+          attributes: cardToPersist.attributes,
+          provenance: cardToPersist.provenance,
+          legalityPeriods: cardToPersist.legalityPeriods,
+          evolution: cardToPersist.evolution,
+          functionalIdentity: cardToPersist.functionalIdentity,
         },
       });
       setStatus("success");
-      setStatusMessage("Card added to binder.");
+      setStatusMessage(
+        serverQuantity > 0
+          ? "Variant copy added to binder."
+          : "Card added to binder.",
+      );
       setTimeout(() => {
         setStatus("idle");
         setStatusMessage(null);
@@ -439,7 +488,10 @@ export function CardPreview({ card }: CardPreviewProps) {
           onOpenChange={setIsPrintDialogOpen}
           data-oid="fyekxfm"
         >
-          <DialogContent data-oid=".sy9mv:">
+          <DialogContent
+            className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+            data-oid=".sy9mv:"
+          >
             <DialogHeader data-oid="cfxkrx0">
               <DialogTitle data-oid="ab23.z2">Select a print</DialogTitle>
               <DialogDescription data-oid="_e-.bx2">
@@ -550,7 +602,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                     : [card]
                   ).map((print: Card) => {
                     const isSelected = selectedPrintCard.id === print.id;
-                    const finishes = getFinishBadges(print);
+                    const finishes = getPokemonFinishOptions(print);
                     return (
                       <button
                         type="button"
@@ -626,14 +678,12 @@ export function CardPreview({ card }: CardPreviewProps) {
                             >
                               {finishes.map((finish) => (
                                 <Badge
-                                  key={finish}
+                                  key={finish.code}
                                   variant="outline"
-                                  className="text-[10px] capitalize"
+                                  className="text-[10px]"
                                   data-oid="zevfg9f"
                                 >
-                                  {finish === "firstEdition"
-                                    ? "1st Ed"
-                                    : finish}
+                                  {finish.label}
                                 </Badge>
                               ))}
                             </div>
@@ -660,6 +710,124 @@ export function CardPreview({ card }: CardPreviewProps) {
                     </div>
                   )}
                 </div>
+                {selectedPrintCard.tcg === "pokemon" ? (
+                  <div className="mt-4 space-y-4 rounded-lg border bg-muted/20 p-4">
+                    <div>
+                      <p className="text-sm font-semibold">
+                        Collectible variant
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Describe the physical copy you own. These details are
+                        separate from the card&apos;s gameplay identity.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`finish-${selectedPrintCard.id}`}>
+                          Finish
+                        </Label>
+                        <Select
+                          value={selectedFinishCode || undefined}
+                          onValueChange={setSelectedFinishCode}
+                          disabled={!finishOptions.length}
+                        >
+                          <SelectTrigger
+                            id={`finish-${selectedPrintCard.id}`}
+                            className="w-full"
+                          >
+                            <SelectValue
+                              placeholder={
+                                finishOptions.length
+                                  ? "Select a finish"
+                                  : "Not specified"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {finishOptions.map((finish) => (
+                              <SelectItem
+                                key={finish.code}
+                                value={finish.code}
+                              >
+                                {finish.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`edition-${selectedPrintCard.id}`}>
+                          Edition
+                        </Label>
+                        <Input
+                          id={`edition-${selectedPrintCard.id}`}
+                          value={edition}
+                          onChange={(event) => setEdition(event.target.value)}
+                          placeholder="e.g. 1st Edition"
+                        />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor={`stamp-${selectedPrintCard.id}`}>
+                          Stamp
+                        </Label>
+                        <Input
+                          id={`stamp-${selectedPrintCard.id}`}
+                          value={stamp}
+                          onChange={(event) => setStamp(event.target.value)}
+                          placeholder="e.g. Prerelease, Staff, Pokémon Center"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {[
+                        {
+                          id: "sealed-promo",
+                          label: "Sealed promo",
+                          checked: isSealedPromo,
+                          setChecked: setIsSealedPromo,
+                        },
+                        {
+                          id: "oversized",
+                          label: "Oversized",
+                          checked: isOversized,
+                          setChecked: setIsOversized,
+                        },
+                        {
+                          id: "peel-off",
+                          label: "Peel-off",
+                          checked: isPeelOff,
+                          setChecked: setIsPeelOff,
+                        },
+                      ].map((option) => (
+                        <Label
+                          key={option.id}
+                          htmlFor={`${option.id}-${selectedPrintCard.id}`}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs font-normal"
+                        >
+                          <Checkbox
+                            id={`${option.id}-${selectedPrintCard.id}`}
+                            checked={option.checked}
+                            onCheckedChange={(checked) =>
+                              option.setChecked(checked === true)
+                            }
+                          />
+                          {option.label}
+                        </Label>
+                      ))}
+                    </div>
+                    {selectedFinishCode ? (
+                      <p className="text-xs text-muted-foreground">
+                        Selected:{" "}
+                        <span className="font-medium text-foreground">
+                          {formatFinishLabel(
+                            selectedFinishCode,
+                            selectedFinish?.label,
+                          )}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             )}
             <DialogFooter data-oid="aa6g:mn">
@@ -925,56 +1093,68 @@ export function CardPreview({ card }: CardPreviewProps) {
                   <span data-oid="bokw66t">Add to Binder</span>
                 </Button>
               ) : (
-                <div
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                  data-oid="4obfj_y"
-                >
-                  <div
-                    className="flex h-9 w-full max-w-[220px] items-center justify-between gap-1 rounded-lg border px-2 py-1"
-                    data-oid="o2vy32d"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleQuantityChange(quantity - 1)}
-                      className="h-8 w-8 rounded-full"
-                      tabIndex={-1}
-                      disabled={quantityControlsDisabled || entrySyncing}
-                      data-oid="wlspwyq"
+                <div className="space-y-2" data-oid="4obfj_y">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div
+                      className="flex h-9 w-full max-w-[220px] items-center justify-between gap-1 rounded-lg border px-2 py-1"
+                      data-oid="o2vy32d"
                     >
-                      <Minus className="h-4 w-4" data-oid="96w-:10" />
-                    </Button>
-                    <input
-                      readOnly
-                      className="w-10 border-none bg-transparent text-center text-sm font-semibold"
-                      type="text"
-                      value={quantity}
-                      data-oid="zuoj2kr"
-                    />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleQuantityChange(quantity - 1)}
+                        className="h-8 w-8 rounded-full"
+                        tabIndex={-1}
+                        disabled={quantityControlsDisabled || entrySyncing}
+                        data-oid="wlspwyq"
+                      >
+                        <Minus className="h-4 w-4" data-oid="96w-:10" />
+                      </Button>
+                      <input
+                        readOnly
+                        className="w-10 border-none bg-transparent text-center text-sm font-semibold"
+                        type="text"
+                        value={quantity}
+                        data-oid="zuoj2kr"
+                      />
 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full"
-                      onClick={() => handleQuantityChange(quantity + 1)}
-                      tabIndex={-1}
-                      disabled={
-                        quantityControlsDisabled ||
-                        entrySyncing ||
-                        quantity >= 99
-                      }
-                      data-oid="qip0fny"
-                    >
-                      <Plus className="h-4 w-4" data-oid="6qazx6c" />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full"
+                        onClick={() => handleQuantityChange(quantity + 1)}
+                        tabIndex={-1}
+                        disabled={
+                          quantityControlsDisabled ||
+                          entrySyncing ||
+                          quantity >= 99
+                        }
+                        data-oid="qip0fny"
+                      >
+                        <Plus className="h-4 w-4" data-oid="6qazx6c" />
+                      </Button>
+                    </div>
+                    {entrySyncing ? (
+                      <p
+                        className="text-[11px] text-muted-foreground"
+                        data-oid="5ulmh0:"
+                      >
+                        Syncing binder entry...
+                      </p>
+                    ) : null}
                   </div>
-                  {entrySyncing ? (
-                    <p
-                      className="text-[11px] text-muted-foreground"
-                      data-oid="5ulmh0:"
+                  {activeCard.tcg === "pokemon" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleAddInitialQuantity}
+                      disabled={addDisabled || entrySyncing || quantity >= 99}
                     >
-                      Syncing binder entry...
-                    </p>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add selected variant copy
+                    </Button>
                   ) : null}
                 </div>
               )}
@@ -1032,6 +1212,9 @@ function WishlistQuickAdd({ card }: { card: Card }) {
     try {
       await addCardToWishlist(token, wishlistId, {
         externalId: card.id,
+        baseExternalId: card.baseExternalId,
+        printingKey: card.printingKey,
+        artworkId: card.artworkId,
         tcg: card.tcg,
         name: card.name,
         setCode: card.setCode,
@@ -1042,6 +1225,19 @@ function WishlistQuickAdd({ card }: { card: Card }) {
         setSymbolUrl: card.setSymbolUrl,
         setLogoUrl: card.setLogoUrl,
         collectorNumber: card.collectorNumber,
+        releasedAt: card.releasedAt,
+        regulationMark: card.regulationMark,
+        language: card.language,
+        supertype: card.supertype,
+        formatLegality: card.formatLegality,
+        dexEntries: card.dexEntries,
+        region: card.region,
+        pokemonPrint: card.pokemonPrint,
+        attributes: card.attributes,
+        provenance: card.provenance,
+        legalityPeriods: card.legalityPeriods,
+        evolution: card.evolution,
+        functionalIdentity: card.functionalIdentity,
       });
     } catch {
       // Error handled in store

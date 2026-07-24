@@ -59,6 +59,29 @@ extension APIService {
         return items
     }
 
+    func getSealedOpeningLedgers(
+        config: ServerConfiguration,
+        token: String
+    ) async throws -> [SealedOpeningLedger] {
+        if config.isDemoMode { return [] }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/openings",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let ledgers = try? JSONDecoder().decode([SealedOpeningLedger].self, from: data) else {
+            throw APIError.decodingError
+        }
+        return ledgers
+    }
+
     func addSealedInventory(
         config: ServerConfiguration,
         token: String,

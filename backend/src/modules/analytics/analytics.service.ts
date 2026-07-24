@@ -1,5 +1,22 @@
 import { prisma } from '../../lib/prisma';
 import type { CollectionValueHistory, CollectionValueBreakdown, CollectionDistribution } from '@tcg/api-types';
+import { isUsablePrice } from '../pricing/pricing.service';
+
+function storedCollectionValue(
+  collectionPrice: unknown,
+  finishCode: string | null,
+  history: Array<{ price: unknown; finishCode: string | null }>
+) {
+  const manual = collectionPrice == null ? undefined : Number(collectionPrice);
+  if (isUsablePrice(manual)) return manual;
+  const matching = history.find(
+    (entry) => (entry.finishCode ?? null) === (finishCode ?? null)
+  );
+  const matchingPrice = matching?.price == null ? undefined : Number(matching.price);
+  if (isUsablePrice(matchingPrice)) return matchingPrice;
+  const fallback = history.find((entry) => isUsablePrice(Number(entry.price)));
+  return fallback?.price == null ? 0 : Number(fallback.price);
+}
 
 export async function getCollectionValueHistory(userId: string, periodDays = 30): Promise<CollectionValueHistory> {
   const since = new Date();
@@ -12,8 +29,8 @@ export async function getCollectionValueHistory(userId: string, periodDays = 30)
       card: {
         include: {
           priceHistory: {
-            where: { recordedAt: { gte: since } },
-            orderBy: { recordedAt: 'asc' }
+            orderBy: { recordedAt: 'desc' },
+            take: 120
           }
         }
       }
@@ -25,10 +42,14 @@ export async function getCollectionValueHistory(userId: string, periodDays = 30)
   let currentValue = 0;
 
   for (const col of collections) {
-    const price = col.price ? parseFloat(col.price.toString()) : 0;
+    const price = storedCollectionValue(
+      col.price,
+      col.finishCode,
+      col.card.priceHistory
+    );
     currentValue += price * col.quantity;
 
-    for (const ph of col.card.priceHistory) {
+    for (const ph of col.card.priceHistory.filter((entry) => entry.recordedAt >= since)) {
       const dateKey = ph.recordedAt.toISOString().split('T')[0];
       const phPrice = ph.price ? parseFloat(ph.price.toString()) : 0;
       dailyValues.set(dateKey, (dailyValues.get(dateKey) || 0) + phPrice * col.quantity);
@@ -54,7 +75,15 @@ export async function getCollectionValueBreakdown(userId: string): Promise<Colle
   const collections = await prisma.collection.findMany({
     where: { userId },
     include: {
-      card: { include: { tcgGame: true } },
+      card: {
+        include: {
+          tcgGame: true,
+          priceHistory: {
+            orderBy: { recordedAt: 'desc' },
+            take: 20
+          }
+        }
+      },
       binder: { select: { id: true, name: true } }
     }
   });
@@ -64,7 +93,11 @@ export async function getCollectionValueBreakdown(userId: string): Promise<Colle
   const cardValues: Array<{ externalId: string; tcg: string; name: string; value: number; imageUrl?: string }> = [];
 
   for (const col of collections) {
-    const price = col.price ? parseFloat(col.price.toString()) : 0;
+    const price = storedCollectionValue(
+      col.price,
+      col.finishCode,
+      col.card.priceHistory
+    );
     const totalPrice = price * col.quantity;
     const tcg = col.card.tcgGame.code;
 

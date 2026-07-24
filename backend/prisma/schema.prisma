@@ -8,39 +8,41 @@ datasource db {
 }
 
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  emailVerified   Boolean      @default(false)
-  name            String?
-  image           String?
-  username        String?      @unique
-  displayUsername String?
-  isAdmin         Boolean      @default(false)
-  showCardNumbers Boolean      @default(true)
-  showPricing     Boolean      @default(true)
-  enabledYugioh   Boolean      @default(true)
-  enabledMagic    Boolean      @default(true)
-  enabledPokemon  Boolean      @default(true)
-  defaultGame     String?
-  sessions        Session[]
-  accounts        Account[]
-  binders         Binder[]
-  collections     Collection[]
-  tags            Tag[]
-  wishlists       Wishlist[]
-  decks           Deck[]
-  priceAlerts     PriceAlert[]
-  transactions    Transaction[]
-  shopConnections ShopConnection[]
-  sealedInventory SealedInventory[]
-  tradesSent      Trade[]   @relation("TradesSent")
-  tradesReceived  Trade[]   @relation("TradesReceived")
-  automations     Automation[]
-  shipments       Shipment[]
-  notificationChannels NotificationChannel[]
-  notifications   Notification[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                       String                    @id @default(uuid())
+  email                    String                    @unique
+  emailVerified            Boolean                   @default(false)
+  name                     String?
+  image                    String?
+  username                 String?                   @unique
+  displayUsername          String?
+  isAdmin                  Boolean                   @default(false)
+  showCardNumbers          Boolean                   @default(true)
+  showPricing              Boolean                   @default(true)
+  enabledYugioh            Boolean                   @default(true)
+  enabledMagic             Boolean                   @default(true)
+  enabledPokemon           Boolean                   @default(true)
+  defaultGame              String?
+  sessions                 Session[]
+  accounts                 Account[]
+  binders                  Binder[]
+  collections              Collection[]
+  tags                     Tag[]
+  wishlists                Wishlist[]
+  decks                    Deck[]
+  priceAlerts              PriceAlert[]
+  transactions             Transaction[]
+  shopConnections          ShopConnection[]
+  sealedInventory          SealedInventory[]
+  sealedOpenings           SealedOpening[]
+  tradesSent               Trade[]                   @relation("TradesSent")
+  tradesReceived           Trade[]                   @relation("TradesReceived")
+  automations              Automation[]
+  shipments                Shipment[]
+  notificationChannels     NotificationChannel[]
+  notifications            Notification[]
+  collectionMutationAudits CollectionMutationAudit[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 }
 
 model Session {
@@ -56,11 +58,11 @@ model Session {
 }
 
 model Account {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   accountId             String
   providerId            String
   userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
   refreshToken          String?
   idToken               String?
@@ -68,8 +70,8 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 model Verification {
@@ -82,99 +84,169 @@ model Verification {
 }
 
 model AppSettings {
-  id                    Int      @id @default(1)
-  publicDashboard       Boolean  @default(false)
-  publicCollections     Boolean  @default(false)
-  requireAuth           Boolean  @default(true)
-  appName               String   @default("TCG Manager")
-  scrydexApiKey         String?
-  scrydexTeamId         String?
-  scryfallApiBaseUrl    String?
-  ygoApiBaseUrl         String?
-  scrydexApiBaseUrl     String?
-  tcgdexApiBaseUrl      String?
-  updatedAt             DateTime @updatedAt
+  id                 Int      @id @default(1)
+  publicDashboard    Boolean  @default(false)
+  publicCollections  Boolean  @default(false)
+  requireAuth        Boolean  @default(true)
+  appName            String   @default("TCG Manager")
+  scrydexApiKey      String?
+  scrydexTeamId      String?
+  scryfallApiBaseUrl String?
+  ygoApiBaseUrl      String?
+  scrydexApiBaseUrl  String?
+  tcgdexApiBaseUrl   String?
+  updatedAt          DateTime @updatedAt
 }
 
 model TcgGame {
-  id           Int      @id @default(autoincrement())
-  code         String   @unique
-  displayName  String
-  apiEndpoint  String?
-  schemaVersion String?
-  enabled      Boolean  @default(true)
-  cards        Card[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             Int            @id @default(autoincrement())
+  code           String         @unique
+  displayName    String
+  apiEndpoint    String?
+  schemaVersion  String?
+  enabled        Boolean        @default(true)
+  cards          Card[]
+  cardIdentities CardIdentity[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+/// A rules-level card identity shared by all of its printings and artwork variants.
+/// Existing Card rows can be linked incrementally through the optional relation below.
+model CardIdentity {
+  id          String   @id @default(uuid())
+  tcgGameId   Int
+  externalId  String
+  name        String
+  tcgSpecific Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tcgGame   TcgGame @relation(fields: [tcgGameId], references: [id], onDelete: Cascade)
+  printings Card[]
+
+  @@unique([tcgGameId, externalId])
+  @@index([name])
 }
 
 model Card {
-  id            String          @id @default(uuid())
-  tcgGameId     Int
-  externalId    String
-  name          String
-  setCode       String?
-  setName       String?
-  rarity        String?
-  imageUrl      String?
-  imageUrlSmall String?
-  tcgSpecific   Json?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id              String   @id @default(uuid())
+  tcgGameId       Int
+  identityId      String?
+  externalId      String
+  baseExternalId  String?
+  printingKey     String?  @unique
+  artworkId       String?
+  collectorNumber String?
+  name            String
+  setCode         String?
+  setName         String?
+  rarity          String?
+  imageUrl        String?
+  imageUrlSmall   String?
+  tcgSpecific     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  tcgGame    TcgGame    @relation(fields: [tcgGameId], references: [id])
-  collections Collection[]
+  tcgGame      TcgGame        @relation(fields: [tcgGameId], references: [id])
+  identity     CardIdentity?  @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  collections  Collection[]
   priceHistory PriceHistory[]
-  yugiohCard  YugiohCard?
-  magicCard   MagicCard?
-  pokemonCard PokemonCard?
+  yugiohCard   YugiohCard?
+  magicCard    MagicCard?
+  pokemonCard  PokemonCard?
 
   @@unique([tcgGameId, externalId])
+  @@index([identityId])
+  @@index([tcgGameId, baseExternalId])
+  @@index([tcgGameId, setCode])
 }
 
 model Binder {
-  id          String       @id @default(uuid())
-  userId      String
-  name        String
-  description String?
-  colorHex    String?
-  shareToken  String?      @unique
-  isPublic    Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                String   @id @default(uuid())
+  userId            String
+  name              String
+  description       String?
+  colorHex          String?
+  containerType     String?
+  imageUrl          String?
+  associatedTcg     String?
+  associatedSetCode String?
+  associatedSetName String?
+  shareToken        String?  @unique
+  isPublic          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   collections Collection[]
+
+  @@index([userId, containerType])
+  @@index([userId, associatedTcg, associatedSetCode])
 }
 
 model Collection {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   userId           String
   cardId           String
   binderId         String?
-  quantity         Int      @default(1)
+  quantity         Int       @default(1)
   condition        String?
   language         String?
   notes            String?
-  price            Decimal? @db.Decimal(10, 2)
-  acquisitionPrice Decimal? @db.Decimal(10, 2)
-  isFoil           Boolean  @default(false)
-  isSigned         Boolean  @default(false)
-  isAltered        Boolean  @default(false)
-  imageUrls        String[] @default([])
+  price            Decimal?  @db.Decimal(10, 2)
+  acquisitionPrice Decimal?  @db.Decimal(10, 2)
+  isFoil           Boolean   @default(false)
+  finishCode       String?
+  finishLabel      String?
+  edition          String?
+  stamp            String?
+  isSealedPromo    Boolean   @default(false)
+  isOversized      Boolean   @default(false)
+  isPeelOff        Boolean   @default(false)
+  isSigned         Boolean   @default(false)
+  isAltered        Boolean   @default(false)
+  imageUrls        String[]  @default([])
   customAttributes Json?
   serialNumber     String?
   acquiredAt       DateTime?
   gradingCompany   String?
   gradingScore     String?
   certNumber       String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  storageLocation  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  card   Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  binder Binder? @relation(fields: [binderId], references: [id], onDelete: SetNull)
-  tags   CollectionTag[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card               Card               @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  binder             Binder?            @relation(fields: [binderId], references: [id], onDelete: SetNull)
+  tags               CollectionTag[]
+  sealedOpeningLinks SealedOpenedCard[]
+}
+
+/// Append-only record of collection mutations. beforeState/afterState are
+/// private restoration snapshots and are never returned by the public API.
+model CollectionMutationAudit {
+  id             String   @id @default(uuid())
+  userId         String
+  actorId        String
+  operationKind  String
+  binderId       String?
+  cardName       String?
+  affectedCopies Int
+  summary        String
+  beforeState    Json
+  afterState     Json
+  metadata       Json?
+  sourceAuditId  String?  @unique
+  idempotencyKey String?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([userId, operationKind, createdAt])
 }
 
 model Tag {
@@ -185,7 +257,7 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments CollectionTag[]
 
   @@unique([userId, label])
@@ -208,13 +280,16 @@ model PriceHistory {
   price      Decimal? @db.Decimal(10, 2)
   currency   String   @default("USD")
   source     String?
+  finishCode String?
   recordedAt DateTime @default(now())
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, finishCode, recordedAt])
 }
 
 model YugiohCard {
-  cardId      String @id
+  cardId      String  @id
   cardType    String?
   monsterType String?
   attribute   String?
@@ -228,49 +303,49 @@ model YugiohCard {
 }
 
 model MagicCard {
-  cardId      String   @id
-  manaCost    String?
-  cmc         Int?
-  cardType    String?
-  colors      String[]
-  oracleText  String?
-  power       String?
-  toughness   String?
-  loyalty     Int?
-  artist      String?
-  foil        Boolean? @default(false)
-  edition     String?
+  cardId     String   @id
+  manaCost   String?
+  cmc        Int?
+  cardType   String?
+  colors     String[]
+  oracleText String?
+  power      String?
+  toughness  String?
+  loyalty    Int?
+  artist     String?
+  foil       Boolean? @default(false)
+  edition    String?
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
 
 model PokemonCard {
-  cardId          String  @id
-  pokemonType     String?
-  hp              Int?
-  evolutionStage  String?
-  retreatCost     Int?
-  weakness        String?
-  resistance      String?
-  attacks         Json?
-  ability         Json?
-  isEx            Boolean? @default(false)
-  isGx            Boolean? @default(false)
-  isV             Boolean? @default(false)
-  firstEdition    Boolean? @default(false)
-  holo            Boolean? @default(false)
+  cardId         String   @id
+  pokemonType    String?
+  hp             Int?
+  evolutionStage String?
+  retreatCost    Int?
+  weakness       String?
+  resistance     String?
+  attacks        Json?
+  ability        Json?
+  isEx           Boolean? @default(false)
+  isGx           Boolean? @default(false)
+  isV            Boolean? @default(false)
+  firstEdition   Boolean? @default(false)
+  holo           Boolean? @default(false)
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
 
 model Wishlist {
-  id          String         @id @default(uuid())
+  id          String   @id @default(uuid())
   userId      String
   name        String
   description String?
   colorHex    String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards WishlistCard[]
@@ -279,33 +354,33 @@ model Wishlist {
 }
 
 model CardHash {
-  id         String   @id @default(uuid())
-  tcg        String                         // 'magic' | 'pokemon' | 'yugioh'
-  externalId String                         // Scryfall ID, YGO ID, etc.
-  name       String
-  setCode    String?
-  setName    String?
-  rarity     String?
-  imageUrl   String?
-  rHash      String                         // Red-channel pHash (hex)
-  gHash      String                         // Green-channel pHash (hex)
-  bHash      String                         // Blue-channel pHash (hex)
-  titleRHash String?
-  titleGHash String?
-  titleBHash String?
+  id          String   @id @default(uuid())
+  tcg         String // 'magic' | 'pokemon' | 'yugioh'
+  externalId  String // Scryfall ID, YGO ID, etc.
+  name        String
+  setCode     String?
+  setName     String?
+  rarity      String?
+  imageUrl    String?
+  rHash       String // Red-channel pHash (hex)
+  gHash       String // Green-channel pHash (hex)
+  bHash       String // Blue-channel pHash (hex)
+  titleRHash  String?
+  titleGHash  String?
+  titleBHash  String?
   footerRHash String?
   footerGHash String?
   footerBHash String?
-  hashSize   Int      @default(16)          // pHash block size (16 → 256-bit)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  hashSize    Int      @default(16) // pHash block size (16 → 256-bit)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([tcg, externalId])
   @@index([tcg])
 }
 
 model CardScanDebugCapture {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   userId              String
   requestedTcg        String?
   captureSource       String?
@@ -323,8 +398,8 @@ model CardScanDebugCapture {
   bestMatchTcg        String?
   bestMatchConfidence Float?
   bestMatchDistance   Int?
-  feedbackStatus      String   @default("unreviewed")
-  reviewTags          String[] @default([])
+  feedbackStatus      String    @default("unreviewed")
+  reviewTags          String[]  @default([])
   notes               String?
   expectedExternalId  String?
   expectedName        String?
@@ -332,30 +407,31 @@ model CardScanDebugCapture {
   reviewedAt          DateTime?
   userAgent           String?
   debugPayload        Json
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([userId, createdAt])
   @@index([feedbackStatus, createdAt])
 }
 
 model WishlistCard {
-  id            String   @id @default(uuid())
-  wishlistId    String
-  externalId    String
-  tcg           String
-  name          String
-  setCode       String?
-  setName       String?
-  rarity        String?
-  imageUrl      String?
-  imageUrlSmall String?
-  setSymbolUrl  String?
-  setLogoUrl    String?
+  id              String   @id @default(uuid())
+  wishlistId      String
+  externalId      String
+  tcg             String
+  name            String
+  setCode         String?
+  setName         String?
+  rarity          String?
+  imageUrl        String?
+  imageUrlSmall   String?
+  setSymbolUrl    String?
+  setLogoUrl      String?
   collectorNumber String?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tcgSpecific     Json?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
 
@@ -369,8 +445,8 @@ model WishlistCard {
 model NotificationChannel {
   id        String   @id @default(uuid())
   userId    String
-  type      String   // 'email' | 'discord' | 'telegram'
-  config    Json     // { email, webhookUrl, chatId, botToken }
+  type      String // 'email' | 'discord' | 'telegram'
+  config    Json // { email, webhookUrl, chatId, botToken }
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -381,7 +457,7 @@ model NotificationChannel {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String   // 'price_alert' | 'trade_request' | 'news' | 'import_complete'
+  type      String // 'price_alert' | 'trade_request' | 'news' | 'import_complete'
   title     String
   body      String
   read      Boolean  @default(false)
@@ -396,16 +472,16 @@ model Notification {
 // ---------------------------------------------------------------------------
 
 model Deck {
-  id          String     @id @default(uuid())
+  id          String   @id @default(uuid())
   userId      String
   name        String
   description String?
-  tcg         String     // 'magic' | 'yugioh' | 'pokemon'
-  format      String?    // 'standard', 'modern', 'commander', etc.
+  tcg         String // 'magic' | 'yugioh' | 'pokemon'
+  format      String? // 'standard', 'modern', 'commander', etc.
   colorHex    String?
-  isPublic    Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards DeckCard[]
@@ -420,6 +496,7 @@ model DeckCard {
   tcg           String
   name          String
   quantity      Int     @default(1)
+  zone          String  @default("main") // 'main' | 'extra' | 'side'
   isCommander   Boolean @default(false)
   isSideboard   Boolean @default(false)
   imageUrl      String?
@@ -430,7 +507,7 @@ model DeckCard {
 
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
-  @@unique([deckId, externalId, isSideboard])
+  @@unique([deckId, externalId, zone])
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +518,7 @@ model SealedProduct {
   id           String    @id @default(uuid())
   tcg          String
   name         String
-  productType  String    // 'booster', 'box', 'etb', 'starter'
+  productType  String // 'booster', 'box', 'etb', 'starter'
   setCode      String?
   cardsPerPack Int?
   packsPerBox  Int?
@@ -466,8 +543,47 @@ model SealedInventory {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product SealedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product  SealedProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  openings SealedOpening[]
+}
+
+model SealedOpening {
+  id                String   @id @default(uuid())
+  userId            String
+  sealedInventoryId String
+  openedQuantity    Int      @default(1)
+  openedAt          DateTime @default(now())
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventory SealedInventory    @relation(fields: [sealedInventoryId], references: [id], onDelete: Restrict)
+  cards     SealedOpenedCard[]
+
+  @@index([userId, openedAt])
+  @@index([sealedInventoryId])
+}
+
+model SealedOpenedCard {
+  id               String    @id @default(uuid())
+  openingId        String
+  collectionId     String?   @unique
+  externalId       String
+  tcg              String
+  cardName         String
+  quantity         Int       @default(1)
+  status           String    @default("active")
+  realizedProceeds Decimal?  @db.Decimal(10, 2)
+  soldAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  opening    SealedOpening @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  collection Collection?   @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@index([openingId, status])
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +599,7 @@ model PriceAlert {
   cardName      String
   imageUrl      String?
   targetPrice   Decimal   @db.Decimal(10, 2)
-  direction     String    // 'below' | 'above'
+  direction     String // 'below' | 'above'
   isActive      Boolean   @default(true)
   lastTriggered DateTime?
   createdAt     DateTime  @default(now())
@@ -495,7 +611,7 @@ model PriceAlert {
 model Transaction {
   id         String   @id @default(uuid())
   userId     String
-  type       String   // 'purchase' | 'sale' | 'trade'
+  type       String // 'purchase' | 'sale' | 'trade'
   cardId     String?
   externalId String?
   tcg        String?
@@ -503,7 +619,7 @@ model Transaction {
   quantity   Int      @default(1)
   amount     Decimal  @db.Decimal(10, 2)
   currency   String   @default("USD")
-  platform   String?  // 'tcgplayer', 'cardmarket', 'local', etc.
+  platform   String? // 'tcgplayer', 'cardmarket', 'local', etc.
   notes      String?
   date       DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -515,7 +631,7 @@ model Transaction {
 model ShopConnection {
   id        String    @id @default(uuid())
   userId    String
-  platform  String    // 'tcgplayer' | 'cardmarket'
+  platform  String // 'tcgplayer' | 'cardmarket'
   apiKey    String
   apiSecret String?
   sellerId  String?
@@ -540,15 +656,15 @@ model Trade {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  sender   User @relation("TradesSent", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("TradesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User        @relation("TradesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User        @relation("TradesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
   cards    TradeCard[]
 }
 
 model TradeCard {
   id             String   @id @default(uuid())
   tradeId        String
-  side           String   // 'sender' | 'receiver'
+  side           String // 'sender' | 'receiver'
   externalId     String
   tcg            String
   name           String
@@ -567,8 +683,8 @@ model Automation {
   id        String   @id @default(uuid())
   userId    String
   name      String
-  trigger   String   // 'price_change' | 'new_card_added' | 'schedule'
-  action    String   // 'notify' | 'move_to_binder' | 'add_tag' | 'export'
+  trigger   String // 'price_change' | 'new_card_added' | 'schedule'
+  action    String // 'notify' | 'move_to_binder' | 'add_tag' | 'export'
   config    Json
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -580,7 +696,7 @@ model Automation {
 model Shipment {
   id             String    @id @default(uuid())
   userId         String
-  carrier        String    // 'usps', 'ups', 'fedex', 'dhl', 'laposte'
+  carrier        String // 'usps', 'ups', 'fedex', 'dhl', 'laposte'
   trackingNumber String
   status         String?
   description    String?

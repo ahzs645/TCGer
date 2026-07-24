@@ -8,6 +8,9 @@ import type {
   AddDeckCardInput,
   UpdateDeckCardInput,
   ImportDeckInput,
+  ValidateDeckInput,
+  DeckOwnershipResult,
+  YdkExportResult,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -16,6 +19,8 @@ export type {
   DeckAnalysis,
   DeckValidationResult,
   DeckImportResult,
+  DeckOwnershipResult,
+  YdkExportResult,
 };
 
 async function authFetch(
@@ -119,12 +124,26 @@ export async function getDeckAnalysis(
 export async function validateDeck(
   token: string,
   deckId: string,
-  format?: string,
+  input: ValidateDeckInput = {},
 ): Promise<DeckValidationResult> {
   return authFetch(`${API_BASE_URL}/decks/${deckId}/validate`, token, {
     method: "POST",
-    body: JSON.stringify({ format }),
+    body: JSON.stringify(input),
   });
+}
+
+export async function getDeckOwnership(
+  token: string,
+  deckId: string,
+): Promise<DeckOwnershipResult> {
+  return authFetch(`${API_BASE_URL}/decks/${deckId}/ownership`, token);
+}
+
+export async function exportDeckYdk(
+  token: string,
+  deckId: string,
+): Promise<YdkExportResult> {
+  return authFetch(`${API_BASE_URL}/decks/${deckId}/ydk`, token);
 }
 
 export async function importDeck(

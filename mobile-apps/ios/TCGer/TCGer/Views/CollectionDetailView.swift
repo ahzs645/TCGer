@@ -567,8 +567,13 @@ struct CollectionDetailView: View {
                                 language: payload.language,
                                 notes: payload.notes,
                                 isFoil: payload.isFoil,
+                                variant: payload.variant,
                                 isSigned: payload.isSigned,
                                 isAltered: payload.isAltered,
+                                gradingCompany: payload.gradingCompany,
+                                gradingScore: payload.gradingScore,
+                                certNumber: payload.certNumber,
+                                storageLocation: payload.storageLocation,
                                 tags: payload.tags,
                                 newPrint: payload.selectedPrint
                             )
@@ -824,8 +829,13 @@ struct CollectionDetailView: View {
         language: String?,
         notes: String?,
         isFoil: Bool = false,
+        variant: CardCopyVariant? = nil,
         isSigned: Bool = false,
         isAltered: Bool = false,
+        gradingCompany: String?,
+        gradingScore: String?,
+        certNumber: String?,
+        storageLocation: String?,
         tags: [String],
         newPrint: Card?
     ) async {
@@ -850,8 +860,14 @@ struct CollectionDetailView: View {
                 language: language,
                 notes: notes,
                 isFoil: isFoil,
+                variant: variant,
                 isSigned: isSigned,
                 isAltered: isAltered,
+                gradingCompany: gradingCompany,
+                gradingScore: gradingScore,
+                certNumber: certNumber,
+                storageLocation: storageLocation,
+                includeOwnedCopyDetails: true,
                 tags: tags,
                 newPrint: newPrint,
                 targetBinderId: nil

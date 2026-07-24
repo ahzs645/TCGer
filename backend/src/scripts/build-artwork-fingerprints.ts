@@ -159,6 +159,7 @@ async function buildFromApi(tcg: string, dataDir: string, gridSize = 8): Promise
     name: string;
     setCode: string | null;
     fingerprint: string;
+    hsvHist?: string;
   }> = [];
 
   let processed = 0;

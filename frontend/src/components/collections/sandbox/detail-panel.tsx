@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -49,6 +51,12 @@ import type {
 } from "@/lib/api/collections";
 import { TagCombobox } from "./tag-combobox";
 import { useModuleStore } from "@/stores/preferences";
+import {
+  formatFinishLabel,
+  getCopyVariantBadges,
+  getPokemonFinishOptions,
+  POKEMON_FINISH_CATALOG,
+} from "@/lib/pokemon-variants";
 
 const GAME_LABELS: Record<string, string> = {
   magic: "Magic: The Gathering",
@@ -67,9 +75,21 @@ export interface DetailPanelProps {
   draftBinderId: string;
   draftCondition: (typeof CONDITION_ORDER)[number];
   draftNotes: string;
+  draftFinishCode: string;
+  draftEdition: string;
+  draftStamp: string;
+  draftIsSealedPromo: boolean;
+  draftIsOversized: boolean;
+  draftIsPeelOff: boolean;
   onBinderChange: (binderId: string) => void;
   onConditionChange: (condition: (typeof CONDITION_ORDER)[number]) => void;
   onNotesChange: (value: string) => void;
+  onFinishCodeChange: (value: string) => void;
+  onEditionChange: (value: string) => void;
+  onStampChange: (value: string) => void;
+  onIsSealedPromoChange: (value: boolean) => void;
+  onIsOversizedChange: (value: boolean) => void;
+  onIsPeelOffChange: (value: boolean) => void;
   onSave: () => void;
   onReset: () => void;
   onMove: () => void;
@@ -242,6 +262,22 @@ function FullCardHeader({
               {card.rarity ?? "Unknown"}
             </p>
           </div>
+          {card.collectorNumber ? (
+            <div className="min-w-0">
+              <p className="uppercase">Collector no.</p>
+              <p className="break-words text-sm font-medium leading-snug text-foreground">
+                #{card.collectorNumber}
+              </p>
+            </div>
+          ) : null}
+          {card.regulationMark ? (
+            <div className="min-w-0">
+              <p className="uppercase">Regulation</p>
+              <p className="break-words text-sm font-medium leading-snug text-foreground">
+                {card.regulationMark}
+              </p>
+            </div>
+          ) : null}
           <div className="min-w-0" data-oid="hykxsus">
             <p className="uppercase" data-oid="po7n6ks">
               Quantity
@@ -299,6 +335,9 @@ function PrintSelection({
 }) {
   const supportsPrintSelection = ["magic", "pokemon"].includes(card.tcg);
   if (!supportsPrintSelection || !onSelectPrint) return null;
+  const variantBadges = selectedCopy
+    ? getCopyVariantBadges(selectedCopy)
+    : [];
 
   return (
     <div className="space-y-1" data-oid="grqiyj0">
@@ -329,12 +368,165 @@ function PrintSelection({
           ? "Updates the printing for this copy only."
           : "Select a copy to change its print."}
       </p>
+      {variantBadges.length ? (
+        <div className="flex flex-wrap gap-1 pt-1">
+          {variantBadges.map((label) => (
+            <span
+              key={label}
+              className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function VariantEditor({
+  card,
+  finishCode,
+  edition,
+  stamp,
+  isSealedPromo,
+  isOversized,
+  isPeelOff,
+  onFinishCodeChange,
+  onEditionChange,
+  onStampChange,
+  onIsSealedPromoChange,
+  onIsOversizedChange,
+  onIsPeelOffChange,
+  compact,
+}: {
+  card: CollectionCard;
+  finishCode: string;
+  edition: string;
+  stamp: string;
+  isSealedPromo: boolean;
+  isOversized: boolean;
+  isPeelOff: boolean;
+  onFinishCodeChange: (value: string) => void;
+  onEditionChange: (value: string) => void;
+  onStampChange: (value: string) => void;
+  onIsSealedPromoChange: (value: boolean) => void;
+  onIsOversizedChange: (value: boolean) => void;
+  onIsPeelOffChange: (value: boolean) => void;
+  compact: boolean;
+}) {
+  if (card.tcg !== "pokemon") return null;
+
+  const choices = new Map(
+    POKEMON_FINISH_CATALOG.map((option) => [option.code, option]),
+  );
+  for (const option of getPokemonFinishOptions(card)) {
+    choices.set(option.code, option);
+  }
+  if (finishCode && !choices.has(finishCode)) {
+    choices.set(finishCode, {
+      code: finishCode,
+      label: formatFinishLabel(finishCode),
+    });
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+      <div>
+        <p className="text-sm font-medium">Collectible variant</p>
+        <p className="text-xs text-muted-foreground">
+          Physical details for this individual copy.
+        </p>
+      </div>
+      <div className={compact ? "space-y-3" : "grid grid-cols-2 gap-3"}>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Finish</Label>
+          <Select
+            value={finishCode || "__finish-empty__"}
+            onValueChange={(value) =>
+              onFinishCodeChange(value === "__finish-empty__" ? "" : value)
+            }
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Not specified" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__finish-empty__">Not specified</SelectItem>
+              {[...choices.values()].map((finish) => (
+                <SelectItem key={finish.code} value={finish.code}>
+                  {finish.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={`variant-edition-${compact}`}>
+            Edition
+          </Label>
+          <Input
+            id={`variant-edition-${compact}`}
+            className="h-9"
+            value={edition}
+            onChange={(event) => onEditionChange(event.target.value)}
+            placeholder="e.g. 1st Edition"
+          />
+        </div>
+        <div className={`space-y-1.5 ${compact ? "" : "col-span-2"}`}>
+          <Label className="text-xs" htmlFor={`variant-stamp-${compact}`}>
+            Stamp
+          </Label>
+          <Input
+            id={`variant-stamp-${compact}`}
+            className="h-9"
+            value={stamp}
+            onChange={(event) => onStampChange(event.target.value)}
+            placeholder="e.g. Prerelease or Staff"
+          />
+        </div>
+      </div>
+      <div className={compact ? "space-y-2" : "grid grid-cols-3 gap-2"}>
+        {[
+          {
+            id: `variant-sealed-${compact}`,
+            label: "Sealed promo",
+            checked: isSealedPromo,
+            setChecked: onIsSealedPromoChange,
+          },
+          {
+            id: `variant-oversized-${compact}`,
+            label: "Oversized",
+            checked: isOversized,
+            setChecked: onIsOversizedChange,
+          },
+          {
+            id: `variant-peel-off-${compact}`,
+            label: "Peel-off",
+            checked: isPeelOff,
+            setChecked: onIsPeelOffChange,
+          },
+        ].map((option) => (
+          <Label
+            key={option.id}
+            htmlFor={option.id}
+            className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-2.5 py-2 text-xs font-normal"
+          >
+            <Checkbox
+              id={option.id}
+              checked={option.checked}
+              onCheckedChange={(checked) => option.setChecked(checked === true)}
+            />
+            {option.label}
+          </Label>
+        ))}
+      </div>
     </div>
   );
 }
 
 /** Shared edit form for both desktop and mobile */
 function EditForm({
+  card,
   selectedCopy,
   availableTags,
   draftCopyTags,
@@ -344,9 +536,21 @@ function EditForm({
   draftBinderId,
   draftCondition,
   draftNotes,
+  draftFinishCode,
+  draftEdition,
+  draftStamp,
+  draftIsSealedPromo,
+  draftIsOversized,
+  draftIsPeelOff,
   onBinderChange,
   onConditionChange,
   onNotesChange,
+  onFinishCodeChange,
+  onEditionChange,
+  onStampChange,
+  onIsSealedPromoChange,
+  onIsOversizedChange,
+  onIsPeelOffChange,
   onSave,
   onReset,
   onMove,
@@ -356,6 +560,7 @@ function EditForm({
   errorMessage,
   compact = false,
 }: {
+  card: CollectionCard;
   selectedCopy: CollectionCardCopy | null;
   availableTags: CollectionTag[];
   draftCopyTags: string[];
@@ -365,9 +570,21 @@ function EditForm({
   draftBinderId: string;
   draftCondition: (typeof CONDITION_ORDER)[number];
   draftNotes: string;
+  draftFinishCode: string;
+  draftEdition: string;
+  draftStamp: string;
+  draftIsSealedPromo: boolean;
+  draftIsOversized: boolean;
+  draftIsPeelOff: boolean;
   onBinderChange: (binderId: string) => void;
   onConditionChange: (condition: (typeof CONDITION_ORDER)[number]) => void;
   onNotesChange: (value: string) => void;
+  onFinishCodeChange: (value: string) => void;
+  onEditionChange: (value: string) => void;
+  onStampChange: (value: string) => void;
+  onIsSealedPromoChange: (value: boolean) => void;
+  onIsOversizedChange: (value: boolean) => void;
+  onIsPeelOffChange: (value: boolean) => void;
   onSave: () => void;
   onReset: () => void;
   onMove: () => void;
@@ -447,6 +664,22 @@ function EditForm({
               </Select>
             </div>
           </div>
+          <VariantEditor
+            card={card}
+            finishCode={draftFinishCode}
+            edition={draftEdition}
+            stamp={draftStamp}
+            isSealedPromo={draftIsSealedPromo}
+            isOversized={draftIsOversized}
+            isPeelOff={draftIsPeelOff}
+            onFinishCodeChange={onFinishCodeChange}
+            onEditionChange={onEditionChange}
+            onStampChange={onStampChange}
+            onIsSealedPromoChange={onIsSealedPromoChange}
+            onIsOversizedChange={onIsOversizedChange}
+            onIsPeelOffChange={onIsPeelOffChange}
+            compact
+          />
           <Button
             variant="secondary"
             size="sm"
@@ -597,6 +830,22 @@ function EditForm({
               </SelectContent>
             </Select>
           </div>
+          <VariantEditor
+            card={card}
+            finishCode={draftFinishCode}
+            edition={draftEdition}
+            stamp={draftStamp}
+            isSealedPromo={draftIsSealedPromo}
+            isOversized={draftIsOversized}
+            isPeelOff={draftIsPeelOff}
+            onFinishCodeChange={onFinishCodeChange}
+            onEditionChange={onEditionChange}
+            onStampChange={onStampChange}
+            onIsSealedPromoChange={onIsSealedPromoChange}
+            onIsOversizedChange={onIsOversizedChange}
+            onIsPeelOffChange={onIsPeelOffChange}
+            compact={false}
+          />
           <div className="space-y-2" data-oid="nhu.vox">
             <Label data-oid="igsimji">Notes</Label>
             <Textarea
@@ -659,9 +908,21 @@ export function DetailPanel(props: DetailPanelProps) {
     draftBinderId,
     draftCondition,
     draftNotes,
+    draftFinishCode,
+    draftEdition,
+    draftStamp,
+    draftIsSealedPromo,
+    draftIsOversized,
+    draftIsPeelOff,
     onBinderChange,
     onConditionChange,
     onNotesChange,
+    onFinishCodeChange,
+    onEditionChange,
+    onStampChange,
+    onIsSealedPromoChange,
+    onIsOversizedChange,
+    onIsPeelOffChange,
     onSave,
     onReset,
     onMove,
@@ -709,6 +970,7 @@ export function DetailPanel(props: DetailPanelProps) {
       </CardHeader>
       <CardContent data-oid="-fqyxis">
         <EditForm
+          card={card}
           selectedCopy={selectedCopy}
           availableTags={availableTags}
           draftCopyTags={draftCopyTags}
@@ -718,9 +980,21 @@ export function DetailPanel(props: DetailPanelProps) {
           draftBinderId={draftBinderId}
           draftCondition={draftCondition}
           draftNotes={draftNotes}
+          draftFinishCode={draftFinishCode}
+          draftEdition={draftEdition}
+          draftStamp={draftStamp}
+          draftIsSealedPromo={draftIsSealedPromo}
+          draftIsOversized={draftIsOversized}
+          draftIsPeelOff={draftIsPeelOff}
           onBinderChange={onBinderChange}
           onConditionChange={onConditionChange}
           onNotesChange={onNotesChange}
+          onFinishCodeChange={onFinishCodeChange}
+          onEditionChange={onEditionChange}
+          onStampChange={onStampChange}
+          onIsSealedPromoChange={onIsSealedPromoChange}
+          onIsOversizedChange={onIsOversizedChange}
+          onIsPeelOffChange={onIsPeelOffChange}
           onSave={onSave}
           onReset={onReset}
           onMove={onMove}
@@ -812,9 +1086,21 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     draftBinderId,
     draftCondition,
     draftNotes,
+    draftFinishCode,
+    draftEdition,
+    draftStamp,
+    draftIsSealedPromo,
+    draftIsOversized,
+    draftIsPeelOff,
     onBinderChange,
     onConditionChange,
     onNotesChange,
+    onFinishCodeChange,
+    onEditionChange,
+    onStampChange,
+    onIsSealedPromoChange,
+    onIsOversizedChange,
+    onIsPeelOffChange,
     onSave,
     onReset,
     onMove,
@@ -865,6 +1151,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
             />
 
             <EditForm
+              card={card}
               selectedCopy={selectedCopy}
               availableTags={availableTags}
               draftCopyTags={draftCopyTags}
@@ -874,9 +1161,21 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               draftBinderId={draftBinderId}
               draftCondition={draftCondition}
               draftNotes={draftNotes}
+              draftFinishCode={draftFinishCode}
+              draftEdition={draftEdition}
+              draftStamp={draftStamp}
+              draftIsSealedPromo={draftIsSealedPromo}
+              draftIsOversized={draftIsOversized}
+              draftIsPeelOff={draftIsPeelOff}
               onBinderChange={onBinderChange}
               onConditionChange={onConditionChange}
               onNotesChange={onNotesChange}
+              onFinishCodeChange={onFinishCodeChange}
+              onEditionChange={onEditionChange}
+              onStampChange={onStampChange}
+              onIsSealedPromoChange={onIsSealedPromoChange}
+              onIsOversizedChange={onIsOversizedChange}
+              onIsPeelOffChange={onIsPeelOffChange}
               onSave={onSave}
               onReset={onReset}
               onMove={onMove}

@@ -3,6 +3,7 @@ import SwiftUI
 struct SealedInventoryView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var inventory: [SealedInventoryItem] = []
+    @State private var ledgers: [SealedOpeningLedger] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingCatalog = false
@@ -27,7 +28,7 @@ struct SealedInventoryView: View {
                             .buttonStyle(.borderedProminent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if inventory.isEmpty {
+                } else if inventory.isEmpty && ledgers.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "shippingbox")
                             .font(.system(size: 50))
@@ -48,15 +49,26 @@ struct SealedInventoryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(inventory) { item in
-                            SealedInventoryRow(item: item)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        Task { await deleteItem(item) }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                        if !ledgers.isEmpty {
+                            Section("Opened Product P&L") {
+                                ForEach(ledgers) { ledger in
+                                    SealedLedgerRow(ledger: ledger)
                                 }
+                            }
+                        }
+                        if !inventory.isEmpty {
+                            Section("Sealed Inventory") {
+                                ForEach(inventory) { item in
+                                    SealedInventoryRow(item: item)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                            Button(role: .destructive) {
+                                                Task { await deleteItem(item) }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                            }
                         }
                     }
                     .listStyle(.plain)
@@ -96,6 +108,10 @@ struct SealedInventoryView: View {
             inventory = try await apiService.getUserSealedInventory(
                 config: environmentStore.serverConfiguration, token: token
             )
+            ledgers = (try? await apiService.getSealedOpeningLedgers(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )) ?? []
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -129,6 +145,37 @@ struct SealedInventoryView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct SealedLedgerRow: View {
+    let ledger: SealedOpeningLedger
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(ledger.productName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text(
+                    "\(ledger.profitLoss >= 0 ? "+" : "")$\(ledger.profitLoss, specifier: "%.2f")"
+                )
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(ledger.profitLoss >= 0 ? .green : .red)
+            }
+            HStack(spacing: 12) {
+                Label("$\(ledger.invested, specifier: "%.2f") in", systemImage: "creditcard")
+                Label("$\(ledger.liveValue, specifier: "%.2f") live", systemImage: "chart.line.uptrend.xyaxis")
+                Label("$\(ledger.realizedProceeds, specifier: "%.2f") sold", systemImage: "banknote")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            Text("\(ledger.activeCopies) active · \(ledger.soldCopies) sold")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
     }
 }
 

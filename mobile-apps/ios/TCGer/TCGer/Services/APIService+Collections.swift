@@ -6,6 +6,118 @@ extension APIService {
         let colorHex: String?
     }
 
+    struct CollectionImportOptions: Codable, Sendable {
+        let defaultBinderId: String?
+        let createMissingBinders: Bool
+    }
+
+    struct CollectionImportRequest: Encodable {
+        let csv: String
+        let options: CollectionImportOptions
+    }
+
+    struct CollectionImportIssue: Codable, Hashable, Sendable, Identifiable {
+        let row: Int
+        let field: String?
+        let message: String
+
+        var id: String { "\(row)-\(field ?? "")-\(message)" }
+    }
+
+    struct CollectionImportRow: Codable, Hashable, Sendable, Identifiable {
+        let row: Int
+        let tcg: String
+        let externalId: String
+        let cardName: String
+        let setCode: String?
+        let setName: String?
+        let rarity: String?
+        let binderName: String?
+        let quantity: Int
+        let condition: String?
+        let language: String?
+        let notes: String?
+        let price: Double?
+        let acquisitionPrice: Double?
+        let serialNumber: String?
+        let acquiredAt: String?
+        let isFoil: Bool
+        let isSigned: Bool
+        let isAltered: Bool
+        let tags: [String]
+
+        var id: String { "\(row)-\(tcg)-\(externalId)-\(binderName ?? "")" }
+    }
+
+    struct CollectionImportPreview: Codable, Sendable {
+        let valid: Bool
+        let rows: [CollectionImportRow]
+        let issues: [CollectionImportIssue]
+        let sourceRows: Int
+        let totalCopies: Int
+    }
+
+    struct CollectionImportResult: Codable, Sendable {
+        let valid: Bool
+        let rows: [CollectionImportRow]
+        let issues: [CollectionImportIssue]
+        let sourceRows: Int
+        let totalCopies: Int
+        let importedRows: Int
+        let importedCopies: Int
+        let createdBinders: [String]
+    }
+
+    func previewCollectionImport(
+        config: ServerConfiguration,
+        token: String,
+        csv: String,
+        options: CollectionImportOptions
+    ) async throws -> CollectionImportPreview {
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/import/preview",
+            method: "POST",
+            token: token,
+            body: CollectionImportRequest(csv: csv, options: options)
+        )
+        guard response.statusCode == 200 || response.statusCode == 422 else {
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let preview = try? JSONDecoder().decode(CollectionImportPreview.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return preview
+    }
+
+    func commitCollectionImport(
+        config: ServerConfiguration,
+        token: String,
+        csv: String,
+        options: CollectionImportOptions
+    ) async throws -> CollectionImportResult {
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/import/commit",
+            method: "POST",
+            token: token,
+            body: CollectionImportRequest(csv: csv, options: options)
+        )
+        guard response.statusCode == 201 || response.statusCode == 422 else {
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let result = try? JSONDecoder().decode(CollectionImportResult.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return result
+    }
+
     func getCollections(
         config: ServerConfiguration,
         token: String? = nil,
@@ -299,6 +411,13 @@ extension APIService {
         let price: Double?
         let acquisitionPrice: Double?
         let isFoil: Bool?
+        let finishCode: String?
+        let finishLabel: String?
+        let edition: String?
+        let stamp: String?
+        let isSealedPromo: Bool?
+        let isOversized: Bool?
+        let isPeelOff: Bool?
         let isSigned: Bool?
         let isAltered: Bool?
         let tags: [String]?
@@ -309,11 +428,30 @@ extension APIService {
             let name: String
             let tcg: String
             let externalId: String
+            let baseExternalId: String?
+            let printingKey: String?
+            let artworkId: String?
             let setCode: String?
             let setName: String?
             let rarity: String?
             let imageUrl: String?
             let imageUrlSmall: String?
+            let collectorNumber: String?
+            let releasedAt: String?
+            let setSymbolUrl: String?
+            let setLogoUrl: String?
+            let regulationMark: String?
+            let language: String?
+            let supertype: String?
+            let formatLegality: PokemonFormatLegality?
+            let dexEntries: [PokedexEntry]?
+            let region: String?
+            let pokemonPrint: PokemonPrintMetadata?
+            let attributes: [String: JSONValue]?
+            let provenance: JSONValue?
+            let legalityPeriods: [JSONValue]?
+            let evolution: JSONValue?
+            let functionalIdentity: JSONValue?
         }
     }
 
@@ -325,11 +463,30 @@ extension APIService {
             let name: String
             let tcg: String
             let externalId: String
+            let baseExternalId: String?
+            let printingKey: String?
+            let artworkId: String?
             let setCode: String?
             let setName: String?
             let rarity: String?
             let imageUrl: String?
             let imageUrlSmall: String?
+            let collectorNumber: String?
+            let releasedAt: String?
+            let setSymbolUrl: String?
+            let setLogoUrl: String?
+            let regulationMark: String?
+            let language: String?
+            let supertype: String?
+            let formatLegality: PokemonFormatLegality?
+            let dexEntries: [PokedexEntry]?
+            let region: String?
+            let pokemonPrint: PokemonPrintMetadata?
+            let attributes: [String: JSONValue]?
+            let provenance: JSONValue?
+            let legalityPeriods: [JSONValue]?
+            let evolution: JSONValue?
+            let functionalIdentity: JSONValue?
         }
     }
 
@@ -339,12 +496,64 @@ extension APIService {
         let language: String?
         let notes: String?
         let isFoil: Bool?
+        let variant: CardCopyVariant?
         let isSigned: Bool?
         let isAltered: Bool?
+        let gradingCompany: String?
+        let gradingScore: String?
+        let certNumber: String?
+        let storageLocation: String?
+        let includeOwnedCopyDetails: Bool
         let tags: [String]?
         let newTags: [TagPayload]?
         let cardOverride: CardOverride?
         let targetBinderId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case quantity, condition, language, notes, isFoil
+            case finishCode, finishLabel, edition, stamp
+            case isSealedPromo, isOversized, isPeelOff
+            case isSigned, isAltered, gradingCompany, gradingScore, certNumber, storageLocation
+            case tags, newTags, cardOverride, targetBinderId
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(quantity, forKey: .quantity)
+            try container.encodeIfPresent(condition, forKey: .condition)
+            try container.encodeIfPresent(language, forKey: .language)
+            try container.encodeIfPresent(notes, forKey: .notes)
+            try container.encodeIfPresent(isFoil, forKey: .isFoil)
+            if let variant {
+                if let value = variant.finishCode { try container.encode(value, forKey: .finishCode) }
+                else { try container.encodeNil(forKey: .finishCode) }
+                if let value = variant.finishLabel { try container.encode(value, forKey: .finishLabel) }
+                else { try container.encodeNil(forKey: .finishLabel) }
+                if let value = variant.edition { try container.encode(value, forKey: .edition) }
+                else { try container.encodeNil(forKey: .edition) }
+                if let value = variant.stamp { try container.encode(value, forKey: .stamp) }
+                else { try container.encodeNil(forKey: .stamp) }
+                try container.encode(variant.isSealedPromo, forKey: .isSealedPromo)
+                try container.encode(variant.isOversized, forKey: .isOversized)
+                try container.encode(variant.isPeelOff, forKey: .isPeelOff)
+            }
+            try container.encodeIfPresent(isSigned, forKey: .isSigned)
+            try container.encodeIfPresent(isAltered, forKey: .isAltered)
+            if includeOwnedCopyDetails {
+                if let gradingCompany { try container.encode(gradingCompany, forKey: .gradingCompany) }
+                else { try container.encodeNil(forKey: .gradingCompany) }
+                if let gradingScore { try container.encode(gradingScore, forKey: .gradingScore) }
+                else { try container.encodeNil(forKey: .gradingScore) }
+                if let certNumber { try container.encode(certNumber, forKey: .certNumber) }
+                else { try container.encodeNil(forKey: .certNumber) }
+                if let storageLocation { try container.encode(storageLocation, forKey: .storageLocation) }
+                else { try container.encodeNil(forKey: .storageLocation) }
+            }
+            try container.encodeIfPresent(tags, forKey: .tags)
+            try container.encodeIfPresent(newTags, forKey: .newTags)
+            try container.encodeIfPresent(cardOverride, forKey: .cardOverride)
+            try container.encodeIfPresent(targetBinderId, forKey: .targetBinderId)
+        }
     }
 
     func addCardToBinder(
@@ -359,6 +568,7 @@ extension APIService {
         price: Double? = nil,
         acquisitionPrice: Double? = nil,
         isFoil: Bool? = nil,
+        variant: CardCopyVariant = .empty,
         isSigned: Bool? = nil,
         isAltered: Bool? = nil,
         tags: [String]? = nil,
@@ -375,6 +585,9 @@ extension APIService {
                 notes: notes,
                 price: price,
                 acquisitionPrice: acquisitionPrice,
+                variant: variant,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 tagIds: tags,
                 newTags: newTags,
                 card: card
@@ -388,11 +601,30 @@ extension APIService {
                 name: card.name,
                 tcg: card.tcg,
                 externalId: card.id,
+                baseExternalId: card.baseExternalId,
+                printingKey: card.printingKey,
+                artworkId: card.artworkId,
                 setCode: card.setCode,
                 setName: card.setName,
                 rarity: card.rarity,
                 imageUrl: card.imageUrl,
-                imageUrlSmall: card.imageUrlSmall
+                imageUrlSmall: card.imageUrlSmall,
+                collectorNumber: card.collectorNumber,
+                releasedAt: card.releasedAt.map { ISO8601DateFormatter().string(from: $0) },
+                setSymbolUrl: card.setSymbolUrl,
+                setLogoUrl: card.setLogoUrl,
+                regulationMark: card.regulationMark,
+                language: card.language,
+                supertype: card.supertype,
+                formatLegality: card.formatLegality,
+                dexEntries: card.dexEntries,
+                region: card.region,
+                pokemonPrint: card.pokemonPrint,
+                attributes: card.attributes,
+                provenance: card.provenance,
+                legalityPeriods: card.legalityPeriods,
+                evolution: card.evolution,
+                functionalIdentity: card.functionalIdentity
             )
         } else {
             cardData = nil
@@ -406,7 +638,14 @@ extension APIService {
             notes: notes,
             price: price,
             acquisitionPrice: acquisitionPrice,
-            isFoil: isFoil,
+            isFoil: isFoil ?? variant.isFoil,
+            finishCode: variant.finishCode,
+            finishLabel: variant.finishLabel,
+            edition: variant.edition,
+            stamp: variant.stamp,
+            isSealedPromo: variant.isSealedPromo,
+            isOversized: variant.isOversized,
+            isPeelOff: variant.isPeelOff,
             isSigned: isSigned,
             isAltered: isAltered,
             tags: tags,
@@ -442,8 +681,14 @@ extension APIService {
         language: String? = nil,
         notes: String? = nil,
         isFoil: Bool? = nil,
+        variant: CardCopyVariant? = nil,
         isSigned: Bool? = nil,
         isAltered: Bool? = nil,
+        gradingCompany: String? = nil,
+        gradingScore: String? = nil,
+        certNumber: String? = nil,
+        storageLocation: String? = nil,
+        includeOwnedCopyDetails: Bool = false,
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         newPrint: Card? = nil,
@@ -457,6 +702,14 @@ extension APIService {
                 condition: condition,
                 language: language,
                 notes: notes,
+                variant: variant,
+                isSigned: isSigned,
+                isAltered: isAltered,
+                gradingCompany: gradingCompany,
+                gradingScore: gradingScore,
+                certNumber: certNumber,
+                storageLocation: storageLocation,
+                includeOwnedCopyDetails: includeOwnedCopyDetails,
                 tagIds: tags,
                 newTags: newTags,
                 newPrint: newPrint,
@@ -472,11 +725,30 @@ extension APIService {
                     name: print.name,
                     tcg: print.tcg,
                     externalId: print.id,
+                    baseExternalId: print.baseExternalId,
+                    printingKey: print.printingKey,
+                    artworkId: print.artworkId,
                     setCode: print.setCode,
                     setName: print.setName,
                     rarity: print.rarity,
                     imageUrl: print.imageUrl,
-                    imageUrlSmall: print.imageUrlSmall
+                    imageUrlSmall: print.imageUrlSmall,
+                    collectorNumber: print.collectorNumber,
+                    releasedAt: print.releasedAt.map { ISO8601DateFormatter().string(from: $0) },
+                    setSymbolUrl: print.setSymbolUrl,
+                    setLogoUrl: print.setLogoUrl,
+                    regulationMark: print.regulationMark,
+                    language: print.language,
+                    supertype: print.supertype,
+                    formatLegality: print.formatLegality,
+                    dexEntries: print.dexEntries,
+                    region: print.region,
+                    pokemonPrint: print.pokemonPrint,
+                    attributes: print.attributes,
+                    provenance: print.provenance,
+                    legalityPeriods: print.legalityPeriods,
+                    evolution: print.evolution,
+                    functionalIdentity: print.functionalIdentity
                 )
             )
         } else {
@@ -492,9 +764,15 @@ extension APIService {
             condition: condition,
             language: language,
             notes: notes,
-            isFoil: isFoil,
+            isFoil: isFoil ?? variant?.isFoil,
+            variant: variant,
             isSigned: isSigned,
             isAltered: isAltered,
+            gradingCompany: gradingCompany,
+            gradingScore: gradingScore,
+            certNumber: certNumber,
+            storageLocation: storageLocation,
+            includeOwnedCopyDetails: includeOwnedCopyDetails,
             tags: tags,
             newTags: newTags,
             cardOverride: cardOverride,

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { richCardMetadataFields } from "./cardMetadata";
 
 export const tcgCodeValidator = v.union(
   v.literal("yugioh"),
@@ -19,6 +20,9 @@ export const tagInputValidator = v.object({
 export const cardSnapshotValidator = v.object({
   tcg: tcgCodeValidator,
   externalId: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   name: v.string(),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
@@ -26,13 +30,17 @@ export const cardSnapshotValidator = v.object({
   collectorNumber: v.optional(v.string()),
   releasedAt: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
-  imageUrlSmall: v.optional(v.string())
+  imageUrlSmall: v.optional(v.string()),
+  ...richCardMetadataFields
 });
 
 export const cardSummaryValidator = v.object({
   id: v.id("cards"),
   tcg: tcgCodeValidator,
   externalId: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   name: v.string(),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
@@ -40,7 +48,8 @@ export const cardSummaryValidator = v.object({
   collectorNumber: v.optional(v.string()),
   releasedAt: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
-  imageUrlSmall: v.optional(v.string())
+  imageUrlSmall: v.optional(v.string()),
+  ...richCardMetadataFields
 });
 
 export const tagSummaryValidator = v.object({
@@ -66,8 +75,19 @@ export const entryValidator = v.object({
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),
+  finishCode: v.optional(v.string()),
+  finishLabel: v.optional(v.string()),
+  edition: v.optional(v.string()),
+  stamp: v.optional(v.string()),
+  isSealedPromo: v.optional(v.boolean()),
+  isOversized: v.optional(v.boolean()),
+  isPeelOff: v.optional(v.boolean()),
   isSigned: v.optional(v.boolean()),
   isAltered: v.optional(v.boolean()),
+  gradingCompany: v.optional(v.string()),
+  gradingScore: v.optional(v.string()),
+  certNumber: v.optional(v.string()),
+  storageLocation: v.optional(v.string()),
   imageUrls: v.optional(v.array(v.string())),
   tags: v.array(tagSummaryValidator),
   createdAt: v.string(),
@@ -81,6 +101,11 @@ export const binderSummaryValidator = v.object({
   name: v.string(),
   description: v.optional(v.string()),
   colorHex: v.optional(v.string()),
+  containerType: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  associatedTcg: v.optional(tcgCodeValidator),
+  associatedSetCode: v.optional(v.string()),
+  associatedSetName: v.optional(v.string()),
   entryCount: v.number(),
   createdAt: v.string(),
   updatedAt: v.string()
@@ -93,6 +118,11 @@ export const binderDetailValidator = v.object({
   name: v.string(),
   description: v.optional(v.string()),
   colorHex: v.optional(v.string()),
+  containerType: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  associatedTcg: v.optional(tcgCodeValidator),
+  associatedSetCode: v.optional(v.string()),
+  associatedSetName: v.optional(v.string()),
   entryCount: v.number(),
   entries: v.array(entryValidator),
   createdAt: v.string(),
@@ -165,14 +195,17 @@ export const wishlistCardValidator = v.object({
   externalId: v.string(),
   tcg: tcgCodeValidator,
   name: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
   rarity: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
   imageUrlSmall: v.optional(v.string()),
-  setSymbolUrl: v.optional(v.string()),
-  setLogoUrl: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
+  releasedAt: v.optional(v.string()),
+  ...richCardMetadataFields,
   notes: v.optional(v.string()),
   owned: v.boolean(),
   ownedQuantity: v.number(),

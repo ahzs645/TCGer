@@ -77,6 +77,8 @@ interface ScryfallCard {
   artist?: string;
   prices?: {
     usd?: string;
+    usd_foil?: string; // eslint-disable-line camelcase
+    usd_etched?: string; // eslint-disable-line camelcase
   };
 }
 
@@ -203,7 +205,7 @@ export class MagicAdapter implements TcgAdapter {
         .map((s) => ({
           code: s.code,
           name: s.name,
-          tcg: this.game as const,
+          tcg: this.game,
           releaseDate: s.released_at,
           totalCards: s.card_count,
           iconUrl: s.icon_svg_uri,
@@ -248,6 +250,12 @@ export class MagicAdapter implements TcgAdapter {
     const image = card.image_uris ?? face?.image_uris ?? {};
     const symbolUrl = card.set ? `https://svgs.scryfall.io/sets/${card.set}.svg` : undefined;
     const priceUsd = card.prices?.usd ? Number.parseFloat(card.prices.usd) : undefined;
+    const foilPriceUsd = card.prices?.usd_foil
+      ? Number.parseFloat(card.prices.usd_foil)
+      : undefined;
+    const etchedPriceUsd = card.prices?.usd_etched
+      ? Number.parseFloat(card.prices.usd_etched)
+      : undefined;
 
     return {
       id: card.id,
@@ -270,7 +278,9 @@ export class MagicAdapter implements TcgAdapter {
         power: card.power ?? face?.power,
         toughness: card.toughness ?? face?.toughness,
         artist: card.artist,
-        price_usd: priceUsd
+        price_usd: priceUsd,
+        price_usd_foil: foilPriceUsd,
+        price_usd_etched: etchedPriceUsd
       }
     };
   }

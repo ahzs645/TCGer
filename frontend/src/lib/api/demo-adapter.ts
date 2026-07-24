@@ -16,6 +16,12 @@ import {
   type DemoCard,
 } from "@/lib/data/demo-cards";
 import type { TcgCode } from "@/types/card";
+import type {
+  AddCardInput,
+  AddWishlistCardInput,
+  CollectionCardCopy,
+  UpdateCardInput,
+} from "@tcg/api-types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -73,23 +79,33 @@ function toCollectionCard(
   binderName: string,
   binderColor: string,
 ) {
+  const copies: CollectionCardCopy[] =
+    card.copies?.length
+      ? card.copies
+      : Array.from({ length: Math.max(1, card.quantity) }, (_, index) => ({
+            id: `${card.id}-copy-${index + 1}`,
+            condition: card.condition,
+            price: card.price,
+            tags: [],
+          }));
   return {
+    ...card.cardData,
     id: card.id,
     cardId: card.cardId,
+    externalId: card.cardData?.externalId ?? card.cardId,
     name: card.name,
     tcg: card.tcg,
     setCode: card.setCode,
     setName: card.setName,
     rarity: card.rarity,
+    languageCode: card.cardData?.language,
     quantity: card.quantity,
     condition: card.condition,
     price: card.price,
     binderId,
     binderName,
     binderColorHex: stripHash(binderColor),
-    copies: [
-      { id: card.id, condition: card.condition, price: card.price, tags: [] },
-    ],
+    copies,
   };
 }
 
@@ -107,6 +123,7 @@ function toBinder(b: DemoBinder) {
 
 function toWishlistCard(card: DemoWishlistCard) {
   return {
+    ...card.cardData,
     id: card.id,
     externalId: card.cardId,
     tcg: card.tcg,
@@ -140,6 +157,7 @@ function toWishlist(w: DemoWishlist) {
 }
 
 function demoCardToSearchResult(dc: DemoCard) {
+  const collectorNumber = dc.setCode.match(/-([^-]+)$/)?.[1];
   return {
     id: dc.id,
     tcg: dc.tcg,
@@ -147,8 +165,45 @@ function demoCardToSearchResult(dc: DemoCard) {
     setCode: dc.setCode,
     setName: dc.setName,
     rarity: dc.rarity,
+    collectorNumber,
     attributes: { price: dc.price },
   };
+}
+
+function demoSetCode(card: DemoCard): string {
+  return card.setCode.replace(/-[^-]+$/, "");
+}
+
+function demoSets(tcg?: TcgCode) {
+  const sets = new Map<
+    string,
+    {
+      code: string;
+      name: string;
+      tcg: TcgCode;
+      totalCards: number;
+    }
+  >();
+
+  for (const card of DEMO_CARDS) {
+    if (tcg && card.tcg !== tcg) continue;
+    const key = `${card.tcg}:${card.setName}`;
+    const existing = sets.get(key);
+    if (existing) {
+      existing.totalCards += 1;
+    } else {
+      sets.set(key, {
+        code: demoSetCode(card),
+        name: card.setName,
+        tcg: card.tcg,
+        totalCards: 1,
+      });
+    }
+  }
+
+  return Array.from(sets.values()).sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -335,12 +390,18 @@ function handleCollections(
   // PATCH /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
     const cardId = segments[2];
-    const binder = store().binders.find(
-      (b: DemoBinder) => b.id === collectionId,
+    const updated = store().updateCardInBinder(
+      collectionId,
+      cardId,
+      body as UpdateCardInput,
     );
-    const card = binder?.cards.find((c: DemoBinderCard) => c.id === cardId);
-    if (!binder || !card) return notFound("Card not found");
-    return json(toCollectionCard(card, binder.id, binder.name, binder.color));
+    const binder = store().binders.find(
+      (entry: DemoBinder) => entry.id === collectionId,
+    );
+    if (!binder || !updated) return notFound("Card not found");
+    return json(
+      toCollectionCard(updated, binder.id, binder.name, binder.color),
+    );
   }
 
   // DELETE /collections/:id/cards/:cardId
@@ -354,19 +415,7 @@ function handleCollections(
 }
 
 function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
-  const data = body as {
-    cardId: string;
-    quantity?: number;
-    price?: number;
-    cardData?: {
-      name: string;
-      tcg: string;
-      externalId: string;
-      setCode?: string;
-      setName?: string;
-      rarity?: string;
-    };
-  };
+  const data = body as AddCardInput;
   const demoCard =
     DEMO_CARDS.find((c) => c.id === data.cardId) ||
     (data.cardData
@@ -387,7 +436,30 @@ function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
     collectionId === "__library__" ? store().binders[0]?.id : collectionId;
 
   if (targetBinder) {
-    store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1);
+    store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
+      cardData: data.cardData,
+      copy: {
+        condition: data.condition,
+        language: data.language,
+        notes: data.notes,
+        price: data.price,
+        acquisitionPrice: data.acquisitionPrice,
+        isFoil: data.isFoil,
+        finishCode: data.finishCode,
+        finishLabel: data.finishLabel,
+        edition: data.edition,
+        stamp: data.stamp,
+        isSealedPromo: data.isSealedPromo,
+        isOversized: data.isOversized,
+        isPeelOff: data.isPeelOff,
+        isSigned: data.isSigned,
+        isAltered: data.isAltered,
+        gradingCompany: data.gradingCompany,
+        gradingScore: data.gradingScore,
+        certNumber: data.certNumber,
+        storageLocation: data.storageLocation,
+      },
+    });
   }
 
   return json({ success: true });
@@ -445,14 +517,7 @@ function handleWishlists(
 
   // POST /wishlists/:id/cards
   if (segments[1] === "cards" && segments.length === 2 && method === "POST") {
-    const data = body as {
-      externalId: string;
-      tcg: string;
-      name: string;
-      setCode?: string;
-      setName?: string;
-      rarity?: string;
-    };
+    const data = body as AddWishlistCardInput;
     const demoCard: DemoCard = DEMO_CARDS.find(
       (c) => c.id === data.externalId,
     ) || {
@@ -464,7 +529,7 @@ function handleWishlists(
       rarity: data.rarity || "Common",
       price: 0,
     };
-    store().addCardToWishlist(wishlistId, demoCard);
+    store().addCardToWishlist(wishlistId, demoCard, data);
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
     )!;
@@ -592,6 +657,26 @@ function handleCards(
   segments: string[],
   queryString?: string,
 ): Promise<Response> {
+  // GET /cards/sets?tcg=...
+  if (segments[0] === "sets" && segments.length === 1 && method === "GET") {
+    const params = new URLSearchParams(queryString || "");
+    const tcg = params.get("tcg") as TcgCode | null;
+    const sets = demoSets(tcg ?? undefined);
+    return json({ sets, total: sets.length });
+  }
+
+  // GET /cards/sets/:tcg/:setCode
+  if (segments[0] === "sets" && segments.length === 3 && method === "GET") {
+    const tcg = segments[1] as TcgCode;
+    const setCode = decodeURIComponent(segments[2]).toLocaleLowerCase();
+    const cards = DEMO_CARDS.filter(
+      (card) =>
+        card.tcg === tcg &&
+        demoSetCode(card).toLocaleLowerCase() === setCode,
+    ).map(demoCardToSearchResult);
+    return json({ cards, total: cards.length });
+  }
+
   // GET /cards/search?query=...&tcg=...
   if (segments[0] === "search" && method === "GET") {
     const params = new URLSearchParams(queryString || "");

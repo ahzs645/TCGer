@@ -133,7 +133,11 @@ struct CollectionCardRow: View {
     }
 
     private var hasAnyFoil: Bool {
-        card.copies.contains { $0.isFoil == true }
+        card.copies.contains { $0.isFoil == true || $0.collectibleVariant.isFoil }
+    }
+
+    private var variantLabels: [String] {
+        uniquePreservingOrder(card.copies.flatMap { $0.collectibleVariant.labels })
     }
 
     private var hasAnySigned: Bool {
@@ -257,6 +261,9 @@ struct CollectionCardRow: View {
 
                             if hasAnyFoil {
                                 AttributeBadge(icon: "sparkles", label: "Foil", color: .yellow)
+                            }
+                            ForEach(variantLabels.prefix(3), id: \.self) { label in
+                                AttributeBadge(icon: "circle.hexagongrid", label: label, color: .indigo)
                             }
                             if hasAnySigned {
                                 AttributeBadge(icon: "pencil.line", label: "Signed", color: .purple)
@@ -492,8 +499,8 @@ struct CollectionCardRow: View {
         }
 
         private var attributeLabels: [String] {
-            var labels: [String] = []
-            if copy.isFoil == true { labels.append("Foil") }
+            var labels = copy.collectibleVariant.labels
+            if copy.isFoil == true && labels.isEmpty { labels.append("Foil") }
             if copy.isSigned == true { labels.append("Signed") }
             if copy.isAltered == true { labels.append("Altered") }
             return labels

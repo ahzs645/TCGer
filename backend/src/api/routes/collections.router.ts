@@ -6,7 +6,11 @@ import {
   addLibraryCardSchema,
   updateCardSchema,
   tagPayloadSchema,
-  exportFormatSchema
+  exportFormatSchema,
+  collectionImportRequestSchema,
+  collectionMutationHistoryQuerySchema,
+  undoCollectionMutationSchema,
+  bulkAddRequestSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -26,6 +30,21 @@ import {
   removeImageFromCollection
 } from '../../modules/collections/collections.service';
 import { exportCollectionAsJson, exportCollectionAsCsv } from '../../modules/collections/export.service';
+import {
+  collectionImportTemplate,
+  commitCollectionImportSource,
+  previewCollectionImportSourceForUser
+} from '../../modules/collections/import.service';
+import {
+  CollectionAuditError,
+  getCollectionMutationHistory,
+  undoCollectionMutation
+} from '../../modules/collections/collection-audit.service';
+import {
+  BulkAddValidationError,
+  commitBulkAdd,
+  previewBulkAdd
+} from '../../modules/collections/bulk-add.service';
 import { asyncHandler } from '../../utils/async-handler';
 import { uploadImages, getImagePublicPath, deleteImageFile } from '../../utils/upload';
 
@@ -39,6 +58,110 @@ collectionsRouter.get(
     const userId = (req as AuthRequest).user!.id;
     const binders = await getUserBinders(userId);
     res.json(binders);
+  })
+);
+
+collectionsRouter.get(
+  '/import/template',
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="tcger-import-template.csv"');
+    res.send(collectionImportTemplate());
+  })
+);
+
+collectionsRouter.post(
+  '/import/preview',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const input = collectionImportRequestSchema.parse(req.body);
+    const preview = await previewCollectionImportSourceForUser(userId, input);
+    res.status(preview.valid ? 200 : 422).json(preview);
+  })
+);
+
+collectionsRouter.post(
+  '/import/commit',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const input = collectionImportRequestSchema.parse(req.body);
+    const result = await commitCollectionImportSource(userId, input);
+    res.status(result.valid ? 201 : 422).json(result);
+  })
+);
+
+collectionsRouter.post(
+  '/bulk/preview',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const input = bulkAddRequestSchema.parse(req.body);
+    const preview = await previewBulkAdd(userId, input);
+    res.status(preview.valid ? 200 : 422).json(preview);
+  })
+);
+
+collectionsRouter.post(
+  '/bulk',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const input = bulkAddRequestSchema.parse(req.body);
+    try {
+      const result = await commitBulkAdd(userId, input);
+      res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof BulkAddValidationError) {
+        return res.status(422).json({
+          error: 'VALIDATION_FAILED',
+          message: error.message,
+          issues: error.issues
+        });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.get(
+  '/history',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { limit } = collectionMutationHistoryQuerySchema.parse(req.query);
+    res.json(await getCollectionMutationHistory(userId, limit));
+  })
+);
+
+collectionsRouter.post(
+  '/history/:auditId/undo',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { auditId } = req.params;
+    const { idempotencyKey } = undoCollectionMutationSchema.parse(req.body);
+    try {
+      res.status(201).json(
+        await undoCollectionMutation(userId, auditId, idempotencyKey)
+      );
+    } catch (error) {
+      if (error instanceof CollectionAuditError) {
+        const status =
+          error.code === 'NOT_FOUND'
+            ? 404
+            : error.code === 'BAD_REQUEST'
+              ? 400
+              : 409;
+        return res.status(status).json({
+          error: error.code,
+          message: error.message
+        });
+      }
+      throw error;
+    }
   })
 );
 

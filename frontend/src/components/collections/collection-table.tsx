@@ -83,6 +83,13 @@ import { useCollectionsStore } from "@/stores/collections";
 import { useAuthStore } from "@/stores/auth";
 import { SetSymbol } from "@/components/cards/set-symbol";
 import { getAppRoute } from "@/lib/app-routes";
+import {
+  formatFinishLabel,
+  getCopyVariantBadges,
+  getPokemonFinishOptions,
+  isFoilFinish,
+  POKEMON_FINISH_CATALOG,
+} from "@/lib/pokemon-variants";
 
 type CardUpdateArgs = {
   cardId: string;
@@ -738,6 +745,7 @@ export function CollectionTable() {
                                 <TableHead data-oid="5bpptyy">Name</TableHead>
                                 <TableHead data-oid="x2b7603">Set</TableHead>
                                 <TableHead data-oid="uvm8n4a">Rarity</TableHead>
+                                <TableHead>Variant</TableHead>
                                 <TableHead
                                   className="text-right"
                                   data-oid="qx.f7ty"
@@ -829,6 +837,7 @@ const CONDITION_OPTIONS = [
   "Damaged",
 ];
 const EMPTY_CONDITION_VALUE = "__condition-empty__";
+const EMPTY_VARIANT_VALUE = "__variant-empty__";
 
 function CardDetailsPanel({
   card,
@@ -860,6 +869,12 @@ function CardDetailsPanel({
   const [selectedCopyId, setSelectedCopyId] = useState<string | null>(null);
   const [condition, setCondition] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [finishCode, setFinishCode] = useState("");
+  const [edition, setEdition] = useState("");
+  const [stamp, setStamp] = useState("");
+  const [isSealedPromo, setIsSealedPromo] = useState(false);
+  const [isOversized, setIsOversized] = useState(false);
+  const [isPeelOff, setIsPeelOff] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -895,9 +910,23 @@ function CardDetailsPanel({
     if (selectedCopy) {
       setCondition(selectedCopy.condition ?? null);
       setNotes(selectedCopy.notes ?? "");
+      setFinishCode(
+        selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : ""),
+      );
+      setEdition(selectedCopy.edition ?? "");
+      setStamp(selectedCopy.stamp ?? "");
+      setIsSealedPromo(selectedCopy.isSealedPromo ?? false);
+      setIsOversized(selectedCopy.isOversized ?? false);
+      setIsPeelOff(selectedCopy.isPeelOff ?? false);
     } else {
       setCondition(null);
       setNotes("");
+      setFinishCode("");
+      setEdition("");
+      setStamp("");
+      setIsSealedPromo(false);
+      setIsOversized(false);
+      setIsPeelOff(false);
     }
     setStatus("idle");
     setErrorMessage(null);
@@ -949,6 +978,35 @@ function CardDetailsPanel({
     return [selectedCopy.condition, ...CONDITION_OPTIONS];
   }, [selectedCopy?.condition]);
 
+  const finishChoices = useMemo(() => {
+    const choices = new Map(
+      POKEMON_FINISH_CATALOG.map((option) => [option.code, option]),
+    );
+    if (card?.pokemonPrint) {
+      for (const option of getPokemonFinishOptions(card)) {
+        choices.set(option.code, option);
+      }
+    }
+    if (selectedCopy?.finishCode) {
+      choices.set(selectedCopy.finishCode, {
+        code: selectedCopy.finishCode,
+        label: formatFinishLabel(
+          selectedCopy.finishCode,
+          selectedCopy.finishLabel,
+        ),
+      });
+    }
+    if (selectedCopy?.isFoil && !selectedCopy.finishCode) {
+      choices.set("foil", { code: "foil", label: "Foil" });
+    }
+    return [...choices.values()];
+  }, [
+    card,
+    selectedCopy?.finishCode,
+    selectedCopy?.finishLabel,
+    selectedCopy?.isFoil,
+  ]);
+
   const pendingPayload = useMemo<UpdateCollectionCardInput | null>(() => {
     if (!selectedCopy) {
       return null;
@@ -964,8 +1022,43 @@ function CardDetailsPanel({
       updates.notes = trimmed.length ? notes : null;
     }
 
+    const originalFinishCode =
+      selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : "");
+    if (finishCode !== originalFinishCode) {
+      updates.finishCode = finishCode || null;
+      updates.finishLabel = finishCode
+        ? formatFinishLabel(finishCode)
+        : null;
+      updates.isFoil = isFoilFinish(finishCode);
+    }
+    if (edition !== (selectedCopy.edition ?? "")) {
+      updates.edition = edition.trim() || null;
+    }
+    if (stamp !== (selectedCopy.stamp ?? "")) {
+      updates.stamp = stamp.trim() || null;
+    }
+    if (isSealedPromo !== (selectedCopy.isSealedPromo ?? false)) {
+      updates.isSealedPromo = isSealedPromo;
+    }
+    if (isOversized !== (selectedCopy.isOversized ?? false)) {
+      updates.isOversized = isOversized;
+    }
+    if (isPeelOff !== (selectedCopy.isPeelOff ?? false)) {
+      updates.isPeelOff = isPeelOff;
+    }
+
     return Object.keys(updates).length ? updates : null;
-  }, [selectedCopy, condition, notes]);
+  }, [
+    selectedCopy,
+    condition,
+    notes,
+    finishCode,
+    edition,
+    stamp,
+    isSealedPromo,
+    isOversized,
+    isPeelOff,
+  ]);
 
   const hasChanges = Boolean(pendingPayload);
   const canEdit = Boolean(card && binderId && selectedCopy);
@@ -1012,6 +1105,14 @@ function CardDetailsPanel({
   const handleReset = () => {
     setCondition(selectedCopy?.condition ?? null);
     setNotes(selectedCopy?.notes ?? "");
+    setFinishCode(
+      selectedCopy?.finishCode ?? (selectedCopy?.isFoil ? "foil" : ""),
+    );
+    setEdition(selectedCopy?.edition ?? "");
+    setStamp(selectedCopy?.stamp ?? "");
+    setIsSealedPromo(selectedCopy?.isSealedPromo ?? false);
+    setIsOversized(selectedCopy?.isOversized ?? false);
+    setIsPeelOff(selectedCopy?.isPeelOff ?? false);
     setStatus("idle");
     setErrorMessage(null);
   };
@@ -1217,6 +1318,22 @@ function CardDetailsPanel({
                   {card.condition ?? "Not specified"}
                 </p>
               </div>
+              {card.collectorNumber ? (
+                <div>
+                  <p className="uppercase tracking-wide">Collector no.</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    #{card.collectorNumber}
+                  </p>
+                </div>
+              ) : null}
+              {card.regulationMark ? (
+                <div>
+                  <p className="uppercase tracking-wide">Regulation</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {card.regulationMark}
+                  </p>
+                </div>
+              ) : null}
               {showPricing ? (
                 <div data-oid="0gp2j.1">
                   <p className="uppercase tracking-wide" data-oid="orfkuy-">
@@ -1253,6 +1370,7 @@ function CardDetailsPanel({
                 <div className="space-y-2" data-oid="ew106p.">
                   {copies.map((copy, index) => {
                     const isSelected = copy.id === selectedCopyId;
+                    const variantBadges = getCopyVariantBadges(copy);
                     return (
                       <button
                         key={copy.id}
@@ -1294,6 +1412,15 @@ function CardDetailsPanel({
                             className="flex flex-wrap gap-1"
                             data-oid="mc5m:56"
                           >
+                            {variantBadges.slice(0, 3).map((label) => (
+                              <Badge
+                                key={label}
+                                variant="outline"
+                                className="text-[10px]"
+                              >
+                                {label}
+                              </Badge>
+                            ))}
                             {copy.tags?.length ? (
                               copy.tags.slice(0, 2).map((tag) => (
                                 <Badge
@@ -1478,6 +1605,106 @@ function CardDetailsPanel({
                   </Select>
                 </div>
 
+                {card.tcg === "pokemon" ? (
+                  <div className="space-y-3 rounded-lg border bg-background/50 p-3">
+                    <div>
+                      <p className="text-sm font-medium">Collectible variant</p>
+                      <p className="text-xs text-muted-foreground">
+                        Finish and physical attributes for this individual copy.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="copy-finish">Finish</Label>
+                      <Select
+                        value={finishCode || EMPTY_VARIANT_VALUE}
+                        onValueChange={(value) =>
+                          setFinishCode(
+                            value === EMPTY_VARIANT_VALUE ? "" : value,
+                          )
+                        }
+                        disabled={!canEdit}
+                      >
+                        <SelectTrigger id="copy-finish">
+                          <SelectValue placeholder="Not specified" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={EMPTY_VARIANT_VALUE}>
+                            Not specified
+                          </SelectItem>
+                          {finishChoices.map((finish) => (
+                            <SelectItem
+                              key={finish.code}
+                              value={finish.code}
+                            >
+                              {finish.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="copy-edition">Edition</Label>
+                        <Input
+                          id="copy-edition"
+                          value={edition}
+                          onChange={(event) => setEdition(event.target.value)}
+                          placeholder="e.g. 1st Edition"
+                          disabled={!canEdit}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="copy-stamp">Stamp</Label>
+                        <Input
+                          id="copy-stamp"
+                          value={stamp}
+                          onChange={(event) => setStamp(event.target.value)}
+                          placeholder="e.g. Prerelease"
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      {[
+                        {
+                          id: "copy-sealed-promo",
+                          label: "Sealed promo",
+                          checked: isSealedPromo,
+                          setChecked: setIsSealedPromo,
+                        },
+                        {
+                          id: "copy-oversized",
+                          label: "Oversized",
+                          checked: isOversized,
+                          setChecked: setIsOversized,
+                        },
+                        {
+                          id: "copy-peel-off",
+                          label: "Peel-off",
+                          checked: isPeelOff,
+                          setChecked: setIsPeelOff,
+                        },
+                      ].map((option) => (
+                        <Label
+                          key={option.id}
+                          htmlFor={option.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs font-normal"
+                        >
+                          <Checkbox
+                            id={option.id}
+                            checked={option.checked}
+                            onCheckedChange={(checked) =>
+                              option.setChecked(checked === true)
+                            }
+                            disabled={!canEdit}
+                          />
+                          {option.label}
+                        </Label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="space-y-2" data-oid="f.gst3p">
                   <Label htmlFor="card-notes" data-oid="01jkp:.">
                     Notes
@@ -1602,6 +1829,9 @@ function CollectionRow({
         color: binderAccent,
       }
     : undefined;
+  const variantLabels = Array.from(
+    new Set(card.copies.flatMap((copy) => getCopyVariantBadges(copy))),
+  );
 
   return (
     <TableRow
@@ -1691,6 +1921,24 @@ function CollectionRow({
         </span>
       </TableCell>
       <TableCell data-oid="sujciun">{card.rarity ?? "N/A"}</TableCell>
+      <TableCell>
+        {variantLabels.length ? (
+          <div className="flex max-w-[180px] flex-wrap gap-1">
+            {variantLabels.slice(0, 2).map((label) => (
+              <Badge key={label} variant="outline" className="text-[10px]">
+                {label}
+              </Badge>
+            ))}
+            {variantLabels.length > 2 ? (
+              <Badge variant="secondary" className="text-[10px]">
+                +{variantLabels.length - 2}
+              </Badge>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="text-right" data-oid="c76_pq5">
         {card.quantity}
       </TableCell>

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const yugiohDeckZoneSchema = z.enum(['main', 'extra', 'side']);
+export type YugiohDeckZone = z.infer<typeof yugiohDeckZoneSchema>;
+
 // ---------------------------------------------------------------------------
 // Request schemas
 // ---------------------------------------------------------------------------
@@ -30,6 +33,7 @@ export const addDeckCardSchema = z.object({
   tcg: z.string().min(1),
   name: z.string().min(1),
   quantity: z.number().int().positive().default(1),
+  zone: yugiohDeckZoneSchema.optional(),
   isCommander: z.boolean().optional(),
   isSideboard: z.boolean().optional(),
   imageUrl: z.string().optional(),
@@ -42,6 +46,7 @@ export type AddDeckCardInput = z.infer<typeof addDeckCardSchema>;
 
 export const updateDeckCardSchema = z.object({
   quantity: z.number().int().positive().optional(),
+  zone: yugiohDeckZoneSchema.optional(),
   isCommander: z.boolean().optional(),
   isSideboard: z.boolean().optional()
 }).refine(data => Object.values(data).some(v => v !== undefined), {
@@ -50,7 +55,7 @@ export const updateDeckCardSchema = z.object({
 export type UpdateDeckCardInput = z.infer<typeof updateDeckCardSchema>;
 
 export const importDeckSchema = z.object({
-  source: z.enum(['text', 'moxfield', 'archidekt', 'mtggoldfish', 'arena', 'ygoprodeck']),
+  source: z.enum(['text', 'moxfield', 'archidekt', 'mtggoldfish', 'arena', 'ygoprodeck', 'ydk']),
   data: z.string().min(1),
   name: z.string().optional(),
   tcg: z.enum(['magic', 'yugioh', 'pokemon']).optional(),
@@ -59,8 +64,24 @@ export const importDeckSchema = z.object({
 export type ImportDeckInput = z.infer<typeof importDeckSchema>;
 
 export const validateDeckSchema = z.object({
-  format: z.string().optional()
+  format: z.string().optional(),
+  banlist: z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('classical'),
+      name: z.string().min(1),
+      effectiveDate: z.string().optional(),
+      cards: z.record(z.string())
+    }),
+    z.object({
+      type: z.literal('genesys'),
+      name: z.string().min(1),
+      effectiveDate: z.string().optional(),
+      maxPoints: z.number().nonnegative(),
+      cards: z.record(z.number())
+    })
+  ]).optional()
 });
+export type ValidateDeckInput = z.infer<typeof validateDeckSchema>;
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -72,6 +93,7 @@ export interface DeckCardResponse {
   tcg: string;
   name: string;
   quantity: number;
+  zone: YugiohDeckZone;
   isCommander: boolean;
   isSideboard: boolean;
   imageUrl?: string;
@@ -98,6 +120,7 @@ export interface DeckResponse {
 export interface DeckAnalysis {
   totalCards: number;
   mainDeckCount: number;
+  extraDeckCount: number;
   sideboardCount: number;
   manaCurve: Record<number, number>;
   colorDistribution: Record<string, number>;
@@ -111,6 +134,29 @@ export interface DeckValidationResult {
   errors: string[];
   warnings: string[];
   format?: string;
+  points?: number;
+  violations?: Array<{
+    externalId?: string;
+    name?: string;
+    zone?: YugiohDeckZone;
+    message: string;
+  }>;
+}
+
+export interface DeckOwnershipResult {
+  owned: Array<{ externalId: string; quantity: number }>;
+  missing: Array<{
+    externalId: string;
+    name: string;
+    quantity: number;
+    zone: YugiohDeckZone;
+  }>;
+  missingCount: number;
+}
+
+export interface YdkExportResult {
+  content: string;
+  skipped: Array<{ externalId: string; name: string; reason: string }>;
 }
 
 export interface DeckImportResult {

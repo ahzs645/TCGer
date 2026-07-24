@@ -21,7 +21,7 @@ export async function parseImportSource(input: ImportDeckInput): Promise<{ cards
       try {
         const res = await fetch(`https://api2.moxfield.com/v3/decks/all/${deckId}`);
         if (!res.ok) throw new Error('Moxfield API error');
-        const data = await res.json();
+        const data = await res.json() as any;
         const cards: ImportedCard[] = [];
         for (const [, v] of Object.entries(data.mainboard || {})) {
           const entry = v as any;
@@ -43,7 +43,7 @@ export async function parseImportSource(input: ImportDeckInput): Promise<{ cards
       try {
         const res = await fetch(`https://archidekt.com/api/decks/${deckId}/`);
         if (!res.ok) throw new Error('Archidekt API error');
-        const data = await res.json();
+        const data = await res.json() as any;
         const cards: ImportedCard[] = (data.cards || []).map((c: any) => ({
           name: c.card?.oracleCard?.name || c.card?.name || '',
           quantity: c.quantity || 1,

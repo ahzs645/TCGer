@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEMO_CARDS, type DemoCard, type DemoTcg } from "@/lib/data/demo-cards";
+import type {
+  AddWishlistCardInput,
+  CardDataPayload,
+  CollectionCardCopy,
+  UpdateCardInput,
+} from "@tcg/api-types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -18,6 +24,8 @@ export interface DemoBinderCard {
   price: number;
   quantity: number;
   addedAt: string;
+  cardData?: CardDataPayload;
+  copies?: CollectionCardCopy[];
 }
 
 export interface DemoBinder {
@@ -38,6 +46,34 @@ export interface DemoWishlistCard {
   setName: string;
   rarity: string;
   addedAt: string;
+  cardData?: AddWishlistCardInput;
+}
+
+interface DemoCopyInput {
+  condition?: string;
+  language?: string;
+  notes?: string;
+  price?: number;
+  acquisitionPrice?: number;
+  isFoil?: boolean;
+  finishCode?: string;
+  finishLabel?: string;
+  edition?: string;
+  stamp?: string;
+  isSealedPromo?: boolean;
+  isOversized?: boolean;
+  isPeelOff?: boolean;
+  isSigned?: boolean;
+  isAltered?: boolean;
+  gradingCompany?: string;
+  gradingScore?: string;
+  certNumber?: string;
+  storageLocation?: string;
+}
+
+interface DemoCardPersistence {
+  cardData?: CardDataPayload;
+  copy?: DemoCopyInput;
 }
 
 export interface DemoWishlist {
@@ -61,6 +97,32 @@ export interface DemoProfile {
 let _idCounter = Date.now();
 function uid(): string {
   return `demo-${(++_idCounter).toString(36)}`;
+}
+
+function makeDemoCopy(input: DemoCopyInput = {}): CollectionCardCopy {
+  return {
+    id: uid(),
+    condition: input.condition,
+    language: input.language,
+    notes: input.notes,
+    price: input.price,
+    acquisitionPrice: input.acquisitionPrice,
+    isFoil: input.isFoil,
+    finishCode: input.finishCode,
+    finishLabel: input.finishLabel,
+    edition: input.edition,
+    stamp: input.stamp,
+    isSealedPromo: input.isSealedPromo,
+    isOversized: input.isOversized,
+    isPeelOff: input.isPeelOff,
+    isSigned: input.isSigned,
+    isAltered: input.isAltered,
+    gradingCompany: input.gradingCompany,
+    gradingScore: input.gradingScore,
+    certNumber: input.certNumber,
+    storageLocation: input.storageLocation,
+    tags: [],
+  };
 }
 
 const CONDITIONS = [
@@ -91,19 +153,25 @@ const BINDER_COLORS = [
 function seedBinders(): DemoBinder[] {
   const now = new Date().toISOString();
 
-  const makeCard = (card: DemoCard, qty = 1): DemoBinderCard => ({
-    id: uid(),
-    cardId: card.id,
-    name: card.name,
-    tcg: card.tcg,
-    setCode: card.setCode,
-    setName: card.setName,
-    rarity: card.rarity,
-    condition: randomCondition(),
-    price: card.price,
-    quantity: qty,
-    addedAt: now,
-  });
+  const makeCard = (card: DemoCard, qty = 1): DemoBinderCard => {
+    const condition = randomCondition();
+    return {
+      id: uid(),
+      cardId: card.id,
+      name: card.name,
+      tcg: card.tcg,
+      setCode: card.setCode,
+      setName: card.setName,
+      rarity: card.rarity,
+      condition,
+      price: card.price,
+      quantity: qty,
+      addedAt: now,
+      copies: Array.from({ length: qty }, () =>
+        makeDemoCopy({ condition, price: card.price }),
+      ),
+    };
+  };
 
   const ygoCards = DEMO_CARDS.filter((c) => c.tcg === "yugioh");
   const mtgCards = DEMO_CARDS.filter((c) => c.tcg === "magic");
@@ -273,13 +341,23 @@ interface DemoState {
     binderId: string,
     card: DemoCard,
     quantity?: number,
+    details?: DemoCardPersistence,
   ) => void;
+  updateCardInBinder: (
+    binderId: string,
+    cardOrCopyId: string,
+    updates: UpdateCardInput,
+  ) => DemoBinderCard | null;
   removeCardFromBinder: (binderId: string, cardInstanceId: string) => void;
 
   // Wishlists
   addWishlist: (name: string, description?: string) => string;
   removeWishlist: (id: string) => void;
-  addCardToWishlist: (wishlistId: string, card: DemoCard) => void;
+  addCardToWishlist: (
+    wishlistId: string,
+    card: DemoCard,
+    cardData?: AddWishlistCardInput,
+  ) => void;
   removeCardFromWishlist: (wishlistId: string, cardInstanceId: string) => void;
 
   // Queries
@@ -361,20 +439,52 @@ export const useDemoStore = create<DemoState>()(
         }));
       },
 
-      addCardToBinder: (binderId, card, quantity = 1) => {
+      addCardToBinder: (binderId, card, quantity = 1, details) => {
         const now = new Date().toISOString();
+        const copyInput: DemoCopyInput = {
+          condition: details?.copy?.condition ?? "Near Mint",
+          language: details?.copy?.language,
+          notes: details?.copy?.notes,
+          price: details?.copy?.price ?? card.price,
+          acquisitionPrice: details?.copy?.acquisitionPrice,
+          isFoil: details?.copy?.isFoil,
+          finishCode: details?.copy?.finishCode,
+          finishLabel: details?.copy?.finishLabel,
+          edition: details?.copy?.edition,
+          stamp: details?.copy?.stamp,
+          isSealedPromo: details?.copy?.isSealedPromo,
+          isOversized: details?.copy?.isOversized,
+          isPeelOff: details?.copy?.isPeelOff,
+          isSigned: details?.copy?.isSigned,
+          isAltered: details?.copy?.isAltered,
+        };
+        const newCopies = Array.from({ length: quantity }, () =>
+          makeDemoCopy(copyInput),
+        );
         set((state) => ({
           binders: state.binders.map((b) => {
             if (b.id !== binderId) return b;
-            // If card already exists in binder, increment quantity
             const existing = b.cards.find((c) => c.cardId === card.id);
             if (existing) {
+              const existingCopies =
+                existing.copies ??
+                Array.from({ length: existing.quantity }, () =>
+                  makeDemoCopy({
+                    condition: existing.condition,
+                    price: existing.price,
+                  }),
+                );
               return {
                 ...b,
                 updatedAt: now,
                 cards: b.cards.map((c) =>
                   c.cardId === card.id
-                    ? { ...c, quantity: c.quantity + quantity }
+                    ? {
+                        ...c,
+                        quantity: existingCopies.length + newCopies.length,
+                        cardData: details?.cardData ?? c.cardData,
+                        copies: [...existingCopies, ...newCopies],
+                      }
                     : c,
                 ),
               };
@@ -396,11 +506,138 @@ export const useDemoStore = create<DemoState>()(
                   price: card.price,
                   quantity,
                   addedAt: now,
+                  cardData: details?.cardData,
+                  copies: newCopies,
                 },
               ],
             };
           }),
         }));
+      },
+
+      updateCardInBinder: (binderId, cardOrCopyId, updates) => {
+        let updatedResult: DemoBinderCard | null = null;
+        set((state) => ({
+          binders: state.binders.map((binder) => {
+            if (binder.id !== binderId) return binder;
+            const cardIndex = binder.cards.findIndex(
+              (card) =>
+                card.id === cardOrCopyId ||
+                card.copies?.some((copy) => copy.id === cardOrCopyId),
+            );
+            if (cardIndex < 0) return binder;
+
+            const current = binder.cards[cardIndex];
+            const fallbackCopies =
+              current.copies ??
+              Array.from({ length: current.quantity }, () =>
+                makeDemoCopy({
+                  condition: current.condition,
+                  price: current.price,
+                }),
+              );
+            const targetsWholeCard = current.id === cardOrCopyId;
+            const copyUpdates = fallbackCopies.map((copy) => {
+              if (!targetsWholeCard && copy.id !== cardOrCopyId) return copy;
+              return {
+                ...copy,
+                condition:
+                  updates.condition === undefined
+                    ? copy.condition
+                    : (updates.condition ?? undefined),
+                language:
+                  updates.language === undefined
+                    ? copy.language
+                    : (updates.language ?? undefined),
+                notes:
+                  updates.notes === undefined
+                    ? copy.notes
+                    : (updates.notes ?? undefined),
+                isFoil: updates.isFoil ?? copy.isFoil,
+                finishCode:
+                  updates.finishCode === undefined
+                    ? copy.finishCode
+                    : (updates.finishCode ?? undefined),
+                finishLabel:
+                  updates.finishLabel === undefined
+                    ? copy.finishLabel
+                    : (updates.finishLabel ?? undefined),
+                edition:
+                  updates.edition === undefined
+                    ? copy.edition
+                    : (updates.edition ?? undefined),
+                stamp:
+                  updates.stamp === undefined
+                    ? copy.stamp
+                    : (updates.stamp ?? undefined),
+                isSealedPromo:
+                  updates.isSealedPromo ?? copy.isSealedPromo,
+                isOversized: updates.isOversized ?? copy.isOversized,
+                isPeelOff: updates.isPeelOff ?? copy.isPeelOff,
+                isSigned: updates.isSigned ?? copy.isSigned,
+                isAltered: updates.isAltered ?? copy.isAltered,
+                gradingCompany:
+                  updates.gradingCompany === undefined
+                    ? copy.gradingCompany
+                    : (updates.gradingCompany ?? undefined),
+                gradingScore:
+                  updates.gradingScore === undefined
+                    ? copy.gradingScore
+                    : (updates.gradingScore ?? undefined),
+                certNumber:
+                  updates.certNumber === undefined
+                    ? copy.certNumber
+                    : (updates.certNumber ?? undefined),
+                storageLocation:
+                  updates.storageLocation === undefined
+                    ? copy.storageLocation
+                    : (updates.storageLocation ?? undefined),
+              };
+            });
+
+            let copies = copyUpdates;
+            if (updates.quantity !== undefined && targetsWholeCard) {
+              const desired = Math.max(1, updates.quantity);
+              if (desired < copies.length) {
+                copies = copies.slice(0, desired);
+              } else {
+                const template = copies[0] ?? makeDemoCopy();
+                while (copies.length < desired) {
+                  copies = [
+                    ...copies,
+                    { ...template, id: uid(), serialNumber: undefined },
+                  ];
+                }
+              }
+            }
+
+            const override = updates.cardOverride;
+            const cardData = override?.cardData ?? current.cardData;
+            const next: DemoBinderCard = {
+              ...current,
+              cardId: override?.cardId ?? current.cardId,
+              name: cardData?.name ?? current.name,
+              tcg: (cardData?.tcg as DemoTcg | undefined) ?? current.tcg,
+              setCode: cardData?.setCode ?? current.setCode,
+              setName: cardData?.setName ?? current.setName,
+              rarity: cardData?.rarity ?? current.rarity,
+              condition: copies[0]?.condition ?? current.condition,
+              price: copies[0]?.price ?? current.price,
+              quantity: copies.length,
+              cardData,
+              copies,
+            };
+            updatedResult = next;
+            const cards = [...binder.cards];
+            cards[cardIndex] = next;
+            return {
+              ...binder,
+              updatedAt: new Date().toISOString(),
+              cards,
+            };
+          }),
+        }));
+        return updatedResult;
       },
 
       removeCardFromBinder: (binderId, cardInstanceId) => {
@@ -442,7 +679,7 @@ export const useDemoStore = create<DemoState>()(
         }));
       },
 
-      addCardToWishlist: (wishlistId, card) => {
+      addCardToWishlist: (wishlistId, card, cardData) => {
         set((state) => ({
           wishlists: state.wishlists.map((w) => {
             if (w.id !== wishlistId) return w;
@@ -460,6 +697,7 @@ export const useDemoStore = create<DemoState>()(
                   setName: card.setName,
                   rarity: card.rarity,
                   addedAt: new Date().toISOString(),
+                  cardData,
                 },
               ],
             };

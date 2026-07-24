@@ -1,8 +1,13 @@
 import { prisma } from '../../lib/prisma';
+import type { Prisma } from '@prisma/client';
 import type { CreateNotificationChannelInput } from '@tcg/api-types';
 import { sendEmail } from './channels/email.channel';
 import { sendDiscord } from './channels/discord.channel';
 import { sendTelegram } from './channels/telegram.channel';
+
+function asPrismaJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
 
 // ---------------------------------------------------------------------------
 // Notification Channels CRUD
@@ -17,7 +22,12 @@ export async function getUserChannels(userId: string) {
 
 export async function createChannel(userId: string, input: CreateNotificationChannelInput) {
   return prisma.notificationChannel.create({
-    data: { userId, type: input.type, config: input.config, enabled: input.enabled ?? true }
+    data: {
+      userId,
+      type: input.type,
+      config: asPrismaJson(input.config),
+      enabled: input.enabled ?? true
+    }
   });
 }
 
@@ -64,7 +74,13 @@ export async function markAllRead(userId: string) {
 export async function sendNotification(userId: string, type: string, title: string, body: string, data?: Record<string, unknown>) {
   // Create in-app notification
   await prisma.notification.create({
-    data: { userId, type, title, body, data: data ?? undefined }
+    data: {
+      userId,
+      type,
+      title,
+      body,
+      data: data ? asPrismaJson(data) : undefined
+    }
   });
 
   // Dispatch to active channels

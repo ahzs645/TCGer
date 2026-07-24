@@ -53,8 +53,8 @@ struct CardScannerView: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(item: $selectedCardForBinder) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
-                await addCardToBinder(
+            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
+                try await addCardToBinder(
                     card: card,
                     binderId: binderId,
                     quantity: quantity,
@@ -62,6 +62,7 @@ struct CardScannerView: View {
                     language: language,
                     notes: notes,
                     isFoil: isFoil,
+                    variant: variant,
                     isSigned: isSigned,
                     isAltered: isAltered
                 )
@@ -371,35 +372,32 @@ struct CardScannerView: View {
         language: String?,
         notes: String?,
         isFoil: Bool = false,
+        variant: CardCopyVariant = .empty,
         isSigned: Bool = false,
         isAltered: Bool = false
-    ) async {
+    ) async throws {
         guard let token = environmentStore.authToken else {
-            viewModel.errorMessage = "Not authenticated."
-            return
+            throw APIService.APIError.unauthorized
         }
 
         let apiService = APIService()
-        do {
-            try await apiService.addCardToBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: binderId,
-                cardId: card.id,
-                quantity: quantity,
-                condition: condition,
-                language: language,
-                notes: notes,
-                price: card.price,
-                acquisitionPrice: nil,
-                isFoil: isFoil,
-                isSigned: isSigned,
-                isAltered: isAltered,
-                card: card
-            )
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
-        }
+        try await apiService.addCardToBinder(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            binderId: binderId,
+            cardId: card.id,
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes,
+            price: card.price,
+            acquisitionPrice: nil,
+            isFoil: isFoil,
+            variant: variant,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            card: card
+        )
     }
 }
 

@@ -590,7 +590,11 @@ async function scanFrameProposalsWithDetector(
   seconds: number,
   tcg: SupportedTcg,
   maxProposals: number,
-  scanCardImageFn: (imageBuffer: Buffer, tcgFilter?: string, options?: { maxDistanceOverride?: number }) => Promise<ScanResult>
+  scanCardImageFn: (
+    imageBuffer: Buffer,
+    tcgFilter?: string,
+    options?: { maxDistanceOverride?: number; ocrNameHint?: string }
+  ) => Promise<ScanResult>
 ): Promise<FrameProposal[]> {
   const frameBuffer = await readFile(framePath);
   const frameImage = sharp(frameBuffer);

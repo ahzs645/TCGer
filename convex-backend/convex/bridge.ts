@@ -18,6 +18,10 @@ import {
 } from "./lib/domain";
 import {
   addEntryForViewer,
+  bulkAddDefaultsValidator,
+  bulkAddForViewer,
+  bulkAddResultValidator,
+  bulkAddRowValidator,
   hydrateBinderDetail,
   hydrateEntry,
   removeEntryForViewer,
@@ -25,11 +29,25 @@ import {
   upsertCard
 } from "./lib/library";
 import {
+  mergeRichCardMetadata,
+  normalizeOptionalIdentifier,
+  pickRichCardMetadata,
+  richCardMetadataFields,
+  type RichCardSnapshot
+} from "./lib/cardMetadata";
+import {
+  appendCollectionAudit,
+  snapshotAuditEntries,
+  undoAuditedCollectionMutation
+} from "./lib/collectionAudit";
+import { collectionMutationAuditEntryValidator } from "./lib/auditValidators";
+import {
   adminAppSettingsValidator,
   appSettingsValidator,
   binderDetailValidator,
   entryValidator,
   tagSummaryValidator,
+  tcgCodeValidator,
   userPreferencesValidator,
   userProfileValidator,
   viewerValidator,
@@ -46,30 +64,55 @@ type BridgeIdentity = {
   username?: string;
 };
 
-type CardSnapshot = {
-  tcg: "yugioh" | "magic" | "pokemon";
-  externalId: string;
-  name: string;
-  setCode?: string;
-  setName?: string;
-  rarity?: string;
-  collectorNumber?: string;
-  releasedAt?: string;
-  imageUrl?: string;
-  imageUrlSmall?: string;
-};
-
 const cardSnapshotInput = v.object({
   name: v.string(),
   tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
   externalId: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
   rarity: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   releasedAt: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
-  imageUrlSmall: v.optional(v.string())
+  imageUrlSmall: v.optional(v.string()),
+  ...richCardMetadataFields
+});
+
+const collectionImportRowInput = v.object({
+  row: v.number(),
+  tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
+  externalId: v.string(),
+  cardName: v.string(),
+  setCode: v.optional(v.string()),
+  setName: v.optional(v.string()),
+  rarity: v.optional(v.string()),
+  binderName: v.optional(v.string()),
+  quantity: v.number(),
+  condition: v.optional(v.string()),
+  language: v.optional(v.string()),
+  notes: v.optional(v.string()),
+  price: v.optional(v.number()),
+  acquisitionPrice: v.optional(v.number()),
+  serialNumber: v.optional(v.string()),
+  acquiredAt: v.optional(v.string()),
+  isFoil: v.boolean(),
+  finishCode: v.optional(v.string()),
+  finishLabel: v.optional(v.string()),
+  edition: v.optional(v.string()),
+  stamp: v.optional(v.string()),
+  isSealedPromo: v.boolean(),
+  isOversized: v.boolean(),
+  isPeelOff: v.boolean(),
+  isSigned: v.boolean(),
+  isAltered: v.boolean(),
+  gradingCompany: v.optional(v.string()),
+  gradingScore: v.optional(v.string()),
+  certNumber: v.optional(v.string()),
+  storageLocation: v.optional(v.string()),
+  tags: v.array(v.string())
 });
 
 const nullableString = v.union(v.string(), v.null());
@@ -106,14 +149,17 @@ const wishlistCardInput = v.object({
   externalId: v.string(),
   tcg: v.union(v.literal("yugioh"), v.literal("magic"), v.literal("pokemon")),
   name: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
   rarity: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
   imageUrlSmall: v.optional(v.string()),
-  setSymbolUrl: v.optional(v.string()),
-  setLogoUrl: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
+  releasedAt: v.optional(v.string()),
+  ...richCardMetadataFields,
   notes: v.optional(v.string())
 });
 
@@ -237,6 +283,9 @@ function toWishlistCardResponse(
     externalId: card.externalId,
     tcg: card.tcg,
     name: card.name,
+    baseExternalId: card.baseExternalId,
+    printingKey: card.printingKey,
+    artworkId: card.artworkId,
     setCode: card.setCode,
     setName: card.setName,
     rarity: card.rarity,
@@ -245,6 +294,8 @@ function toWishlistCardResponse(
     setSymbolUrl: card.setSymbolUrl,
     setLogoUrl: card.setLogoUrl,
     collectorNumber: card.collectorNumber,
+    releasedAt: card.releasedAt,
+    ...pickRichCardMetadata(card),
     notes: card.notes,
     owned: ownedQuantity > 0,
     ownedQuantity,
@@ -471,15 +522,20 @@ async function getGroupEntries(
 ) {
   const entries = await ctx.db
     .query("collectionEntries")
-    .withIndex("by_binder", (q) => q.eq("binderId", binderId))
+    .withIndex("by_binder_and_card", (q) =>
+      q.eq("binderId", binderId).eq("cardId", cardId)
+    )
     .collect();
-  return entries.filter((entry) => entry.userId === userId && entry.cardId === cardId);
+  return entries.filter((entry) => entry.userId === userId);
 }
 
-function toCardSnapshot(card: Doc<"cards">): CardSnapshot {
+function toCardSnapshot(card: Doc<"cards">): RichCardSnapshot {
   return {
     tcg: card.tcg,
     externalId: card.externalId,
+    baseExternalId: card.baseExternalId,
+    printingKey: card.printingKey,
+    artworkId: card.artworkId,
     name: card.name,
     setCode: card.setCode,
     setName: card.setName,
@@ -487,33 +543,31 @@ function toCardSnapshot(card: Doc<"cards">): CardSnapshot {
     collectorNumber: card.collectorNumber,
     releasedAt: card.releasedAt,
     imageUrl: card.imageUrl,
-    imageUrlSmall: card.imageUrlSmall
+    imageUrlSmall: card.imageUrlSmall,
+    ...pickRichCardMetadata(card)
   };
 }
 
 async function resolveStoredCard(ctx: ReaderCtx, cardId: string) {
-  const byInternalId = (await ctx.db
-    .query("cards")
-    .collect())
-    .find((card) => card._id === cardId);
-
-  if (byInternalId) {
-    return byInternalId;
+  const normalizedId = ctx.db.normalizeId("cards", cardId);
+  if (normalizedId) {
+    const byInternalId = await ctx.db.get(normalizedId);
+    if (byInternalId) {
+      return byInternalId;
+    }
   }
 
-  return (
-    await ctx.db
-      .query("cards")
-      .withIndex("by_name", (q) => q.gte("name", ""))
-      .collect()
-  ).find((card) => card.externalId === cardId) ?? null;
+  return await ctx.db
+    .query("cards")
+    .withIndex("by_external_id", (q) => q.eq("externalId", cardId))
+    .first();
 }
 
 async function resolveCardSnapshot(
   ctx: ReaderCtx,
   args: {
     cardId?: string;
-    cardData?: CardSnapshot;
+    cardData?: RichCardSnapshot;
   },
   missingMessage: string
 ) {
@@ -539,7 +593,7 @@ async function createCopiesForViewer(
   userId: Id<"users">,
   args: {
     binderId: Id<"binders">;
-    card: CardSnapshot;
+    card: RichCardSnapshot;
     quantity: number;
     condition?: string;
     language?: string;
@@ -549,8 +603,19 @@ async function createCopiesForViewer(
     serialNumber?: string;
     acquiredAt?: string;
     isFoil?: boolean;
+    finishCode?: string;
+    finishLabel?: string;
+    edition?: string;
+    stamp?: string;
+    isSealedPromo?: boolean;
+    isOversized?: boolean;
+    isPeelOff?: boolean;
     isSigned?: boolean;
     isAltered?: boolean;
+    gradingCompany?: string;
+    gradingScore?: string;
+    certNumber?: string;
+    storageLocation?: string;
     tagIds?: Id<"tags">[];
     newTags?: Array<{ label: string; colorHex?: string }>;
     imageUrls?: string[];
@@ -558,6 +623,7 @@ async function createCopiesForViewer(
   }
 ) {
   let firstEntry: Awaited<ReturnType<typeof addEntryForViewer>> | null = null;
+  const createdIds: Id<"collectionEntries">[] = [];
 
   for (let index = 0; index < args.quantity; index += 1) {
     const entry = await addEntryForViewer(ctx, userId, {
@@ -572,8 +638,19 @@ async function createCopiesForViewer(
       serialNumber: args.serialNumber,
       acquiredAt: args.acquiredAt,
       isFoil: args.isFoil,
+      finishCode: args.finishCode,
+      finishLabel: args.finishLabel,
+      edition: args.edition,
+      stamp: args.stamp,
+      isSealedPromo: args.isSealedPromo,
+      isOversized: args.isOversized,
+      isPeelOff: args.isPeelOff,
       isSigned: args.isSigned,
       isAltered: args.isAltered,
+      gradingCompany: args.gradingCompany,
+      gradingScore: args.gradingScore,
+      certNumber: args.certNumber,
+      storageLocation: args.storageLocation,
       tagIds: args.tagIds,
       newTags: args.newTags?.map((tag) => ({
         label: tag.label,
@@ -584,6 +661,7 @@ async function createCopiesForViewer(
     if (!firstEntry) {
       firstEntry = entry;
     }
+    createdIds.push(entry.id);
 
     if ((args.imageUrls?.length ?? 0) > 0 || (args.imageStorageIds?.length ?? 0) > 0) {
       await ctx.db.patch(entry.id, {
@@ -600,7 +678,7 @@ async function createCopiesForViewer(
     });
   }
 
-  return firstEntry;
+  return { firstEntry, createdIds };
 }
 
 export const ensureViewer = internalMutation({
@@ -674,7 +752,12 @@ export const createBinder = internalMutation({
     subject: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
-    colorHex: v.optional(v.string())
+    colorHex: v.optional(v.string()),
+    containerType: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    associatedTcg: v.optional(tcgCodeValidator),
+    associatedSetCode: v.optional(v.string()),
+    associatedSetName: v.optional(v.string())
   },
   returns: binderDetailValidator,
   handler: async (ctx, args) => {
@@ -696,6 +779,11 @@ export const createBinder = internalMutation({
       name: trimmedName,
       description: args.description?.trim() || undefined,
       colorHex: validateColorHex(args.colorHex),
+      containerType: args.containerType?.trim() || undefined,
+      imageUrl: args.imageUrl?.trim() || undefined,
+      associatedTcg: args.associatedTcg,
+      associatedSetCode: args.associatedSetCode?.trim() || undefined,
+      associatedSetName: args.associatedSetName?.trim() || undefined,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -710,7 +798,12 @@ export const updateBinder = internalMutation({
     binderId: v.id("binders"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
-    colorHex: v.optional(v.string())
+    colorHex: v.optional(v.string()),
+    containerType: v.optional(v.union(v.string(), v.null())),
+    imageUrl: v.optional(v.union(v.string(), v.null())),
+    associatedTcg: v.optional(v.union(tcgCodeValidator, v.null())),
+    associatedSetCode: v.optional(v.union(v.string(), v.null())),
+    associatedSetName: v.optional(v.union(v.string(), v.null()))
   },
   returns: binderDetailValidator,
   handler: async (ctx, args) => {
@@ -723,6 +816,22 @@ export const updateBinder = internalMutation({
         args.description === undefined ? binder.description : args.description?.trim() || undefined,
       colorHex:
         args.colorHex === undefined ? binder.colorHex : validateColorHex(args.colorHex),
+      containerType:
+        args.containerType === undefined
+          ? binder.containerType
+          : args.containerType?.trim() || undefined,
+      imageUrl:
+        args.imageUrl === undefined ? binder.imageUrl : args.imageUrl?.trim() || undefined,
+      associatedTcg:
+        args.associatedTcg === undefined ? binder.associatedTcg : args.associatedTcg ?? undefined,
+      associatedSetCode:
+        args.associatedSetCode === undefined
+          ? binder.associatedSetCode
+          : args.associatedSetCode?.trim() || undefined,
+      associatedSetName:
+        args.associatedSetName === undefined
+          ? binder.associatedSetName
+          : args.associatedSetName?.trim() || undefined,
       updatedAt: timestamp
     });
     const updated = await requireBinderForUser(ctx, binder._id, viewer._id);
@@ -846,8 +955,19 @@ export const addCardToBinder = internalMutation({
     serialNumber: v.optional(v.string()),
     acquiredAt: v.optional(v.string()),
     isFoil: v.optional(v.boolean()),
+    finishCode: v.optional(v.string()),
+    finishLabel: v.optional(v.string()),
+    edition: v.optional(v.string()),
+    stamp: v.optional(v.string()),
+    isSealedPromo: v.optional(v.boolean()),
+    isOversized: v.optional(v.boolean()),
+    isPeelOff: v.optional(v.boolean()),
     isSigned: v.optional(v.boolean()),
     isAltered: v.optional(v.boolean()),
+    gradingCompany: v.optional(v.string()),
+    gradingScore: v.optional(v.string()),
+    certNumber: v.optional(v.string()),
+    storageLocation: v.optional(v.string()),
     tagIds: v.optional(v.array(v.id("tags"))),
     newTags: v.optional(v.array(v.object({ label: v.string(), colorHex: v.optional(v.string()) }))),
     cardId: v.optional(v.string()),
@@ -874,7 +994,7 @@ export const addCardToBinder = internalMutation({
       });
     }
 
-    return await createCopiesForViewer(ctx, viewer._id, {
+    const created = await createCopiesForViewer(ctx, viewer._id, {
       binderId: args.binderId,
       card,
       quantity,
@@ -886,11 +1006,190 @@ export const addCardToBinder = internalMutation({
       serialNumber: args.serialNumber,
       acquiredAt: args.acquiredAt,
       isFoil: args.isFoil,
+      finishCode: args.finishCode,
+      finishLabel: args.finishLabel,
+      edition: args.edition,
+      stamp: args.stamp,
+      isSealedPromo: args.isSealedPromo,
+      isOversized: args.isOversized,
+      isPeelOff: args.isPeelOff,
       isSigned: args.isSigned,
       isAltered: args.isAltered,
+      gradingCompany: args.gradingCompany,
+      gradingScore: args.gradingScore,
+      certNumber: args.certNumber,
+      storageLocation: args.storageLocation,
       tagIds: args.tagIds,
       newTags: args.newTags
     });
+    const after = await snapshotAuditEntries(ctx, viewer._id, created.createdIds);
+    await appendCollectionAudit(ctx, {
+      userId: viewer._id,
+      actorId: args.subject,
+      operationKind: quantity > 1 ? "bulk" : "add",
+      binderId: args.binderId,
+      cardName: card.name,
+      summary:
+        quantity > 1
+          ? `Added ${quantity} collection copies`
+          : `Added ${card.name}`,
+      before: [],
+      after
+    });
+    return created.firstEntry;
+  }
+});
+
+export const bulkAddToCollection = internalMutation({
+  args: {
+    subject: v.string(),
+    defaults: v.optional(bulkAddDefaultsValidator),
+    rows: v.array(bulkAddRowValidator)
+  },
+  returns: bulkAddResultValidator,
+  handler: async (ctx, args) => {
+    const viewer = await ensureViewerBySubject(ctx, { subject: args.subject });
+    return await bulkAddForViewer(ctx, viewer._id, {
+      defaults: args.defaults,
+      rows: args.rows
+    });
+  }
+});
+
+export const importCollectionRows = internalMutation({
+  args: {
+    subject: v.string(),
+    rows: v.array(collectionImportRowInput),
+    defaultBinderId: v.optional(v.id("binders")),
+    createMissingBinders: v.boolean()
+  },
+  returns: v.object({
+    importedRows: v.number(),
+    importedCopies: v.number(),
+    createdBinders: v.array(v.string())
+  }),
+  handler: async (ctx, args) => {
+    const viewer = await ensureViewerBySubject(ctx, { subject: args.subject });
+    const totalCopies = args.rows.reduce((sum, row) => sum + row.quantity, 0);
+    if (
+      args.rows.length === 0 ||
+      totalCopies > 500 ||
+      args.rows.some(
+        (row) =>
+          !Number.isInteger(row.quantity) ||
+          row.quantity < 1 ||
+          !Number.isFinite(row.price ?? 0) ||
+          !Number.isFinite(row.acquisitionPrice ?? 0)
+      )
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Import rows failed validation"
+      });
+    }
+
+    const library = await getLibraryBinder(ctx, viewer._id);
+    if (!library) {
+      throw new ConvexError({
+        code: "INVARIANT",
+        message: "Library binder not found"
+      });
+    }
+    const defaultBinder = args.defaultBinderId
+      ? await requireBinderForUser(ctx, args.defaultBinderId, viewer._id)
+      : library;
+    const binders = await ctx.db
+      .query("binders")
+      .withIndex("by_user", (q) => q.eq("userId", viewer._id))
+      .collect();
+    const bindersByName = new Map(
+      binders.map((binder) => [binder.name.trim().toLocaleLowerCase(), binder])
+    );
+    const createdBinders: string[] = [];
+    const createdEntryIds: Id<"collectionEntries">[] = [];
+
+    for (const row of args.rows) {
+      let target = defaultBinder;
+      const binderName = row.binderName?.trim();
+      if (binderName && binderName.toLocaleLowerCase() !== "unsorted") {
+        const key = binderName.toLocaleLowerCase();
+        let namedBinder = bindersByName.get(key);
+        if (!namedBinder && args.createMissingBinders) {
+          const timestamp = now();
+          const binderId = await ctx.db.insert("binders", {
+            userId: viewer._id,
+            kind: "binder",
+            name: binderName,
+            createdAt: timestamp,
+            updatedAt: timestamp
+          });
+          namedBinder = await ctx.db.get(binderId) ?? undefined;
+          if (namedBinder) {
+            bindersByName.set(key, namedBinder);
+            createdBinders.push(namedBinder.name);
+          }
+        }
+        if (!namedBinder) {
+          throw new ConvexError({
+            code: "BAD_REQUEST",
+            message: `Binder "${binderName}" was not found`
+          });
+        }
+        target = namedBinder;
+      }
+
+      const created = await createCopiesForViewer(ctx, viewer._id, {
+        binderId: target._id,
+        card: {
+          tcg: row.tcg,
+          externalId: row.externalId,
+          name: row.cardName,
+          setCode: row.setCode,
+          setName: row.setName,
+          rarity: row.rarity
+        },
+        quantity: row.quantity,
+        condition: row.condition,
+        language: row.language,
+        notes: row.notes,
+        price: row.price,
+        acquisitionPrice: row.acquisitionPrice,
+        serialNumber: row.serialNumber,
+        acquiredAt: row.acquiredAt,
+        isFoil: row.isFoil,
+        finishCode: row.finishCode,
+        finishLabel: row.finishLabel,
+        edition: row.edition,
+        stamp: row.stamp,
+        isSealedPromo: row.isSealedPromo,
+        isOversized: row.isOversized,
+        isPeelOff: row.isPeelOff,
+        isSigned: row.isSigned,
+        isAltered: row.isAltered,
+        gradingCompany: row.gradingCompany,
+        gradingScore: row.gradingScore,
+        certNumber: row.certNumber,
+        storageLocation: row.storageLocation,
+        newTags: row.tags.map((label) => ({ label }))
+      });
+      createdEntryIds.push(...created.createdIds);
+    }
+
+    const after = await snapshotAuditEntries(ctx, viewer._id, createdEntryIds);
+    await appendCollectionAudit(ctx, {
+      userId: viewer._id,
+      actorId: args.subject,
+      operationKind: "import",
+      summary: `Imported ${createdEntryIds.length} collection copies`,
+      before: [],
+      after
+    });
+
+    return {
+      importedRows: args.rows.length,
+      importedCopies: totalCopies,
+      createdBinders
+    };
   }
 });
 
@@ -908,8 +1207,19 @@ export const updateEntry = internalMutation({
     serialNumber: v.optional(nullableString),
     acquiredAt: v.optional(nullableString),
     isFoil: v.optional(v.boolean()),
+    finishCode: v.optional(nullableString),
+    finishLabel: v.optional(nullableString),
+    edition: v.optional(nullableString),
+    stamp: v.optional(nullableString),
+    isSealedPromo: v.optional(v.boolean()),
+    isOversized: v.optional(v.boolean()),
+    isPeelOff: v.optional(v.boolean()),
     isSigned: v.optional(v.boolean()),
     isAltered: v.optional(v.boolean()),
+    gradingCompany: v.optional(nullableString),
+    gradingScore: v.optional(nullableString),
+    certNumber: v.optional(nullableString),
+    storageLocation: v.optional(nullableString),
     tagIds: v.optional(v.array(v.id("tags"))),
     newTags: v.optional(v.array(v.object({ label: v.string(), colorHex: v.optional(v.string()) }))),
     cardOverride: v.optional(
@@ -924,6 +1234,14 @@ export const updateEntry = internalMutation({
     const viewer = await requireViewerBySubject(ctx, args.subject);
     let entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
     let nextCardId = entry.cardId;
+    const sourceBinderId = entry.binderId;
+    const sourceCardId = entry.cardId;
+    const sourceGroup = await getGroupEntries(
+      ctx,
+      viewer._id,
+      sourceBinderId,
+      sourceCardId
+    );
 
     if (args.cardOverride) {
       const card = await resolveCardSnapshot(
@@ -935,7 +1253,27 @@ export const updateEntry = internalMutation({
         "cardData is required when selecting a new print"
       );
       nextCardId = await upsertCard(ctx, card);
-      const sourceGroup = await getGroupEntries(ctx, viewer._id, entry.binderId, entry.cardId);
+    }
+
+    const targetBinderId = args.binderId ?? entry.binderId;
+    const isGroupMutation =
+      args.quantity !== undefined ||
+      args.cardOverride !== undefined ||
+      targetBinderId !== sourceBinderId;
+    const destinationBefore = isGroupMutation
+      ? await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId)
+      : [];
+    const beforeIds = isGroupMutation
+      ? Array.from(
+          new Set([
+            ...sourceGroup.map((groupEntry) => groupEntry._id),
+            ...destinationBefore.map((groupEntry) => groupEntry._id)
+          ])
+        )
+      : [entry._id];
+    const before = await snapshotAuditEntries(ctx, viewer._id, beforeIds);
+
+    if (args.cardOverride) {
       const timestamp = now();
       await Promise.all(
         sourceGroup.map((groupEntry) =>
@@ -959,7 +1297,6 @@ export const updateEntry = internalMutation({
     }
 
     const timestamp = now();
-    const targetBinderId = args.binderId ?? entry.binderId;
     await ctx.db.patch(entry._id, {
       binderId: targetBinderId,
       quantity: 1,
@@ -972,9 +1309,32 @@ export const updateEntry = internalMutation({
         args.serialNumber === undefined ? entry.serialNumber : args.serialNumber ?? undefined,
       acquiredAt:
         args.acquiredAt === undefined ? entry.acquiredAt : args.acquiredAt ?? undefined,
-      isFoil: args.isFoil ?? entry.isFoil,
+      isFoil:
+        args.isFoil ??
+        (args.finishCode === null ? false : entry.isFoil),
+      finishCode:
+        args.finishCode === undefined ? entry.finishCode : args.finishCode ?? undefined,
+      finishLabel:
+        args.finishLabel === undefined ? entry.finishLabel : args.finishLabel ?? undefined,
+      edition: args.edition === undefined ? entry.edition : args.edition ?? undefined,
+      stamp: args.stamp === undefined ? entry.stamp : args.stamp ?? undefined,
+      isSealedPromo: args.isSealedPromo ?? entry.isSealedPromo,
+      isOversized: args.isOversized ?? entry.isOversized,
+      isPeelOff: args.isPeelOff ?? entry.isPeelOff,
       isSigned: args.isSigned ?? entry.isSigned,
       isAltered: args.isAltered ?? entry.isAltered,
+      gradingCompany:
+        args.gradingCompany === undefined
+          ? entry.gradingCompany
+          : args.gradingCompany ?? undefined,
+      gradingScore:
+        args.gradingScore === undefined ? entry.gradingScore : args.gradingScore ?? undefined,
+      certNumber:
+        args.certNumber === undefined ? entry.certNumber : args.certNumber ?? undefined,
+      storageLocation:
+        args.storageLocation === undefined
+          ? entry.storageLocation
+          : args.storageLocation ?? undefined,
       updatedAt: timestamp
     });
 
@@ -1017,8 +1377,19 @@ export const updateEntry = internalMutation({
         serialNumber: refreshed.serialNumber,
         acquiredAt: refreshed.acquiredAt,
         isFoil: refreshed.isFoil,
+        finishCode: refreshed.finishCode,
+        finishLabel: refreshed.finishLabel,
+        edition: refreshed.edition,
+        stamp: refreshed.stamp,
+        isSealedPromo: refreshed.isSealedPromo,
+        isOversized: refreshed.isOversized,
+        isPeelOff: refreshed.isPeelOff,
         isSigned: refreshed.isSigned,
         isAltered: refreshed.isAltered,
+        gradingCompany: refreshed.gradingCompany,
+        gradingScore: refreshed.gradingScore,
+        certNumber: refreshed.certNumber,
+        storageLocation: refreshed.storageLocation,
         tagIds
       });
     } else if (desiredQuantity < currentQuantity) {
@@ -1044,6 +1415,41 @@ export const updateEntry = internalMutation({
     }
 
     const updated = await requireEntryForUser(ctx, entry._id, viewer._id);
+    const sourceAfter = isGroupMutation
+      ? await getGroupEntries(ctx, viewer._id, sourceBinderId, sourceCardId)
+      : [];
+    const destinationAfter = isGroupMutation
+      ? await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId)
+      : [updated];
+    const afterIds = Array.from(
+      new Set([
+        ...sourceAfter.map((groupEntry) => groupEntry._id),
+        ...destinationAfter.map((groupEntry) => groupEntry._id)
+      ])
+    );
+    const after = await snapshotAuditEntries(ctx, viewer._id, afterIds);
+    const card = await ctx.db.get(updated.cardId);
+    const operationKind =
+      targetBinderId !== sourceBinderId
+        ? "move"
+        : args.quantity !== undefined || args.cardOverride !== undefined
+          ? "bulk"
+          : "update";
+    await appendCollectionAudit(ctx, {
+      userId: viewer._id,
+      actorId: args.subject,
+      operationKind,
+      binderId: targetBinderId,
+      cardName: card?.name,
+      summary:
+        operationKind === "move"
+          ? `Moved ${card?.name ?? "a card"}`
+          : operationKind === "bulk"
+            ? `Updated copies of ${card?.name ?? "a card"}`
+            : `Updated ${card?.name ?? "a card"}`,
+      before,
+      after
+    });
     return await hydrateEntry(ctx, updated);
   }
 });
@@ -1056,8 +1462,96 @@ export const removeEntry = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
+    const entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+    const card = await ctx.db.get(entry.cardId);
+    const before = await snapshotAuditEntries(ctx, viewer._id, [entry._id]);
     await removeEntryForViewer(ctx, viewer._id, args.entryId);
+    await appendCollectionAudit(ctx, {
+      userId: viewer._id,
+      actorId: args.subject,
+      operationKind: "remove",
+      binderId: entry.binderId,
+      cardName: card?.name,
+      summary: `Removed ${card?.name ?? "a collection copy"}`,
+      before,
+      after: []
+    });
     return null;
+  }
+});
+
+export const listCollectionMutationHistory = internalQuery({
+  args: {
+    subject: v.string(),
+    limit: v.number()
+  },
+  returns: v.array(collectionMutationAuditEntryValidator),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const limit = Math.min(100, Math.max(1, Math.trunc(args.limit)));
+    const entries = await ctx.db
+      .query("collectionMutationAudits")
+      .withIndex("by_user", (q) => q.eq("userId", viewer._id))
+      .order("desc")
+      .take(limit);
+    const undoRows = await Promise.all(
+      entries.map((entry) =>
+        ctx.db
+          .query("collectionMutationAudits")
+          .withIndex("by_source_audit", (q) => q.eq("sourceAuditId", entry._id))
+          .unique()
+      )
+    );
+
+    return entries.map((entry, index) => ({
+      id: entry._id,
+      operationKind: entry.operationKind,
+      actorId: entry.actorId,
+      affectedCopies: entry.affectedCopies,
+      binderId: entry.binderId,
+      cardName: entry.cardName,
+      summary: entry.summary,
+      sourceAuditId: entry.sourceAuditId,
+      canUndo: entry.operationKind !== "undo" && undoRows[index] === null,
+      createdAt: toIso(entry.createdAt)
+    }));
+  }
+});
+
+export const undoCollectionMutation = internalMutation({
+  args: {
+    subject: v.string(),
+    auditId: v.id("collectionMutationAudits"),
+    idempotencyKey: v.string()
+  },
+  returns: collectionMutationAuditEntryValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const idempotencyKey = args.idempotencyKey.trim();
+    if (idempotencyKey.length < 8 || idempotencyKey.length > 200) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "A valid idempotency key is required"
+      });
+    }
+    const audit = await undoAuditedCollectionMutation(ctx, {
+      userId: viewer._id,
+      actorId: args.subject,
+      auditId: args.auditId,
+      idempotencyKey
+    });
+    return {
+      id: audit._id,
+      operationKind: audit.operationKind,
+      actorId: audit.actorId,
+      affectedCopies: audit.affectedCopies,
+      binderId: audit.binderId,
+      cardName: audit.cardName,
+      summary: audit.summary,
+      sourceAuditId: audit.sourceAuditId,
+      canUndo: false,
+      createdAt: toIso(audit.createdAt)
+    };
   }
 });
 
@@ -1291,13 +1785,40 @@ export const addWishlistCard = internalMutation({
       .unique();
 
     const timestamp = now();
-    const cardId =
-      existing?._id ??
-      (await ctx.db.insert("wishlistCards", {
+    let cardId: Id<"wishlistCards">;
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        name: args.card.name,
+        baseExternalId:
+          normalizeOptionalIdentifier(args.card.baseExternalId) ??
+          normalizeOptionalIdentifier(existing.baseExternalId),
+        printingKey:
+          normalizeOptionalIdentifier(args.card.printingKey) ??
+          normalizeOptionalIdentifier(existing.printingKey),
+        artworkId:
+          normalizeOptionalIdentifier(args.card.artworkId) ??
+          normalizeOptionalIdentifier(existing.artworkId),
+        setCode: args.card.setCode ?? existing.setCode,
+        setName: args.card.setName ?? existing.setName,
+        rarity: args.card.rarity ?? existing.rarity,
+        imageUrl: args.card.imageUrl ?? existing.imageUrl,
+        imageUrlSmall: args.card.imageUrlSmall ?? existing.imageUrlSmall,
+        collectorNumber: args.card.collectorNumber ?? existing.collectorNumber,
+        releasedAt: args.card.releasedAt ?? existing.releasedAt,
+        ...mergeRichCardMetadata(args.card, existing),
+        notes: args.card.notes ?? existing.notes,
+        updatedAt: timestamp
+      });
+      cardId = existing._id;
+    } else {
+      cardId = await ctx.db.insert("wishlistCards", {
         wishlistId: wishlist._id,
         externalId: args.card.externalId,
         tcg: args.card.tcg,
         name: args.card.name,
+        baseExternalId: normalizeOptionalIdentifier(args.card.baseExternalId),
+        printingKey: normalizeOptionalIdentifier(args.card.printingKey),
+        artworkId: normalizeOptionalIdentifier(args.card.artworkId),
         setCode: args.card.setCode,
         setName: args.card.setName,
         rarity: args.card.rarity,
@@ -1306,10 +1827,13 @@ export const addWishlistCard = internalMutation({
         setSymbolUrl: args.card.setSymbolUrl,
         setLogoUrl: args.card.setLogoUrl,
         collectorNumber: args.card.collectorNumber,
+        releasedAt: args.card.releasedAt,
+        ...pickRichCardMetadata(args.card),
         notes: args.card.notes,
         createdAt: timestamp,
         updatedAt: timestamp
-      }));
+      });
+    }
 
     await ctx.db.patch(wishlist._id, { updatedAt: timestamp });
 
@@ -1346,6 +1870,28 @@ export const addWishlistCards = internalMutation({
         .unique();
 
       if (existing) {
+        await ctx.db.patch(existing._id, {
+          name: card.name,
+          baseExternalId:
+            normalizeOptionalIdentifier(card.baseExternalId) ??
+            normalizeOptionalIdentifier(existing.baseExternalId),
+          printingKey:
+            normalizeOptionalIdentifier(card.printingKey) ??
+            normalizeOptionalIdentifier(existing.printingKey),
+          artworkId:
+            normalizeOptionalIdentifier(card.artworkId) ??
+            normalizeOptionalIdentifier(existing.artworkId),
+          setCode: card.setCode ?? existing.setCode,
+          setName: card.setName ?? existing.setName,
+          rarity: card.rarity ?? existing.rarity,
+          imageUrl: card.imageUrl ?? existing.imageUrl,
+          imageUrlSmall: card.imageUrlSmall ?? existing.imageUrlSmall,
+          collectorNumber: card.collectorNumber ?? existing.collectorNumber,
+          releasedAt: card.releasedAt ?? existing.releasedAt,
+          ...mergeRichCardMetadata(card, existing),
+          notes: card.notes ?? existing.notes,
+          updatedAt: timestamp
+        });
         continue;
       }
 
@@ -1354,6 +1900,9 @@ export const addWishlistCards = internalMutation({
         externalId: card.externalId,
         tcg: card.tcg,
         name: card.name,
+        baseExternalId: normalizeOptionalIdentifier(card.baseExternalId),
+        printingKey: normalizeOptionalIdentifier(card.printingKey),
+        artworkId: normalizeOptionalIdentifier(card.artworkId),
         setCode: card.setCode,
         setName: card.setName,
         rarity: card.rarity,
@@ -1362,6 +1911,8 @@ export const addWishlistCards = internalMutation({
         setSymbolUrl: card.setSymbolUrl,
         setLogoUrl: card.setLogoUrl,
         collectorNumber: card.collectorNumber,
+        releasedAt: card.releasedAt,
+        ...pickRichCardMetadata(card),
         notes: card.notes,
         createdAt: timestamp,
         updatedAt: timestamp

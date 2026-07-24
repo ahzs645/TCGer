@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Plus, Trash2 } from "lucide-react";
+import { Download, Layers, Minus, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -36,9 +36,18 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createDeck,
   deleteDeck,
+  addCardToDeck,
+  exportDeckYdk,
+  getDeckOwnership,
   getDecks,
+  importDeck,
+  removeDeckCard,
+  updateDeckCard,
+  validateDeck,
   type DeckResponse,
 } from "@/lib/api/decks";
+import { searchCards } from "@/lib/api/cards";
+import type { Card as CardResult, YugiohDeckZone } from "@tcg/api-types";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
@@ -61,6 +70,7 @@ export default function DecksPage() {
 
   const [selectedDeck, setSelectedDeck] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [ydkOpen, setYdkOpen] = useState(false);
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
@@ -110,14 +120,21 @@ export default function DecksPage() {
               Build and manage your constructed decks across all games.
             </p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => setCreateOpen(true)}
-            disabled={!mounted || !isAuthenticated}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Deck
-          </Button>
+          <div className="flex gap-2">
+            {enabledGames.yugioh !== false && (
+              <Button variant="outline" size="sm" onClick={() => setYdkOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" /> Import YDK
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              disabled={!mounted || !isAuthenticated}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Deck
+            </Button>
+          </div>
         </div>
 
         {mounted && !isAuthenticated ? (
@@ -294,6 +311,15 @@ export default function DecksPage() {
           setSelectedDeck(deck.id);
         }}
       />
+      <YdkImportDialog
+        open={ydkOpen}
+        onOpenChange={setYdkOpen}
+        token={token}
+        onCreated={(deck) => {
+          void queryClient.invalidateQueries({ queryKey: ["decks"] });
+          setSelectedDeck(deck.id);
+        }}
+      />
     </AppShell>
   );
 }
@@ -347,7 +373,9 @@ function DeckDetail({
         </div>
       </CardHeader>
       <CardContent>
-        {deck.cards.length === 0 ? (
+        {deck.tcg === "yugioh" ? (
+          <YugiohDeckBuilder deck={deck} />
+        ) : deck.cards.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             This deck has no cards yet.
           </p>
@@ -392,6 +420,358 @@ function DeckDetail({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const YUGIOH_ZONES: YugiohDeckZone[] = ["main", "extra", "side"];
+
+function deckCardBaseId(card: DeckResponse["cards"][number]) {
+  const data = card.cardData ?? {};
+  return String(
+    data.baseExternalId ??
+      data.baseId ??
+      (data.attributes as Record<string, unknown> | undefined)?.baseId ??
+      card.externalId,
+  );
+}
+
+function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
+  const token = useAuthStore((state) => state.token);
+  const queryClient = useQueryClient();
+  const [query, setQuery] = useState("");
+  const [zone, setZone] = useState<YugiohDeckZone>("main");
+  const [validationMode, setValidationMode] = useState<"classical" | "genesys">(
+    "classical",
+  );
+  const [banlistCards, setBanlistCards] = useState("{}");
+  const [maxPoints, setMaxPoints] = useState("100");
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["decks"] });
+    void queryClient.invalidateQueries({ queryKey: ["deck-ownership", deck.id] });
+  };
+  const poolQuery = useQuery({
+    queryKey: ["deck-card-pool", query, "yugioh"],
+    queryFn: () => searchCards(token!, query.trim(), "yugioh"),
+    enabled: Boolean(token && query.trim().length >= 2),
+    staleTime: 60_000,
+  });
+  const ownershipQuery = useQuery({
+    queryKey: ["deck-ownership", deck.id],
+    queryFn: () => getDeckOwnership(token!, deck.id),
+    enabled: Boolean(token),
+  });
+  const addMutation = useMutation({
+    mutationFn: (card: CardResult) =>
+      addCardToDeck(token!, deck.id, {
+        externalId: card.id,
+        tcg: "yugioh",
+        name: card.name,
+        quantity: 1,
+        zone,
+        imageUrl: card.imageUrl,
+        imageUrlSmall: card.imageUrlSmall,
+        setCode: card.setCode,
+        setName: card.setName,
+        cardData: { ...card, baseExternalId: card.baseExternalId ?? card.id },
+      }),
+    onSuccess: refresh,
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({
+      cardId,
+      quantity,
+      nextZone,
+    }: {
+      cardId: string;
+      quantity?: number;
+      nextZone?: YugiohDeckZone;
+    }) =>
+      updateDeckCard(token!, deck.id, cardId, {
+        quantity,
+        zone: nextZone,
+      }),
+    onSuccess: refresh,
+  });
+  const removeMutation = useMutation({
+    mutationFn: (cardId: string) => removeDeckCard(token!, deck.id, cardId),
+    onSuccess: refresh,
+  });
+  const validationMutation = useMutation({
+    mutationFn: async () => {
+      const cards = JSON.parse(banlistCards) as Record<string, string | number>;
+      return validateDeck(token!, deck.id, {
+        format: deck.format,
+        banlist:
+          validationMode === "genesys"
+            ? {
+                type: "genesys",
+                name: "Genesys",
+                maxPoints: Number(maxPoints),
+                cards: cards as Record<string, number>,
+              }
+            : {
+                type: "classical",
+                name: deck.format || "TCG Advanced",
+                cards: cards as Record<string, string>,
+              },
+      });
+    },
+    onMutate: () => setValidationError(null),
+    onError: (error) =>
+      setValidationError(
+        error instanceof SyntaxError
+          ? "Banlist card map must be valid JSON."
+          : (error as Error).message,
+      ),
+  });
+
+  const owned = new Map(
+    (ownershipQuery.data?.owned ?? []).map((item) => [
+      item.externalId,
+      item.quantity,
+    ]),
+  );
+
+  async function downloadYdk() {
+    const result = await exportDeckYdk(token!, deck.id);
+    const blob = new Blob([result.content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${deck.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ydk`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    if (result.skipped.length) {
+      window.alert(`${result.skipped.length} card(s) lacked an eight-digit passcode.`);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => void downloadYdk()}>
+          <Download className="mr-2 h-4 w-4" /> Export YDK
+        </Button>
+        <Badge
+          variant={ownershipQuery.data?.missingCount ? "default" : "secondary"}
+          className={ownershipQuery.data?.missingCount ? "bg-destructive text-destructive-foreground" : undefined}
+        >
+          {ownershipQuery.data?.missingCount ?? 0} missing
+        </Badge>
+      </div>
+
+      <div className="space-y-2 rounded-lg border p-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search Yu-Gi-Oh card pool"
+              className="pl-8"
+            />
+          </div>
+          <Select value={zone} onValueChange={(value) => setZone(value as YugiohDeckZone)}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {YUGIOH_ZONES.map((item) => (
+                <SelectItem key={item} value={item}>
+                  {item[0].toUpperCase() + item.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {(poolQuery.data ?? []).slice(0, 8).map((card) => (
+          <div key={card.id} className="flex items-center justify-between gap-2 text-sm">
+            <span className="truncate">{card.name} <span className="text-xs text-muted-foreground">{card.setCode}</span></span>
+            <Button size="sm" variant="outline" onClick={() => addMutation.mutate(card)}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      {YUGIOH_ZONES.map((currentZone) => {
+        const cards = deck.cards.filter((card) => card.zone === currentZone);
+        const count = cards.reduce((sum, card) => sum + card.quantity, 0);
+        return (
+          <div key={currentZone} className="space-y-2">
+            <div className="flex items-center justify-between border-b pb-1">
+              <h3 className="text-sm font-semibold capitalize">{currentZone} Deck</h3>
+              <Badge variant="outline">{count}</Badge>
+            </div>
+            {cards.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No cards in this zone.</p>
+            ) : cards.map((card) => (
+              <div key={card.id} className="flex items-center gap-2 text-sm">
+                <span className="min-w-0 flex-1 truncate">
+                  {card.name}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    owned {owned.get(deckCardBaseId(card)) ?? 0}
+                  </span>
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={card.quantity <= 1}
+                  onClick={() =>
+                    updateMutation.mutate({ cardId: card.id, quantity: card.quantity - 1 })
+                  }
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <span className="w-5 text-center">{card.quantity}</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() =>
+                    updateMutation.mutate({ cardId: card.id, quantity: card.quantity + 1 })
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+                <Select
+                  value={card.zone}
+                  onValueChange={(value) =>
+                    updateMutation.mutate({
+                      cardId: card.id,
+                      nextZone: value as YugiohDeckZone,
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {YUGIOH_ZONES.map((item) => (
+                      <SelectItem key={item} value={item}>{item}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="icon" variant="ghost" onClick={() => removeMutation.mutate(card.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      <div className="space-y-3 rounded-lg border p-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Banlist validation</h3>
+          <Select
+            value={validationMode}
+            onValueChange={(value) => setValidationMode(value as "classical" | "genesys")}
+          >
+            <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="classical">Classical</SelectItem>
+              <SelectItem value="genesys">Genesys</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {validationMode === "genesys" && (
+          <Input
+            type="number"
+            min="0"
+            value={maxPoints}
+            onChange={(event) => setMaxPoints(event.target.value)}
+            placeholder="Maximum points"
+          />
+        )}
+        <Textarea
+          value={banlistCards}
+          onChange={(event) => setBanlistCards(event.target.value)}
+          rows={3}
+          placeholder='{"46986414":"Limited"} or {"46986414":4}'
+          className="font-mono text-xs"
+        />
+        <Button size="sm" onClick={() => validationMutation.mutate()}>
+          Validate deck
+        </Button>
+        {validationError && <p className="text-sm text-destructive">{validationError}</p>}
+        {validationMutation.data && (
+          <div className="text-sm">
+            <Badge
+              variant={validationMutation.data.valid ? "secondary" : "default"}
+              className={validationMutation.data.valid ? undefined : "bg-destructive text-destructive-foreground"}
+            >
+              {validationMutation.data.valid ? "Valid" : "Invalid"}
+            </Badge>
+            {validationMutation.data.points !== undefined && (
+              <span className="ml-2">{validationMutation.data.points} points</span>
+            )}
+            {[...validationMutation.data.errors, ...validationMutation.data.warnings].map(
+              (message) => <p key={message} className="mt-1 text-xs text-muted-foreground">{message}</p>,
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function YdkImportDialog({
+  open,
+  onOpenChange,
+  token,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  token: string | null;
+  onCreated: (deck: DeckResponse) => void;
+}) {
+  const [name, setName] = useState("");
+  const [content, setContent] = useState("");
+  const mutation = useMutation({
+    mutationFn: () =>
+      importDeck(token!, {
+        source: "ydk",
+        data: content,
+        name: name.trim() || undefined,
+        tcg: "yugioh",
+      }),
+    onSuccess: (result) => {
+      onCreated(result.deck);
+      onOpenChange(false);
+      setName("");
+      setContent("");
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Import YDK deck</DialogTitle>
+          <DialogDescription>Paste a YGOPro-compatible .ydk file.</DialogDescription>
+        </DialogHeader>
+        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Deck name" />
+        <Textarea
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          rows={12}
+          className="font-mono text-xs"
+          placeholder={"#main\n46986414\n#extra\n!side"}
+        />
+        {Boolean(mutation.error) && (
+          <p className="text-sm text-destructive">
+            {(mutation.error as Error).message}
+          </p>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            disabled={!content.trim() || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending ? "Importing…" : "Import"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

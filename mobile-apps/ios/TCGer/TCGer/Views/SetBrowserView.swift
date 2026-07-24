@@ -7,6 +7,8 @@ struct SetBrowserView: View {
     @State private var errorMessage: String?
     @State private var searchText = ""
     @State private var selectedGame: TCGGame = .all
+    @State private var progressFilter: SetProgressFilter = .all
+    @State private var ownedCardsBySet: [String: Set<String>] = [:]
 
     private let apiService = APIService()
 
@@ -28,6 +30,21 @@ struct SetBrowserView: View {
             result = result.filter {
                 $0.name.lowercased().contains(query) ||
                 $0.code.lowercased().contains(query)
+            }
+        }
+
+        result = result.filter { set in
+            let owned = ownedCount(for: set)
+            let total = set.totalCards ?? 0
+            switch progressFilter {
+            case .all:
+                return true
+            case .started:
+                return owned > 0 && (total == 0 || owned < total)
+            case .complete:
+                return total > 0 && owned >= total
+            case .notStarted:
+                return owned == 0
             }
         }
 
@@ -60,6 +77,15 @@ struct SetBrowserView: View {
                     .background(Color(.systemBackground))
                     Divider()
                 }
+
+                Picker("Progress", selection: $progressFilter) {
+                    ForEach(SetProgressFilter.allCases) { filter in
+                        Text(filter.title).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 10)
 
                 if isLoading {
                     ProgressView("Loading sets...")
@@ -104,7 +130,7 @@ struct SetBrowserView: View {
                                         SetDetailView(set: set)
                                             .environmentObject(environmentStore)
                                     } label: {
-                                        SetRow(set: set)
+                                        SetRow(set: set, ownedCount: ownedCount(for: set))
                                     }
                                 }
                             } header: {
@@ -139,10 +165,50 @@ struct SetBrowserView: View {
                 config: environmentStore.serverConfiguration,
                 token: token
             )
+            let collections = (try? await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                useCache: true
+            )) ?? []
+            var ownership: [String: Set<String>] = [:]
+            for collection in collections {
+                for card in collection.cards {
+                    guard let setCode = card.setCode else { continue }
+                    let key = setKey(tcg: card.tcg, code: setCode)
+                    ownership[key, default: []].insert(card.externalId ?? card.cardId)
+                }
+            }
+            ownedCardsBySet = ownership
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+
+    private func setKey(tcg: String, code: String) -> String {
+        "\(tcg.lowercased())::\(code.lowercased())"
+    }
+
+    private func ownedCount(for set: TcgSet) -> Int {
+        ownedCardsBySet[setKey(tcg: set.tcg, code: set.code)]?.count ?? 0
+    }
+}
+
+private enum SetProgressFilter: String, CaseIterable, Identifiable {
+    case all
+    case started
+    case complete
+    case notStarted
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .started: return "Started"
+        case .complete: return "Complete"
+        case .notStarted: return "New"
         }
     }
 }
@@ -150,6 +216,7 @@ struct SetBrowserView: View {
 // MARK: - Set Row
 private struct SetRow: View {
     let set: TcgSet
+    let ownedCount: Int
 
     var body: some View {
         HStack(spacing: 12) {
@@ -199,6 +266,21 @@ private struct SetRow: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
+                }
+
+                if let totalCards = set.totalCards, totalCards > 0 {
+                    ProgressView(
+                        value: Double(min(ownedCount, totalCards)),
+                        total: Double(totalCards)
+                    )
+                    .tint(ownedCount >= totalCards ? .green : .accentColor)
+                    Text("\(ownedCount) of \(totalCards) owned")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else if ownedCount > 0 {
+                    Text("\(ownedCount) owned")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
             }
 

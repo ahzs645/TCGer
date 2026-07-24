@@ -3,7 +3,11 @@ import { v } from "convex/values";
 import { requireViewer } from "./lib/auth";
 import { hydrateBinderDetail, hydrateBinderSummary } from "./lib/library";
 import { now, requireBinderForUser, validateColorHex } from "./lib/domain";
-import { binderDetailValidator, binderSummaryValidator } from "./lib/validators";
+import {
+  binderDetailValidator,
+  binderSummaryValidator,
+  tcgCodeValidator
+} from "./lib/validators";
 
 export const list = query({
   args: {},
@@ -40,7 +44,12 @@ export const create = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
-    colorHex: v.optional(v.string())
+    colorHex: v.optional(v.string()),
+    containerType: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    associatedTcg: v.optional(tcgCodeValidator),
+    associatedSetCode: v.optional(v.string()),
+    associatedSetName: v.optional(v.string())
   },
   returns: binderSummaryValidator,
   handler: async (ctx, args) => {
@@ -52,6 +61,11 @@ export const create = mutation({
       name: args.name.trim(),
       description: args.description?.trim() || undefined,
       colorHex: validateColorHex(args.colorHex),
+      containerType: args.containerType?.trim() || undefined,
+      imageUrl: args.imageUrl?.trim() || undefined,
+      associatedTcg: args.associatedTcg,
+      associatedSetCode: args.associatedSetCode?.trim() || undefined,
+      associatedSetName: args.associatedSetName?.trim() || undefined,
       createdAt: timestamp,
       updatedAt: timestamp
     });

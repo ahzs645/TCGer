@@ -5,7 +5,15 @@ import { validatePokemonDeck } from './pokemon-formats';
 
 export function validateDeck(
   tcg: string,
-  cards: Array<{ name: string; quantity: number; isSideboard: boolean; isCommander?: boolean; cardData?: Record<string, unknown> }>,
+  cards: Array<{
+    externalId: string;
+    name: string;
+    quantity: number;
+    zone?: 'main' | 'extra' | 'side';
+    isSideboard: boolean;
+    isCommander?: boolean;
+    cardData?: Record<string, unknown>;
+  }>,
   format?: string
 ): DeckValidationResult {
   switch (tcg) {

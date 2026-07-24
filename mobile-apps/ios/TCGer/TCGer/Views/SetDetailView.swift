@@ -14,8 +14,39 @@ struct SetDetailView: View {
     @State private var wishlistSheetCard: Card?
     @State private var ownedCardIds: Set<String> = []
     @State private var ownershipLoaded = false
+    @State private var collections: [Collection] = []
+    @State private var cardFilter: SetCardFilter = .all
+    @State private var cardSort: SetCardSort = .collectorNumber
+    @State private var isSelecting = false
+    @State private var selectedCardIds: Set<String> = []
+    @State private var showingBulkBinderPicker = false
+    @State private var isBulkAdding = false
 
     private let apiService = APIService()
+
+    private var displayedCards: [Card] {
+        cards
+            .filter { card in
+                switch cardFilter {
+                case .all:
+                    return true
+                case .missing:
+                    return !ownedCardIds.contains(card.id)
+                case .owned:
+                    return ownedCardIds.contains(card.id)
+                }
+            }
+            .sorted { left, right in
+                switch cardSort {
+                case .collectorNumber:
+                    let leftNumber = left.collectorNumber ?? left.id
+                    let rightNumber = right.collectorNumber ?? right.id
+                    return leftNumber.localizedStandardCompare(rightNumber) == .orderedAscending
+                case .name:
+                    return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+                }
+            }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,14 +130,62 @@ struct SetDetailView: View {
                         .padding(.bottom, 4)
                     }
 
+                    HStack(spacing: 12) {
+                        Picker("Cards", selection: $cardFilter) {
+                            ForEach(SetCardFilter.allCases) { filter in
+                                Text(filter.title).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Menu {
+                            Picker("Sort", selection: $cardSort) {
+                                ForEach(SetCardSort.allCases) { sort in
+                                    Text(sort.title).tag(sort)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
+                                .frame(width: 36, height: 32)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 4)
+
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible())
                     ], spacing: 16) {
-                        ForEach(cards) { card in
+                        ForEach(displayedCards) { card in
                             SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
+                                .overlay(alignment: .topLeading) {
+                                    if isSelecting {
+                                        Image(
+                                            systemName: selectedCardIds.contains(card.id)
+                                                ? "checkmark.circle.fill"
+                                                : "circle"
+                                        )
+                                        .font(.title2)
+                                        .foregroundStyle(
+                                            selectedCardIds.contains(card.id)
+                                                ? Color.accentColor
+                                                : Color.secondary
+                                        )
+                                        .background(Circle().fill(.background))
+                                        .padding(6)
+                                    }
+                                }
+                                .onTapGesture {
+                                    if isSelecting {
+                                        toggleSelection(card.id)
+                                    }
+                                }
                                 .cardPreviewContextMenu(card: card, onSelect: {
-                                    Task { await handleCardSelection(card) }
+                                    if isSelecting {
+                                        toggleSelection(card.id)
+                                    } else {
+                                        Task { await handleCardSelection(card) }
+                                    }
                                 }, onAddToWishlist: {
                                     wishlistSheetCard = card
                                 })
@@ -118,6 +197,41 @@ struct SetDetailView: View {
         }
         .navigationTitle(set.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(isSelecting ? "Done" : "Select") {
+                    isSelecting.toggle()
+                    if !isSelecting {
+                        selectedCardIds.removeAll()
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if isSelecting && !selectedCardIds.isEmpty {
+                Button {
+                    showingBulkBinderPicker = true
+                } label: {
+                    HStack {
+                        if isBulkAdding {
+                            ProgressView()
+                        }
+                        Text(
+                            isBulkAdding
+                                ? "Adding cards…"
+                                : "Add \(selectedCardIds.count) selected to binder"
+                        )
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isBulkAdding)
+                .padding()
+                .background(.regularMaterial)
+            }
+        }
         .task {
             await loadCards()
             await loadOwnershipData()
@@ -155,8 +269,8 @@ struct SetDetailView: View {
             currentPrintOptions = []
             addSheetCard = nil
         }) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
-                await addCardToBinder(
+            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
+                try await addCardToBinder(
                     card: card,
                     binderId: binderId,
                     quantity: quantity,
@@ -164,10 +278,25 @@ struct SetDetailView: View {
                     language: language,
                     notes: notes,
                     isFoil: isFoil,
+                    variant: variant,
                     isSigned: isSigned,
                     isAltered: isAltered
                 )
             }
+        }
+        .sheet(isPresented: $showingBulkBinderPicker) {
+            BulkBinderPicker(collections: collections) { binderId in
+                showingBulkBinderPicker = false
+                Task { await bulkAddSelectedCards(to: binderId) }
+            }
+        }
+    }
+
+    private func toggleSelection(_ cardId: String) {
+        if selectedCardIds.contains(cardId) {
+            selectedCardIds.remove(cardId)
+        } else {
+            selectedCardIds.insert(cardId)
         }
     }
 
@@ -241,31 +370,32 @@ struct SetDetailView: View {
         language: String?,
         notes: String?,
         isFoil: Bool = false,
+        variant: CardCopyVariant = .empty,
         isSigned: Bool = false,
         isAltered: Bool = false
-    ) async {
-        guard let token = environmentStore.authToken else { return }
-
-        do {
-            try await apiService.addCardToBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: binderId,
-                cardId: card.id,
-                quantity: quantity,
-                condition: condition,
-                language: language,
-                notes: notes,
-                price: card.price,
-                acquisitionPrice: nil,
-                isFoil: isFoil,
-                isSigned: isSigned,
-                isAltered: isAltered,
-                card: card
-            )
-        } catch {
-            errorMessage = error.localizedDescription
+    ) async throws {
+        guard let token = environmentStore.authToken else {
+            throw APIService.APIError.unauthorized
         }
+
+        try await apiService.addCardToBinder(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            binderId: binderId,
+            cardId: card.id,
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes,
+            price: card.price,
+            acquisitionPrice: nil,
+            isFoil: isFoil,
+            variant: variant,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            card: card
+        )
+        ownedCardIds.insert(card.id)
     }
 
     @MainActor
@@ -278,6 +408,7 @@ struct SetDetailView: View {
                 token: token,
                 useCache: true
             )
+            self.collections = collections
             var ids = Set<String>()
             for collection in collections {
                 for card in collection.cards {
@@ -290,6 +421,34 @@ struct SetDetailView: View {
             // Silently fail - ownership is an enhancement, not critical
             ownershipLoaded = true
         }
+    }
+
+    @MainActor
+    private func bulkAddSelectedCards(to binderId: String) async {
+        guard let token = environmentStore.authToken else { return }
+        let selectedCards = cards.filter { selectedCardIds.contains($0.id) }
+        guard !selectedCards.isEmpty else { return }
+
+        isBulkAdding = true
+        errorMessage = nil
+        do {
+            for card in selectedCards {
+                try await apiService.addCardToBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    binderId: binderId,
+                    cardId: card.id,
+                    price: card.price,
+                    card: card
+                )
+                ownedCardIds.insert(card.id)
+            }
+            selectedCardIds.removeAll()
+            isSelecting = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isBulkAdding = false
     }
 
     @MainActor
@@ -314,6 +473,62 @@ struct SetDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+}
+
+private enum SetCardFilter: String, CaseIterable, Identifiable {
+    case all
+    case missing
+    case owned
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
+private enum SetCardSort: String, CaseIterable, Identifiable {
+    case collectorNumber
+    case name
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .collectorNumber: return "Collector number"
+        case .name: return "Name"
+        }
+    }
+}
+
+private struct BulkBinderPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let collections: [Collection]
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List(collections) { collection in
+                Button {
+                    onSelect(collection.id)
+                } label: {
+                    HStack {
+                        Circle()
+                            .fill(Color.fromHex(collection.colorHex))
+                            .frame(width: 12, height: 12)
+                        Text(collection.name)
+                        Spacer()
+                        Text("\(collection.totalCopies)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .foregroundStyle(.primary)
+            }
+            .navigationTitle("Choose Binder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
         }
     }
 }

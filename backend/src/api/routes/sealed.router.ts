@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
-import { createSealedInventorySchema, updateSealedInventorySchema } from '@tcg/api-types';
+import {
+  createSealedInventorySchema,
+  createSealedOpeningSchema,
+  recordOpenedCardSaleSchema,
+  updateSealedInventorySchema
+} from '@tcg/api-types';
 import * as sealedService from '../../modules/sealed/sealed.service';
 
 export const sealedRouter = Router();
@@ -27,6 +32,34 @@ sealedRouter.get('/inventory', asyncHandler(async (req, res) => {
   const { id: userId } = (req as AuthRequest).user!;
   const inventory = await sealedService.getUserSealedInventory(userId);
   res.json(inventory);
+}));
+
+sealedRouter.get('/openings', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  const ledgers = await sealedService.getSealedOpeningLedgers(userId);
+  res.json(ledgers);
+}));
+
+sealedRouter.post('/inventory/:itemId/open', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  const input = createSealedOpeningSchema.parse(req.body);
+  const opening = await sealedService.createSealedOpening(
+    userId,
+    req.params.itemId,
+    input
+  );
+  res.status(201).json(opening);
+}));
+
+sealedRouter.patch('/openings/cards/:cardId/sale', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  const input = recordOpenedCardSaleSchema.parse(req.body);
+  const entry = await sealedService.recordOpenedCardSale(
+    userId,
+    req.params.cardId,
+    input
+  );
+  res.json(entry);
 }));
 
 sealedRouter.post('/inventory', asyncHandler(async (req, res) => {

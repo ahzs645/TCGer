@@ -1,25 +1,20 @@
 import type { DeckValidationResult } from '@tcg/api-types';
+import {
+  inferYugiohZone,
+  resolveYugiohBaseId,
+  type YugiohDeckDomainCard
+} from '../yugioh-domain';
 
 export function validateYugiohDeck(
-  cards: Array<{ name: string; quantity: number; isSideboard: boolean; cardData?: Record<string, unknown> }>,
+  cards: YugiohDeckDomainCard[],
   _format: string
 ): DeckValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  const mainDeck = cards.filter(c => !c.isSideboard);
-  const sideboard = cards.filter(c => c.isSideboard);
-
-  // Separate main deck into main + extra deck by card type
-  const extraTypes = ['Fusion Monster', 'Synchro Monster', 'Xyz Monster', 'Link Monster'];
-  const mainCards = mainDeck.filter(c => {
-    const type = (c.cardData as any)?.cardType || '';
-    return !extraTypes.some(t => type.includes(t));
-  });
-  const extraCards = mainDeck.filter(c => {
-    const type = (c.cardData as any)?.cardType || '';
-    return extraTypes.some(t => type.includes(t));
-  });
+  const mainCards = cards.filter(c => inferYugiohZone(c) === 'main');
+  const extraCards = cards.filter(c => inferYugiohZone(c) === 'extra');
+  const sideboard = cards.filter(c => inferYugiohZone(c) === 'side');
 
   const mainCount = mainCards.reduce((s, c) => s + c.quantity, 0);
   const extraCount = extraCards.reduce((s, c) => s + c.quantity, 0);
@@ -31,11 +26,14 @@ export function validateYugiohDeck(
   if (sideCount > 15) errors.push(`Side Deck has ${sideCount} cards, maximum is 15`);
 
   // Copy limit: max 3 of any card
-  const nameCounts = new Map<string, number>();
+  const nameCounts = new Map<string, { name: string; count: number }>();
   for (const card of cards) {
-    nameCounts.set(card.name, (nameCounts.get(card.name) || 0) + card.quantity);
+    const baseId = resolveYugiohBaseId(card);
+    const current = nameCounts.get(baseId) ?? { name: card.name, count: 0 };
+    current.count += card.quantity;
+    nameCounts.set(baseId, current);
   }
-  for (const [name, count] of nameCounts) {
+  for (const { name, count } of nameCounts.values()) {
     if (count > 3) errors.push(`"${name}" has ${count} copies, maximum is 3`);
   }
 

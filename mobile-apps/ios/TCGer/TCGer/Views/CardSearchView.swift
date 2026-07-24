@@ -121,15 +121,16 @@ struct CardSearchView: View {
                 currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
-                    await addCardToBinder(
-                        cardId: card.id,
+                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
+                    try await addCardToBinder(
+                        card: card,
                         binderId: binderId,
                         quantity: quantity,
                         condition: condition,
                         language: language,
                         notes: notes,
                         isFoil: isFoil,
+                        variant: variant,
                         isSigned: isSigned,
                         isAltered: isAltered
                     )
@@ -255,45 +256,39 @@ struct CardSearchView: View {
 
     @MainActor
     private func addCardToBinder(
-        cardId: String,
+        card: Card,
         binderId: String,
         quantity: Int,
         condition: String?,
         language: String?,
         notes: String?,
         isFoil: Bool = false,
+        variant: CardCopyVariant = .empty,
         isSigned: Bool = false,
         isAltered: Bool = false
-    ) async {
+    ) async throws {
         guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            return
+            throw APIService.APIError.unauthorized
         }
 
-        // Find the card from search results to pass full data
-        let card = searchResults.first { $0.id == cardId }
-
-        do {
-            try await apiService.addCardToBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: binderId,
-                cardId: cardId,
-                quantity: quantity,
-                condition: condition,
-                language: language,
-                notes: notes,
-                price: nil,
-                acquisitionPrice: nil,
-                isFoil: isFoil,
-                isSigned: isSigned,
-                isAltered: isAltered,
-                card: card
-            )
-            addCardSuccessMessage = "Card added to binder successfully!"
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        try await apiService.addCardToBinder(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            binderId: binderId,
+            cardId: card.id,
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes,
+            price: card.price,
+            acquisitionPrice: nil,
+            isFoil: isFoil,
+            variant: variant,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            card: card
+        )
+        addCardSuccessMessage = "Card added to binder successfully!"
     }
 
     @MainActor

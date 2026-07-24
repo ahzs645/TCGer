@@ -9,6 +9,15 @@ import type {
   UpdateCardInput,
   CollectionTagResponse,
   CreateTagInput,
+  CollectionImportOptions,
+  CollectionImportPreview,
+  CollectionImportResult,
+  CollectionImportRequest,
+  CollectionMutationHistoryResponse,
+  UndoCollectionMutationResult,
+  BulkAddPreview,
+  BulkAddRequest,
+  BulkAddResult,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 import { resolvePublicConvexSiteOrigin } from "@/lib/utils";
@@ -26,6 +35,15 @@ export type {
   CollectionCard,
   CollectionTagResponse,
   CreateTagInput,
+  CollectionImportOptions,
+  CollectionImportPreview,
+  CollectionImportResult,
+  CollectionMutationAuditEntry,
+  CollectionMutationHistoryResponse,
+  UndoCollectionMutationResult,
+  BulkAddPreview,
+  BulkAddRequest,
+  BulkAddResult,
 } from "@tcg/api-types";
 
 // Frontend uses "Collection" terminology; backend uses "Binder"
@@ -224,6 +242,46 @@ export async function removeCardFromCollection(
   }
 }
 
+export async function getCollectionMutationHistory(
+  token: string,
+  viewer?: CollectionsViewerContext | null,
+  limit = 50,
+): Promise<CollectionMutationHistoryResponse> {
+  const params = new URLSearchParams({
+    limit: String(Math.min(100, Math.max(1, limit))),
+  });
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/history?${params.toString()}`,
+    { headers: buildHeaders(token, viewer, false) },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to fetch collection history");
+  }
+  return response.json();
+}
+
+export async function undoCollectionMutation(
+  token: string,
+  auditId: string,
+  idempotencyKey: string,
+  viewer?: CollectionsViewerContext | null,
+): Promise<UndoCollectionMutationResult> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/history/${encodeURIComponent(auditId)}/undo`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify({ idempotencyKey }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to undo collection mutation");
+  }
+  return response.json();
+}
+
 export async function updateCollectionCard(
   token: string,
   binderId: string,
@@ -281,4 +339,132 @@ export async function createTag(
   }
 
   return response.json();
+}
+
+async function importRequest<T>(
+  token: string,
+  action: "preview" | "commit",
+  input: CollectionImportRequest,
+  viewer?: CollectionsViewerContext | null,
+): Promise<T> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/import/${action}`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify(input),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok && response.status !== 422) {
+    throw new Error(payload.message || `Failed to ${action} collection import`);
+  }
+  return payload as T;
+}
+
+export function previewCollectionCsv(
+  token: string,
+  csv: string,
+  options: CollectionImportOptions,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return importRequest<CollectionImportPreview>(
+    token,
+    "preview",
+    { csv, options },
+    viewer,
+  );
+}
+
+export function commitCollectionCsv(
+  token: string,
+  csv: string,
+  options: CollectionImportOptions,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return importRequest<CollectionImportResult>(
+    token,
+    "commit",
+    { csv, options },
+    viewer,
+  );
+}
+
+export function previewCollectionSource(
+  token: string,
+  input: CollectionImportRequest,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return importRequest<CollectionImportPreview>(
+    token,
+    "preview",
+    input,
+    viewer,
+  );
+}
+
+export function commitCollectionSource(
+  token: string,
+  input: CollectionImportRequest,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return importRequest<CollectionImportResult>(
+    token,
+    "commit",
+    input,
+    viewer,
+  );
+}
+
+export async function downloadCollectionImportTemplate(
+  token: string,
+  viewer?: CollectionsViewerContext | null,
+): Promise<Blob> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/import/template`,
+    { headers: buildHeaders(token, viewer, false) },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to download import template");
+  }
+  return response.blob();
+}
+
+async function bulkRequest<T>(
+  token: string,
+  action: "preview" | "commit",
+  input: BulkAddRequest,
+  viewer?: CollectionsViewerContext | null,
+): Promise<T> {
+  const suffix = action === "preview" ? "/bulk/preview" : "/bulk";
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections${suffix}`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify(input),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok && !(action === "preview" && response.status === 422)) {
+    throw new Error(payload.message || `Failed to ${action} Bulk Add`);
+  }
+  return payload as T;
+}
+
+export function previewBulkAdd(
+  token: string,
+  input: BulkAddRequest,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return bulkRequest<BulkAddPreview>(token, "preview", input, viewer);
+}
+
+export function commitBulkAdd(
+  token: string,
+  input: BulkAddRequest,
+  viewer?: CollectionsViewerContext | null,
+) {
+  return bulkRequest<BulkAddResult>(token, "commit", input, viewer);
 }

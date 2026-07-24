@@ -162,7 +162,24 @@ extension Card {
             imageUrlSmall: collectionCard.imageUrlSmall,
             price: collectionCard.price,
             collectorNumber: collectionCard.collectorNumber,
-            releasedAt: nil
+            releasedAt: collectionCard.releasedAt.flatMap(ISO8601DateFormatter().date),
+            supertype: collectionCard.supertype,
+            formatLegality: collectionCard.formatLegality,
+            dexEntries: collectionCard.dexEntries,
+            region: collectionCard.region,
+            setSymbolUrl: collectionCard.setSymbolUrl,
+            setLogoUrl: collectionCard.setLogoUrl,
+            regulationMark: collectionCard.regulationMark,
+            language: collectionCard.languageCode,
+            pokemonPrint: collectionCard.pokemonPrint,
+            attributes: collectionCard.attributes,
+            provenance: collectionCard.provenance,
+            legalityPeriods: collectionCard.legalityPeriods,
+            evolution: collectionCard.evolution,
+            functionalIdentity: collectionCard.functionalIdentity,
+            baseExternalId: collectionCard.baseExternalId,
+            printingKey: collectionCard.printingKey,
+            artworkId: collectionCard.artworkId
         )
     }
 }

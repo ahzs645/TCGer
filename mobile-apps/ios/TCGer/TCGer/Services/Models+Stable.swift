@@ -16,6 +16,24 @@ struct StableCollectionCard: Identifiable, Codable {
     let notes: String?
     let collectorNumber: String?
     let copies: [StableCollectionCardCopy]
+    let releasedAt: String?
+    let setSymbolUrl: String?
+    let setLogoUrl: String?
+    let regulationMark: String?
+    let languageCode: String?
+    let supertype: String?
+    let formatLegality: PokemonFormatLegality?
+    let dexEntries: [PokedexEntry]?
+    let region: String?
+    let pokemonPrint: PokemonPrintMetadata?
+    let attributes: [String: JSONValue]?
+    let provenance: JSONValue?
+    let legalityPeriods: [JSONValue]?
+    let evolution: JSONValue?
+    let functionalIdentity: JSONValue?
+    let baseExternalId: String?
+    let printingKey: String?
+    let artworkId: String?
 
     func asModel() -> CollectionCard {
         CollectionCard(
@@ -35,7 +53,25 @@ struct StableCollectionCard: Identifiable, Codable {
             language: language,
             notes: notes,
             collectorNumber: collectorNumber,
-            copies: copies.map { $0.asModel() }
+            copies: copies.map { $0.asModel() },
+            releasedAt: releasedAt,
+            setSymbolUrl: setSymbolUrl,
+            setLogoUrl: setLogoUrl,
+            regulationMark: regulationMark,
+            languageCode: languageCode,
+            supertype: supertype,
+            formatLegality: formatLegality,
+            dexEntries: dexEntries,
+            region: region,
+            pokemonPrint: pokemonPrint,
+            attributes: attributes,
+            provenance: provenance,
+            legalityPeriods: legalityPeriods,
+            evolution: evolution,
+            functionalIdentity: functionalIdentity,
+            baseExternalId: baseExternalId,
+            printingKey: printingKey,
+            artworkId: artworkId
         )
     }
 }
@@ -50,6 +86,13 @@ struct StableCollectionCardCopy: Identifiable, Codable {
     let serialNumber: String?
     let acquiredAt: String?
     let isFoil: Bool?
+    let finishCode: String?
+    let finishLabel: String?
+    let edition: String?
+    let stamp: String?
+    let isSealedPromo: Bool?
+    let isOversized: Bool?
+    let isPeelOff: Bool?
     let isSigned: Bool?
     let isAltered: Bool?
     let imageUrls: [String]?
@@ -70,6 +113,13 @@ struct StableCollectionCardCopy: Identifiable, Codable {
             serialNumber: serialNumber,
             acquiredAt: acquiredAt,
             isFoil: isFoil,
+            finishCode: finishCode,
+            finishLabel: finishLabel,
+            edition: edition,
+            stamp: stamp,
+            isSealedPromo: isSealedPromo,
+            isOversized: isOversized,
+            isPeelOff: isPeelOff,
             isSigned: isSigned,
             isAltered: isAltered,
             imageUrls: imageUrls,

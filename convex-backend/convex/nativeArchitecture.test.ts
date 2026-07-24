@@ -34,7 +34,12 @@ describe("convex native architecture", () => {
     await asJordan.mutation(api.users.ensureCurrent, {});
     await asAvery.mutation(api.binders.create, {
       name: "Trade Binder",
-      colorHex: "22c55e"
+      colorHex: "22c55e",
+      containerType: "binder",
+      imageUrl: "https://example.com/trade-binder.jpg",
+      associatedTcg: "yugioh",
+      associatedSetCode: "LOB",
+      associatedSetName: "Legend of Blue Eyes White Dragon"
     });
 
     const averyBinders = await asAvery.query(api.binders.list);
@@ -42,6 +47,12 @@ describe("convex native architecture", () => {
 
     expect(averyBinders.map((binder) => binder.name)).toEqual(["Library", "Trade Binder"]);
     expect(jordanBinders.map((binder) => binder.name)).toEqual(["Library"]);
+    expect(averyBinders[1]).toMatchObject({
+      containerType: "binder",
+      imageUrl: "https://example.com/trade-binder.jpg",
+      associatedTcg: "yugioh",
+      associatedSetCode: "LOB"
+    });
   });
 
   test("adds cards to a binder with native tags and returns hydrated entries", async () => {
@@ -75,10 +86,84 @@ describe("convex native architecture", () => {
     const detail = await asAvery.query(api.binders.get, { binderId: binder.id });
 
     expect(entry.card.name).toBe("Smothering Tithe");
-    expect(entry.quantity).toBe(2);
+    expect(entry.quantity).toBe(1);
     expect(entry.tags.map((tag) => tag.label).sort()).toEqual(["For Trade", "Staple"]);
-    expect(detail.entryCount).toBe(1);
+    expect(detail.entryCount).toBe(2);
     expect(detail.entries[0].card.externalId).toBe("smothering-tithe");
+  });
+
+  test("keeps exact printings separate while sharing a base card identity", async () => {
+    const t = createTestConvex();
+    const asAvery = t.withIdentity({ subject: "user_avery", name: "Avery" });
+
+    await asAvery.mutation(api.users.ensureCurrent, {});
+    const binder = await asAvery.mutation(api.binders.create, {
+      name: "Yu-Gi-Oh Printings"
+    });
+
+    const first = await asAvery.mutation(api.collections.addToBinder, {
+      binderId: binder.id,
+      card: {
+        tcg: "yugioh",
+        externalId: "46986414:lob-001:na",
+        baseExternalId: "46986414",
+        printingKey: "yugioh|46986414|lob-001|ultra-rare|001|na",
+        artworkId: "46986414",
+        collectorNumber: "LOB-001",
+        name: "Dark Magician",
+        setCode: "LOB-001",
+        rarity: "Ultra Rare"
+      }
+    });
+    const second = await asAvery.mutation(api.collections.addToBinder, {
+      binderId: binder.id,
+      card: {
+        tcg: "yugioh",
+        externalId: "46986414:sd6-en003:na",
+        baseExternalId: "46986414",
+        printingKey: "yugioh|46986414|sd6-en003|common|003|na",
+        artworkId: "46986414",
+        collectorNumber: "SD6-EN003",
+        name: "Dark Magician",
+        setCode: "SD6-EN003",
+        rarity: "Common"
+      }
+    });
+
+    expect(first.card).toMatchObject({
+      baseExternalId: "46986414",
+      collectorNumber: "LOB-001",
+      printingKey: "yugioh|46986414|lob-001|ultra-rare|001|na"
+    });
+    expect(second.card).toMatchObject({
+      baseExternalId: "46986414",
+      collectorNumber: "SD6-EN003",
+      printingKey: "yugioh|46986414|sd6-en003|common|003|na"
+    });
+    expect(second.card.id).not.toBe(first.card.id);
+
+    const persisted = await t.run(async (ctx) => {
+      const identities = await ctx.db
+        .query("cardIdentities")
+        .withIndex("by_tcg_external", (q) =>
+          q.eq("tcg", "yugioh").eq("externalId", "46986414")
+        )
+        .take(2);
+      const printings = await ctx.db
+        .query("cards")
+        .withIndex("by_tcg_base_external", (q) =>
+          q.eq("tcg", "yugioh").eq("baseExternalId", "46986414")
+        )
+        .take(3);
+      return {
+        identityCount: identities.length,
+        identityIds: printings.map((printing) => printing.identityId)
+      };
+    });
+
+    expect(persisted.identityCount).toBe(1);
+    expect(persisted.identityIds).toHaveLength(2);
+    expect(new Set(persisted.identityIds).size).toBe(1);
   });
 
   test("updates and moves entries between binders", async () => {
@@ -122,6 +207,122 @@ describe("convex native architecture", () => {
     expect(pcDetail.entryCount).toBe(1);
   });
 
+  test("preserves rich catalog metadata and collectible variants", async () => {
+    const t = createTestConvex();
+    const asAvery = t.withIdentity({ subject: "user_avery", name: "Avery" });
+
+    await asAvery.mutation(api.users.ensureCurrent, {});
+    const binder = await asAvery.mutation(api.binders.create, {
+      name: "Pokemon Variants"
+    });
+
+    const entry = await asAvery.mutation(api.collections.addToBinder, {
+      binderId: binder.id,
+      card: {
+        tcg: "pokemon",
+        externalId: "base1-4",
+        baseExternalId: "charizard",
+        printingKey: "pokemon:base1:4:en",
+        artworkId: "base1-charizard",
+        name: "Charizard",
+        setCode: "base1",
+        setName: "Base Set",
+        rarity: "Rare Holo",
+        collectorNumber: "4/102",
+        releasedAt: "1999-01-09",
+        setSymbolUrl: "https://example.com/base1-symbol.png",
+        setLogoUrl: "https://example.com/base1-logo.png",
+        regulationMark: "A",
+        language: "English",
+        supertype: "Pokémon",
+        formatLegality: { standard: false, expanded: false },
+        dexEntries: [{ number: 6, name: "Charizard" }],
+        region: "International",
+        pokemonPrint: {
+          finishes: ["cosmos-holofoil", "normal"],
+          category: "Pokémon",
+          language: "English",
+          dexEntries: [{ number: 6, name: "Charizard" }]
+        },
+        attributes: { hp: "120", types: ["Fire"] },
+        provenance: {
+          source: "pokemon-tcg-api",
+          sourceId: "base1-4",
+          fetchedAt: "2026-07-23T00:00:00.000Z",
+          schemaVersion: "1"
+        },
+        legalityPeriods: [
+          {
+            format: "Standard",
+            rotation: "Base-Neo",
+            validFrom: "1999-01-09",
+            validTo: "2003-06-30",
+            legal: true
+          }
+        ],
+        evolution: {
+          evolvesFrom: "Charmeleon",
+          evolvesTo: []
+        },
+        functionalIdentity: {
+          key: "charizard|120|fire-spin",
+          normalizedRules: "fire spin"
+        }
+      },
+      isFoil: true,
+      finishCode: "cosmos-holofoil",
+      finishLabel: "Cosmos Holofoil",
+      edition: "1st Edition",
+      stamp: "Edition 1",
+      isSealedPromo: false,
+      isOversized: false,
+      isPeelOff: false
+    });
+
+    expect(entry.card).toMatchObject({
+      collectorNumber: "4/102",
+      baseExternalId: "charizard",
+      printingKey: "pokemon:base1:4:en",
+      artworkId: "base1-charizard",
+      regulationMark: "A",
+      language: "English",
+      supertype: "Pokémon",
+      region: "International",
+      provenance: {
+        source: "pokemon-tcg-api",
+        sourceId: "base1-4"
+      },
+      evolution: {
+        evolvesFrom: "Charmeleon"
+      },
+      functionalIdentity: {
+        key: "charizard|120|fire-spin"
+      }
+    });
+    expect(entry.card.pokemonPrint?.finishes).toEqual(["cosmos-holofoil", "normal"]);
+    expect(entry).toMatchObject({
+      isFoil: true,
+      finishCode: "cosmos-holofoil",
+      finishLabel: "Cosmos Holofoil",
+      edition: "1st Edition",
+      stamp: "Edition 1",
+      isSealedPromo: false,
+      isOversized: false,
+      isPeelOff: false
+    });
+
+    const updated = await asAvery.mutation(api.collections.update, {
+      entryId: entry.id,
+      finishLabel: null,
+      edition: null,
+      stamp: "Wizards"
+    });
+
+    expect(updated.finishLabel).toBeUndefined();
+    expect(updated.edition).toBeUndefined();
+    expect(updated.stamp).toBe("Wizards");
+  });
+
   test("serves a native health endpoint through Convex HTTP actions", async () => {
     const t = createTestConvex();
     const response = await t.fetch("/health");
@@ -148,13 +349,23 @@ describe("convex native architecture", () => {
       headers,
       body: JSON.stringify({
         name: "HTTP Binder",
-        colorHex: "22c55e"
+        colorHex: "22c55e",
+        containerType: "storage-box",
+        imageUrl: "https://example.com/http-binder.jpg",
+        associatedTcg: "magic",
+        associatedSetCode: "CMM"
       })
     });
     const createdBinder = await createBinderResponse.json();
 
     expect(createBinderResponse.status).toBe(201);
     expect(createdBinder.name).toBe("HTTP Binder");
+    expect(createdBinder).toMatchObject({
+      containerType: "storage-box",
+      imageUrl: "https://example.com/http-binder.jpg",
+      associatedTcg: "magic",
+      associatedSetCode: "CMM"
+    });
     expect(Array.isArray(createdBinder.cards)).toBe(true);
 
     const createTagResponse = await t.fetch("/collections/tags", {
@@ -177,8 +388,28 @@ describe("convex native architecture", () => {
           externalId: "sol-ring",
           name: "Sol Ring",
           setCode: "CMM",
-          setName: "Commander Masters"
-        }
+          setName: "Commander Masters",
+          collectorNumber: "396",
+          releasedAt: "2023-08-04",
+          setSymbolUrl: "https://example.com/cmm.svg",
+          attributes: { oracleId: "sol-ring-oracle" },
+          provenance: {
+            source: "scryfall",
+            sourceId: "sol-ring"
+          },
+          functionalIdentity: {
+            key: "sol-ring-oracle",
+            normalizedRules: "{T}: Add {C}{C}."
+          }
+        },
+        isFoil: true,
+        finishCode: "etched",
+        finishLabel: "Etched Foil",
+        edition: "Borderless",
+        stamp: "Promo Pack",
+        isSealedPromo: true,
+        isOversized: false,
+        isPeelOff: false
       })
     });
     const addedCard = await addCardResponse.json();
@@ -192,6 +423,21 @@ describe("convex native architecture", () => {
     expect(tag.label).toBe("For Trade");
     expect(addCardResponse.status).toBe(201);
     expect(addedCard.name).toBe("Sol Ring");
+    expect(addedCard.collectorNumber).toBe("396");
+    expect(addedCard.provenance).toEqual({
+      source: "scryfall",
+      sourceId: "sol-ring"
+    });
+    expect(addedCard.copies[0]).toMatchObject({
+      isFoil: true,
+      finishCode: "etched",
+      finishLabel: "Etched Foil",
+      edition: "Borderless",
+      stamp: "Promo Pack",
+      isSealedPromo: true,
+      isOversized: false,
+      isPeelOff: false
+    });
     expect(addedCard.copies[0].id).toBeTruthy();
     expect(binders[0].id).toBe("__library__");
     expect(binders[1].cards[0].copies[0].id).toBe(addedCard.copies[0].id);
@@ -202,6 +448,9 @@ describe("convex native architecture", () => {
       body: JSON.stringify({
         quantity: 2,
         notes: "Promoted to foil slot",
+        finishCode: "galaxy",
+        finishLabel: "Galaxy Foil",
+        stamp: null,
         cardOverride: {
           cardId: "sol-ring-borderless",
           cardData: {
@@ -210,7 +459,18 @@ describe("convex native architecture", () => {
             name: "Sol Ring",
             setCode: "SPG",
             setName: "Special Guests",
-            rarity: "Mythic"
+            rarity: "Mythic",
+            collectorNumber: "38",
+            provenance: {
+              source: "scryfall",
+              sourceId: "sol-ring-borderless"
+            },
+            legalityPeriods: [
+              {
+                format: "Commander",
+                legal: true
+              }
+            ]
           }
         }
       })
@@ -219,8 +479,16 @@ describe("convex native architecture", () => {
 
     expect(updateCardResponse.status).toBe(200);
     expect(updatedCard.externalId).toBe("sol-ring-borderless");
+    expect(updatedCard.collectorNumber).toBe("38");
+    expect(updatedCard.provenance.sourceId).toBe("sol-ring-borderless");
     expect(updatedCard.quantity).toBe(2);
     expect(updatedCard.copies).toHaveLength(2);
+    expect(updatedCard.copies[0]).toMatchObject({
+      finishCode: "galaxy",
+      finishLabel: "Galaxy Foil"
+    });
+    expect(updatedCard.copies[0].stamp).toBeUndefined();
+    expect(updatedCard.copies[1].finishCode).toBe("galaxy");
 
     const imageForm = new FormData();
     imageForm.append("images", new Blob(["test-image"], { type: "image/jpeg" }), "proof.jpg");
@@ -250,6 +518,15 @@ describe("convex native architecture", () => {
     expect(exportJsonResponse.status).toBe(200);
     expect(exportJson).toHaveLength(2);
     expect(exportJson[0].externalId).toBe("sol-ring-borderless");
+    expect(exportJson[0]).toMatchObject({
+      collectorNumber: "38",
+      finishCode: "galaxy",
+      finishLabel: "Galaxy Foil",
+      provenance: {
+        source: "scryfall",
+        sourceId: "sol-ring-borderless"
+      }
+    });
 
     const exportCsvResponse = await t.fetch("/collections/export?format=csv", {
       headers
@@ -328,7 +605,19 @@ describe("convex native architecture", () => {
         tcg: "magic",
         name: "Sol Ring",
         setCode: "CMM",
-        setName: "Commander Masters"
+        setName: "Commander Masters",
+        baseExternalId: "sol-ring",
+        printingKey: "magic:cmm:396:en",
+        collectorNumber: "396",
+        releasedAt: "2023-08-04",
+        setSymbolUrl: "https://example.com/cmm.svg",
+        provenance: {
+          source: "scryfall",
+          sourceId: "sol-ring"
+        },
+        functionalIdentity: {
+          key: "sol-ring"
+        }
       })
     });
     const wishlistCard = await addWishlistCardResponse.json();
@@ -336,6 +625,14 @@ describe("convex native architecture", () => {
     expect(addWishlistCardResponse.status).toBe(201);
     expect(wishlistCard).toMatchObject({
       externalId: "sol-ring",
+      baseExternalId: "sol-ring",
+      printingKey: "magic:cmm:396:en",
+      collectorNumber: "396",
+      releasedAt: "2023-08-04",
+      provenance: {
+        source: "scryfall",
+        sourceId: "sol-ring"
+      },
       owned: true,
       ownedQuantity: 1
     });
@@ -388,6 +685,16 @@ describe("convex native architecture", () => {
     expect(wishlists[0]).toMatchObject({
       name: "Commander Staples",
       totalCards: 2
+    });
+    expect(
+      wishlists[0].cards.find((card: { externalId: string }) => card.externalId === "sol-ring")
+    ).toMatchObject({
+      printingKey: "magic:cmm:396:en",
+      collectorNumber: "396",
+      provenance: {
+        source: "scryfall",
+        sourceId: "sol-ring"
+      }
     });
 
     const removeCardResponse = await t.fetch(

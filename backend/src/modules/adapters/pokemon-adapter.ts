@@ -1,6 +1,5 @@
 import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
-import { ENERGY_TYPE_CODES } from '@tcg/api-types';
 import type {
   CardDTO,
   CardPrintsResult,
@@ -11,6 +10,12 @@ import type {
   PokemonVariantFlags,
   TcgAdapter
 } from './types';
+import {
+  canonicalizePokemonRarity,
+  normalizePokemonEffectText,
+  normalizePokemonEnergy,
+  normalizePokemonName
+} from './pokemon-normalization';
 
 const POKEMON_TCG_IO_API_ROOT = 'https://api.pokemontcg.io/v2';
 const configuredPokemonApiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
@@ -37,11 +42,6 @@ if (scrydexConfigured && !hasScrydexApiKey) {
     'SCRYDEX_API_KEY is not configured; falling back to Pokemon TCG API for Pokemon card search'
   );
 }
-
-/** Map energy symbol codes to lowercase names for normalization */
-const ENERGY_SYMBOL_MAP: Record<string, string> = Object.fromEntries(
-  Object.entries(ENERGY_TYPE_CODES).map(([code, name]) => [code, name.toLowerCase()])
-);
 
 let rateLimitChain: Promise<void> = Promise.resolve();
 let nextAllowedRequestTime = 0;
@@ -165,6 +165,7 @@ interface PokemonCard {
   hp?: string;
   types?: string[];
   evolvesFrom?: string;
+  evolvesTo?: string[];
   number?: string;
   rarity?: string;
   images?: {
@@ -188,6 +189,20 @@ interface PokemonCard {
   flavorText?: string;
   rules?: string[];
   regulationMark?: string;
+  legalities?: {
+    standard?: string;
+    expanded?: string;
+    unlimited?: string;
+  };
+  tcgplayer?: {
+    prices?: {
+      normal?: { market?: number };
+      holofoil?: { market?: number };
+      reverseHolofoil?: { market?: number };
+      firstEditionHolofoil?: { market?: number };
+      firstEditionNormal?: { market?: number };
+    };
+  };
 }
 
 interface FunctionalSignature {
@@ -396,7 +411,7 @@ export class PokemonAdapter implements TcgAdapter {
       return (payload.data ?? []).map((s) => ({
         code: s.id,
         name: s.name,
-        tcg: this.game as const,
+        tcg: this.game,
         releaseDate: s.releaseDate,
         totalCards: s.total,
         iconUrl: s.images?.symbol,
@@ -445,8 +460,10 @@ export class PokemonAdapter implements TcgAdapter {
     const imageUrl = card.image ? `${card.image}/high.webp` : undefined;
     const imageUrlSmall = card.image ? `${card.image}/low.webp` : undefined;
 
-    // TCGdex returns "None" for promo cards, convert to "Promo"
-    const rarity = card.rarity === 'None' ? 'Promo' : card.rarity;
+    // TCGdex returns "None" for promo cards; also collapse known source aliases.
+    const rarity = canonicalizePokemonRarity(card.rarity, card.name, {
+      noneMeansPromo: true
+    });
 
     // Build format legality from TCGdex legal field
     const formatLegality = card.legal ? {
@@ -458,10 +475,36 @@ export class PokemonAdapter implements TcgAdapter {
     const dexEntries = card.dexId?.length
       ? card.dexId.map((num) => ({ number: num, name: card.name }))
       : undefined;
+    const variants = card.variants ?? {};
+    const finishes = this.buildFinishList(variants);
+    const functionalSource: PokemonCard = {
+      id: card.id,
+      name: card.name,
+      supertype: card.category,
+      subtypes: card.stage ? [card.stage] : undefined,
+      hp: card.hp?.toString(),
+      evolvesFrom: card.evolveFrom,
+      attacks: card.attacks?.map((attack) => ({
+        name: attack.name,
+        cost: attack.cost,
+        damage: attack.damage?.toString(),
+        text: attack.effect,
+        convertedEnergyCost: attack.cost?.length
+      })),
+      abilities: card.abilities?.map((ability) => ({
+        name: ability.name,
+        text: ability.effect,
+        type: ability.type
+      })),
+      regulationMark: card.regulationMark
+    };
+    const functionalIdentity = this.buildFunctionalSignature(functionalSource);
 
     return {
       id: card.id,
       tcg: this.game,
+      baseExternalId: functionalIdentity.key || undefined,
+      printingKey: `${this.game}:${card.id}`,
       name: card.name,
       setCode: card.set?.id,
       setName: card.set?.name,
@@ -472,9 +515,35 @@ export class PokemonAdapter implements TcgAdapter {
       setSymbolUrl: card.set?.symbol,
       setLogoUrl: card.set?.logo,
       regulationMark: card.regulationMark,
+      language: card.language,
       supertype: card.category,
       formatLegality,
       dexEntries,
+      pokemonPrint: {
+        tcgdexId: card.id,
+        tcgdexImage: imageUrl,
+        variants,
+        finishes: finishes.length ? finishes : undefined,
+        category: card.category,
+        regulationMark: card.regulationMark,
+        language: card.language,
+        formatLegality,
+        dexEntries
+      },
+      legalityPeriods: this.buildCurrentLegalityPeriods(formatLegality),
+      evolution: card.evolveFrom ? { evolvesFrom: card.evolveFrom } : undefined,
+      functionalIdentity: functionalIdentity.key
+        ? {
+            key: functionalIdentity.key,
+            normalizedRules: functionalIdentity.normalizedRules
+          }
+        : undefined,
+      provenance: {
+        source: 'tcgdex',
+        sourceId: card.id,
+        fetchedAt: new Date().toISOString(),
+        schemaVersion: 'v2'
+      },
       attributes: {
         hp: card.hp,
         types: card.types,
@@ -490,14 +559,24 @@ export class PokemonAdapter implements TcgAdapter {
 
   private mapCard(card: PokemonCard): CardDTO {
     const retreatCost = Array.isArray(card.retreatCost) ? card.retreatCost.length : undefined;
+    const formatLegality = card.legalities
+      ? {
+          standard: this.isLegalStatus(card.legalities.standard),
+          expanded: this.isLegalStatus(card.legalities.expanded)
+        }
+      : undefined;
+    const functionalIdentity = this.buildFunctionalSignature(card);
+    const source = isScrydex ? 'scrydex' : isTCGdex ? 'tcgdex' : 'pokemon-tcg-api';
 
     return {
       id: card.id,
       tcg: this.game,
+      baseExternalId: functionalIdentity.key || undefined,
+      printingKey: `${this.game}:${card.id}`,
       name: card.name,
       setCode: card.set?.id,
       setName: card.set?.name,
-      rarity: card.rarity,
+      rarity: canonicalizePokemonRarity(card.rarity, card.name),
       collectorNumber: card.number,
       releasedAt: card.set?.releaseDate,
       imageUrl: card.images?.large ?? card.images?.small,
@@ -506,6 +585,27 @@ export class PokemonAdapter implements TcgAdapter {
       setLogoUrl: card.set?.images?.logo,
       regulationMark: card.regulationMark,
       supertype: card.supertype,
+      formatLegality,
+      legalityPeriods: this.buildCurrentLegalityPeriods(formatLegality),
+      evolution:
+        card.evolvesFrom || card.evolvesTo?.length
+          ? {
+              evolvesFrom: card.evolvesFrom,
+              evolvesTo: card.evolvesTo
+            }
+          : undefined,
+      functionalIdentity: functionalIdentity.key
+        ? {
+            key: functionalIdentity.key,
+            normalizedRules: functionalIdentity.normalizedRules
+          }
+        : undefined,
+      provenance: {
+        source,
+        sourceId: card.id,
+        fetchedAt: new Date().toISOString(),
+        schemaVersion: 'v2'
+      },
       attributes: {
         subtypes: card.subtypes,
         hp: card.hp,
@@ -515,9 +615,48 @@ export class PokemonAdapter implements TcgAdapter {
         weaknesses: card.weaknesses,
         resistances: card.resistances,
         retreatCost,
-        flavorText: card.flavorText
+        flavorText: card.flavorText,
+        market_price:
+          card.tcgplayer?.prices?.normal?.market ??
+          card.tcgplayer?.prices?.firstEditionNormal?.market,
+        holofoil_market_price:
+          card.tcgplayer?.prices?.holofoil?.market ??
+          card.tcgplayer?.prices?.firstEditionHolofoil?.market,
+        reverse_holo_market_price: card.tcgplayer?.prices?.reverseHolofoil?.market
       }
     };
+  }
+
+  private isLegalStatus(status?: string): boolean | undefined {
+    if (!status) {
+      return undefined;
+    }
+    return status.trim().toLowerCase() === 'legal';
+  }
+
+  private buildCurrentLegalityPeriods(
+    legality?: { standard?: boolean; expanded?: boolean }
+  ): CardDTO['legalityPeriods'] {
+    if (!legality) {
+      return undefined;
+    }
+
+    const periods: NonNullable<CardDTO['legalityPeriods']> = [];
+    if (legality.standard !== undefined) {
+      periods.push({
+        format: 'Standard',
+        rotation: 'Current',
+        legal: legality.standard
+      });
+    }
+    if (legality.expanded !== undefined) {
+      periods.push({
+        format: 'Expanded',
+        rotation: 'Current',
+        legal: legality.expanded
+      });
+    }
+    return periods.length ? periods : undefined;
   }
 
   private buildHeaders(): Record<string, string> {
@@ -879,11 +1018,7 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   private normalizeName(name?: string): string {
-    if (!name) {
-      return '';
-    }
-    const stripped = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-    return stripped.replace(/\s+/g, ' ').trim().toLowerCase();
+    return normalizePokemonName(name);
   }
 
   private normalizeHp(value?: string): string {
@@ -962,24 +1097,11 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   private normalizeEffectText(text?: string): string {
-    if (!text) {
-      return '';
-    }
-    let normalized = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-    normalized = normalized.toLowerCase();
-    normalized = normalized.replace(/pok[eé]mon/g, 'pokemon');
-    normalized = normalized.replace(/\[([a-z])\]/gi, (_, symbol: string) => ` ${ENERGY_SYMBOL_MAP[symbol.toUpperCase()] ?? symbol.toLowerCase()} `);
-    normalized = normalized.replace(/[.,:;!?()[\]{}]/g, ' ');
-    normalized = normalized.replace(/\s+/g, ' ').trim();
-    return normalized;
+    return normalizePokemonEffectText(text);
   }
 
   private normalizeEnergySymbol(symbol?: string): string {
-    if (!symbol) {
-      return '';
-    }
-    const key = symbol.replace(/[^a-z0-9]/gi, '').toUpperCase();
-    return ENERGY_SYMBOL_MAP[key] ?? symbol.toLowerCase();
+    return normalizePokemonEnergy(symbol);
   }
 
   private buildFinishList(variants: PokemonVariantFlags): NonNullable<PokemonPrintMetadata['finishes']> {
@@ -992,9 +1114,6 @@ export class PokemonAdapter implements TcgAdapter {
     }
     if (variants.holo) {
       finishes.push('holo');
-    }
-    if (variants.firstEdition) {
-      finishes.push('firstEdition');
     }
     return finishes;
   }

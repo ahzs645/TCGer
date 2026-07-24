@@ -7,6 +7,7 @@ import { Loader2, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -25,6 +26,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +48,8 @@ import {
   type CollectionCard,
   type CollectionCardCopy,
   type CollectionTag,
+  type CreateCollectionInput,
+  type UpdateCollectionInput,
   type UpdateCollectionCardInput,
 } from "@/lib/api/collections";
 import { fetchCardPrintsApi } from "@/lib/api-client";
@@ -60,10 +70,15 @@ import { getAppRoute } from "@/lib/app-routes";
 import type {
   Card as TcgCard,
   CardPrintsResponse,
-  PokemonFinishType,
   PokemonFunctionalGroup,
   TcgCode,
 } from "@/types/card";
+import {
+  formatFinishLabel,
+  getCopyVariantBadges,
+  getPokemonFinishOptions,
+  isFoilFinish,
+} from "@/lib/pokemon-variants";
 
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
 const DEFAULT_BINDER_COLORS = [
@@ -83,6 +98,13 @@ const DEFAULT_BINDER_COLORS = [
   "#3B82F6",
   "#6366F1",
   "#A855F7",
+] as const;
+const CONTAINER_TYPES = [
+  { value: "binder", label: "Binder" },
+  { value: "box", label: "Storage box" },
+  { value: "deck-box", label: "Deck box" },
+  { value: "album", label: "Album" },
+  { value: "case", label: "Display case" },
 ] as const;
 
 const GAME_LABELS: Record<TcgCode, string> = {
@@ -148,22 +170,6 @@ function formatPrintDetails(print: TcgCard) {
   return parts.join(" • ");
 }
 
-function getFinishBadges(print: TcgCard): PokemonFinishType[] {
-  if (print.pokemonPrint?.finishes?.length) {
-    return print.pokemonPrint.finishes;
-  }
-  const variants = print.pokemonPrint?.variants;
-  if (!variants) {
-    return [];
-  }
-  const finishes: PokemonFinishType[] = [];
-  if (variants.normal) finishes.push("normal");
-  if (variants.reverse) finishes.push("reverse");
-  if (variants.holo) finishes.push("holo");
-  if (variants.firstEdition) finishes.push("firstEdition");
-  return finishes;
-}
-
 export function CollectionView() {
   const token = useAuthStore((state) => state.token);
   const router = useRouter();
@@ -215,6 +221,12 @@ export function CollectionView() {
     useState<(typeof CONDITION_ORDER)[number]>("NM");
   const [draftNotes, setDraftNotes] = useState("");
   const [draftCopyTags, setDraftCopyTags] = useState<string[]>([]);
+  const [draftFinishCode, setDraftFinishCode] = useState("");
+  const [draftEdition, setDraftEdition] = useState("");
+  const [draftStamp, setDraftStamp] = useState("");
+  const [draftIsSealedPromo, setDraftIsSealedPromo] = useState(false);
+  const [draftIsOversized, setDraftIsOversized] = useState(false);
+  const [draftIsPeelOff, setDraftIsPeelOff] = useState(false);
   const [pendingBinderId, setPendingBinderId] = useState<string>(
     LIBRARY_COLLECTION_ID,
   );
@@ -232,6 +244,11 @@ export function CollectionView() {
   const [newBinderColor, setNewBinderColor] = useState<string>(
     DEFAULT_BINDER_COLORS[0],
   );
+  const [newContainerType, setNewContainerType] = useState("binder");
+  const [newBinderImageUrl, setNewBinderImageUrl] = useState("");
+  const [newBinderSetTcg, setNewBinderSetTcg] = useState<TcgCode | "">("");
+  const [newBinderSetCode, setNewBinderSetCode] = useState("");
+  const [newBinderSetName, setNewBinderSetName] = useState("");
   const [isCreatingBinder, setIsCreatingBinder] = useState(false);
   const [createBinderError, setCreateBinderError] = useState<string | null>(
     null,
@@ -242,6 +259,11 @@ export function CollectionView() {
   const [editBinderName, setEditBinderName] = useState("");
   const [editBinderDescription, setEditBinderDescription] = useState("");
   const [editBinderColor, setEditBinderColor] = useState<string>("");
+  const [editContainerType, setEditContainerType] = useState("binder");
+  const [editBinderImageUrl, setEditBinderImageUrl] = useState("");
+  const [editBinderSetTcg, setEditBinderSetTcg] = useState<TcgCode | "">("");
+  const [editBinderSetCode, setEditBinderSetCode] = useState("");
+  const [editBinderSetName, setEditBinderSetName] = useState("");
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -252,6 +274,14 @@ export function CollectionView() {
   const [isLoadingPrints, setIsLoadingPrints] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const [isSavingPrintSelection, setIsSavingPrintSelection] = useState(false);
+  const [selectedPrintFinishCode, setSelectedPrintFinishCode] = useState("");
+  const [selectedPrintEdition, setSelectedPrintEdition] = useState("");
+  const [selectedPrintStamp, setSelectedPrintStamp] = useState("");
+  const [selectedPrintIsSealedPromo, setSelectedPrintIsSealedPromo] =
+    useState(false);
+  const [selectedPrintIsOversized, setSelectedPrintIsOversized] =
+    useState(false);
+  const [selectedPrintIsPeelOff, setSelectedPrintIsPeelOff] = useState(false);
 
   useEffect(() => {
     const binderParam = searchParams.get("binder");
@@ -389,6 +419,12 @@ export function CollectionView() {
   const printOptions = printData?.prints ?? null;
   const pokemonFunctionalGroup: PokemonFunctionalGroup | null =
     printData?.mode === "pokemon-functional" ? printData.functionalGroup : null;
+  const selectedPrintFinishOptions = selectedPrintCard
+    ? getPokemonFinishOptions(selectedPrintCard, true)
+    : [];
+  const selectedPrintFinish = selectedPrintFinishOptions.find(
+    (finish) => finish.code === selectedPrintFinishCode,
+  );
 
   useEffect(() => {
     setIsPrintDialogOpen(false);
@@ -397,6 +433,7 @@ export function CollectionView() {
     setIsLoadingPrints(false);
     setPrintError(null);
     setIsSavingPrintSelection(false);
+    setSelectedPrintFinishCode("");
   }, [selectedCard?.cardId]);
 
   useEffect(() => {
@@ -440,15 +477,50 @@ export function CollectionView() {
       );
       setDraftNotes(selectedCopy.notes ?? "");
       setDraftCopyTags(selectedCopy.tags.map((tag) => tag.id));
+      setDraftFinishCode(
+        selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : ""),
+      );
+      setDraftEdition(selectedCopy.edition ?? "");
+      setDraftStamp(selectedCopy.stamp ?? "");
+      setDraftIsSealedPromo(selectedCopy.isSealedPromo ?? false);
+      setDraftIsOversized(selectedCopy.isOversized ?? false);
+      setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
     } else {
       setDraftNotes("");
       setDraftCopyTags([]);
+      setDraftFinishCode("");
+      setDraftEdition("");
+      setDraftStamp("");
+      setDraftIsSealedPromo(false);
+      setDraftIsOversized(false);
+      setDraftIsPeelOff(false);
     }
     setStatus("idle");
     setErrorMessage(null);
     setMoveStatus("idle");
     setMoveError(null);
   }, [selectedCopy]);
+
+  useEffect(() => {
+    if (!selectedPrintCard) return;
+    const options = getPokemonFinishOptions(selectedPrintCard, true);
+    const currentCode = selectedCopy?.finishCode;
+    setSelectedPrintFinishCode(
+      (currentCode && options.some((option) => option.code === currentCode)
+        ? currentCode
+        : options[0]?.code) ?? "",
+    );
+    setSelectedPrintEdition(
+      selectedCopy?.edition ||
+        (selectedPrintCard.pokemonPrint?.variants?.firstEdition
+          ? "1st Edition"
+          : ""),
+    );
+    setSelectedPrintStamp(selectedCopy?.stamp ?? "");
+    setSelectedPrintIsSealedPromo(selectedCopy?.isSealedPromo ?? false);
+    setSelectedPrintIsOversized(selectedCopy?.isOversized ?? false);
+    setSelectedPrintIsPeelOff(selectedCopy?.isPeelOff ?? false);
+  }, [selectedPrintCard, selectedCopy]);
 
   useEffect(() => {
     if (
@@ -493,7 +565,13 @@ export function CollectionView() {
     return () => {
       cancelled = true;
     };
-  }, [supportsPrintSelection, isPrintDialogOpen, printOptions, selectedCard]);
+  }, [
+    supportsPrintSelection,
+    isPrintDialogOpen,
+    printOptions,
+    selectedCard,
+    token,
+  ]);
 
   useEffect(() => {
     if (!isPrintDialogOpen || !printOptions || !selectedCard) {
@@ -540,7 +618,15 @@ export function CollectionView() {
   const isPrintSaveDisabled =
     !selectedPrintCard ||
     !selectedCard ||
-    selectedPrintCard.id === selectedCard.cardId ||
+    (selectedPrintCard.id === selectedCard.cardId &&
+      selectedPrintFinishCode ===
+        (selectedCopy?.finishCode ?? (selectedCopy?.isFoil ? "foil" : "")) &&
+      selectedPrintEdition === (selectedCopy?.edition ?? "") &&
+      selectedPrintStamp === (selectedCopy?.stamp ?? "") &&
+      selectedPrintIsSealedPromo ===
+        (selectedCopy?.isSealedPromo ?? false) &&
+      selectedPrintIsOversized === (selectedCopy?.isOversized ?? false) &&
+      selectedPrintIsPeelOff === (selectedCopy?.isPeelOff ?? false)) ||
     isSavingPrintSelection;
 
   const toggleRowExpansion = (cardId: string) => {
@@ -627,6 +713,30 @@ export function CollectionView() {
     if (!sameTags) {
       updates.tags = draftCopyTags;
     }
+    const originalFinishCode =
+      selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : "");
+    if (draftFinishCode !== originalFinishCode) {
+      updates.finishCode = draftFinishCode || null;
+      updates.finishLabel = draftFinishCode
+        ? formatFinishLabel(draftFinishCode)
+        : null;
+      updates.isFoil = isFoilFinish(draftFinishCode);
+    }
+    if (draftEdition !== (selectedCopy.edition ?? "")) {
+      updates.edition = draftEdition.trim() || null;
+    }
+    if (draftStamp !== (selectedCopy.stamp ?? "")) {
+      updates.stamp = draftStamp.trim() || null;
+    }
+    if (draftIsSealedPromo !== (selectedCopy.isSealedPromo ?? false)) {
+      updates.isSealedPromo = draftIsSealedPromo;
+    }
+    if (draftIsOversized !== (selectedCopy.isOversized ?? false)) {
+      updates.isOversized = draftIsOversized;
+    }
+    if (draftIsPeelOff !== (selectedCopy.isPeelOff ?? false)) {
+      updates.isPeelOff = draftIsPeelOff;
+    }
     return Object.keys(updates).length ? updates : null;
   };
 
@@ -654,6 +764,26 @@ export function CollectionView() {
         error instanceof Error ? error.message : "Failed to update copy",
       );
     }
+  };
+
+  const resetSelectedCopyDrafts = () => {
+    if (!selectedCopy) return;
+    setDraftCondition(
+      ((selectedCopy.condition as (typeof CONDITION_ORDER)[number]) ??
+        "NM") as (typeof CONDITION_ORDER)[number],
+    );
+    setDraftNotes(selectedCopy.notes ?? "");
+    setDraftCopyTags(selectedCopy.tags.map((tag) => tag.id));
+    setDraftFinishCode(
+      selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : ""),
+    );
+    setDraftEdition(selectedCopy.edition ?? "");
+    setDraftStamp(selectedCopy.stamp ?? "");
+    setDraftIsSealedPromo(selectedCopy.isSealedPromo ?? false);
+    setDraftIsOversized(selectedCopy.isOversized ?? false);
+    setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
+    setStatus("idle");
+    setErrorMessage(null);
   };
 
   const handleMove = async () => {
@@ -690,10 +820,6 @@ export function CollectionView() {
     if (!token || !selectedCard || !selectedCopy || !selectedPrintCard) {
       return;
     }
-    if (selectedPrintCard.id === selectedCard.cardId) {
-      setIsPrintDialogOpen(false);
-      return;
-    }
     setIsSavingPrintSelection(true);
     setPrintError(null);
     try {
@@ -702,19 +828,55 @@ export function CollectionView() {
         selectedCard.binderId ?? LIBRARY_COLLECTION_ID,
         selectedCopy.id,
         {
-          cardOverride: {
-            cardId: selectedPrintCard.id,
-            cardData: {
-              name: selectedPrintCard.name,
-              tcg: selectedPrintCard.tcg,
-              externalId: selectedPrintCard.id,
-              setCode: selectedPrintCard.setCode,
-              setName: selectedPrintCard.setName,
-              rarity: selectedPrintCard.rarity,
-              imageUrl: selectedPrintCard.imageUrl,
-              imageUrlSmall: selectedPrintCard.imageUrlSmall,
-            },
-          },
+          finishCode: selectedPrintFinishCode || null,
+          finishLabel: selectedPrintFinishCode
+            ? formatFinishLabel(
+                selectedPrintFinishCode,
+                selectedPrintFinish?.label,
+              )
+            : null,
+          edition: selectedPrintEdition.trim() || null,
+          stamp: selectedPrintStamp.trim() || null,
+          isSealedPromo: selectedPrintIsSealedPromo,
+          isOversized: selectedPrintIsOversized,
+          isPeelOff: selectedPrintIsPeelOff,
+          isFoil: isFoilFinish(selectedPrintFinishCode),
+          ...(selectedPrintCard.id !== selectedCard.cardId
+            ? {
+                cardOverride: {
+                  cardId: selectedPrintCard.id,
+                  cardData: {
+                    name: selectedPrintCard.name,
+                    tcg: selectedPrintCard.tcg,
+                    externalId: selectedPrintCard.id,
+                    baseExternalId: selectedPrintCard.baseExternalId,
+                    printingKey: selectedPrintCard.printingKey,
+                    artworkId: selectedPrintCard.artworkId,
+                    setCode: selectedPrintCard.setCode,
+                    setName: selectedPrintCard.setName,
+                    rarity: selectedPrintCard.rarity,
+                    collectorNumber: selectedPrintCard.collectorNumber,
+                    releasedAt: selectedPrintCard.releasedAt,
+                    imageUrl: selectedPrintCard.imageUrl,
+                    imageUrlSmall: selectedPrintCard.imageUrlSmall,
+                    setSymbolUrl: selectedPrintCard.setSymbolUrl,
+                    setLogoUrl: selectedPrintCard.setLogoUrl,
+                    regulationMark: selectedPrintCard.regulationMark,
+                    language: selectedPrintCard.language,
+                    supertype: selectedPrintCard.supertype,
+                    formatLegality: selectedPrintCard.formatLegality,
+                    dexEntries: selectedPrintCard.dexEntries,
+                    region: selectedPrintCard.region,
+                    pokemonPrint: selectedPrintCard.pokemonPrint,
+                    attributes: selectedPrintCard.attributes,
+                    provenance: selectedPrintCard.provenance,
+                    legalityPeriods: selectedPrintCard.legalityPeriods,
+                    evolution: selectedPrintCard.evolution,
+                    functionalIdentity: selectedPrintCard.functionalIdentity,
+                  },
+                },
+              }
+            : {}),
         },
       );
       setIsPrintDialogOpen(false);
@@ -732,6 +894,11 @@ export function CollectionView() {
     setNewBinderName("");
     setNewBinderDescription("");
     setNewBinderColor(DEFAULT_BINDER_COLORS[0]);
+    setNewContainerType("binder");
+    setNewBinderImageUrl("");
+    setNewBinderSetTcg("");
+    setNewBinderSetCode("");
+    setNewBinderSetName("");
     setIsCreatingBinder(false);
     setCreateBinderError(null);
   };
@@ -763,13 +930,27 @@ export function CollectionView() {
     setIsCreatingBinder(true);
     setCreateBinderError(null);
     try {
-      const payload: { name: string; description?: string; colorHex?: string } =
-        { name: trimmedName };
+      const payload: CreateCollectionInput = {
+        name: trimmedName,
+        containerType: newContainerType,
+      };
       if (trimmedDescription) {
         payload.description = trimmedDescription;
       }
       if (colorHex) {
         payload.colorHex = colorHex;
+      }
+      if (newBinderImageUrl.trim()) {
+        payload.imageUrl = newBinderImageUrl.trim();
+      }
+      if (newBinderSetTcg) {
+        payload.associatedTcg = newBinderSetTcg;
+      }
+      if (newBinderSetCode.trim()) {
+        payload.associatedSetCode = newBinderSetCode.trim();
+      }
+      if (newBinderSetName.trim()) {
+        payload.associatedSetName = newBinderSetName.trim();
       }
       const newBinderId = await addCollection(token, payload);
       closeCreateBinderDialog();
@@ -797,6 +978,11 @@ export function CollectionView() {
     setEditBinderId(binderId);
     setEditBinderName(binder.name);
     setEditBinderDescription(binder.description ?? "");
+    setEditContainerType(binder.containerType ?? "binder");
+    setEditBinderImageUrl(binder.imageUrl ?? "");
+    setEditBinderSetTcg(binder.associatedTcg ?? "");
+    setEditBinderSetCode(binder.associatedSetCode ?? "");
+    setEditBinderSetName(binder.associatedSetName ?? "");
     setEditBinderError(null);
     setIsEditBinderOpen(true);
   };
@@ -842,6 +1028,11 @@ export function CollectionView() {
     setEditBinderName("");
     setEditBinderDescription("");
     setEditBinderColor("");
+    setEditContainerType("binder");
+    setEditBinderImageUrl("");
+    setEditBinderSetTcg("");
+    setEditBinderSetCode("");
+    setEditBinderSetName("");
     setIsEditingBinder(false);
     setEditBinderError(null);
   };
@@ -857,8 +1048,13 @@ export function CollectionView() {
     setIsEditingBinder(true);
     setEditBinderError(null);
     try {
-      const payload: { name?: string; description?: string } = {
+      const payload: UpdateCollectionInput = {
         name: trimmedName,
+        containerType: editContainerType,
+        imageUrl: editBinderImageUrl.trim() || null,
+        associatedTcg: editBinderSetTcg || null,
+        associatedSetCode: editBinderSetCode.trim() || null,
+        associatedSetName: editBinderSetName.trim() || null,
       };
       if (trimmedDescription) {
         payload.description = trimmedDescription;
@@ -1378,6 +1574,8 @@ export function CollectionView() {
                                   selectCard(card.id);
                                   setSelectedCopyId(copy.id);
                                 };
+                                const variantBadges =
+                                  getCopyVariantBadges(copy);
                                 return (
                                   <div
                                     key={copy.id}
@@ -1427,6 +1625,15 @@ export function CollectionView() {
                                       className="flex flex-wrap items-center gap-2"
                                       data-oid="5zdh.bt"
                                     >
+                                      {variantBadges.map((label) => (
+                                        <Badge
+                                          key={label}
+                                          variant="outline"
+                                          className="text-[10px]"
+                                        >
+                                          {label}
+                                        </Badge>
+                                      ))}
                                       {copy.tags.length ? (
                                         copy.tags.map((tag) => (
                                           <Badge
@@ -1487,26 +1694,26 @@ export function CollectionView() {
           draftBinderId={draftBinderId}
           draftCondition={draftCondition}
           draftNotes={draftNotes}
+          draftFinishCode={draftFinishCode}
+          draftEdition={draftEdition}
+          draftStamp={draftStamp}
+          draftIsSealedPromo={draftIsSealedPromo}
+          draftIsOversized={draftIsOversized}
+          draftIsPeelOff={draftIsPeelOff}
           onBinderChange={(value) => {
             setDraftBinderId(value);
             setPendingBinderId(value);
           }}
           onConditionChange={setDraftCondition}
           onNotesChange={setDraftNotes}
+          onFinishCodeChange={setDraftFinishCode}
+          onEditionChange={setDraftEdition}
+          onStampChange={setDraftStamp}
+          onIsSealedPromoChange={setDraftIsSealedPromo}
+          onIsOversizedChange={setDraftIsOversized}
+          onIsPeelOffChange={setDraftIsPeelOff}
           onSave={handleSave}
-          onReset={() => {
-            if (!selectedCopy) {
-              return;
-            }
-            setDraftCondition(
-              ((selectedCopy.condition as (typeof CONDITION_ORDER)[number]) ??
-                "NM") as (typeof CONDITION_ORDER)[number],
-            );
-            setDraftNotes(selectedCopy.notes ?? "");
-            setDraftCopyTags(selectedCopy.tags.map((tag) => tag.id));
-            setStatus("idle");
-            setErrorMessage(null);
-          }}
+          onReset={resetSelectedCopyDrafts}
           onMove={handleMove}
           moveStatus={moveStatus}
           moveError={moveError}
@@ -1532,26 +1739,26 @@ export function CollectionView() {
         draftBinderId={draftBinderId}
         draftCondition={draftCondition}
         draftNotes={draftNotes}
+        draftFinishCode={draftFinishCode}
+        draftEdition={draftEdition}
+        draftStamp={draftStamp}
+        draftIsSealedPromo={draftIsSealedPromo}
+        draftIsOversized={draftIsOversized}
+        draftIsPeelOff={draftIsPeelOff}
         onBinderChange={(value) => {
           setDraftBinderId(value);
           setPendingBinderId(value);
         }}
         onConditionChange={setDraftCondition}
         onNotesChange={setDraftNotes}
+        onFinishCodeChange={setDraftFinishCode}
+        onEditionChange={setDraftEdition}
+        onStampChange={setDraftStamp}
+        onIsSealedPromoChange={setDraftIsSealedPromo}
+        onIsOversizedChange={setDraftIsOversized}
+        onIsPeelOffChange={setDraftIsPeelOff}
         onSave={handleSave}
-        onReset={() => {
-          if (!selectedCopy) {
-            return;
-          }
-          setDraftCondition(
-            ((selectedCopy.condition as (typeof CONDITION_ORDER)[number]) ??
-              "NM") as (typeof CONDITION_ORDER)[number],
-          );
-          setDraftNotes(selectedCopy.notes ?? "");
-          setDraftCopyTags(selectedCopy.tags.map((tag) => tag.id));
-          setStatus("idle");
-          setErrorMessage(null);
-        }}
+        onReset={resetSelectedCopyDrafts}
         onMove={handleMove}
         moveStatus={moveStatus}
         moveError={moveError}
@@ -1579,7 +1786,10 @@ export function CollectionView() {
         }}
         data-oid="m_khlun"
       >
-        <DialogContent className="sm:max-w-lg" data-oid="q7_t:1f">
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+          data-oid="q7_t:1f"
+        >
           <DialogHeader data-oid="-sx.izg">
             <DialogTitle data-oid="41s2xob">Select a print</DialogTitle>
             <DialogDescription data-oid="du79e1_">
@@ -1685,7 +1895,7 @@ export function CollectionView() {
               >
                 {(printOptions ?? []).map((print) => {
                   const isSelected = selectedPrintCard?.id === print.id;
-                  const finishes = getFinishBadges(print);
+                  const finishes = getPokemonFinishOptions(print);
                   return (
                     <button
                       type="button"
@@ -1742,12 +1952,12 @@ export function CollectionView() {
                           >
                             {finishes.map((finish) => (
                               <Badge
-                                key={finish}
+                                key={finish.code}
                                 variant="outline"
-                                className="text-[10px] capitalize"
+                                className="text-[10px]"
                                 data-oid=":mwiyxs"
                               >
-                                {finish === "firstEdition" ? "1st Ed" : finish}
+                                {finish.label}
                               </Badge>
                             ))}
                           </div>
@@ -1774,6 +1984,98 @@ export function CollectionView() {
                   </div>
                 )}
               </div>
+              {selectedPrintCard?.tcg === "pokemon" ? (
+                <div className="mt-4 space-y-4 rounded-lg border bg-muted/20 p-4">
+                  <div>
+                    <p className="text-sm font-semibold">
+                      Collectible variant
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Apply the finish and physical attributes to this copy.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="selected-print-finish">Finish</Label>
+                      <Select
+                        value={selectedPrintFinishCode || undefined}
+                        onValueChange={setSelectedPrintFinishCode}
+                        disabled={!selectedPrintFinishOptions.length}
+                      >
+                        <SelectTrigger id="selected-print-finish">
+                          <SelectValue placeholder="Not specified" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedPrintFinishOptions.map((finish) => (
+                            <SelectItem key={finish.code} value={finish.code}>
+                              {finish.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="selected-print-edition">Edition</Label>
+                      <Input
+                        id="selected-print-edition"
+                        value={selectedPrintEdition}
+                        onChange={(event) =>
+                          setSelectedPrintEdition(event.target.value)
+                        }
+                        placeholder="e.g. 1st Edition"
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label htmlFor="selected-print-stamp">Stamp</Label>
+                      <Input
+                        id="selected-print-stamp"
+                        value={selectedPrintStamp}
+                        onChange={(event) =>
+                          setSelectedPrintStamp(event.target.value)
+                        }
+                        placeholder="e.g. Prerelease, Staff, Pokémon Center"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {[
+                      {
+                        id: "selected-print-sealed",
+                        label: "Sealed promo",
+                        checked: selectedPrintIsSealedPromo,
+                        setChecked: setSelectedPrintIsSealedPromo,
+                      },
+                      {
+                        id: "selected-print-oversized",
+                        label: "Oversized",
+                        checked: selectedPrintIsOversized,
+                        setChecked: setSelectedPrintIsOversized,
+                      },
+                      {
+                        id: "selected-print-peel-off",
+                        label: "Peel-off",
+                        checked: selectedPrintIsPeelOff,
+                        setChecked: setSelectedPrintIsPeelOff,
+                      },
+                    ].map((option) => (
+                      <Label
+                        key={option.id}
+                        htmlFor={option.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs font-normal"
+                      >
+                        <Checkbox
+                          id={option.id}
+                          checked={option.checked}
+                          onCheckedChange={(checked) =>
+                            option.setChecked(checked === true)
+                          }
+                        />
+                        {option.label}
+                      </Label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
           <DialogFooter data-oid="uim_2lk">
@@ -1803,7 +2105,7 @@ export function CollectionView() {
         onOpenChange={handleCreateDialogChange}
         data-oid="55g:v8i"
       >
-        <DialogContent className="sm:max-w-md" data-oid="mhe3gg8">
+        <DialogContent className="sm:max-w-2xl" data-oid="mhe3gg8">
           <DialogHeader data-oid="5yaetxa">
             <DialogTitle data-oid="slpahs_">Create binder</DialogTitle>
             <DialogDescription data-oid="ltzx4u0">
@@ -1837,6 +2139,76 @@ export function CollectionView() {
                 rows={3}
                 data-oid="z4ia-:f"
               />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Container type</Label>
+                <Select
+                  value={newContainerType}
+                  onValueChange={setNewContainerType}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONTAINER_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-binder-image">Cover image URL</Label>
+                <Input
+                  id="new-binder-image"
+                  type="url"
+                  value={newBinderImageUrl}
+                  onChange={(event) => setNewBinderImageUrl(event.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Optional set association</p>
+                <p className="text-xs text-muted-foreground">
+                  Label this container for a specific game or set.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Select
+                  value={newBinderSetTcg || "none"}
+                  onValueChange={(value) =>
+                    setNewBinderSetTcg(
+                      value === "none" ? "" : (value as TcgCode),
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Game" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Any game</SelectItem>
+                    {Object.entries(GAME_LABELS).map(([code, label]) => (
+                      <SelectItem key={code} value={code}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={newBinderSetCode}
+                  onChange={(event) => setNewBinderSetCode(event.target.value)}
+                  placeholder="Set code"
+                />
+                <Input
+                  value={newBinderSetName}
+                  onChange={(event) => setNewBinderSetName(event.target.value)}
+                  placeholder="Set name"
+                />
+              </div>
             </div>
             <div className="space-y-3" data-oid="qbovcfx">
               <Label data-oid="lvv6t2-">Color accent</Label>
@@ -1918,7 +2290,7 @@ export function CollectionView() {
         onOpenChange={(open) => !open && closeEditBinderDialog()}
         data-oid="ymc773f"
       >
-        <DialogContent className="sm:max-w-md" data-oid="d5f6e-0">
+        <DialogContent className="sm:max-w-2xl" data-oid="d5f6e-0">
           <DialogHeader data-oid="m:mbeql">
             <DialogTitle data-oid="pvw7hp5">Edit binder</DialogTitle>
             <DialogDescription data-oid="9kn-lnl">
@@ -1952,6 +2324,73 @@ export function CollectionView() {
                 rows={3}
                 data-oid="qax0leg"
               />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Container type</Label>
+                <Select
+                  value={editContainerType}
+                  onValueChange={setEditContainerType}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONTAINER_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-binder-image">Cover image URL</Label>
+                <Input
+                  id="edit-binder-image"
+                  type="url"
+                  value={editBinderImageUrl}
+                  onChange={(event) =>
+                    setEditBinderImageUrl(event.target.value)
+                  }
+                  placeholder="https://…"
+                />
+              </div>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">Optional set association</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Select
+                  value={editBinderSetTcg || "none"}
+                  onValueChange={(value) =>
+                    setEditBinderSetTcg(
+                      value === "none" ? "" : (value as TcgCode),
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Game" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Any game</SelectItem>
+                    {Object.entries(GAME_LABELS).map(([code, label]) => (
+                      <SelectItem key={code} value={code}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={editBinderSetCode}
+                  onChange={(event) => setEditBinderSetCode(event.target.value)}
+                  placeholder="Set code"
+                />
+                <Input
+                  value={editBinderSetName}
+                  onChange={(event) => setEditBinderSetName(event.target.value)}
+                  placeholder="Set name"
+                />
+              </div>
             </div>
             {editBinderError && (
               <p className="text-sm text-destructive" data-oid="3qglhv.">

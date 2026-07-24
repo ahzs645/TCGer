@@ -10,6 +10,7 @@ struct CollectionsView: View {
    @State private var selectedCollection: Collection?
     @State private var selectedSmartFolder: SmartFolder?
     @State private var showingSmartFolderEditor = false
+    @State private var showingImportSheet = false
 
     private let apiService = APIService()
     private var displayCollections: [Collection] {
@@ -126,6 +127,11 @@ struct CollectionsView: View {
                             } label: {
                                 Label("New Smart Folder", systemImage: "wand.and.stars")
                             }
+                            Button {
+                                showingImportSheet = true
+                            } label: {
+                                Label("Import CSV", systemImage: "square.and.arrow.down")
+                            }
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -140,6 +146,12 @@ struct CollectionsView: View {
                 CreateCollectionSheet { name, description, colorHex in
                     await createCollection(name: name, description: description, colorHex: colorHex)
                 }
+            }
+            .sheet(isPresented: $showingImportSheet) {
+                CollectionImportSheet(collections: collections) {
+                    await loadCollections()
+                }
+                .environmentObject(environmentStore)
             }
             .sheet(
                 isPresented: Binding(

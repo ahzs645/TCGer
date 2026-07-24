@@ -1,10 +1,19 @@
 import { Router } from 'express';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
-import { createDeckSchema, updateDeckSchema, addDeckCardSchema, updateDeckCardSchema, importDeckSchema } from '@tcg/api-types';
+import {
+  createDeckSchema,
+  updateDeckSchema,
+  addDeckCardSchema,
+  updateDeckCardSchema,
+  importDeckSchema,
+  validateDeckSchema
+} from '@tcg/api-types';
 import * as decksService from '../../modules/decks/decks.service';
 import { validateDeck } from '../../modules/decks/validation';
 import { parseImportSource } from '../../modules/decks/import';
+import { evaluateYugiohBanlist, parseYdk } from '../../modules/decks/yugioh-domain';
+import { adapterRegistry } from '../../modules/adapters/adapter-registry';
 
 export const decksRouter = Router();
 
@@ -29,6 +38,48 @@ decksRouter.post('/', asyncHandler(async (req, res) => {
 decksRouter.post('/import', asyncHandler(async (req, res) => {
   const { id: userId } = (req as AuthRequest).user!;
   const input = importDeckSchema.parse(req.body);
+  if (input.source === 'ydk') {
+    const parsedCards = parseYdk(input.data);
+    const deck = await decksService.createDeck(userId, {
+      name: input.name || 'Imported YDK Deck',
+      tcg: 'yugioh',
+      format: input.format
+    });
+    const adapter = adapterRegistry.get('yugioh');
+    const skippedCards: string[] = [];
+    let importedCount = 0;
+
+    for (const parsed of parsedCards) {
+      try {
+        const resolved = await adapter.fetchCardById(parsed.externalId);
+        await decksService.addCardToDeck(userId, deck.id, {
+          externalId: resolved?.id ?? parsed.externalId,
+          tcg: 'yugioh',
+          name: resolved?.name ?? parsed.name,
+          quantity: parsed.quantity,
+          zone: parsed.zone,
+          imageUrl: resolved?.imageUrl,
+          imageUrlSmall: resolved?.imageUrlSmall,
+          setCode: resolved?.setCode,
+          setName: resolved?.setName,
+          cardData: {
+            ...(resolved ?? {}),
+            baseExternalId: resolved?.baseExternalId ?? parsed.externalId
+          }
+        });
+        importedCount += 1;
+      } catch {
+        skippedCards.push(parsed.externalId);
+      }
+    }
+
+    return res.status(201).json({
+      deck: await decksService.getDeck(userId, deck.id),
+      importedCount,
+      skippedCount: skippedCards.length,
+      skippedCards
+    });
+  }
   const { cards, name } = await parseImportSource(input);
 
   const deck = await decksService.createDeck(userId, {
@@ -93,13 +144,34 @@ decksRouter.get('/:deckId/analysis', asyncHandler(async (req, res) => {
   res.json(analysis);
 }));
 
+decksRouter.get('/:deckId/ownership', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  res.json(await decksService.getDeckOwnership(userId, req.params.deckId));
+}));
+
+decksRouter.get('/:deckId/ydk', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  res.json(await decksService.exportDeckAsYdk(userId, req.params.deckId));
+}));
+
 // Validate deck
 decksRouter.post('/:deckId/validate', asyncHandler(async (req, res) => {
   const { id: userId } = (req as AuthRequest).user!;
   const deck = await decksService.getDeck(userId, req.params.deckId);
-  const format = req.body?.format || deck.format;
+  const input = validateDeckSchema.parse(req.body ?? {});
+  const format = input.format || deck.format;
   const result = validateDeck(deck.tcg, deck.cards, format);
-  res.json(result);
+  if (deck.tcg !== 'yugioh' || !input.banlist) {
+    return res.json(result);
+  }
+  const yugioh = evaluateYugiohBanlist(deck.cards, input.banlist);
+  res.json({
+    ...result,
+    valid: result.valid && yugioh.valid,
+    errors: [...result.errors, ...yugioh.violations.map((violation) => violation.message)],
+    points: yugioh.points,
+    violations: yugioh.violations
+  });
 }));
 
 // Add card to deck

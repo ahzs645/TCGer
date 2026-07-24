@@ -651,6 +651,9 @@ final class DemoStore {
         notes: String?,
         price: Double?,
         acquisitionPrice: Double?,
+        variant: CardCopyVariant = .empty,
+        isSigned: Bool?,
+        isAltered: Bool?,
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         card: Card?
@@ -678,6 +681,9 @@ final class DemoStore {
                 notes: notes ?? existing.notes,
                 price: price ?? existing.price,
                 acquisitionPrice: acquisitionPrice,
+                variant: variant,
+                isSigned: isSigned,
+                isAltered: isAltered,
                 tags: selectedTags
             )
             let allCopies = existing.copies + newCopies
@@ -726,6 +732,9 @@ final class DemoStore {
                     notes: notes,
                     price: price ?? resolvedCard.price,
                     acquisitionPrice: acquisitionPrice,
+                    variant: variant,
+                    isSigned: isSigned,
+                    isAltered: isAltered,
                     tags: selectedTags
                 )
             )
@@ -744,6 +753,14 @@ final class DemoStore {
         condition: String?,
         language: String?,
         notes: String?,
+        variant: CardCopyVariant?,
+        isSigned: Bool?,
+        isAltered: Bool?,
+        gradingCompany: String?,
+        gradingScore: String?,
+        certNumber: String?,
+        storageLocation: String?,
+        includeOwnedCopyDetails: Bool,
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         newPrint: Card?,
@@ -853,6 +870,13 @@ final class DemoStore {
                             serialNumber: template.serialNumber,
                             acquiredAt: template.acquiredAt,
                             isFoil: template.isFoil,
+                            finishCode: template.finishCode,
+                            finishLabel: template.finishLabel,
+                            edition: template.edition,
+                            stamp: template.stamp,
+                            isSealedPromo: template.isSealedPromo,
+                            isOversized: template.isOversized,
+                            isPeelOff: template.isPeelOff,
                             isSigned: template.isSigned,
                             isAltered: template.isAltered,
                             imageUrls: template.imageUrls,
@@ -870,9 +894,19 @@ final class DemoStore {
             }
         }
 
-        if condition != nil || language != nil || notes != nil || !selectedTags.isEmpty {
+        if condition != nil ||
+            language != nil ||
+            notes != nil ||
+            variant != nil ||
+            isSigned != nil ||
+            isAltered != nil ||
+            includeOwnedCopyDetails ||
+            !selectedTags.isEmpty {
             updatedCopies = updatedCopies.map { copy in
-                CollectionCardCopy(
+                guard targetCopyId == nil || copy.id == targetCopyId else {
+                    return copy
+                }
+                return CollectionCardCopy(
                     id: copy.id,
                     condition: condition ?? copy.condition,
                     language: language ?? copy.language,
@@ -881,14 +915,21 @@ final class DemoStore {
                     acquisitionPrice: copy.acquisitionPrice,
                     serialNumber: copy.serialNumber,
                     acquiredAt: copy.acquiredAt,
-                    isFoil: copy.isFoil,
-                    isSigned: copy.isSigned,
-                    isAltered: copy.isAltered,
+                    isFoil: variant?.isFoil ?? copy.isFoil,
+                    finishCode: variant == nil ? copy.finishCode : variant?.finishCode,
+                    finishLabel: variant == nil ? copy.finishLabel : variant?.finishLabel,
+                    edition: variant == nil ? copy.edition : variant?.edition,
+                    stamp: variant == nil ? copy.stamp : variant?.stamp,
+                    isSealedPromo: variant?.isSealedPromo ?? copy.isSealedPromo,
+                    isOversized: variant?.isOversized ?? copy.isOversized,
+                    isPeelOff: variant?.isPeelOff ?? copy.isPeelOff,
+                    isSigned: isSigned ?? copy.isSigned,
+                    isAltered: isAltered ?? copy.isAltered,
                     imageUrls: copy.imageUrls,
-                    gradingCompany: copy.gradingCompany,
-                    gradingScore: copy.gradingScore,
-                    certNumber: copy.certNumber,
-                    storageLocation: copy.storageLocation,
+                    gradingCompany: includeOwnedCopyDetails ? gradingCompany : copy.gradingCompany,
+                    gradingScore: includeOwnedCopyDetails ? gradingScore : copy.gradingScore,
+                    certNumber: includeOwnedCopyDetails ? certNumber : copy.certNumber,
+                    storageLocation: includeOwnedCopyDetails ? storageLocation : copy.storageLocation,
                     tags: selectedTags.isEmpty ? copy.tags : selectedTags
                 )
             }
@@ -1231,6 +1272,9 @@ final class DemoStore {
         notes: String?,
         price: Double?,
         acquisitionPrice: Double?,
+        variant: CardCopyVariant = .empty,
+        isSigned: Bool? = nil,
+        isAltered: Bool? = nil,
         tags: [CollectionCardTag]
     ) -> [CollectionCardCopy] {
         let now = DemoStore.isoFormatter.string(from: Date())
@@ -1248,9 +1292,16 @@ final class DemoStore {
                     acquisitionPrice: acquisitionPrice,
                     serialNumber: nil,
                     acquiredAt: now,
-                    isFoil: nil,
-                    isSigned: nil,
-                    isAltered: nil,
+                    isFoil: variant.isFoil,
+                    finishCode: variant.finishCode,
+                    finishLabel: variant.finishLabel,
+                    edition: variant.edition,
+                    stamp: variant.stamp,
+                    isSealedPromo: variant.isSealedPromo,
+                    isOversized: variant.isOversized,
+                    isPeelOff: variant.isPeelOff,
+                    isSigned: isSigned,
+                    isAltered: isAltered,
                     imageUrls: nil,
                     gradingCompany: nil,
                     gradingScore: nil,

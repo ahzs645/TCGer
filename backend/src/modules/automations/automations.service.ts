@@ -1,5 +1,10 @@
 import { prisma } from '../../lib/prisma';
+import type { Prisma } from '@prisma/client';
 import type { CreateAutomationInput, UpdateAutomationInput } from '@tcg/api-types';
+
+function asPrismaJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
 
 export async function getUserAutomations(userId: string) {
   const automations = await prisma.automation.findMany({
@@ -25,7 +30,7 @@ export async function createAutomation(userId: string, input: CreateAutomationIn
       name: input.name,
       trigger: input.trigger,
       action: input.action,
-      config: input.config,
+      config: asPrismaJson(input.config),
       enabled: input.enabled ?? true
     }
   });
@@ -44,7 +49,7 @@ export async function updateAutomation(userId: string, automationId: string, inp
       ...(input.name !== undefined && { name: input.name }),
       ...(input.trigger !== undefined && { trigger: input.trigger }),
       ...(input.action !== undefined && { action: input.action }),
-      ...(input.config !== undefined && { config: input.config }),
+      ...(input.config !== undefined && { config: asPrismaJson(input.config) }),
       ...(input.enabled !== undefined && { enabled: input.enabled })
     }
   });

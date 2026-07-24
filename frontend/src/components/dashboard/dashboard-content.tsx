@@ -21,6 +21,12 @@ import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
 import { useAuthStore } from "@/stores/auth";
 import type { CollectionCard, TcgCode } from "@/types/card";
+import { getSetCards } from "@/lib/api/cards";
+import {
+  isCardInSet,
+  summarizeIdentityProgress,
+  summarizeSetProgress,
+} from "@/lib/sets/progress";
 
 type DashboardCard = CollectionCard & {
   updatedAt?: string;
@@ -40,6 +46,18 @@ interface DashboardStats {
     binderId?: string;
     timestamp: string;
   }>;
+}
+
+interface SetCompletionMetric {
+  tcg: TcgCode;
+  setCode: string;
+  setName: string;
+  identityOwned: number;
+  identityTotal: number;
+  identityPercent: number;
+  printingOwned: number;
+  printingTotal: number;
+  printingPercent: number;
 }
 
 function buildDashboardStats(
@@ -159,6 +177,79 @@ export function DashboardContent() {
     () => buildDashboardStats(filteredCards, showPricing),
     [filteredCards, showPricing],
   );
+  const representedSets = useMemo(() => {
+    const sets = new Map<
+      string,
+      { tcg: TcgCode; setCode: string; setName: string; copies: number }
+    >();
+    for (const card of filteredCards) {
+      if (!card.setCode) continue;
+      const key = `${card.tcg}:${card.setCode.trim().toLocaleLowerCase()}`;
+      const current = sets.get(key);
+      const copies = Math.max(card.quantity ?? 0, 0);
+      if (current) {
+        current.copies += copies;
+      } else {
+        sets.set(key, {
+          tcg: card.tcg,
+          setCode: card.setCode,
+          setName: card.setName || card.setCode,
+          copies,
+        });
+      }
+    }
+    return Array.from(sets.values())
+      .sort((left, right) => right.copies - left.copies)
+      .slice(0, 3);
+  }, [filteredCards]);
+  const [setCompletion, setSetCompletion] = useState<SetCompletionMetric[]>([]);
+  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
+
+  useEffect(() => {
+    if (!token || representedSets.length === 0) {
+      setSetCompletion([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingCompletion(true);
+    void Promise.all(
+      representedSets.map(async (set) => {
+        const catalogCards = await getSetCards(token, set.tcg, set.setCode);
+        const ownedCards = filteredCards.filter((card) =>
+          isCardInSet(card, {
+            tcg: set.tcg,
+            code: set.setCode,
+            name: set.setName,
+          }),
+        );
+        const identities = summarizeIdentityProgress(catalogCards, ownedCards);
+        const printings = summarizeSetProgress(catalogCards, ownedCards);
+        return {
+          tcg: set.tcg,
+          setCode: set.setCode,
+          setName: set.setName,
+          identityOwned: identities.owned,
+          identityTotal: identities.total,
+          identityPercent: identities.percent,
+          printingOwned: printings.owned,
+          printingTotal: printings.total,
+          printingPercent: printings.percent,
+        };
+      }),
+    )
+      .then((metrics) => {
+        if (!cancelled) setSetCompletion(metrics);
+      })
+      .catch(() => {
+        if (!cancelled) setSetCompletion([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingCompletion(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredCards, representedSets, token]);
   const loading = mounted && isAuthenticated && !hasFetched;
   const loadFailed = mounted && isAuthenticated && hasFetched && !!error;
   const hasNoCards = !loading && !loadFailed && stats.totalCopies === 0;
@@ -290,8 +381,105 @@ export function DashboardContent() {
       )}
 
       {!loadFailed && !hasNoCards && (
+        <SetCompletionOverview
+          metrics={setCompletion}
+          loading={isLoadingCompletion}
+        />
+      )}
+
+      {!loadFailed && !hasNoCards && (
         <RecentActivity items={stats.recentActivity} data-oid="2rew8b1" />
       )}
+    </div>
+  );
+}
+
+function SetCompletionOverview({
+  metrics,
+  loading,
+}: {
+  metrics: SetCompletionMetric[];
+  loading: boolean;
+}) {
+  const pathname = usePathname();
+  if (!loading && metrics.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Set completion</CardTitle>
+        <CardDescription>
+          Unique card identities and exact printings for your most represented
+          sets.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-32 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {metrics.map((metric) => (
+              <Link
+                key={`${metric.tcg}:${metric.setCode}`}
+                href={`${getAppRoute("/sets", pathname)}/${metric.tcg}/${encodeURIComponent(metric.setCode)}`}
+                className="space-y-4 rounded-lg border bg-card p-4 transition hover:border-primary/50 hover:bg-muted/40"
+              >
+                <div>
+                  <p className="font-semibold">{metric.setName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {GAME_LABELS[metric.tcg]} · {metric.setCode}
+                  </p>
+                </div>
+                <CompletionBar
+                  label="Unique cards"
+                  owned={metric.identityOwned}
+                  total={metric.identityTotal}
+                  percent={metric.identityPercent}
+                />
+                <CompletionBar
+                  label="Exact printings"
+                  owned={metric.printingOwned}
+                  total={metric.printingTotal}
+                  percent={metric.printingPercent}
+                />
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompletionBar({
+  label,
+  owned,
+  total,
+  percent,
+}: {
+  label: string;
+  owned: number;
+  total: number;
+  percent: number;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">
+          {owned}/{total} · {percent}%
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
     </div>
   );
 }

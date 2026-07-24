@@ -8,7 +8,12 @@ import { pokemonFormatLegalitySchema, pokedexEntrySchema } from './pokemon';
 export const tcgCodeSchema = z.enum(['yugioh', 'magic', 'pokemon']);
 export type TcgCode = z.infer<typeof tcgCodeSchema>;
 
-export const pokemonFinishTypeSchema = z.enum(['normal', 'reverse', 'holo', 'firstEdition']);
+/**
+ * Finish codes are deliberately open-ended. Providers already expose more
+ * finishes than the legacy normal/reverse/holo set, and new
+ * finishes should not require an API contract release.
+ */
+export const pokemonFinishTypeSchema = z.string().min(1);
 export type PokemonFinishType = z.infer<typeof pokemonFinishTypeSchema>;
 
 // ---------------------------------------------------------------------------
@@ -36,6 +41,35 @@ export const pokemonPrintMetadataSchema = z.object({
   region: z.string().optional()
 });
 export type PokemonPrintMetadata = z.infer<typeof pokemonPrintMetadataSchema>;
+
+export const cardProvenanceSchema = z.object({
+  source: z.string().min(1),
+  sourceId: z.string().optional(),
+  fetchedAt: z.string().optional(),
+  schemaVersion: z.string().optional()
+});
+export type CardProvenance = z.infer<typeof cardProvenanceSchema>;
+
+export const cardLegalityPeriodSchema = z.object({
+  format: z.string().min(1),
+  rotation: z.string().optional(),
+  validFrom: z.string().optional(),
+  validTo: z.string().optional(),
+  legal: z.boolean()
+});
+export type CardLegalityPeriod = z.infer<typeof cardLegalityPeriodSchema>;
+
+export const pokemonEvolutionSchema = z.object({
+  evolvesFrom: z.string().optional(),
+  evolvesTo: z.array(z.string()).optional()
+});
+export type PokemonEvolution = z.infer<typeof pokemonEvolutionSchema>;
+
+export const cardFunctionalIdentitySchema = z.object({
+  key: z.string().min(1),
+  normalizedRules: z.string().nullish()
+});
+export type CardFunctionalIdentity = z.infer<typeof cardFunctionalIdentitySchema>;
 
 export const pokemonFunctionalAttackSchema = z.object({
   name: z.string(),
@@ -75,6 +109,12 @@ export type PokemonFunctionalGroup = z.infer<typeof pokemonFunctionalGroupSchema
 export const cardSchema = z.object({
   id: z.string(),
   tcg: tcgCodeSchema,
+  /** Provider-level identifier shared by every printing of this card. */
+  baseExternalId: z.string().optional(),
+  /** Stable, game-qualified identifier for one exact printing/variant. */
+  printingKey: z.string().optional(),
+  /** Provider artwork/image identifier when a printing has alternate art. */
+  artworkId: z.string().optional(),
   name: z.string(),
   setCode: z.string().optional(),
   setName: z.string().optional(),
@@ -92,7 +132,11 @@ export const cardSchema = z.object({
   dexEntries: z.array(pokedexEntrySchema).optional(),
   region: z.string().optional(),
   pokemonPrint: pokemonPrintMetadataSchema.optional(),
-  attributes: z.record(z.unknown()).optional()
+  attributes: z.record(z.unknown()).optional(),
+  provenance: cardProvenanceSchema.optional(),
+  legalityPeriods: z.array(cardLegalityPeriodSchema).optional(),
+  evolution: pokemonEvolutionSchema.optional(),
+  functionalIdentity: cardFunctionalIdentitySchema.optional()
 });
 export type Card = z.infer<typeof cardSchema>;
 

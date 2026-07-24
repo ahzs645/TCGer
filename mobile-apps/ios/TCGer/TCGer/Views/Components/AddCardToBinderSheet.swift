@@ -5,7 +5,7 @@ struct AddCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: Card
-    let onAdd: (String, Int, String?, String?, String?, Bool, Bool, Bool) async -> Void
+    let onAdd: (String, Int, String?, String?, String?, Bool, Bool, Bool, CardCopyVariant) async throws -> Void
 
     @State private var collections: [Collection] = []
     @State private var selectedBinderId: String?
@@ -16,6 +16,12 @@ struct AddCardToBinderSheet: View {
     @State private var isFoil: Bool = false
     @State private var isSigned: Bool = false
     @State private var isAltered: Bool = false
+    @State private var finishCode: String = ""
+    @State private var edition: String = ""
+    @State private var stamp: String = ""
+    @State private var isSealedPromo = false
+    @State private var isOversized = false
+    @State private var isPeelOff = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
@@ -24,6 +30,9 @@ struct AddCardToBinderSheet: View {
 
     private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = PokemonCardLanguage.allCases.map(\.rawValue)
+    private var finishOptions: [PokemonFinishOption] {
+        PokemonFinishOption.options(for: card, includeCatalog: true)
+    }
 
     var body: some View {
         NavigationView {
@@ -132,8 +141,22 @@ struct AddCardToBinderSheet: View {
 
                 // Attributes
                 Section {
-                    Toggle(isOn: $isFoil) {
-                        Label("Foil", systemImage: "sparkles")
+                    if card.tcg.lowercased() == "pokemon" {
+                        Picker("Finish", selection: $finishCode) {
+                            Text("Not specified").tag("")
+                            ForEach(finishOptions) { finish in
+                                Text(finish.label).tag(finish.code)
+                            }
+                        }
+                        TextField("Edition (e.g. 1st Edition)", text: $edition)
+                        TextField("Stamp (e.g. Prerelease, Staff)", text: $stamp)
+                        Toggle("Sealed promo", isOn: $isSealedPromo)
+                        Toggle("Oversized", isOn: $isOversized)
+                        Toggle("Peel-off", isOn: $isPeelOff)
+                    } else {
+                        Toggle(isOn: $isFoil) {
+                            Label("Foil", systemImage: "sparkles")
+                        }
                     }
                     Toggle(isOn: $isSigned) {
                         Label("Signed", systemImage: "pencil.line")
@@ -182,6 +205,12 @@ struct AddCardToBinderSheet: View {
             }
         }
         .task {
+            if finishCode.isEmpty {
+                finishCode = finishOptions.first?.code ?? ""
+            }
+            if edition.isEmpty, card.pokemonPrint?.variants?.firstEdition == true {
+                edition = "1st Edition"
+            }
             await loadCollections()
         }
     }
@@ -227,21 +256,39 @@ struct AddCardToBinderSheet: View {
 
         isAdding = true
         errorMessage = nil
+        let trimmedEdition = edition.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedStamp = stamp.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        await onAdd(
-            binderId,
-            quantity,
-            condition,
-            language,
-            notes.isEmpty ? nil : notes,
-            isFoil,
-            isSigned,
-            isAltered
-        )
-
-        isAdding = false
-        HapticManager.notification(.success)
-        dismiss()
+        do {
+            try await onAdd(
+                binderId,
+                quantity,
+                condition,
+                language,
+                notes.isEmpty ? nil : notes,
+                card.tcg.lowercased() == "pokemon"
+                    ? PokemonFinishOption.isFoil(finishCode)
+                    : isFoil,
+                isSigned,
+                isAltered,
+                CardCopyVariant(
+                    finishCode: finishCode.isEmpty ? nil : finishCode,
+                    finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
+                    edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
+                    stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
+                    isSealedPromo: isSealedPromo,
+                    isOversized: isOversized,
+                    isPeelOff: isPeelOff
+                )
+            )
+            isAdding = false
+            HapticManager.notification(.success)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isAdding = false
+            HapticManager.notification(.error)
+        }
     }
 
     private func collection(for id: String?) -> Collection? {
@@ -329,7 +376,7 @@ private struct CardPreviewRow: View {
                     collectorNumber: nil,
                     releasedAt: nil
                 ),
-                onAdd: { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered in
+                onAdd: { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, _ in
                     print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered)")
                 }
             )

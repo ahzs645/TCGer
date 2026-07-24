@@ -3,10 +3,17 @@ import type {
   CreateBinderInput,
   UpdateBinderInput,
   AddCardInput,
-  UpdateCardInput
+  UpdateCardInput,
+  CardDataPayload,
+  CollectionCard,
+  CollectionCardCopy
 } from '@tcg/api-types';
 
 import { prisma } from '../../lib/prisma';
+import {
+  createCollectionAudit,
+  snapshotCollectionEntries
+} from './collection-audit.service';
 
 // Re-export shared types for existing consumers
 export type { CreateBinderInput, UpdateBinderInput } from '@tcg/api-types';
@@ -49,27 +56,7 @@ type PrismaCollectionWithCard = Prisma.CollectionGetPayload<{
   include: typeof collectionInclude;
 }>;
 
-type CollectionTagDto = {
-  id: string;
-  label: string;
-  colorHex: string;
-};
-
-type CollectionCopyDto = {
-  id: string;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  acquisitionPrice?: number;
-  serialNumber?: string;
-  acquiredAt?: string;
-  isFoil?: boolean;
-  isSigned?: boolean;
-  isAltered?: boolean;
-  imageUrls?: string[];
-  tags: CollectionTagDto[];
-};
+type CollectionCopyDto = CollectionCardCopy;
 
 type BinderSnapshot = {
   id: string;
@@ -77,29 +64,238 @@ type BinderSnapshot = {
   colorHex?: string;
 };
 
-type AggregatedCollectionCard = {
-  id: string;
-  cardId: string;
-  externalId?: string;
-  tcg: 'yugioh' | 'magic' | 'pokemon';
-  name: string;
-  setCode?: string;
-  setName?: string;
-  rarity?: string;
-  imageUrl?: string;
-  imageUrlSmall?: string;
-  quantity: number;
-  condition?: string;
-  language?: string;
-  notes?: string;
-  price?: number;
-  binderId?: string;
-  binderName?: string;
-  binderColorHex?: string;
-  priceHistory: { price: number; recordedAt: string }[];
-  copies: CollectionCopyDto[];
-  conditionSummary?: string;
-};
+type AggregatedCollectionCard = CollectionCard;
+
+const CARD_SPECIFIC_FIELDS = [
+  'releasedAt',
+  'setSymbolUrl',
+  'setLogoUrl',
+  'regulationMark',
+  'language',
+  'supertype',
+  'formatLegality',
+  'dexEntries',
+  'region',
+  'pokemonPrint',
+  'attributes',
+  'provenance',
+  'legalityPeriods',
+  'evolution',
+  'functionalIdentity'
+] as const satisfies ReadonlyArray<keyof CardDataPayload>;
+
+type CardSpecificSnapshot = Pick<CardDataPayload, (typeof CARD_SPECIFIC_FIELDS)[number]>;
+
+const CARD_IDENTITY_SPECIFIC_FIELDS = [
+  'supertype',
+  'attributes',
+  'evolution',
+  'functionalIdentity'
+] as const satisfies ReadonlyArray<keyof CardDataPayload>;
+
+function compactJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function buildCardSpecificSnapshot(input: CardDataPayload): Prisma.InputJsonValue | undefined {
+  const snapshot: Partial<CardSpecificSnapshot> = {};
+  for (const field of CARD_SPECIFIC_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      Object.assign(snapshot, { [field]: value });
+    }
+  }
+  return Object.keys(snapshot).length ? compactJsonValue(snapshot) : undefined;
+}
+
+function buildCardIdentitySpecificSnapshot(input: CardDataPayload): Prisma.InputJsonValue | undefined {
+  const snapshot: Partial<CardDataPayload> = {};
+  for (const field of CARD_IDENTITY_SPECIFIC_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      Object.assign(snapshot, { [field]: value });
+    }
+  }
+  return Object.keys(snapshot).length ? compactJsonValue(snapshot) : undefined;
+}
+
+function asJsonObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function mergeLegalityPeriods(current: unknown, incoming: unknown): unknown[] | undefined {
+  const periods = new Map<string, Record<string, unknown>>();
+  for (const value of [
+    ...(Array.isArray(current) ? current : []),
+    ...(Array.isArray(incoming) ? incoming : [])
+  ]) {
+    const period = asJsonObject(value);
+    if (typeof period.format !== 'string') {
+      continue;
+    }
+    const key = [
+      period.format.trim().toLowerCase(),
+      typeof period.rotation === 'string' ? period.rotation.trim().toLowerCase() : '',
+      typeof period.validFrom === 'string' ? period.validFrom : ''
+    ].join('|');
+    periods.set(key, period);
+  }
+  return periods.size ? [...periods.values()] : undefined;
+}
+
+function mergeCardSpecificSnapshot(
+  current: Prisma.JsonValue | null | undefined,
+  input: CardDataPayload
+): Prisma.InputJsonValue | undefined {
+  const next = buildCardSpecificSnapshot(input);
+  if (!next) {
+    return current ? compactJsonValue(current) : undefined;
+  }
+  const currentObject = asJsonObject(current);
+  const nextObject = asJsonObject(next);
+  const legalityPeriods = mergeLegalityPeriods(
+    currentObject.legalityPeriods,
+    nextObject.legalityPeriods
+  );
+  return compactJsonValue({
+    ...currentObject,
+    ...nextObject,
+    ...(legalityPeriods ? { legalityPeriods } : {})
+  });
+}
+
+function inferLegacyFoil(finishCode: string | null | undefined) {
+  if (!finishCode) {
+    return undefined;
+  }
+  return !['normal', 'nonfoil', 'non-foil', 'standard'].includes(finishCode.trim().toLowerCase());
+}
+
+function buildCardCreateData(
+  id: string,
+  tcgGameId: number,
+  input: CardDataPayload,
+  identityId?: string
+): Prisma.CardUncheckedCreateInput {
+  return {
+    id,
+    tcgGameId,
+    identityId,
+    externalId: input.externalId,
+    baseExternalId: input.baseExternalId,
+    printingKey: input.printingKey,
+    artworkId: input.artworkId,
+    collectorNumber: input.collectorNumber,
+    name: input.name,
+    setCode: input.setCode,
+    setName: input.setName,
+    rarity: input.rarity,
+    imageUrl: input.imageUrl,
+    imageUrlSmall: input.imageUrlSmall,
+    tcgSpecific: buildCardSpecificSnapshot(input)
+  };
+}
+
+function buildCardRefreshData(
+  existingSpecific: Prisma.JsonValue | null,
+  input: CardDataPayload,
+  identityId?: string
+): Prisma.CardUpdateInput {
+  return {
+    externalId: input.externalId,
+    baseExternalId: input.baseExternalId,
+    printingKey: input.printingKey,
+    artworkId: input.artworkId,
+    collectorNumber: input.collectorNumber,
+    name: input.name,
+    setCode: input.setCode,
+    setName: input.setName,
+    rarity: input.rarity,
+    imageUrl: input.imageUrl,
+    imageUrlSmall: input.imageUrlSmall,
+    tcgSpecific: mergeCardSpecificSnapshot(existingSpecific, input),
+    identity: identityId ? { connect: { id: identityId } } : undefined
+  };
+}
+
+async function upsertCardIdentity(
+  tx: Prisma.TransactionClient,
+  tcgGameId: number,
+  input: CardDataPayload
+) {
+  const baseExternalId = input.baseExternalId?.trim();
+  if (!baseExternalId) {
+    return undefined;
+  }
+
+  const tcgSpecific = buildCardIdentitySpecificSnapshot(input);
+  let identity = await tx.cardIdentity.upsert({
+    where: {
+      tcgGameId_externalId: {
+        tcgGameId,
+        externalId: baseExternalId
+      }
+    },
+    create: {
+      tcgGameId,
+      externalId: baseExternalId,
+      name: input.name,
+      tcgSpecific
+    },
+    update: {
+      name: input.name
+    }
+  });
+  if (tcgSpecific) {
+    identity = await tx.cardIdentity.update({
+      where: { id: identity.id },
+      data: {
+        tcgSpecific: compactJsonValue({
+          ...asJsonObject(identity.tcgSpecific),
+          ...asJsonObject(tcgSpecific)
+        })
+      }
+    });
+  }
+  return identity.id;
+}
+
+export async function ensureCardForCollection(
+  tx: Prisma.TransactionClient,
+  cardId: string,
+  input?: CardDataPayload
+) {
+  const existing = await tx.card.findUnique({ where: { id: cardId } });
+  if (existing) {
+    if (!input) {
+      return existing;
+    }
+    const identityId = await upsertCardIdentity(tx, existing.tcgGameId, input);
+    return tx.card.update({
+      where: { id: cardId },
+      data: buildCardRefreshData(existing.tcgSpecific, input, identityId)
+    });
+  }
+
+  if (!input) {
+    throw new Error('Card not found and no card data provided');
+  }
+
+  const tcgGame = await tx.tcgGame.findFirst({
+    where: { code: input.tcg }
+  });
+  if (!tcgGame) {
+    throw new Error(`TCG game '${input.tcg}' not found`);
+  }
+
+  const identityId = await upsertCardIdentity(tx, tcgGame.id, input);
+  return tx.card.create({
+    data: buildCardCreateData(cardId, tcgGame.id, input, identityId)
+  });
+}
 
 const CONDITION_SORT_ORDER = [
   'GEM MINT',
@@ -178,8 +374,19 @@ function mapCollectionCopy(collection: PrismaCollectionWithCard): CollectionCopy
     serialNumber: collection.serialNumber ?? undefined,
     acquiredAt: collection.acquiredAt ? collection.acquiredAt.toISOString() : undefined,
     isFoil: collection.isFoil || undefined,
+    finishCode: collection.finishCode ?? undefined,
+    finishLabel: collection.finishLabel ?? undefined,
+    edition: collection.edition ?? undefined,
+    stamp: collection.stamp ?? undefined,
+    isSealedPromo: collection.isSealedPromo || undefined,
+    isOversized: collection.isOversized || undefined,
+    isPeelOff: collection.isPeelOff || undefined,
     isSigned: collection.isSigned || undefined,
     isAltered: collection.isAltered || undefined,
+    gradingCompany: collection.gradingCompany ?? undefined,
+    gradingScore: collection.gradingScore ?? undefined,
+    certNumber: collection.certNumber ?? undefined,
+    storageLocation: collection.storageLocation ?? undefined,
     imageUrls: collection.imageUrls?.length ? collection.imageUrls : undefined,
     tags:
       collection.tags?.map((entry) => ({
@@ -225,17 +432,37 @@ function aggregateCollectionEntries(
     const key = `${binderMeta.id ?? UNSORTED_BINDER_ID}:${card.id}`;
 
     if (!grouped.has(key)) {
+      const metadata = asJsonObject(card.tcgSpecific);
       grouped.set(key, {
         id: copyPayload.id,
         cardId: card.id,
         externalId: card.externalId ?? undefined,
+        baseExternalId: card.baseExternalId ?? undefined,
+        printingKey: card.printingKey ?? undefined,
+        artworkId: card.artworkId ?? undefined,
         tcg: card.tcgGame.code as 'yugioh' | 'magic' | 'pokemon',
         name: card.name,
         setCode: card.setCode ?? undefined,
         setName: card.setName ?? undefined,
         rarity: card.rarity ?? undefined,
+        collectorNumber: card.collectorNumber ?? metadata.collectorNumber as string | undefined,
+        releasedAt: metadata.releasedAt as string | undefined,
         imageUrl: card.imageUrl ?? undefined,
         imageUrlSmall: card.imageUrlSmall ?? undefined,
+        setSymbolUrl: metadata.setSymbolUrl as string | undefined,
+        setLogoUrl: metadata.setLogoUrl as string | undefined,
+        regulationMark: metadata.regulationMark as string | undefined,
+        languageCode: metadata.language as string | undefined,
+        supertype: metadata.supertype as string | undefined,
+        formatLegality: metadata.formatLegality as CollectionCard['formatLegality'],
+        dexEntries: metadata.dexEntries as CollectionCard['dexEntries'],
+        region: metadata.region as string | undefined,
+        pokemonPrint: metadata.pokemonPrint as CollectionCard['pokemonPrint'],
+        attributes: metadata.attributes as Record<string, unknown> | undefined,
+        provenance: metadata.provenance as CollectionCard['provenance'],
+        legalityPeriods: metadata.legalityPeriods as CollectionCard['legalityPeriods'],
+        evolution: metadata.evolution as CollectionCard['evolution'],
+        functionalIdentity: metadata.functionalIdentity as CollectionCard['functionalIdentity'],
         quantity: 0,
         condition: undefined,
         language: undefined,
@@ -326,7 +553,7 @@ async function resolveTagIds(
   return resolved;
 }
 
-async function syncCollectionTags(
+export async function syncCollectionTags(
   tx: Prisma.TransactionClient,
   userId: string,
   collectionId: string,
@@ -389,8 +616,19 @@ async function applyQuantityAdjustment(
           price: template.price,
           acquisitionPrice: template.acquisitionPrice,
           isFoil: template.isFoil,
+          finishCode: template.finishCode,
+          finishLabel: template.finishLabel,
+          edition: template.edition,
+          stamp: template.stamp,
+          isSealedPromo: template.isSealedPromo,
+          isOversized: template.isOversized,
+          isPeelOff: template.isPeelOff,
           isSigned: template.isSigned,
           isAltered: template.isAltered,
+          gradingCompany: template.gradingCompany,
+          gradingScore: template.gradingScore,
+          certNumber: template.certNumber,
+          storageLocation: template.storageLocation,
           serialNumber: null,
           acquiredAt: null
         }
@@ -475,6 +713,11 @@ export async function getUserBinders(userId: string) {
     name: binder.name,
     description: binder.description ?? '',
     colorHex: binder.colorHex,
+    containerType: binder.containerType ?? undefined,
+    imageUrl: binder.imageUrl ?? undefined,
+    associatedTcg: binder.associatedTcg ?? undefined,
+    associatedSetCode: binder.associatedSetCode ?? undefined,
+    associatedSetName: binder.associatedSetName ?? undefined,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(binder.collections)
@@ -491,6 +734,11 @@ export async function getUserBinders(userId: string) {
     name: 'Unsorted',
     description: 'Cards not yet assigned to a binder',
     colorHex: UNSORTED_BINDER_COLOR,
+    containerType: undefined,
+    imageUrl: undefined,
+    associatedTcg: undefined,
+    associatedSetCode: undefined,
+    associatedSetName: undefined,
     createdAt: (looseCollections[0]?.createdAt ?? fallbackDate).toISOString(),
     updatedAt: latestUpdated.toISOString(),
     cards: aggregateCollectionEntries(looseCollections, {
@@ -520,7 +768,12 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
       userId,
       name: input.name,
       description: input.description,
-      colorHex: input.colorHex
+      colorHex: input.colorHex,
+      containerType: input.containerType,
+      imageUrl: input.imageUrl,
+      associatedTcg: input.associatedTcg,
+      associatedSetCode: input.associatedSetCode,
+      associatedSetName: input.associatedSetName
     }
   });
 
@@ -529,6 +782,11 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     name: binder.name,
     description: binder.description ?? '',
     colorHex: binder.colorHex,
+    containerType: binder.containerType ?? undefined,
+    imageUrl: binder.imageUrl ?? undefined,
+    associatedTcg: binder.associatedTcg ?? undefined,
+    associatedSetCode: binder.associatedSetCode ?? undefined,
+    associatedSetName: binder.associatedSetName ?? undefined,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: []
@@ -550,7 +808,20 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     data: {
       name: input.name ?? binder.name,
       description: input.description ?? binder.description,
-      colorHex: input.colorHex ?? binder.colorHex
+      colorHex: input.colorHex ?? binder.colorHex,
+      containerType:
+        input.containerType === undefined ? binder.containerType : input.containerType,
+      imageUrl: input.imageUrl === undefined ? binder.imageUrl : input.imageUrl,
+      associatedTcg:
+        input.associatedTcg === undefined ? binder.associatedTcg : input.associatedTcg,
+      associatedSetCode:
+        input.associatedSetCode === undefined
+          ? binder.associatedSetCode
+          : input.associatedSetCode,
+      associatedSetName:
+        input.associatedSetName === undefined
+          ? binder.associatedSetName
+          : input.associatedSetName
     },
     include: {
       collections: {
@@ -564,6 +835,11 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     name: updated.name,
     description: updated.description ?? '',
     colorHex: updated.colorHex,
+    containerType: updated.containerType ?? undefined,
+    imageUrl: updated.imageUrl ?? undefined,
+    associatedTcg: updated.associatedTcg ?? undefined,
+    associatedSetCode: updated.associatedSetCode ?? undefined,
+    associatedSetName: updated.associatedSetName ?? undefined,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(updated.collections)
@@ -595,45 +871,13 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
     throw new Error('Binder not found');
   }
 
-  // Check if card exists, create if not
   const cardId = input.cardId;
-  const existingCard = await prisma.card.findUnique({
-    where: { id: cardId }
-  });
-
-  if (!existingCard && input.cardData) {
-    // Get TCG game ID
-    const tcgGame = await prisma.tcgGame.findFirst({
-      where: { code: input.cardData.tcg }
-    });
-
-    if (!tcgGame) {
-      throw new Error(`TCG game '${input.cardData.tcg}' not found`);
-    }
-
-    // Create the card
-    await prisma.card.create({
-      data: {
-        id: cardId,
-        tcgGameId: tcgGame.id,
-        externalId: input.cardData.externalId,
-        name: input.cardData.name,
-        setCode: input.cardData.setCode,
-        setName: input.cardData.setName,
-        rarity: input.cardData.rarity,
-        imageUrl: input.cardData.imageUrl,
-        imageUrlSmall: input.cardData.imageUrlSmall
-      }
-    });
-  } else if (!existingCard) {
-    throw new Error('Card not found and no card data provided');
-  }
-
   const copiesToCreate = Math.max(1, input.quantity ?? 1);
   const serialNumber = sanitizeOptionalText(input.serialNumber) ?? undefined;
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
+    await ensureCardForCollection(tx, cardId, input.cardData);
     const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
@@ -647,9 +891,20 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
-          isFoil: input.isFoil ?? false,
+          isFoil: input.isFoil ?? inferLegacyFoil(input.finishCode) ?? false,
+          finishCode: input.finishCode,
+          finishLabel: input.finishLabel,
+          edition: input.edition,
+          stamp: input.stamp,
+          isSealedPromo: input.isSealedPromo ?? false,
+          isOversized: input.isOversized ?? false,
+          isPeelOff: input.isPeelOff ?? false,
           isSigned: input.isSigned ?? false,
           isAltered: input.isAltered ?? false,
+          gradingCompany: input.gradingCompany,
+          gradingScore: input.gradingScore,
+          certNumber: input.certNumber,
+          storageLocation: input.storageLocation,
           serialNumber,
           acquiredAt
         }
@@ -661,6 +916,23 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
 
       created.push(entry);
     }
+    const after = await snapshotCollectionEntries(
+      tx,
+      userId,
+      created.map((entry) => entry.id)
+    );
+    await createCollectionAudit(tx, {
+      userId,
+      operationKind: copiesToCreate > 1 ? 'bulk' : 'add',
+      binderId,
+      cardName: input.cardData?.name,
+      summary:
+        copiesToCreate > 1
+          ? `Added ${copiesToCreate} collection copies`
+          : `Added ${input.cardData?.name ?? 'a card'} to ${binder.name}`,
+      before: [],
+      after
+    });
     return created;
   });
 
@@ -674,43 +946,13 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
 }
 
 export async function addCardToLibrary(userId: string, input: AddCardToBinderInput) {
-  // Ensure card exists, create if not (reuse logic)
   const cardId = input.cardId;
-  const existingCard = await prisma.card.findUnique({
-    where: { id: cardId }
-  });
-
-  if (!existingCard && input.cardData) {
-    const tcgGame = await prisma.tcgGame.findFirst({
-      where: { code: input.cardData.tcg }
-    });
-
-    if (!tcgGame) {
-      throw new Error(`TCG game '${input.cardData.tcg}' not found`);
-    }
-
-    await prisma.card.create({
-      data: {
-        id: cardId,
-        tcgGameId: tcgGame.id,
-        externalId: input.cardData.externalId,
-        name: input.cardData.name,
-        setCode: input.cardData.setCode,
-        setName: input.cardData.setName,
-        rarity: input.cardData.rarity,
-        imageUrl: input.cardData.imageUrl,
-        imageUrlSmall: input.cardData.imageUrlSmall
-      }
-    });
-  } else if (!existingCard) {
-    throw new Error('Card not found and no card data provided');
-  }
-
   const copiesToCreate = Math.max(1, input.quantity ?? 1);
   const serialNumber = sanitizeOptionalText(input.serialNumber) ?? undefined;
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
+    await ensureCardForCollection(tx, cardId, input.cardData);
     const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
@@ -724,9 +966,20 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
-          isFoil: input.isFoil ?? false,
+          isFoil: input.isFoil ?? inferLegacyFoil(input.finishCode) ?? false,
+          finishCode: input.finishCode,
+          finishLabel: input.finishLabel,
+          edition: input.edition,
+          stamp: input.stamp,
+          isSealedPromo: input.isSealedPromo ?? false,
+          isOversized: input.isOversized ?? false,
+          isPeelOff: input.isPeelOff ?? false,
           isSigned: input.isSigned ?? false,
           isAltered: input.isAltered ?? false,
+          gradingCompany: input.gradingCompany,
+          gradingScore: input.gradingScore,
+          certNumber: input.certNumber,
+          storageLocation: input.storageLocation,
           serialNumber,
           acquiredAt
         }
@@ -738,6 +991,23 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
 
       created.push(entry);
     }
+    const after = await snapshotCollectionEntries(
+      tx,
+      userId,
+      created.map((entry) => entry.id)
+    );
+    await createCollectionAudit(tx, {
+      userId,
+      operationKind: copiesToCreate > 1 ? 'bulk' : 'add',
+      binderId: null,
+      cardName: input.cardData?.name,
+      summary:
+        copiesToCreate > 1
+          ? `Added ${copiesToCreate} collection copies to Unsorted`
+          : `Added ${input.cardData?.name ?? 'a card'} to Unsorted`,
+      before: [],
+      after
+    });
     return created;
   });
 
@@ -760,8 +1030,19 @@ export async function removeCardFromBinder(userId: string, binderId: string, col
     throw new Error('Collection entry not found');
   }
 
-  await prisma.collection.delete({
-    where: { id: collectionId }
+  await prisma.$transaction(async (tx) => {
+    const before = await snapshotCollectionEntries(tx, userId, [collectionId]);
+    await tx.collection.delete({
+      where: { id: collectionId }
+    });
+    await createCollectionAudit(tx, {
+      userId,
+      operationKind: 'remove',
+      binderId: resolvedBinderId,
+      summary: 'Removed a collection copy',
+      before,
+      after: []
+    });
   });
 
   // Update binder's updatedAt
@@ -825,12 +1106,57 @@ export async function updateCardInBinder(
   }
   if (input.isFoil !== undefined) {
     updatePayload.isFoil = input.isFoil;
+  } else if (input.finishCode !== undefined) {
+    updatePayload.isFoil = input.finishCode
+      ? inferLegacyFoil(input.finishCode)
+      : false;
+  }
+  const normalizedFinishCode = sanitizeOptionalText(input.finishCode);
+  if (normalizedFinishCode !== undefined) {
+    updatePayload.finishCode = normalizedFinishCode;
+  }
+  const normalizedFinishLabel = sanitizeOptionalText(input.finishLabel);
+  if (normalizedFinishLabel !== undefined) {
+    updatePayload.finishLabel = normalizedFinishLabel;
+  }
+  const normalizedEdition = sanitizeOptionalText(input.edition);
+  if (normalizedEdition !== undefined) {
+    updatePayload.edition = normalizedEdition;
+  }
+  const normalizedStamp = sanitizeOptionalText(input.stamp);
+  if (normalizedStamp !== undefined) {
+    updatePayload.stamp = normalizedStamp;
+  }
+  if (input.isSealedPromo !== undefined) {
+    updatePayload.isSealedPromo = input.isSealedPromo;
+  }
+  if (input.isOversized !== undefined) {
+    updatePayload.isOversized = input.isOversized;
+  }
+  if (input.isPeelOff !== undefined) {
+    updatePayload.isPeelOff = input.isPeelOff;
   }
   if (input.isSigned !== undefined) {
     updatePayload.isSigned = input.isSigned;
   }
   if (input.isAltered !== undefined) {
     updatePayload.isAltered = input.isAltered;
+  }
+  const normalizedGradingCompany = sanitizeOptionalText(input.gradingCompany);
+  if (normalizedGradingCompany !== undefined) {
+    updatePayload.gradingCompany = normalizedGradingCompany;
+  }
+  const normalizedGradingScore = sanitizeOptionalText(input.gradingScore);
+  if (normalizedGradingScore !== undefined) {
+    updatePayload.gradingScore = normalizedGradingScore;
+  }
+  const normalizedCertNumber = sanitizeOptionalText(input.certNumber);
+  if (normalizedCertNumber !== undefined) {
+    updatePayload.certNumber = normalizedCertNumber;
+  }
+  const normalizedStorageLocation = sanitizeOptionalText(input.storageLocation);
+  if (normalizedStorageLocation !== undefined) {
+    updatePayload.storageLocation = normalizedStorageLocation;
   }
   if (hasTargetBinder) {
     if (resolvedTargetBinderId) {
@@ -853,42 +1179,45 @@ export async function updateCardInBinder(
   const shouldSyncTags = input.tags !== undefined || Boolean(input.newTags?.length);
 
   const updated = await prisma.$transaction(async (tx) => {
+    const isGroupMutation =
+      input.quantity !== undefined ||
+      (hasTargetBinder && resolvedTargetBinderId !== resolvedBinderId);
+    const desiredScopeCardId = desiredCardId ?? collection.cardId;
+    const beforeRows = isGroupMutation
+      ? await tx.collection.findMany({
+          where: {
+            userId,
+            OR: [
+              {
+                binderId: resolvedBinderId,
+                cardId: collection.cardId
+              },
+              {
+                binderId: resolvedTargetBinderId ?? null,
+                cardId: desiredScopeCardId
+              }
+            ]
+          },
+          select: { id: true }
+        })
+      : [{ id: collectionId }];
+    const before = await snapshotCollectionEntries(
+      tx,
+      userId,
+      beforeRows.map((entry) => entry.id)
+    );
     const hasFieldUpdates = Object.keys(updatePayload).length > 0;
 
     if (wantsCardOverride && desiredCardId) {
-      let targetCard = await tx.card.findUnique({ where: { id: desiredCardId } });
-      if (!targetCard) {
-        const payload = input.cardOverride?.cardData;
-        if (!payload) {
-          throw new Error('Card data is required when selecting a new print.');
-        }
-        const tcgGame = await tx.tcgGame.findFirst({
-          where: { code: payload.tcg }
-        });
-        if (!tcgGame) {
-          throw new Error(`TCG game '${payload.tcg}' not found`);
-        }
-        targetCard = await tx.card.create({
-          data: {
-            id: desiredCardId,
-            tcgGameId: tcgGame.id,
-            externalId: payload.externalId,
-            name: payload.name,
-            setCode: payload.setCode,
-            setName: payload.setName,
-            rarity: payload.rarity,
-            imageUrl: payload.imageUrl,
-            imageUrlSmall: payload.imageUrlSmall
-          }
-        });
+      const existingTarget = await tx.card.findUnique({ where: { id: desiredCardId } });
+      const payload = input.cardOverride?.cardData;
+      if (!existingTarget && !payload) {
+        throw new Error('Card data is required when selecting a new print.');
       }
+      await ensureCardForCollection(tx, desiredCardId, payload);
 
-      await tx.collection.updateMany({
-        where: {
-          userId,
-          binderId: resolvedBinderId,
-          cardId: collection.cardId
-        },
+      await tx.collection.update({
+        where: { id: collectionId },
         data: {
           cardId: desiredCardId
         }
@@ -931,6 +1260,50 @@ export async function updateCardInBinder(
         preserveId: workingCollection.id
       });
     }
+
+    const afterRows = isGroupMutation
+      ? await tx.collection.findMany({
+          where: {
+            userId,
+            OR: [
+              {
+                binderId: resolvedBinderId,
+                cardId: collection.cardId
+              },
+              {
+                binderId: destinationBinderId ?? null,
+                cardId: workingCollection.cardId
+              }
+            ]
+          },
+          select: { id: true }
+        })
+      : [{ id: collectionId }];
+    const after = await snapshotCollectionEntries(
+      tx,
+      userId,
+      afterRows.map((entry) => entry.id)
+    );
+    const operationKind =
+      hasTargetBinder && resolvedTargetBinderId !== resolvedBinderId
+        ? 'move'
+        : input.quantity !== undefined
+          ? 'bulk'
+          : 'update';
+    await createCollectionAudit(tx, {
+      userId,
+      operationKind,
+      binderId: destinationBinderId,
+      cardName: workingCollection.card.name,
+      summary:
+        operationKind === 'move'
+          ? `Moved ${workingCollection.card.name}`
+          : operationKind === 'bulk'
+            ? `Updated copies of ${workingCollection.card.name}`
+            : `Updated ${workingCollection.card.name}`,
+      before,
+      after
+    });
 
     return workingCollection;
   });

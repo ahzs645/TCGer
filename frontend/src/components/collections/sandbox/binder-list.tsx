@@ -68,6 +68,15 @@ export function BinderList({
       : activeBinder
         ? `${binderCopyCount(activeBinder)} copies · ${activeBinder.cards.length} unique`
         : "";
+  const activeContext =
+    activeBinderId !== "all" && activeBinder
+      ? [
+          activeBinder.containerType,
+          activeBinder.associatedSetName ?? activeBinder.associatedSetCode,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
 
   return (
     <div className="space-y-2" data-oid="kas:4nw">
@@ -106,6 +115,13 @@ export function BinderList({
                   data-oid="dv31lx7"
                 />
               )}
+              {activeBinder?.imageUrl && activeBinderId !== "all" && (
+                <span
+                  className="h-8 w-8 shrink-0 rounded bg-cover bg-center"
+                  style={{ backgroundImage: `url("${activeBinder.imageUrl}")` }}
+                  aria-hidden="true"
+                />
+              )}
               <div className="text-left min-w-0" data-oid="d04:le0">
                 <p className="text-sm font-medium truncate" data-oid="k4ofef0">
                   {activeLabel}
@@ -115,6 +131,7 @@ export function BinderList({
                   data-oid="_6n57mh"
                 >
                   {activeCount}
+                  {activeContext ? ` · ${activeContext}` : ""}
                 </p>
               </div>
             </div>
@@ -157,13 +174,27 @@ export function BinderList({
                   data-oid="utylm2j"
                 >
                   <span
-                    className="inline-flex h-2.5 w-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: color }}
+                    className="inline-flex h-7 w-7 rounded shrink-0 bg-cover bg-center"
+                    style={{
+                      backgroundColor: color,
+                      backgroundImage: binder.imageUrl
+                        ? `url("${binder.imageUrl}")`
+                        : undefined,
+                    }}
                     data-oid="_-gwrpd"
                   />
 
-                  <span className="flex-1 truncate" data-oid="u:obm3q">
-                    {binder.name}
+                  <span className="flex-1 min-w-0" data-oid="u:obm3q">
+                    <span className="block truncate">{binder.name}</span>
+                    {(binder.containerType ||
+                      binder.associatedSetName ||
+                      binder.associatedSetCode) && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[binder.containerType, binder.associatedSetName ?? binder.associatedSetCode]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-1" data-oid=".hc8le2">
                     {onEditBinder && (

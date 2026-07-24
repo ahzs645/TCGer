@@ -3,6 +3,12 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { authComponent, createAuth } from "./betterAuth/auth";
+import type { RichCardMetadata } from "./lib/cardMetadata";
+import {
+  collectionImportTemplate,
+  previewCollectionImport,
+  type CollectionImportPreview
+} from "./lib/collectionImport";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -28,9 +34,12 @@ type NativeEntry = {
   id: string;
   binderId: string;
   cardId: string;
-  card: {
+  card: RichCardMetadata & {
     id: string;
     externalId: string;
+    baseExternalId?: string;
+    printingKey?: string;
+    artworkId?: string;
     tcg: "magic" | "pokemon" | "yugioh";
     name: string;
     setCode?: string;
@@ -50,8 +59,19 @@ type NativeEntry = {
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;
+  finishCode?: string;
+  finishLabel?: string;
+  edition?: string;
+  stamp?: string;
+  isSealedPromo?: boolean;
+  isOversized?: boolean;
+  isPeelOff?: boolean;
   isSigned?: boolean;
   isAltered?: boolean;
+  gradingCompany?: string;
+  gradingScore?: string;
+  certNumber?: string;
+  storageLocation?: string;
   imageUrls?: string[];
   tags: NativeTag[];
   createdAt: string;
@@ -65,15 +85,23 @@ type NativeBinderDetail = {
   name: string;
   description?: string;
   colorHex?: string;
+  containerType?: string;
+  imageUrl?: string;
+  associatedTcg?: "magic" | "pokemon" | "yugioh";
+  associatedSetCode?: string;
+  associatedSetName?: string;
   entryCount: number;
   entries: NativeEntry[];
   createdAt: string;
   updatedAt: string;
 };
 
-type NativeWishlistCard = {
+type NativeWishlistCard = RichCardMetadata & {
   id: string;
   externalId: string;
+  baseExternalId?: string;
+  printingKey?: string;
+  artworkId?: string;
   tcg: "magic" | "pokemon" | "yugioh";
   name: string;
   setCode?: string;
@@ -84,6 +112,7 @@ type NativeWishlistCard = {
   setSymbolUrl?: string;
   setLogoUrl?: string;
   collectorNumber?: string;
+  releasedAt?: string;
   notes?: string;
   owned: boolean;
   ownedQuantity: number;
@@ -233,8 +262,19 @@ function expandLegacyCopies(entry: NativeEntry) {
     serialNumber: entry.serialNumber,
     acquiredAt: entry.acquiredAt,
     isFoil: entry.isFoil,
+    finishCode: entry.finishCode,
+    finishLabel: entry.finishLabel,
+    edition: entry.edition,
+    stamp: entry.stamp,
+    isSealedPromo: entry.isSealedPromo,
+    isOversized: entry.isOversized,
+    isPeelOff: entry.isPeelOff,
     isSigned: entry.isSigned,
     isAltered: entry.isAltered,
+    gradingCompany: entry.gradingCompany,
+    gradingScore: entry.gradingScore,
+    certNumber: entry.certNumber,
+    storageLocation: entry.storageLocation,
     imageUrls: entry.imageUrls ?? [],
     tags: toLegacyTags(entry.tags)
   }));
@@ -258,25 +298,28 @@ function toLegacyBinder(binder: NativeBinderDetail) {
       existing.serialNumber ??= entry.serialNumber;
       existing.acquiredAt ??= entry.acquiredAt;
       existing.isFoil ??= entry.isFoil;
+      existing.finishCode ??= entry.finishCode;
+      existing.finishLabel ??= entry.finishLabel;
+      existing.edition ??= entry.edition;
+      existing.stamp ??= entry.stamp;
+      existing.isSealedPromo ??= entry.isSealedPromo;
+      existing.isOversized ??= entry.isOversized;
+      existing.isPeelOff ??= entry.isPeelOff;
       existing.isSigned ??= entry.isSigned;
       existing.isAltered ??= entry.isAltered;
+      existing.gradingCompany ??= entry.gradingCompany;
+      existing.gradingScore ??= entry.gradingScore;
+      existing.certNumber ??= entry.certNumber;
+      existing.storageLocation ??= entry.storageLocation;
       existing.copies.push(...copies);
       continue;
     }
 
     grouped.set(key, {
+      ...entry.card,
       id: copies[0]?.id ?? entry.id,
       cardId: entry.cardId,
-      externalId: entry.card.externalId,
-      name: entry.card.name,
-      tcg: entry.card.tcg,
-      setCode: entry.card.setCode,
-      setName: entry.card.setName,
-      rarity: entry.card.rarity,
-      collectorNumber: entry.card.collectorNumber,
-      releasedAt: entry.card.releasedAt,
-      imageUrl: entry.card.imageUrl,
-      imageUrlSmall: entry.card.imageUrlSmall,
+      languageCode: entry.card.language,
       quantity: copies.length,
       condition: entry.condition,
       language: entry.language,
@@ -285,6 +328,20 @@ function toLegacyBinder(binder: NativeBinderDetail) {
       acquisitionPrice: entry.acquisitionPrice,
       serialNumber: entry.serialNumber,
       acquiredAt: entry.acquiredAt,
+      isFoil: entry.isFoil,
+      finishCode: entry.finishCode,
+      finishLabel: entry.finishLabel,
+      edition: entry.edition,
+      stamp: entry.stamp,
+      isSealedPromo: entry.isSealedPromo,
+      isOversized: entry.isOversized,
+      isPeelOff: entry.isPeelOff,
+      isSigned: entry.isSigned,
+      isAltered: entry.isAltered,
+      gradingCompany: entry.gradingCompany,
+      gradingScore: entry.gradingScore,
+      certNumber: entry.certNumber,
+      storageLocation: entry.storageLocation,
       binderId: toLegacyBinderId(binder),
       binderName: binder.name,
       binderColorHex: binder.colorHex,
@@ -297,6 +354,11 @@ function toLegacyBinder(binder: NativeBinderDetail) {
     name: binder.name,
     description: binder.description ?? "",
     colorHex: binder.colorHex,
+    containerType: binder.containerType,
+    imageUrl: binder.imageUrl,
+    associatedTcg: binder.associatedTcg,
+    associatedSetCode: binder.associatedSetCode,
+    associatedSetName: binder.associatedSetName,
     cards: Array.from(grouped.values()),
     createdAt: binder.createdAt,
     updatedAt: binder.updatedAt
@@ -316,7 +378,292 @@ async function resolveActualBinderId(ctx: any, identity: BridgeIdentity, binderI
   });
 }
 
+function validateCollectionImportTargets(
+  preview: CollectionImportPreview,
+  binders: NativeBinderDetail[],
+  defaultBinderId: string | undefined,
+  createMissingBinders: boolean
+) {
+  const issues = [...preview.issues];
+  const binderIds = new Set(binders.map((binder) => binder.id));
+  const binderNames = new Set(
+    binders.map((binder) => binder.name.trim().toLocaleLowerCase())
+  );
+  if (defaultBinderId && defaultBinderId !== LIBRARY_COLLECTION_ID && !binderIds.has(defaultBinderId)) {
+    issues.push({
+      row: 1,
+      field: "defaultBinderId",
+      message: "default binder was not found"
+    });
+  }
+  if (!createMissingBinders) {
+    for (const row of preview.rows) {
+      const name = row.binderName?.trim();
+      if (
+        name &&
+        name.toLocaleLowerCase() !== "unsorted" &&
+        !binderNames.has(name.toLocaleLowerCase())
+      ) {
+        issues.push({
+          row: row.row,
+          field: "binder_name",
+          message: `binder "${name}" does not exist`
+        });
+      }
+    }
+  }
+  return {
+    ...preview,
+    valid: issues.length === 0 && preview.rows.length > 0,
+    issues
+  };
+}
+
+type HttpBulkAddIssue = {
+  rowId?: string;
+  field?: string;
+  message: string;
+};
+
+function previewBulkAddBody(body: any, binders: NativeBinderDetail[]) {
+  const defaults =
+    body.defaults && typeof body.defaults === "object" ? body.defaults : {};
+  const sourceRows = Array.isArray(body.rows) ? body.rows : [];
+  const binderByLegacyId = new Map(
+    binders.map((binder) => [toLegacyBinderId(binder), binder])
+  );
+  const issues: HttpBulkAddIssue[] = [];
+  const seenRowIds = new Set<string>();
+  let totalCopies = 0;
+
+  if (sourceRows.length < 1 || sourceRows.length > 200) {
+    issues.push({ message: "Bulk Add requires between 1 and 200 staged rows" });
+  }
+
+  const rows = sourceRows.slice(0, 200).map((source: any, index: number) => {
+    const rowId =
+      typeof source?.rowId === "string" && source.rowId.trim()
+        ? source.rowId.trim()
+        : `row-${index + 1}`;
+    if (seenRowIds.has(rowId)) {
+      issues.push({ rowId, field: "rowId", message: "Row IDs must be unique" });
+    }
+    seenRowIds.add(rowId);
+
+    const binderId =
+      typeof source?.binderId === "string"
+        ? source.binderId
+        : typeof defaults.binderId === "string"
+          ? defaults.binderId
+          : "";
+    const binder = binderByLegacyId.get(binderId);
+    if (!binder) {
+      issues.push({
+        rowId,
+        field: "binderId",
+        message: "Destination binder was not found"
+      });
+    }
+
+    const quantity =
+      typeof source?.quantity === "number"
+        ? source.quantity
+        : typeof defaults.quantity === "number"
+          ? defaults.quantity
+          : 1;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      issues.push({
+        rowId,
+        field: "quantity",
+        message: "Quantity must be a whole number between 1 and 100"
+      });
+    } else {
+      totalCopies += quantity;
+    }
+
+    const card = source?.cardData;
+    const tcg = card?.tcg;
+    if (
+      !card ||
+      typeof card.name !== "string" ||
+      !card.name.trim() ||
+      typeof card.externalId !== "string" ||
+      !card.externalId.trim() ||
+      !["yugioh", "magic", "pokemon"].includes(tcg)
+    ) {
+      issues.push({
+        rowId,
+        field: "cardData",
+        message: "An exact card printing snapshot is required"
+      });
+    }
+    if (typeof source?.cardId !== "string" || !source.cardId.trim()) {
+      issues.push({ rowId, field: "cardId", message: "Card ID is required" });
+    }
+
+    const effective = { ...defaults, ...(source?.overrides ?? {}) };
+    if (effective.serialNumber && quantity !== 1) {
+      issues.push({
+        rowId,
+        field: "quantity",
+        message: "Serialized copies must be staged as individual rows"
+      });
+    }
+    for (const field of ["price", "acquisitionPrice"] as const) {
+      const value = effective[field];
+      if (
+        value !== undefined &&
+        (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+      ) {
+        issues.push({
+          rowId,
+          field,
+          message: "Price must be a finite, non-negative number"
+        });
+      }
+    }
+    if (
+      effective.acquiredAt !== undefined &&
+      (typeof effective.acquiredAt !== "string" ||
+        Number.isNaN(Date.parse(effective.acquiredAt)))
+    ) {
+      issues.push({
+        rowId,
+        field: "acquiredAt",
+        message: "Acquired date must be an ISO date or timestamp"
+      });
+    }
+
+    return {
+      rowId,
+      valid: true,
+      cardId: typeof source?.cardId === "string" ? source.cardId : "",
+      name: typeof card?.name === "string" ? card.name : "Unknown card",
+      tcg: ["yugioh", "magic", "pokemon"].includes(tcg) ? tcg : "yugioh",
+      setCode: typeof card?.setCode === "string" ? card.setCode : undefined,
+      rarity: typeof card?.rarity === "string" ? card.rarity : undefined,
+      binderId,
+      binderName: binder?.name,
+      quantity,
+      condition:
+        typeof effective.condition === "string" ? effective.condition : undefined,
+      language:
+        typeof effective.language === "string" ? effective.language : undefined,
+      finishCode:
+        typeof effective.finishCode === "string" ? effective.finishCode : undefined,
+      edition: typeof effective.edition === "string" ? effective.edition : undefined
+    };
+  });
+
+  if (totalCopies > 500) {
+    issues.push({
+      field: "rows",
+      message: "Bulk Add is limited to 500 physical copies per transaction"
+    });
+  }
+
+  for (const row of rows) {
+    row.valid = !issues.some((issue) => issue.rowId === row.rowId);
+  }
+
+  return {
+    valid: issues.length === 0,
+    rows,
+    issues,
+    totalRows: sourceRows.length,
+    totalCopies
+  };
+}
+
+function buildBulkAddMutationArgs(body: any, binders: NativeBinderDetail[]) {
+  const binderByLegacyId = new Map(
+    binders.map((binder) => [toLegacyBinderId(binder), binder.id])
+  );
+  const defaults =
+    body.defaults && typeof body.defaults === "object" ? body.defaults : {};
+  return {
+    defaults: {
+      ...pickBulkCopyFields(defaults),
+      binderId:
+        typeof defaults.binderId === "string"
+          ? (binderByLegacyId.get(defaults.binderId) as any)
+          : undefined,
+      quantity:
+        typeof defaults.quantity === "number" ? defaults.quantity : undefined
+    },
+    rows: body.rows.map((row: any) => ({
+      rowId: row.rowId,
+      binderId:
+        typeof row.binderId === "string"
+          ? (binderByLegacyId.get(row.binderId) as any)
+          : undefined,
+      quantity: typeof row.quantity === "number" ? row.quantity : undefined,
+      card: row.cardData,
+      overrides:
+        row.overrides && typeof row.overrides === "object"
+          ? pickBulkCopyFields(row.overrides)
+          : undefined
+    }))
+  };
+}
+
+function pickBulkCopyFields(source: any) {
+  const result: Record<string, unknown> = {};
+  for (const field of [
+    "condition",
+    "language",
+    "notes",
+    "serialNumber",
+    "acquiredAt",
+    "finishCode",
+    "finishLabel",
+    "edition",
+    "stamp",
+    "gradingCompany",
+    "gradingScore",
+    "certNumber",
+    "storageLocation"
+  ]) {
+    if (typeof source?.[field] === "string") {
+      result[field] = source[field];
+    }
+  }
+  for (const field of ["price", "acquisitionPrice"]) {
+    if (typeof source?.[field] === "number") {
+      result[field] = source[field];
+    }
+  }
+  for (const field of [
+    "isFoil",
+    "isSealedPromo",
+    "isOversized",
+    "isPeelOff",
+    "isSigned",
+    "isAltered"
+  ]) {
+    if (typeof source?.[field] === "boolean") {
+      result[field] = source[field];
+    }
+  }
+  if (Array.isArray(source?.tags)) {
+    result.tagIds = source.tags.map((tagId: unknown) => String(tagId)) as any;
+  }
+  if (Array.isArray(source?.newTags)) {
+    result.newTags = source.newTags
+      .filter((tag: any) => tag && typeof tag.label === "string")
+      .map((tag: any) => ({
+        label: tag.label,
+        colorHex: typeof tag.colorHex === "string" ? tag.colorHex : undefined
+      }));
+  }
+  return result;
+}
+
 function asCollectionEntryId(value: string) {
+  return value as any;
+}
+
+function asCollectionMutationAuditId(value: string) {
   return value as any;
 }
 
@@ -338,6 +685,21 @@ function toExportRows(binders: NativeBinderDetail[]) {
         setCode: entry.card.setCode ?? null,
         setName: entry.card.setName ?? null,
         rarity: entry.card.rarity ?? null,
+        baseExternalId: entry.card.baseExternalId ?? null,
+        printingKey: entry.card.printingKey ?? null,
+        artworkId: entry.card.artworkId ?? null,
+        collectorNumber: entry.card.collectorNumber ?? null,
+        releasedAt: entry.card.releasedAt ?? null,
+        regulationMark: entry.card.regulationMark ?? null,
+        cardLanguage: entry.card.language ?? null,
+        supertype: entry.card.supertype ?? null,
+        region: entry.card.region ?? null,
+        setSymbolUrl: entry.card.setSymbolUrl ?? null,
+        setLogoUrl: entry.card.setLogoUrl ?? null,
+        provenance: entry.card.provenance ?? null,
+        legalityPeriods: entry.card.legalityPeriods ?? null,
+        evolution: entry.card.evolution ?? null,
+        functionalIdentity: entry.card.functionalIdentity ?? null,
         externalId: entry.card.externalId,
         condition: entry.condition ?? null,
         language: entry.language ?? null,
@@ -346,8 +708,19 @@ function toExportRows(binders: NativeBinderDetail[]) {
         acquisitionPrice: entry.acquisitionPrice ?? null,
         serialNumber: entry.serialNumber ?? null,
         isFoil: Boolean(entry.isFoil),
+        finishCode: entry.finishCode ?? null,
+        finishLabel: entry.finishLabel ?? null,
+        edition: entry.edition ?? null,
+        stamp: entry.stamp ?? null,
+        isSealedPromo: Boolean(entry.isSealedPromo),
+        isOversized: Boolean(entry.isOversized),
+        isPeelOff: Boolean(entry.isPeelOff),
         isSigned: Boolean(entry.isSigned),
         isAltered: Boolean(entry.isAltered),
+        gradingCompany: entry.gradingCompany ?? null,
+        gradingScore: entry.gradingScore ?? null,
+        certNumber: entry.certNumber ?? null,
+        storageLocation: entry.storageLocation ?? null,
         tags: entry.tags.map((tag) => tag.label),
         acquiredAt: entry.acquiredAt ?? null,
         createdAt: entry.createdAt
@@ -375,6 +748,15 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
     "Set Code",
     "Set Name",
     "Rarity",
+    "Base External ID",
+    "Printing Key",
+    "Artwork ID",
+    "Collector Number",
+    "Released At",
+    "Regulation Mark",
+    "Card Language",
+    "Supertype",
+    "Region",
     "External ID",
     "Condition",
     "Language",
@@ -383,8 +765,19 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
     "Acquisition Price",
     "Serial Number",
     "Foil",
+    "Finish Code",
+    "Finish Label",
+    "Edition",
+    "Stamp",
+    "Sealed Promo",
+    "Oversized",
+    "Peel-Off",
     "Signed",
     "Altered",
+    "Grading Company",
+    "Grading Score",
+    "Certification Number",
+    "Storage Location",
     "Tags",
     "Acquired At",
     "Created At"
@@ -398,6 +791,15 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
       escapeCsvField(row.setCode),
       escapeCsvField(row.setName),
       escapeCsvField(row.rarity),
+      escapeCsvField(row.baseExternalId),
+      escapeCsvField(row.printingKey),
+      escapeCsvField(row.artworkId),
+      escapeCsvField(row.collectorNumber),
+      escapeCsvField(row.releasedAt),
+      escapeCsvField(row.regulationMark),
+      escapeCsvField(row.cardLanguage),
+      escapeCsvField(row.supertype),
+      escapeCsvField(row.region),
       escapeCsvField(row.externalId),
       escapeCsvField(row.condition),
       escapeCsvField(row.language),
@@ -406,8 +808,19 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
       escapeCsvField(row.acquisitionPrice),
       escapeCsvField(row.serialNumber),
       row.isFoil ? "Yes" : "No",
+      escapeCsvField(row.finishCode),
+      escapeCsvField(row.finishLabel),
+      escapeCsvField(row.edition),
+      escapeCsvField(row.stamp),
+      row.isSealedPromo ? "Yes" : "No",
+      row.isOversized ? "Yes" : "No",
+      row.isPeelOff ? "Yes" : "No",
       row.isSigned ? "Yes" : "No",
       row.isAltered ? "Yes" : "No",
+      escapeCsvField(row.gradingCompany),
+      escapeCsvField(row.gradingScore),
+      escapeCsvField(row.certNumber),
+      escapeCsvField(row.storageLocation),
       escapeCsvField(row.tags.join("; ")),
       escapeCsvField(row.acquiredAt),
       escapeCsvField(row.createdAt)
@@ -903,6 +1316,30 @@ http.route({
 });
 
 http.route({
+  path: "/collections/history",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const requested = Number(new URL(request.url).searchParams.get("limit") ?? 50);
+      const limit = Number.isInteger(requested)
+        ? Math.min(100, Math.max(1, requested))
+        : 50;
+      const entries = await ctx.runQuery(
+        internal.bridge.listCollectionMutationHistory,
+        {
+          subject: identity.subject,
+          limit
+        }
+      );
+      return json({ entries });
+    } catch (error) {
+      return handleConvexError(error, "Failed to fetch collection history");
+    }
+  })
+});
+
+http.route({
   path: "/collections",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
@@ -913,11 +1350,164 @@ http.route({
         subject: identity.subject,
         name: typeof body.name === "string" ? body.name : "",
         description: typeof body.description === "string" ? body.description : undefined,
-        colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined
+        colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined,
+        containerType:
+          typeof body.containerType === "string" ? body.containerType : undefined,
+        imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
+        associatedTcg:
+          body.associatedTcg === "magic" ||
+          body.associatedTcg === "pokemon" ||
+          body.associatedTcg === "yugioh"
+            ? body.associatedTcg
+            : undefined,
+        associatedSetCode:
+          typeof body.associatedSetCode === "string" ? body.associatedSetCode : undefined,
+        associatedSetName:
+          typeof body.associatedSetName === "string" ? body.associatedSetName : undefined
       })) as NativeBinderDetail;
       return json(toLegacyBinder(binder), 201);
     } catch (error) {
       return handleConvexError(error, "Failed to create binder");
+    }
+  })
+});
+
+http.route({
+  path: "/collections/import/template",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      await requireBridgeIdentity(ctx, request);
+      return textResponse(collectionImportTemplate(), 200, {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="tcger-collection-import.csv"'
+      });
+    } catch (error) {
+      return handleConvexError(error, "Failed to download import template");
+    }
+  })
+});
+
+http.route({
+  path: "/collections/import/preview",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const body = await parseJsonBody(request);
+      const options =
+        body.options && typeof body.options === "object" ? body.options : {};
+      const binders = (await ctx.runQuery(internal.bridge.listBinders, {
+        subject: identity.subject
+      })) as NativeBinderDetail[];
+      const preview = validateCollectionImportTargets(
+        previewCollectionImport(typeof body.csv === "string" ? body.csv : ""),
+        binders,
+        typeof options.defaultBinderId === "string" ? options.defaultBinderId : undefined,
+        options.createMissingBinders === true
+      );
+      return json(preview, preview.valid ? 200 : 422);
+    } catch (error) {
+      return handleConvexError(error, "Failed to preview collection import");
+    }
+  })
+});
+
+http.route({
+  path: "/collections/import/commit",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const body = await parseJsonBody(request);
+      const options =
+        body.options && typeof body.options === "object" ? body.options : {};
+      const binders = (await ctx.runQuery(internal.bridge.listBinders, {
+        subject: identity.subject
+      })) as NativeBinderDetail[];
+      const defaultBinderId =
+        typeof options.defaultBinderId === "string"
+          ? options.defaultBinderId
+          : undefined;
+      const preview = validateCollectionImportTargets(
+        previewCollectionImport(typeof body.csv === "string" ? body.csv : ""),
+        binders,
+        defaultBinderId,
+        options.createMissingBinders === true
+      );
+      if (!preview.valid) {
+        return json(
+          {
+            ...preview,
+            importedRows: 0,
+            importedCopies: 0,
+            createdBinders: []
+          },
+          422
+        );
+      }
+      const result = await ctx.runMutation(internal.bridge.importCollectionRows, {
+        subject: identity.subject,
+        rows: preview.rows,
+        defaultBinderId: defaultBinderId
+          ? await resolveActualBinderId(ctx, identity, defaultBinderId)
+          : undefined,
+        createMissingBinders: options.createMissingBinders === true
+      });
+      return json({ ...preview, ...result, valid: true }, 201);
+    } catch (error) {
+      return handleConvexError(error, "Failed to import collection");
+    }
+  })
+});
+
+http.route({
+  path: "/collections/bulk/preview",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const body = await parseJsonBody(request);
+      const binders = (await ctx.runQuery(internal.bridge.listBinders, {
+        subject: identity.subject
+      })) as NativeBinderDetail[];
+      const preview = previewBulkAddBody(body, binders);
+      return json(preview, preview.valid ? 200 : 422);
+    } catch (error) {
+      return handleConvexError(error, "Failed to preview Bulk Add");
+    }
+  })
+});
+
+http.route({
+  path: "/collections/bulk",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const body = await parseJsonBody(request);
+      const binders = (await ctx.runQuery(internal.bridge.listBinders, {
+        subject: identity.subject
+      })) as NativeBinderDetail[];
+      const preview = previewBulkAddBody(body, binders);
+      if (!preview.valid) {
+        return json(
+          {
+            error: "VALIDATION_FAILED",
+            message: preview.issues[0]?.message ?? "Bulk Add failed validation",
+            issues: preview.issues
+          },
+          422
+        );
+      }
+      const mutationArgs = buildBulkAddMutationArgs(body, binders);
+      const result = await ctx.runMutation(internal.bridge.bulkAddToCollection, {
+        subject: identity.subject,
+        ...mutationArgs
+      });
+      return json(result, 201);
+    } catch (error) {
+      return handleConvexError(error, "Failed to commit Bulk Add");
     }
   })
 });
@@ -1009,8 +1599,22 @@ http.route({
         serialNumber: typeof body.serialNumber === "string" ? body.serialNumber : undefined,
         acquiredAt: typeof body.acquiredAt === "string" ? body.acquiredAt : undefined,
         isFoil: typeof body.isFoil === "boolean" ? body.isFoil : undefined,
+        finishCode: typeof body.finishCode === "string" ? body.finishCode : undefined,
+        finishLabel: typeof body.finishLabel === "string" ? body.finishLabel : undefined,
+        edition: typeof body.edition === "string" ? body.edition : undefined,
+        stamp: typeof body.stamp === "string" ? body.stamp : undefined,
+        isSealedPromo:
+          typeof body.isSealedPromo === "boolean" ? body.isSealedPromo : undefined,
+        isOversized: typeof body.isOversized === "boolean" ? body.isOversized : undefined,
+        isPeelOff: typeof body.isPeelOff === "boolean" ? body.isPeelOff : undefined,
         isSigned: typeof body.isSigned === "boolean" ? body.isSigned : undefined,
         isAltered: typeof body.isAltered === "boolean" ? body.isAltered : undefined,
+        gradingCompany:
+          typeof body.gradingCompany === "string" ? body.gradingCompany : undefined,
+        gradingScore: typeof body.gradingScore === "string" ? body.gradingScore : undefined,
+        certNumber: typeof body.certNumber === "string" ? body.certNumber : undefined,
+        storageLocation:
+          typeof body.storageLocation === "string" ? body.storageLocation : undefined,
         tagIds: Array.isArray(body.tags) ? body.tags : undefined,
         newTags: Array.isArray(body.newTags) ? body.newTags : undefined,
         cardData: body.cardData
@@ -1059,6 +1663,25 @@ http.route({
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
 
+      if (
+        segments.length === 3 &&
+        segments[0] === "history" &&
+        segments[2] === "undo"
+      ) {
+        const body = await parseJsonBody(request);
+        const idempotencyKey =
+          typeof body.idempotencyKey === "string" ? body.idempotencyKey : "";
+        const audit = await ctx.runMutation(
+          internal.bridge.undoCollectionMutation,
+          {
+            subject: identity.subject,
+            auditId: asCollectionMutationAuditId(segments[1]),
+            idempotencyKey
+          }
+        );
+        return json({ audit }, 201);
+      }
+
       if (segments.length === 2 && segments[1] === "cards") {
         const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
         const body = await parseJsonBody(request);
@@ -1076,8 +1699,24 @@ http.route({
           serialNumber: typeof body.serialNumber === "string" ? body.serialNumber : undefined,
           acquiredAt: typeof body.acquiredAt === "string" ? body.acquiredAt : undefined,
           isFoil: typeof body.isFoil === "boolean" ? body.isFoil : undefined,
+          finishCode: typeof body.finishCode === "string" ? body.finishCode : undefined,
+          finishLabel: typeof body.finishLabel === "string" ? body.finishLabel : undefined,
+          edition: typeof body.edition === "string" ? body.edition : undefined,
+          stamp: typeof body.stamp === "string" ? body.stamp : undefined,
+          isSealedPromo:
+            typeof body.isSealedPromo === "boolean" ? body.isSealedPromo : undefined,
+          isOversized:
+            typeof body.isOversized === "boolean" ? body.isOversized : undefined,
+          isPeelOff: typeof body.isPeelOff === "boolean" ? body.isPeelOff : undefined,
           isSigned: typeof body.isSigned === "boolean" ? body.isSigned : undefined,
           isAltered: typeof body.isAltered === "boolean" ? body.isAltered : undefined,
+          gradingCompany:
+            typeof body.gradingCompany === "string" ? body.gradingCompany : undefined,
+          gradingScore:
+            typeof body.gradingScore === "string" ? body.gradingScore : undefined,
+          certNumber: typeof body.certNumber === "string" ? body.certNumber : undefined,
+          storageLocation:
+            typeof body.storageLocation === "string" ? body.storageLocation : undefined,
           tagIds: Array.isArray(body.tags) ? body.tags : undefined,
           newTags: Array.isArray(body.newTags) ? body.newTags : undefined,
           cardData: body.cardData
@@ -1143,7 +1782,30 @@ http.route({
           binderId,
           name: typeof body.name === "string" ? body.name : undefined,
           description: typeof body.description === "string" ? body.description : undefined,
-          colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined
+          colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined,
+          containerType:
+            body.containerType === null || typeof body.containerType === "string"
+              ? body.containerType
+              : undefined,
+          imageUrl:
+            body.imageUrl === null || typeof body.imageUrl === "string"
+              ? body.imageUrl
+              : undefined,
+          associatedTcg:
+            body.associatedTcg === null ||
+            body.associatedTcg === "magic" ||
+            body.associatedTcg === "pokemon" ||
+            body.associatedTcg === "yugioh"
+              ? body.associatedTcg
+              : undefined,
+          associatedSetCode:
+            body.associatedSetCode === null || typeof body.associatedSetCode === "string"
+              ? body.associatedSetCode
+              : undefined,
+          associatedSetName:
+            body.associatedSetName === null || typeof body.associatedSetName === "string"
+              ? body.associatedSetName
+              : undefined
         })) as NativeBinderDetail;
         return json(toLegacyBinder(binder));
       }
@@ -1180,8 +1842,43 @@ http.route({
               ? body.acquiredAt
               : undefined,
           isFoil: typeof body.isFoil === "boolean" ? body.isFoil : undefined,
+          finishCode:
+            typeof body.finishCode === "string" || body.finishCode === null
+              ? body.finishCode
+              : undefined,
+          finishLabel:
+            typeof body.finishLabel === "string" || body.finishLabel === null
+              ? body.finishLabel
+              : undefined,
+          edition:
+            typeof body.edition === "string" || body.edition === null
+              ? body.edition
+              : undefined,
+          stamp:
+            typeof body.stamp === "string" || body.stamp === null ? body.stamp : undefined,
+          isSealedPromo:
+            typeof body.isSealedPromo === "boolean" ? body.isSealedPromo : undefined,
+          isOversized:
+            typeof body.isOversized === "boolean" ? body.isOversized : undefined,
+          isPeelOff: typeof body.isPeelOff === "boolean" ? body.isPeelOff : undefined,
           isSigned: typeof body.isSigned === "boolean" ? body.isSigned : undefined,
           isAltered: typeof body.isAltered === "boolean" ? body.isAltered : undefined,
+          gradingCompany:
+            typeof body.gradingCompany === "string" || body.gradingCompany === null
+              ? body.gradingCompany
+              : undefined,
+          gradingScore:
+            typeof body.gradingScore === "string" || body.gradingScore === null
+              ? body.gradingScore
+              : undefined,
+          certNumber:
+            typeof body.certNumber === "string" || body.certNumber === null
+              ? body.certNumber
+              : undefined,
+          storageLocation:
+            typeof body.storageLocation === "string" || body.storageLocation === null
+              ? body.storageLocation
+              : undefined,
           tagIds: Array.isArray(body.tags) ? body.tags : undefined,
           newTags: Array.isArray(body.newTags) ? body.newTags : undefined,
           cardOverride:
