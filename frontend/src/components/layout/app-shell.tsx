@@ -51,7 +51,7 @@ const navigation = [
 ];
 
 const mobileNavPrimary = navigation.slice(0, 3);
-const mobileNavSecondary = [navigation[3], ...secondaryNavigation];
+const mobileNavSecondary = [...navigation.slice(3), ...secondaryNavigation];
 
 interface AppShellProps {
   children: React.ReactNode;
