@@ -31,6 +31,7 @@ export const secondaryNavigation = [
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
 import { getAppRoute } from "@/lib/app-routes";
 import { cn } from "@/lib/utils";
 import { isDemoMode } from "@/lib/demo-mode";
@@ -63,6 +64,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col" data-oid="zfaufj9">
       <PreferenceHydrator data-oid="b9x-5v1" />
+      <CatalogDownloadPrompt />
       <header
         className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 backdrop-blur"
         data-oid="4h6rq90"

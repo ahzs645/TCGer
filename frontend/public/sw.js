@@ -6,6 +6,7 @@
  *                            up), cache fallback when offline.
  *   - scan-index artifacts → cache-first (immutable per version; the loader
  *                            re-fetches a new file name / re-validates by version).
+ *   - catalog manifest     → network-first; per-game packs → cache-first.
  *   - model + wasm + OCR   → cache-first (DINOv2 ONNX, ORT wasm, Tesseract from
  *                            CDNs; opaque responses allowed) → fully offline scan.
  *   - navigations          → network-first with cached app-shell fallback.
@@ -13,12 +14,20 @@
  * Bump CACHE_VERSION to roll all caches.
  */
 
-const CACHE_VERSION = "tcger-v1";
+const CACHE_VERSION = "tcger-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SCAN_CACHE = `${CACHE_VERSION}-scan`;
+const CATALOG_CACHE = `${CACHE_VERSION}-catalog`;
 const MODEL_CACHE = `${CACHE_VERSION}-model`;
 
-const APP_SHELL = ["/", "/scan", "/manifest.webmanifest"];
+const APP_SHELL = [
+  "/",
+  "/scan",
+  "/manifest.webmanifest",
+  "/card-backs/pokemon.png",
+  "/card-backs/magic.png",
+  "/card-backs/yugioh.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -35,7 +44,9 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((k) => !k.startsWith(CACHE_VERSION)).map((k) => caches.delete(k)),
+        keys
+          .filter((k) => !k.startsWith(CACHE_VERSION))
+          .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
     })(),
@@ -63,6 +74,14 @@ self.addEventListener("fetch", (event) => {
   }
   if (url.pathname.startsWith("/scan-index/")) {
     event.respondWith(cacheFirst(req, SCAN_CACHE));
+    return;
+  }
+  if (url.pathname === "/catalog/manifest.json") {
+    event.respondWith(networkFirst(req, CATALOG_CACHE));
+    return;
+  }
+  if (url.pathname.startsWith("/catalog/")) {
+    event.respondWith(cacheFirst(req, CATALOG_CACHE));
     return;
   }
   if (isModelAsset(url)) {

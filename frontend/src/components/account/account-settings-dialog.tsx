@@ -42,9 +42,12 @@ import {
   getUserPreferences,
   updateUserPreferences,
 } from "@/lib/api/user-preferences";
+import { isDemoMode } from "@/lib/demo-mode";
+import { requestCatalogPrompt } from "@/lib/catalog/use-catalog";
 import { GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
+import { CatalogManagementPanel } from "./catalog-management-panel";
 
 const iconPaths = {
   yugioh: "/icons/Yugioh.svg",
@@ -112,7 +115,7 @@ export function AccountSettingsDialog({
         .catch((error) => console.error("Failed to load settings:", error))
         .finally(() => setLoadingSettings(false));
     }
-  }, [open, isAdmin]);
+  }, [open, isAdmin, token]);
 
   useEffect(() => {
     if (!open || !token) {
@@ -204,13 +207,14 @@ export function AccountSettingsDialog({
   };
 
   const handleGameToggle = async (game: ManageableGame) => {
-    if (!token) {
-      toggleGame(game);
-      return;
-    }
-
     const previousValue = enabledGames[game];
     const newValue = !previousValue;
+
+    if (!token) {
+      toggleGame(game);
+      if (newValue && isDemoMode()) requestCatalogPrompt(game);
+      return;
+    }
 
     setUpdatingGame(game);
     toggleGame(game);
@@ -225,6 +229,7 @@ export function AccountSettingsDialog({
     try {
       await updateUserPreferences(preferencePayload, token);
       updateStoredPreferences(preferencePayload);
+      if (newValue && isDemoMode()) requestCatalogPrompt(game);
     } catch (error) {
       console.error("Failed to update enabled game:", error);
       toggleGame(game);
@@ -376,6 +381,10 @@ export function AccountSettingsDialog({
         </section>
 
         <Separator data-oid="9u8__q_" />
+
+        <CatalogManagementPanel />
+
+        <Separator />
 
         <section className="space-y-4" data-oid="inksgtk">
           <div data-oid="jheeyaf">

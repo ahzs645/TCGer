@@ -15,11 +15,20 @@ import {
   DEMO_CARDS,
   type DemoCard,
 } from "@/lib/data/demo-cards";
+import { isCatalogInstalled } from "@/lib/catalog/catalog-client";
+import {
+  getCardsInSet as getCatalogCardsInSet,
+  getSets as getCatalogSets,
+  normalizeCatalogText,
+  searchCatalog,
+} from "@/lib/catalog/catalog-search";
 import type { TcgCode } from "@/types/card";
 import type {
   AddCardInput,
   AddWishlistCardInput,
+  Card,
   CollectionCardCopy,
+  TcgSet,
   UpdateCardInput,
 } from "@tcg/api-types";
 
@@ -79,15 +88,14 @@ function toCollectionCard(
   binderName: string,
   binderColor: string,
 ) {
-  const copies: CollectionCardCopy[] =
-    card.copies?.length
-      ? card.copies
-      : Array.from({ length: Math.max(1, card.quantity) }, (_, index) => ({
-            id: `${card.id}-copy-${index + 1}`,
-            condition: card.condition,
-            price: card.price,
-            tags: [],
-          }));
+  const copies: CollectionCardCopy[] = card.copies?.length
+    ? card.copies
+    : Array.from({ length: Math.max(1, card.quantity) }, (_, index) => ({
+        id: `${card.id}-copy-${index + 1}`,
+        condition: card.condition,
+        price: card.price,
+        tags: [],
+      }));
   return {
     ...card.cardData,
     id: card.id,
@@ -170,11 +178,60 @@ function demoCardToSearchResult(dc: DemoCard) {
   };
 }
 
+const DEMO_TCGS: TcgCode[] = ["pokemon", "magic", "yugioh"];
+
+function demoOwnedCards(tcg?: TcgCode): Card[] {
+  const cards = new Map<string, Card>();
+  for (const binder of store().binders) {
+    for (const owned of binder.cards) {
+      if (tcg && owned.tcg !== tcg) continue;
+      cards.set(owned.cardId, {
+        ...owned.cardData,
+        id: owned.cardId,
+        tcg: owned.tcg,
+        name: owned.name,
+        setCode: owned.cardData?.setCode ?? owned.setCode,
+        setName: owned.cardData?.setName ?? owned.setName,
+        rarity: owned.cardData?.rarity ?? owned.rarity,
+      });
+    }
+  }
+  return Array.from(cards.values());
+}
+
+function mergeOwnedCards(base: Card[], owned: Card[]): Card[] {
+  const merged = new Map(base.map((card) => [card.id, card] as const));
+  for (const card of owned) merged.set(card.id, card);
+  return Array.from(merged.values());
+}
+
+function cardMatchesQuery(card: Card, query: string): boolean {
+  const needle = normalizeCatalogText(query);
+  if (!needle) return false;
+  return normalizeCatalogText(
+    [
+      card.name,
+      card.setName,
+      card.setCode,
+      card.collectorNumber,
+      card.rarity,
+      card.supertype,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" "),
+  ).includes(needle);
+}
+
+function ownedCardSetCode(card: Card): string {
+  const setCode = card.setCode ?? "";
+  return setCode.includes("-") ? setCode.replace(/-[^-]+$/, "") : setCode;
+}
+
 function demoSetCode(card: DemoCard): string {
   return card.setCode.replace(/-[^-]+$/, "");
 }
 
-function demoSets(tcg?: TcgCode) {
+function demoSets(tcg?: TcgCode): TcgSet[] {
   const sets = new Map<
     string,
     {
@@ -204,6 +261,47 @@ function demoSets(tcg?: TcgCode) {
   return Array.from(sets.values()).sort((left, right) =>
     left.name.localeCompare(right.name),
   );
+}
+
+async function demoSearchCards(query: string, tcg?: TcgCode): Promise<Card[]> {
+  const games = tcg ? [tcg] : DEMO_TCGS;
+  const gameResults = await Promise.all(
+    games.map(async (game) => {
+      const installed = await isCatalogInstalled(game);
+      if (installed) return searchCatalog(query, game);
+      return searchDemoCards(query, game).map(demoCardToSearchResult);
+    }),
+  );
+  const owned = demoOwnedCards(tcg).filter((card) =>
+    cardMatchesQuery(card, query),
+  );
+  return mergeOwnedCards(gameResults.flat(), owned);
+}
+
+async function demoCatalogSets(tcg?: TcgCode): Promise<TcgSet[]> {
+  const games = tcg ? [tcg] : DEMO_TCGS;
+  const results = await Promise.all(
+    games.map(async (game) =>
+      (await isCatalogInstalled(game)) ? getCatalogSets(game) : demoSets(game),
+    ),
+  );
+  return results.flat();
+}
+
+async function demoCardsInSet(tcg: TcgCode, setCode: string): Promise<Card[]> {
+  const normalizedSetCode = normalizeCatalogText(setCode);
+  const base = (await isCatalogInstalled(tcg))
+    ? await getCatalogCardsInSet(tcg, setCode)
+    : DEMO_CARDS.filter(
+        (card) =>
+          card.tcg === tcg &&
+          normalizeCatalogText(demoSetCode(card)) === normalizedSetCode,
+      ).map(demoCardToSearchResult);
+  const owned = demoOwnedCards(tcg).filter(
+    (card) =>
+      normalizeCatalogText(ownedCardSetCode(card)) === normalizedSetCode,
+  );
+  return mergeOwnedCards(base, owned);
 }
 
 /* ------------------------------------------------------------------ */
@@ -652,7 +750,7 @@ function handleSettings(method: string, body?: unknown): Promise<Response> {
 /*  Cards handlers                                                      */
 /* ------------------------------------------------------------------ */
 
-function handleCards(
+async function handleCards(
   method: string,
   segments: string[],
   queryString?: string,
@@ -661,19 +759,15 @@ function handleCards(
   if (segments[0] === "sets" && segments.length === 1 && method === "GET") {
     const params = new URLSearchParams(queryString || "");
     const tcg = params.get("tcg") as TcgCode | null;
-    const sets = demoSets(tcg ?? undefined);
+    const sets = await demoCatalogSets(tcg ?? undefined);
     return json({ sets, total: sets.length });
   }
 
   // GET /cards/sets/:tcg/:setCode
   if (segments[0] === "sets" && segments.length === 3 && method === "GET") {
     const tcg = segments[1] as TcgCode;
-    const setCode = decodeURIComponent(segments[2]).toLocaleLowerCase();
-    const cards = DEMO_CARDS.filter(
-      (card) =>
-        card.tcg === tcg &&
-        demoSetCode(card).toLocaleLowerCase() === setCode,
-    ).map(demoCardToSearchResult);
+    const setCode = decodeURIComponent(segments[2]);
+    const cards = await demoCardsInSet(tcg, setCode);
     return json({ cards, total: cards.length });
   }
 
@@ -682,8 +776,8 @@ function handleCards(
     const params = new URLSearchParams(queryString || "");
     const query = params.get("query") || "";
     const tcg = params.get("tcg") as TcgCode | undefined;
-    const results = searchDemoCards(query, tcg || "all");
-    return json({ cards: results.map(demoCardToSearchResult) });
+    const results = await demoSearchCards(query, tcg);
+    return json({ cards: results });
   }
 
   // GET /cards/:tcg/:cardId/prints
