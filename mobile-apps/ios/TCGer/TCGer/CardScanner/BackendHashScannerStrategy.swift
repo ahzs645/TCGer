@@ -27,7 +27,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
             return nil
         }
 
-        guard !context.serverConfiguration.isDemoMode else {
+        guard !context.serverConfiguration.isOnDevice else {
             return nil
         }
 

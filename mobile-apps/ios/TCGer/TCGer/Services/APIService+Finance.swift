@@ -18,7 +18,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [Transaction] {
-        if config.isDemoMode { return DemoStore.shared.getTransactions() }
+        if config.isOnDevice { return LocalStore.shared.getTransactions() }
         let (data, response) = try await makeRequest(config: config, path: "finance/transactions", token: token)
 
         guard response.statusCode == 200 else {
@@ -45,8 +45,8 @@ extension APIService {
         notes: String? = nil,
         date: String? = nil
     ) async throws -> Transaction {
-        if config.isDemoMode {
-            return DemoStore.shared.createTransaction(type: type, cardName: cardName, tcg: tcg, quantity: quantity ?? 1, amount: amount, platform: platform, notes: notes)
+        if config.isOnDevice {
+            return LocalStore.shared.createTransaction(type: type, cardName: cardName, tcg: tcg, quantity: quantity ?? 1, amount: amount, platform: platform, notes: notes)
         }
         let body = CreateTransactionRequest(
             type: type, cardName: cardName, tcg: tcg, quantity: quantity,
@@ -72,7 +72,7 @@ extension APIService {
         token: String,
         transactionId: String
     ) async throws {
-        if config.isDemoMode { DemoStore.shared.deleteTransaction(id: transactionId); return }
+        if config.isOnDevice { LocalStore.shared.deleteTransaction(id: transactionId); return }
         let (data, response) = try await makeRequest(
             config: config, path: "finance/transactions/\(transactionId)", method: "DELETE", token: token
         )
@@ -87,7 +87,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> FinanceSummary {
-        if config.isDemoMode { return DemoStore.shared.getFinanceSummary() }
+        if config.isOnDevice { return LocalStore.shared.getFinanceSummary() }
         let (data, response) = try await makeRequest(config: config, path: "finance/summary", token: token)
 
         guard response.statusCode == 200 else {

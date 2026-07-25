@@ -73,6 +73,8 @@ final class EnvironmentStore: ObservableObject {
     @Published var accentColorChoice: AccentColorChoice
     @Published var biometricLockEnabled: Bool
     @Published var smartFolders: [SmartFolder]
+    @Published var tabOrder: [AppTab]
+    @Published var hiddenTabs: Set<AppTab>
 
     private var cancellables = Set<AnyCancellable>()
     private let storage = UserDefaults.standard
@@ -99,13 +101,19 @@ final class EnvironmentStore: ObservableObject {
         static let accentColor = "tcg.appearance.accentColor"
         static let biometricLockEnabled = "tcg.security.biometricLock"
         static let smartFolders = "tcg.smartFolders"
+        static let tabOrder = "tcg.tabs.order"
+        static let hiddenTabs = "tcg.tabs.hidden"
     }
 
-    private enum DemoDefaults {
-        static let token = "demo-token-static"
-        static let userId = "demo-user-001"
-        static let email = "demo@tcger.app"
-        static let username = "Demo User"
+    /// Phone-only mode has no account. These stand in for the session the rest
+    /// of the app expects, so every screen works without a server or sign-in.
+    private enum LocalDefaults {
+        static let token = "local-device-token"
+        static let userId = "local-user"
+        static let email = ""
+        static let username = "This Phone"
+        static let legacyToken = "demo-token-static"
+        static let legacyUserId = "demo-user-001"
     }
 
     private enum SingleUserDefaults {
@@ -118,9 +126,9 @@ final class EnvironmentStore: ObservableObject {
             // A previously-saved empty config falls back to on-device mode so a
             // fresh launch lands in a working phone-only experience instead of a
             // failed connection to a server that was never set up.
-            serverConfiguration = decoded.baseURL.isEmpty ? .demoLocal : decoded
+            serverConfiguration = decoded.baseURL.isEmpty ? .onDevice : decoded
         } else {
-            serverConfiguration = .demoLocal
+            serverConfiguration = .onDevice
         }
 
         if let data = storage.data(forKey: Keys.credentials),
@@ -217,8 +225,20 @@ final class EnvironmentStore: ObservableObject {
             smartFolders = []
         }
 
-        if serverConfiguration.isDemoMode {
-            enableDemoSession(force: false)
+        if let storedOrder = storage.stringArray(forKey: Keys.tabOrder) {
+            tabOrder = AppTab.normalizedOrder(from: storedOrder)
+        } else {
+            tabOrder = AppTab.defaultOrder
+        }
+
+        if let storedHidden = storage.stringArray(forKey: Keys.hiddenTabs) {
+            hiddenTabs = Set(storedHidden.compactMap(AppTab.init(rawValue:)).filter { !$0.isPinned })
+        } else {
+            hiddenTabs = []
+        }
+
+        if serverConfiguration.isOnDevice {
+            enableLocalSession(force: false)
         }
 
         $serverConfiguration
@@ -232,7 +252,7 @@ final class EnvironmentStore: ObservableObject {
                 self.isServerVerified = false
                 Task(priority: .utility) {
                     await CatalogStore.shared.configure(
-                        enabledGames: configuration.isDemoMode ? self.enabledGames : []
+                        enabledGames: configuration.isOnDevice ? self.enabledGames : []
                     )
                 }
             }
@@ -279,7 +299,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledYugioh)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .yugioh
                 )
             }
@@ -290,7 +310,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledMagic)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .magic
                 )
             }
@@ -301,7 +321,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledPokemon)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .pokemon
                 )
             }
@@ -312,7 +332,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledOnepiece)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .onepiece
                 )
             }
@@ -323,7 +343,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledLorcana)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .lorcana
                 )
             }
@@ -334,7 +354,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.enabledDragonball)
                 CatalogStore.shared.setEnabled(
-                    (self?.serverConfiguration.isDemoMode == true) && flag,
+                    (self?.serverConfiguration.isOnDevice == true) && flag,
                     for: .dragonball
                 )
             }
@@ -409,9 +429,23 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $tabOrder
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.map(\.rawValue), forKey: Keys.tabOrder)
+            }
+            .store(in: &cancellables)
+
+        $hiddenTabs
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.map(\.rawValue).sorted(), forKey: Keys.hiddenTabs)
+            }
+            .store(in: &cancellables)
+
         Task(priority: .utility) {
             await CatalogStore.shared.configure(
-                enabledGames: serverConfiguration.isDemoMode ? enabledGames : []
+                enabledGames: serverConfiguration.isOnDevice ? enabledGames : []
             )
         }
     }
@@ -425,6 +459,36 @@ final class EnvironmentStore: ObservableObject {
         if enabledLorcana { games.append(.lorcana) }
         if enabledDragonball { games.append(.dragonball) }
         return games
+    }
+
+    // MARK: - Tab Bar
+
+    /// Tabs the user wants in the bar, in their chosen order. Availability
+    /// (auth, access policy) is applied separately by `ContentView`.
+    var visibleTabs: [AppTab] {
+        tabOrder.filter { !hiddenTabs.contains($0) }
+    }
+
+    func isTabVisible(_ tab: AppTab) -> Bool {
+        !hiddenTabs.contains(tab)
+    }
+
+    func setTab(_ tab: AppTab, visible: Bool) {
+        guard !tab.isPinned else { return }
+        if visible {
+            hiddenTabs.remove(tab)
+        } else {
+            hiddenTabs.insert(tab)
+        }
+    }
+
+    func moveTabs(fromOffsets source: IndexSet, toOffset destination: Int) {
+        tabOrder.move(fromOffsets: source, toOffset: destination)
+    }
+
+    func resetTabBar() {
+        tabOrder = AppTab.defaultOrder
+        hiddenTabs = []
     }
 
     func isGameEnabled(_ game: TCGGame) -> Bool {
@@ -532,6 +596,10 @@ final class EnvironmentStore: ObservableObject {
         accentColorChoice = .blue
         biometricLockEnabled = false
         smartFolders = []
+        tabOrder = AppTab.defaultOrder
+        hiddenTabs = []
+        storage.removeObject(forKey: Keys.tabOrder)
+        storage.removeObject(forKey: Keys.hiddenTabs)
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
@@ -597,22 +665,24 @@ final class EnvironmentStore: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func enableDemoSession(force: Bool) {
-        guard serverConfiguration.isDemoMode else { return }
+    func enableLocalSession(force: Bool) {
+        guard serverConfiguration.isOnDevice else { return }
 
         isUsingSingleUserMode = false
 
-        if force || authToken == nil {
-            storeToken(DemoDefaults.token)
+        // Installs configured before phone-only mode was split from demo mode
+        // still hold the old marker token; swap it for the local one.
+        if force || authToken == nil || authToken == LocalDefaults.legacyToken {
+            storeToken(LocalDefaults.token)
         }
 
-        if force || currentUser == nil {
+        if force || currentUser == nil || currentUser?.id == LocalDefaults.legacyUserId {
             currentUser = User(
-                id: DemoDefaults.userId,
-                email: DemoDefaults.email,
-                name: DemoDefaults.username,
-                username: DemoDefaults.username,
-                isAdmin: true,
+                id: LocalDefaults.userId,
+                email: LocalDefaults.email,
+                name: LocalDefaults.username,
+                username: LocalDefaults.username,
+                isAdmin: false,
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
@@ -625,13 +695,13 @@ final class EnvironmentStore: ObservableObject {
             )
         }
 
-        if force || appSettings == nil {
+        if force || appSettings == nil || appSettings?.appName == "TCGer Demo" {
             appSettings = AppSettings(
                 id: 0,
                 publicDashboard: true,
                 publicCollections: true,
                 requireAuth: false,
-                appName: "TCGer Demo",
+                appName: "TCGer",
                 updatedAt: ISO8601DateFormatter().string(from: Date())
             )
         }

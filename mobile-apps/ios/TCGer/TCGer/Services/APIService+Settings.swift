@@ -2,8 +2,8 @@ import Foundation
 
 extension APIService {
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
-        if config.isDemoMode {
-            return DemoStore.shared.getSettings()
+        if config.isOnDevice {
+            return LocalStore.shared.getSettings()
         }
 
         let (data, response) = try await makeRequest(config: config, path: "settings")
@@ -34,8 +34,8 @@ extension APIService {
         requireAuth: Bool? = nil,
         appName: String? = nil
     ) async throws -> AppSettings {
-        if config.isDemoMode {
-            return DemoStore.shared.updateSettings(
+        if config.isOnDevice {
+            return LocalStore.shared.updateSettings(
                 publicDashboard: publicDashboard,
                 publicCollections: publicCollections,
                 requireAuth: requireAuth,
@@ -133,8 +133,8 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> UserPreferences {
-        if config.isDemoMode {
-            return DemoStore.shared.getUserPreferences()
+        if config.isOnDevice {
+            return LocalStore.shared.getUserPreferences()
         }
 
         let (data, response) = try await makeRequest(
@@ -182,8 +182,8 @@ extension APIService {
         enabledDragonball: Bool? = nil,
         defaultGame: String? = nil
     ) async throws -> UserPreferences {
-        if config.isDemoMode {
-            return DemoStore.shared.updateUserPreferences(
+        if config.isOnDevice {
+            return LocalStore.shared.updateUserPreferences(
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,

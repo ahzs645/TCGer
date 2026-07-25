@@ -235,7 +235,9 @@ struct CardScannerView: View {
                     .padding(.horizontal)
             }
 
-            if hasEnabledScanModes && isModeSupported {
+            // Debug captures are stored on the server, so the control is
+            // pointless without one.
+            if hasEnabledScanModes && isModeSupported && !environmentStore.serverConfiguration.isOnDevice {
                 debugCaptureControls
             }
 
@@ -406,8 +408,14 @@ private extension CardScannerView {
         ScanMode.allCases.filter { environmentStore.isGameEnabled($0.tcgGame) }
     }
 
+    /// Server-backed matchers are hidden in phone-only mode — there is no
+    /// backend to send the capture to.
     var availableScanEngines: [ScanEnginePreference] {
-        ScanEnginePreference.allCases.filter { $0.supports(viewModel.selectedMode) }
+        let isOnDevice = environmentStore.serverConfiguration.isOnDevice
+        return ScanEnginePreference.allCases.filter { engine in
+            guard engine.supports(viewModel.selectedMode) else { return false }
+            return !isOnDevice || !engine.requiresServerOnlyFlow
+        }
     }
 
     var hasEnabledScanModes: Bool {

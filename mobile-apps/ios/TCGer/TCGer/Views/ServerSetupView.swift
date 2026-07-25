@@ -13,6 +13,7 @@ struct ServerSetupView: View {
     @State private var selectedMode: ConnectionMode = .onDevice
     @State private var localInput: String = ServerConfiguration.defaultLocalBaseURL
     @State private var showingCatalogSetup = false
+    @State private var loadSampleData = false
 
     private var sanitizedLocalInput: String {
         ServerConfiguration.sanitized(localInput)
@@ -31,7 +32,7 @@ struct ServerSetupView: View {
     private var resolvedConfiguration: ServerConfiguration {
         switch selectedMode {
         case .onDevice:
-            return .demoLocal
+            return .onDevice
         case .server:
             return ServerConfiguration(baseURL: sanitizedLocalInput)
         }
@@ -111,6 +112,21 @@ struct ServerSetupView: View {
         }
 
         Section {
+            Toggle(isOn: $loadSampleData) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Add Sample Collection")
+                    Text("Example binders, wishlists, and transactions to explore")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Sample Data")
+        } footer: {
+            Text("Leave this off to start with an empty collection. You can add or remove the samples later in Settings.")
+        }
+
+        Section {
             Button {
                 finishOnDeviceSetup()
             } label: {
@@ -129,7 +145,7 @@ struct ServerSetupView: View {
 
     private func populateFromStore() {
         let stored = environmentStore.serverConfiguration.baseURL
-        if stored == ServerConfiguration.demoLocalBaseURL || stored.isEmpty {
+        if stored == ServerConfiguration.onDeviceBaseURL || stored.isEmpty {
             selectedMode = .onDevice
             localInput = ServerConfiguration.defaultLocalBaseURL
         } else {
@@ -151,7 +167,10 @@ struct ServerSetupView: View {
     }
 
     private func finishOnDeviceSetup() {
-        environmentStore.serverConfiguration = .demoLocal
-        environmentStore.enableDemoSession(force: true)
+        environmentStore.serverConfiguration = .onDevice
+        environmentStore.enableLocalSession(force: true)
+        if loadSampleData {
+            LocalStore.shared.loadSampleData()
+        }
     }
 }

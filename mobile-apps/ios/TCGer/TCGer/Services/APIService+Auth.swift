@@ -5,8 +5,8 @@ extension APIService {
         config: ServerConfiguration,
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
-        if config.isDemoMode {
-            return DemoStore.shared.authenticate(username: credentials.username)
+        if config.isOnDevice {
+            return LocalStore.shared.authenticate(username: credentials.username)
         }
 
         let payload = UsernameLoginPayload(
@@ -40,8 +40,8 @@ extension APIService {
         password: String,
         username: String
     ) async throws -> AuthResponse {
-        if config.isDemoMode {
-            return DemoStore.shared.authenticate(username: username, email: email)
+        if config.isOnDevice {
+            return LocalStore.shared.authenticate(username: username, email: email)
         }
 
         let payload = SignupPayload(
@@ -59,8 +59,8 @@ extension APIService {
         password: String,
         username: String
     ) async throws -> AuthResponse {
-        if config.isDemoMode {
-            return DemoStore.shared.authenticate(username: username, email: email)
+        if config.isOnDevice {
+            return LocalStore.shared.authenticate(username: username, email: email)
         }
 
         // Step 1: Sign up via Better Auth
@@ -112,8 +112,8 @@ extension APIService {
     }
 
     func checkSetupRequired(config: ServerConfiguration) async throws -> SetupCheckResponse {
-        if config.isDemoMode {
-            return DemoStore.shared.checkSetupRequired()
+        if config.isOnDevice {
+            return LocalStore.shared.checkSetupRequired()
         }
 
         let (data, response) = try await makeRequest(
@@ -133,7 +133,7 @@ extension APIService {
     }
 
     func verifyServer(config: ServerConfiguration) async -> Bool {
-        if config.isDemoMode {
+        if config.isOnDevice {
             return true
         }
 

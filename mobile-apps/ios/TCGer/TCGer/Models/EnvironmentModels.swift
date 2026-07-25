@@ -4,7 +4,12 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
 
     static let defaultLocalBaseURL = "http://localhost:3001"
-    static let demoLocalBaseURL = "demo://local"
+
+    /// Sentinel base URL for phone-only mode, where every request is served by
+    /// `LocalStore` instead of a backend. The `demo://` scheme is kept for
+    /// compatibility with installs configured before the mode was renamed — it
+    /// no longer implies demo/sample content.
+    static let onDeviceBaseURL = "demo://local"
 
     init(baseURL: String) {
         self.baseURL = ServerConfiguration.sanitized(baseURL)
@@ -30,8 +35,9 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
         return URL(string: baseURL)
     }
 
-    var isDemoMode: Bool {
-        baseURL == ServerConfiguration.demoLocalBaseURL
+    /// True when the app runs entirely on this phone with no backend server.
+    var isOnDevice: Bool {
+        baseURL == ServerConfiguration.onDeviceBaseURL
     }
 
     var isValid: Bool {
@@ -99,7 +105,7 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
 
     static let empty = ServerConfiguration(baseURL: "")
     static let localDefault = ServerConfiguration(baseURL: defaultLocalBaseURL)
-    static let demoLocal = ServerConfiguration(baseURL: demoLocalBaseURL)
+    static let onDevice = ServerConfiguration(baseURL: onDeviceBaseURL)
 }
 
 struct LoginCredentials: Codable, Equatable, Sendable {

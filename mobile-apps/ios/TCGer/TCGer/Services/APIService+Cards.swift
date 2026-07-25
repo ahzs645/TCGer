@@ -7,9 +7,9 @@ extension APIService {
         query: String,
         game: TCGGame = .all
     ) async throws -> CardSearchResponse {
-        if config.isDemoMode {
+        if config.isOnDevice {
             await prepareLocalCatalog(for: game)
-            return DemoStore.shared.searchCards(query: query, game: game)
+            return LocalStore.shared.searchCards(query: query, game: game)
         }
 
         var path = "cards/search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
@@ -40,8 +40,8 @@ extension APIService {
         tcg: String,
         cardId: String
     ) async throws -> [Card] {
-        if config.isDemoMode {
-            return DemoStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
+        if config.isOnDevice {
+            return LocalStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
         }
 
         let path = "cards/\(tcg)/\(cardId)/prints"
@@ -79,7 +79,7 @@ extension APIService {
         token: String,
         tcg: String? = nil
     ) async throws -> [TcgSet] {
-        if config.isDemoMode {
+        if config.isOnDevice {
             if let tcg, let game = TCGGame(rawValue: tcg) {
                 if TCGGame.catalogGames.contains(game) {
                     await CatalogStore.shared.loadIfNeeded(game)
@@ -87,7 +87,7 @@ extension APIService {
             } else {
                 await prepareLocalCatalog(for: .all)
             }
-            return DemoStore.shared.getSets(tcg: tcg)
+            return LocalStore.shared.getSets(tcg: tcg)
         }
 
         var path = "cards/sets"
@@ -117,12 +117,12 @@ extension APIService {
         tcg: String,
         setCode: String
     ) async throws -> [Card] {
-        if config.isDemoMode {
+        if config.isOnDevice {
             if let game = TCGGame(rawValue: tcg),
                TCGGame.catalogGames.contains(game) {
                 await CatalogStore.shared.loadIfNeeded(game)
             }
-            return DemoStore.shared.getSetCards(tcg: tcg, setCode: setCode)
+            return LocalStore.shared.getSetCards(tcg: tcg, setCode: setCode)
         }
 
         let path = "cards/sets/\(tcg)/\(setCode)"

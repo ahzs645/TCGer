@@ -305,7 +305,7 @@ struct RootView: View {
             return
         }
 
-        if environmentStore.serverConfiguration.isDemoMode {
+        if environmentStore.serverConfiguration.isOnDevice {
             return
         }
 

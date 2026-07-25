@@ -28,59 +28,71 @@ struct SettingsView: View {
     @State private var gameDisableBlock: GameDisableBlock?
     @State private var pendingCatalogInstall: TCGGame?
     @State private var catalogInstallError: String?
+    @State private var sampleDataLoaded = false
+    @State private var showingRemoveSampleAlert = false
+    @State private var showingEraseLocalDataAlert = false
 
     /// True when running fully on-device with no backend server.
     private var isLocalMode: Bool {
-        environmentStore.serverConfiguration.isDemoMode
+        environmentStore.serverConfiguration.isOnDevice
+    }
+
+    /// Phone-only mode has no account, so preferences are always editable;
+    /// against a server they need a session.
+    private var canEditPreferences: Bool {
+        isLocalMode || environmentStore.isAuthenticated
     }
 
     var body: some View {
         NavigationView {
             List {
-                // Account Section
-                Section {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(displayEmail)
-                                .font(.headline)
-                            if environmentStore.isAuthenticated {
-                                Text("Signed in")
+                // Account Section — a server concept; phone-only mode has no
+                // account, profile, or sign-in state to show.
+                if !isLocalMode {
+                    Section {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(displayEmail)
+                                    .font(.headline)
+                                if environmentStore.isAuthenticated {
+                                    Text("Signed in")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("Guest access")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "person.circle.fill")
+                                .font(.title)
+                                .foregroundColor(.accentColor)
+                        }
+                        .padding(.vertical, 4)
+
+                        if environmentStore.isAuthenticated {
+                            Button(action: { showingProfile = true }) {
+                                HStack {
+                                    Image(systemName: "person.text.rectangle")
+                                        .foregroundColor(.accentColor)
+                                    Text("View Profile")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            if environmentStore.isCurrentUserAdmin {
+                                Label("Administrator", systemImage: "checkmark.shield.fill")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("Guest access")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(.blue)
                             }
                         }
-                        Spacer()
-                        Image(systemName: "person.circle.fill")
-                            .font(.title)
-                            .foregroundColor(.accentColor)
+                    } header: {
+                        Text("Account")
                     }
-                    .padding(.vertical, 4)
-
-                    if environmentStore.isAuthenticated {
-                        Button(action: { showingProfile = true }) {
-                            HStack {
-                                Image(systemName: "person.text.rectangle")
-                                    .foregroundColor(.accentColor)
-                                Text("View Profile")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        if environmentStore.isCurrentUserAdmin {
-                            Label("Administrator", systemImage: "checkmark.shield.fill")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                } header: {
-                    Text("Account")
                 }
 
                 // Appearance Section
@@ -121,6 +133,22 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+
+                    NavigationLink {
+                        TabBarCustomizationView()
+                            .environmentObject(environmentStore)
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.grid.2x2")
+                                .foregroundColor(.accentColor)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Customize Tab Bar")
+                                Text(tabBarSummary)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Appearance")
                 }
@@ -167,7 +195,7 @@ struct SettingsView: View {
                             Text("Yu-Gi-Oh!")
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledYugioh) {
                         Task {
                             await handleGameToggle(
@@ -189,7 +217,7 @@ struct SettingsView: View {
                             Text("Magic: The Gathering")
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledMagic) {
                         Task {
                             await handleGameToggle(
@@ -211,7 +239,7 @@ struct SettingsView: View {
                             Text("Pokémon")
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledPokemon) {
                         Task {
                             await handleGameToggle(
@@ -226,7 +254,7 @@ struct SettingsView: View {
                     Toggle(isOn: $environmentStore.enabledOnepiece) {
                         Label("One Piece", systemImage: "sail.boat.fill")
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledOnepiece) {
                         Task {
                             await handleGameToggle(
@@ -240,7 +268,7 @@ struct SettingsView: View {
                     Toggle(isOn: $environmentStore.enabledLorcana) {
                         Label("Disney Lorcana", systemImage: "wand.and.stars")
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledLorcana) {
                         Task {
                             await handleGameToggle(
@@ -254,7 +282,7 @@ struct SettingsView: View {
                     Toggle(isOn: $environmentStore.enabledDragonball) {
                         Label("Dragon Ball Super", systemImage: "flame.fill")
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.enabledDragonball) {
                         Task {
                             await handleGameToggle(
@@ -292,7 +320,7 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.showCardNumbers) {
                         Task { await updatePreferences(showCardNumbers: environmentStore.showCardNumbers) }
                     }
@@ -305,7 +333,7 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.showPricing) {
                         Task { await updatePreferences(showPricing: environmentStore.showPricing) }
                     }
@@ -325,7 +353,7 @@ struct SettingsView: View {
                         Text("Disney Lorcana").tag("lorcana")
                         Text("Dragon Ball Super").tag("dragonball")
                     }
-                    .disabled(!environmentStore.isAuthenticated)
+                    .disabled(!canEditPreferences)
                 } header: {
                     Text("Display Preferences")
                 }
@@ -346,8 +374,9 @@ struct SettingsView: View {
                     }
                 }
 
-                if environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin {
-                    // Admin Access Policy Section
+                // Admin Access Policy governs who may reach a shared server, so
+                // it is meaningless when everything lives on this phone.
+                if !isLocalMode && environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin {
                     Section {
                         if isLoadingAppSettings {
                             HStack {
@@ -419,7 +448,7 @@ struct SettingsView: View {
                 }
 
                 // Finance Section
-                if environmentStore.isAuthenticated {
+                if canEditPreferences {
                     Section {
                         NavigationLink {
                             TransactionsView()
@@ -433,6 +462,31 @@ struct SettingsView: View {
                         }
                     } header: {
                         Text("Finance")
+                    }
+                }
+
+                // Sample Data Section — opt-in demo content, kept separate from
+                // the real collection stored on this phone.
+                if isLocalMode {
+                    Section {
+                        if sampleDataLoaded {
+                            Button("Remove Sample Data", role: .destructive) {
+                                showingRemoveSampleAlert = true
+                            }
+                        } else {
+                            Button {
+                                LocalStore.shared.loadSampleData()
+                                sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                            } label: {
+                                Label("Load Sample Collection", systemImage: "sparkles")
+                            }
+                        }
+                    } header: {
+                        Text("Sample Data")
+                    } footer: {
+                        Text(sampleDataLoaded
+                            ? "Sample binders, wishlists, sealed items, and transactions are loaded. Removing them leaves everything you added untouched."
+                            : "Adds a few example binders, wishlists, and transactions so you can try the app out. Your own cards are never affected.")
                     }
                 }
 
@@ -469,7 +523,7 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
-                        .disabled(!environmentStore.isAuthenticated)
+                        .disabled(!canEditPreferences)
 
                         if let lastSync = lastSyncDate {
                             HStack {
@@ -526,7 +580,7 @@ struct SettingsView: View {
                 }
 
                 // Export Section
-                if environmentStore.isAuthenticated {
+                if canEditPreferences {
                     Section {
                         Button(action: { Task { await exportCollection(format: "json") } }) {
                             HStack {
@@ -574,6 +628,16 @@ struct SettingsView: View {
                     Button("Reset All Settings", role: .destructive) {
                         showingResetAlert = true
                     }
+
+                    if isLocalMode {
+                        Button("Erase All Cards & Binders", role: .destructive) {
+                            showingEraseLocalDataAlert = true
+                        }
+                    }
+                } footer: {
+                    if isLocalMode {
+                        Text("Reset All Settings only clears preferences. Erasing removes every card, binder, wishlist, and transaction stored on this phone.")
+                    }
                 }
 
                 // Scanner Tools (Developer) Section — debug builds only.
@@ -619,6 +683,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .task {
+                sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                 await refreshProfileIfNeeded()
                 await refreshPreferencesIfNeeded()
                 await refreshAppSettingsIfNeeded()
@@ -631,7 +696,27 @@ struct SettingsView: View {
                     environmentStore.resetEverything()
                 }
             } message: {
-                Text("This will remove your server address, login credentials, and authentication token.")
+                Text(isLocalMode
+                    ? "This clears your app preferences and returns you to setup. Cards and binders stored on this phone are kept."
+                    : "This will remove your server address, login credentials, and authentication token.")
+            }
+            .alert("Remove Sample Data?", isPresented: $showingRemoveSampleAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Remove", role: .destructive) {
+                    LocalStore.shared.removeSampleData()
+                    sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                }
+            } message: {
+                Text("Removes the example binders, wishlists, sealed items, and transactions. Cards you added yourself stay where they are.")
+            }
+            .alert("Erase Everything on This Phone?", isPresented: $showingEraseLocalDataAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Erase", role: .destructive) {
+                    LocalStore.shared.resetLocalData()
+                    sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                }
+            } message: {
+                Text("Every card, binder, wishlist, sealed item, and transaction stored on this phone is deleted. This cannot be undone.")
             }
             .alert("Clear Cache?", isPresented: $showingClearCacheAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -710,6 +795,10 @@ struct SettingsView: View {
                 await refreshAppSettingsIfNeeded()
             }
         }
+    }
+
+    private var tabBarSummary: String {
+        environmentStore.visibleTabs.map(\.title).joined(separator: " · ")
     }
 
     private var displayEmail: String {

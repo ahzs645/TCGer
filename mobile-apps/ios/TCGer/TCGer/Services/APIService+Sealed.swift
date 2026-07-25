@@ -22,8 +22,8 @@ extension APIService {
         token: String,
         tcg: String? = nil
     ) async throws -> [SealedProduct] {
-        if config.isDemoMode {
-            let all = DemoStore.shared.getSealedProducts()
+        if config.isOnDevice {
+            let all = LocalStore.shared.getSealedProducts()
             if let tcg { return all.filter { $0.tcg == tcg } }
             return all
         }
@@ -45,7 +45,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [SealedInventoryItem] {
-        if config.isDemoMode { return DemoStore.shared.getSealedInventory() }
+        if config.isOnDevice { return LocalStore.shared.getSealedInventory() }
         let (data, response) = try await makeRequest(config: config, path: "sealed/inventory", token: token)
 
         guard response.statusCode == 200 else {
@@ -63,7 +63,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [SealedOpeningLedger] {
-        if config.isDemoMode { return [] }
+        if config.isOnDevice { return [] }
         let (data, response) = try await makeRequest(
             config: config,
             path: "sealed/openings",
@@ -91,8 +91,8 @@ extension APIService {
         purchaseDate: String? = nil,
         notes: String? = nil
     ) async throws -> SealedInventoryItem {
-        if config.isDemoMode {
-            guard let item = DemoStore.shared.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
+        if config.isOnDevice {
+            guard let item = LocalStore.shared.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
                 throw APIError.serverError(status: 404, message: "Product not found")
             }
             return item
@@ -128,8 +128,8 @@ extension APIService {
         purchaseDate: String? = nil,
         notes: String? = nil
     ) async throws -> SealedInventoryItem {
-        if config.isDemoMode {
-            return try DemoStore.shared.updateSealedInventory(
+        if config.isOnDevice {
+            return try LocalStore.shared.updateSealedInventory(
                 itemId: itemId,
                 quantity: quantity,
                 purchasePrice: purchasePrice,
@@ -163,7 +163,7 @@ extension APIService {
         token: String,
         itemId: String
     ) async throws {
-        if config.isDemoMode { DemoStore.shared.deleteSealedInventory(itemId: itemId); return }
+        if config.isOnDevice { LocalStore.shared.deleteSealedInventory(itemId: itemId); return }
         let (data, response) = try await makeRequest(
             config: config, path: "sealed/inventory/\(itemId)", method: "DELETE", token: token
         )

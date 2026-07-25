@@ -57,7 +57,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [Wishlist] {
-        if config.isDemoMode { return DemoStore.shared.getWishlists() }
+        if config.isOnDevice { return LocalStore.shared.getWishlists() }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists",
@@ -80,7 +80,7 @@ extension APIService {
         token: String,
         id: String
     ) async throws -> Wishlist {
-        if config.isDemoMode { return try DemoStore.shared.getWishlist(id: id) }
+        if config.isOnDevice { return try LocalStore.shared.getWishlist(id: id) }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(id)",
@@ -105,7 +105,7 @@ extension APIService {
         description: String? = nil,
         colorHex: String? = nil
     ) async throws -> Wishlist {
-        if config.isDemoMode { return DemoStore.shared.createWishlist(name: name, description: description, colorHex: colorHex) }
+        if config.isOnDevice { return LocalStore.shared.createWishlist(name: name, description: description, colorHex: colorHex) }
         let body = CreateWishlistRequest(name: name, description: description, colorHex: colorHex)
         let (data, response) = try await makeRequest(
             config: config,
@@ -134,8 +134,8 @@ extension APIService {
         description: String? = nil,
         colorHex: String? = nil
     ) async throws -> Wishlist {
-        if config.isDemoMode {
-            return try DemoStore.shared.updateWishlist(id: id, name: name, description: description, colorHex: colorHex)
+        if config.isOnDevice {
+            return try LocalStore.shared.updateWishlist(id: id, name: name, description: description, colorHex: colorHex)
         }
         let body = UpdateWishlistRequest(name: name, description: description, colorHex: colorHex)
         let (data, response) = try await makeRequest(
@@ -162,7 +162,7 @@ extension APIService {
         token: String,
         id: String
     ) async throws {
-        if config.isDemoMode { DemoStore.shared.deleteWishlist(id: id); return }
+        if config.isOnDevice { LocalStore.shared.deleteWishlist(id: id); return }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(id)",
@@ -184,7 +184,7 @@ extension APIService {
         wishlistId: String,
         card: Card
     ) async throws -> WishlistCard {
-        if config.isDemoMode { return try DemoStore.shared.addCardToWishlist(wishlistId: wishlistId, card: card) }
+        if config.isOnDevice { return try LocalStore.shared.addCardToWishlist(wishlistId: wishlistId, card: card) }
         let body = AddWishlistCardRequest(
             externalId: card.id,
             baseExternalId: card.baseExternalId,
@@ -240,7 +240,7 @@ extension APIService {
         wishlistId: String,
         cardId: String
     ) async throws {
-        if config.isDemoMode { DemoStore.shared.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId); return }
+        if config.isOnDevice { LocalStore.shared.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId); return }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(wishlistId)/cards/\(cardId)",

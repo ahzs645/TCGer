@@ -73,9 +73,11 @@ final class CardScannerViewModel: ObservableObject {
 
     func updateEnvironment(_ environment: EnvironmentStore) {
         environmentStore = environment
-        // In local (no-server) mode, default to the fully on-device engine so
-        // scanning never depends on a backend.
-        if environment.serverConfiguration.isDemoMode, selectedEngine == .automatic {
+        // In phone-only mode there is no backend, so fall back to the fully
+        // on-device engine — both for the default and for a server matcher
+        // carried over from a previous server connection.
+        if environment.serverConfiguration.isOnDevice,
+           selectedEngine == .automatic || selectedEngine.requiresServerOnlyFlow {
             selectedEngine = .localOnly
         }
         rebuildContext()
@@ -134,7 +136,7 @@ final class CardScannerViewModel: ObservableObject {
             return
         }
         // Local mode needs no auth token; only require it when a backend is in use.
-        if context?.serverConfiguration.isDemoMode != true, context?.authToken == nil {
+        if context?.serverConfiguration.isOnDevice != true, context?.authToken == nil {
             state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
             return
         }
@@ -227,7 +229,7 @@ final class CardScannerViewModel: ObservableObject {
         guard !isProcessingPhoto else { return }
         guard latestResult == nil else { return }
         guard let context else { return }
-        if !context.serverConfiguration.isDemoMode, context.authToken == nil { return }
+        if !context.serverConfiguration.isOnDevice, context.authToken == nil { return }
         guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
 
         let now = Date()

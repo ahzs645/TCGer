@@ -74,6 +74,10 @@ extension APIService {
         csv: String,
         options: CollectionImportOptions
     ) async throws -> CollectionImportPreview {
+        if config.isOnDevice {
+            return LocalStore.shared.previewImport(csv: csv, options: options)
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections/import/preview",
@@ -99,6 +103,10 @@ extension APIService {
         csv: String,
         options: CollectionImportOptions
     ) async throws -> CollectionImportResult {
+        if config.isOnDevice {
+            return LocalStore.shared.commitImport(csv: csv, options: options)
+        }
+
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections/import/commit",
@@ -123,8 +131,8 @@ extension APIService {
         token: String? = nil,
         useCache: Bool = false
     ) async throws -> [Collection] {
-        if config.isDemoMode {
-            return DemoStore.shared.getCollections()
+        if config.isOnDevice {
+            return LocalStore.shared.getCollections()
         }
 
         if useCache || !NetworkMonitor.shared.isConnected {
@@ -200,8 +208,8 @@ extension APIService {
         token: String? = nil,
         id: String
     ) async throws -> Collection {
-        if config.isDemoMode {
-            return try DemoStore.shared.getCollection(id: id)
+        if config.isOnDevice {
+            return try LocalStore.shared.getCollection(id: id)
         }
 
         let (data, response) = try await makeRequest(
@@ -238,8 +246,8 @@ extension APIService {
         description: String?,
         colorHex: String? = nil
     ) async throws -> Collection {
-        if config.isDemoMode {
-            return DemoStore.shared.createCollection(
+        if config.isOnDevice {
+            return LocalStore.shared.createCollection(
                 name: name,
                 description: description,
                 colorHex: colorHex
@@ -283,8 +291,8 @@ extension APIService {
         description: String? = nil,
         colorHex: String? = nil
     ) async throws -> Collection {
-        if config.isDemoMode {
-            return try DemoStore.shared.updateCollection(
+        if config.isOnDevice {
+            return try LocalStore.shared.updateCollection(
                 id: id,
                 name: name,
                 description: description,
@@ -320,8 +328,8 @@ extension APIService {
         token: String,
         id: String
     ) async throws {
-        if config.isDemoMode {
-            try DemoStore.shared.deleteCollection(id: id)
+        if config.isOnDevice {
+            try LocalStore.shared.deleteCollection(id: id)
             return
         }
 
@@ -344,8 +352,8 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [CollectionCardTag] {
-        if config.isDemoMode {
-            return DemoStore.shared.getTags()
+        if config.isOnDevice {
+            return LocalStore.shared.getTags()
         }
 
         let (data, response) = try await makeRequest(
@@ -374,8 +382,8 @@ extension APIService {
         label: String,
         colorHex: String? = nil
     ) async throws -> CollectionCardTag {
-        if config.isDemoMode {
-            return DemoStore.shared.createTag(label: label, colorHex: colorHex)
+        if config.isOnDevice {
+            return LocalStore.shared.createTag(label: label, colorHex: colorHex)
         }
 
         let payload = TagPayload(label: label, colorHex: colorHex)
@@ -575,8 +583,8 @@ extension APIService {
         newTags: [TagPayload]? = nil,
         card: Card? = nil
     ) async throws {
-        if config.isDemoMode {
-            try DemoStore.shared.addCardToBinder(
+        if config.isOnDevice {
+            try LocalStore.shared.addCardToBinder(
                 binderId: binderId,
                 cardId: cardId,
                 quantity: quantity,
@@ -694,8 +702,8 @@ extension APIService {
         newPrint: Card? = nil,
         targetBinderId: String? = nil
     ) async throws -> CollectionCard {
-        if config.isDemoMode {
-            return try DemoStore.shared.updateCardInBinder(
+        if config.isOnDevice {
+            return try LocalStore.shared.updateCardInBinder(
                 binderId: binderId,
                 collectionCardOrCopyId: collectionCardId,
                 quantity: quantity,
@@ -821,8 +829,8 @@ extension APIService {
         binderId: String,
         collectionCardId: String
     ) async throws {
-        if config.isDemoMode {
-            try DemoStore.shared.deleteCardFromBinder(
+        if config.isOnDevice {
+            try LocalStore.shared.deleteCardFromBinder(
                 binderId: binderId,
                 collectionCardOrCopyId: collectionCardId
             )
@@ -851,8 +859,8 @@ extension APIService {
         token: String,
         format: String = "json"
     ) async throws -> Data {
-        if config.isDemoMode {
-            return DemoStore.shared.exportCollections(format: format)
+        if config.isOnDevice {
+            return LocalStore.shared.exportCollections(format: format)
         }
 
         let (data, response) = try await makeRequest(
@@ -881,7 +889,7 @@ extension APIService {
         imageData: Data,
         filename: String = "photo.jpg"
     ) async throws -> [String] {
-        if config.isDemoMode {
+        if config.isOnDevice {
             // Local mode has no image store; report no remote images rather than
             // failing the whole add/edit flow.
             return []
@@ -932,7 +940,7 @@ extension APIService {
         collectionId: String,
         imageIndex: Int
     ) async throws {
-        if config.isDemoMode {
+        if config.isOnDevice {
             return
         }
 

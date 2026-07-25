@@ -19,52 +19,56 @@ struct ContentView: View {
         return settings.publicCollections || !settings.requireAuth
     }
 
+    /// The user's chosen tabs, minus any that the current session can't reach.
+    private var tabs: [AppTab] {
+        environmentStore.visibleTabs.filter(isAvailable)
+    }
+
     var body: some View {
         TabView {
-            if environmentStore.isAuthenticated || canViewDashboardWithoutAuth {
-                Tab("Home", systemImage: "house.fill") {
-                    DashboardView()
+            ForEach(tabs) { tab in
+                Tab(tab.title, systemImage: tab.systemImage) {
+                    destination(for: tab)
                 }
-            }
-
-            if environmentStore.isAuthenticated || canViewCollectionsWithoutAuth {
-                Tab("Collections", systemImage: "folder.fill") {
-                    CollectionsView()
-                }
-            }
-
-            if environmentStore.isAuthenticated {
-                Tab("Sets", systemImage: "square.stack.3d.up") {
-                    SetBrowserView()
-                }
-            }
-
-            if environmentStore.isAuthenticated {
-                Tab("Wishlists", systemImage: "heart.fill") {
-                    WishlistsView()
-                }
-            }
-
-            if environmentStore.isAuthenticated {
-                Tab("Sealed", systemImage: "shippingbox.fill") {
-                    SealedInventoryView()
-                }
-            }
-
-            if environmentStore.isAuthenticated {
-                Tab("Scan", systemImage: "camera.viewfinder") {
-                    CardScannerView()
-                }
-            }
-
-            Tab("Settings", systemImage: "gearshape.fill") {
-                SettingsView()
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .environment(\.showingSearch, $showingSearch)
         .sheet(isPresented: $showingSearch) {
             CardSearchView()
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for tab: AppTab) -> some View {
+        switch tab {
+        case .home:
+            DashboardView()
+        case .collections:
+            CollectionsView()
+        case .sets:
+            SetBrowserView()
+        case .wishlists:
+            WishlistsView()
+        case .sealed:
+            SealedInventoryView()
+        case .scan:
+            CardScannerView()
+        case .settings:
+            SettingsView()
+        }
+    }
+
+    private func isAvailable(_ tab: AppTab) -> Bool {
+        switch tab {
+        case .settings:
+            return true
+        case .home:
+            return environmentStore.isAuthenticated || canViewDashboardWithoutAuth
+        case .collections:
+            return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
+        case .sets, .wishlists, .sealed, .scan:
+            return environmentStore.isAuthenticated
         }
     }
 }

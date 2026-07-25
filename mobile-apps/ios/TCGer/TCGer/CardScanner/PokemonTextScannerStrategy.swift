@@ -28,7 +28,7 @@ final class PokemonTextScannerStrategy: ScanStrategy {
         // In local mode the catalog lookup runs against the on-device store and
         // ignores the token, so only require auth when talking to a backend.
         let token = context.authToken
-        if !context.serverConfiguration.isDemoMode, token == nil {
+        if !context.serverConfiguration.isOnDevice, token == nil {
             throw CardScannerError.missingAuthToken
         }
 

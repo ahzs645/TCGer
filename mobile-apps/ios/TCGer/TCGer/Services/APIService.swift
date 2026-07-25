@@ -105,14 +105,25 @@ private struct AnyEncodable: Encodable {
 }
 
 @MainActor
-final class DemoStore {
-    static let shared = DemoStore()
+final class LocalStore {
+    static let shared = LocalStore()
 
     private enum Constants {
-        static let userId = "demo-user-001"
-        static let token = "demo-token-static"
+        static let userId = "local-user"
+        static let token = "local-device-token"
         static let unsortedBinderId = "__library__"
         static let storeFilename = "TCGerLocalStore.json"
+        /// Prefix for every record created by the optional sample collection.
+        static let samplePrefix = "sample-"
+        /// Sample ids written by builds that seeded phone-only mode automatically.
+        static let legacySampleIds: Set<String> = [
+            "demo-binder-1", "demo-binder-2",
+            "demo-cc-1", "demo-cc-2", "demo-cc-3", "demo-cc-4",
+            "demo-wishlist-1", "demo-wishlist-2",
+            "demo-wc-1", "demo-wc-2", "demo-wc-3", "demo-wc-4",
+            "demo-si-1", "demo-si-2", "demo-si-3",
+            "demo-txn-1", "demo-txn-2", "demo-txn-3", "demo-txn-4", "demo-txn-5"
+        ]
     }
 
     private var user: User
@@ -132,6 +143,10 @@ final class DemoStore {
     private var transactions: [Transaction]
     private var nextWishlistId: Int
     private var nextTransactionId: Int
+
+    /// True once the user has explicitly asked for the sample collection.
+    /// Phone-only mode is a real, empty collection until they do.
+    private(set) var sampleDataLoaded: Bool
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -153,10 +168,10 @@ final class DemoStore {
         )
         self.user = User(
             id: Constants.userId,
-            email: "demo@tcger.app",
-            name: "Demo User",
-            username: "DemoUser",
-            isAdmin: true,
+            email: "",
+            name: "This Phone",
+            username: "This Phone",
+            isAdmin: false,
             showCardNumbers: true,
             showPricing: true,
             enabledYugioh: true,
@@ -172,18 +187,14 @@ final class DemoStore {
             publicDashboard: true,
             publicCollections: true,
             requireAuth: false,
-            appName: "TCGer Demo",
-            updatedAt: DemoStore.isoFormatter.string(from: Date())
+            appName: "TCGer",
+            updatedAt: LocalStore.isoFormatter.string(from: Date())
         )
-        self.tags = [
-            CollectionCardTag(id: "demo-tag-1", label: "For Trade", colorHex: "4caf50"),
-            CollectionCardTag(id: "demo-tag-2", label: "PC", colorHex: "2196f3"),
-            CollectionCardTag(id: "demo-tag-3", label: "Needs Grading", colorHex: "ff9800")
-        ]
+        self.tags = LocalStore.starterTags
         self.collections = []
         self.searchCatalog = []
         self.printGroups = [:]
-        self.nextBinderId = 3
+        self.nextBinderId = 1
         self.nextCollectionCardId = 100
         self.nextCopyId = 1000
         self.nextTagId = 4
@@ -193,17 +204,17 @@ final class DemoStore {
         self.sealedProducts = []
         self.sealedInventory = []
         self.transactions = []
-        seedData()
-        seedNewFeatureData()
+        self.sampleDataLoaded = false
+        seedBaseline()
         loadPersistedState()
     }
 
     // MARK: - Persistence
     //
-    // Local mode keeps everything the user creates on-device. The seed data
-    // above provides starter content on first launch; once the user changes
-    // anything we snapshot the mutable state to disk and restore it on the
-    // next launch so nothing is lost when the app is relaunched.
+    // Phone-only mode keeps everything the user creates on-device. A fresh
+    // install starts with an empty library — sample content is opt-in via
+    // `loadSampleData()` — and every change is snapshotted to disk so nothing
+    // is lost when the app is relaunched.
 
     private struct PersistedState: Codable {
         var collections: [Collection]
@@ -220,6 +231,9 @@ final class DemoStore {
         var user: User?
         var preferences: APIService.UserPreferences?
         var appSettings: AppSettings?
+        /// Absent in stores written before sample data became opt-in; those
+        /// stores were seeded automatically, so they are treated as loaded.
+        var sampleDataLoaded: Bool?
     }
 
     private static var storeURL: URL? {
@@ -230,7 +244,7 @@ final class DemoStore {
     }
 
     private func loadPersistedState() {
-        guard let url = DemoStore.storeURL,
+        guard let url = LocalStore.storeURL,
               FileManager.default.fileExists(atPath: url.path),
               let data = try? Data(contentsOf: url),
               let state = try? JSONDecoder().decode(PersistedState.self, from: data) else {
@@ -248,13 +262,34 @@ final class DemoStore {
         nextTagId = state.nextTagId
         nextWishlistId = state.nextWishlistId
         nextTransactionId = state.nextTransactionId
-        if let user = state.user { self.user = user }
+        sampleDataLoaded = state.sampleDataLoaded ?? true
         if let preferences = state.preferences { self.preferences = preferences }
-        if let appSettings = state.appSettings { self.appSettings = appSettings }
+
+        // The identity and app name persisted by older builds described a demo
+        // account ("Demo User" / "TCGer Demo"); phone-only mode has no account,
+        // so the neutral local defaults always win.
+        if let user = state.user, !LocalStore.isLegacyDemoUser(user) {
+            self.user = user
+        }
+        if let appSettings = state.appSettings, appSettings.appName != "TCGer Demo" {
+            self.appSettings = appSettings
+        }
+
+        if !collections.contains(where: { $0.id == Constants.unsortedBinderId }) {
+            collections.append(LocalStore.makeUnsortedLibrary())
+        }
+
+        if sampleDataLoaded {
+            seedSampleCatalog()
+        }
+    }
+
+    private static func isLegacyDemoUser(_ user: User) -> Bool {
+        user.id == "demo-user-001" || user.email == "demo@tcger.app"
     }
 
     private func persist() {
-        guard let url = DemoStore.storeURL else { return }
+        guard let url = LocalStore.storeURL else { return }
         let state = PersistedState(
             collections: collections,
             tags: tags,
@@ -269,34 +304,33 @@ final class DemoStore {
             nextTransactionId: nextTransactionId,
             user: user,
             preferences: preferences,
-            appSettings: appSettings
+            appSettings: appSettings,
+            sampleDataLoaded: sampleDataLoaded
         )
         guard let data = try? JSONEncoder().encode(state) else { return }
         try? data.write(to: url, options: [.atomic])
     }
 
-    /// Erase persisted local data and restore the original seed content.
+    /// Erase everything stored on this phone and start from an empty library.
     func resetLocalData() {
-        if let url = DemoStore.storeURL {
+        if let url = LocalStore.storeURL {
             try? FileManager.default.removeItem(at: url)
         }
         collections = []
         wishlists = []
         sealedInventory = []
         transactions = []
-        tags = [
-            CollectionCardTag(id: "demo-tag-1", label: "For Trade", colorHex: "4caf50"),
-            CollectionCardTag(id: "demo-tag-2", label: "PC", colorHex: "2196f3"),
-            CollectionCardTag(id: "demo-tag-3", label: "Needs Grading", colorHex: "ff9800")
-        ]
-        nextBinderId = 3
+        tags = LocalStore.starterTags
+        searchCatalog = []
+        printGroups = [:]
+        nextBinderId = 1
         nextCollectionCardId = 100
         nextCopyId = 1000
         nextTagId = 4
         nextWishlistId = 1
         nextTransactionId = 1
-        seedData()
-        seedNewFeatureData()
+        sampleDataLoaded = false
+        seedBaseline()
     }
 
     func authenticate(username: String? = nil, email: String? = nil) -> AuthResponse {
@@ -308,7 +342,7 @@ final class DemoStore {
             email: (resolvedEmail?.isEmpty == false) ? resolvedEmail! : user.email,
             name: resolvedUsername ?? user.name,
             username: (resolvedUsername?.isEmpty == false) ? resolvedUsername : user.username,
-            isAdmin: true,
+            isAdmin: false,
             showCardNumbers: preferences.showCardNumbers,
             showPricing: preferences.showPricing,
             enabledYugioh: preferences.enabledYugioh,
@@ -343,7 +377,7 @@ final class DemoStore {
             publicCollections: publicCollections ?? appSettings.publicCollections,
             requireAuth: requireAuth ?? appSettings.requireAuth,
             appName: appName ?? appSettings.appName,
-            updatedAt: DemoStore.isoFormatter.string(from: Date())
+            updatedAt: LocalStore.isoFormatter.string(from: Date())
         )
         persist()
         return appSettings
@@ -403,7 +437,7 @@ final class DemoStore {
             isAdmin: user.isAdmin,
             showCardNumbers: preferences.showCardNumbers,
             showPricing: preferences.showPricing,
-            createdAt: DemoStore.isoFormatter.string(from: Date())
+            createdAt: LocalStore.isoFormatter.string(from: Date())
         )
     }
 
@@ -442,7 +476,7 @@ final class DemoStore {
     }
 
     func changePassword(currentPassword _: String, newPassword _: String) {
-        // No-op in demo mode.
+        // No-op: phone-only mode has no account to hold a password.
     }
 
     func searchCards(query: String, game: TCGGame) -> CardSearchResponse {
@@ -627,28 +661,243 @@ final class DemoStore {
             return "\"" + raw.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }
 
-        var rows = ["Binder,Name,TCG,SetCode,SetName,Rarity,CollectorNumber,Quantity,Condition,Language,Price,Notes"]
+        func money(_ value: Double?) -> String {
+            value.map { String(format: "%.2f", $0) } ?? ""
+        }
+
+        // Phone-only mode has no server backup, so the export doubles as one:
+        // emit the server's import-template columns, one row per group of
+        // identical copies, so the file can be imported back here (or into a
+        // server) without losing per-copy detail.
+        var rows = [
+            [
+                "tcg", "external_id", "card_name", "collector_number", "set_code", "set_name",
+                "rarity", "binder_name", "quantity", "condition", "language", "notes",
+                "price", "acquisition_price", "is_foil", "finish_code", "is_signed",
+                "is_altered", "tags"
+            ].joined(separator: ",")
+        ]
+
         for collection in collections {
+            let binderName = collection.isUnsortedBinder ? "" : collection.name
             for card in collection.cards {
-                let price = card.price.map { String(format: "%.2f", $0) } ?? ""
-                let fields = [
-                    collection.name,
-                    card.name,
-                    card.tcg,
-                    card.setCode ?? "",
-                    card.setName ?? "",
-                    card.rarity ?? "",
-                    card.collectorNumber ?? "",
-                    String(card.quantity),
-                    card.condition ?? "",
-                    card.language ?? "",
-                    price,
-                    card.notes ?? ""
-                ]
-                rows.append(fields.map(escape).joined(separator: ","))
+                let copies = card.copies
+                guard !copies.isEmpty else {
+                    rows.append(
+                        [
+                            card.tcg,
+                            card.externalId ?? card.cardId,
+                            card.name,
+                            card.collectorNumber ?? "",
+                            card.setCode ?? "",
+                            card.setName ?? "",
+                            card.rarity ?? "",
+                            binderName,
+                            String(card.quantity),
+                            card.condition ?? "",
+                            card.language ?? "",
+                            card.notes ?? "",
+                            money(card.price),
+                            "", "false", "", "false", "false", ""
+                        ].map(escape).joined(separator: ",")
+                    )
+                    continue
+                }
+
+                let grouped = Dictionary(grouping: copies) { copy in
+                    [
+                        copy.condition ?? "",
+                        copy.language ?? "",
+                        copy.finishCode ?? "",
+                        copy.notes ?? "",
+                        money(copy.acquisitionPrice),
+                        (copy.isSigned ?? false) ? "1" : "0",
+                        (copy.isAltered ?? false) ? "1" : "0",
+                        copy.tags.map(\.label).sorted().joined(separator: ";")
+                    ].joined(separator: "|")
+                }
+
+                for group in grouped.values.sorted(by: { ($0.first?.id ?? "") < ($1.first?.id ?? "") }) {
+                    guard let sample = group.first else { continue }
+                    rows.append(
+                        [
+                            card.tcg,
+                            card.externalId ?? card.cardId,
+                            card.name,
+                            card.collectorNumber ?? "",
+                            card.setCode ?? "",
+                            card.setName ?? "",
+                            card.rarity ?? "",
+                            binderName,
+                            String(group.count),
+                            sample.condition ?? card.condition ?? "",
+                            sample.language ?? card.language ?? "",
+                            sample.notes ?? card.notes ?? "",
+                            money(sample.price ?? card.price),
+                            money(sample.acquisitionPrice),
+                            (sample.isFoil ?? false) ? "true" : "false",
+                            sample.finishCode ?? "",
+                            (sample.isSigned ?? false) ? "true" : "false",
+                            (sample.isAltered ?? false) ? "true" : "false",
+                            sample.tags.map(\.label).joined(separator: ";")
+                        ].map(escape).joined(separator: ",")
+                    )
+                }
             }
         }
+
         return Data(rows.joined(separator: "\n").utf8)
+    }
+
+    // MARK: - CSV Import
+    //
+    // With a server the backend parses and resolves the upload; phone-only mode
+    // runs the same two-step (preview, then commit) locally so importing works
+    // with no network at all.
+
+    func previewImport(
+        csv: String,
+        options: APIService.CollectionImportOptions
+    ) -> APIService.CollectionImportPreview {
+        let parsed = CollectionCSVImporter.parse(csv: csv)
+        return APIService.CollectionImportPreview(
+            valid: parsed.valid,
+            rows: parsed.rows.map(\.row),
+            issues: parsed.issues,
+            sourceRows: parsed.sourceRows,
+            totalCopies: parsed.totalCopies
+        )
+    }
+
+    func commitImport(
+        csv: String,
+        options: APIService.CollectionImportOptions
+    ) -> APIService.CollectionImportResult {
+        let parsed = CollectionCSVImporter.parse(csv: csv)
+        let previewRows = parsed.rows.map(\.row)
+
+        guard parsed.valid else {
+            return APIService.CollectionImportResult(
+                valid: false,
+                rows: previewRows,
+                issues: parsed.issues,
+                sourceRows: parsed.sourceRows,
+                totalCopies: parsed.totalCopies,
+                importedRows: 0,
+                importedCopies: 0,
+                createdBinders: []
+            )
+        }
+
+        var issues = parsed.issues
+        var createdBinders: [String] = []
+        var importedRows = 0
+        var importedCopies = 0
+
+        for item in parsed.rows {
+            let binderId = resolveImportBinder(
+                named: item.binderName,
+                options: options,
+                createdBinders: &createdBinders
+            )
+            let (tagIds, newTags) = resolveImportTags(item.tags)
+
+            do {
+                try addCardToBinder(
+                    binderId: binderId,
+                    cardId: item.card.id,
+                    quantity: item.row.quantity,
+                    condition: item.row.condition,
+                    language: item.row.language,
+                    notes: item.row.notes,
+                    price: item.row.price,
+                    acquisitionPrice: item.row.acquisitionPrice,
+                    variant: CardCopyVariant(
+                        finishCode: item.finishCode,
+                        finishLabel: nil,
+                        edition: nil,
+                        stamp: nil,
+                        isSealedPromo: false,
+                        isOversized: false,
+                        isPeelOff: false
+                    ),
+                    isSigned: item.row.isSigned,
+                    isAltered: item.row.isAltered,
+                    tagIds: tagIds,
+                    newTags: newTags,
+                    card: item.card
+                )
+                importedRows += 1
+                importedCopies += item.row.quantity
+            } catch {
+                issues.append(
+                    APIService.CollectionImportIssue(
+                        row: item.row.row,
+                        field: nil,
+                        message: "Could not import \(item.row.cardName): \(error.localizedDescription)"
+                    )
+                )
+            }
+        }
+
+        persist()
+
+        return APIService.CollectionImportResult(
+            valid: issues.isEmpty,
+            rows: previewRows,
+            issues: issues,
+            sourceRows: parsed.sourceRows,
+            totalCopies: parsed.totalCopies,
+            importedRows: importedRows,
+            importedCopies: importedCopies,
+            createdBinders: createdBinders
+        )
+    }
+
+    /// A named binder wins when it already exists (or may be created); anything
+    /// else lands in the chosen default binder, falling back to the library.
+    private func resolveImportBinder(
+        named name: String?,
+        options: APIService.CollectionImportOptions,
+        createdBinders: inout [String]
+    ) -> String {
+        if let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+            if let existing = collections.first(where: {
+                $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+            }) {
+                return existing.id
+            }
+            if options.createMissingBinders {
+                let created = createCollection(name: trimmed, description: nil, colorHex: nil)
+                createdBinders.append(created.name)
+                return created.id
+            }
+        }
+
+        if let defaultBinderId = options.defaultBinderId,
+           collections.contains(where: { $0.id == defaultBinderId }) {
+            return defaultBinderId
+        }
+
+        return Constants.unsortedBinderId
+    }
+
+    private func resolveImportTags(
+        _ labels: [String]
+    ) -> ([String]?, [APIService.TagPayload]?) {
+        guard !labels.isEmpty else { return (nil, nil) }
+
+        var ids: [String] = []
+        var created: [APIService.TagPayload] = []
+        for label in labels {
+            if let existing = tags.first(where: { $0.label.caseInsensitiveCompare(label) == .orderedSame }) {
+                ids.append(existing.id)
+            } else {
+                created.append(APIService.TagPayload(label: label, colorHex: nil))
+            }
+        }
+
+        return (ids.isEmpty ? nil : ids, created.isEmpty ? nil : created)
     }
 
     func getCardPrints(tcg: String, cardId: String) -> [Card] {
@@ -675,9 +924,9 @@ final class DemoStore {
     }
 
     func createCollection(name: String, description: String?, colorHex: String?) -> Collection {
-        let now = DemoStore.isoFormatter.string(from: Date())
+        let now = LocalStore.isoFormatter.string(from: Date())
         let collection = Collection(
-            id: "demo-binder-\(nextBinderId)",
+            id: "local-binder-\(nextBinderId)",
             name: name,
             description: description,
             cards: [],
@@ -707,7 +956,7 @@ final class DemoStore {
             description: description ?? existing.description,
             cards: existing.cards,
             createdAt: existing.createdAt,
-            updatedAt: DemoStore.isoFormatter.string(from: Date()),
+            updatedAt: LocalStore.isoFormatter.string(from: Date()),
             colorHex: colorHex ?? existing.colorHex
         )
         collections[index] = updated
@@ -732,7 +981,7 @@ final class DemoStore {
 
     func createTag(label: String, colorHex: String?) -> CollectionCardTag {
         let newTag = CollectionCardTag(
-            id: "demo-tag-\(nextTagId)",
+            id: "local-tag-\(nextTagId)",
             label: label,
             colorHex: colorHex ?? "cccccc"
         )
@@ -809,7 +1058,7 @@ final class DemoStore {
             binderCards[existingIndex] = existing
         } else {
             let newCard = CollectionCard(
-                id: "demo-cc-\(nextCollectionCardId)",
+                id: "local-cc-\(nextCollectionCardId)",
                 cardId: resolvedCard.id,
                 externalId: resolvedCard.id,
                 name: resolvedCard.name,
@@ -907,7 +1156,7 @@ final class DemoStore {
                 destinationCards[destinationCardIndex] = replaceCard(existing, copies: mergedCopies)
             } else {
                 let movedCard = CollectionCard(
-                    id: "demo-cc-\(nextCollectionCardId)",
+                    id: "local-cc-\(nextCollectionCardId)",
                     cardId: sourceCard.cardId,
                     externalId: sourceCard.externalId,
                     name: sourceCard.name,
@@ -961,7 +1210,7 @@ final class DemoStore {
                 for _ in 0..<needed {
                     updatedCopies.append(
                         CollectionCardCopy(
-                            id: "demo-copy-\(nextCopyId)",
+                            id: "local-copy-\(nextCopyId)",
                             condition: template.condition,
                             language: template.language,
                             notes: template.notes,
@@ -1102,16 +1351,138 @@ final class DemoStore {
         }
     }
 
-    private func seedData() {
+    // MARK: - Baseline Content
+    //
+    // Present in every phone-only install: the library binder that holds loose
+    // cards, a few starter tags, and the bundled sealed product catalog. None
+    // of this is sample content.
+
+    private static let starterTags: [CollectionCardTag] = [
+        CollectionCardTag(id: "local-tag-1", label: "For Trade", colorHex: "4caf50"),
+        CollectionCardTag(id: "local-tag-2", label: "PC", colorHex: "2196f3"),
+        CollectionCardTag(id: "local-tag-3", label: "Needs Grading", colorHex: "ff9800")
+    ]
+
+    private static func makeUnsortedLibrary() -> Collection {
+        let now = LocalStore.isoFormatter.string(from: Date())
+        return Collection(
+            id: Constants.unsortedBinderId,
+            name: "Unsorted Library",
+            description: "Cards not yet assigned to a binder",
+            cards: [],
+            createdAt: now,
+            updatedAt: now,
+            colorHex: "9e9e9e"
+        )
+    }
+
+    private func seedBaseline() {
+        collections = [LocalStore.makeUnsortedLibrary()]
+        sealedProducts = LocalStore.bundledSealedProducts()
+    }
+
+    // MARK: - Sample Content
+    //
+    // Optional starter content for trying the app out. It only exists once the
+    // user asks for it, and removing it leaves everything they added alone.
+
+    var isSampleDataLoaded: Bool { sampleDataLoaded }
+
+    func loadSampleData() {
+        guard !sampleDataLoaded else { return }
+        seedSampleCatalog()
+        seedSampleCollections()
+        seedSampleWishlistsAndFinance()
+        sampleDataLoaded = true
+        persist()
+    }
+
+    /// Take the sample content back out, leaving anything the user added in
+    /// place — including their own cards inside a sample binder.
+    func removeSampleData() {
+        collections = collections.compactMap { collection -> Collection? in
+            let remaining = collection.cards.filter { !LocalStore.isSampleId($0.id) }
+            if remaining.isEmpty, LocalStore.isSampleId(collection.id) {
+                return nil
+            }
+            guard remaining.count != collection.cards.count else { return collection }
+            return stampUpdatedAt(collection, cards: remaining)
+        }
+
+        wishlists.removeAll { LocalStore.isSampleId($0.id) }
+        wishlists = wishlists.map { wishlist -> Wishlist in
+            let remaining = wishlist.cards.filter { !LocalStore.isSampleId($0.id) }
+            guard remaining.count != wishlist.cards.count else { return wishlist }
+            return Wishlist(
+                id: wishlist.id,
+                name: wishlist.name,
+                description: wishlist.description,
+                colorHex: wishlist.colorHex,
+                cards: remaining,
+                totalCards: remaining.count,
+                ownedCards: remaining.filter { $0.owned }.count,
+                completionPercent: remaining.isEmpty ? 0 : Int((Double(remaining.filter { $0.owned }.count) / Double(remaining.count)) * 100),
+                createdAt: wishlist.createdAt,
+                updatedAt: LocalStore.isoFormatter.string(from: Date())
+            )
+        }
+
+        sealedInventory.removeAll { LocalStore.isSampleId($0.id) }
+        transactions.removeAll { LocalStore.isSampleId($0.id) }
+        searchCatalog = []
+        printGroups = [:]
+        sampleDataLoaded = false
+        persist()
+    }
+
+    /// Sample records carry a reserved id prefix. The explicit legacy list
+    /// covers stores written by builds that seeded phone-only mode on launch.
+    private static func isSampleId(_ id: String) -> Bool {
+        id.hasPrefix(Constants.samplePrefix) || Constants.legacySampleIds.contains(id)
+    }
+
+    /// Starter tags that still exist, matched by label so a sample card never
+    /// references a tag the user has since deleted.
+    private func existingTags(labeled labels: [String]) -> [CollectionCardTag] {
+        tags.filter { labels.contains($0.label) }
+    }
+
+    /// The seven cards the sample content is built from. They are rebuilt on
+    /// every launch (they are catalog data, not user data) so sample cards keep
+    /// showing up in search and print pickers after a relaunch.
+    private struct SampleCards {
+        let pikaBase: Card
+        let pikaSurging: Card
+        let charizard: Card
+        let boltM10: Card
+        let bolt2xm: Card
+        let blackLotus: Card
+        let blueEyes: Card
+
+        var all: [Card] {
+            [pikaBase, pikaSurging, charizard, boltM10, bolt2xm, blackLotus, blueEyes]
+        }
+
+        var printGroups: [String: [Card]] {
+            [
+                pikaBase.id: [pikaBase, pikaSurging],
+                pikaSurging.id: [pikaBase, pikaSurging],
+                boltM10.id: [boltM10, bolt2xm],
+                bolt2xm.id: [boltM10, bolt2xm]
+            ]
+        }
+    }
+
+    private static func makeSampleCards() -> SampleCards {
         let pikaBase = Card(
-            id: "demo-pokemon-pikachu-base",
+            id: "sample-pokemon-pikachu-base",
             name: "Pikachu",
             tcg: "pokemon",
             setCode: "PR",
             setName: "Promo",
             rarity: "Rare",
-            imageUrl: DemoStore.cardBack(for: "pokemon"),
-            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
+            imageUrl: LocalStore.cardBack(for: "pokemon"),
+            imageUrlSmall: LocalStore.cardBack(for: "pokemon"),
             price: 6.75,
             collectorNumber: "25",
             releasedAt: nil,
@@ -1120,14 +1491,14 @@ final class DemoStore {
             types: ["Lightning"]
         )
         let pikaSurging = Card(
-            id: "demo-pokemon-pikachu-surging",
+            id: "sample-pokemon-pikachu-surging",
             name: "Pikachu",
             tcg: "pokemon",
             setCode: "SV",
             setName: "Surging Sparks",
             rarity: "Illustration Rare",
-            imageUrl: DemoStore.cardBack(for: "pokemon"),
-            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
+            imageUrl: LocalStore.cardBack(for: "pokemon"),
+            imageUrlSmall: LocalStore.cardBack(for: "pokemon"),
             price: 19.25,
             collectorNumber: "188",
             releasedAt: nil,
@@ -1136,14 +1507,14 @@ final class DemoStore {
             types: ["Lightning"]
         )
         let charizard = Card(
-            id: "demo-pokemon-charizard",
+            id: "sample-pokemon-charizard",
             name: "Charizard ex",
             tcg: "pokemon",
             setCode: "PAF",
             setName: "Paldean Fates",
             rarity: "Ultra Rare",
-            imageUrl: DemoStore.cardBack(for: "pokemon"),
-            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
+            imageUrl: LocalStore.cardBack(for: "pokemon"),
+            imageUrlSmall: LocalStore.cardBack(for: "pokemon"),
             price: 33.40,
             collectorNumber: "54",
             releasedAt: nil,
@@ -1152,78 +1523,86 @@ final class DemoStore {
             types: ["Fire"]
         )
         let boltM10 = Card(
-            id: "demo-magic-lightning-bolt-m10",
+            id: "sample-magic-lightning-bolt-m10",
             name: "Lightning Bolt",
             tcg: "magic",
             setCode: "M10",
             setName: "Magic 2010",
             rarity: "Common",
-            imageUrl: DemoStore.cardBack(for: "magic"),
-            imageUrlSmall: DemoStore.cardBack(for: "magic"),
+            imageUrl: LocalStore.cardBack(for: "magic"),
+            imageUrlSmall: LocalStore.cardBack(for: "magic"),
             price: 2.10,
             collectorNumber: "146",
             releasedAt: nil
         )
         let bolt2xm = Card(
-            id: "demo-magic-lightning-bolt-2xm",
+            id: "sample-magic-lightning-bolt-2xm",
             name: "Lightning Bolt",
             tcg: "magic",
             setCode: "2XM",
             setName: "Double Masters",
             rarity: "Uncommon",
-            imageUrl: DemoStore.cardBack(for: "magic"),
-            imageUrlSmall: DemoStore.cardBack(for: "magic"),
+            imageUrl: LocalStore.cardBack(for: "magic"),
+            imageUrlSmall: LocalStore.cardBack(for: "magic"),
             price: 3.75,
             collectorNumber: "132",
             releasedAt: nil
         )
         let blackLotus = Card(
-            id: "demo-magic-black-lotus",
+            id: "sample-magic-black-lotus",
             name: "Black Lotus",
             tcg: "magic",
             setCode: "LEA",
             setName: "Limited Edition Alpha",
             rarity: "Rare",
-            imageUrl: DemoStore.cardBack(for: "magic"),
-            imageUrlSmall: DemoStore.cardBack(for: "magic"),
+            imageUrl: LocalStore.cardBack(for: "magic"),
+            imageUrlSmall: LocalStore.cardBack(for: "magic"),
             price: 25000,
             collectorNumber: "233",
             releasedAt: nil
         )
         let blueEyes = Card(
-            id: "demo-ygo-blue-eyes",
+            id: "sample-ygo-blue-eyes",
             name: "Blue-Eyes White Dragon",
             tcg: "yugioh",
             setCode: "SDK",
             setName: "Starter Deck: Kaiba",
             rarity: "Ultra Rare",
-            imageUrl: DemoStore.cardBack(for: "yugioh"),
-            imageUrlSmall: DemoStore.cardBack(for: "yugioh"),
+            imageUrl: LocalStore.cardBack(for: "yugioh"),
+            imageUrlSmall: LocalStore.cardBack(for: "yugioh"),
             price: 18.50,
             collectorNumber: nil,
             releasedAt: nil
         )
 
-        searchCatalog = [
-            pikaBase,
-            pikaSurging,
-            charizard,
-            boltM10,
-            bolt2xm,
-            blackLotus,
-            blueEyes
-        ]
-        printGroups = [
-            pikaBase.id: [pikaBase, pikaSurging],
-            pikaSurging.id: [pikaBase, pikaSurging],
-            boltM10.id: [boltM10, bolt2xm],
-            bolt2xm.id: [boltM10, bolt2xm]
-        ]
+        return SampleCards(
+            pikaBase: pikaBase,
+            pikaSurging: pikaSurging,
+            charizard: charizard,
+            boltM10: boltM10,
+            bolt2xm: bolt2xm,
+            blackLotus: blackLotus,
+            blueEyes: blueEyes
+        )
+    }
 
-        let now = DemoStore.isoFormatter.string(from: Date())
+    /// Make the sample cards searchable without touching stored collections.
+    private func seedSampleCatalog() {
+        let cards = LocalStore.makeSampleCards()
+        searchCatalog = cards.all
+        printGroups = cards.printGroups
+    }
+
+    private func seedSampleCollections() {
+        let cards = LocalStore.makeSampleCards()
+        let charizard = cards.charizard
+        let boltM10 = cards.boltM10
+        let blueEyes = cards.blueEyes
+        let pikaBase = cards.pikaBase
+        let now = LocalStore.isoFormatter.string(from: Date())
         let starterCards: [CollectionCard] = [
             CollectionCard(
-                id: "demo-cc-1",
+                id: "sample-cc-1",
                 cardId: charizard.id,
                 externalId: charizard.id,
                 name: charizard.name,
@@ -1231,8 +1610,8 @@ final class DemoStore {
                 setCode: charizard.setCode,
                 setName: charizard.setName,
                 rarity: charizard.rarity,
-                imageUrl: DemoStore.cardBack(for: charizard.tcg),
-                imageUrlSmall: DemoStore.cardBack(for: charizard.tcg),
+                imageUrl: LocalStore.cardBack(for: charizard.tcg),
+                imageUrlSmall: LocalStore.cardBack(for: charizard.tcg),
                 quantity: 1,
                 price: charizard.price,
                 condition: "Near Mint",
@@ -1246,11 +1625,11 @@ final class DemoStore {
                     notes: "Pulled from pack",
                     price: charizard.price,
                     acquisitionPrice: 8.99,
-                    tags: [tags[1]]
+                    tags: existingTags(labeled: ["PC"])
                 )
             ),
             CollectionCard(
-                id: "demo-cc-2",
+                id: "sample-cc-2",
                 cardId: boltM10.id,
                 externalId: boltM10.id,
                 name: boltM10.name,
@@ -1258,8 +1637,8 @@ final class DemoStore {
                 setCode: boltM10.setCode,
                 setName: boltM10.setName,
                 rarity: boltM10.rarity,
-                imageUrl: DemoStore.cardBack(for: boltM10.tcg),
-                imageUrlSmall: DemoStore.cardBack(for: boltM10.tcg),
+                imageUrl: LocalStore.cardBack(for: boltM10.tcg),
+                imageUrlSmall: LocalStore.cardBack(for: boltM10.tcg),
                 quantity: 3,
                 price: boltM10.price,
                 condition: "Excellent",
@@ -1273,14 +1652,14 @@ final class DemoStore {
                     notes: nil,
                     price: boltM10.price,
                     acquisitionPrice: 1.25,
-                    tags: [tags[0]]
+                    tags: existingTags(labeled: ["For Trade"])
                 )
             )
         ]
 
-        collections = [
+        collections.append(contentsOf: [
             Collection(
-                id: "demo-binder-1",
+                id: "sample-binder-1",
                 name: "Favorites Binder",
                 description: "Showcase cards and personal favorites",
                 cards: starterCards,
@@ -1289,12 +1668,12 @@ final class DemoStore {
                 colorHex: "7c4dff"
             ),
             Collection(
-                id: "demo-binder-2",
+                id: "sample-binder-2",
                 name: "Trade Binder",
                 description: "Cards available for trade",
                 cards: [
                     CollectionCard(
-                        id: "demo-cc-3",
+                        id: "sample-cc-3",
                         cardId: blueEyes.id,
                         externalId: blueEyes.id,
                         name: blueEyes.name,
@@ -1302,8 +1681,8 @@ final class DemoStore {
                         setCode: blueEyes.setCode,
                         setName: blueEyes.setName,
                         rarity: blueEyes.rarity,
-                        imageUrl: DemoStore.cardBack(for: blueEyes.tcg),
-                        imageUrlSmall: DemoStore.cardBack(for: blueEyes.tcg),
+                        imageUrl: LocalStore.cardBack(for: blueEyes.tcg),
+                        imageUrlSmall: LocalStore.cardBack(for: blueEyes.tcg),
                         quantity: 1,
                         price: blueEyes.price,
                         condition: "Good",
@@ -1317,52 +1696,52 @@ final class DemoStore {
                             notes: "Light edge wear",
                             price: blueEyes.price,
                             acquisitionPrice: 4.50,
-                            tags: [tags[0], tags[2]]
+                            tags: existingTags(labeled: ["For Trade", "Needs Grading"])
                         )
                     )
                 ],
                 createdAt: now,
                 updatedAt: now,
                 colorHex: "26a69a"
-            ),
-            Collection(
-                id: Constants.unsortedBinderId,
-                name: "Unsorted Library",
-                description: "Cards not yet assigned to a binder",
-                cards: [
-                    CollectionCard(
-                        id: "demo-cc-4",
-                        cardId: pikaBase.id,
-                        externalId: pikaBase.id,
-                        name: pikaBase.name,
-                        tcg: pikaBase.tcg,
-                        setCode: pikaBase.setCode,
-                        setName: pikaBase.setName,
-                        rarity: pikaBase.rarity,
-                        imageUrl: DemoStore.cardBack(for: pikaBase.tcg),
-                        imageUrlSmall: DemoStore.cardBack(for: pikaBase.tcg),
-                        quantity: 2,
-                        price: pikaBase.price,
-                        condition: "Near Mint",
-                        language: "English",
-                        notes: nil,
-                        collectorNumber: pikaBase.collectorNumber,
-                        copies: makeCopies(
-                            quantity: 2,
-                            condition: "Near Mint",
-                            language: "English",
-                            notes: nil,
-                            price: pikaBase.price,
-                            acquisitionPrice: 1.75,
-                            tags: []
-                        )
-                    )
-                ],
-                createdAt: now,
-                updatedAt: now,
-                colorHex: "9e9e9e"
             )
-        ]
+        ])
+
+        let libraryCard = CollectionCard(
+            id: "sample-cc-4",
+            cardId: pikaBase.id,
+            externalId: pikaBase.id,
+            name: pikaBase.name,
+            tcg: pikaBase.tcg,
+            setCode: pikaBase.setCode,
+            setName: pikaBase.setName,
+            rarity: pikaBase.rarity,
+            imageUrl: LocalStore.cardBack(for: pikaBase.tcg),
+            imageUrlSmall: LocalStore.cardBack(for: pikaBase.tcg),
+            quantity: 2,
+            price: pikaBase.price,
+            condition: "Near Mint",
+            language: "English",
+            notes: nil,
+            collectorNumber: pikaBase.collectorNumber,
+            copies: makeCopies(
+                quantity: 2,
+                condition: "Near Mint",
+                language: "English",
+                notes: nil,
+                price: pikaBase.price,
+                acquisitionPrice: 1.75,
+                tags: []
+            )
+        )
+
+        if let libraryIndex = collections.firstIndex(where: { $0.id == Constants.unsortedBinderId }) {
+            let library = collections[libraryIndex]
+            collections[libraryIndex] = stampUpdatedAt(library, cards: library.cards + [libraryCard])
+        } else {
+            collections.append(
+                stampUpdatedAt(LocalStore.makeUnsortedLibrary(), cards: [libraryCard])
+            )
+        }
     }
 
     private func makeCopies(
@@ -1377,14 +1756,14 @@ final class DemoStore {
         isAltered: Bool? = nil,
         tags: [CollectionCardTag]
     ) -> [CollectionCardCopy] {
-        let now = DemoStore.isoFormatter.string(from: Date())
+        let now = LocalStore.isoFormatter.string(from: Date())
         let count = max(1, quantity)
         var copies: [CollectionCardCopy] = []
         copies.reserveCapacity(count)
         for _ in 0..<count {
             copies.append(
                 CollectionCardCopy(
-                    id: "demo-copy-\(nextCopyId)",
+                    id: "local-copy-\(nextCopyId)",
                     condition: condition,
                     language: language,
                     notes: notes,
@@ -1422,7 +1801,7 @@ final class DemoStore {
             description: collection.description,
             cards: cards ?? collection.cards,
             createdAt: collection.createdAt,
-            updatedAt: DemoStore.isoFormatter.string(from: Date()),
+            updatedAt: LocalStore.isoFormatter.string(from: Date()),
             colorHex: collection.colorHex
         )
     }
@@ -1449,38 +1828,51 @@ final class DemoStore {
         )
     }
 
+    /// Stand-in for a card that is added by id while its catalog is not
+    /// installed, so the copy still shows up in the binder.
     private func placeholderCard(id: String) -> Card {
         Card(
             id: id,
-            name: "Demo Card",
+            name: "Unknown Card",
             tcg: "pokemon",
-            setCode: "DEMO",
-            setName: "Demo Set",
-            rarity: "Common",
-            imageUrl: DemoStore.cardBack(for: "pokemon"),
-            imageUrlSmall: DemoStore.cardBack(for: "pokemon"),
-            price: 1.0,
+            setCode: nil,
+            setName: nil,
+            rarity: nil,
+            imageUrl: LocalStore.cardBack(for: "pokemon"),
+            imageUrlSmall: LocalStore.cardBack(for: "pokemon"),
+            price: nil,
             collectorNumber: nil,
             releasedAt: nil
         )
     }
 
-    // MARK: - New Feature Demo Data
+    // MARK: - Bundled Sealed Product Catalog
 
-    private func seedNewFeatureData() {
-        let now = DemoStore.isoFormatter.string(from: Date())
+    /// Phone-only mode has no product API, so a small bundled catalog backs the
+    /// sealed inventory picker. These are real products, not sample content.
+    private static func bundledSealedProducts() -> [SealedProduct] {
+        [
+            SealedProduct(id: "sealed-product-1", tcg: "pokemon", name: "Surging Sparks Booster Box", productType: "box", setCode: "SV", cardsPerPack: 10, packsPerBox: 36, releaseDate: "2024-11-08", imageUrl: LocalStore.cardBack(for: "pokemon"), msrp: 143.64, upc: "820650855221"),
+            SealedProduct(id: "sealed-product-2", tcg: "pokemon", name: "Paldean Fates Elite Trainer Box", productType: "etb", setCode: "PAF", cardsPerPack: 10, packsPerBox: 9, releaseDate: "2024-01-26", imageUrl: LocalStore.cardBack(for: "pokemon"), msrp: 49.99, upc: "820650853159"),
+            SealedProduct(id: "sealed-product-3", tcg: "magic", name: "Modern Horizons 3 Draft Booster Box", productType: "box", setCode: "MH3", cardsPerPack: 15, packsPerBox: 36, releaseDate: "2024-06-14", imageUrl: LocalStore.cardBack(for: "magic"), msrp: 287.64, upc: nil),
+            SealedProduct(id: "sealed-product-4", tcg: "yugioh", name: "Age of Overlord Booster Box", productType: "box", setCode: "AGOV", cardsPerPack: 9, packsPerBox: 24, releaseDate: "2023-10-19", imageUrl: LocalStore.cardBack(for: "yugioh"), msrp: 79.99, upc: nil),
+            SealedProduct(id: "sealed-product-5", tcg: "pokemon", name: "Prismatic Evolutions Booster Pack", productType: "booster", setCode: "PRE", cardsPerPack: 10, packsPerBox: nil, releaseDate: "2025-01-17", imageUrl: LocalStore.cardBack(for: "pokemon"), msrp: 5.99, upc: nil)
+        ]
+    }
 
-        // Wishlists
-        wishlists = [
+    private func seedSampleWishlistsAndFinance() {
+        let now = LocalStore.isoFormatter.string(from: Date())
+
+        wishlists.append(contentsOf: [
             Wishlist(
-                id: "demo-wishlist-1",
+                id: "sample-wishlist-1",
                 name: "Want List",
                 description: "Cards I'm looking for",
                 colorHex: "e91e63",
                 cards: [
-                    WishlistCard(id: "demo-wc-1", externalId: "demo-pokemon-charizard", tcg: "pokemon", name: "Charizard ex", setCode: "PAF", setName: "Paldean Fates", rarity: "Ultra Rare", imageUrl: DemoStore.cardBack(for: "pokemon"), imageUrlSmall: DemoStore.cardBack(for: "pokemon"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "54", notes: nil, owned: true, ownedQuantity: 1, createdAt: now),
-                    WishlistCard(id: "demo-wc-2", externalId: "demo-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: DemoStore.cardBack(for: "magic"), imageUrlSmall: DemoStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: "The dream card", owned: false, ownedQuantity: 0, createdAt: now),
-                    WishlistCard(id: "demo-wc-3", externalId: "demo-ygo-blue-eyes", tcg: "yugioh", name: "Blue-Eyes White Dragon", setCode: "SDK", setName: "Starter Deck: Kaiba", rarity: "Ultra Rare", imageUrl: DemoStore.cardBack(for: "yugioh"), imageUrlSmall: DemoStore.cardBack(for: "yugioh"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: nil, notes: nil, owned: true, ownedQuantity: 1, createdAt: now)
+                    WishlistCard(id: "sample-wc-1", externalId: "sample-pokemon-charizard", tcg: "pokemon", name: "Charizard ex", setCode: "PAF", setName: "Paldean Fates", rarity: "Ultra Rare", imageUrl: LocalStore.cardBack(for: "pokemon"), imageUrlSmall: LocalStore.cardBack(for: "pokemon"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "54", notes: nil, owned: true, ownedQuantity: 1, createdAt: now),
+                    WishlistCard(id: "sample-wc-2", externalId: "sample-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: LocalStore.cardBack(for: "magic"), imageUrlSmall: LocalStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: "The dream card", owned: false, ownedQuantity: 0, createdAt: now),
+                    WishlistCard(id: "sample-wc-3", externalId: "sample-ygo-blue-eyes", tcg: "yugioh", name: "Blue-Eyes White Dragon", setCode: "SDK", setName: "Starter Deck: Kaiba", rarity: "Ultra Rare", imageUrl: LocalStore.cardBack(for: "yugioh"), imageUrlSmall: LocalStore.cardBack(for: "yugioh"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: nil, notes: nil, owned: true, ownedQuantity: 1, createdAt: now)
                 ],
                 totalCards: 3,
                 ownedCards: 2,
@@ -1489,12 +1881,12 @@ final class DemoStore {
                 updatedAt: now
             ),
             Wishlist(
-                id: "demo-wishlist-2",
+                id: "sample-wishlist-2",
                 name: "Grails",
                 description: "High-value chase cards",
                 colorHex: "ffd700",
                 cards: [
-                    WishlistCard(id: "demo-wc-4", externalId: "demo-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: DemoStore.cardBack(for: "magic"), imageUrlSmall: DemoStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
+                    WishlistCard(id: "sample-wc-4", externalId: "sample-magic-black-lotus", tcg: "magic", name: "Black Lotus", setCode: "LEA", setName: "Limited Edition Alpha", rarity: "Rare", imageUrl: LocalStore.cardBack(for: "magic"), imageUrlSmall: LocalStore.cardBack(for: "magic"), setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: "233", notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
                 ],
                 totalCards: 1,
                 ownedCards: 0,
@@ -1502,31 +1894,31 @@ final class DemoStore {
                 createdAt: now,
                 updatedAt: now
             )
-        ]
+        ])
 
-        // Sealed Products
-        sealedProducts = [
-            SealedProduct(id: "demo-sp-1", tcg: "pokemon", name: "Surging Sparks Booster Box", productType: "box", setCode: "SV", cardsPerPack: 10, packsPerBox: 36, releaseDate: "2024-11-08", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 143.64, upc: "820650855221"),
-            SealedProduct(id: "demo-sp-2", tcg: "pokemon", name: "Paldean Fates Elite Trainer Box", productType: "etb", setCode: "PAF", cardsPerPack: 10, packsPerBox: 9, releaseDate: "2024-01-26", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 49.99, upc: "820650853159"),
-            SealedProduct(id: "demo-sp-3", tcg: "magic", name: "Modern Horizons 3 Draft Booster Box", productType: "box", setCode: "MH3", cardsPerPack: 15, packsPerBox: 36, releaseDate: "2024-06-14", imageUrl: DemoStore.cardBack(for: "magic"), msrp: 287.64, upc: nil),
-            SealedProduct(id: "demo-sp-4", tcg: "yugioh", name: "Age of Overlord Booster Box", productType: "box", setCode: "AGOV", cardsPerPack: 9, packsPerBox: 24, releaseDate: "2023-10-19", imageUrl: DemoStore.cardBack(for: "yugioh"), msrp: 79.99, upc: nil),
-            SealedProduct(id: "demo-sp-5", tcg: "pokemon", name: "Prismatic Evolutions Booster Pack", productType: "booster", setCode: "PRE", cardsPerPack: 10, packsPerBox: nil, releaseDate: "2025-01-17", imageUrl: DemoStore.cardBack(for: "pokemon"), msrp: 5.99, upc: nil)
-        ]
+        let boosterBox = sealedProducts.first { $0.name == "Surging Sparks Booster Box" }
+        let eliteTrainerBox = sealedProducts.first { $0.name == "Paldean Fates Elite Trainer Box" }
+        let boosterPack = sealedProducts.first { $0.name == "Prismatic Evolutions Booster Pack" }
 
-        sealedInventory = [
-            SealedInventoryItem(id: "demo-si-1", product: sealedProducts[0], quantity: 2, purchasePrice: 130.00, purchaseDate: "2024-11-15", notes: "From LGS pre-order", createdAt: now),
-            SealedInventoryItem(id: "demo-si-2", product: sealedProducts[1], quantity: 1, purchasePrice: 49.99, purchaseDate: "2024-02-01", notes: nil, createdAt: now),
-            SealedInventoryItem(id: "demo-si-3", product: sealedProducts[4], quantity: 5, purchasePrice: 4.99, purchaseDate: "2025-01-20", notes: "Target restock", createdAt: now)
-        ]
+        var sampleInventory: [SealedInventoryItem] = []
+        if let boosterBox {
+            sampleInventory.append(SealedInventoryItem(id: "sample-si-1", product: boosterBox, quantity: 2, purchasePrice: 130.00, purchaseDate: "2024-11-15", notes: "From LGS pre-order", createdAt: now))
+        }
+        if let eliteTrainerBox {
+            sampleInventory.append(SealedInventoryItem(id: "sample-si-2", product: eliteTrainerBox, quantity: 1, purchasePrice: 49.99, purchaseDate: "2024-02-01", notes: nil, createdAt: now))
+        }
+        if let boosterPack {
+            sampleInventory.append(SealedInventoryItem(id: "sample-si-3", product: boosterPack, quantity: 5, purchasePrice: 4.99, purchaseDate: "2025-01-20", notes: "Target restock", createdAt: now))
+        }
+        sealedInventory.append(contentsOf: sampleInventory)
 
-        // Transactions
-        transactions = [
-            Transaction(id: "demo-txn-1", type: "purchase", cardName: "Charizard ex", tcg: "pokemon", quantity: 1, amount: 8.99, currency: "USD", platform: "Local", notes: "Pulled from pack", date: now),
-            Transaction(id: "demo-txn-2", type: "purchase", cardName: "Lightning Bolt", tcg: "magic", quantity: 3, amount: 3.75, currency: "USD", platform: "TCGPlayer", notes: nil, date: now),
-            Transaction(id: "demo-txn-3", type: "sale", cardName: "Pikachu VMAX", tcg: "pokemon", quantity: 1, amount: 15.00, currency: "USD", platform: "eBay", notes: "Sold in lot", date: now),
-            Transaction(id: "demo-txn-4", type: "purchase", cardName: "Blue-Eyes White Dragon", tcg: "yugioh", quantity: 1, amount: 4.50, currency: "USD", platform: "CardMarket", notes: nil, date: now),
-            Transaction(id: "demo-txn-5", type: "sale", cardName: "Mewtwo GX", tcg: "pokemon", quantity: 2, amount: 22.50, currency: "USD", platform: "TCGPlayer", notes: nil, date: now)
-        ]
+        transactions.append(contentsOf: [
+            Transaction(id: "sample-txn-1", type: "purchase", cardName: "Charizard ex", tcg: "pokemon", quantity: 1, amount: 8.99, currency: "USD", platform: "Local", notes: "Pulled from pack", date: now),
+            Transaction(id: "sample-txn-2", type: "purchase", cardName: "Lightning Bolt", tcg: "magic", quantity: 3, amount: 3.75, currency: "USD", platform: "TCGPlayer", notes: nil, date: now),
+            Transaction(id: "sample-txn-3", type: "sale", cardName: "Pikachu VMAX", tcg: "pokemon", quantity: 1, amount: 15.00, currency: "USD", platform: "eBay", notes: "Sold in lot", date: now),
+            Transaction(id: "sample-txn-4", type: "purchase", cardName: "Blue-Eyes White Dragon", tcg: "yugioh", quantity: 1, amount: 4.50, currency: "USD", platform: "CardMarket", notes: nil, date: now),
+            Transaction(id: "sample-txn-5", type: "sale", cardName: "Mewtwo GX", tcg: "pokemon", quantity: 2, amount: 22.50, currency: "USD", platform: "TCGPlayer", notes: nil, date: now)
+        ])
     }
 
     // MARK: - Wishlist Accessors
@@ -1541,8 +1933,8 @@ final class DemoStore {
     }
 
     func createWishlist(name: String, description: String?, colorHex: String?) -> Wishlist {
-        let now = DemoStore.isoFormatter.string(from: Date())
-        let wl = Wishlist(id: "demo-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now)
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let wl = Wishlist(id: "local-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now)
         nextWishlistId += 1
         wishlists.insert(wl, at: 0)
         persist()
@@ -1564,7 +1956,7 @@ final class DemoStore {
             ownedCards: wl.ownedCards,
             completionPercent: wl.completionPercent,
             createdAt: wl.createdAt,
-            updatedAt: DemoStore.isoFormatter.string(from: Date())
+            updatedAt: LocalStore.isoFormatter.string(from: Date())
         )
         wishlists[idx] = updated
         persist()
@@ -1580,8 +1972,8 @@ final class DemoStore {
         guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
-        let now = DemoStore.isoFormatter.string(from: Date())
-        let wc = WishlistCard(id: "demo-wc-\(Int.random(in: 100...9999))", externalId: card.id, tcg: card.tcg, name: card.name, setCode: card.setCode, setName: card.setName, rarity: card.rarity, imageUrl: card.imageUrl, imageUrlSmall: card.imageUrlSmall, setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: card.collectorNumber, notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let wc = WishlistCard(id: "local-wc-\(Int.random(in: 100...9999))", externalId: card.id, tcg: card.tcg, name: card.name, setCode: card.setCode, setName: card.setName, rarity: card.rarity, imageUrl: card.imageUrl, imageUrlSmall: card.imageUrlSmall, setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: card.collectorNumber, notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
         let wl = wishlists[idx]
         var cards = wl.cards
         cards.append(wc)
@@ -1594,7 +1986,7 @@ final class DemoStore {
         guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else { return }
         let wl = wishlists[idx]
         let cards = wl.cards.filter { $0.id != cardId }
-        let now = DemoStore.isoFormatter.string(from: Date())
+        let now = LocalStore.isoFormatter.string(from: Date())
         wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
         persist()
     }
@@ -1606,8 +1998,8 @@ final class DemoStore {
 
     func addSealedInventory(productId: String, quantity: Int, purchasePrice: Double?) -> SealedInventoryItem? {
         guard let product = sealedProducts.first(where: { $0.id == productId }) else { return nil }
-        let now = DemoStore.isoFormatter.string(from: Date())
-        let item = SealedInventoryItem(id: "demo-si-\(Int.random(in: 100...9999))", product: product, quantity: quantity, purchasePrice: purchasePrice, purchaseDate: now, notes: nil, createdAt: now)
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let item = SealedInventoryItem(id: "local-si-\(Int.random(in: 100...9999))", product: product, quantity: quantity, purchasePrice: purchasePrice, purchaseDate: now, notes: nil, createdAt: now)
         sealedInventory.insert(item, at: 0)
         persist()
         return item
@@ -1648,8 +2040,8 @@ final class DemoStore {
     }
 
     func createTransaction(type: String, cardName: String?, tcg: String?, quantity: Int, amount: Double, platform: String?, notes: String?) -> Transaction {
-        let now = DemoStore.isoFormatter.string(from: Date())
-        let txn = Transaction(id: "demo-txn-\(nextTransactionId)", type: type, cardName: cardName, tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform, notes: notes, date: now)
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let txn = Transaction(id: "local-txn-\(nextTransactionId)", type: type, cardName: cardName, tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform, notes: notes, date: now)
         nextTransactionId += 1
         transactions.insert(txn, at: 0)
         persist()
