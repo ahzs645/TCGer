@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
+    @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
     @State private var serverStatus: ServerStatusState = .checking
@@ -31,10 +32,48 @@ struct SettingsView: View {
     @State private var sampleDataLoaded = false
     @State private var showingRemoveSampleAlert = false
     @State private var showingEraseLocalDataAlert = false
+    @State private var versionTapCount = 0
 
     /// True when running fully on-device with no backend server.
     private var isLocalMode: Bool {
         environmentStore.serverConfiguration.isOnDevice
+    }
+
+    /// Developer tools are always present in debug builds; release builds (and
+    /// TestFlight/phone-only installs) reveal them after the About → Version row
+    /// is tapped `versionTapsToUnlock` times.
+    private var showDeveloperTools: Bool {
+        #if DEBUG
+        return true
+        #else
+        return developerToolsUnlocked
+        #endif
+    }
+
+    private static let versionTapsToUnlock = 7
+
+    /// Marketing version + build from the bundle, so the About row reflects the
+    /// installed binary instead of a hardcoded string.
+    private var appVersionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        guard let build = info?["CFBundleVersion"] as? String, build != short else {
+            return short
+        }
+        return "\(short) (\(build))"
+    }
+
+    private func registerVersionTap() {
+        guard !developerToolsUnlocked else { return }
+        versionTapCount += 1
+
+        if versionTapCount >= Self.versionTapsToUnlock {
+            versionTapCount = 0
+            developerToolsUnlocked = true
+            HapticManager.notification(.success)
+        } else if versionTapCount >= Self.versionTapsToUnlock - 3 {
+            HapticManager.selection()
+        }
     }
 
     /// Phone-only mode has no account, so preferences are always editable;
@@ -640,43 +679,56 @@ struct SettingsView: View {
                     }
                 }
 
-                // Scanner Tools (Developer) Section — debug builds only.
-                #if DEBUG
-                Section {
-                    NavigationLink {
-                        ScannerDebugView()
-                            .environmentObject(environmentStore)
-                    } label: {
-                        HStack {
-                            Image(systemName: "ladybug")
-                                .foregroundColor(.purple)
-                            Text("Live Scanner Debug")
+                // Scanner Tools (Developer) Section — always in debug builds,
+                // unlocked via the About → Version row elsewhere.
+                if showDeveloperTools {
+                    Section {
+                        NavigationLink {
+                            ScannerDebugView()
+                                .environmentObject(environmentStore)
+                        } label: {
+                            HStack {
+                                Image(systemName: "ladybug")
+                                    .foregroundColor(.purple)
+                                Text("Live Scanner Debug")
+                            }
                         }
-                    }
 
-                    Toggle(isOn: $showScannerTestingTools) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Scanner Testing Tools")
-                            Text("Show diagnostics and debug-capture controls in the scanner")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        Toggle(isOn: $showScannerTestingTools) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Scanner Testing Tools")
+                                Text("Show diagnostics and debug-capture controls in the scanner")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
+
+                        if developerToolsUnlocked {
+                            Button(role: .destructive) {
+                                developerToolsUnlocked = false
+                                showScannerTestingTools = false
+                                versionTapCount = 0
+                            } label: {
+                                Text("Hide Developer Tools")
+                            }
+                        }
+                    } header: {
+                        Text("Scanner Tools")
+                    } footer: {
+                        Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time. Record a run to save every analyzed frame plus its results, then export them as a shareable bundle to re-analyze later.")
                     }
-                } header: {
-                    Text("Scanner Tools")
-                } footer: {
-                    Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time. Record a run to save every analyzed frame plus its results, then export them as a shareable bundle to re-analyze later.")
                 }
-                #endif
 
                 // App Info Section
                 Section {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text(appVersionString)
                             .foregroundColor(.secondary)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: registerVersionTap)
                 } header: {
                     Text("About")
                 }
