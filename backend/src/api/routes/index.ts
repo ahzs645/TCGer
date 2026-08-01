@@ -10,6 +10,7 @@ import { newsRouter } from './news.router';
 import { settingsRouter } from './settings.router';
 import { usersRouter } from './users.router';
 import { convexWishlistsRouter } from './wishlists.convex.router';
+import { convexDecksRouter } from './decks.convex.router';
 
 async function loadCollectionsRouter(): Promise<ExpressRouter> {
   if (env.BACKEND_MODE === 'convex' || env.COLLECTIONS_BACKEND === 'convex') {
@@ -90,6 +91,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/users', usersRouter);
   app.use('/wishlists', wishlistsRouter);
   app.use('/news', newsRouter);
+
+  // Decks are Convex-native only when the whole backend is in Convex mode.
+  if (env.BACKEND_MODE === 'convex') {
+    app.use('/decks', convexDecksRouter);
+  }
 
   if (env.BACKEND_MODE !== 'convex') {
     await registerLegacyRoutes(app);

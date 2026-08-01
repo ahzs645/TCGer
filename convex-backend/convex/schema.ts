@@ -229,5 +229,38 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_operation_kind", ["userId", "operationKind"])
     .index("by_source_audit", ["sourceAuditId"])
-    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"])
+    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"]),
+
+  // Decks (convex-native)
+  decks: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    tcg: tcgCode,
+    format: v.optional(v.string()),
+    colorHex: v.optional(v.string()),
+    isPublic: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_name", ["userId", "name"]),
+
+  deckCards: defineTable({
+    deckId: v.id("decks"),
+    externalId: v.string(),
+    tcg: v.string(),
+    name: v.string(),
+    quantity: v.number(),
+    zone: v.union(v.literal("main"), v.literal("extra"), v.literal("side")),
+    isCommander: v.boolean(),
+    isSideboard: v.boolean(),
+    imageUrl: v.optional(v.string()),
+    imageUrlSmall: v.optional(v.string()),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    cardData: v.optional(v.record(v.string(), v.any()))
+  })
+    .index("by_deck", ["deckId"])
+    .index("by_deck_and_external_id_and_zone", ["deckId", "externalId", "zone"])
 });
