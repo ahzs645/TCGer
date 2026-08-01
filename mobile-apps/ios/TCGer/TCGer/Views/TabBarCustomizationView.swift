@@ -12,11 +12,11 @@ struct TabBarCustomizationView: View {
     var body: some View {
         List {
             Section {
-                ForEach(environmentStore.tabOrder) { tab in
+                ForEach(environmentStore.availableTabs) { tab in
                     row(for: tab)
                 }
                 .onMove { source, destination in
-                    environmentStore.moveTabs(fromOffsets: source, toOffset: destination)
+                    environmentStore.moveAvailableTabs(fromOffsets: source, toOffset: destination)
                 }
             } header: {
                 Text("Tabs")
@@ -82,11 +82,13 @@ struct TabBarCustomizationView: View {
     }
 
     private var summary: String {
-        let hidden = environmentStore.hiddenTabs.count
+        let hidden = environmentStore.availableTabs.filter {
+            environmentStore.hiddenTabs.contains($0)
+        }.count
         if hidden == 0 {
             return "Showing all \(shownCount) tabs."
         }
-        return "Showing \(shownCount) of \(AppTab.allCases.count) tabs. Hiding a tab also hides the screen behind it."
+        return "Showing \(shownCount) of \(environmentStore.availableTabs.count) tabs. Hiding a tab also hides the screen behind it."
     }
 }
 

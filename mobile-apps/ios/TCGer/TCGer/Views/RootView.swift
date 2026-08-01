@@ -10,6 +10,7 @@ struct RootView: View {
     @State private var showingSignup = false
     @State private var errorMessage: String?
     @State private var isAppLocked = true
+    @State private var featureConfigurationURL: String?
 
     private let apiService = APIService()
 
@@ -64,7 +65,11 @@ struct RootView: View {
             }
         }
         .task(id: "\(environmentStore.serverConfiguration.baseURL)|\(environmentStore.isServerVerified)") {
-            guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else { return }
+            guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else {
+                featureConfigurationURL = nil
+                return
+            }
+            await refreshServerFeatures()
             await refreshBootstrapState(force: true)
         }
         .alert("Oops", isPresented: Binding(
@@ -120,6 +125,7 @@ struct RootView: View {
                 setupRequired = nil
                 environmentStore.appSettings = nil
                 errorMessage = nil
+                await refreshServerFeatures()
                 await refreshBootstrapState(force: true)
                 return
             }
@@ -133,12 +139,30 @@ struct RootView: View {
 
     @MainActor
     private func resetServerSelection() {
+        featureConfigurationURL = nil
         setupRequired = nil
         showingSignup = false
         errorMessage = nil
         environmentStore.appSettings = nil
         environmentStore.serverConfiguration = .empty
         environmentStore.signOut()
+    }
+
+    @MainActor
+    private func refreshServerFeatures() async {
+        let configuration = environmentStore.serverConfiguration
+        guard configuration.isValid else { return }
+        guard featureConfigurationURL != configuration.baseURL else { return }
+
+        featureConfigurationURL = configuration.baseURL
+        do {
+            let features = try await apiService.getServerFeatures(config: configuration)
+            guard environmentStore.serverConfiguration.baseURL == configuration.baseURL else { return }
+            environmentStore.serverFeatures = features
+        } catch {
+            guard environmentStore.serverConfiguration.baseURL == configuration.baseURL else { return }
+            environmentStore.serverFeatures = .allEnabled
+        }
     }
 
     @MainActor

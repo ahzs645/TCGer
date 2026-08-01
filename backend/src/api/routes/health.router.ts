@@ -4,11 +4,32 @@ import { env } from '../../config/env';
 
 export const healthRouter = Router();
 
+export function getHealthResponse() {
+  const supportsLegacyFeatures = env.BACKEND_MODE !== 'convex';
+
+  return {
+    status: 'ok' as const,
+    env: env.NODE_ENV,
+    mode: env.BACKEND_MODE,
+    features: {
+      decks: true,
+      finance: true,
+      sealed: true,
+      analytics: true,
+      trades: true,
+      prices: supportsLegacyFeatures,
+      notifications: supportsLegacyFeatures,
+      alerts: supportsLegacyFeatures,
+      shops: supportsLegacyFeatures,
+      automations: supportsLegacyFeatures,
+      shipments: supportsLegacyFeatures,
+      public: true,
+    },
+  };
+}
+
 healthRouter.get('/', (_req, res) => {
-  res.json({
-    status: 'ok',
-    env: env.NODE_ENV
-  });
+  res.json(getHealthResponse());
 });
 
 healthRouter.get('/ready', async (_req, res) => {
@@ -24,7 +45,7 @@ healthRouter.get('/ready', async (_req, res) => {
         if (!response.ok) {
           throw new Error(`Convex returned ${response.status}`);
         }
-      })
+      }),
     );
 
     await Promise.all(checks);
@@ -35,7 +56,7 @@ healthRouter.get('/ready', async (_req, res) => {
       message:
         env.BACKEND_MODE === 'convex'
           ? 'Convex backend unavailable'
-          : 'One or more backing services are unavailable'
+          : 'One or more backing services are unavailable',
     });
   }
 });

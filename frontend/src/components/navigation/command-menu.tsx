@@ -10,7 +10,7 @@ import {
   Search,
   Table,
 } from "lucide-react";
-import { secondaryNavigation } from "@/components/layout/app-shell";
+import type { LucideIcon } from "lucide-react";
 
 import {
   CommandDialog,
@@ -27,7 +27,15 @@ import { getAppRoute } from "@/lib/app-routes";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { supportedGameOptions, useGameFilterStore } from "@/stores/game-filter";
 
-export function CommandMenu() {
+interface CommandMenuProps {
+  secondaryNavigation: Array<{
+    href: string;
+    label: string;
+    icon: LucideIcon;
+  }>;
+}
+
+export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();

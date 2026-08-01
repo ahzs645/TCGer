@@ -487,7 +487,7 @@ struct SettingsView: View {
                 }
 
                 // Finance Section
-                if canEditPreferences {
+                if canEditPreferences && environmentStore.serverFeatures.finance {
                     Section {
                         NavigationLink {
                             TransactionsView()

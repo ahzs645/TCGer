@@ -13,3 +13,4 @@ export * from './analytics';
 export * from './sealed';
 export * from './automations';
 export * from './shipping';
+export * from './health';

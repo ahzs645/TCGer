@@ -1,5 +1,91 @@
 import Foundation
 
+struct ServerFeatures: Decodable, Equatable, Sendable {
+    let decks: Bool
+    let finance: Bool
+    let sealed: Bool
+    let analytics: Bool
+    let trades: Bool
+    let prices: Bool
+    let notifications: Bool
+    let alerts: Bool
+    let shops: Bool
+    let automations: Bool
+    let shipments: Bool
+    let `public`: Bool
+
+    static let allEnabled = ServerFeatures()
+
+    init(
+        decks: Bool = true,
+        finance: Bool = true,
+        sealed: Bool = true,
+        analytics: Bool = true,
+        trades: Bool = true,
+        prices: Bool = true,
+        notifications: Bool = true,
+        alerts: Bool = true,
+        shops: Bool = true,
+        automations: Bool = true,
+        shipments: Bool = true,
+        publicFeature: Bool = true
+    ) {
+        self.decks = decks
+        self.finance = finance
+        self.sealed = sealed
+        self.analytics = analytics
+        self.trades = trades
+        self.prices = prices
+        self.notifications = notifications
+        self.alerts = alerts
+        self.shops = shops
+        self.automations = automations
+        self.shipments = shipments
+        self.`public` = publicFeature
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case decks, finance, sealed, analytics, trades, prices
+        case notifications, alerts, shops, automations, shipments
+        case publicFeature = "public"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        decks = try container.decodeIfPresent(Bool.self, forKey: .decks) ?? true
+        finance = try container.decodeIfPresent(Bool.self, forKey: .finance) ?? true
+        sealed = try container.decodeIfPresent(Bool.self, forKey: .sealed) ?? true
+        analytics = try container.decodeIfPresent(Bool.self, forKey: .analytics) ?? true
+        trades = try container.decodeIfPresent(Bool.self, forKey: .trades) ?? true
+        prices = try container.decodeIfPresent(Bool.self, forKey: .prices) ?? true
+        notifications = try container.decodeIfPresent(Bool.self, forKey: .notifications) ?? true
+        alerts = try container.decodeIfPresent(Bool.self, forKey: .alerts) ?? true
+        shops = try container.decodeIfPresent(Bool.self, forKey: .shops) ?? true
+        automations = try container.decodeIfPresent(Bool.self, forKey: .automations) ?? true
+        shipments = try container.decodeIfPresent(Bool.self, forKey: .shipments) ?? true
+        self.`public` = try container.decodeIfPresent(Bool.self, forKey: .publicFeature) ?? true
+    }
+}
+
+struct HealthResponse: Decodable, Sendable {
+    let status: String
+    let env: String?
+    let mode: String?
+    let features: ServerFeatures
+
+    private enum CodingKeys: String, CodingKey {
+        case status, env, mode, features
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decode(String.self, forKey: .status)
+        env = try container.decodeIfPresent(String.self, forKey: .env)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode)
+        features = try container.decodeIfPresent(ServerFeatures.self, forKey: .features) ?? .allEnabled
+    }
+}
+
 struct ServerConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
 

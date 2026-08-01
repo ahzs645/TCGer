@@ -57,6 +57,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var isUsingSingleUserMode: Bool
     @Published var currentUser: User?
     @Published var appSettings: AppSettings?
+    @Published var serverFeatures: ServerFeatures
     @Published var isServerVerified: Bool
     @Published var enabledYugioh: Bool
     @Published var enabledMagic: Bool
@@ -147,6 +148,7 @@ final class EnvironmentStore: ObservableObject {
             ?? ((keychainToken ?? legacyToken) == SingleUserDefaults.token)
         currentUser = nil
         appSettings = nil
+        serverFeatures = .allEnabled
         if keychainToken == nil, let legacyToken {
             KeychainTokenStore.saveToken(legacyToken)
             storage.removeObject(forKey: Keys.token)
@@ -250,6 +252,7 @@ final class EnvironmentStore: ObservableObject {
                 }
                 storage.set(false, forKey: Keys.verified)
                 self.isServerVerified = false
+                self.serverFeatures = .allEnabled
                 Task(priority: .utility) {
                     await CatalogStore.shared.configure(
                         enabledGames: configuration.isOnDevice ? self.enabledGames : []
@@ -463,10 +466,14 @@ final class EnvironmentStore: ObservableObject {
 
     // MARK: - Tab Bar
 
-    /// Tabs the user wants in the bar, in their chosen order. Availability
-    /// (auth, access policy) is applied separately by `ContentView`.
+    var availableTabs: [AppTab] {
+        tabOrder.filter { $0.isSupported(by: serverFeatures) }
+    }
+
+    /// Tabs the user wants in the bar, in their chosen order. Authentication
+    /// and access-policy availability are applied separately by `ContentView`.
     var visibleTabs: [AppTab] {
-        tabOrder.filter { !hiddenTabs.contains($0) }
+        availableTabs.filter { !hiddenTabs.contains($0) }
     }
 
     func isTabVisible(_ tab: AppTab) -> Bool {
@@ -482,8 +489,13 @@ final class EnvironmentStore: ObservableObject {
         }
     }
 
-    func moveTabs(fromOffsets source: IndexSet, toOffset destination: Int) {
-        tabOrder.move(fromOffsets: source, toOffset: destination)
+    func moveAvailableTabs(fromOffsets source: IndexSet, toOffset destination: Int) {
+        var reordered = availableTabs
+        reordered.move(fromOffsets: source, toOffset: destination)
+        var iterator = reordered.makeIterator()
+        tabOrder = tabOrder.map { tab in
+            tab.isSupported(by: serverFeatures) ? (iterator.next() ?? tab) : tab
+        }
     }
 
     func resetTabBar() {
@@ -580,6 +592,7 @@ final class EnvironmentStore: ObservableObject {
         isAuthenticated = false
         currentUser = nil
         appSettings = nil
+        serverFeatures = .allEnabled
         isServerVerified = false
         enabledYugioh = true
         enabledMagic = true
@@ -669,6 +682,7 @@ final class EnvironmentStore: ObservableObject {
         guard serverConfiguration.isOnDevice else { return }
 
         isUsingSingleUserMode = false
+        serverFeatures = .allEnabled
 
         // Installs configured before phone-only mode was split from demo mode
         // still hold the old marker token; swap it for the local one.

@@ -18,15 +18,29 @@ import {
   X,
   Camera,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { ServerFeatures } from "@tcg/api-types";
+
+interface NavigationItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  feature?: keyof ServerFeatures;
+}
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
-export const secondaryNavigation = [
+export const secondaryNavigation: NavigationItem[] = [
   { href: "/sets", label: "Sets", icon: LibraryBig },
-  { href: "/decks", label: "Decks", icon: Layers },
-  { href: "/prices", label: "Prices", icon: DollarSign },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/trades", label: "Trades", icon: Repeat2 },
-  { href: "/sealed", label: "Sealed", icon: Package },
+  { href: "/decks", label: "Decks", icon: Layers, feature: "decks" },
+  { href: "/prices", label: "Prices", icon: DollarSign, feature: "prices" },
+  {
+    href: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    feature: "analytics",
+  },
+  { href: "/trades", label: "Trades", icon: Repeat2, feature: "trades" },
+  { href: "/sealed", label: "Sealed", icon: Package, feature: "sealed" },
 ];
 
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +50,14 @@ import { getAppRoute } from "@/lib/app-routes";
 import { cn } from "@/lib/utils";
 import { isDemoMode } from "@/lib/demo-mode";
 import { getUserPreferences } from "@/lib/api/user-preferences";
+import { isFeatureAvailable, useServerFeatures } from "@/lib/api/health";
 import { useAuthStore } from "@/stores/auth";
 
 import { CommandMenu } from "../navigation/command-menu";
 import { GameSwitcher } from "../navigation/game-switcher";
 import { UserMenu } from "../navigation/user-menu";
 
-const navigation = [
+const navigation: NavigationItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cards", label: "Card Search", icon: Search },
   { href: "/scan", label: "Scan", icon: Camera },
@@ -51,7 +66,6 @@ const navigation = [
 ];
 
 const mobileNavPrimary = navigation.slice(0, 3);
-const mobileNavSecondary = [...navigation.slice(3), ...secondaryNavigation];
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -60,6 +74,16 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const dashboardHref = getAppRoute("/", pathname);
+  const features = useServerFeatures();
+  const demoMode = isDemoMode();
+  const availableSecondaryNavigation = secondaryNavigation.filter(
+    (item) =>
+      demoMode || !item.feature || isFeatureAvailable(features, item.feature),
+  );
+  const mobileNavSecondary = [
+    ...navigation.slice(3),
+    ...availableSecondaryNavigation,
+  ];
 
   return (
     <div className="flex min-h-screen flex-col" data-oid="zfaufj9">
@@ -90,7 +114,7 @@ export function AppShell({ children }: AppShellProps) {
               />
               TCGer
             </Link>
-            {isDemoMode() && (
+            {demoMode && (
               <Badge
                 variant="secondary"
                 className="hidden text-xs sm:inline-flex"
@@ -136,7 +160,10 @@ export function AppShell({ children }: AppShellProps) {
             </nav>
           </div>
           <div className="flex items-center gap-2" data-oid="3834h_j">
-            <CommandMenu data-oid="i6m6x59" />
+            <CommandMenu
+              secondaryNavigation={availableSecondaryNavigation}
+              data-oid="i6m6x59"
+            />
             <GameSwitcher data-oid="98z96r_" />
             <UserMenu data-oid="d8c.j:4" />
           </div>
@@ -152,14 +179,24 @@ export function AppShell({ children }: AppShellProps) {
       </main>
 
       {/* Mobile bottom navigation */}
-      <MobileBottomNav pathname={pathname} data-oid="caik0xj" />
+      <MobileBottomNav
+        pathname={pathname}
+        secondaryNavigation={mobileNavSecondary}
+        data-oid="caik0xj"
+      />
     </div>
   );
 }
 
-function MobileBottomNav({ pathname }: { pathname: string }) {
+function MobileBottomNav({
+  pathname,
+  secondaryNavigation,
+}: {
+  pathname: string;
+  secondaryNavigation: NavigationItem[];
+}) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const isSecondaryActive = mobileNavSecondary.some(
+  const isSecondaryActive = secondaryNavigation.some(
     (item) => pathname === getAppRoute(item.href, pathname),
   );
 
@@ -250,7 +287,7 @@ function MobileBottomNav({ pathname }: { pathname: string }) {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2 px-4" data-oid="0868z5k">
-              {mobileNavSecondary.map((item) => {
+              {secondaryNavigation.map((item) => {
                 const href = getAppRoute(item.href, pathname);
                 const isActive = pathname === href;
                 const Icon = item.icon;

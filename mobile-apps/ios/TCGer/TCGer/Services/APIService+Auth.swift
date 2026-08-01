@@ -166,6 +166,22 @@ extension APIService {
             return false
         }
     }
+
+    func getServerFeatures(config: ServerConfiguration) async throws -> ServerFeatures {
+        if config.isOnDevice {
+            return .allEnabled
+        }
+
+        let (data, response) = try await makeRequest(config: config, path: "health")
+        guard (200..<300).contains(response.statusCode) else {
+            throw APIError.serverError(status: response.statusCode)
+        }
+
+        guard let health = try? JSONDecoder().decode(HealthResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return health.features
+    }
 }
 
 private extension APIService {

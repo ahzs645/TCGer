@@ -56,6 +56,15 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         self == .settings
     }
 
+    func isSupported(by features: ServerFeatures) -> Bool {
+        switch self {
+        case .sealed:
+            return features.sealed
+        default:
+            return true
+        }
+    }
+
     static let defaultOrder: [AppTab] = allCases
 
     /// Rebuild a stored order into a valid one: drop anything unrecognized and

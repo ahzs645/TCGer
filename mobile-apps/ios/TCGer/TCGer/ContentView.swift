@@ -67,7 +67,9 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewDashboardWithoutAuth
         case .collections:
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
-        case .sets, .wishlists, .sealed, .scan:
+        case .sealed:
+            return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
+        case .sets, .wishlists, .scan:
             return environmentStore.isAuthenticated
         }
     }
