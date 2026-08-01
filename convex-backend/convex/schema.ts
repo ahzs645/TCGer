@@ -381,5 +381,15 @@ export default defineSchema({
     quantity: v.number(),
     imageUrl: v.optional(v.string()),
     estimatedValue: v.optional(v.number())
-  }).index("by_trade", ["tradeId"])
+  }).index("by_trade", ["tradeId"]),
+
+  // Analytics history (convex-native)
+  // `day` is the UTC calendar day formatted as YYYY-MM-DD.
+  collectionValueSnapshots: defineTable({
+    userId: v.id("users"),
+    day: v.string(),
+    capturedAt: v.number(),
+    totalValue: v.number(),
+    byTcg: v.record(v.string(), v.number())
+  }).index("by_user_and_day", ["userId", "day"])
 });

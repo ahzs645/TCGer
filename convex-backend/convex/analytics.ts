@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalQuery, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+  type QueryCtx
+} from "./_generated/server";
 
 const valueHistoryValidator = v.object({
   history: v.array(v.object({ date: v.string(), value: v.number() })),
@@ -71,11 +77,18 @@ function roundCurrency(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function utcDayKey(timestamp = Date.now()) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
 function usableStoredPrice(value: number | undefined) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-async function requireUserBySubject(ctx: QueryCtx, subject: string) {
+async function requireUserBySubject(
+  ctx: QueryCtx | MutationCtx,
+  subject: string
+) {
   const user = await ctx.db
     .query("users")
     .withIndex("by_auth_subject", (q) => q.eq("authSubject", subject))
@@ -87,7 +100,7 @@ async function requireUserBySubject(ctx: QueryCtx, subject: string) {
 }
 
 async function loadAnalyticsRows(
-  ctx: QueryCtx,
+  ctx: QueryCtx | MutationCtx,
   userId: Id<"users">
 ): Promise<AnalyticsRow[]> {
   const entries = await ctx.db
@@ -124,6 +137,115 @@ function collectionValue(rows: AnalyticsRow[]) {
   );
 }
 
+function snapshotValue(rows: AnalyticsRow[]) {
+  const byTcg: Record<string, number> = {};
+  let totalValue = 0;
+
+  for (const { entry, card } of rows) {
+    const value = usableStoredPrice(entry.price) * entry.quantity;
+    totalValue += value;
+    byTcg[card.tcg] = (byTcg[card.tcg] ?? 0) + value;
+  }
+
+  return {
+    totalValue: roundCurrency(totalValue),
+    byTcg: Object.fromEntries(
+      Object.entries(byTcg).map(([tcg, value]) => [tcg, roundCurrency(value)])
+    )
+  };
+}
+
+function recordsEqual(
+  left: Record<string, number>,
+  right: Record<string, number>
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => left[key] === right[key])
+  );
+}
+
+async function captureSnapshotForUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  day: string
+) {
+  const value = snapshotValue(await loadAnalyticsRows(ctx, userId));
+  const existing = await ctx.db
+    .query("collectionValueSnapshots")
+    .withIndex("by_user_and_day", (q) =>
+      q.eq("userId", userId).eq("day", day)
+    )
+    .unique();
+
+  if (!existing) {
+    return await ctx.db.insert("collectionValueSnapshots", {
+      userId,
+      day,
+      capturedAt: Date.now(),
+      ...value
+    });
+  }
+
+  if (
+    existing.totalValue !== value.totalValue ||
+    !recordsEqual(existing.byTcg, value.byTcg)
+  ) {
+    await ctx.db.patch(existing._id, {
+      capturedAt: Date.now(),
+      ...value
+    });
+  }
+  return existing._id;
+}
+
+export const captureCurrentValueSnapshot = internalMutation({
+  args: { subject: v.string() },
+  returns: v.id("collectionValueSnapshots"),
+  handler: async (ctx, args) => {
+    const user = await requireUserBySubject(ctx, args.subject);
+    return await captureSnapshotForUser(ctx, user._id, utcDayKey());
+  }
+});
+
+export const captureDailySnapshotForUser = internalMutation({
+  args: { userId: v.id("users"), day: v.string() },
+  returns: v.id("collectionValueSnapshots"),
+  handler: async (ctx, args) => {
+    return await captureSnapshotForUser(ctx, args.userId, args.day);
+  }
+});
+
+export const scheduleDailySnapshots = internalMutation({
+  args: { cursor: v.optional(v.string()), day: v.optional(v.string()) },
+  returns: v.object({ scheduled: v.number(), isDone: v.boolean() }),
+  handler: async (ctx, args): Promise<{ scheduled: number; isDone: boolean }> => {
+    const day = args.day ?? utcDayKey();
+    const users = await ctx.db.query("users").order("asc").paginate({
+      cursor: args.cursor ?? null,
+      numItems: 100
+    });
+
+    for (const user of users.page) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.analytics.captureDailySnapshotForUser,
+        { userId: user._id, day }
+      );
+    }
+    if (!users.isDone) {
+      await ctx.scheduler.runAfter(0, internal.analytics.scheduleDailySnapshots, {
+        cursor: users.continueCursor,
+        day
+      });
+    }
+
+    return { scheduled: users.page.length, isDone: users.isDone };
+  }
+});
+
 export const getValueHistory = internalQuery({
   args: { subject: v.string(), periodDays: v.number() },
   returns: valueHistoryValidator,
@@ -131,13 +253,37 @@ export const getValueHistory = internalQuery({
     const user = await requireUserBySubject(ctx, args.subject);
     const rows = await loadAnalyticsRows(ctx, user._id);
     const periodDays = Math.min(365, Math.max(1, Math.trunc(args.periodDays)));
+    const today = utcDayKey();
+    const firstDay = utcDayKey(Date.now() - periodDays * 24 * 60 * 60 * 1_000);
+    const snapshots = await ctx.db
+      .query("collectionValueSnapshots")
+      .withIndex("by_user_and_day", (q) =>
+        q.eq("userId", user._id).gte("day", firstDay)
+      )
+      .order("asc")
+      .collect();
+    const currentValue = roundCurrency(collectionValue(rows));
+    const historyByDay = new Map(
+      snapshots.map((snapshot) => [
+        snapshot.day,
+        { date: snapshot.day, value: snapshot.totalValue }
+      ])
+    );
+    // A stale same-day cron value must never override the live collection value.
+    historyByDay.set(today, { date: today, value: currentValue });
+    const history = [...historyByDay.values()].sort((left, right) =>
+      left.date.localeCompare(right.date)
+    );
+    const firstValue = history[0]?.value ?? currentValue;
+    const changePercent =
+      firstValue > 0
+        ? Math.round(((currentValue - firstValue) / firstValue) * 10_000) / 100
+        : 0;
 
-    // Convex currently stores live per-entry prices, but no historical price observations.
-    // This intentionally mirrors the legacy empty-history behavior when no observations exist.
     return {
-      history: [],
-      currentValue: roundCurrency(collectionValue(rows)),
-      changePercent: 0,
+      history,
+      currentValue,
+      changePercent,
       changePeriod: `${periodDays}d`
     };
   }
