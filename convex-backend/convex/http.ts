@@ -23,6 +23,7 @@ import {
   type BridgeIdentity
 } from "./lib/httpBridge";
 import type { TcgCode } from "./lib/validators";
+import { registerDecksRoutes } from "./decksHttp";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -1946,4 +1947,5 @@ http.route({
   })
 });
 
+registerDecksRoutes(http);
 export default http;
