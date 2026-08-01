@@ -20,6 +20,12 @@ const senderCard = {
   estimatedValue: 4.5
 };
 
+function utcDayOffset(days: number) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
 describe("analytics and trades Convex HTTP routes", () => {
   test("aggregates live collection value, breakdown, and distribution", async () => {
     const t = createTestConvex();
@@ -62,7 +68,7 @@ describe("analytics and trades Convex HTTP routes", () => {
 
     expect(valueResponse.status).toBe(200);
     expect(value).toEqual({
-      history: [],
+      history: [{ date: utcDayOffset(0), value: 30 }],
       currentValue: 30,
       changePercent: 0,
       changePeriod: "7d"
@@ -89,6 +95,138 @@ describe("analytics and trades Convex HTTP routes", () => {
         { label: "pokemon", count: 1, percentage: 33.33 }
       ],
       total: 3
+    });
+  });
+
+  test("lazily creates and idempotently refreshes today's value snapshot", async () => {
+    const t = createTestConvex();
+    const asAvery = t.withIdentity({ subject: "history_avery", name: "Avery" });
+    const user = await asAvery.mutation(api.users.ensureCurrent, {
+      username: "history-avery"
+    });
+    const entry = await asAvery.mutation(api.collections.addToBinder, {
+      binderId: user.libraryBinderId,
+      price: 12.5,
+      card: {
+        externalId: "history-sol-ring",
+        tcg: "magic",
+        name: "Sol Ring"
+      }
+    });
+    const headers = bridgeHeaders("history_avery", "history-avery");
+
+    const firstResponse = await t.fetch("/analytics/value?period=30d", { headers });
+    expect(firstResponse.status).toBe(200);
+    expect(await firstResponse.json()).toMatchObject({
+      history: [{ date: utcDayOffset(0), value: 12.5 }],
+      currentValue: 12.5,
+      changePercent: 0,
+      changePeriod: "30d"
+    });
+    const firstSnapshots = await t.run(async (ctx) =>
+      await ctx.db
+        .query("collectionValueSnapshots")
+        .withIndex("by_user_and_day", (q) => q.eq("userId", user.id))
+        .collect()
+    );
+    expect(firstSnapshots).toHaveLength(1);
+    expect(firstSnapshots[0]).toMatchObject({
+      day: utcDayOffset(0),
+      totalValue: 12.5,
+      byTcg: { magic: 12.5 }
+    });
+
+    const secondResponse = await t.fetch("/analytics/value?period=30d", { headers });
+    expect(secondResponse.status).toBe(200);
+    const unchangedSnapshots = await t.run(async (ctx) =>
+      await ctx.db
+        .query("collectionValueSnapshots")
+        .withIndex("by_user_and_day", (q) => q.eq("userId", user.id))
+        .collect()
+    );
+    expect(unchangedSnapshots).toHaveLength(1);
+    expect(unchangedSnapshots[0]!.capturedAt).toBe(firstSnapshots[0]!.capturedAt);
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(entry.id, { price: 20 });
+    });
+    const updatedResponse = await t.fetch("/analytics/value?period=30d", { headers });
+    expect(await updatedResponse.json()).toMatchObject({
+      history: [{ date: utcDayOffset(0), value: 20 }],
+      currentValue: 20
+    });
+    const updatedSnapshots = await t.run(async (ctx) =>
+      await ctx.db
+        .query("collectionValueSnapshots")
+        .withIndex("by_user_and_day", (q) => q.eq("userId", user.id))
+        .collect()
+    );
+    expect(updatedSnapshots).toHaveLength(1);
+    expect(updatedSnapshots[0]).toMatchObject({
+      totalValue: 20,
+      byTcg: { magic: 20 }
+    });
+  });
+
+  test("calculates history changes and filters snapshots by requested period", async () => {
+    const t = createTestConvex();
+    const asAvery = t.withIdentity({ subject: "period_avery", name: "Avery" });
+    const user = await asAvery.mutation(api.users.ensureCurrent, {
+      username: "period-avery"
+    });
+    await asAvery.mutation(api.collections.addToBinder, {
+      binderId: user.libraryBinderId,
+      price: 200,
+      card: {
+        externalId: "period-black-lotus",
+        tcg: "magic",
+        name: "Black Lotus"
+      }
+    });
+    await t.run(async (ctx) => {
+      for (const [daysAgo, totalValue] of [
+        [40, 50],
+        [20, 100],
+        [5, 150]
+      ] as const) {
+        await ctx.db.insert("collectionValueSnapshots", {
+          userId: user.id,
+          day: utcDayOffset(-daysAgo),
+          capturedAt: Date.now() - daysAgo * 24 * 60 * 60 * 1_000,
+          totalValue,
+          byTcg: { magic: totalValue }
+        });
+      }
+    });
+    const headers = bridgeHeaders("period_avery", "period-avery");
+
+    const thirtyDayResponse = await t.fetch("/analytics/value?period=30d", {
+      headers
+    });
+    expect(thirtyDayResponse.status).toBe(200);
+    expect(await thirtyDayResponse.json()).toEqual({
+      history: [
+        { date: utcDayOffset(-20), value: 100 },
+        { date: utcDayOffset(-5), value: 150 },
+        { date: utcDayOffset(0), value: 200 }
+      ],
+      currentValue: 200,
+      changePercent: 100,
+      changePeriod: "30d"
+    });
+
+    const sevenDayResponse = await t.fetch("/analytics/value?period=7d", {
+      headers
+    });
+    expect(sevenDayResponse.status).toBe(200);
+    expect(await sevenDayResponse.json()).toEqual({
+      history: [
+        { date: utcDayOffset(-5), value: 150 },
+        { date: utcDayOffset(0), value: 200 }
+      ],
+      currentValue: 200,
+      changePercent: 33.33,
+      changePeriod: "7d"
     });
   });
 

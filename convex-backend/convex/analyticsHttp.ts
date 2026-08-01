@@ -33,6 +33,9 @@ export function registerAnalyticsRoutes(http: HttpRouter) {
       try {
         const identity = await requireBridgeIdentity(ctx, request);
         const periodDays = parsePeriod(new URL(request.url).searchParams.get("period"));
+        await ctx.runMutation(analyticsApi.captureCurrentValueSnapshot, {
+          subject: identity.subject
+        });
         return json(
           await ctx.runQuery(analyticsApi.getValueHistory, {
             subject: identity.subject,

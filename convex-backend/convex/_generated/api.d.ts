@@ -13,6 +13,7 @@ import type * as analyticsHttp from "../analyticsHttp.js";
 import type * as binders from "../binders.js";
 import type * as bridge from "../bridge.js";
 import type * as collections from "../collections.js";
+import type * as crons from "../crons.js";
 import type * as decks from "../decks.js";
 import type * as decksHttp from "../decksHttp.js";
 import type * as finance from "../finance.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   binders: typeof binders;
   bridge: typeof bridge;
   collections: typeof collections;
+  crons: typeof crons;
   decks: typeof decks;
   decksHttp: typeof decksHttp;
   finance: typeof finance;
