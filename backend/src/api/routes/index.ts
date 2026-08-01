@@ -3,11 +3,15 @@ import type { Router as ExpressRouter, Express } from 'express';
 import { authRouter, setupRouter } from './auth.router';
 import { cardsRouter } from './cards.router';
 import { env } from '../../config/env';
+import { convexAnalyticsRouter } from './analytics.convex.router';
 import { convexCollectionsRouter } from './collections.convex.router';
 import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { newsRouter } from './news.router';
+import { createNotImplementedRouter } from './not-implemented.router';
+import { convexPublicRouter } from './public.convex.router';
 import { settingsRouter } from './settings.router';
+import { convexTradesRouter } from './trades.convex.router';
 import { usersRouter } from './users.router';
 import { convexWishlistsRouter } from './wishlists.convex.router';
 
@@ -90,6 +94,19 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/users', usersRouter);
   app.use('/wishlists', wishlistsRouter);
   app.use('/news', newsRouter);
+
+  // Convex-mode ports and explicit legacy-feature availability signals.
+  if (env.BACKEND_MODE === 'convex') {
+    app.use('/analytics', convexAnalyticsRouter);
+    app.use('/trades', convexTradesRouter);
+    app.use('/prices', createNotImplementedRouter('prices'));
+    app.use('/notifications', createNotImplementedRouter('notifications'));
+    app.use('/alerts', createNotImplementedRouter('alerts'));
+    app.use('/shops', createNotImplementedRouter('shops'));
+    app.use('/automations', createNotImplementedRouter('automations'));
+    app.use('/shipments', createNotImplementedRouter('shipments'));
+    app.use('/public', convexPublicRouter);
+  }
 
   if (env.BACKEND_MODE !== 'convex') {
     await registerLegacyRoutes(app);

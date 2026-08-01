@@ -65,12 +65,15 @@ export default defineSchema({
     associatedTcg: v.optional(tcgCode),
     associatedSetCode: v.optional(v.string()),
     associatedSetName: v.optional(v.string()),
+    shareToken: v.optional(v.string()),
+    isPublic: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number()
   })
     .index("by_user", ["userId"])
     .index("by_user_kind", ["userId", "kind"])
-    .index("by_user_name", ["userId", "name"]),
+    .index("by_user_name", ["userId", "name"])
+    .index("by_share_token", ["shareToken"]),
 
   cardIdentities: defineTable({
     tcg: tcgCode,
@@ -229,5 +232,33 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_operation_kind", ["userId", "operationKind"])
     .index("by_source_audit", ["sourceAuditId"])
-    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"])
+    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"]),
+
+  // Analytics + Trades (convex-native)
+  trades: defineTable({
+    senderId: v.id("users"),
+    receiverId: v.id("users"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("declined"),
+      v.literal("cancelled")
+    ),
+    message: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_sender", ["senderId"])
+    .index("by_receiver", ["receiverId"]),
+
+  tradeCards: defineTable({
+    tradeId: v.id("trades"),
+    side: v.union(v.literal("sender"), v.literal("receiver")),
+    externalId: v.string(),
+    tcg: tcgCode,
+    name: v.string(),
+    quantity: v.number(),
+    imageUrl: v.optional(v.string()),
+    estimatedValue: v.optional(v.number())
+  }).index("by_trade", ["tradeId"])
 });
