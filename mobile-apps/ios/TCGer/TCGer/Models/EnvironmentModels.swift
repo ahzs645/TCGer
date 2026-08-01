@@ -3,7 +3,7 @@ import Foundation
 struct ServerConfiguration: Codable, Equatable, Sendable {
     var baseURL: String
 
-    static let defaultLocalBaseURL = "http://localhost:3001"
+    static let defaultLocalBaseURL = "http://localhost:3004"
 
     /// Sentinel base URL for phone-only mode, where every request is served by
     /// `LocalStore` instead of a backend. The `demo://` scheme is kept for
@@ -44,14 +44,35 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
         normalizedURL != nil
     }
 
-    func endpoint(path: String) -> URL? {
-        guard let base = normalizedURL else { return nil }
-        // Don't use appendingPathComponent as it URL-encodes query strings
-        var baseString = base.absoluteString
-        if !baseString.hasSuffix("/") {
-            baseString += "/"
+    func endpoint(path: String, queryItems: [URLQueryItem] = []) -> URL? {
+        guard let base = normalizedURL,
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+              let pathComponents = URLComponents(string: path) else {
+            return nil
         }
-        return URL(string: baseString + path)
+
+        let basePath = components.percentEncodedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointPath = pathComponents.percentEncodedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.percentEncodedPath = [basePath, endpointPath]
+            .filter { !$0.isEmpty }
+            .joined(separator: "/")
+        if !components.percentEncodedPath.isEmpty {
+            components.percentEncodedPath = "/" + components.percentEncodedPath
+        }
+
+        let combinedQueryItems = (components.queryItems ?? [])
+            + (pathComponents.queryItems ?? [])
+            + queryItems
+        if !combinedQueryItems.isEmpty {
+            components.queryItems = combinedQueryItems
+            // URLComponents leaves these two query-value delimiters unescaped.
+            // Escape them so form-style server parsers cannot reinterpret values.
+            components.percentEncodedQuery = components.percentEncodedQuery?
+                .replacingOccurrences(of: "+", with: "%2B")
+                .replacingOccurrences(of: "?", with: "%3F")
+        }
+
+        return components.url
     }
 
     var backendCandidates: [ServerConfiguration] {
@@ -68,21 +89,18 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
         var candidates: [ServerConfiguration] = []
         appendCandidate(from: baseComponents, to: &candidates)
 
-        if baseComponents.port == 3001 {
-            var apiComponents = baseComponents
-            apiComponents.port = 3000
-            appendCandidate(from: apiComponents, to: &candidates)
-        }
-
         if baseComponents.path.isEmpty || baseComponents.path == "/" {
-            var apiComponents = baseComponents
-            apiComponents.path = "/api"
-            appendCandidate(from: apiComponents, to: &candidates)
-
-            if baseComponents.port == 3001 {
-                apiComponents.port = 3000
-                appendCandidate(from: apiComponents, to: &candidates)
+            var gatewayComponents = baseComponents
+            if baseComponents.port == 3004 {
+                gatewayComponents.port = 3003
             }
+            gatewayComponents.path = "/api"
+            appendCandidate(from: gatewayComponents, to: &candidates)
+        } else if baseComponents.port == 3003 && baseComponents.path == "/api" {
+            var directComponents = baseComponents
+            directComponents.port = 3004
+            directComponents.path = ""
+            appendCandidate(from: directComponents, to: &candidates)
         }
 
         return candidates
