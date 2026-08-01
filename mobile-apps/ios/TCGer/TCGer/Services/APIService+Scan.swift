@@ -323,12 +323,8 @@ extension APIService {
             )
         }
 
-        var path = "cards/scan"
-        if tcg != .all {
-            path += "?tcg=\(tcg.rawValue)"
-        }
-
-        guard let url = config.endpoint(path: path) else {
+        let queryItems = tcg == .all ? [] : [URLQueryItem(name: "tcg", value: tcg.rawValue)]
+        guard let url = config.endpoint(path: "cards/scan", queryItems: queryItems) else {
             throw APIError.invalidURL
         }
 
@@ -424,7 +420,8 @@ extension APIService {
         let cappedLimit = max(1, min(50, limit))
         let (data, response) = try await makeRequest(
             config: config,
-            path: "cards/scan/debug-captures?limit=\(cappedLimit)",
+            path: "cards/scan/debug-captures",
+            queryItems: [URLQueryItem(name: "limit", value: String(cappedLimit))],
             method: "GET",
             token: token
         )

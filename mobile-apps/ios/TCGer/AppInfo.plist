@@ -29,6 +29,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>TCGer needs camera access to scan trading cards.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>TCGer needs Face ID access to unlock the app when biometric lock is enabled.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>TCGer needs local network access to connect to your TCGer server.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

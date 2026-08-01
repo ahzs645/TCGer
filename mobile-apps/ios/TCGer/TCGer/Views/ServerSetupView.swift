@@ -74,7 +74,7 @@ struct ServerSetupView: View {
         } else {
             Section(
                 header: Text("Server"),
-                footer: Text("Connect to your own TCG Manager server to sync across devices. Examples: http://localhost:3001, http://10.1.15.216:3001, or http://192.168.1.50:31452")
+                footer: Text("Connect to your own TCG Manager server to sync across devices. Examples: http://localhost:3004, http://192.168.1.50:3004, or http://192.168.1.50:3003/api")
             ) {
                 TextField("Server URL", text: $localInput)
                     .keyboardType(.URL)

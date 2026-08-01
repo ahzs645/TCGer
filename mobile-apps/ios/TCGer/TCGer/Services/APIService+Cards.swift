@@ -12,12 +12,17 @@ extension APIService {
             return LocalStore.shared.searchCards(query: query, game: game)
         }
 
-        var path = "cards/search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
+        var queryItems = [URLQueryItem(name: "query", value: query)]
         if game != .all {
-            path += "&tcg=\(game.rawValue)"
+            queryItems.append(URLQueryItem(name: "tcg", value: game.rawValue))
         }
 
-        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/search",
+            queryItems: queryItems,
+            token: token
+        )
 
         guard response.statusCode == 200 else {
             if response.statusCode == 401 {
@@ -52,15 +57,21 @@ extension APIService {
             return LocalStore.shared.searchCards(query: query, game: game).cards
         }
 
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        var path = "cards/search/all?query=\(encodedQuery)"
-        path += "&unique=\(includeAllPrintings ? "prints" : "cards")"
-        path += "&limit=\(limit)"
+        var queryItems = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "unique", value: includeAllPrintings ? "prints" : "cards"),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
         if game != .all {
-            path += "&tcg=\(game.rawValue)"
+            queryItems.append(URLQueryItem(name: "tcg", value: game.rawValue))
         }
 
-        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/search/all",
+            queryItems: queryItems,
+            token: token
+        )
 
         guard response.statusCode == 200 else {
             if response.statusCode == 401 {
@@ -133,12 +144,13 @@ extension APIService {
             return LocalStore.shared.getSets(tcg: tcg)
         }
 
-        var path = "cards/sets"
-        if let tcg {
-            path += "?tcg=\(tcg)"
-        }
-
-        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+        let queryItems = tcg.map { [URLQueryItem(name: "tcg", value: $0)] } ?? []
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/sets",
+            queryItems: queryItems,
+            token: token
+        )
 
         guard response.statusCode == 200 else {
             if response.statusCode == 401 {
