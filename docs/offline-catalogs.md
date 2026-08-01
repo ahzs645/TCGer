@@ -29,11 +29,26 @@ the same card found via server search dedupe to one identity.
 ## Generating and updating packs
 
 Packs are generated build artifacts (gitignored), like the scanner's
-`ScanIndex` resources. From the repo root:
+large `ScanIndex` resources. For an iOS-ready checkout, run the reproducible
+pipeline from the repo root:
+
+```bash
+bash scripts/ios-assets.sh build
+bash scripts/ios-assets.sh check
+```
+
+`build` generates and synchronizes all three catalog packs, converts the web
+embedding artifact into the compact iOS index, copies the tracked card-face
+gate fixture, and converts DINOv2 to Core ML when the required Python packages
+are available. If the web embedding source or Core ML Python packages are
+absent, it prints the exact prerequisite commands, skips that generator, and
+the final validation remains nonzero until every required asset exists.
+
+To regenerate only the catalog packs, the underlying command is:
 
 ```bash
 cd backend
-npx tsx src/scripts/build-catalog-packs.ts --sync
+npx --no-install tsx src/scripts/build-catalog-packs.ts --sync
 ```
 
 This fetches from tcgdex, the Scryfall bulk `default_cards` file (~558 MB
@@ -51,6 +66,11 @@ manifest entries are preserved), `--limit <n>` (fast test builds),
 Versioning is automatic: regenerating unchanged content keeps a game's
 `version`; changed content increments it. Clients compare manifest versions to
 offer updates.
+
+The TCGer Xcode target runs `scripts/ios-assets.sh check` before compiling.
+Debug builds emit a warning and continue when assets are absent, preserving
+clean-clone simulator development. Release builds hard-fail so an app cannot be
+shipped without valid catalogs, model/index resources, and rejection gate.
 
 ## Web / PWA behavior
 
@@ -83,8 +103,9 @@ offer updates.
 
 ## Known limitations
 
-- **Clean clones don't include packs.** A fresh checkout must run the builder
-  once before packs exist (the feature degrades gracefully: clients show
+- **Clean clones don't include generated packs/model/index files.** A fresh
+  checkout must run `bash scripts/ios-assets.sh build` before a complete Release
+  build is possible (Debug degrades gracefully: clients show
   catalogs as unavailable and fall back to seeded demo behavior). If/when packs
   move to a CDN (e.g. R2), the client abstractions are already in place —
   publish the same files and add a remote source.

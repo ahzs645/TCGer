@@ -108,11 +108,11 @@ Highest-leverage next steps — ALL SHIPPED later the same day (session 2):
      `Resources/ScanIndex/CardFaceGate.json`; `BoardCardEmbeddingScannerStrategy`
      returns nil for gated crops. Simulator build green, artifact verified in
      the .app bundle.
-   - NOTE: both runtime copies are gitignored (scan-index JSONs are generated
-     artifacts). The tracked canonical file is
-     `backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json`; on a
-     fresh checkout copy it to `frontend/public/scan-index/card-face-gate.json`
-     and `mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardFaceGate.json`.
+   - NOTE: the web runtime copy remains gitignored. The iOS
+     `Resources/ScanIndex/CardFaceGate.json` copy is now tracked and bundled so
+     clean clones retain rejection gating. The canonical fixture remains
+     `backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json`; the iOS
+     asset pipeline verifies that the bundled JSON matches it.
 3. DONE — dense-sampling benchmark. `live-video-stream-scan.ts` gained
    `--native-backend` (tfjs-node, accuracy runs only). 3s sampling + full-res
    + gate on the Sinnoh video: coverage 85.5% → **98.7%** (75/76 windows),
@@ -365,6 +365,28 @@ Relevant iOS files:
 - `/Users/ahmadjalil/github/TCGer/mobile-apps/ios/scripts/convert-dinov2-coreml.py`
 
 ## Current Model Assets
+
+### Reproducible iOS asset pipeline
+
+From the repository root:
+
+```bash
+bash scripts/ios-assets.sh build
+bash scripts/ios-assets.sh check
+```
+
+The build command generates/synchronizes the offline catalogs, builds the iOS
+binary/metadata index from the web DINOv2 embedding index, runs Core ML
+conversion when its Python dependencies are installed, and refreshes the
+tracked rejection-gate copy. It prints exact setup commands for unavailable
+optional generators; its final check still exits nonzero while any required
+shipping asset is missing or invalid. The check validates JSON, catalog
+manifest counts/byte sizes/SHA-256 hashes, and scanner-index binary headers.
+
+The TCGer app target has a pre-build guard that invokes the same check. Missing
+or invalid assets are warning-only in Debug, but hard-fail Release builds. This
+keeps simulator work possible on a clean clone while preventing an incomplete
+scanner/catalog bundle from shipping.
 
 Web YOLO model:
 

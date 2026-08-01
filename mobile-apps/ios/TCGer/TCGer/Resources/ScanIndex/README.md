@@ -1,16 +1,29 @@
-# iOS scanner resources (generated — not committed)
+# iOS scanner resources
 
-The CoreML model and embedding index bundled by the iOS scanner. These are
-large, reproducible build outputs and are **gitignored**:
+The CoreML model and embedding index bundled by the iOS scanner are large,
+reproducible build outputs and are **gitignored**:
 
 - `CardEmbeddings.mlpackage` — DINOv2-small image encoder (`image` 224→`embedding` 384-d).
 - `CardsIndexVectors.bin` — packed int8 index (header `[Int32 count, Int32 dim]` + int8 rows, scale 127).
 - `CardsIndexMetadata.json` — `annIndex → {cardId, name, game, setCode, …}`.
 
+`CardFaceGate.json` is the small rejection-gate artifact. Unlike the generated
+model/index, it is tracked so clean clones always bundle the gate; its canonical
+fixture is `backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json`.
+
 Xcode (synchronized folder groups) auto-includes them once present; the
 `.mlpackage` is compiled to `CardEmbeddings.mlmodelc` in the app bundle.
 
 ## Regenerate
+
+From the repository root, use the complete iOS asset pipeline:
+
+```bash
+bash scripts/ios-assets.sh build
+bash scripts/ios-assets.sh check
+```
+
+The lower-level model and index commands used by that pipeline are:
 
 ```bash
 # 1. CoreML model (needs the py3.11 venv — coremltools lacks a 3.14 BlobWriter).

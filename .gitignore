@@ -66,6 +66,7 @@ frontend/public/scan-index/*.bin
 mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.mlpackage
 mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.bin
 mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/*.json
+!mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardFaceGate.json
 
 # Generated offline catalog packs (READMEs remain tracked).
 data/catalog/
