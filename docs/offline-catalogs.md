@@ -29,11 +29,26 @@ the same card found via server search dedupe to one identity.
 ## Generating and updating packs
 
 Packs are generated build artifacts (gitignored), like the scanner's
-`ScanIndex` resources. From the repo root:
+large `ScanIndex` resources. For an iOS-ready checkout, run the reproducible
+pipeline from the repo root:
+
+```bash
+bash scripts/ios-assets.sh build
+bash scripts/ios-assets.sh check
+```
+
+`build` generates and synchronizes all three catalog packs, converts the web
+embedding artifact into the compact iOS index, copies the tracked card-face
+gate fixture, and converts DINOv2 to Core ML when the required Python packages
+are available. If the web embedding source or Core ML Python packages are
+absent, it prints the exact prerequisite commands, skips that generator, and
+the final validation remains nonzero until every required asset exists.
+
+To regenerate only the catalog packs, the underlying command is:
 
 ```bash
 cd backend
-npx tsx src/scripts/build-catalog-packs.ts --sync
+npx --no-install tsx src/scripts/build-catalog-packs.ts --sync
 ```
 
 This fetches from tcgdex, the Scryfall bulk `default_cards` file (~558 MB
@@ -62,6 +77,11 @@ npm run assets:r2:publish-catalogs
 
 See [`cloudflare/README.md`](../cloudflare/README.md) for initial bucket, custom
 domain, CORS, cache-rule, and credential setup.
+
+The TCGer Xcode target runs `scripts/ios-assets.sh check` before compiling.
+Debug builds emit a warning and continue when assets are absent, preserving
+clean-clone simulator development. Release builds hard-fail so an app cannot be
+shipped without valid catalogs, model/index resources, and rejection gate.
 
 ## Web / PWA behavior
 
@@ -94,10 +114,12 @@ domain, CORS, cache-rule, and credential setup.
 
 ## Known limitations
 
-- **Clean clones don't include packs.** A fresh checkout must run the builder
-  once before bundled packs exist. Production clients can download the same
-  generated artifacts from R2 and fall back to bundled/seeded data when neither
-  the network nor an on-device cached pack is available.
+- **Clean clones don't include generated packs/model/index files.** A fresh
+  checkout must run `bash scripts/ios-assets.sh build` before a complete Release
+  build is possible (Debug degrades gracefully: clients show catalogs as
+  unavailable and fall back to seeded demo behavior). Production clients can
+  download the same generated artifacts from R2 and fall back to bundled/seeded
+  data when neither the network nor an on-device cached pack is available.
 - Yu-Gi-Oh has one row per Konami card (representative printing), not one per
   print — see the format spec for the exact identity rules.
 - Card-image hosting is separate from catalog distribution and remains on the

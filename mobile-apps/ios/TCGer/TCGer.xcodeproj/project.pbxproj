@@ -133,6 +133,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C3C831EE2EA9F37F007FE5BA /* Build configuration list for PBXNativeTarget "TCGer" */;
 			buildPhases = (
+				A7E7A55E4C9B4F6D9A210001 /* Check iOS Assets */,
 				C3C831DF2EA9F37F007FE5BA /* Sources */,
 				C3C831E02EA9F37F007FE5BA /* Frameworks */,
 				C3C831E12EA9F37F007FE5BA /* Resources */,
@@ -205,6 +206,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A7E7A55E4C9B4F6D9A210001 /* Check iOS Assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Check iOS Assets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "ASSET_SCRIPT=\"${SRCROOT}/../../../scripts/ios-assets.sh\"\nif \"${ASSET_SCRIPT}\" check; then\n  exit 0\nfi\n\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  echo \"error: Required iOS catalogs/scanner assets are missing or invalid. Run: bash scripts/ios-assets.sh build\"\n  exit 1\nfi\n\necho \"warning: iOS catalogs/scanner assets are missing or invalid; Debug continues. Run: bash scripts/ios-assets.sh build\"\nexit 0\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		81D21CC7072A54D46367A32D /* Sources */ = {
@@ -399,6 +422,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AppInfo.plist;
@@ -437,6 +461,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AppInfo.plist;
