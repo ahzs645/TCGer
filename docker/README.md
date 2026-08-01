@@ -101,19 +101,106 @@ The resulting artifacts are stored in the named volume `tcger_card_scan_data`:
 - `/data/card-library/pokemon/images/...` — local card-image corpus
 
 ## Production Build
+
+Production uses Convex's official self-hosted backend image. Unlike the development stack, it does not run `convex dev`, and ports 3210/3211 are exposed only to `tcg-net` rather than published on the host.
+
+### First boot
+
 ```bash
+cp .env.docker.example .env.docker
+
+# Put the output in INSTANCE_SECRET in .env.docker. It must remain stable.
+openssl rand -hex 32
+
+# Start only the database service; no admin key exists yet.
+docker compose -f docker/docker-compose.prod.yml --env-file .env.docker up -d convex-backend
+
+# Put the printed key in CONVEX_SELF_HOSTED_ADMIN_KEY in .env.docker.
+docker compose -f docker/docker-compose.prod.yml --env-file .env.docker \
+  exec convex-backend ./generate_admin_key.sh
+
+# Set the Convex deployment environment and deploy the functions once.
+docker compose -f docker/docker-compose.prod.yml --env-file .env.docker \
+  --profile deploy run --rm convex-deploy
+
+# Start the application. The deploy profile is not part of normal startup.
 docker compose -f docker/docker-compose.prod.yml --env-file .env.docker up --build -d
 ```
 
 Uses compiled TypeScript/Next.js output with no development volumes. Add `--profile bulk` for cache services in production.
 
-Production requires both `BETTER_AUTH_SECRET` and `TCGER_BRIDGE_SECRET` in `.env.docker`. The latter is delivered only to the Express and Convex containers and authenticates their internal compatibility-route traffic. Convex ports are not published by the production Compose file; containers reach Convex over `tcg-net`.
+Run the `convex-deploy` command again after changing Convex functions or any deployment environment value. It sets the environment before deploying, which is required because non-local TCGer deployments fail closed when either application secret is absent. `BETTER_AUTH_SECRET` and `TCGER_BRIDGE_SECRET` are passed to the deploy runner; they are not process environment variables on the official backend container. The CLI stores them as Convex deployment environment variables. The bridge secret is also passed to Express so both sides authenticate internal compatibility-route traffic with the same value.
+
+For externally reachable production, route one HTTPS origin to `convex-backend:3210` and a second HTTPS origin to `convex-backend:3211` from a reverse proxy attached to `tcg-net`. Set `CONVEX_CLOUD_ORIGIN`/`NEXT_PUBLIC_CONVEX_URL` to the first origin and `CONVEX_SITE_ORIGIN`/`NEXT_PUBLIC_CONVEX_SITE_URL` to the second. Do not publish 3210/3211 directly. The Compose defaults are safe internal bootstrap/server-proxy origins; the browser app requires the externally routed values.
+
+The optional official dashboard was deliberately not added: it needs a separate browser-reachable routed origin, while this production file keeps Convex management endpoints internal. Use the CLI deploy runner for administration.
+
+### Production variables
+
+| Name | Purpose | Where it is set/used |
+| --- | --- | --- |
+| `INSTANCE_NAME` | Stable self-hosted deployment name. | `.env.docker` → official backend `INSTANCE_NAME`; defaults to `tcger-production`. |
+| `INSTANCE_SECRET` | 64-character hex root secret used to sign admin keys and sessions. | Required in `.env.docker` → official backend `INSTANCE_SECRET`; generate with `openssl rand -hex 32`. |
+| `CONVEX_SELF_HOSTED_ADMIN_KEY` | CLI administrator credential printed by `generate_admin_key.sh`. | Added to `.env.docker` after first boot → `convex-deploy` only. |
+| `CONVEX_BACKEND_TAG` | Official backend image tag. | `.env.docker`/Compose image selector; `latest` follows the official example, but an immutable qualified tag or digest is safer for upgrades. |
+| `CONVEX_CLOUD_ORIGIN` | Browser-reachable Convex client/API origin for port 3210. | Official backend process env; defaults to the internal service URL. |
+| `CONVEX_SITE_ORIGIN` | Browser-reachable HTTP Actions origin for port 3211. | Official backend process env; defaults to the internal service URL. |
+| `CONVEX_SELF_HOSTED_URL` | CLI target for deployment operations. | Fixed to `http://convex-backend:3210` inside `convex-deploy`. |
+| `BETTER_AUTH_SECRET` | Better Auth signing secret, at least 32 random characters. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `TCGER_BRIDGE_SECRET` | Shared Express-to-Convex bridge credential, at least 32 random characters. | `.env.docker` → Express process env and Convex deployment env via `convex-deploy`. |
+| `SITE_URL` | Canonical public application origin used by Better Auth. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `BETTER_AUTH_URL` | Canonical public Better Auth endpoint (`SITE_URL/api/auth`); retained for auth integration compatibility. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `BETTER_AUTH_DISABLE_ORIGIN_CHECK` | Origin/CSRF bypass; must remain `false` in production. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | Optional comma-separated additional trusted origins. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `BETTER_AUTH_USE_SECURE_COOKIES` | Optional explicit secure-cookie switch; normally inferred from HTTPS `SITE_URL`. | `.env.docker` → Convex deployment env via `convex-deploy`. |
+| `NEXT_PUBLIC_CONVEX_URL` | Browser's Convex WebSocket/API origin. | Frontend runtime/build environment; use the externally routed 3210 origin. |
+| `NEXT_PUBLIC_CONVEX_SITE_URL` | Browser-visible Convex HTTP Actions origin. | Frontend runtime environment; use the externally routed 3211 origin. |
+| `CONVEX_HTTP_ORIGIN` | Express auth/HTTP bridge target. | Backend process env; defaults to internal `http://convex-backend:3211`. |
+| `CONVEX_URL_INTERNAL` / `CONVEX_SITE_URL_INTERNAL` | Next.js server-side Convex and auth-proxy targets. | Frontend process env; default to internal ports 3210/3211. |
 
 For legacy Prisma-backed production routes, also add `--profile legacy BACKEND_MODE=hybrid`.
 
+### Back up and restore Convex
+
+The `convex_data` volume is mounted at `/convex/data`. With the default SQLite configuration, the database is `/convex/data/db.sqlite3`; local files, modules, search indexes, exports, and snapshot imports are under `/convex/data/storage/`. Back up the complete volume, not only the SQLite file, and stop application writes first so the database and storage tree are consistent.
+
+One filesystem-level backup sequence is:
+
+```bash
+compose="docker compose -f docker/docker-compose.prod.yml --env-file .env.docker"
+$compose stop
+container_id="$($compose ps -a -q convex-backend)"
+volume_name="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/convex/data"}}{{.Name}}{{end}}{{end}}' "$container_id")"
+test -n "$volume_name"
+mkdir -p backups
+docker run --rm --mount "type=volume,src=$volume_name,dst=/source,readonly" \
+  --mount "type=bind,src=$PWD/backups,dst=/backup" alpine:3.20 \
+  tar -C /source -czf /backup/convex-data.tar.gz .
+$compose start
+```
+
+To restore, first save the current volume separately, then stop the entire stack. Restore only a trusted archive and verify `volume_name` before the destructive clearing step:
+
+```bash
+compose="docker compose -f docker/docker-compose.prod.yml --env-file .env.docker"
+$compose stop
+container_id="$($compose ps -a -q convex-backend)"
+volume_name="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/convex/data"}}{{.Name}}{{end}}{{end}}' "$container_id")"
+backup_file="$PWD/backups/convex-data.tar.gz"
+test -n "$volume_name" && test -f "$backup_file"
+docker run --rm --mount "type=volume,src=$volume_name,dst=/target" alpine:3.20 \
+  sh -euc 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
+docker run --rm --mount "type=volume,src=$volume_name,dst=/target" \
+  --mount "type=bind,src=$PWD/backups,dst=/backup,readonly" alpine:3.20 \
+  tar -C /target -xzf /backup/convex-data.tar.gz
+$compose start
+```
+
+Keep `INSTANCE_NAME` and `INSTANCE_SECRET` with the backup. Changing the root secret invalidates existing admin keys and sessions. For version-to-version migration, also take a logical `npx convex export`, save `npx convex env list`, and use `npx convex import --replace-all` as described by Convex's upgrade guide.
+
 ## Notes
 - Node modules live inside the container; each start runs `npm install` to sync dependencies.
-- Convex local state is persisted in the `convex_data` named volume mounted at `/app/convex-backend/.convex`.
+- Development Convex state is persisted at `/app/convex-backend/.convex`; production self-hosted state uses the same named volume at the official image path `/convex/data`.
 - In full Docker mode, access the frontend at `http://localhost:${APP_PORT:-3003}`. API requests are served at `http://localhost:${APP_PORT:-3003}/api`.
 - In host frontend mode, the backend is exposed on `localhost:${BACKEND_PORT:-3004}`.
 - Postgres is only started when the `legacy` profile is enabled. When active, the database is accessible on `localhost:5432` with credentials from `.env.docker`.
