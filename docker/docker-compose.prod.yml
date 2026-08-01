@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -16,25 +14,73 @@ services:
       - tcg-net
 
   convex-backend:
+    image: ghcr.io/get-convex/convex-backend:${CONVEX_BACKEND_TAG:-latest}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    environment:
+      INSTANCE_NAME: ${INSTANCE_NAME:-tcger-production}
+      INSTANCE_SECRET: ${INSTANCE_SECRET:?set INSTANCE_SECRET to a 64-character hex secret}
+      CONVEX_CLOUD_ORIGIN: ${CONVEX_CLOUD_ORIGIN:-http://convex-backend:3210}
+      CONVEX_SITE_ORIGIN: ${CONVEX_SITE_ORIGIN:-http://convex-backend:3211}
+      DISABLE_METRICS_ENDPOINT: ${DISABLE_METRICS_ENDPOINT:-true}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - convex_data:/convex/data
+    expose:
+      - "3210"
+      - "3211"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3210/version"]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 10
+    networks:
+      - tcg-net
+
+  convex-deploy:
     build:
       context: ..
       dockerfile: docker/convex-backend.Dockerfile
-      target: production
-    restart: unless-stopped
+      target: deploy
+    profiles:
+      - deploy
+    restart: "no"
     environment:
-      NODE_ENV: production
-      CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
+      CONVEX_SELF_HOSTED_URL: http://convex-backend:3210
+      CONVEX_SELF_HOSTED_ADMIN_KEY: ${CONVEX_SELF_HOSTED_ADMIN_KEY:-}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?err}
       TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:?err}
       BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-false}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
+      BETTER_AUTH_USE_SECURE_COOKIES: ${BETTER_AUTH_USE_SECURE_COOKIES:-}
       SITE_URL: ${SITE_URL:-http://localhost:3000}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
       POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
-    volumes:
-      - convex_data:/app/convex-backend/.convex
+    command:
+      - sh
+      - -euc
+      - |
+        : "$${CONVEX_SELF_HOSTED_ADMIN_KEY:?generate an admin key with ./generate_admin_key.sh and set CONVEX_SELF_HOSTED_ADMIN_KEY}"
+        npx --no-install convex env set BETTER_AUTH_SECRET "$${BETTER_AUTH_SECRET}"
+        npx --no-install convex env set TCGER_BRIDGE_SECRET "$${TCGER_BRIDGE_SECRET}"
+        npx --no-install convex env set SITE_URL "$${SITE_URL}"
+        npx --no-install convex env set BETTER_AUTH_URL "$${BETTER_AUTH_URL}"
+        npx --no-install convex env set BETTER_AUTH_DISABLE_ORIGIN_CHECK "$${BETTER_AUTH_DISABLE_ORIGIN_CHECK}"
+        npx --no-install convex env set BETTER_AUTH_TRUSTED_ORIGINS "$${BETTER_AUTH_TRUSTED_ORIGINS}"
+        npx --no-install convex env set BETTER_AUTH_USE_SECURE_COOKIES "$${BETTER_AUTH_USE_SECURE_COOKIES}"
+        npx --no-install convex env set SCRYFALL_API_BASE_URL "$${SCRYFALL_API_BASE_URL}"
+        npx --no-install convex env set YGO_API_BASE_URL "$${YGO_API_BASE_URL}"
+        npx --no-install convex env set POKEMON_API_BASE_URL "$${POKEMON_API_BASE_URL}"
+        npx --no-install convex env set TCGDEX_API_BASE_URL "$${TCGDEX_API_BASE_URL}"
+        npx --no-install convex deploy
+    depends_on:
+      convex-backend:
+        condition: service_healthy
     networks:
       - tcg-net
 
@@ -141,7 +187,7 @@ services:
       APITCG_API_KEY: ${APITCG_API_KEY:-}
     depends_on:
       convex-backend:
-        condition: service_started
+        condition: service_healthy
     networks:
       - tcg-net
 

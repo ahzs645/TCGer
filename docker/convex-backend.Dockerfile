@@ -13,6 +13,6 @@ FROM base AS dev
 WORKDIR /app/convex-backend
 CMD ["npm", "run", "dev", "--", "--typecheck", "disable", "--tail-logs", "disable"]
 
-FROM base AS production
+FROM base AS deploy
 WORKDIR /app/convex-backend
-CMD ["npm", "run", "dev", "--", "--typecheck", "disable", "--tail-logs", "disable"]
+CMD ["npx", "--no-install", "convex", "deploy"]
