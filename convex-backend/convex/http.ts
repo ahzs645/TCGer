@@ -24,6 +24,8 @@ import {
 } from "./lib/httpBridge";
 import type { TcgCode } from "./lib/validators";
 import { registerDecksRoutes } from "./decksHttp";
+import { registerFinanceRoutes } from "./financeHttp";
+import { registerSealedRoutes } from "./sealedHttp";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -1948,4 +1950,6 @@ http.route({
 });
 
 registerDecksRoutes(http);
+registerFinanceRoutes(http);
+registerSealedRoutes(http);
 export default http;

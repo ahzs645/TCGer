@@ -4,10 +4,12 @@ import { authRouter, setupRouter } from './auth.router';
 import { cardsRouter } from './cards.router';
 import { env } from '../../config/env';
 import { convexCollectionsRouter } from './collections.convex.router';
+import { convexFinanceRouter } from './finance.convex.router';
 import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { newsRouter } from './news.router';
 import { settingsRouter } from './settings.router';
+import { convexSealedRouter } from './sealed.convex.router';
 import { usersRouter } from './users.router';
 import { convexWishlistsRouter } from './wishlists.convex.router';
 import { convexDecksRouter } from './decks.convex.router';
@@ -92,9 +94,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/wishlists', wishlistsRouter);
   app.use('/news', newsRouter);
 
-  // Decks are Convex-native only when the whole backend is in Convex mode.
+  // Convex-native feature routers, mounted only in full Convex mode.
   if (env.BACKEND_MODE === 'convex') {
     app.use('/decks', convexDecksRouter);
+    app.use('/finance', convexFinanceRouter);
+    app.use('/sealed', convexSealedRouter);
   }
 
   if (env.BACKEND_MODE !== 'convex') {
