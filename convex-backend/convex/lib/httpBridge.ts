@@ -90,13 +90,32 @@ export async function parseJsonBody(request: Request) {
   }
 }
 
+// NODE_ENV is unreliable inside Convex (push analysis always reports
+// "production"); only localhost deployments may use the baked-in dev secret.
+function isLocalDeployment(): boolean {
+  const url = process.env.CONVEX_CLOUD_URL ?? process.env.CONVEX_SITE_URL ?? "";
+  if (!url) {
+    return true;
+  }
+  try {
+    const hostname = new URL(url).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname.endsWith(".local")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function configuredBridgeSecret(): string | null {
   const configured = process.env.TCGER_BRIDGE_SECRET?.trim();
   if (configured !== undefined) {
     return configured.length >= 32 ? configured : null;
   }
 
-  return process.env.NODE_ENV === "production" ? null : DEVELOPMENT_BRIDGE_SECRET;
+  return isLocalDeployment() ? DEVELOPMENT_BRIDGE_SECRET : null;
 }
 
 function secretsMatch(expected: string, provided: string): boolean {

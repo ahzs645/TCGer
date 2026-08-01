@@ -10,13 +10,35 @@ import authConfig from "../auth.config";
 
 const fallbackSecret = "tcger-convex-dev-local-secret-2026-not-default";
 
+// NODE_ENV is unreliable inside Convex (push analysis always reports
+// "production"), so dev-vs-deployed is derived from the deployment URL:
+// only localhost deployments may fall back to the baked-in dev secret.
+const isLocalDeployment = (): boolean => {
+  const url = process.env.CONVEX_CLOUD_URL ?? process.env.CONVEX_SITE_URL ?? "";
+  if (!url) {
+    return true;
+  }
+  try {
+    const hostname = new URL(url).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname.endsWith(".local")
+    );
+  } catch {
+    return false;
+  }
+};
+
 const getBetterAuthSecret = (): string => {
   const configured = process.env.BETTER_AUTH_SECRET?.trim();
   if (configured) {
     return configured;
   }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("BETTER_AUTH_SECRET is required in production");
+  if (!isLocalDeployment()) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is required on non-local Convex deployments"
+    );
   }
   return fallbackSecret;
 };
