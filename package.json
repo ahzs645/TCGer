@@ -30,6 +30,8 @@
     "dev:all": "turbo dev",
     "build": "turbo build",
     "build:marketing": "npm --prefix marketing-site run build",
+    "catalogs:build": "tsx backend/src/scripts/build-catalog-packs.ts --sync",
+    "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
     "lint": "turbo lint",
     "test": "turbo test",
     "format": "turbo format"
@@ -39,8 +41,10 @@
     "npm": ">=9.0.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
     "@types/node": "^25.3.2",
-    "turbo": "^2.8.9"
+    "turbo": "^2.8.9",
+    "wrangler": "^4.118.0"
   },
   "dependencies": {
     "@tensorflow/tfjs-node": "^4.22.0"

@@ -7,12 +7,8 @@ import {
   replaceCatalog,
 } from "./catalog-db";
 import { invalidateCatalogSearchIndex } from "./catalog-search";
-import {
-  CATALOG_GAMES,
-  type CatalogTcgCode,
-} from "./catalog-types";
-
-const CATALOG_ROOT = "/catalog";
+import { CATALOG_GAMES, type CatalogTcgCode } from "./catalog-types";
+import { catalogAssetUrl } from "./catalog-assets";
 
 export interface CatalogManifestGame {
   version: number;
@@ -74,7 +70,10 @@ function parseManifestGame(value: unknown): CatalogManifestGame | undefined {
     typeof value.setCount !== "number" ||
     typeof value.bytes !== "number" ||
     !isString(value.sha256) ||
-    !isString(value.file)
+    !isString(value.file) ||
+    !value.file ||
+    value.file.includes("/") ||
+    value.file.includes("\\")
   ) {
     return undefined;
   }
@@ -144,7 +143,10 @@ function isCatalogCard(value: unknown): value is CatalogCard {
   );
 }
 
-function parseCatalogPack(value: unknown, expectedTcg: CatalogTcgCode): CatalogPack {
+function parseCatalogPack(
+  value: unknown,
+  expectedTcg: CatalogTcgCode,
+): CatalogPack {
   if (
     !isRecord(value) ||
     value.formatVersion !== 1 ||
@@ -185,14 +187,26 @@ function progressValue(
   };
 }
 
+async function sha256Hex(value: string): Promise<string | undefined> {
+  if (typeof crypto === "undefined" || !crypto.subtle) return undefined;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
 async function readResponseWithProgress(
   response: Response,
   fallbackBytes: number,
   onProgress?: CatalogProgressCallback,
 ): Promise<string> {
   const contentLength = Number(response.headers.get("Content-Length"));
+  const isEncoded = Boolean(response.headers.get("Content-Encoding"));
   const totalBytes =
-    Number.isFinite(contentLength) && contentLength > 0
+    !isEncoded && Number.isFinite(contentLength) && contentLength > 0
       ? contentLength
       : fallbackBytes > 0
         ? fallbackBytes
@@ -224,7 +238,7 @@ async function readResponseWithProgress(
 }
 
 export async function fetchCatalogManifest(): Promise<CatalogManifest> {
-  const response = await fetch(`${CATALOG_ROOT}/manifest.json`, {
+  const response = await fetch(catalogAssetUrl("manifest.json"), {
     cache: "no-cache",
   });
   if (!response.ok) {
@@ -236,7 +250,9 @@ export async function fetchCatalogManifest(): Promise<CatalogManifest> {
   return parseCatalogManifest(value);
 }
 
-export async function isCatalogInstalled(tcg: CatalogTcgCode): Promise<boolean> {
+export async function isCatalogInstalled(
+  tcg: CatalogTcgCode,
+): Promise<boolean> {
   try {
     return Boolean(await getInstalledCatalog(tcg));
   } catch {
@@ -254,12 +270,9 @@ export async function downloadCatalog(
     throw new Error(`No ${tcg} catalog is published.`);
   }
 
-  const response = await fetch(
-    `${CATALOG_ROOT}/${entry.file}?v=${entry.version}`,
-    {
-      cache: "force-cache",
-    },
-  );
+  const response = await fetch(catalogAssetUrl(entry.file), {
+    cache: "force-cache",
+  });
   if (!response.ok) {
     throw new Error(
       `Unable to download the ${tcg} catalog (${response.status}).`,
@@ -271,6 +284,10 @@ export async function downloadCatalog(
     entry.bytes,
     onProgress,
   );
+  const sha256 = await sha256Hex(text);
+  if (sha256 && sha256 !== entry.sha256) {
+    throw new Error(`The ${tcg} catalog failed its integrity check.`);
+  }
   const value: unknown = JSON.parse(text);
   const pack = parseCatalogPack(value, tcg);
   if (pack.version !== entry.version) {

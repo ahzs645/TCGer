@@ -33,6 +33,8 @@
 	<string>TCGer needs Face ID access to unlock the app when biometric lock is enabled.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>TCGer needs local network access to connect to your TCGer server.</string>
+	<key>TCGerCatalogBaseURL</key>
+	<string>$(TCGER_CATALOG_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

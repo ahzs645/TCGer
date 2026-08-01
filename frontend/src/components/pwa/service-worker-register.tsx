@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { CATALOG_ROOT } from "@/lib/catalog/catalog-assets";
 
 /**
  * Registers the PWA service worker (offline-first scanner assets + installable
@@ -13,9 +14,15 @@ export function ServiceWorkerRegister() {
     if (process.env.NODE_ENV !== "production") return;
 
     const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // SW registration is best-effort; the app works without it.
-      });
+      const catalogRoot = new URL(CATALOG_ROOT, window.location.origin);
+      const workerUrl = new URL("/sw.js", window.location.origin);
+      workerUrl.searchParams.set("catalogOrigin", catalogRoot.origin);
+      workerUrl.searchParams.set("catalogPath", catalogRoot.pathname);
+      navigator.serviceWorker
+        .register(`${workerUrl.pathname}${workerUrl.search}`)
+        .catch(() => {
+          // SW registration is best-effort; the app works without it.
+        });
     };
 
     if (document.readyState === "complete") register();

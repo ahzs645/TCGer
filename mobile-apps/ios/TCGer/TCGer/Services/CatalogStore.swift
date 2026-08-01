@@ -1,9 +1,10 @@
 import Combine
+import CryptoKit
 import Foundation
 
 nonisolated protocol CatalogSource: Sendable {
-    func contains(_ filename: String) -> Bool
-    func data(for filename: String) throws -> Data
+    func data(for filename: String) async throws -> Data
+    func remove(_ filename: String) async
 }
 
 nonisolated struct BundledCatalogSource: CatalogSource, @unchecked Sendable {
@@ -13,16 +14,14 @@ nonisolated struct BundledCatalogSource: CatalogSource, @unchecked Sendable {
         self.bundle = bundle
     }
 
-    func contains(_ filename: String) -> Bool {
-        resourceURL(for: filename) != nil
-    }
-
-    func data(for filename: String) throws -> Data {
+    func data(for filename: String) async throws -> Data {
         guard let url = resourceURL(for: filename) else {
             throw CatalogStore.StoreError.resourceUnavailable(filename)
         }
         return try Data(contentsOf: url, options: .mappedIfSafe)
     }
+
+    func remove(_ filename: String) async {}
 
     private func resourceURL(for filename: String) -> URL? {
         let fileManager = FileManager.default
@@ -37,6 +36,103 @@ nonisolated struct BundledCatalogSource: CatalogSource, @unchecked Sendable {
 
         // Xcode may flatten synchronized resources depending on project settings.
         return bundle.url(forResource: filename, withExtension: nil)
+    }
+}
+
+actor RemoteCatalogSource: CatalogSource {
+    private let baseURL: URL
+    private let cacheDirectory: URL
+    private let fallback: any CatalogSource
+    private let session: URLSession
+
+    init(
+        baseURL: URL,
+        fallback: any CatalogSource = BundledCatalogSource(),
+        session: URLSession = .shared,
+        fileManager: FileManager = .default
+    ) {
+        self.baseURL = baseURL
+        self.fallback = fallback
+        self.session = session
+        let applicationSupport = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first ?? fileManager.temporaryDirectory
+        cacheDirectory = applicationSupport
+            .appendingPathComponent("TCGer", isDirectory: true)
+            .appendingPathComponent("Catalogs", isDirectory: true)
+    }
+
+    func data(for filename: String) async throws -> Data {
+        guard Self.isSafe(filename) else {
+            throw CatalogStore.StoreError.resourceUnavailable(filename)
+        }
+
+        let cachedURL = cacheDirectory.appendingPathComponent(filename, isDirectory: false)
+        if filename != "manifest.json",
+           let cached = try? Data(contentsOf: cachedURL, options: .mappedIfSafe) {
+            return cached
+        }
+
+        do {
+            let remoteURL = baseURL.appendingPathComponent(filename, isDirectory: false)
+            var request = URLRequest(url: remoteURL)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 60
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                throw CatalogStore.StoreError.resourceUnavailable(filename)
+            }
+            try FileManager.default.createDirectory(
+                at: cacheDirectory,
+                withIntermediateDirectories: true
+            )
+            try data.write(to: cachedURL, options: .atomic)
+            return data
+        } catch {
+            if let cached = try? Data(contentsOf: cachedURL, options: .mappedIfSafe) {
+                return cached
+            }
+            return try await fallback.data(for: filename)
+        }
+    }
+
+    func remove(_ filename: String) async {
+        guard Self.isSafe(filename), filename != "manifest.json" else { return }
+        try? FileManager.default.removeItem(
+            at: cacheDirectory.appendingPathComponent(filename, isDirectory: false)
+        )
+    }
+
+    private static func isSafe(_ filename: String) -> Bool {
+        !filename.isEmpty &&
+            filename != "." &&
+            filename != ".." &&
+            !filename.contains("/") &&
+            !filename.contains("\\")
+    }
+}
+
+nonisolated enum CatalogAssetConfiguration {
+    static func catalogSource(bundle: Bundle = .main) -> any CatalogSource {
+        let bundled = BundledCatalogSource(bundle: bundle)
+        guard let baseURL = httpsURL(for: "TCGerCatalogBaseURL", bundle: bundle) else {
+            return bundled
+        }
+        return RemoteCatalogSource(baseURL: baseURL, fallback: bundled)
+    }
+
+    private static func httpsURL(for key: String, bundle: Bundle) -> URL? {
+        guard let value = bundle.object(forInfoDictionaryKey: key) as? String,
+              !value.isEmpty,
+              !value.contains("$("),
+              let url = URL(string: value),
+              url.scheme == "https",
+              url.host != nil else {
+            return nil
+        }
+        return url
     }
 }
 
@@ -94,6 +190,7 @@ final class CatalogStore: ObservableObject {
         case resourceUnavailable(String)
         case unsupportedFormat(Int)
         case invalidPack(expected: TCGGame)
+        case checksumMismatch(expected: TCGGame)
 
         var errorDescription: String? {
             switch self {
@@ -102,7 +199,9 @@ final class CatalogStore: ObservableObject {
             case .unsupportedFormat(let version):
                 return "Catalog format version \(version) is not supported."
             case .invalidPack(let game):
-                return "The bundled \(game.rawValue) catalog is invalid."
+                return "The \(game.rawValue) catalog is invalid."
+            case .checksumMismatch(let game):
+                return "The downloaded \(game.rawValue) catalog failed its integrity check."
             }
         }
     }
@@ -167,20 +266,36 @@ final class CatalogStore: ObservableObject {
     private var enabledGames: Set<TCGGame> = []
 
     init(
-        source: any CatalogSource = BundledCatalogSource(),
+        source: any CatalogSource = CatalogAssetConfiguration.catalogSource(),
         defaults: UserDefaults = .standard
     ) {
         self.source = source
         self.defaults = defaults
+        manifest = nil
 
-        guard source.contains("manifest.json"),
-              let data = try? source.data(for: "manifest.json"),
-              let decoded = try? JSONDecoder().decode(CatalogManifest.self, from: data),
-              decoded.formatVersion == 1 else {
-            manifest = nil
-            return
+        Task { [weak self] in
+            await self?.refreshManifest()
         }
-        manifest = decoded
+    }
+
+    func refreshManifest() async {
+        do {
+            let source = self.source
+            let data = try await source.data(for: "manifest.json")
+            let decoded = try await Task.detached(priority: .utility) {
+                try JSONDecoder().decode(CatalogManifest.self, from: data)
+            }.value
+            guard decoded.formatVersion == 1 else {
+                throw StoreError.unsupportedFormat(decoded.formatVersion)
+            }
+            manifest = decoded
+            for game in TCGGame.catalogGames where enabledGames.contains(game) && isInstalled(game) {
+                await loadIfNeeded(game)
+            }
+        } catch {
+            // The source already tries its disk cache and bundled resources.
+            // With no manifest at all, local mode keeps its small seed catalog.
+        }
     }
 
     func metadata(for game: TCGGame) -> CatalogManifestGame? {
@@ -196,8 +311,7 @@ final class CatalogStore: ObservableObject {
     }
 
     func isAvailable(_ game: TCGGame) -> Bool {
-        guard let metadata = metadata(for: game) else { return false }
-        return source.contains(metadata.file)
+        metadata(for: game) != nil
     }
 
     func isUpdateAvailable(_ game: TCGGame) -> Bool {
@@ -245,8 +359,7 @@ final class CatalogStore: ObservableObject {
 
     func install(_ game: TCGGame) async throws {
         guard game != .all,
-              let metadata = metadata(for: game),
-              source.contains(metadata.file) else {
+              let metadata = metadata(for: game) else {
             throw StoreError.resourceUnavailable(metadata(for: game)?.file ?? game.rawValue)
         }
 
@@ -267,9 +380,16 @@ final class CatalogStore: ObservableObject {
     }
 
     func remove(_ game: TCGGame) {
+        let file = metadata(for: game)?.file
         defaults.removeObject(forKey: installKey(for: game))
         loadedPacks.removeValue(forKey: game)
         installProgress.removeValue(forKey: game)
+        if let file {
+            let source = self.source
+            Task(priority: .utility) {
+                await source.remove(file)
+            }
+        }
         objectWillChange.send()
     }
 
@@ -279,8 +399,7 @@ final class CatalogStore: ObservableObject {
               loadedPacks[game] == nil,
               isInstalled(game),
               let metadata = metadata(for: game),
-              metadata.version == installedVersion(for: game),
-              source.contains(metadata.file) else {
+              metadata.version == installedVersion(for: game) else {
             return
         }
 
@@ -443,10 +562,15 @@ final class CatalogStore: ObservableObject {
 
         let source = self.source
         let file = metadata.file
-        let data = try await Task.detached(priority: .utility) {
-            try source.data(for: file)
-        }.value
+        let data = try await source.data(for: file)
         installProgress[game] = 0.3
+
+        let digest = await Task.detached(priority: .utility) {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }.value
+        guard digest == metadata.sha256 else {
+            throw StoreError.checksumMismatch(expected: game)
+        }
 
         let pack = try await Task.detached(priority: .utility) {
             try JSONDecoder().decode(CatalogPack.self, from: data)

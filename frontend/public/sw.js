@@ -19,6 +19,12 @@ const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SCAN_CACHE = `${CACHE_VERSION}-scan`;
 const CATALOG_CACHE = `${CACHE_VERSION}-catalog`;
 const MODEL_CACHE = `${CACHE_VERSION}-model`;
+const workerUrl = new URL(self.location.href);
+const CATALOG_ORIGIN =
+  workerUrl.searchParams.get("catalogOrigin") || self.location.origin;
+const CATALOG_PATH = `/${(
+  workerUrl.searchParams.get("catalogPath") || "/catalog"
+).replace(/^\/+|\/+$/g, "")}`;
 
 const APP_SHELL = [
   "/",
@@ -63,6 +69,14 @@ function isModelAsset(url) {
   );
 }
 
+function isCatalogAsset(url) {
+  return (
+    url.origin === CATALOG_ORIGIN &&
+    (url.pathname === `${CATALOG_PATH}/manifest.json` ||
+      url.pathname.startsWith(`${CATALOG_PATH}/`))
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -76,11 +90,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(cacheFirst(req, SCAN_CACHE));
     return;
   }
-  if (url.pathname === "/catalog/manifest.json") {
+  if (isCatalogAsset(url) && url.pathname === `${CATALOG_PATH}/manifest.json`) {
     event.respondWith(networkFirst(req, CATALOG_CACHE));
     return;
   }
-  if (url.pathname.startsWith("/catalog/")) {
+  if (isCatalogAsset(url)) {
     event.respondWith(cacheFirst(req, CATALOG_CACHE));
     return;
   }

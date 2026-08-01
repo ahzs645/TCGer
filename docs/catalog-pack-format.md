@@ -2,14 +2,16 @@
 
 Per-game card catalog packs that give clients (iOS local mode, PWA demo mode) full
 card search and set browsing without a server. Generated locally by
-`backend/src/scripts/build-catalog-packs.ts`; distribution via R2/CDN may come later,
-for now packs are bundled into the iOS app and served from `frontend/public/catalog/`.
+`backend/src/scripts/build-catalog-packs.ts`; production distribution uses
+Cloudflare R2 while generated copies may also be bundled into iOS and served
+from `frontend/public/catalog/` for local development.
 
 ## Locations
 
 - Canonical build output: `data/catalog/` at the repo root (gitignored).
   - `data/catalog/manifest.json`
-  - `data/catalog/{game}.pack.json` (uncompressed; game = `pokemon | magic | yugioh`)
+  - `data/catalog/{game}.v{version}.{sha-prefix}.pack.json` (uncompressed;
+    game = `pokemon | magic | yugioh`)
 - Synced copies (both gitignored, each with a committed README explaining regeneration):
   - `frontend/public/catalog/` — served same-origin to the PWA.
   - `mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/` — bundled into the app
@@ -22,7 +24,14 @@ for now packs are bundled into the iOS app and served from `frontend/public/cata
   "formatVersion": 1,
   "generatedAt": "2026-07-24T00:00:00Z",
   "games": {
-    "pokemon": { "version": 1, "cardCount": 23444, "setCount": 160, "bytes": 5000000, "sha256": "…", "file": "pokemon.pack.json" }
+    "pokemon": {
+      "version": 1,
+      "cardCount": 23444,
+      "setCount": 160,
+      "bytes": 5000000,
+      "sha256": "…",
+      "file": "pokemon.v1.fd0c13e09b1483cb.pack.json"
+    }
   }
 }
 ```
@@ -37,14 +46,32 @@ Games are independent — a pack may be absent (client treats that game as "no c
   "tcg": "pokemon",
   "version": 1,
   "updatedAt": "2026-07-24T00:00:00Z",
-  "sets": [ { "code": "swsh6", "name": "Chilling Reign", "serie": "swsh", "releasedAt": "2021-06-18", "count": 233 } ],
-  "cards": [ { "id": "swsh6-82", "name": "Galarian Yamask", "setCode": "swsh6", "collectorNumber": "82", "rarity": "Common", "type": "Pokémon" } ]
+  "sets": [
+    {
+      "code": "swsh6",
+      "name": "Chilling Reign",
+      "serie": "swsh",
+      "releasedAt": "2021-06-18",
+      "count": 233
+    }
+  ],
+  "cards": [
+    {
+      "id": "swsh6-82",
+      "name": "Galarian Yamask",
+      "setCode": "swsh6",
+      "collectorNumber": "82",
+      "rarity": "Common",
+      "type": "Pokémon"
+    }
+  ]
 }
 ```
 
 Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `type?`.
 `setName` is NOT stored per card; clients join via the `sets` array by `setCode`.
 Per game extras (all optional):
+
 - pokemon: `types` (string[]), `hp` (number). `id` is the tcgdex id (`{setCode}-{localId}`).
 - magic: `manaCost`, `colors` (string[]). `id` is the Scryfall print UUID.
 - yugioh: `race`, `atk`, `def`, `level`, `konamiId` (number). `konamiId` is the
@@ -81,17 +108,20 @@ found offline and a card found via server search dedupe to the same identity.
 - yugioh: `https://images.ygoprodeck.com/images/cards/{konamiId}.jpg`
   (`images/cards_small/` for thumbnails)
 
+Image hosting is independent of catalog distribution. Moving an image source
+does not require rebuilding or republishing these metadata packs.
+
 While an image is not yet cached (or offline), clients show the per-game card back:
 iOS asset names `PokemonCardBack` / `MagicCardBack` / `YugiohCardBack`
 (see `APIService.cardBack(for:)`), web `marketing-site/public/*_Back.png` equivalents.
 
 ## Sources & expected sizes
 
-| game | source | cards | pack raw |
-|---|---|---|---|
-| pokemon | tcgdex (`https://api.tcgdex.net/v2/en`) | ~23.4k | ~5 MB |
-| magic | Scryfall bulk `default_cards` (~558 MB download, streamed + trimmed) | ~96k paper prints | ~15 MB |
-| yugioh | YGOPRODeck `cardinfo.php` | ~14.5k | ~4–8 MB |
+| game    | source                                                               | cards             | pack raw |
+| ------- | -------------------------------------------------------------------- | ----------------- | -------- |
+| pokemon | tcgdex (`https://api.tcgdex.net/v2/en`)                              | ~23.4k            | ~5 MB    |
+| magic   | Scryfall bulk `default_cards` (~558 MB download, streamed + trimmed) | ~96k paper prints | ~15 MB   |
+| yugioh  | YGOPRODeck `cardinfo.php`                                            | ~14.5k            | ~4–8 MB  |
 
 Magic includes every `default_cards` record whose `games` contains `paper`.
 Pure-digital records are excluded. Paper tokens, emblems, and art-series cards

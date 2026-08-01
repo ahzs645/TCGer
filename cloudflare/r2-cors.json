@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://tcger.ahmadjalil.com",
+          "https://ahzs645.github.io",
+          "http://localhost:3003"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": []
+      },
+      "exposeHeaders": ["Content-Length", "Content-Encoding", "ETag"],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}

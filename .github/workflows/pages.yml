@@ -75,6 +75,8 @@ jobs:
           cp -R docs/dist/. marketing-site/dist/docs/
 
       - name: Build frontend demo (static export)
+        env:
+          NEXT_PUBLIC_CATALOG_BASE_URL: https://assets.tcger.ahmadjalil.com/catalogs
         run: |
           BASE_PATH="${{ steps.pages.outputs.base_path }}"
           if [ -z "$BASE_PATH" ]; then

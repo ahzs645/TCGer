@@ -12,15 +12,15 @@ feature works and how to maintain it.
 
 ## What ships
 
-| Game | Cards | Sets | Pack size (raw) |
-|---|---:|---:|---:|
-| Pokémon (tcgdex) | 23,444 | 214 | ~1.8 MB |
-| Magic (Scryfall, paper prints) | 106,826 | 986 | ~20.7 MB |
-| Yu-Gi-Oh (YGOPRODeck, representative printing per card) | 14,471 | 454 | ~3.4 MB |
+| Game                                                    |   Cards | Sets | Pack size (raw) |
+| ------------------------------------------------------- | ------: | ---: | --------------: |
+| Pokémon (tcgdex)                                        |  23,444 |  214 |         ~1.8 MB |
+| Magic (Scryfall, paper prints)                          | 106,826 |  986 |        ~20.7 MB |
+| Yu-Gi-Oh (YGOPRODeck, representative printing per card) |  14,471 |  454 |         ~3.4 MB |
 
-Packs store no image URLs — clients derive them from card ids (Scryfall CDN,
-tcgdex assets, YGOPRODeck images). While an image loads (or offline), clients
-show the per-game card back instead of a gray placeholder:
+Packs store no image URLs — clients derive them from card ids and the existing
+per-game image sources. While an image loads (or offline), clients show the
+per-game card back instead of a gray placeholder:
 `Assets.xcassets/CardBacks/*` on iOS, `frontend/public/card-backs/*.png` on web.
 
 Card ids match the backend adapters' ids exactly, so a card found offline and
@@ -49,8 +49,19 @@ manifest entries are preserved), `--limit <n>` (fast test builds),
 `--out <dir>`.
 
 Versioning is automatic: regenerating unchanged content keeps a game's
-`version`; changed content increments it. Clients compare manifest versions to
-offer updates.
+`version`; changed content increments it. Pack filenames include the version and
+SHA-256 prefix, making them immutable CDN objects. Clients compare manifest
+versions to offer updates.
+
+Production packs are published to Cloudflare R2 after generation:
+
+```bash
+npm run assets:r2:publish-catalogs -- --dry-run
+npm run assets:r2:publish-catalogs
+```
+
+See [`cloudflare/README.md`](../cloudflare/README.md) for initial bucket, custom
+domain, CORS, cache-rule, and credential setup.
 
 ## Web / PWA behavior
 
@@ -68,9 +79,9 @@ offer updates.
 
 ## iOS behavior
 
-- `Services/CatalogStore.swift` reads the bundled manifest/packs via a small
-  `CatalogSource` protocol (`BundledCatalogSource` today; a remote CDN source
-  can be added later without UI changes).
+- `Services/CatalogStore.swift` reads through a small `CatalogSource` protocol.
+  Production uses an R2-backed source with persistent on-device caching and
+  bundled fallback; builds without a configured CDN use bundled resources only.
 - Install state is per game in UserDefaults. Settings has a "Card Catalogs"
   section (install/update/remove, counts, sizes); the "This Phone" onboarding
   offers the same rows. Enabling a game in local mode without its catalog
@@ -84,11 +95,11 @@ offer updates.
 ## Known limitations
 
 - **Clean clones don't include packs.** A fresh checkout must run the builder
-  once before packs exist (the feature degrades gracefully: clients show
-  catalogs as unavailable and fall back to seeded demo behavior). If/when packs
-  move to a CDN (e.g. R2), the client abstractions are already in place —
-  publish the same files and add a remote source.
+  once before bundled packs exist. Production clients can download the same
+  generated artifacts from R2 and fall back to bundled/seeded data when neither
+  the network nor an on-device cached pack is available.
 - Yu-Gi-Oh has one row per Konami card (representative printing), not one per
   print — see the format spec for the exact identity rules.
-- Card images still load from the upstream CDNs; only metadata is offline.
+- Card-image hosting is separate from catalog distribution and remains on the
+  existing per-game image sources for now.
   Cached images persist via the existing image caches on both platforms.

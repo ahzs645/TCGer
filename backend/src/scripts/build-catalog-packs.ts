@@ -557,7 +557,6 @@ async function writePack(
   pack: CatalogPack,
   existingEntry?: ManifestGame
 ): Promise<ManifestGame> {
-  const file = `${pack.tcg}.pack.json`;
   const generatedAt = pack.updatedAt;
   let contents: string | undefined;
 
@@ -579,13 +578,15 @@ async function writePack(
     contents = JSON.stringify(pack);
   }
 
+  const sha256 = packSha256(contents);
+  const file = `${pack.tcg}.v${pack.version}.${sha256.slice(0, 16)}.pack.json`;
   await writeFile(resolve(outDir, file), contents);
   return {
     version: pack.version,
     cardCount: pack.cards.length,
     setCount: pack.sets.length,
     bytes: Buffer.byteLength(contents),
-    sha256: packSha256(contents),
+    sha256,
     file
   };
 }
