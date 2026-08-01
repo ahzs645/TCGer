@@ -9,6 +9,9 @@ cd ..
 cp .env.docker.example .env.docker
 cp frontend/.env.local.example frontend/.env.local
 
+# Replace BETTER_AUTH_SECRET and TCGER_BRIDGE_SECRET in .env.docker.
+# Use different random values of at least 32 characters.
+
 # Start backend, Postgres, and cache services in Docker
 npm run docker:dev:legacy:bulk
 
@@ -22,7 +25,7 @@ This starts:
 - `postgres` on `localhost:5432`
 - `scryfall-bulk`, `ygo-cache`, and `tcgdex-cache`
 
-The frontend runs natively on your machine with full Next.js hot reload speed at `http://localhost:3003`. It connects to the backend directly at `http://localhost:3004` (no `/api` prefix — that path is only used when you run the nginx gateway in full Docker mode).
+The frontend runs natively on your machine with full Next.js hot reload speed at `http://localhost:3003`. It connects to the backend directly at `http://localhost:3004` (no `/api` prefix — that path is only used when you run the nginx gateway in full Docker mode). Collection bridge requests always go through this authenticated Express API; browser code must not call Convex HTTP actions or send `X-TCGER-*` identity headers directly.
 
 If the default ports are already in use, override `APP_PORT`, `BACKEND_PORT`, `CONVEX_PORT`, or `CONVEX_SITE_PORT` in `.env.docker` before starting the stack.
 
@@ -104,10 +107,13 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.docker up --bui
 
 Uses compiled TypeScript/Next.js output with no development volumes. Add `--profile bulk` for cache services in production.
 
+Production requires both `BETTER_AUTH_SECRET` and `TCGER_BRIDGE_SECRET` in `.env.docker`. The latter is delivered only to the Express and Convex containers and authenticates their internal compatibility-route traffic. Convex ports are not published by the production Compose file; containers reach Convex over `tcg-net`.
+
 For legacy Prisma-backed production routes, also add `--profile legacy BACKEND_MODE=hybrid`.
 
 ## Notes
 - Node modules live inside the container; each start runs `npm install` to sync dependencies.
+- Convex local state is persisted in the `convex_data` named volume mounted at `/app/convex-backend/.convex`.
 - In full Docker mode, access the frontend at `http://localhost:${APP_PORT:-3003}`. API requests are served at `http://localhost:${APP_PORT:-3003}/api`.
 - In host frontend mode, the backend is exposed on `localhost:${BACKEND_PORT:-3004}`.
 - Postgres is only started when the `legacy` profile is enabled. When active, the database is accessible on `localhost:5432` with credentials from `.env.docker`.

@@ -20,7 +20,6 @@ import type {
   BulkAddResult,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
-import { resolvePublicConvexSiteOrigin } from "@/lib/utils";
 
 export interface CollectionsViewerContext {
   id: string;
@@ -54,29 +53,13 @@ export type AddCardToCollectionInput = AddCardInput;
 export type UpdateCollectionCardInput = UpdateCardInput;
 
 export const LIBRARY_COLLECTION_ID = "__library__";
-export const COLLECTIONS_BACKEND =
-  process.env.NEXT_PUBLIC_COLLECTIONS_BACKEND ?? "rest";
-export const isConvexCollectionsBackend = COLLECTIONS_BACKEND === "convex";
-
-const CONVEX_COLLECTIONS_ORIGIN =
-  process.env.NEXT_PUBLIC_CONVEX_COLLECTIONS_ORIGIN?.replace(/\/+$/, "") ??
-  (typeof window !== "undefined" ? resolvePublicConvexSiteOrigin() : "");
-
 function getCollectionsBaseUrl() {
-  if (!isConvexCollectionsBackend) {
-    return API_BASE_URL;
-  }
-  if (!CONVEX_COLLECTIONS_ORIGIN) {
-    throw new Error(
-      "NEXT_PUBLIC_CONVEX_COLLECTIONS_ORIGIN must be set when using the Convex collections backend",
-    );
-  }
-  return CONVEX_COLLECTIONS_ORIGIN;
+  return API_BASE_URL;
 }
 
 function buildHeaders(
   token: string,
-  viewer?: CollectionsViewerContext | null,
+  _viewer?: CollectionsViewerContext | null,
   includeJson = true,
 ): HeadersInit {
   const headers: Record<string, string> = {
@@ -85,21 +68,6 @@ function buildHeaders(
 
   if (includeJson) {
     headers["Content-Type"] = "application/json";
-  }
-
-  if (isConvexCollectionsBackend) {
-    if (!viewer?.id) {
-      throw new Error(
-        "Authenticated viewer context is required for the Convex collections bridge",
-      );
-    }
-    headers["X-TCGER-User-Id"] = viewer.id;
-    if (viewer.email) {
-      headers["X-TCGER-User-Email"] = viewer.email;
-    }
-    if (viewer.username) {
-      headers["X-TCGER-Username"] = viewer.username;
-    }
   }
 
   return headers;

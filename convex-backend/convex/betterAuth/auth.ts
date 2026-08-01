@@ -10,6 +10,17 @@ import authConfig from "../auth.config";
 
 const fallbackSecret = "tcger-convex-dev-local-secret-2026-not-default";
 
+const getBetterAuthSecret = (): string => {
+  const configured = process.env.BETTER_AUTH_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("BETTER_AUTH_SECRET is required in production");
+  }
+  return fallbackSecret;
+};
+
 const parseBooleanEnv = (value: string | undefined): boolean | undefined => {
   if (value === undefined) {
     return undefined;
@@ -54,7 +65,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     appName: "TCGer",
     baseURL: siteUrl,
     basePath: "/api/auth",
-    secret: process.env.BETTER_AUTH_SECRET ?? fallbackSecret,
+    secret: getBetterAuthSecret(),
     trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : undefined,
     database: authComponent.adapter(ctx),
     emailAndPassword: {

@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 dotenv.config();
 
+const DEVELOPMENT_BRIDGE_SECRET = 'tcger-local-convex-bridge-secret-2026';
+
 const booleanEnv = z
   .enum(['true', 'false'])
   .optional()
@@ -23,6 +25,7 @@ const envSchema = z.object({
   COLLECTIONS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
   WISHLISTS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
   CONVEX_HTTP_ORIGIN: z.string().url().optional(),
+  TCGER_BRIDGE_SECRET: z.string().trim().min(32).optional(),
   SCRYDEX_API_KEY: z.string().optional(),
   SCRYDEX_TEAM_ID: z.string().optional(),
   SCRYFALL_API_BASE_URL: z.string().url().default('https://api.scryfall.com'),
@@ -64,4 +67,14 @@ if (parsed.data.NODE_ENV !== 'test' && !parsed.data.CONVEX_HTTP_ORIGIN) {
   throw new Error('Failed to load environment variables');
 }
 
-export const env = parsed.data;
+if (parsed.data.NODE_ENV === 'production' && !parsed.data.TCGER_BRIDGE_SECRET) {
+  console.error('Invalid environment configuration:', {
+    TCGER_BRIDGE_SECRET: ['TCGER_BRIDGE_SECRET is required in production']
+  });
+  throw new Error('Failed to load environment variables');
+}
+
+export const env = {
+  ...parsed.data,
+  TCGER_BRIDGE_SECRET: parsed.data.TCGER_BRIDGE_SECRET ?? DEVELOPMENT_BRIDGE_SECRET
+};

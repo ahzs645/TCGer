@@ -24,6 +24,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 ```bash
 cp .env.docker.example .env.docker
 cp frontend/.env.local.example frontend/.env.local
+# Set different random BETTER_AUTH_SECRET and TCGER_BRIDGE_SECRET values (32+ characters).
 npm run docker:dev:legacy:bulk
 ```
 
@@ -100,6 +101,11 @@ Backend (see `backend/src/config/env.ts`):
 Frontend:
 - `NEXT_PUBLIC_API_BASE_URL` (public API base; typically `http://localhost:3003/api` with nginx).
 - `BACKEND_API_ORIGIN` (internal API origin for server-side Next.js fetches).
+- Collection requests use the authenticated Express API exclusively. Do not configure browser-to-Convex collection HTTP calls or send `X-TCGER-*` identity headers from browser code.
+
+Convex bridge:
+- `TCGER_BRIDGE_SECRET` is shared only by Express and Convex and must be a distinct random value of at least 32 characters in production.
+- Docker persists local Convex users, collections, and file storage in the `convex_data` named volume. Production does not publish the Convex backend or site ports to the host.
 
 ## API overview
 OpenAPI + Swagger:
