@@ -22,7 +22,7 @@ final class MagicPerceptualHashScannerStrategy: ScanStrategy {
     }
 
     func supports(_ mode: ScanMode) -> Bool {
-        mode == .mtg
+        mode == .mtg && hashLibrary.isAvailable
     }
 
     func scan(

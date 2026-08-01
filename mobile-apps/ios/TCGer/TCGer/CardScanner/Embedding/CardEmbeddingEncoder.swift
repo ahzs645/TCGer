@@ -4,7 +4,12 @@ import CoreVideo
 import Foundation
 
 protocol CardEmbeddingModelLoading {
+    var isAvailable: Bool { get }
     func makeModel() throws -> MLModel
+}
+
+extension CardEmbeddingModelLoading {
+    var isAvailable: Bool { true }
 }
 
 struct CardEmbeddingEncoder {
@@ -42,6 +47,10 @@ struct CardEmbeddingEncoder {
         self.outputName = outputName
     }
 
+    var isAvailable: Bool {
+        modelLoader.isAvailable
+    }
+
     func embedding(for image: CGImage) async throws -> [Float] {
         let model = try modelLoader.makeModel()
         guard let constraint = model.modelDescription.inputDescriptionsByName[inputName]?.imageConstraint else {
@@ -68,14 +77,24 @@ struct CardEmbeddingEncoder {
 struct BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     private let modelName: String
     private let fileExtension: String
+    private let bundle: Bundle
 
-    init(modelName: String = "CardEmbeddings", fileExtension: String = "mlmodelc") {
+    init(
+        modelName: String = "CardEmbeddings",
+        fileExtension: String = "mlmodelc",
+        bundle: Bundle = .main
+    ) {
         self.modelName = modelName
         self.fileExtension = fileExtension
+        self.bundle = bundle
+    }
+
+    var isAvailable: Bool {
+        bundle.url(forResource: modelName, withExtension: fileExtension) != nil
     }
 
     func makeModel() throws -> MLModel {
-        guard let url = Bundle.main.url(forResource: modelName, withExtension: fileExtension) else {
+        guard let url = bundle.url(forResource: modelName, withExtension: fileExtension) else {
             throw CardEmbeddingEncoder.EncoderError.modelUnavailable
         }
         return try MLModel(contentsOf: url)

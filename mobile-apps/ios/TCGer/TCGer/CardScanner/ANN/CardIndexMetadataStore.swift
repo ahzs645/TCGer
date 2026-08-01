@@ -4,12 +4,22 @@ struct CardIndexMetadataEntry: Codable {
     let annIndex: Int
     let cardId: String
     let name: String
-    let game: String
+    let game: String?
     let setCode: String?
     let setName: String?
     let rarity: String?
     let imageURL: String?
     let price: Double?
+
+    nonisolated var resolvedGame: TCGGame {
+        guard let game else { return .pokemon }
+        switch game.lowercased() {
+        case "pokemon": return .pokemon
+        case "magic", "mtg": return .magic
+        case "yugioh", "yu-gi-oh", "yu_gi_oh": return .yugioh
+        default: return .all
+        }
+    }
 }
 
 actor CardIndexMetadataStore {
@@ -20,7 +30,19 @@ actor CardIndexMetadataStore {
     static let shared = CardIndexMetadataStore()
 
     private var cache: [Int: CardIndexMetadataEntry] = [:]
-    private var isLoaded = false
+    nonisolated let supportedGames: Set<TCGGame>
+
+    init(
+        bundle: Bundle = .main,
+        resource: String = "CardsIndexMetadata",
+        fileExtension: String = "json"
+    ) {
+        let entries = Self.loadEntries(from: bundle, resource: resource, fileExtension: fileExtension)
+        cache = entries.reduce(into: [:]) { result, entry in
+            result[entry.annIndex] = entry
+        }
+        supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
+    }
 
     func entry(for index: Int) -> CardIndexMetadataEntry? {
         cache[index]
@@ -31,11 +53,15 @@ actor CardIndexMetadataStore {
         return Self.makeDetails(from: entry)
     }
 
+    func indices(for game: TCGGame) -> Set<Int> {
+        Set(cache.values.lazy.filter { $0.resolvedGame == game }.map(\.annIndex))
+    }
+
     private nonisolated static func makeDetails(from entry: CardIndexMetadataEntry) -> CardDetails {
         let identity = CardIdentity(
             id: entry.cardId,
             name: entry.name,
-            game: TCGGame(rawValue: entry.game) ?? .all,
+            game: entry.resolvedGame,
             setCode: entry.setCode,
             setName: entry.setName
         )
@@ -49,20 +75,19 @@ actor CardIndexMetadataStore {
         )
     }
 
-    func loadIfNeeded(from bundle: Bundle = .main, resource: String = "CardsIndexMetadata", fileExtension: String = "json") async {
-        guard !isLoaded else { return }
+    private nonisolated static func loadEntries(
+        from bundle: Bundle,
+        resource: String,
+        fileExtension: String
+    ) -> [CardIndexMetadataEntry] {
         guard let url = bundle.url(forResource: resource, withExtension: fileExtension) else {
-            cache = [:]
-            isLoaded = true
-            return
+            return []
         }
         do {
             let data = try Data(contentsOf: url)
-            let entries = try JSONDecoder().decode([CardIndexMetadataEntry].self, from: data)
-            cache = Dictionary(uniqueKeysWithValues: entries.map { ($0.annIndex, $0) })
+            return try JSONDecoder().decode([CardIndexMetadataEntry].self, from: data)
         } catch {
-            cache = [:]
+            return []
         }
-        isLoaded = true
     }
 }
