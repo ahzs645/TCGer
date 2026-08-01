@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { api } from "./_generated/api";
-import { createTestConvex } from "./test.setup";
+import { createTestConvex, TEST_BRIDGE_SECRET } from "./test.setup";
 
 describe("convex native architecture", () => {
   test("provisions an authenticated viewer with a default library binder", async () => {
@@ -365,22 +365,49 @@ describe("convex native architecture", () => {
     expect(updated.stamp).toBe("Wizards");
   });
 
-  test("serves a native health endpoint through Convex HTTP actions", async () => {
-    const t = createTestConvex();
-    const response = await t.fetch("/health");
-    const payload = await response.json();
+  test(
+    "serves a native health endpoint through Convex HTTP actions",
+    async () => {
+      const t = createTestConvex();
+      const response = await t.fetch("/health");
+      const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toMatchObject({
-      status: "ok",
-      backend: "convex-native"
+      expect(response.status).toBe(200);
+      expect(payload).toMatchObject({
+        status: "ok",
+        backend: "convex-native"
+      });
+    },
+    15_000
+  );
+
+  test("rejects forged bridge identities before provisioning a viewer or admin", async () => {
+    const t = createTestConvex();
+    const forgedHeaders = {
+      Authorization: "Bearer forged-token",
+      "x-tcger-user-id": "forged_admin",
+      "x-tcger-user-email": "forged@example.com"
+    };
+
+    const profileResponse = await t.fetch("/users/me", { headers: forgedHeaders });
+    const setupResponse = await t.fetch("/setup/setup", {
+      method: "POST",
+      headers: forgedHeaders
     });
+    const setupRequiredResponse = await t.fetch("/setup/setup-required", {
+      headers: { "x-tcger-bridge-key": TEST_BRIDGE_SECRET }
+    });
+
+    expect(profileResponse.status).toBe(401);
+    expect(setupResponse.status).toBe(401);
+    expect(await setupRequiredResponse.json()).toEqual({ setupRequired: true });
   });
 
   test("mirrors collection REST routes over Convex HTTP actions", async () => {
     const t = createTestConvex();
     const headers = {
       Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
       "x-tcger-user-id": "user_avery",
       "x-tcger-user-email": "avery@example.com",
       "x-tcger-username": "avery"
@@ -540,6 +567,7 @@ describe("convex native architecture", () => {
         method: "POST",
         headers: {
           Authorization: headers.Authorization,
+          "x-tcger-bridge-key": headers["x-tcger-bridge-key"],
           "x-tcger-user-id": headers["x-tcger-user-id"],
           "x-tcger-user-email": headers["x-tcger-user-email"],
           "x-tcger-username": headers["x-tcger-username"]
@@ -602,6 +630,7 @@ describe("convex native architecture", () => {
     const t = createTestConvex();
     const headers = {
       Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
       "x-tcger-user-id": "user_avery",
       "x-tcger-user-email": "avery@example.com",
       "x-tcger-username": "avery"
@@ -833,12 +862,13 @@ describe("convex native architecture", () => {
     const t = createTestConvex();
     const headers = {
       Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
       "x-tcger-user-id": "user_admin",
       "x-tcger-user-email": "admin@example.com",
       "x-tcger-username": "admin"
     };
 
-    const setupRequiredResponse = await t.fetch("/setup/setup-required");
+    const setupRequiredResponse = await t.fetch("/setup/setup-required", { headers });
     expect(await setupRequiredResponse.json()).toEqual({ setupRequired: true });
 
     const setupResponse = await t.fetch("/setup/setup", {
@@ -905,7 +935,9 @@ describe("convex native architecture", () => {
       scrydexApiKey: "secret-key"
     });
 
-    const publicSettingsResponse = await t.fetch("/settings");
+    const publicSettingsResponse = await t.fetch("/settings", {
+      headers: { "x-tcger-bridge-key": TEST_BRIDGE_SECRET }
+    });
     const publicSettings = await publicSettingsResponse.json();
 
     expect(publicSettingsResponse.status).toBe(200);

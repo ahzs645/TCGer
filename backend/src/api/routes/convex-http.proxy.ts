@@ -3,9 +3,11 @@ import type { Request, Response as ExpressResponse } from 'express';
 import { env } from '../../config/env';
 import type { AuthRequest } from '../middleware/auth';
 
-function buildProxyHeaders(req: AuthRequest) {
+export function buildProxyHeaders(req: AuthRequest) {
   const headers = new Headers();
   const user = req.user;
+
+  headers.set('X-TCGER-Bridge-Key', env.TCGER_BRIDGE_SECRET);
 
   if (user) {
     headers.set('Authorization', 'Bearer convex-http-proxy');
@@ -31,7 +33,7 @@ function buildProxyHeaders(req: AuthRequest) {
   return headers;
 }
 
-function buildAuthProxyHeaders(req: Request) {
+export function buildAuthProxyHeaders(req: Request) {
   const headers = new Headers();
   const authorization = req.header('authorization');
   const cookie = req.header('cookie');

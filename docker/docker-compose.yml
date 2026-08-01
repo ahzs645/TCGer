@@ -32,6 +32,7 @@ services:
       NODE_ENV: development
       CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-tcger-local-convex-auth-secret-2026}
+      TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:-tcger-local-convex-bridge-secret-2026}
       BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-true}
       SITE_URL: ${SITE_URL:-http://localhost:3000}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
@@ -41,6 +42,7 @@ services:
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
     volumes:
       - ../convex-backend:/app/convex-backend
+      - convex_data:/app/convex-backend/.convex
       - /app/node_modules
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     healthcheck:
@@ -168,6 +170,7 @@ services:
       COLLECTIONS_BACKEND: ${COLLECTIONS_BACKEND:-convex}
       WISHLISTS_BACKEND: ${WISHLISTS_BACKEND:-convex}
       CONVEX_HTTP_ORIGIN: ${CONVEX_HTTP_ORIGIN:-http://convex-backend:3211}
+      TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:-tcger-local-convex-bridge-secret-2026}
       SCRYDEX_API_KEY: ${SCRYDEX_API_KEY:-}
       SCRYDEX_TEAM_ID: ${SCRYDEX_TEAM_ID:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
@@ -208,7 +211,6 @@ services:
       NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:-http://localhost:3211}
       CONVEX_URL_INTERNAL: ${CONVEX_URL_INTERNAL:-http://convex-backend:3210}
       CONVEX_SITE_URL_INTERNAL: ${CONVEX_SITE_URL_INTERNAL:-http://convex-backend:3211}
-      NEXT_PUBLIC_COLLECTIONS_BACKEND: ${NEXT_PUBLIC_COLLECTIONS_BACKEND:-rest}
     volumes:
       - ../frontend:/app/frontend
       - ../packages:/app/packages
@@ -241,6 +243,7 @@ services:
 
 volumes:
   postgres_data:
+  convex_data:
   scryfall_bulk_data:
   ygo_cache_data:
   pokemon_cache_data:

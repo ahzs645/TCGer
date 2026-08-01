@@ -8,7 +8,6 @@ import { CollectionImportDialog } from "@/components/collections/collection-impo
 import { CollectionHistoryDialog } from "@/components/collections/collection-history-dialog";
 import { BulkAddDialog } from "@/components/collections/bulk-add-dialog";
 import { Badge } from "@/components/ui/badge";
-import { isConvexCollectionsBackend } from "@/lib/api/collections";
 
 export default function CollectionsPage() {
   return (
@@ -25,9 +24,6 @@ export default function CollectionsPage() {
             <Badge variant="outline" data-oid="ikiv_ay">
               Beta
             </Badge>
-            {isConvexCollectionsBackend && (
-              <Badge data-oid="ejjsaov">Convex Native</Badge>
-            )}
             <div className="ml-auto flex items-center gap-2">
               <BulkAddDialog />
               <CollectionHistoryDialog />

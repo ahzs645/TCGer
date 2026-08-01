@@ -865,7 +865,8 @@ extension APIService {
 
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/export?format=\(format)",
+            path: "collections/export",
+            queryItems: [URLQueryItem(name: "format", value: format)],
             token: token
         )
 

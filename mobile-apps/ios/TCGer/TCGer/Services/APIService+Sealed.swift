@@ -27,8 +27,13 @@ extension APIService {
             if let tcg { return all.filter { $0.tcg == tcg } }
             return all
         }
-        let path = tcg != nil ? "sealed/products?tcg=\(tcg!)" : "sealed/products"
-        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+        let queryItems = tcg.map { [URLQueryItem(name: "tcg", value: $0)] } ?? []
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/products",
+            queryItems: queryItems,
+            token: token
+        )
 
         guard response.statusCode == 200 else {
             if response.statusCode == 401 { throw APIError.unauthorized }

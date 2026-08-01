@@ -32,7 +32,7 @@ ARG IMAGE_TAG=""
 # Build shared types first, then backend
 RUN npm run --workspace=packages/api-types build
 WORKDIR /app/backend
-RUN npx prisma generate && (npx tsc -p tsconfig.build.json --skipLibCheck || true) && test -f dist/server.js
+RUN npx prisma generate && npx tsc -p tsconfig.build.json --skipLibCheck && test -f dist/server.js
 
 # --- Production target ---
 FROM node:20-bookworm-slim AS production

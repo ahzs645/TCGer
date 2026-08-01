@@ -15,6 +15,8 @@ const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
 
 const LIBRARY_COLLECTION_ID = "__library__";
+const BRIDGE_KEY_HEADER = "x-tcger-bridge-key";
+const DEVELOPMENT_BRIDGE_SECRET = "tcger-local-convex-bridge-secret-2026";
 const TCG_CODES: readonly TcgCode[] = [
   "yugioh",
   "magic",
@@ -222,6 +224,38 @@ async function parseJsonBody(request: Request) {
   }
 }
 
+function configuredBridgeSecret(): string | null {
+  const configured = process.env.TCGER_BRIDGE_SECRET?.trim();
+  if (configured !== undefined) {
+    return configured.length >= 32 ? configured : null;
+  }
+
+  return process.env.NODE_ENV === "production" ? null : DEVELOPMENT_BRIDGE_SECRET;
+}
+
+function secretsMatch(expected: string, provided: string): boolean {
+  if (expected.length !== provided.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
+  }
+  return mismatch === 0;
+}
+
+function requireBridgeKey(request: Request): void {
+  const expected = configuredBridgeSecret();
+  const provided = request.headers.get(BRIDGE_KEY_HEADER);
+  if (!expected || !provided || !secretsMatch(expected, provided)) {
+    throw new ConvexError({
+      code: "UNAUTHORIZED",
+      message: "Valid bridge credentials are required"
+    });
+  }
+}
+
 function getBridgeIdentity(request: Request): BridgeIdentity | null {
   const authorization = request.headers.get("authorization");
   const subject = request.headers.get("x-tcger-user-id");
@@ -241,6 +275,7 @@ function getBridgeIdentity(request: Request): BridgeIdentity | null {
 }
 
 async function requireBridgeIdentity(ctx: any, request: Request) {
+  requireBridgeKey(request);
   const identity = getBridgeIdentity(request);
   if (!identity) {
     throw new ConvexError({
@@ -878,8 +913,9 @@ http.route({
 http.route({
   path: "/setup/setup-required",
   method: "GET",
-  handler: httpAction(async (ctx) => {
+  handler: httpAction(async (ctx, request) => {
     try {
+      requireBridgeKey(request);
       const setupRequired = await ctx.runQuery(internal.bridge.getSetupRequired, {});
       return json({ setupRequired });
     } catch (error) {
@@ -1006,6 +1042,7 @@ http.route({
   method: "GET",
   handler: httpAction(async (ctx, request) => {
     try {
+      requireBridgeKey(request);
       const identity = getBridgeIdentity(request);
       if (identity) {
         await ctx.runMutation(internal.bridge.ensureViewer, identity);

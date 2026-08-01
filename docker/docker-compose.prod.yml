@@ -25,6 +25,7 @@ services:
       NODE_ENV: production
       CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?err}
+      TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:?err}
       BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-false}
       SITE_URL: ${SITE_URL:-http://localhost:3000}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
@@ -32,9 +33,8 @@ services:
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
       POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
       TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
-    ports:
-      - "${CONVEX_PORT:-3210}:3210"
-      - "${CONVEX_SITE_PORT:-3211}:3211"
+    volumes:
+      - convex_data:/app/convex-backend/.convex
     networks:
       - tcg-net
 
@@ -129,6 +129,7 @@ services:
       COLLECTIONS_BACKEND: ${COLLECTIONS_BACKEND:-convex}
       WISHLISTS_BACKEND: ${WISHLISTS_BACKEND:-convex}
       CONVEX_HTTP_ORIGIN: ${CONVEX_HTTP_ORIGIN:-http://convex-backend:3211}
+      TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:?err}
       POKEMON_TCG_API_KEY: ${POKEMON_TCG_API_KEY:-}
       SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
       YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
@@ -180,6 +181,7 @@ services:
 
 volumes:
   postgres_data:
+  convex_data:
   scryfall_bulk_data:
   ygo_cache_data:
   pokemon_cache_data:

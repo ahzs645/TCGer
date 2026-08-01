@@ -36,11 +36,12 @@ final class APIService {
     func makeRequest(
         config: ServerConfiguration,
         path: String,
+        queryItems: [URLQueryItem] = [],
         method: String = "GET",
         token: String? = nil,
         body: Encodable? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        guard let url = config.endpoint(path: path) else {
+        guard let url = config.endpoint(path: path, queryItems: queryItems) else {
             throw APIError.invalidURL
         }
 
