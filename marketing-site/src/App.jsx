@@ -67,7 +67,7 @@ const EXTRAS = [
   "API-First \u00b7 OpenAPI 3.0 + Swagger UI",
   "Self-Hosted \u00b7 Docker Compose + PostgreSQL",
   "Extensible \u00b7 Adapter pattern for new TCGs",
-  "Auth Built-In \u00b7 JWT + admin setup flow",
+  "Auth Built-In \u00b7 Better Auth + admin setup",
   "Mobile Coming \u00b7 iOS SwiftUI + Android Kotlin",
 ];
 
@@ -90,15 +90,15 @@ const STEPS = [
 ];
 
 const STACK = [
-  { group: "Backend", items: ["Node.js", "Express", "PostgreSQL", "Prisma", "JWT"] },
-  { group: "Frontend", items: ["Next.js 14", "React 18", "Tailwind", "Zustand", "React Query"] },
+  { group: "Backend", items: ["Node.js", "Express", "Convex", "PostgreSQL", "Prisma", "Better Auth"] },
+  { group: "Frontend", items: ["Next.js 15", "React 18", "Tailwind", "Zustand", "React Query"] },
   { group: "Cache Services", items: ["Scryfall", "YGO", "TCGdex", "Docker"] },
   { group: "Shared Layer", items: ["TypeScript", "Zod", "OpenAPI 3.0", "Turborepo"] },
 ];
 
 const OSS = [
   { title: "Fully open source", desc: "Every line on GitHub. Fork it, self-host it, adapt it. No hidden services, no vendor lock-in." },
-  { title: "Own your data", desc: "PostgreSQL on your machine. Optional Redis. No third-party services required. Your collection stays yours." },
+  { title: "Own your data", desc: "Self-host Convex and PostgreSQL, with optional cache workers for upstream card APIs. Your collection stays yours." },
   { title: "Built to extend", desc: "Adapter pattern for new TCGs. OpenAPI spec and typed interfaces make contributions straightforward." },
 ];
 

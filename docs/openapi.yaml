@@ -1,7 +1,10 @@
 openapi: 3.0.3
 info:
   title: TCGer API
-  description: REST API for TCGer - Trading Card Collection Manager
+  description: >-
+    REST API for TCGer. Browser clients use this Express API; they must not call
+    Convex HTTP routes or supply internal X-TCGER-* bridge headers. The /auth/*
+    namespace proxies Better Auth (https://www.better-auth.com).
   version: 0.1.0
 
 servers:
@@ -18,7 +21,9 @@ tags:
   - name: Health
     description: Liveness and readiness probes
   - name: Auth
-    description: Authentication and initial setup
+    description: >-
+      Better Auth proxy and initial setup. /auth/* is forwarded to Better Auth
+      in Convex; see https://www.better-auth.com for the complete generated API.
   - name: Cards
     description: Card search and details
   - name: Scanner
@@ -31,6 +36,22 @@ tags:
     description: User profile and preferences (requires auth)
   - name: Settings
     description: Application settings
+  - name: Decks
+    description: Deck construction, import, validation, and analysis
+  - name: Finance
+    description: Purchase, sale, and trade transaction ledger
+  - name: Sealed
+    description: Sealed products, inventory, and opening ledger
+  - name: Analytics
+    description: Collection value and distribution analytics
+  - name: Trades
+    description: User trades and wishlist matches
+  - name: Public
+    description: Publicly shared collection views
+  - name: News
+    description: Public TCG news feed
+  - name: Legacy availability
+    description: Legacy route groups that return 501 when BACKEND_MODE is convex
 
 paths:
   /cards/scan:
@@ -85,6 +106,11 @@ paths:
                   env:
                     type: string
                     example: development
+                  mode:
+                    type: string
+                    enum: [hybrid, convex]
+                  features:
+                    $ref: "#/components/schemas/ServerFeatures"
 
   /health/ready:
     get:
@@ -104,86 +130,81 @@ paths:
                     example: ready
 
   # ─── Auth ────────────────────────────────────────────────────────────
-  /auth/signup:
+  /auth/sign-up/email:
     post:
       tags: [Auth]
-      summary: Register a new user
-      operationId: signup
+      summary: Sign up with email and username
+      description: >-
+        Better Auth email/password sign-up with the username plugin configured
+        in convex-backend/convex/betterAuth/auth.ts.
+      operationId: signUpEmail
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SignupInput"
-      responses:
-        "201":
-          description: User created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          $ref: "#/components/responses/ValidationError"
-
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Authenticate user
-      operationId: login
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginInput"
+              $ref: "#/components/schemas/BetterAuthSignUpInput"
       responses:
         "200":
-          description: Authentication successful
+          description: Account and Better Auth session created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/BetterAuthSessionResponse"
         "400":
           $ref: "#/components/responses/ValidationError"
 
-  /auth/me:
+  /auth/sign-in/username:
+    post:
+      tags: [Auth]
+      summary: Sign in with username
+      description: Better Auth username-plugin sign-in returning an opaque session token.
+      operationId: signInUsername
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BetterAuthUsernameSignInInput"
+      responses:
+        "200":
+          description: Better Auth session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetterAuthSessionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /auth/get-session:
     get:
       tags: [Auth]
-      summary: Get current user from token
-      operationId: getCurrentUser
+      summary: Get the current Better Auth session
+      operationId: getSession
       security:
         - bearerAuth: []
+        - sessionCookie: []
       responses:
         "200":
-          description: Current user
+          description: Current session, or null when unauthenticated
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  user:
-                    $ref: "#/components/schemas/AuthUser"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+                $ref: "#/components/schemas/BetterAuthSessionResponse"
 
-  /auth/logout:
+  /auth/sign-out:
     post:
       tags: [Auth]
-      summary: Logout (client-side token removal)
-      operationId: logout
+      summary: End the current Better Auth session
+      operationId: signOut
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
       responses:
         "200":
-          description: Logged out
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Logged out successfully
+          description: Session ended
 
-  /auth/setup-required:
+  /setup/setup-required:
     get:
       tags: [Auth]
       summary: Check if initial admin setup is needed
@@ -196,26 +217,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/SetupCheckResponse"
 
-  /auth/setup:
+  /setup/setup:
     post:
       tags: [Auth]
-      summary: Create the initial admin user
+      summary: Promote the authenticated user to initial admin
+      description: >-
+        After signing up through Better Auth, call this endpoint with that
+        session. The request has no body. It returns 409 if an admin exists.
       operationId: setupAdmin
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SignupInput"
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
       responses:
-        "201":
-          description: Admin user created
+        "200":
+          description: Current user promoted to admin
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          $ref: "#/components/responses/ValidationError"
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+                    example: Admin account configured successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: An admin user already exists
 
   # ─── Cards ───────────────────────────────────────────────────────────
   /cards/search:
@@ -937,6 +965,747 @@ paths:
               schema:
                 $ref: "#/components/schemas/AppSettings"
 
+  # ─── Public routes ──────────────────────────────────────────────────
+  /public/collections/{shareToken}:
+    get:
+      tags: [Public]
+      summary: Get a publicly shared collection
+      operationId: getPublicCollection
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Public collection view }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /news:
+    get:
+      tags: [News]
+      summary: Get TCG news
+      operationId: getNews
+      parameters:
+        - name: tcg
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: News feed }
+
+  # ─── Convex-native feature groups ───────────────────────────────────
+  /decks:
+    get:
+      tags: [Decks]
+      summary: List the current user's decks
+      operationId: listDecks
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Deck list }
+    post:
+      tags: [Decks]
+      summary: Create a deck
+      operationId: createDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDeckInput" }
+      responses:
+        "201": { description: Deck created }
+
+  /decks/import:
+    post:
+      tags: [Decks]
+      summary: Import a deck from text or a supported service format
+      operationId: importDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportDeckInput" }
+      responses:
+        "201": { description: Deck imported }
+
+  /decks/{deckId}:
+    parameters:
+      - $ref: "#/components/parameters/deckId"
+    get:
+      tags: [Decks]
+      summary: Get a deck
+      operationId: getDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Deck detail }
+    patch:
+      tags: [Decks]
+      summary: Update a deck
+      operationId: updateDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDeckInput" }
+      responses:
+        "200": { description: Updated deck }
+    delete:
+      tags: [Decks]
+      summary: Delete a deck
+      operationId: deleteDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "204": { description: Deck deleted }
+
+  /decks/{deckId}/analysis:
+    get:
+      tags: [Decks]
+      summary: Analyze a deck
+      operationId: analyzeDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/deckId" }]
+      responses:
+        "200": { description: Deck analysis }
+
+  /decks/{deckId}/ownership:
+    get:
+      tags: [Decks]
+      summary: Compare deck cards with the current user's collection
+      operationId: getDeckOwnership
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/deckId" }]
+      responses:
+        "200": { description: Owned and missing cards }
+
+  /decks/{deckId}/ydk:
+    get:
+      tags: [Decks]
+      summary: Export a Yu-Gi-Oh deck as YDK
+      operationId: exportDeckYdk
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/deckId" }]
+      responses:
+        "200": { description: YDK export content and skipped cards }
+
+  /decks/{deckId}/validate:
+    post:
+      tags: [Decks]
+      summary: Validate a deck against format or banlist rules
+      operationId: validateDeck
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/deckId" }]
+      responses:
+        "200": { description: Validation result }
+
+  /decks/{deckId}/cards:
+    post:
+      tags: [Decks]
+      summary: Add a card to a deck
+      operationId: addDeckCard
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/deckId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddDeckCardInput" }
+      responses:
+        "201": { description: Deck card added }
+
+  /decks/{deckId}/cards/{cardId}:
+    parameters:
+      - $ref: "#/components/parameters/deckId"
+      - $ref: "#/components/parameters/cardId"
+    patch:
+      tags: [Decks]
+      summary: Update a card in a deck
+      operationId: updateDeckCard
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Updated deck card }
+    delete:
+      tags: [Decks]
+      summary: Remove a card from a deck
+      operationId: removeDeckCard
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "204": { description: Deck card removed }
+
+  /finance/transactions:
+    get:
+      tags: [Finance]
+      summary: List finance transactions
+      operationId: listFinanceTransactions
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Transaction list }
+    post:
+      tags: [Finance]
+      summary: Record a finance transaction
+      operationId: createFinanceTransaction
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTransactionInput" }
+      responses:
+        "201": { description: Transaction created }
+
+  /finance/transactions/{transactionId}:
+    delete:
+      tags: [Finance]
+      summary: Delete a finance transaction
+      operationId: deleteFinanceTransaction
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Transaction deleted }
+
+  /finance/summary:
+    get:
+      tags: [Finance]
+      summary: Get spending and earnings summary
+      operationId: getFinanceSummary
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Finance summary }
+
+  /sealed/products:
+    get:
+      tags: [Sealed]
+      summary: List sealed products
+      operationId: listSealedProducts
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: tcg
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Sealed product list }
+
+  /sealed/open-pack:
+    post:
+      tags: [Sealed]
+      summary: Simulate opening a pack
+      operationId: openSealedPack
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tcg, setCode]
+              properties:
+                tcg: { type: string }
+                setCode: { type: string }
+      responses:
+        "200": { description: Simulated pack contents }
+
+  /sealed/inventory:
+    get:
+      tags: [Sealed]
+      summary: List sealed inventory
+      operationId: listSealedInventory
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Sealed inventory list }
+    post:
+      tags: [Sealed]
+      summary: Add sealed inventory
+      operationId: createSealedInventory
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSealedInventoryInput" }
+      responses:
+        "201": { description: Inventory item created }
+
+  /sealed/inventory/{itemId}:
+    parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Sealed]
+      summary: Update sealed inventory
+      operationId: updateSealedInventory
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSealedInventoryInput" }
+      responses:
+        "200": { description: Updated inventory item }
+    delete:
+      tags: [Sealed]
+      summary: Delete sealed inventory
+      operationId: deleteSealedInventory
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "204": { description: Inventory item deleted }
+
+  /sealed/inventory/{itemId}/open:
+    post:
+      tags: [Sealed]
+      summary: Record opening sealed inventory
+      operationId: createSealedOpening
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSealedOpeningInput" }
+      responses:
+        "201": { description: Opening ledger created }
+
+  /sealed/openings:
+    get:
+      tags: [Sealed]
+      summary: List sealed opening ledgers
+      operationId: listSealedOpenings
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Opening ledger list }
+
+  /sealed/openings/cards/{cardId}/sale:
+    patch:
+      tags: [Sealed]
+      summary: Record proceeds for a sold opened card
+      operationId: recordOpenedCardSale
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/cardId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordOpenedCardSaleInput" }
+      responses:
+        "200": { description: Updated opening-ledger card }
+
+  /analytics/value:
+    get:
+      tags: [Analytics]
+      summary: Get collection value history
+      operationId: getCollectionValueHistory
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: period
+          in: query
+          description: Number of days; normalized by the router.
+          schema: { type: integer }
+      responses:
+        "200": { description: Value history and current change }
+
+  /analytics/value/breakdown:
+    get:
+      tags: [Analytics]
+      summary: Get collection value breakdown
+      operationId: getCollectionValueBreakdown
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Value grouped by TCG and binder, plus top cards }
+
+  /analytics/distribution:
+    get:
+      tags: [Analytics]
+      summary: Get collection distribution
+      operationId: getCollectionDistribution
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: by
+          in: query
+          schema: { type: string, default: tcg }
+      responses:
+        "200": { description: Distribution entries }
+
+  /trades:
+    get:
+      tags: [Trades]
+      summary: List the current user's trades
+      operationId: listTrades
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Trade list }
+    post:
+      tags: [Trades]
+      summary: Create a trade
+      operationId: createTrade
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTradeInput" }
+      responses:
+        "201": { description: Trade created }
+
+  /trades/matches:
+    get:
+      tags: [Trades]
+      summary: Find collection and wishlist trade matches
+      operationId: findTradeMatches
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Ranked trade matches }
+
+  /trades/{tradeId}:
+    parameters:
+      - $ref: "#/components/parameters/tradeId"
+    get:
+      tags: [Trades]
+      summary: Get a trade
+      operationId: getTrade
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Trade detail }
+    delete:
+      tags: [Trades]
+      summary: Delete a trade
+      operationId: deleteTrade
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "204": { description: Trade deleted }
+
+  /trades/{tradeId}/accept:
+    patch:
+      tags: [Trades]
+      summary: Accept a trade
+      operationId: acceptTrade
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/tradeId" }]
+      responses:
+        "200": { description: Accepted trade }
+
+  /trades/{tradeId}/decline:
+    patch:
+      tags: [Trades]
+      summary: Decline a trade
+      operationId: declineTrade
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: "#/components/parameters/tradeId" }]
+      responses:
+        "200": { description: Declined trade }
+
+  # ─── Legacy-only feature groups ─────────────────────────────────────
+  /prices/analytics/movers:
+    get:
+      tags: [Legacy availability]
+      summary: Get price movers
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: getPriceMovers
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Price gainers and losers }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /prices/{tcg}/{cardId}:
+    get:
+      tags: [Legacy availability]
+      summary: Get provider prices for a card
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: getCardPrices
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - $ref: "#/components/parameters/tcg"
+        - $ref: "#/components/parameters/cardId"
+      responses:
+        "200": { description: Provider prices }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /notifications:
+    get:
+      tags: [Legacy availability]
+      summary: List notifications
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listNotifications
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Notification list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /notifications/{notificationId}/read:
+    patch:
+      tags: [Legacy availability]
+      summary: Mark a notification read
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: markNotificationRead
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Updated notification }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /notifications/read-all:
+    post:
+      tags: [Legacy availability]
+      summary: Mark all notifications read
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: markAllNotificationsRead
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Notifications marked read }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /notifications/channels:
+    get:
+      tags: [Legacy availability]
+      summary: List notification channels
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listNotificationChannels
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Notification channel list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    post:
+      tags: [Legacy availability]
+      summary: Create a notification channel
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: createNotificationChannel
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "201": { description: Notification channel created }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /notifications/channels/{channelId}:
+    delete:
+      tags: [Legacy availability]
+      summary: Delete a notification channel
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: deleteNotificationChannel
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Notification channel deleted }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /alerts:
+    get:
+      tags: [Legacy availability]
+      summary: List price alerts
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listPriceAlerts
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Price alert list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    post:
+      tags: [Legacy availability]
+      summary: Create a price alert
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: createPriceAlert
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "201": { description: Price alert created }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /alerts/{alertId}:
+    patch:
+      tags: [Legacy availability]
+      summary: Update a price alert
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: updatePriceAlert
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Updated price alert }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    delete:
+      tags: [Legacy availability]
+      summary: Delete a price alert
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: deletePriceAlert
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Price alert deleted }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shops/connections:
+    get:
+      tags: [Legacy availability]
+      summary: List shop connections
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listShopConnections
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Shop connection list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    post:
+      tags: [Legacy availability]
+      summary: Create a shop connection
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: createShopConnection
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "201": { description: Shop connection created }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shops/connections/{connectionId}:
+    delete:
+      tags: [Legacy availability]
+      summary: Delete a shop connection
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: deleteShopConnection
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Shop connection deleted }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shops/sync/{connectionId}:
+    post:
+      tags: [Legacy availability]
+      summary: Synchronize shop stock
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: syncShopStock
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Synchronization result }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /automations:
+    get:
+      tags: [Legacy availability]
+      summary: List automations
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listAutomations
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Automation list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    post:
+      tags: [Legacy availability]
+      summary: Create an automation
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: createAutomation
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "201": { description: Automation created }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /automations/{automationId}:
+    patch:
+      tags: [Legacy availability]
+      summary: Update an automation
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: updateAutomation
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: automationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Updated automation }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    delete:
+      tags: [Legacy availability]
+      summary: Delete an automation
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: deleteAutomation
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: automationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Automation deleted }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shipments:
+    get:
+      tags: [Legacy availability]
+      summary: List shipments
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: listShipments
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200": { description: Shipment list }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+    post:
+      tags: [Legacy availability]
+      summary: Create a shipment
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: createShipment
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "201": { description: Shipment created }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shipments/{shipmentId}/status:
+    get:
+      tags: [Legacy availability]
+      summary: Get shipment tracking status
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: getShipmentStatus
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Shipment status }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
+  /shipments/{shipmentId}:
+    delete:
+      tags: [Legacy availability]
+      summary: Delete a shipment
+      description: Available from the legacy router; returns 501 when BACKEND_MODE is convex.
+      operationId: deleteShipment
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Shipment deleted }
+        "501": { $ref: "#/components/responses/ConvexNotImplemented" }
+
 # ═══════════════════════════════════════════════════════════════════════
 # Components
 # ═══════════════════════════════════════════════════════════════════════
@@ -945,7 +1714,12 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
+      description: Opaque Better Auth session token returned by sign-in.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Better Auth session cookie, normally managed automatically by the browser.
 
   parameters:
     tcg:
@@ -978,6 +1752,18 @@ components:
       required: true
       schema:
         type: string
+    deckId:
+      name: deckId
+      in: path
+      required: true
+      schema:
+        type: string
+    tradeId:
+      name: tradeId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     ValidationError:
@@ -998,6 +1784,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    ConvexNotImplemented:
+      description: This legacy feature group is not available when BACKEND_MODE is convex.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
     # ─── Enums & Primitives ──────────────────────────────────────────
@@ -1007,6 +1799,23 @@ components:
     ScannerTcgCode:
       type: string
       enum: [yugioh, magic, pokemon]
+
+    ServerFeatures:
+      type: object
+      required: [decks, finance, sealed, analytics, trades, prices, notifications, alerts, shops, automations, shipments, public]
+      properties:
+        decks: { type: boolean }
+        finance: { type: boolean }
+        sealed: { type: boolean }
+        analytics: { type: boolean }
+        trades: { type: boolean }
+        prices: { type: boolean }
+        notifications: { type: boolean }
+        alerts: { type: boolean }
+        shops: { type: boolean }
+        automations: { type: boolean }
+        shipments: { type: boolean }
+        public: { type: boolean }
 
     # ─── Error ───────────────────────────────────────────────────────
     ErrorResponse:
@@ -1023,9 +1832,9 @@ components:
           type: object
 
     # ─── Auth ────────────────────────────────────────────────────────
-    SignupInput:
+    BetterAuthSignUpInput:
       type: object
-      required: [email, password]
+      required: [email, password, name, username]
       properties:
         email:
           type: string
@@ -1033,16 +1842,22 @@ components:
         password:
           type: string
           minLength: 8
+        name:
+          type: string
+          description: Display name; TCGer supplies the selected username.
         username:
           type: string
+          minLength: 3
+          maxLength: 50
 
-    LoginInput:
+    BetterAuthUsernameSignInInput:
       type: object
-      required: [email, password]
+      required: [username, password]
       properties:
-        email:
+        username:
           type: string
-          format: email
+          minLength: 3
+          maxLength: 50
         password:
           type: string
           minLength: 1
@@ -1077,14 +1892,18 @@ components:
         enabledDragonball:
           type: boolean
 
-    AuthResponse:
+    BetterAuthSessionResponse:
       type: object
-      required: [user, token]
       properties:
         user:
           $ref: "#/components/schemas/AuthUser"
         token:
           type: string
+          description: Opaque Better Auth session token.
+        session:
+          type: object
+          additionalProperties: true
+      nullable: true
 
     SetupCheckResponse:
       type: object
@@ -1092,6 +1911,136 @@ components:
       properties:
         setupRequired:
           type: boolean
+
+    # ─── Decks, finance, sealed, and trades ─────────────────────────
+    CreateDeckInput:
+      type: object
+      required: [name, tcg]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        tcg: { $ref: "#/components/schemas/TcgCode" }
+        format: { type: string }
+        colorHex: { type: string }
+        isPublic: { type: boolean }
+
+    UpdateDeckInput:
+      type: object
+      description: At least one property must be provided.
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        format: { type: string }
+        colorHex: { type: string }
+        isPublic: { type: boolean }
+
+    ImportDeckInput:
+      type: object
+      required: [source, data]
+      properties:
+        source:
+          type: string
+          enum: [text, moxfield, archidekt, mtggoldfish, arena, ygoprodeck, ydk]
+        data: { type: string, minLength: 1 }
+        name: { type: string }
+        tcg: { $ref: "#/components/schemas/TcgCode" }
+        format: { type: string }
+
+    AddDeckCardInput:
+      type: object
+      required: [externalId, tcg, name]
+      properties:
+        externalId: { type: string, minLength: 1 }
+        tcg: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        zone: { type: string, enum: [main, extra, side] }
+        isCommander: { type: boolean }
+        isSideboard: { type: boolean }
+        imageUrl: { type: string }
+        imageUrlSmall: { type: string }
+        setCode: { type: string }
+        setName: { type: string }
+        cardData: { type: object, additionalProperties: true }
+
+    CreateTransactionInput:
+      type: object
+      required: [type, amount]
+      properties:
+        type: { type: string, enum: [purchase, sale, trade] }
+        cardId: { type: string }
+        externalId: { type: string }
+        tcg: { type: string }
+        cardName: { type: string }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        amount: { type: number }
+        currency: { type: string, default: USD }
+        platform: { type: string }
+        notes: { type: string }
+        date: { type: string, format: date-time }
+
+    CreateSealedInventoryInput:
+      type: object
+      required: [productId]
+      properties:
+        productId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        purchasePrice: { type: number, minimum: 0 }
+        purchaseDate: { type: string, format: date-time }
+        notes: { type: string }
+
+    UpdateSealedInventoryInput:
+      type: object
+      description: At least one property must be provided.
+      properties:
+        quantity: { type: integer, minimum: 1 }
+        purchasePrice: { type: number, minimum: 0 }
+        purchaseDate: { type: string, format: date-time }
+        notes: { type: string }
+
+    CreateSealedOpeningInput:
+      type: object
+      properties:
+        openedQuantity: { type: integer, minimum: 1, default: 1 }
+        collectionIds:
+          type: array
+          maxItems: 500
+          default: []
+          items: { type: string, format: uuid }
+        openedAt: { type: string, format: date-time }
+        notes: { type: string, maxLength: 2000 }
+
+    RecordOpenedCardSaleInput:
+      type: object
+      required: [proceeds]
+      properties:
+        proceeds: { type: number, minimum: 0 }
+        soldAt: { type: string, format: date-time }
+
+    TradeCardInput:
+      type: object
+      required: [externalId, tcg, name]
+      properties:
+        externalId: { type: string, minLength: 1 }
+        tcg: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        imageUrl: { type: string }
+        estimatedValue: { type: number }
+
+    CreateTradeInput:
+      type: object
+      required: [receiverId, senderCards]
+      properties:
+        receiverId: { type: string, format: uuid }
+        message: { type: string }
+        senderCards:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/TradeCardInput" }
+        receiverCards:
+          type: array
+          items: { $ref: "#/components/schemas/TradeCardInput" }
 
     # ─── Cards ───────────────────────────────────────────────────────
     Card:
