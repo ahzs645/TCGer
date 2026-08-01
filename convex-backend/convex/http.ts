@@ -23,6 +23,8 @@ import {
   type BridgeIdentity
 } from "./lib/httpBridge";
 import type { TcgCode } from "./lib/validators";
+import { registerFinanceRoutes } from "./financeHttp";
+import { registerSealedRoutes } from "./sealedHttp";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -1946,4 +1948,6 @@ http.route({
   })
 });
 
+registerFinanceRoutes(http);
+registerSealedRoutes(http);
 export default http;

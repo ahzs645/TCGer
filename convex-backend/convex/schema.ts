@@ -229,5 +229,93 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_operation_kind", ["userId", "operationKind"])
     .index("by_source_audit", ["sourceAuditId"])
-    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"])
+    .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"]),
+
+  // Finance + Sealed (convex-native)
+  transactions: defineTable({
+    userId: v.id("users"),
+    type: v.union(v.literal("purchase"), v.literal("sale"), v.literal("trade")),
+    cardId: v.optional(v.string()),
+    externalId: v.optional(v.string()),
+    tcg: v.optional(v.string()),
+    cardName: v.optional(v.string()),
+    quantity: v.number(),
+    amount: v.number(),
+    currency: v.string(),
+    platform: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    date: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  }).index("by_user_and_date", ["userId", "date"]),
+
+  financeSummaries: defineTable({
+    userId: v.id("users"),
+    totalSpent: v.number(),
+    totalEarned: v.number(),
+    transactionCount: v.number(),
+    updatedAt: v.number()
+  }).index("by_user", ["userId"]),
+
+  sealedProducts: defineTable({
+    catalogKey: v.string(),
+    tcg: v.string(),
+    name: v.string(),
+    productType: v.string(),
+    setCode: v.optional(v.string()),
+    cardsPerPack: v.optional(v.number()),
+    packsPerBox: v.optional(v.number()),
+    releaseDate: v.optional(v.number()),
+    imageUrl: v.optional(v.string()),
+    msrp: v.optional(v.number()),
+    upc: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_catalog_key", ["catalogKey"])
+    .index("by_release_date", ["releaseDate"])
+    .index("by_tcg_and_release_date", ["tcg", "releaseDate"]),
+
+  sealedInventory: defineTable({
+    userId: v.id("users"),
+    productId: v.id("sealedProducts"),
+    quantity: v.number(),
+    purchasePrice: v.optional(v.number()),
+    purchaseDate: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_product", ["productId"]),
+
+  sealedOpenings: defineTable({
+    userId: v.id("users"),
+    sealedInventoryId: v.id("sealedInventory"),
+    openedQuantity: v.number(),
+    openedAt: v.number(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user_and_opened_at", ["userId", "openedAt"])
+    .index("by_sealed_inventory", ["sealedInventoryId"]),
+
+  sealedOpenedCards: defineTable({
+    userId: v.id("users"),
+    openingId: v.id("sealedOpenings"),
+    collectionId: v.optional(v.id("collectionEntries")),
+    externalId: v.string(),
+    tcg: v.string(),
+    cardName: v.string(),
+    quantity: v.number(),
+    status: v.union(v.literal("active"), v.literal("sold")),
+    realizedProceeds: v.optional(v.number()),
+    soldAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_opening", ["openingId"])
+    .index("by_collection", ["collectionId"])
 });

@@ -11,6 +11,8 @@
 import type * as binders from "../binders.js";
 import type * as bridge from "../bridge.js";
 import type * as collections from "../collections.js";
+import type * as finance from "../finance.js";
+import type * as financeHttp from "../financeHttp.js";
 import type * as http from "../http.js";
 import type * as lib_auditValidators from "../lib/auditValidators.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -20,6 +22,8 @@ import type * as lib_collectionImport from "../lib/collectionImport.js";
 import type * as lib_domain from "../lib/domain.js";
 import type * as lib_library from "../lib/library.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as sealed from "../sealed.js";
+import type * as sealedHttp from "../sealedHttp.js";
 import type * as tags from "../tags.js";
 import type * as users from "../users.js";
 
@@ -33,6 +37,8 @@ declare const fullApi: ApiFromModules<{
   binders: typeof binders;
   bridge: typeof bridge;
   collections: typeof collections;
+  finance: typeof finance;
+  financeHttp: typeof financeHttp;
   http: typeof http;
   "lib/auditValidators": typeof lib_auditValidators;
   "lib/auth": typeof lib_auth;
@@ -42,6 +48,8 @@ declare const fullApi: ApiFromModules<{
   "lib/domain": typeof lib_domain;
   "lib/library": typeof lib_library;
   "lib/validators": typeof lib_validators;
+  sealed: typeof sealed;
+  sealedHttp: typeof sealedHttp;
   tags: typeof tags;
   users: typeof users;
 }>;
