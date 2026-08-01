@@ -33,7 +33,7 @@ type ImportedCard = {
   cardData?: Record<string, unknown>;
 };
 
-const deckFunctions = (internal as any).decks;
+const deckFunctions = internal.decks;
 const TCG_CODES: readonly TcgCode[] = [
   "yugioh",
   "magic",
@@ -319,7 +319,48 @@ async function parseImportSource(body: Record<string, any>) {
   };
 }
 
-function isValidCreateDeck(body: Record<string, unknown>) {
+type CreateDeckPayload = {
+  name: string;
+  description?: string;
+  tcg: TcgCode;
+  format?: string;
+  colorHex?: string;
+  isPublic?: boolean;
+};
+
+type AddCardPayload = {
+  externalId: string;
+  tcg: string;
+  name: string;
+  quantity?: number;
+  zone?: DeckZone;
+  isCommander?: boolean;
+  isSideboard?: boolean;
+  imageUrl?: string;
+  imageUrlSmall?: string;
+  setCode?: string;
+  setName?: string;
+  cardData?: Record<string, unknown>;
+};
+
+type ClassicalBanlist = {
+  type: "classical";
+  name: string;
+  effectiveDate?: string;
+  cards: Record<string, string>;
+};
+
+type GenesysBanlist = {
+  type: "genesys";
+  name: string;
+  effectiveDate?: string;
+  cards: Record<string, number>;
+  maxPoints: number;
+};
+
+function isValidCreateDeck(
+  body: Record<string, unknown>
+): body is Record<string, unknown> & CreateDeckPayload {
   return (
     typeof body.name === "string" &&
     body.name.length >= 1 &&
@@ -331,7 +372,9 @@ function isValidCreateDeck(body: Record<string, unknown>) {
   );
 }
 
-function isValidAddCard(body: Record<string, unknown>) {
+function isValidAddCard(
+  body: Record<string, unknown>
+): body is Record<string, unknown> & AddCardPayload {
   return (
     typeof body.externalId === "string" &&
     body.externalId.length >= 1 &&
@@ -354,7 +397,7 @@ function isValidAddCard(body: Record<string, unknown>) {
   );
 }
 
-function parseBanlist(value: unknown) {
+function parseBanlist(value: unknown): ClassicalBanlist | GenesysBanlist | null {
   if (
     !isRecord(value) ||
     typeof value.name !== "string" ||
@@ -370,7 +413,7 @@ function parseBanlist(value: unknown) {
   if (value.type === "classical") {
     if (Object.values(value.cards).some((entry) => typeof entry !== "string"))
       return null;
-    return value;
+    return value as ClassicalBanlist;
   }
   if (value.type === "genesys") {
     if (
@@ -380,7 +423,7 @@ function parseBanlist(value: unknown) {
     ) {
       return null;
     }
-    return value;
+    return value as GenesysBanlist;
   }
   return null;
 }
@@ -449,7 +492,7 @@ export function registerDecksRoutes(http: HttpRouter) {
           subject: identity.subject,
           name: imported.name,
           tcg: imported.tcg,
-          format: body.format,
+          format: body.format as string | undefined,
         });
         let importedCount = 0;
         const skippedCards: string[] = [];
@@ -572,8 +615,8 @@ export function registerDecksRoutes(http: HttpRouter) {
             await ctx.runQuery(deckFunctions.validate, {
               subject: identity.subject,
               deckId: asDeckId(segments[0]!),
-              format: body.format,
-              banlist,
+              format: body.format as string | undefined,
+              banlist: banlist ?? undefined,
             }),
           );
         }
@@ -617,15 +660,22 @@ export function registerDecksRoutes(http: HttpRouter) {
           ) {
             return invalidPayload();
           }
+          const update = body as {
+            name?: string;
+            description?: string;
+            format?: string;
+            colorHex?: string;
+            isPublic?: boolean;
+          };
           return json(
             await ctx.runMutation(deckFunctions.update, {
               subject: identity.subject,
               deckId: asDeckId(segments[0]!),
-              name: body.name,
-              description: body.description,
-              format: body.format,
-              colorHex: body.colorHex,
-              isPublic: body.isPublic,
+              name: update.name,
+              description: update.description,
+              format: update.format,
+              colorHex: update.colorHex,
+              isPublic: update.isPublic,
             }),
           );
         }

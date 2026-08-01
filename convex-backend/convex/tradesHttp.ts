@@ -11,7 +11,7 @@ import {
 } from "./lib/httpBridge";
 import type { TcgCode } from "./lib/validators";
 
-const tradesApi = (internal as any).trades;
+const tradesApi = internal.trades;
 const TCG_CODES = new Set<TcgCode>([
   "yugioh",
   "magic",

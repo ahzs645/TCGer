@@ -8,9 +8,13 @@
  * @module
  */
 
+import type * as analytics from "../analytics.js";
+import type * as analyticsHttp from "../analyticsHttp.js";
 import type * as binders from "../binders.js";
 import type * as bridge from "../bridge.js";
 import type * as collections from "../collections.js";
+import type * as decks from "../decks.js";
+import type * as decksHttp from "../decksHttp.js";
 import type * as finance from "../finance.js";
 import type * as financeHttp from "../financeHttp.js";
 import type * as http from "../http.js";
@@ -25,6 +29,8 @@ import type * as lib_validators from "../lib/validators.js";
 import type * as sealed from "../sealed.js";
 import type * as sealedHttp from "../sealedHttp.js";
 import type * as tags from "../tags.js";
+import type * as trades from "../trades.js";
+import type * as tradesHttp from "../tradesHttp.js";
 import type * as users from "../users.js";
 
 import type {
@@ -34,9 +40,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
+  analyticsHttp: typeof analyticsHttp;
   binders: typeof binders;
   bridge: typeof bridge;
   collections: typeof collections;
+  decks: typeof decks;
+  decksHttp: typeof decksHttp;
   finance: typeof finance;
   financeHttp: typeof financeHttp;
   http: typeof http;
@@ -51,6 +61,8 @@ declare const fullApi: ApiFromModules<{
   sealed: typeof sealed;
   sealedHttp: typeof sealedHttp;
   tags: typeof tags;
+  trades: typeof trades;
+  tradesHttp: typeof tradesHttp;
   users: typeof users;
 }>;
 

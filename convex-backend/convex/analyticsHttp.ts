@@ -9,7 +9,7 @@ import {
   requireBridgeKey
 } from "./lib/httpBridge";
 
-const analyticsApi = (internal as any).analytics;
+const analyticsApi = internal.analytics;
 const PERIOD_DAYS: Record<string, number> = {
   "7d": 7,
   "30d": 30,
