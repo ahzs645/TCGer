@@ -3,13 +3,17 @@ import type { Router as ExpressRouter, Express } from 'express';
 import { authRouter, setupRouter } from './auth.router';
 import { cardsRouter } from './cards.router';
 import { env } from '../../config/env';
+import { convexAnalyticsRouter } from './analytics.convex.router';
 import { convexCollectionsRouter } from './collections.convex.router';
 import { convexFinanceRouter } from './finance.convex.router';
 import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { newsRouter } from './news.router';
+import { createNotImplementedRouter } from './not-implemented.router';
+import { convexPublicRouter } from './public.convex.router';
 import { settingsRouter } from './settings.router';
 import { convexSealedRouter } from './sealed.convex.router';
+import { convexTradesRouter } from './trades.convex.router';
 import { usersRouter } from './users.router';
 import { convexWishlistsRouter } from './wishlists.convex.router';
 import { convexDecksRouter } from './decks.convex.router';
@@ -94,11 +98,21 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/wishlists', wishlistsRouter);
   app.use('/news', newsRouter);
 
-  // Convex-native feature routers, mounted only in full Convex mode.
+  // Convex-native feature routers and explicit legacy-feature availability
+  // signals, mounted only in full Convex mode.
   if (env.BACKEND_MODE === 'convex') {
     app.use('/decks', convexDecksRouter);
     app.use('/finance', convexFinanceRouter);
     app.use('/sealed', convexSealedRouter);
+    app.use('/analytics', convexAnalyticsRouter);
+    app.use('/trades', convexTradesRouter);
+    app.use('/prices', createNotImplementedRouter('prices'));
+    app.use('/notifications', createNotImplementedRouter('notifications'));
+    app.use('/alerts', createNotImplementedRouter('alerts'));
+    app.use('/shops', createNotImplementedRouter('shops'));
+    app.use('/automations', createNotImplementedRouter('automations'));
+    app.use('/shipments', createNotImplementedRouter('shipments'));
+    app.use('/public', convexPublicRouter);
   }
 
   if (env.BACKEND_MODE !== 'convex') {

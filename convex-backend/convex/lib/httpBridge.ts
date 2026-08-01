@@ -36,24 +36,25 @@ export function errorJson(status: number, error: string, message: string) {
   return json({ error, message }, status);
 }
 
-function convexErrorData(error: ConvexError<any>): Record<string, unknown> {
-  if (typeof error.data === "string") {
+function convexErrorData(error: unknown): Record<string, unknown> | null {
+  if (!error || typeof error !== "object") return null;
+  const rawData = (error as { data?: unknown }).data;
+  if (rawData && typeof rawData === "object") {
+    return rawData as Record<string, unknown>;
+  }
+  if (typeof rawData === "string") {
     try {
-      const parsed = JSON.parse(error.data);
-      return parsed !== null && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>)
-        : {};
+      const parsed = JSON.parse(rawData);
+      return parsed && typeof parsed === "object" ? parsed : null;
     } catch {
-      return {};
+      return null;
     }
   }
-  return error.data !== null && typeof error.data === "object"
-    ? (error.data as Record<string, unknown>)
-    : {};
+  return null;
 }
 
-export function statusFromConvexError(error: ConvexError<any>) {
-  const code = String(convexErrorData(error).code ?? "");
+export function statusFromConvexError(error: unknown) {
+  const code = String(convexErrorData(error)?.code ?? "");
   if (code === "UNAUTHORIZED" || code === "UNAUTHENTICATED" || code === "USER_NOT_PROVISIONED") {
     return 401;
   }
@@ -70,12 +71,12 @@ export function statusFromConvexError(error: ConvexError<any>) {
 }
 
 export function handleConvexError(error: unknown, fallback: string) {
-  if (error instanceof ConvexError) {
-    const data = convexErrorData(error);
+  const data = convexErrorData(error);
+  if (error instanceof ConvexError || data) {
     return errorJson(
       statusFromConvexError(error),
-      String(data.code ?? "BAD_REQUEST"),
-      String(data.message ?? fallback)
+      String(data?.code ?? "BAD_REQUEST"),
+      String(data?.message ?? fallback)
     );
   }
   throw error;
