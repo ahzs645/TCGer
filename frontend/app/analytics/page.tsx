@@ -22,9 +22,11 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  ANALYTICS_PERIODS,
   getCollectionValueHistory,
   getCollectionValueBreakdown,
   getCollectionDistribution,
+  type AnalyticsPeriod,
 } from "@/lib/api/analytics";
 import { getPriceMovers } from "@/lib/api/pricing";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
@@ -35,15 +37,6 @@ import { useGameFilterStore } from "@/stores/game-filter";
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
-
-const PERIODS = [
-  { label: "7D", value: "7d", days: 7 },
-  { label: "30D", value: "30d", days: 30 },
-  { label: "90D", value: "90d", days: 90 },
-  { label: "1Y", value: "1y", days: 365 },
-] as const;
-
-type PeriodValue = (typeof PERIODS)[number]["value"];
 
 const TCG_BAR_COLORS: Record<string, string> = {
   yugioh: "#ef4444",
@@ -70,9 +63,9 @@ export default function AnalyticsPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const [period, setPeriod] = useState<PeriodValue>("30d");
+  const [period, setPeriod] = useState<AnalyticsPeriod>("30d");
   const periodDays =
-    PERIODS.find((p) => p.value === period)?.days ?? 30;
+    ANALYTICS_PERIODS.find((p) => p.value === period)?.days ?? 30;
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
@@ -319,7 +312,7 @@ export default function AnalyticsPage() {
                 </CardDescription>
               </div>
               <div className="flex shrink-0 gap-1">
-                {PERIODS.map((p) => (
+                {ANALYTICS_PERIODS.map((p) => (
                   <Button
                     key={p.value}
                     size="sm"
