@@ -153,7 +153,8 @@ export type Card = z.infer<typeof cardSchema>;
 // ---------------------------------------------------------------------------
 
 export const searchCardsResponseSchema = z.object({
-  cards: z.array(cardSchema)
+  cards: z.array(cardSchema),
+  total: z.number()
 });
 export type SearchCardsResponse = z.infer<typeof searchCardsResponseSchema>;
 

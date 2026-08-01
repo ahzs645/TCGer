@@ -1,5 +1,25 @@
 import { prisma } from '../../lib/prisma';
-import type { CreateTransactionInput, FinanceSummary } from '@tcg/api-types';
+import type { Transaction } from '@prisma/client';
+import type {
+  CreateTransactionInput,
+  FinanceSummary,
+  TransactionResponse
+} from '@tcg/api-types';
+
+function serializeTransaction(transaction: Transaction): TransactionResponse {
+  return {
+    id: transaction.id,
+    type: transaction.type,
+    cardName: transaction.cardName ?? undefined,
+    tcg: transaction.tcg ?? undefined,
+    quantity: transaction.quantity,
+    amount: Number(transaction.amount),
+    currency: transaction.currency,
+    platform: transaction.platform ?? undefined,
+    notes: transaction.notes ?? undefined,
+    date: transaction.date.toISOString()
+  };
+}
 
 export async function getUserTransactions(userId: string, limit = 100) {
   const txns = await prisma.transaction.findMany({
@@ -7,22 +27,11 @@ export async function getUserTransactions(userId: string, limit = 100) {
     orderBy: { date: 'desc' },
     take: limit
   });
-  return txns.map(t => ({
-    id: t.id,
-    type: t.type,
-    cardName: t.cardName,
-    tcg: t.tcg,
-    quantity: t.quantity,
-    amount: t.amount ? parseFloat(t.amount.toString()) : 0,
-    currency: t.currency,
-    platform: t.platform,
-    notes: t.notes,
-    date: t.date.toISOString()
-  }));
+  return txns.map(serializeTransaction);
 }
 
 export async function createTransaction(userId: string, input: CreateTransactionInput) {
-  return prisma.transaction.create({
+  const transaction = await prisma.transaction.create({
     data: {
       userId,
       type: input.type,
@@ -38,6 +47,7 @@ export async function createTransaction(userId: string, input: CreateTransaction
       date: input.date ? new Date(input.date) : new Date()
     }
   });
+  return serializeTransaction(transaction);
 }
 
 export async function deleteTransaction(userId: string, transactionId: string) {

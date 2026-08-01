@@ -1,26 +1,91 @@
 import { prisma } from '../../lib/prisma';
 import type {
+  Prisma,
+  SealedOpenedCard,
+  SealedOpening,
+  SealedProduct
+} from '@prisma/client';
+import type {
   CreateSealedInventoryInput,
   CreateSealedOpeningInput,
   RecordOpenedCardSaleInput,
+  SealedInventoryResponse,
   SealedOpeningLedger,
+  SealedProductResponse,
   UpdateSealedInventoryInput
 } from '@tcg/api-types';
 import { isUsablePrice } from '../pricing/pricing.service';
+
+type SealedInventoryWithProduct = Prisma.SealedInventoryGetPayload<{
+  include: { product: true };
+}>;
+
+function serializeSealedProduct(product: SealedProduct): SealedProductResponse {
+  return {
+    id: product.id,
+    tcg: product.tcg,
+    name: product.name,
+    productType: product.productType,
+    setCode: product.setCode ?? undefined,
+    cardsPerPack: product.cardsPerPack ?? undefined,
+    packsPerBox: product.packsPerBox ?? undefined,
+    releaseDate: product.releaseDate?.toISOString(),
+    imageUrl: product.imageUrl ?? undefined,
+    msrp: product.msrp == null ? undefined : Number(product.msrp),
+    upc: product.upc ?? undefined
+  };
+}
+
+function serializeSealedInventory(
+  inventory: SealedInventoryWithProduct
+): SealedInventoryResponse {
+  return {
+    id: inventory.id,
+    product: serializeSealedProduct(inventory.product),
+    quantity: inventory.quantity,
+    purchasePrice:
+      inventory.purchasePrice == null ? undefined : Number(inventory.purchasePrice),
+    purchaseDate: inventory.purchaseDate?.toISOString(),
+    notes: inventory.notes ?? undefined,
+    createdAt: inventory.createdAt.toISOString()
+  };
+}
+
+function serializeSealedOpening(opening: SealedOpening) {
+  return {
+    ...opening,
+    openedAt: opening.openedAt.toISOString(),
+    createdAt: opening.createdAt.toISOString(),
+    updatedAt: opening.updatedAt.toISOString()
+  };
+}
+
+function serializeSealedOpenedCard(card: SealedOpenedCard) {
+  return {
+    ...card,
+    realizedProceeds:
+      card.realizedProceeds == null ? undefined : Number(card.realizedProceeds),
+    soldAt: card.soldAt?.toISOString(),
+    createdAt: card.createdAt.toISOString(),
+    updatedAt: card.updatedAt.toISOString()
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Sealed Products Catalog
 // ---------------------------------------------------------------------------
 
 export async function getSealedProducts(tcg?: string) {
-  return prisma.sealedProduct.findMany({
+  const products = await prisma.sealedProduct.findMany({
     where: tcg ? { tcg } : undefined,
     orderBy: { releaseDate: 'desc' }
   });
+  return products.map(serializeSealedProduct);
 }
 
 export async function getSealedProduct(productId: string) {
-  return prisma.sealedProduct.findUnique({ where: { id: productId } });
+  const product = await prisma.sealedProduct.findUnique({ where: { id: productId } });
+  return product ? serializeSealedProduct(product) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,31 +98,11 @@ export async function getUserSealedInventory(userId: string) {
     include: { product: true },
     orderBy: { createdAt: 'desc' }
   });
-  return items.map(i => ({
-    id: i.id,
-    product: {
-      id: i.product.id,
-      tcg: i.product.tcg,
-      name: i.product.name,
-      productType: i.product.productType,
-      setCode: i.product.setCode,
-      cardsPerPack: i.product.cardsPerPack,
-      packsPerBox: i.product.packsPerBox,
-      releaseDate: i.product.releaseDate?.toISOString(),
-      imageUrl: i.product.imageUrl,
-      msrp: i.product.msrp ? parseFloat(i.product.msrp.toString()) : undefined,
-      upc: i.product.upc
-    },
-    quantity: i.quantity,
-    purchasePrice: i.purchasePrice ? parseFloat(i.purchasePrice.toString()) : undefined,
-    purchaseDate: i.purchaseDate?.toISOString(),
-    notes: i.notes,
-    createdAt: i.createdAt.toISOString()
-  }));
+  return items.map(serializeSealedInventory);
 }
 
 export async function addSealedInventory(userId: string, input: CreateSealedInventoryInput) {
-  return prisma.sealedInventory.create({
+  const inventory = await prisma.sealedInventory.create({
     data: {
       userId,
       productId: input.productId,
@@ -68,6 +113,7 @@ export async function addSealedInventory(userId: string, input: CreateSealedInve
     },
     include: { product: true }
   });
+  return serializeSealedInventory(inventory);
 }
 
 export async function updateSealedInventory(userId: string, itemId: string, input: UpdateSealedInventoryInput) {
@@ -77,7 +123,7 @@ export async function updateSealedInventory(userId: string, itemId: string, inpu
     error.status = 404;
     throw error;
   }
-  return prisma.sealedInventory.update({
+  const inventory = await prisma.sealedInventory.update({
     where: { id: itemId },
     data: {
       ...(input.quantity !== undefined && { quantity: input.quantity }),
@@ -87,6 +133,7 @@ export async function updateSealedInventory(userId: string, itemId: string, inpu
     },
     include: { product: true }
   });
+  return serializeSealedInventory(inventory);
 }
 
 export async function deleteSealedInventory(userId: string, itemId: string) {
@@ -196,7 +243,7 @@ export async function createSealedOpening(
       where: { id: inventoryId },
       data: { quantity: { decrement: input.openedQuantity } }
     });
-    return opening;
+    return serializeSealedOpening(opening);
   });
 }
 
@@ -215,7 +262,7 @@ export async function recordOpenedCardSale(
     error.status = 404;
     throw error;
   }
-  return prisma.sealedOpenedCard.update({
+  const updatedCard = await prisma.sealedOpenedCard.update({
     where: { id: card.id },
     data: {
       status: 'sold',
@@ -223,6 +270,7 @@ export async function recordOpenedCardSale(
       soldAt: input.soldAt ? new Date(input.soldAt) : new Date()
     }
   });
+  return serializeSealedOpenedCard(updatedCard);
 }
 
 export async function getSealedOpeningLedgers(
