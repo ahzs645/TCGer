@@ -37,10 +37,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     }
 
     func supports(_ mode: ScanMode) -> Bool {
-        switch mode {
-        case .pokemon, .mtg, .yugioh:
-            return true
-        }
+        encoder.isAvailable &&
+            indexStore.isAvailable &&
+            metadataStore.supportedGames.contains(mode.tcgGame)
     }
 
     func scan(
@@ -64,9 +63,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             return nil
         }
 
+        let allowedIndices = await metadataStore.indices(for: context.mode.tcgGame)
+        guard !allowedIndices.isEmpty else {
+            throw CardScannerError.ineligibleMode
+        }
+
         let matches: [ANNVectorMatch]
         do {
-            matches = try await indexStore.nearestNeighbors(for: embedding, limit: Configuration.maxNeighbors)
+            matches = try await indexStore.nearestNeighbors(
+                for: embedding,
+                limit: Configuration.maxNeighbors,
+                allowedIndices: allowedIndices
+            )
         } catch {
             if error is AnnoyIndexStore.StoreError {
                 return nil
@@ -75,11 +83,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         }
         guard !matches.isEmpty else { return nil }
 
-        await metadataStore.loadIfNeeded()
-
         var candidates: [CardScanCandidate] = []
         for match in matches {
             guard let details = await metadataStore.details(for: match.index) else { continue }
+            guard details.identity.game == context.mode.tcgGame else { continue }
             let score = scoreForDistance(match.distance)
             guard score >= Configuration.minimumVerifiedScore else { continue }
             let candidate = CardScanCandidate(

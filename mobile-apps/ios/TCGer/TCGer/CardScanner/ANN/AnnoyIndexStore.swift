@@ -7,19 +7,36 @@ actor AnnoyIndexStore: ANNIndexProviding {
 
     private let resourceName: String
     private let fileExtension: String
+    private let bundle: Bundle
     private var vectors: [[Float]] = []
     private var isLoaded = false
+    nonisolated let isAvailable: Bool
 
-    init(resourceName: String = "CardsIndexVectors", fileExtension: String = "bin") {
+    init(
+        resourceName: String = "CardsIndexVectors",
+        fileExtension: String = "bin",
+        bundle: Bundle = .main
+    ) {
         self.resourceName = resourceName
         self.fileExtension = fileExtension
+        self.bundle = bundle
+        isAvailable = Self.hasValidHeader(
+            bundle: bundle,
+            resourceName: resourceName,
+            fileExtension: fileExtension
+        )
     }
 
-    func nearestNeighbors(for vector: [Float], limit: Int) async throws -> [ANNVectorMatch] {
+    func nearestNeighbors(
+        for vector: [Float],
+        limit: Int,
+        allowedIndices: Set<Int>
+    ) async throws -> [ANNVectorMatch] {
         try await loadIfNeeded()
-        guard !vectors.isEmpty else { return [] }
+        guard !vectors.isEmpty, !allowedIndices.isEmpty else { return [] }
 
-        let matches = vectors.enumerated().map { index, candidate -> ANNVectorMatch in
+        let matches = vectors.enumerated().compactMap { index, candidate -> ANNVectorMatch? in
+            guard allowedIndices.contains(index) else { return nil }
             let distance = cosineDistance(lhs: vector, rhs: candidate)
             return ANNVectorMatch(index: index, distance: distance)
         }
@@ -32,7 +49,7 @@ actor AnnoyIndexStore: ANNIndexProviding {
     /// followed by `count * dim` Int8 values, dequantised by `scale` (127). This
     /// replaces the impractical ~80 MB `[[Float]]` JSON with an ~8 MB binary that
     /// matches the web index exactly.
-    private func loadIfNeeded(bundle: Bundle = .main) async throws {
+    private func loadIfNeeded() async throws {
         guard !isLoaded else { return }
         defer { isLoaded = true }
         guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension) else {
@@ -80,5 +97,25 @@ actor AnnoyIndexStore: ANNIndexProviding {
         guard denominator > 0 else { return .infinity }
         let cosine = dot / denominator
         return 1 - min(max(cosine, -1), 1)
+    }
+
+    private nonisolated static func hasValidHeader(
+        bundle: Bundle,
+        resourceName: String,
+        fileExtension: String
+    ) -> Bool {
+        guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension),
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+              data.count >= 8
+        else {
+            return false
+        }
+        let count = Int(data.withUnsafeBytes {
+            $0.loadUnaligned(fromByteOffset: 0, as: Int32.self).littleEndian
+        })
+        let dimension = Int(data.withUnsafeBytes {
+            $0.loadUnaligned(fromByteOffset: 4, as: Int32.self).littleEndian
+        })
+        return count > 0 && dimension > 0 && data.count >= 8 + count * dimension
     }
 }

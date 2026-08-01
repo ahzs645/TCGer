@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Open-set rejection gate: a logistic head trained on the same L2-normalized
 /// DINOv2 embedding the CoreML encoder produces (backend
@@ -8,6 +9,14 @@ import Foundation
 /// crops; matching them against the index would just return the nearest wrong
 /// card. Runtime cost: one dot product over the embedding.
 struct CardFaceRejectionGate {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "TCGer",
+        category: "CardScanner"
+    )
+    private static let logMissingArtifactOnce: Void = {
+        logger.warning("CardFaceGate.json is missing; card-face rejection is disabled.")
+    }()
+
     private struct Artifact: Decodable {
         let model: String?
         let dimension: Int?
@@ -27,8 +36,11 @@ struct CardFaceRejectionGate {
         resource: String = "CardFaceGate",
         bundle: Bundle = .main
     ) -> CardFaceRejectionGate? {
-        guard let url = bundle.url(forResource: resource, withExtension: "json"),
-              let data = try? Data(contentsOf: url),
+        guard let url = bundle.url(forResource: resource, withExtension: "json") else {
+            _ = logMissingArtifactOnce
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url),
               let artifact = try? JSONDecoder().decode(Artifact.self, from: data),
               !artifact.weights.isEmpty
         else {

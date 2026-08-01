@@ -21,16 +21,6 @@ final class CardScannerCoordinator {
     private let strategies: [ScanStrategy]
     private let apiService: APIService
 
-    private lazy var supportedModes: [ScanMode: [ScanStrategy]] = {
-        var mapping: [ScanMode: [ScanStrategy]] = [:]
-        for strategy in strategies {
-            for mode in ScanMode.allCases where strategy.supports(mode) {
-                mapping[mode, default: []].append(strategy)
-            }
-        }
-        return mapping
-    }()
-
     init(strategies: [ScanStrategy], apiService: APIService) {
         self.strategies = strategies
         self.apiService = apiService
@@ -120,14 +110,26 @@ final class CardScannerCoordinator {
         source: ScanInvocationKind,
         preferredEngine: ScanEnginePreference
     ) -> [ScanStrategy] {
-        let strategiesForMode = (supportedModes[mode] ?? []).filter { strategy in
-            switch source {
-            case .livePreview:
-                return strategy.supportsLiveScanning
-            case .photoCapture:
-                return true
+        let strategiesForMode = strategies
+            .enumerated()
+            .filter { _, strategy in
+                guard strategy.supports(mode) else { return false }
+                switch source {
+                case .livePreview:
+                    return strategy.supportsLiveScanning
+                case .photoCapture:
+                    return true
+                }
             }
-        }
+            .sorted { lhs, rhs in
+                let lhsPriority = priority(of: lhs.element, for: mode)
+                let rhsPriority = priority(of: rhs.element, for: mode)
+                if lhsPriority == rhsPriority {
+                    return lhs.offset < rhs.offset
+                }
+                return lhsPriority < rhsPriority
+            }
+            .map(\.element)
 
         if preferredEngine.isLocalOnly {
             // Only strategies that run entirely on-device: bundled artwork
@@ -152,5 +154,20 @@ final class CardScannerCoordinator {
         }
 
         return strategiesForMode.filter { $0.kind == .serverHash }
+    }
+
+    private func priority(of strategy: ScanStrategy, for mode: ScanMode) -> Int {
+        switch (mode, strategy.kind) {
+        case (.pokemon, .artworkFingerprint), (.mtg, .perceptualHash):
+            return 0
+        case (_, .artworkFingerprint), (_, .perceptualHash):
+            return 1
+        case (_, .mlDetector):
+            return 2
+        case (_, .textOCR):
+            return 3
+        case (_, .serverHash), (_, .serverEmbedding):
+            return 4
+        }
     }
 }

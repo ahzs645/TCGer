@@ -134,28 +134,23 @@ actor MagicCardHashLibrary {
 
     static let shared = MagicCardHashLibrary()
 
-    private var entries: [CardHashEntry] = []
-    private var isLoaded = false
+    private let entries: [CardHashEntry]
+    nonisolated let isAvailable: Bool
 
-    func preloadIfNeeded() {
-        guard !isLoaded else { return }
-
-        // Load from bundle (not from cache to avoid MainActor isolation issues)
-        if let url = Bundle.main.url(
+    init(bundle: Bundle = .main) {
+        if let url = bundle.url(
             forResource: Configuration.sharedJSONName,
             withExtension: Configuration.fileExtension
         ), let data = try? Data(contentsOf: url) {
-            if let decoded = try? JSONDecoder().decode([CardHashEntry].self, from: data) {
-                entries = decoded
-            }
+            entries = (try? JSONDecoder().decode([CardHashEntry].self, from: data)) ?? []
+        } else {
+            entries = []
         }
-
-        isLoaded = !entries.isEmpty
+        isAvailable = !entries.isEmpty
     }
 
     func isReady() async -> Bool {
-        preloadIfNeeded()
-        return !entries.isEmpty
+        isAvailable
     }
 
     func bestMatches(
@@ -163,7 +158,6 @@ actor MagicCardHashLibrary {
         limit: Int = Configuration.maximumMatches,
         maxDistance: Int = Int(Configuration.qualityCutoff)
     ) async -> [MagicCardHashMatch] {
-        preloadIfNeeded()
         guard !entries.isEmpty else { return [] }
         var matches: [MagicCardHashMatch] = []
         matches.reserveCapacity(limit)
