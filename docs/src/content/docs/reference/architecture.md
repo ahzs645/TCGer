@@ -5,7 +5,8 @@ description: High-level structure of TCGer services and applications.
 
 ## Repository layout
 
-- `backend/`: Express + Prisma API service
+- `backend/`: Express API gateway and compatibility service
+- `convex-backend/`: Convex data, Better Auth, and native feature implementation
 - `frontend/`: Next.js 15 web app
 - `services/`: optional cache services (`scryfall-bulk`, `ygo-cache`, `tcgdex-cache`, `pokemon-cache`)
 - `docker/`: compose files, nginx gateway, backup/restore scripts
@@ -15,9 +16,20 @@ description: High-level structure of TCGer services and applications.
 ## Backend design
 
 - Adapter layer for cross-game card search and card details.
-- Auth includes first-run setup, login/signup, and JWT session handling.
-- Prisma-backed data model for binders and copy-level inventory.
+- Better Auth runs in Convex. Express proxies `/auth/*`, validates Better Auth session cookies or opaque bearer session tokens through Convex, and exposes `GET /setup/setup-required` plus authenticated `POST /setup/setup` for first-run admin promotion.
+- `TCGER_BRIDGE_SECRET` authenticates internal Express-to-Convex HTTP traffic. Express derives bridge identity from the validated session; browsers must never send bridge headers or call Convex HTTP routes directly.
+- Convex-native and Prisma-backed data paths coexist during migration.
 - Wishlist system with per-user wishlists and collection-vs-wishlist ownership comparison.
+
+### Backend modes
+
+The recommended Docker stack defaults `BACKEND_MODE` to `convex`. A directly started Express process currently defaults to `hybrid` in `backend/src/config/env.ts`, so local commands should set the mode explicitly.
+
+- `convex`: collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native handlers. Prices, notifications, alerts, shops, automations, and shipments are explicit `501 Not Implemented` groups.
+- `hybrid`: legacy routers remain active. Collections and wishlists can independently use Prisma or Convex through `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`.
+- Express remains the browser-facing API in either mode. It also owns provider-backed card search/details, scanning, news, API documentation, and capability reporting.
+
+`GET /health` returns `{ status, env, mode, features }`. Clients should gate feature UI from this response because route availability changes by mode.
 
 ### Expansion symbols
 
@@ -35,6 +47,7 @@ The frontend `SetSymbol` component renders the image when available and falls ba
 - Shared UI components under `frontend/src/components`.
 - API hooks and client helpers under `frontend/src/lib`.
 - Zustand stores for collections, wishlists, auth, and preferences.
+- Browser data access targets Express (directly in local development or through the `/api` gateway path); Convex and its bridge credentials remain server-side.
 
 ## Optional cache workers
 

@@ -15,10 +15,13 @@ TCGer API docs are now exposed directly by the backend service using OpenAPI + S
 
 ## Authorizing secured endpoints
 
-1. Login via `POST /auth/login` (or create admin via `POST /auth/setup` on first run).
-2. Copy the `token` from the response.
-3. In Swagger UI, click **Authorize** and enter:
-   `Bearer <your-jwt-token>`
+TCGer uses Better Auth sessions. The legacy token-secret flow is no longer part of authentication.
+
+1. Sign in with `POST /auth/sign-in/username`. On first run, create an account with `POST /auth/sign-up/email`, then call authenticated `POST /setup/setup` to promote that account to admin.
+2. If Swagger UI is served from the same backend/gateway origin, the Better Auth session cookie is sent automatically after sign-in.
+3. Alternatively, copy the opaque `token` returned by Better Auth, click **Authorize**, and enter the token value. Swagger UI adds the `Bearer` scheme, so do not prefix the value with `Bearer`.
+
+The backend forwards either the session cookie or `Authorization: Bearer <opaque-session-token>` to Better Auth's `get-session` endpoint in Convex.
 
 ## Server selection in Swagger
 

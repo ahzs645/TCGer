@@ -4,7 +4,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 
 ## Highlights
 - Unified card search across Yu-Gi-Oh!, Magic, and Pokemon via an adapter layer.
-- Auth flow with initial admin setup and JWT sessions.
+- Better Auth sessions backed by Convex, including a first-run admin promotion flow.
 - Binders and per-copy inventory tracking (condition, language, notes, price, acquisition price, serial number, tags).
 - Card prints lookup for Magic and Pokemon (Pokemon returns functional print group metadata).
 - User preferences for enabled games and display options (card numbers, pricing).
@@ -62,24 +62,42 @@ Notes:
 - The first run should go to `/setup` to create the initial admin account.
 
 ## Local development (without Docker)
-Prereqs: Node 18+, Postgres, and a `DATABASE_URL`.
+Prereqs: Node 18+. The default Convex development path does not require Postgres.
 
 ```bash
 npm install
 ```
 
-Backend:
+Start the local Convex backend first and leave it running:
 ```bash
-cd backend
-npx prisma migrate dev
-PORT=3004 JWT_SECRET=changeme-super-secret npm run dev
+cd convex-backend
+BETTER_AUTH_SECRET=tcger-local-convex-auth-secret-2026 \
+TCGER_BRIDGE_SECRET=tcger-local-convex-bridge-secret-2026 \
+npx convex dev
 ```
 
-Frontend (point to the backend port):
+In a second terminal, start Express in Convex mode. `CONVEX_HTTP_ORIGIN` is the local Convex HTTP/site origin printed by `convex dev` (normally port `3211`):
+```bash
+cd backend
+BACKEND_MODE=convex \
+CONVEX_HTTP_ORIGIN=http://127.0.0.1:3211 \
+TCGER_BRIDGE_SECRET=tcger-local-convex-bridge-secret-2026 \
+APP_ORIGIN=http://localhost:3003 \
+PORT=3004 npm run dev
+```
+
+In a third terminal, point the Next.js frontend at Express:
 ```bash
 cd frontend
-NEXT_PUBLIC_SITE_URL=http://localhost:3003 NEXT_PUBLIC_API_BASE_URL=http://localhost:3004 npm run dev -- --port 3003
+NEXT_PUBLIC_SITE_URL=http://localhost:3003 \
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3004 \
+BACKEND_API_ORIGIN=http://localhost:3004 \
+CONVEX_URL_INTERNAL=http://127.0.0.1:3210 \
+CONVEX_SITE_URL_INTERNAL=http://127.0.0.1:3211 \
+npm run dev -- --port 3003
 ```
+
+Open `http://localhost:3003`. Browser-facing REST requests must go through Express; do not call Convex HTTP routes directly or send `X-TCGER-*` bridge headers from browser code.
 
 Docker-backed local development shortcuts from the repo root:
 - `npm run docker:dev:legacy` - backend stack + Postgres for hybrid/legacy routes.
@@ -89,14 +107,20 @@ Docker-backed local development shortcuts from the repo root:
 - `npm run docker:down` - stop the Docker development stack.
 
 ## Environment variables
-Backend (see `backend/src/config/env.ts`):
-- `DATABASE_URL` (required for Prisma).
-- `JWT_SECRET` (min 16 chars).
+Express backend (see `backend/src/config/env.ts`):
+- `BACKEND_MODE` selects `convex` or `hybrid`. Docker Compose defaults to `convex`; a directly launched backend currently defaults to `hybrid`, so set it explicitly for Convex-only local development. `DATABASE_URL` is required outside test only in `hybrid` mode.
+- `CONVEX_HTTP_ORIGIN` is required outside test and points Express at the Convex HTTP/site origin (`http://convex-backend:3211` in Compose, normally `http://127.0.0.1:3211` locally).
+- `TCGER_BRIDGE_SECRET` authenticates internal Express-to-Convex bridge traffic. It must be at least 32 characters when set and is required in production.
 - `SCRYFALL_API_BASE_URL` (default `https://api.scryfall.com`).
 - `YGO_API_BASE_URL` (default `https://db.ygoprodeck.com/api/v7`).
-- `POKEMON_API_BASE_URL` (default `https://api.pokemontcg.io/v2` or point to `tcgdex-cache`).
+- `POKEMON_API_BASE_URL` (default `https://api.scrydex.com`).
 - `TCGDEX_API_BASE_URL` (default `https://api.tcgdex.net/v2/en`).
-- `POKEMON_TCG_API_KEY` (optional for official Pokemon API).
+
+Convex backend:
+- `BETTER_AUTH_SECRET` signs Better Auth sessions. Non-local Convex deployments require it; use a random value of at least 32 characters.
+- `TCGER_BRIDGE_SECRET` must exactly match the Express value.
+
+Development fallbacks are defined in `backend/src/config/env.ts` and `convex-backend/convex/betterAuth/auth.ts`. The development Compose defaults are in `docker/docker-compose.yml`; production Compose requires both secrets and supplies its Convex origin in `docker/docker-compose.prod.yml`. Replace development defaults for any shared or deployed environment.
 
 Frontend:
 - `NEXT_PUBLIC_API_BASE_URL` (public API base; typically `http://localhost:3003/api` with nginx).
@@ -108,6 +132,8 @@ Convex bridge:
 - `TCGER_BRIDGE_SECRET` is shared only by Express and Convex and must be a distinct random value of at least 32 characters in production.
 - Docker persists local Convex users, collections, and file storage in the `convex_data` named volume. Production does not publish the Convex backend or site ports to the host.
 
+In `convex` mode, collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native implementations. Prices, notifications, alerts, shops, automations, and shipments return `501 Not Implemented`. In `hybrid` mode the legacy routers remain available, and collections/wishlists can be selected independently with `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`. Read `GET /health` and its `features` object to capability-gate clients instead of assuming every deployment supports every group.
+
 ## API overview
 OpenAPI + Swagger:
 - OpenAPI source: `docs/openapi.yaml`
@@ -116,8 +142,8 @@ OpenAPI + Swagger:
 
 Key routes (see `backend/src/api/routes`):
 - `GET /health` - Liveness and readiness probes.
-- `POST /auth/signup`, `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`
-- `GET /auth/setup-required`, `POST /auth/setup`
+- `/auth/*` proxies Better Auth; common entry points are `POST /auth/sign-up/email` and `POST /auth/sign-in/username`.
+- `GET /setup/setup-required`, `POST /setup/setup`
 - `GET /cards/search?query=...&tcg=...`
 - `GET /cards/:tcg/:cardId`
 - `GET /cards/:tcg/:cardId/prints`
