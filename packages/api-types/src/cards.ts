@@ -210,3 +210,28 @@ export const cardParamsSchema = z.object({
   cardId: z.string()
 });
 export type CardParamsInput = z.infer<typeof cardParamsSchema>;
+
+/** Upper bound on results from an exhaustive name search, per game. */
+export const EXHAUSTIVE_SEARCH_MAX_LIMIT = 1000;
+export const EXHAUSTIVE_SEARCH_DEFAULT_LIMIT = 500;
+
+/**
+ * Exhaustive name search ("every Darkrai"). Unlike {@link searchQuerySchema}
+ * this pages through the provider instead of returning a preview page.
+ */
+export const exhaustiveSearchQuerySchema = z.object({
+  query: z.string().min(1, 'query parameter is required'),
+  tcg: z.string().optional(),
+  /**
+   * `prints` returns every printing of every matching card; `cards` collapses
+   * them to one entry per distinct card.
+   */
+  unique: z.enum(['prints', 'cards']).default('prints'),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(EXHAUSTIVE_SEARCH_MAX_LIMIT)
+    .default(EXHAUSTIVE_SEARCH_DEFAULT_LIMIT)
+});
+export type ExhaustiveSearchQueryInput = z.infer<typeof exhaustiveSearchQuerySchema>;

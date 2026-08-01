@@ -34,8 +34,10 @@ import type {
   AddWishlistCardInput,
   Card,
   CollectionCardCopy,
+  CreateWishlistRuleInput,
   TcgSet,
   UpdateCardInput,
+  UpdateWishlistRuleInput,
   UserPreferences,
 } from "@tcg/api-types";
 
@@ -158,6 +160,7 @@ function toWishlist(w: DemoWishlist) {
     description: w.description,
     colorHex: stripHash(w.color),
     cards,
+    rules: w.rules ?? [],
     totalCards,
     ownedCards,
     completionPercent:
@@ -670,9 +673,65 @@ function handleWishlists(
     return json(toWishlistCard(card));
   }
 
+  // POST /wishlists/:id/cards/batch
+  if (
+    segments[1] === "cards" &&
+    segments[2] === "batch" &&
+    segments.length === 3 &&
+    method === "POST"
+  ) {
+    const data = body as { cards: AddWishlistCardInput[] };
+    for (const card of data.cards ?? []) {
+      const demoCard: DemoOwnedCard = DEMO_CARDS.find(
+        (c) => c.id === card.externalId,
+      ) || {
+        id: card.externalId,
+        tcg: card.tcg,
+        name: card.name,
+        setCode: card.setCode || "",
+        setName: card.setName || "",
+        rarity: card.rarity || "Common",
+        price: 0,
+      };
+      store().addCardToWishlist(wishlistId, demoCard, card);
+    }
+    const w = store().wishlists.find(
+      (wl: DemoWishlist) => wl.id === wishlistId,
+    );
+    return w ? json(toWishlist(w)) : notFound("Wishlist not found");
+  }
+
   // DELETE /wishlists/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
     store().removeCardFromWishlist(wishlistId, segments[2]);
+    return noContent();
+  }
+
+  // POST /wishlists/:id/rules
+  if (segments[1] === "rules" && segments.length === 2 && method === "POST") {
+    const data = body as CreateWishlistRuleInput;
+    const rule = store().addWishlistRule(wishlistId, {
+      type: data.type,
+      tcg: data.tcg,
+      query: data.query,
+      setCode: data.setCode,
+      setName: data.setName,
+      includeAllPrintings: data.includeAllPrintings ?? true,
+      autoSync: data.autoSync ?? true,
+    });
+    return rule ? json(rule) : notFound("Wishlist not found");
+  }
+
+  // PATCH /wishlists/:id/rules/:ruleId
+  if (segments[1] === "rules" && segments.length === 3 && method === "PATCH") {
+    const data = body as UpdateWishlistRuleInput;
+    const rule = store().updateWishlistRule(wishlistId, segments[2], data);
+    return rule ? json(rule) : notFound("Wishlist rule not found");
+  }
+
+  // DELETE /wishlists/:id/rules/:ruleId
+  if (segments[1] === "rules" && segments.length === 3 && method === "DELETE") {
+    store().removeWishlistRule(wishlistId, segments[2]);
     return noContent();
   }
 
@@ -793,7 +852,9 @@ async function handleCards(
     return json({ cards, total: cards.length });
   }
 
-  // GET /cards/search?query=...&tcg=...
+  // GET /cards/search?query=... and GET /cards/search/all?query=...
+  // The demo dataset is small enough that the exhaustive variant can reuse the
+  // same search — there are no extra pages to page through.
   if (segments[0] === "search" && method === "GET") {
     const params = new URLSearchParams(queryString || "");
     const query = params.get("query") || "";

@@ -34,6 +34,49 @@ extension APIService {
         return searchResponse
     }
 
+    /// Exhaustive name search — every printing matching a name, rather than
+    /// the capped preview page `searchCards` returns. Used to expand wishlist
+    /// rules such as "every Darkrai".
+    func searchAllCards(
+        config: ServerConfiguration,
+        token: String,
+        query: String,
+        game: TCGGame = .all,
+        includeAllPrintings: Bool = true,
+        limit: Int = 500
+    ) async throws -> [Card] {
+        if config.isOnDevice {
+            // The on-device catalog is already fully local, so its regular
+            // search is exhaustive.
+            await prepareLocalCatalog(for: game)
+            return LocalStore.shared.searchCards(query: query, game: game).cards
+        }
+
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        var path = "cards/search/all?query=\(encodedQuery)"
+        path += "&unique=\(includeAllPrintings ? "prints" : "cards")"
+        path += "&limit=\(limit)"
+        if game != .all {
+            path += "&tcg=\(game.rawValue)"
+        }
+
+        let (data, response) = try await makeRequest(config: config, path: path, token: token)
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+
+        let decoder = JSONDecoder.tcgCardDecoder
+        guard let searchResponse = try? decoder.decode(CardSearchResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return searchResponse.cards
+    }
+
     func getCardPrints(
         config: ServerConfiguration,
         token: String,

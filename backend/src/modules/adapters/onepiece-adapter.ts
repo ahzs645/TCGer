@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { TcgSet } from '@tcg/api-types';
 
 import { env } from '../../config/env';
-import type { CardDTO, TcgAdapter } from './types';
+import type { CardDTO, CardNameSearchOptions, TcgAdapter } from './types';
 
 const API_ROOT = env.ONEPIECE_API_BASE_URL.replace(/\/+$/, '');
 const isRemoteApi = /optcgapi\.com$/i.test(new URL(API_ROOT).hostname);
@@ -121,6 +121,36 @@ export class OnePieceAdapter implements TcgAdapter {
     return parseCards(await response.json(), 'search')
       .slice(0, 20)
       .map((card) => this.mapCard(card));
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) return [];
+
+    // The filtered endpoint returns the full match set in one response; only
+    // searchCards truncates it to a preview page.
+    const url = new URL(`${API_ROOT}/sets/filtered/`);
+    url.searchParams.set('card_name', trimmed);
+    const response = await rateLimitedFetch(url.toString());
+    if (!response.ok) throw upstreamError('name search', response.status);
+    const cards = parseCards(await response.json(), 'name search').map((card) =>
+      this.mapCard(card)
+    );
+
+    if (options.includeAllPrintings) {
+      return cards.slice(0, options.limit);
+    }
+
+    // Alternate arts share a base card id; keep the first printing of each.
+    const seen = new Set<string>();
+    return cards
+      .filter((card) => {
+        const key = (card.baseExternalId ?? card.id).toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, options.limit);
   }
 
   async fetchCardById(externalId: string): Promise<CardDTO | null> {

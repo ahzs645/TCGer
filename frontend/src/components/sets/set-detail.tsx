@@ -9,6 +9,7 @@ import {
   Check,
   Grid2X2,
   List,
+  Heart,
   Loader2,
   Plus,
   Search,
@@ -39,6 +40,8 @@ import {
   addCardToCollection,
   LIBRARY_COLLECTION_ID,
 } from "@/lib/api/collections";
+import { addCardsInChunks } from "@/lib/wishlists/sync";
+import { useWishlistsStore } from "@/stores/wishlists";
 import { getAppRoute } from "@/lib/app-routes";
 import { compareCollectorNumbers } from "@/lib/cards/collector-number";
 import { ALL_COLLECTION_ID } from "@/lib/hooks/use-collection";
@@ -126,6 +129,19 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const [bulkBinderId, setBulkBinderId] = useState(LIBRARY_COLLECTION_ID);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const {
+    wishlists,
+    fetchWishlists,
+    hasFetchedWishlists,
+    addRule: addWishlistRule,
+  } = useWishlistsStore((state) => ({
+    wishlists: state.wishlists,
+    fetchWishlists: state.fetchWishlists,
+    hasFetchedWishlists: state.hasFetched,
+    addRule: state.addRule,
+  }));
+  const [wishlistId, setWishlistId] = useState("");
+  const [wishlistBusy, setWishlistBusy] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -134,6 +150,18 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
       void fetchCollections(token);
     }
   }, [fetchCollections, hasFetched, isAuthenticated, token]);
+
+  useEffect(() => {
+    if (token && isAuthenticated && !hasFetchedWishlists) {
+      void fetchWishlists(token);
+    }
+  }, [fetchWishlists, hasFetchedWishlists, isAuthenticated, token]);
+
+  useEffect(() => {
+    if (!wishlistId && wishlists.length) {
+      setWishlistId(wishlists[0].id);
+    }
+  }, [wishlistId, wishlists]);
 
   useEffect(() => {
     if (
@@ -277,6 +305,58 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
       );
     } finally {
       setBulkAdding(false);
+    }
+  };
+
+  /** Adds the selected printings to a wishlist without touching binders. */
+  const addSelectedToWishlist = async () => {
+    if (!token || !wishlistId || selectedCardIds.size === 0) return;
+    const cards = setCards.filter((card) => selectedCardIds.has(card.id));
+    setWishlistBusy(true);
+    setBulkStatus(null);
+    try {
+      await addCardsInChunks(token, wishlistId, cards, (sent, total) =>
+        setBulkStatus(`Adding ${sent} of ${total} cards to wishlist…`),
+      );
+      await fetchWishlists(token);
+      setBulkStatus(`Added ${cards.length} cards to your wishlist.`);
+      setSelectedCardIds(new Set());
+    } catch (error) {
+      setBulkStatus(
+        error instanceof Error ? error.message : "Wishlist add failed.",
+      );
+    } finally {
+      setWishlistBusy(false);
+    }
+  };
+
+  /**
+   * Tracks the full set as a wishlist rule, so the checklist keeps itself
+   * current as the provider publishes more cards for the set.
+   */
+  const trackSetInWishlist = async () => {
+    if (!token || !wishlistId) return;
+    setWishlistBusy(true);
+    setBulkStatus(`Adding ${setCards.length} cards to your wishlist…`);
+    try {
+      await addCardsInChunks(token, wishlistId, setCards, (sent, total) =>
+        setBulkStatus(`Adding ${sent} of ${total} cards to wishlist…`),
+      );
+      await addWishlistRule(token, wishlistId, {
+        type: "set",
+        tcg,
+        setCode,
+        setName: setTitle,
+        includeAllPrintings: true,
+        autoSync: true,
+      });
+      setBulkStatus(`Tracking ${setTitle} in your wishlist.`);
+    } catch (error) {
+      setBulkStatus(
+        error instanceof Error ? error.message : "Could not track this set.",
+      );
+    } finally {
+      setWishlistBusy(false);
     }
   };
 
@@ -499,30 +579,65 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
             </CardContent>
           </UiCard>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               Showing {visibleCards.length} of {progress.total} unique printings
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setSelectedCardIds(
-                  new Set(
-                    visibleCards
-                      .filter(
-                        (card) =>
-                          !progress.ownedPrintingKeys.has(
-                            getPrintingIdentity(card),
-                          ),
-                      )
-                      .map((card) => card.id),
-                  ),
-                )
-              }
-            >
-              Select visible missing
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {wishlists.length > 0 && (
+                <>
+                  <Select value={wishlistId} onValueChange={setWishlistId}>
+                    <SelectTrigger
+                      className="w-[180px]"
+                      aria-label="Target wishlist"
+                    >
+                      <SelectValue placeholder="Wishlist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wishlists.map((wishlist) => (
+                        <SelectItem key={wishlist.id} value={wishlist.id}>
+                          {wishlist.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void trackSetInWishlist()}
+                    disabled={wishlistBusy || !wishlistId || !setCards.length}
+                    title="Add every card in this set to the wishlist and keep it updated"
+                  >
+                    {wishlistBusy ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Heart className="mr-2 h-4 w-4" />
+                    )}
+                    Track set in wishlist
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setSelectedCardIds(
+                    new Set(
+                      visibleCards
+                        .filter(
+                          (card) =>
+                            !progress.ownedPrintingKeys.has(
+                              getPrintingIdentity(card),
+                            ),
+                        )
+                        .map((card) => card.id),
+                    ),
+                  )
+                }
+              >
+                Select visible missing
+              </Button>
+            </div>
           </div>
 
           {selectedCardIds.size > 0 && (
@@ -563,6 +678,21 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
                   )}
                   Add to binder
                 </Button>
+                {wishlists.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void addSelectedToWishlist()}
+                    disabled={wishlistBusy || !wishlistId}
+                  >
+                    {wishlistBusy ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Heart className="mr-2 h-4 w-4" />
+                    )}
+                    Add to wishlist
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"

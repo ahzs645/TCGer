@@ -39,6 +39,16 @@ Reference frontend
 .env
 tmp/
 
+# Local agent artifacts
+/.codex-prompts/
+
+# Generated frontend export
+/frontend/out/
+
+# Xcode user-specific state
+**/xcuserdata/
+*.xcuserstate
+
 # Local research artifacts
 research/
 

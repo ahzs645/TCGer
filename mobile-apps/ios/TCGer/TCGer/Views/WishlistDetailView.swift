@@ -17,6 +17,10 @@ struct WishlistDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var searchText = ""
     @State private var filterOwned: OwnershipFilter = .all
+    @State private var rules: [WishlistRule]
+    @State private var showingBulkAdd = false
+    @State private var isSyncing = false
+    @State private var syncStatus: String?
 
     enum OwnershipFilter: String, CaseIterable {
         case all = "All"
@@ -30,6 +34,7 @@ struct WishlistDetailView: View {
         self.wishlist = wishlist
         self.onUpdate = onUpdate
         _cards = State(initialValue: wishlist.cards)
+        _rules = State(initialValue: wishlist.expansionRules)
         _editedName = State(initialValue: wishlist.name)
         _editedDescription = State(initialValue: wishlist.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(wishlist.colorHex))
@@ -112,6 +117,44 @@ struct WishlistDetailView: View {
                     }
                 }
 
+                // Saved expansion rules
+                if !rules.isEmpty {
+                    Section {
+                        ForEach(rules) { rule in
+                            WishlistRuleRow(rule: rule)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await removeRule(rule) }
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
+                        }
+
+                        Button {
+                            Task { await syncRules() }
+                        } label: {
+                            HStack {
+                                if isSyncing {
+                                    ProgressView().scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                }
+                                Text(isSyncing ? (syncStatus ?? "Syncing…") : "Sync now")
+                            }
+                        }
+                        .disabled(isSyncing)
+                    } header: {
+                        Text("Auto-updating rules")
+                    } footer: {
+                        if let syncStatus, !isSyncing {
+                            Text(syncStatus)
+                        } else {
+                            Text("Syncing adds newly printed cards. Nothing is ever removed.")
+                        }
+                    }
+                }
+
                 // Filter
                 if totalCount > 0 {
                     Section {
@@ -140,6 +183,12 @@ struct WishlistDetailView: View {
                                 Label("Add Cards", systemImage: "plus")
                             }
                             .buttonStyle(.borderedProminent)
+                            Button {
+                                showingBulkAdd = true
+                            } label: {
+                                Label("Add a whole set or every printing", systemImage: "square.stack.3d.up")
+                            }
+                            .buttonStyle(.bordered)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 20)
@@ -197,8 +246,17 @@ struct WishlistDetailView: View {
                             .fontWeight(.semibold)
                         } else {
                             Button("Edit") { isEditing = true }
-                            Button {
-                                showingAddCards = true
+                            Menu {
+                                Button {
+                                    showingAddCards = true
+                                } label: {
+                                    Label("Search for cards", systemImage: "magnifyingglass")
+                                }
+                                Button {
+                                    showingBulkAdd = true
+                                } label: {
+                                    Label("Add every match or a whole set", systemImage: "square.stack.3d.up")
+                                }
                             } label: {
                                 Image(systemName: "plus")
                             }
@@ -219,6 +277,30 @@ struct WishlistDetailView: View {
                 })
                 .environmentObject(environmentStore)
             }
+            .sheet(isPresented: $showingBulkAdd) {
+                AddWishlistRuleSheet(
+                    wishlist: Wishlist(
+                        id: wishlist.id,
+                        name: wishlist.name,
+                        description: wishlist.description,
+                        colorHex: wishlist.colorHex,
+                        cards: cards,
+                        totalCards: cards.count,
+                        ownedCards: ownedCount,
+                        completionPercent: completionPercent,
+                        createdAt: wishlist.createdAt,
+                        updatedAt: wishlist.updatedAt,
+                        rules: rules
+                    ),
+                    onComplete: {
+                        Task {
+                            await refreshWishlist()
+                            onUpdate?()
+                        }
+                    }
+                )
+                .environmentObject(environmentStore)
+            }
             .task {
                 await refreshWishlist()
             }
@@ -236,8 +318,70 @@ struct WishlistDetailView: View {
                 id: wishlist.id
             )
             cards = updated.cards
+            rules = updated.expansionRules
         } catch {
             // Keep existing cards if refresh fails
+        }
+    }
+
+    @MainActor
+    private func syncRules() async {
+        guard let token = environmentStore.authToken else { return }
+        isSyncing = true
+        syncStatus = "Syncing…"
+
+        let service = WishlistSyncService(
+            apiService: apiService,
+            config: environmentStore.serverConfiguration,
+            token: token
+        )
+        let snapshot = Wishlist(
+            id: wishlist.id,
+            name: wishlist.name,
+            description: wishlist.description,
+            colorHex: wishlist.colorHex,
+            cards: cards,
+            totalCards: cards.count,
+            ownedCards: ownedCount,
+            completionPercent: completionPercent,
+            createdAt: wishlist.createdAt,
+            updatedAt: wishlist.updatedAt,
+            rules: rules
+        )
+
+        let result = await service.sync(wishlist: snapshot) { message in
+            Task { @MainActor in syncStatus = message }
+        }
+
+        await refreshWishlist()
+        onUpdate?()
+
+        if let firstError = result.errors.first {
+            syncStatus = firstError
+        } else if result.addedCards > 0 {
+            syncStatus = "Added \(result.addedCards) new card\(result.addedCards == 1 ? "" : "s")."
+            HapticManager.notification(.success)
+        } else {
+            syncStatus = "Already up to date."
+        }
+        isSyncing = false
+    }
+
+    @MainActor
+    private func removeRule(_ rule: WishlistRule) async {
+        guard let token = environmentStore.authToken else { return }
+
+        do {
+            try await apiService.removeWishlistRule(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                wishlistId: wishlist.id,
+                ruleId: rule.id
+            )
+            rules.removeAll { $0.id == rule.id }
+            onUpdate?()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -296,6 +440,47 @@ struct WishlistDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+// MARK: - Wishlist Rule Row
+
+private struct WishlistRuleRow: View {
+    let rule: WishlistRule
+
+    private var subtitle: String? {
+        var parts: [String] = []
+        if let tcg = rule.tcg, let game = TCGGame(rawValue: tcg) {
+            parts.append(game.displayName)
+        }
+        if let count = rule.lastMatchCount {
+            parts.append("\(count) matched")
+        }
+        if let synced = rule.lastSyncedAt, let date = ISO8601DateFormatter().date(from: synced) {
+            parts.append("synced \(date.formatted(date: .abbreviated, time: .omitted))")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: rule.type == .set ? "square.stack.3d.up" : "sparkles")
+                .foregroundColor(.accentColor)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rule.summary)
+                    .font(.subheadline)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 2)
     }
 }
 

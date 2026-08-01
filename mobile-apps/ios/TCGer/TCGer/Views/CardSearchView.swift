@@ -15,6 +15,9 @@ struct CardSearchView: View {
     @State private var currentPrintOptions: [Card] = []
     @State private var addSheetCard: Card?
     @State private var wishlistSheetCard: Card?
+    @State private var isAddingAllMatches = false
+    @State private var bulkWishlistStatus: String?
+    @State private var keepWishlistUpdated = true
 
     var addToWishlistId: String?
     var onCardAdded: (() -> Void)?
@@ -50,6 +53,51 @@ struct CardSearchView: View {
                         .padding(.vertical, 12)
                     }
                     .background(Color(.systemBackground))
+
+                    Divider()
+                }
+
+                // Bulk add banner — only when this search is feeding a wishlist
+                if let wishlistId = addToWishlistId,
+                   hasSearched,
+                   !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Add every match")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text("Not just the results shown below")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                Task { await addAllMatches(to: wishlistId) }
+                            } label: {
+                                if isAddingAllMatches {
+                                    ProgressView().scaleEffect(0.8)
+                                } else {
+                                    Text("Add all")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(isAddingAllMatches)
+                        }
+
+                        Toggle("Keep this wishlist updated", isOn: $keepWishlistUpdated)
+                            .font(.caption)
+
+                        if let bulkWishlistStatus {
+                            Text(bulkWishlistStatus)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemBackground))
 
                     Divider()
                 }
@@ -254,6 +302,64 @@ struct CardSearchView: View {
             onCardAdded?()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Adds every card matching the current query — the exhaustive search, not
+    /// the preview page — and optionally saves it as a rule.
+    @MainActor
+    private func addAllMatches(to wishlistId: String) async {
+        guard let token = environmentStore.authToken else { return }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        isAddingAllMatches = true
+        bulkWishlistStatus = "Searching every printing…"
+        defer { isAddingAllMatches = false }
+
+        let service = WishlistSyncService(
+            apiService: apiService,
+            config: environmentStore.serverConfiguration,
+            token: token
+        )
+
+        do {
+            let matches = try await apiService.searchAllCards(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                query: query,
+                game: selectedGame
+            )
+
+            guard !matches.isEmpty else {
+                bulkWishlistStatus = "No cards found for \"\(query)\"."
+                return
+            }
+
+            try await service.addCards(matches, toWishlist: wishlistId) { sent, total in
+                Task { @MainActor in
+                    bulkWishlistStatus = "Adding \(sent) of \(total) cards…"
+                }
+            }
+
+            if keepWishlistUpdated {
+                _ = try await apiService.addWishlistRule(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    wishlistId: wishlistId,
+                    type: .name,
+                    tcg: selectedGame == .all ? nil : selectedGame.rawValue,
+                    query: query,
+                    includeAllPrintings: true,
+                    autoSync: true
+                )
+            }
+
+            bulkWishlistStatus = "Added \(matches.count) card\(matches.count == 1 ? "" : "s") for \"\(query)\"."
+            HapticManager.notification(.success)
+            onCardAdded?()
+        } catch {
+            bulkWishlistStatus = error.localizedDescription
         }
     }
 

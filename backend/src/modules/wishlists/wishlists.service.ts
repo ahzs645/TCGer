@@ -3,11 +3,14 @@ import type {
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  CreateWishlistRuleInput,
+  UpdateWishlistRuleInput,
   WishlistResponse,
-  WishlistCardResponse
+  WishlistCardResponse,
+  WishlistRuleResponse
 } from '@tcg/api-types';
 import type { TcgCode } from '@tcg/api-types';
-import type { Prisma, WishlistCard } from '@prisma/client';
+import type { Prisma, WishlistCard, WishlistRule } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
 
@@ -109,10 +112,27 @@ function mapWishlistCard(
   };
 }
 
+function mapWishlistRule(rule: WishlistRule): WishlistRuleResponse {
+  return {
+    id: rule.id,
+    type: rule.type as WishlistRuleResponse['type'],
+    tcg: (rule.tcg as TcgCode | null) ?? undefined,
+    query: rule.query ?? undefined,
+    setCode: rule.setCode ?? undefined,
+    setName: rule.setName ?? undefined,
+    includeAllPrintings: rule.includeAllPrintings,
+    autoSync: rule.autoSync,
+    lastSyncedAt: rule.lastSyncedAt?.toISOString(),
+    lastMatchCount: rule.lastMatchCount ?? undefined,
+    createdAt: rule.createdAt.toISOString(),
+    updatedAt: rule.updatedAt.toISOString()
+  };
+}
+
 export async function getUserWishlists(userId: string): Promise<WishlistResponse[]> {
   const wishlists = await prisma.wishlist.findMany({
     where: { userId },
-    include: { cards: true },
+    include: { cards: true, rules: { orderBy: { createdAt: 'asc' } } },
     orderBy: { createdAt: 'desc' }
   });
 
@@ -151,6 +171,7 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
       description: wishlist.description ?? undefined,
       colorHex: wishlist.colorHex ?? undefined,
       cards,
+      rules: wishlist.rules.map(mapWishlistRule),
       totalCards,
       ownedCards,
       completionPercent,
@@ -163,7 +184,7 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
 export async function getUserWishlist(userId: string, wishlistId: string): Promise<WishlistResponse> {
   const wishlist = await prisma.wishlist.findFirst({
     where: { id: wishlistId, userId },
-    include: { cards: true }
+    include: { cards: true, rules: { orderBy: { createdAt: 'asc' } } }
   });
 
   if (!wishlist) {
@@ -203,6 +224,7 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
     cards,
+    rules: wishlist.rules.map(mapWishlistRule),
     totalCards,
     ownedCards: ownedCount,
     completionPercent,
@@ -222,7 +244,7 @@ export async function createWishlist(
       description: input.description,
       colorHex: input.colorHex
     },
-    include: { cards: true }
+    include: { cards: true, rules: true }
   });
 
   return {
@@ -231,6 +253,7 @@ export async function createWishlist(
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
     cards: [],
+    rules: [],
     totalCards: 0,
     ownedCards: 0,
     completionPercent: 0,
@@ -441,4 +464,107 @@ export async function addCardsToWishlist(
   });
 
   return getUserWishlist(userId, wishlistId);
+}
+
+// ---------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------
+
+async function requireWishlist(userId: string, wishlistId: string) {
+  const wishlist = await prisma.wishlist.findFirst({
+    where: { id: wishlistId, userId }
+  });
+  if (!wishlist) {
+    throw new Error('Wishlist not found');
+  }
+  return wishlist;
+}
+
+export async function addWishlistRule(
+  userId: string,
+  wishlistId: string,
+  input: CreateWishlistRuleInput
+): Promise<WishlistRuleResponse> {
+  await requireWishlist(userId, wishlistId);
+
+  // Re-adding the same rule should refresh it rather than duplicate it.
+  const existing = await prisma.wishlistRule.findFirst({
+    where: {
+      wishlistId,
+      type: input.type,
+      tcg: input.tcg ?? null,
+      query: input.query ?? null,
+      setCode: input.setCode ?? null
+    }
+  });
+
+  if (existing) {
+    const updated = await prisma.wishlistRule.update({
+      where: { id: existing.id },
+      data: {
+        setName: input.setName ?? existing.setName,
+        includeAllPrintings: input.includeAllPrintings,
+        autoSync: input.autoSync
+      }
+    });
+    return mapWishlistRule(updated);
+  }
+
+  const rule = await prisma.wishlistRule.create({
+    data: {
+      wishlistId,
+      type: input.type,
+      tcg: input.tcg,
+      query: input.query,
+      setCode: input.setCode,
+      setName: input.setName,
+      includeAllPrintings: input.includeAllPrintings,
+      autoSync: input.autoSync
+    }
+  });
+  return mapWishlistRule(rule);
+}
+
+export async function updateWishlistRule(
+  userId: string,
+  wishlistId: string,
+  ruleId: string,
+  input: UpdateWishlistRuleInput
+): Promise<WishlistRuleResponse> {
+  await requireWishlist(userId, wishlistId);
+
+  const existing = await prisma.wishlistRule.findFirst({
+    where: { id: ruleId, wishlistId }
+  });
+  if (!existing) {
+    throw new Error('Wishlist rule not found');
+  }
+
+  const rule = await prisma.wishlistRule.update({
+    where: { id: ruleId },
+    data: {
+      autoSync: input.autoSync,
+      includeAllPrintings: input.includeAllPrintings,
+      lastSyncedAt: input.lastSyncedAt ? new Date(input.lastSyncedAt) : undefined,
+      lastMatchCount: input.lastMatchCount
+    }
+  });
+  return mapWishlistRule(rule);
+}
+
+export async function removeWishlistRule(
+  userId: string,
+  wishlistId: string,
+  ruleId: string
+): Promise<void> {
+  await requireWishlist(userId, wishlistId);
+
+  const existing = await prisma.wishlistRule.findFirst({
+    where: { id: ruleId, wishlistId }
+  });
+  if (!existing) {
+    throw new Error('Wishlist rule not found');
+  }
+
+  await prisma.wishlistRule.delete({ where: { id: ruleId } });
 }

@@ -2,13 +2,17 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
   Heart,
+  Layers,
   Loader2,
   Plus,
+  RefreshCw,
   Search,
+  Sparkles,
   Trash,
   X,
 } from "lucide-react";
@@ -42,6 +46,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { SetSymbol } from "@/components/cards/set-symbol";
 import {
   cn,
@@ -51,10 +61,19 @@ import {
 } from "@/lib/utils";
 import { normalizeHexColor } from "@/lib/color";
 import { searchCardsApi } from "@/lib/api-client";
+import { getSets } from "@/lib/api/cards";
+import {
+  addCardsInChunks,
+  expandWishlistRule,
+} from "@/lib/wishlists/sync";
 import { useAuthStore } from "@/stores/auth";
 import { useWishlistsStore } from "@/stores/wishlists";
 import { supportedGames } from "@/stores/game-filter";
-import type { WishlistCardResponse } from "@/stores/wishlists";
+import type {
+  WishlistCardResponse,
+  WishlistRuleResponse,
+} from "@/stores/wishlists";
+import { describeWishlistRule } from "@tcg/api-types";
 import type { Card as CardType, TcgCode } from "@/types/card";
 
 export function WishlistContent() {
@@ -67,6 +86,9 @@ export function WishlistContent() {
     addCardToWishlist,
     addCardsToWishlist,
     removeCardFromWishlist,
+    addRule,
+    removeRule,
+    syncWishlist,
     isLoading,
     hasFetched,
     error,
@@ -97,6 +119,28 @@ export function WishlistContent() {
   const [filterOwned, setFilterOwned] = useState<"all" | "owned" | "missing">(
     "all",
   );
+
+  // Bulk "everything that matches" state
+  const [addMode, setAddMode] = useState<"search" | "set">("search");
+  const [keepUpdated, setKeepUpdated] = useState(true);
+  const [includeAllPrintings, setIncludeAllPrintings] = useState(true);
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [isExpanding, setIsExpanding] = useState(false);
+
+  // "From a set" tab state
+  const [setGame, setSetGame] = useState<TcgCode>("pokemon");
+  const [selectedSetCode, setSelectedSetCode] = useState<string>("");
+
+  // Rule sync state
+  const [isSyncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  const setsQuery = useQuery({
+    queryKey: ["sets", setGame],
+    queryFn: () => getSets(token!, setGame),
+    enabled: Boolean(token && isAddCardDialogOpen && addMode === "set"),
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     if (isAuthenticated && token && !hasFetched) {
@@ -140,6 +184,18 @@ export function WishlistContent() {
 
   const wishlistCardIds = useMemo(
     () => new Set((activeWishlist?.cards ?? []).map((card) => card.externalId)),
+    [activeWishlist?.cards],
+  );
+
+  // Bulk adds span games, where provider ids can collide (OP01-001 exists in
+  // more than one catalogue), so they dedupe on a game-qualified key.
+  const wishlistCardKeys = useMemo(
+    () =>
+      new Set(
+        (activeWishlist?.cards ?? []).map(
+          (card) => `${card.tcg}:${card.externalId}`,
+        ),
+      ),
     [activeWishlist?.cards],
   );
 
@@ -278,6 +334,156 @@ export function WishlistContent() {
       // Error handled in store
     } finally {
       setIsBulkAdding(false);
+    }
+  };
+
+  /**
+   * Adds every card matching the current search — not just the preview page —
+   * and optionally saves it as a rule so later printings get pulled in too.
+   */
+  const handleAddAllMatching = async () => {
+    if (!token || !activeWishlistId || !searchQuery.trim()) return;
+    const query = searchQuery.trim();
+    const tcg = searchTcg === "all" ? undefined : (searchTcg as TcgCode);
+
+    setIsExpanding(true);
+    setBulkStatus("Searching every printing…");
+    try {
+      const matches = await expandWishlistRule(token, {
+        type: "name",
+        tcg,
+        query,
+        includeAllPrintings,
+      });
+
+      if (!matches.length) {
+        setBulkStatus(`No cards found for "${query}".`);
+        return;
+      }
+
+      const fresh = matches.filter(
+        (card) => !wishlistCardKeys.has(`${card.tcg}:${card.id}`),
+      );
+      if (fresh.length) {
+        await addCardsInChunks(token, activeWishlistId, fresh, (sent, total) =>
+          setBulkStatus(`Adding ${sent} of ${total} cards…`),
+        );
+      }
+
+      if (keepUpdated) {
+        await addRule(token, activeWishlistId, {
+          type: "name",
+          tcg,
+          query,
+          includeAllPrintings,
+          autoSync: true,
+        });
+      } else {
+        await fetchWishlists(token);
+      }
+
+      setBulkStatus(
+        fresh.length
+          ? `Added ${fresh.length} card${fresh.length === 1 ? "" : "s"} matching "${query}".`
+          : `Already tracking all ${matches.length} matches for "${query}".`,
+      );
+      setSelectedCards(new Set());
+    } catch (bulkError) {
+      setBulkStatus(
+        bulkError instanceof Error
+          ? bulkError.message
+          : "Failed to add matching cards.",
+      );
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+  /** Adds an entire set as a checklist, optionally kept in sync. */
+  const handleAddSet = async () => {
+    if (!token || !activeWishlistId || !selectedSetCode) return;
+    const set = setsQuery.data?.find((entry) => entry.code === selectedSetCode);
+
+    setIsExpanding(true);
+    setBulkStatus(`Loading ${set?.name ?? selectedSetCode}…`);
+    try {
+      const matches = await expandWishlistRule(token, {
+        type: "set",
+        tcg: setGame,
+        setCode: selectedSetCode,
+      });
+
+      if (!matches.length) {
+        setBulkStatus("That set returned no cards.");
+        return;
+      }
+
+      const fresh = matches.filter(
+        (card) => !wishlistCardKeys.has(`${card.tcg}:${card.id}`),
+      );
+      if (fresh.length) {
+        await addCardsInChunks(token, activeWishlistId, fresh, (sent, total) =>
+          setBulkStatus(`Adding ${sent} of ${total} cards…`),
+        );
+      }
+
+      if (keepUpdated) {
+        await addRule(token, activeWishlistId, {
+          type: "set",
+          tcg: setGame,
+          setCode: selectedSetCode,
+          setName: set?.name,
+          includeAllPrintings: true,
+          autoSync: true,
+        });
+      } else {
+        await fetchWishlists(token);
+      }
+
+      setBulkStatus(
+        fresh.length
+          ? `Added ${fresh.length} card${fresh.length === 1 ? "" : "s"} from ${set?.name ?? selectedSetCode}.`
+          : `Already tracking all ${matches.length} cards in ${set?.name ?? selectedSetCode}.`,
+      );
+    } catch (bulkError) {
+      setBulkStatus(
+        bulkError instanceof Error
+          ? bulkError.message
+          : "Failed to add the set.",
+      );
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!token || !activeWishlistId) return;
+    setSyncing(true);
+    setSyncStatus("Syncing…");
+    try {
+      const result = await syncWishlist(token, activeWishlistId, {
+        onProgress: setSyncStatus,
+      });
+      setSyncStatus(
+        result.addedCards
+          ? `Added ${result.addedCards} new card${result.addedCards === 1 ? "" : "s"}.`
+          : "Already up to date.",
+      );
+    } catch (syncError) {
+      setSyncStatus(
+        syncError instanceof Error ? syncError.message : "Sync failed.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleRemoveRule = async (ruleId: string) => {
+    if (!token || !activeWishlistId) return;
+    try {
+      await removeRule(token, activeWishlistId, ruleId);
+    } catch {
+      // Surfaced via the store error banner.
     }
   };
 
@@ -501,6 +707,20 @@ export function WishlistContent() {
               </div>
             </div>
             <div className="flex gap-2 flex-shrink-0 ml-2" data-oid="chre:su">
+              {activeWishlist.rules.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleSync()}
+                  disabled={isSyncing}
+                  title="Re-run this wishlist's rules and add anything new"
+                >
+                  <RefreshCw
+                    className={cn("h-4 w-4 sm:mr-1", isSyncing && "animate-spin")}
+                  />
+                  <span className="hidden sm:inline">Sync</span>
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={() => setAddCardDialogOpen(true)}
@@ -524,6 +744,24 @@ export function WishlistContent() {
               </Button>
             </div>
           </CardHeader>
+          {(activeWishlist.rules.length > 0 || syncStatus) && (
+            <div className="border-b bg-muted/30 px-4 py-3 sm:px-6">
+              <div className="flex flex-wrap items-center gap-2">
+                {activeWishlist.rules.map((rule) => (
+                  <WishlistRuleChip
+                    key={rule.id}
+                    rule={rule}
+                    onRemove={() => void handleRemoveRule(rule.id)}
+                  />
+                ))}
+              </div>
+              {syncStatus && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {syncStatus}
+                </p>
+              )}
+            </div>
+          )}
           <div className="border-b px-4 py-3 sm:px-6" data-oid="rf4iju2">
             <div className="flex gap-2" data-oid="j3hjjed">
               <Input
@@ -726,10 +964,108 @@ export function WishlistContent() {
           <DialogHeader data-oid="5:jh4b7">
             <DialogTitle data-oid="qjv8w_w">Add Cards to Wishlist</DialogTitle>
             <DialogDescription data-oid="2.m:oe9">
-              Search for cards to add to &ldquo;{activeWishlist?.name}&rdquo;.
-              Select multiple cards and add them all at once.
+              Pick cards one at a time, grab every printing of a name, or drop
+              in a whole set for &ldquo;{activeWishlist?.name}&rdquo;.
             </DialogDescription>
           </DialogHeader>
+          <Tabs
+            value={addMode}
+            onValueChange={(value) => {
+              setAddMode(value as "search" | "set");
+              setBulkStatus(null);
+            }}
+            className="flex flex-1 min-h-0 flex-col gap-3"
+          >
+            <TabsList className="w-full">
+              <TabsTrigger value="search" className="flex-1">
+                <Search className="mr-1 h-3.5 w-3.5" />
+                By name
+              </TabsTrigger>
+              <TabsTrigger value="set" className="flex-1">
+                <Layers className="mr-1 h-3.5 w-3.5" />
+                Whole set
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent
+              value="set"
+              className="flex flex-col gap-3 data-[state=inactive]:hidden"
+            >
+              <div className="flex gap-2">
+                <Select
+                  value={setGame}
+                  onValueChange={(value) => {
+                    setSetGame(value as TcgCode);
+                    setSelectedSetCode("");
+                  }}
+                >
+                  <SelectTrigger className="w-[140px]" aria-label="Game">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supportedGames
+                      .filter((game) => game !== "all")
+                      .map((game) => (
+                        <SelectItem key={game} value={game}>
+                          {GAME_LABELS[game]}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={selectedSetCode}
+                  onValueChange={setSelectedSetCode}
+                  disabled={setsQuery.isLoading || !setsQuery.data?.length}
+                >
+                  <SelectTrigger className="flex-1" aria-label="Set">
+                    <SelectValue
+                      placeholder={
+                        setsQuery.isLoading ? "Loading sets…" : "Choose a set"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {(setsQuery.data ?? []).map((set) => (
+                      <SelectItem key={set.code} value={set.code}>
+                        {set.name}
+                        {set.totalCards ? ` (${set.totalCards})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={keepUpdated}
+                  onCheckedChange={(checked) => setKeepUpdated(checked === true)}
+                />
+                Keep this wishlist updated as the set gets new cards
+              </label>
+              <Button
+                onClick={() => void handleAddSet()}
+                disabled={!selectedSetCode || isExpanding}
+              >
+                {isExpanding ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Layers className="mr-2 h-4 w-4" />
+                )}
+                Add every card in this set
+              </Button>
+              {setsQuery.isError && (
+                <p className="text-sm text-destructive">
+                  Could not load sets for {GAME_LABELS[setGame]}.
+                </p>
+              )}
+              {bulkStatus && addMode === "set" && (
+                <p className="text-sm text-muted-foreground">{bulkStatus}</p>
+              )}
+            </TabsContent>
+
+            <TabsContent
+              value="search"
+              className="flex flex-1 min-h-0 flex-col gap-3 data-[state=inactive]:hidden"
+            >
           <div
             className="flex flex-col gap-3 flex-1 min-h-0"
             data-oid="3bmqdmv"
@@ -785,6 +1121,56 @@ export function WishlistContent() {
                 )}
               </Button>
             </form>
+
+            {/* Grab everything matching the name, not just this preview page */}
+            {searchQuery.trim() && (
+              <div className="space-y-2 rounded-md border border-dashed p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span>
+                      Add <strong>every</strong> card matching &ldquo;
+                      {searchQuery.trim()}&rdquo;
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => void handleAddAllMatching()}
+                    disabled={isExpanding}
+                  >
+                    {isExpanding ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="mr-1 h-3 w-3" />
+                    )}
+                    Add all matches
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={includeAllPrintings}
+                      onCheckedChange={(checked) =>
+                        setIncludeAllPrintings(checked === true)
+                      }
+                    />
+                    Include every printing (uncheck for one entry per card)
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={keepUpdated}
+                      onCheckedChange={(checked) =>
+                        setKeepUpdated(checked === true)
+                      }
+                    />
+                    Keep this wishlist updated with future printings
+                  </label>
+                </div>
+                {bulkStatus && addMode === "search" && (
+                  <p className="text-xs text-muted-foreground">{bulkStatus}</p>
+                )}
+              </div>
+            )}
 
             {/* Select all bar */}
             {searchResults.length > 0 && (
@@ -946,6 +1332,8 @@ export function WishlistContent() {
               </div>
             </ScrollArea>
           </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter data-oid="bs.6ddj">
             <Button
               variant="ghost"
@@ -974,6 +1362,43 @@ export function WishlistContent() {
         {mobileView === "list" ? sidebarContent : detailContent}
       </div>
     </>
+  );
+}
+
+function WishlistRuleChip({
+  rule,
+  onRemove,
+}: {
+  rule: WishlistRuleResponse;
+  onRemove: () => void;
+}) {
+  const lastSynced = rule.lastSyncedAt
+    ? new Date(rule.lastSyncedAt).toLocaleDateString()
+    : null;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs">
+      {rule.type === "set" ? (
+        <Layers className="h-3 w-3 text-muted-foreground" />
+      ) : (
+        <Sparkles className="h-3 w-3 text-muted-foreground" />
+      )}
+      <span className="font-medium">{describeWishlistRule(rule)}</span>
+      {rule.tcg && (
+        <span className="text-muted-foreground">{GAME_LABELS[rule.tcg]}</span>
+      )}
+      {lastSynced && (
+        <span className="text-muted-foreground">· synced {lastSynced}</span>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        aria-label={`Remove rule: ${describeWishlistRule(rule)}`}
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
 

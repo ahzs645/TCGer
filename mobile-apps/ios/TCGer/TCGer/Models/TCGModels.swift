@@ -791,6 +791,45 @@ struct Wishlist: Identifiable, Codable, Hashable, Sendable {
     let completionPercent: Int
     let createdAt: String
     let updatedAt: String
+    /// Optional so wishlists saved by older builds (and servers that predate
+    /// smart wishlists) still decode.
+    var rules: [WishlistRule]? = nil
+
+    var expansionRules: [WishlistRule] { rules ?? [] }
+}
+
+/// A saved expansion rule: "every Darkrai", "everything in Prismatic
+/// Evolutions". Re-running a rule pulls in printings that did not exist when
+/// the wishlist was created.
+struct WishlistRule: Identifiable, Codable, Hashable, Sendable {
+    enum RuleType: String, Codable, Sendable {
+        case name
+        case set
+    }
+
+    let id: String
+    let type: RuleType
+    let tcg: String?
+    let query: String?
+    let setCode: String?
+    let setName: String?
+    let includeAllPrintings: Bool
+    let autoSync: Bool
+    let lastSyncedAt: String?
+    let lastMatchCount: Int?
+    let createdAt: String
+    let updatedAt: String
+
+    /// Human-readable summary, mirroring `describeWishlistRule` on the web.
+    var summary: String {
+        switch type {
+        case .set:
+            return "Every card in \(setName ?? setCode ?? "set")"
+        case .name:
+            let scope = includeAllPrintings ? "printing" : "card"
+            return "Every \(scope) named \"\(query ?? "")\""
+        }
+    }
 }
 
 struct WishlistCard: Identifiable, Codable, Hashable, Sendable {

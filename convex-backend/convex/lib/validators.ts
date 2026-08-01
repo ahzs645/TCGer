@@ -228,12 +228,28 @@ export const wishlistCardValidator = v.object({
   createdAt: v.string()
 });
 
+export const wishlistRuleValidator = v.object({
+  id: v.id("wishlistRules"),
+  type: v.union(v.literal("name"), v.literal("set")),
+  tcg: v.optional(tcgCodeValidator),
+  query: v.optional(v.string()),
+  setCode: v.optional(v.string()),
+  setName: v.optional(v.string()),
+  includeAllPrintings: v.boolean(),
+  autoSync: v.boolean(),
+  lastSyncedAt: v.optional(v.string()),
+  lastMatchCount: v.optional(v.number()),
+  createdAt: v.string(),
+  updatedAt: v.string()
+});
+
 export const wishlistValidator = v.object({
   id: v.id("wishlists"),
   name: v.string(),
   description: v.optional(v.string()),
   colorHex: v.optional(v.string()),
   cards: v.array(wishlistCardValidator),
+  rules: v.array(wishlistRuleValidator),
   totalCards: v.number(),
   ownedCards: v.number(),
   completionPercent: v.number(),

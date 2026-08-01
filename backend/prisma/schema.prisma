@@ -352,8 +352,31 @@ model Wishlist {
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards WishlistCard[]
+  rules WishlistRule[]
 
   @@unique([userId, name])
+}
+
+/// Saved expansion rule for a "smart" wishlist — e.g. every Darkrai printing,
+/// or every card in a set. Clients re-expand these to pick up new printings.
+model WishlistRule {
+  id                  String    @id @default(uuid())
+  wishlistId          String
+  type                String // 'name' | 'set'
+  tcg                 String? // null on a name rule means every game
+  query               String? // name rules
+  setCode             String? // set rules
+  setName             String?
+  includeAllPrintings Boolean   @default(true)
+  autoSync            Boolean   @default(true)
+  lastSyncedAt        DateTime?
+  lastMatchCount      Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+
+  @@index([wishlistId])
 }
 
 model CardHash {

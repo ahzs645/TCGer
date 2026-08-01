@@ -1,8 +1,18 @@
 import { Router } from 'express';
-import { searchQuerySchema, cardParamsSchema } from '@tcg/api-types';
+import {
+  searchQuerySchema,
+  cardParamsSchema,
+  exhaustiveSearchQuerySchema
+} from '@tcg/api-types';
 
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
-import { getCardPrints, searchCards, getSets, getSetCards } from '../../modules/cards/cards.service';
+import {
+  getCardPrints,
+  searchCards,
+  searchAllCards,
+  getSets,
+  getSetCards
+} from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
 import { requireAuth } from '../middleware/auth';
 
@@ -14,6 +24,16 @@ cardsRouter.get(
   asyncHandler(async (req, res) => {
     const { query, tcg } = searchQuerySchema.parse(req.query);
     const cards = await searchCards({ query, tcg });
+    res.json({ cards, total: cards.length });
+  })
+);
+
+// Exhaustive name search: every printing matching a name, for wishlist rules
+cardsRouter.get(
+  '/search/all',
+  asyncHandler(async (req, res) => {
+    const params = exhaustiveSearchQuerySchema.parse(req.query);
+    const cards = await searchAllCards(params);
     res.json({ cards, total: cards.length });
   })
 );

@@ -1,6 +1,6 @@
 import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
-import { CardDTO, CardPrintsResult, TcgAdapter } from './types';
+import { CardDTO, CardNameSearchOptions, CardPrintsResult, TcgAdapter } from './types';
 
 const API_ROOT = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
 const BASE_URL = `${API_ROOT}/cards`;
@@ -108,6 +108,44 @@ export class MagicAdapter implements TcgAdapter {
       console.error('MagicAdapter.searchCards error', error);
       return [];
     }
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const url = new URL(`${BASE_URL}/search`);
+    // Scryfall's bare name filter is a substring match, so quoting the term is
+    // enough to pull "Darkrai", "Darkrai, Enigma of Nightmares", and so on.
+    url.searchParams.set('q', `name:"${trimmed.replace(/"/g, '')}"`);
+    url.searchParams.set('order', 'released');
+    url.searchParams.set('unique', options.includeAllPrintings ? 'prints' : 'cards');
+    url.searchParams.set('dir', 'desc');
+
+    const collected: ScryfallCard[] = [];
+    let nextPageUrl: string | undefined = url.toString();
+
+    try {
+      while (nextPageUrl && collected.length < options.limit) {
+        const response: Response = await rateLimitedFetch(nextPageUrl);
+        if (response.status === 404) {
+          // Scryfall returns 404 for a search with no matches.
+          break;
+        }
+        if (!response.ok) {
+          throw new Error(`Scryfall name search failed: ${response.status}`);
+        }
+        const payload = (await response.json()) as ScryfallSearchResponse;
+        collected.push(...(payload.data ?? []));
+        nextPageUrl = payload.has_more && payload.next_page ? payload.next_page : undefined;
+      }
+    } catch (error) {
+      console.error('MagicAdapter.fetchCardsByName error', error);
+    }
+
+    return collected.slice(0, options.limit).map((card) => this.mapCard(card));
   }
 
   async fetchCardById(externalId: string): Promise<CardDTO | null> {

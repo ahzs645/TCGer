@@ -80,12 +80,28 @@ interface DemoCardPersistence {
   copy?: DemoCopyInput;
 }
 
+export interface DemoWishlistRule {
+  id: string;
+  type: "name" | "set";
+  tcg?: TcgCode;
+  query?: string;
+  setCode?: string;
+  setName?: string;
+  includeAllPrintings: boolean;
+  autoSync: boolean;
+  lastSyncedAt?: string;
+  lastMatchCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DemoWishlist {
   id: string;
   name: string;
   description: string;
   color: string;
   cards: DemoWishlistCard[];
+  rules?: DemoWishlistRule[];
   createdAt: string;
 }
 
@@ -378,6 +394,21 @@ interface DemoState {
     cardData?: AddWishlistCardInput,
   ) => void;
   removeCardFromWishlist: (wishlistId: string, cardInstanceId: string) => void;
+  addWishlistRule: (
+    wishlistId: string,
+    rule: Omit<DemoWishlistRule, "id" | "createdAt" | "updatedAt">,
+  ) => DemoWishlistRule | null;
+  updateWishlistRule: (
+    wishlistId: string,
+    ruleId: string,
+    patch: Partial<
+      Pick<
+        DemoWishlistRule,
+        "autoSync" | "includeAllPrintings" | "lastSyncedAt" | "lastMatchCount"
+      >
+    >,
+  ) => DemoWishlistRule | null;
+  removeWishlistRule: (wishlistId: string, ruleId: string) => void;
 
   // Queries
   isCardInCollection: (cardId: string) => boolean;
@@ -750,6 +781,77 @@ export const useDemoStore = create<DemoState>()(
               cards: w.cards.filter((c) => c.id !== cardInstanceId),
             };
           }),
+        }));
+      },
+
+      addWishlistRule: (wishlistId, rule) => {
+        const timestamp = new Date().toISOString();
+        let saved: DemoWishlistRule | null = null;
+        set((state) => ({
+          wishlists: state.wishlists.map((w) => {
+            if (w.id !== wishlistId) return w;
+            const rules = w.rules ?? [];
+            // Re-adding the same rule refreshes it rather than duplicating.
+            const existing = rules.find(
+              (candidate) =>
+                candidate.type === rule.type &&
+                candidate.tcg === rule.tcg &&
+                candidate.query === rule.query &&
+                candidate.setCode === rule.setCode,
+            );
+            if (existing) {
+              saved = {
+                ...existing,
+                ...rule,
+                setName: rule.setName ?? existing.setName,
+                updatedAt: timestamp,
+              };
+              const next = saved;
+              return {
+                ...w,
+                rules: rules.map((candidate) =>
+                  candidate.id === existing.id ? next : candidate,
+                ),
+              };
+            }
+            saved = {
+              ...rule,
+              id: uid(),
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            };
+            return { ...w, rules: [...rules, saved] };
+          }),
+        }));
+        return saved;
+      },
+
+      updateWishlistRule: (wishlistId, ruleId, patch) => {
+        const timestamp = new Date().toISOString();
+        let saved: DemoWishlistRule | null = null;
+        set((state) => ({
+          wishlists: state.wishlists.map((w) => {
+            if (w.id !== wishlistId) return w;
+            return {
+              ...w,
+              rules: (w.rules ?? []).map((rule) => {
+                if (rule.id !== ruleId) return rule;
+                saved = { ...rule, ...patch, updatedAt: timestamp };
+                return saved;
+              }),
+            };
+          }),
+        }));
+        return saved;
+      },
+
+      removeWishlistRule: (wishlistId, ruleId) => {
+        set((state) => ({
+          wishlists: state.wishlists.map((w) =>
+            w.id === wishlistId
+              ? { ...w, rules: (w.rules ?? []).filter((r) => r.id !== ruleId) }
+              : w,
+          ),
         }));
       },
 

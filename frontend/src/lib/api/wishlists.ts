@@ -3,18 +3,24 @@ import type {
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  CreateWishlistRuleInput,
+  UpdateWishlistRuleInput,
   WishlistResponse,
   WishlistCardResponse,
+  WishlistRuleResponse,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
 export type {
   WishlistResponse,
   WishlistCardResponse,
+  WishlistRuleResponse,
   CreateWishlistInput,
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  CreateWishlistRuleInput,
+  UpdateWishlistRuleInput,
 };
 
 export async function getWishlists(token: string): Promise<WishlistResponse[]> {
@@ -160,6 +166,78 @@ export async function addCardsToWishlist(
   }
 
   return response.json();
+}
+
+export async function addWishlistRule(
+  token: string,
+  wishlistId: string,
+  data: CreateWishlistRuleInput,
+): Promise<WishlistRuleResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/rules`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to add wishlist rule");
+  }
+
+  return response.json();
+}
+
+export async function updateWishlistRule(
+  token: string,
+  wishlistId: string,
+  ruleId: string,
+  data: UpdateWishlistRuleInput,
+): Promise<WishlistRuleResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/rules/${ruleId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to update wishlist rule");
+  }
+
+  return response.json();
+}
+
+export async function removeWishlistRule(
+  token: string,
+  wishlistId: string,
+  ruleId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/rules/${ruleId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to remove wishlist rule");
+  }
 }
 
 export async function removeCardFromWishlist(

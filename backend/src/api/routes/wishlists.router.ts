@@ -3,7 +3,9 @@ import {
   createWishlistSchema,
   updateWishlistSchema,
   addWishlistCardSchema,
-  addWishlistCardsSchema
+  addWishlistCardsSchema,
+  createWishlistRuleSchema,
+  updateWishlistRuleSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -15,7 +17,10 @@ import {
   deleteWishlist,
   addCardToWishlist,
   addCardsToWishlist,
-  removeCardFromWishlist
+  removeCardFromWishlist,
+  addWishlistRule,
+  updateWishlistRule,
+  removeWishlistRule
 } from '../../modules/wishlists/wishlists.service';
 import { asyncHandler } from '../../utils/async-handler';
 
@@ -141,6 +146,74 @@ wishlistsRouter.post(
     } catch (error) {
       if (error instanceof Error && error.message === 'Wishlist not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Add (or refresh) an expansion rule on a wishlist
+wishlistsRouter.post(
+  '/:wishlistId/rules',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { wishlistId } = req.params;
+    const data = createWishlistRuleSchema.parse(req.body);
+
+    try {
+      const rule = await addWishlistRule(userId, wishlistId, data);
+      res.status(201).json(rule);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wishlist not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Update a rule (used to record sync results)
+wishlistsRouter.patch(
+  '/:wishlistId/rules/:ruleId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { wishlistId, ruleId } = req.params;
+    const data = updateWishlistRuleSchema.parse(req.body);
+
+    try {
+      const rule = await updateWishlistRule(userId, wishlistId, ruleId, data);
+      res.json(rule);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wishlist not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      if (error instanceof Error && error.message === 'Wishlist rule not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist rule not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Remove a rule (already-added cards stay on the wishlist)
+wishlistsRouter.delete(
+  '/:wishlistId/rules/:ruleId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { wishlistId, ruleId } = req.params;
+
+    try {
+      await removeWishlistRule(userId, wishlistId, ruleId);
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wishlist not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      if (error instanceof Error && error.message === 'Wishlist rule not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist rule not found' });
       }
       throw error;
     }

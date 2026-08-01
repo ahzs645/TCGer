@@ -21,10 +21,25 @@ export type { CardPrintsResponse as CardPrintsResult } from '@tcg/api-types';
 
 import type { TcgCode, TcgSet, Card, CardPrintsResponse } from '@tcg/api-types';
 
+/** Options for an exhaustive name lookup (see {@link TcgAdapter.fetchCardsByName}). */
+export interface CardNameSearchOptions {
+  /** Return every printing rather than one entry per distinct card. */
+  includeAllPrintings: boolean;
+  /** Hard cap on returned cards; adapters stop paging once they reach it. */
+  limit: number;
+}
+
 // Backend-only: adapter interface (not part of the API contract)
 export interface TcgAdapter {
   readonly game: TcgCode;
+  /** Preview search: a small, fast page of results for interactive UI. */
   searchCards(query: string): Promise<Card[]>;
+  /**
+   * Exhaustive name search: every card matching the name, paged to `limit`.
+   * Adapters that do not implement it fall back to {@link searchCards}, which
+   * only returns a capped preview page.
+   */
+  fetchCardsByName?(name: string, options: CardNameSearchOptions): Promise<Card[]>;
   fetchCardById(externalId: string): Promise<Card | null>;
   fetchCardPrints?(externalId: string): Promise<CardPrintsResponse>;
   fetchSets?(): Promise<TcgSet[]>;

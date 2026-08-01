@@ -142,6 +142,7 @@ final class LocalStore {
     private var sealedInventory: [SealedInventoryItem]
     private var transactions: [Transaction]
     private var nextWishlistId: Int
+    private var nextWishlistRuleId: Int
     private var nextTransactionId: Int
 
     /// True once the user has explicitly asked for the sample collection.
@@ -199,6 +200,7 @@ final class LocalStore {
         self.nextCopyId = 1000
         self.nextTagId = 4
         self.nextWishlistId = 1
+        self.nextWishlistRuleId = 1
         self.nextTransactionId = 1
         self.wishlists = []
         self.sealedProducts = []
@@ -227,6 +229,8 @@ final class LocalStore {
         var nextCopyId: Int
         var nextTagId: Int
         var nextWishlistId: Int
+        /// Absent in stores written before smart wishlists shipped.
+        var nextWishlistRuleId: Int?
         var nextTransactionId: Int
         var user: User?
         var preferences: APIService.UserPreferences?
@@ -261,6 +265,7 @@ final class LocalStore {
         nextCopyId = state.nextCopyId
         nextTagId = state.nextTagId
         nextWishlistId = state.nextWishlistId
+        nextWishlistRuleId = state.nextWishlistRuleId ?? 1
         nextTransactionId = state.nextTransactionId
         sampleDataLoaded = state.sampleDataLoaded ?? true
         if let preferences = state.preferences { self.preferences = preferences }
@@ -301,6 +306,7 @@ final class LocalStore {
             nextCopyId: nextCopyId,
             nextTagId: nextTagId,
             nextWishlistId: nextWishlistId,
+            nextWishlistRuleId: nextWishlistRuleId,
             nextTransactionId: nextTransactionId,
             user: user,
             preferences: preferences,
@@ -328,6 +334,7 @@ final class LocalStore {
         nextCopyId = 1000
         nextTagId = 4
         nextWishlistId = 1
+        nextWishlistRuleId = 1
         nextTransactionId = 1
         sampleDataLoaded = false
         seedBaseline()
@@ -1423,7 +1430,8 @@ final class LocalStore {
                 ownedCards: remaining.filter { $0.owned }.count,
                 completionPercent: remaining.isEmpty ? 0 : Int((Double(remaining.filter { $0.owned }.count) / Double(remaining.count)) * 100),
                 createdAt: wishlist.createdAt,
-                updatedAt: LocalStore.isoFormatter.string(from: Date())
+                updatedAt: LocalStore.isoFormatter.string(from: Date()),
+                rules: wishlist.rules
             )
         }
 
@@ -1956,7 +1964,8 @@ final class LocalStore {
             ownedCards: wl.ownedCards,
             completionPercent: wl.completionPercent,
             createdAt: wl.createdAt,
-            updatedAt: LocalStore.isoFormatter.string(from: Date())
+            updatedAt: LocalStore.isoFormatter.string(from: Date()),
+            rules: wl.rules
         )
         wishlists[idx] = updated
         persist()
@@ -1973,13 +1982,42 @@ final class LocalStore {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
         let now = LocalStore.isoFormatter.string(from: Date())
-        let wc = WishlistCard(id: "local-wc-\(Int.random(in: 100...9999))", externalId: card.id, tcg: card.tcg, name: card.name, setCode: card.setCode, setName: card.setName, rarity: card.rarity, imageUrl: card.imageUrl, imageUrlSmall: card.imageUrlSmall, setSymbolUrl: nil, setLogoUrl: nil, collectorNumber: card.collectorNumber, notes: nil, owned: false, ownedQuantity: 0, createdAt: now)
         let wl = wishlists[idx]
+
+        if let existing = wl.cards.first(where: { $0.externalId == card.id && $0.tcg == card.tcg }) {
+            return existing
+        }
+
+        let wc = LocalStore.makeWishlistCard(from: card, at: now)
         var cards = wl.cards
         cards.append(wc)
-        wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+        wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         persist()
         return wc
+    }
+
+    /// Batch equivalent of `addCardToWishlist`, used when a rule expands into
+    /// many cards at once. Cards already on the list are skipped.
+    func addCardsToWishlist(wishlistId: String, cards newCards: [Card]) throws -> Wishlist {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let wl = wishlists[idx]
+        var cards = wl.cards
+        var seen = Set(cards.map { "\($0.tcg):\($0.externalId)" })
+
+        for card in newCards {
+            let key = "\(card.tcg):\(card.id)"
+            if seen.contains(key) { continue }
+            seen.insert(key)
+            cards.append(LocalStore.makeWishlistCard(from: card, at: now))
+        }
+
+        let updated = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
+        wishlists[idx] = updated
+        persist()
+        return updated
     }
 
     func removeCardFromWishlist(wishlistId: String, cardId: String) {
@@ -1987,8 +2025,152 @@ final class LocalStore {
         let wl = wishlists[idx]
         let cards = wl.cards.filter { $0.id != cardId }
         let now = LocalStore.isoFormatter.string(from: Date())
-        wishlists[idx] = Wishlist(id: wl.id, name: wl.name, description: wl.description, colorHex: wl.colorHex, cards: cards, totalCards: cards.count, ownedCards: wl.ownedCards, completionPercent: cards.isEmpty ? 0 : Int((Double(wl.ownedCards) / Double(cards.count)) * 100), createdAt: wl.createdAt, updatedAt: now)
+        wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         persist()
+    }
+
+    // MARK: - Wishlist Rule Accessors
+
+    func addWishlistRule(
+        wishlistId: String,
+        type: WishlistRule.RuleType,
+        tcg: String?,
+        query: String?,
+        setCode: String?,
+        setName: String?,
+        includeAllPrintings: Bool,
+        autoSync: Bool
+    ) throws -> WishlistRule {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let wl = wishlists[idx]
+        var rules = wl.expansionRules
+
+        // Re-adding the same rule refreshes it rather than duplicating it.
+        let existingIndex = rules.firstIndex {
+            $0.type == type && $0.tcg == tcg && $0.query == query && $0.setCode == setCode
+        }
+
+        let rule = WishlistRule(
+            id: existingIndex.map { rules[$0].id } ?? "local-wr-\(nextWishlistRuleId)",
+            type: type,
+            tcg: tcg,
+            query: query,
+            setCode: setCode,
+            setName: setName ?? existingIndex.flatMap { rules[$0].setName },
+            includeAllPrintings: includeAllPrintings,
+            autoSync: autoSync,
+            lastSyncedAt: existingIndex.flatMap { rules[$0].lastSyncedAt },
+            lastMatchCount: existingIndex.flatMap { rules[$0].lastMatchCount },
+            createdAt: existingIndex.map { rules[$0].createdAt } ?? now,
+            updatedAt: now
+        )
+
+        if let existingIndex {
+            rules[existingIndex] = rule
+        } else {
+            rules.append(rule)
+            nextWishlistRuleId += 1
+        }
+
+        wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: wl.cards, rules: rules, updatedAt: now)
+        persist()
+        return rule
+    }
+
+    func updateWishlistRule(
+        wishlistId: String,
+        ruleId: String,
+        autoSync: Bool?,
+        includeAllPrintings: Bool?,
+        lastSyncedAt: String?,
+        lastMatchCount: Int?
+    ) throws -> WishlistRule {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
+        }
+        let wl = wishlists[idx]
+        var rules = wl.expansionRules
+        guard let ruleIndex = rules.firstIndex(where: { $0.id == ruleId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Wishlist rule not found")
+        }
+
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let current = rules[ruleIndex]
+        let updated = WishlistRule(
+            id: current.id,
+            type: current.type,
+            tcg: current.tcg,
+            query: current.query,
+            setCode: current.setCode,
+            setName: current.setName,
+            includeAllPrintings: includeAllPrintings ?? current.includeAllPrintings,
+            autoSync: autoSync ?? current.autoSync,
+            lastSyncedAt: lastSyncedAt ?? current.lastSyncedAt,
+            lastMatchCount: lastMatchCount ?? current.lastMatchCount,
+            createdAt: current.createdAt,
+            updatedAt: now
+        )
+        rules[ruleIndex] = updated
+
+        wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: wl.cards, rules: rules, updatedAt: now)
+        persist()
+        return updated
+    }
+
+    func removeWishlistRule(wishlistId: String, ruleId: String) {
+        guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else { return }
+        let wl = wishlists[idx]
+        let rules = wl.expansionRules.filter { $0.id != ruleId }
+        let now = LocalStore.isoFormatter.string(from: Date())
+        wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: wl.cards, rules: rules, updatedAt: now)
+        persist()
+    }
+
+    private static func makeWishlistCard(from card: Card, at timestamp: String) -> WishlistCard {
+        WishlistCard(
+            id: "local-wc-\(UUID().uuidString.prefix(8))",
+            externalId: card.id,
+            tcg: card.tcg,
+            name: card.name,
+            setCode: card.setCode,
+            setName: card.setName,
+            rarity: card.rarity,
+            imageUrl: card.imageUrl,
+            imageUrlSmall: card.imageUrlSmall,
+            setSymbolUrl: card.setSymbolUrl,
+            setLogoUrl: card.setLogoUrl,
+            collectorNumber: card.collectorNumber,
+            notes: nil,
+            owned: false,
+            ownedQuantity: 0,
+            createdAt: timestamp
+        )
+    }
+
+    /// Rebuilds a wishlist with new cards/rules, recomputing the totals.
+    private static func rebuildWishlist(
+        _ wishlist: Wishlist,
+        cards: [WishlistCard],
+        rules: [WishlistRule]?,
+        updatedAt: String
+    ) -> Wishlist {
+        let ownedCards = cards.filter(\.owned).count
+        return Wishlist(
+            id: wishlist.id,
+            name: wishlist.name,
+            description: wishlist.description,
+            colorHex: wishlist.colorHex,
+            cards: cards,
+            totalCards: cards.count,
+            ownedCards: ownedCards,
+            completionPercent: cards.isEmpty ? 0 : Int((Double(ownedCards) / Double(cards.count)) * 100),
+            createdAt: wishlist.createdAt,
+            updatedAt: updatedAt,
+            rules: rules
+        )
     }
 
     // MARK: - Sealed Accessors

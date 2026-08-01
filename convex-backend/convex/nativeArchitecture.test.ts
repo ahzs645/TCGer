@@ -749,6 +749,78 @@ describe("convex native architecture", () => {
 
     expect(removeCardResponse.status).toBe(204);
 
+    const createRuleResponse = await t.fetch(`/wishlists/${createdWishlist.id}/rules`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        type: "name",
+        tcg: "magic",
+        query: "Sol Ring",
+        includeAllPrintings: true,
+        autoSync: true
+      })
+    });
+    const createdRule = await createRuleResponse.json();
+
+    expect(createRuleResponse.status).toBe(201);
+    expect(createdRule).toMatchObject({
+      type: "name",
+      tcg: "magic",
+      query: "Sol Ring",
+      includeAllPrintings: true,
+      autoSync: true
+    });
+
+    // Re-posting the same rule refreshes it instead of creating a duplicate.
+    const duplicateRuleResponse = await t.fetch(`/wishlists/${createdWishlist.id}/rules`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        type: "name",
+        tcg: "magic",
+        query: "Sol Ring",
+        includeAllPrintings: false,
+        autoSync: true
+      })
+    });
+    const duplicateRule = await duplicateRuleResponse.json();
+
+    expect(duplicateRule.id).toBe(createdRule.id);
+    expect(duplicateRule.includeAllPrintings).toBe(false);
+
+    const syncedAt = "2026-07-26T12:00:00.000Z";
+    const patchRuleResponse = await t.fetch(
+      `/wishlists/${createdWishlist.id}/rules/${createdRule.id}`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ lastSyncedAt: syncedAt, lastMatchCount: 7 })
+      }
+    );
+    const patchedRule = await patchRuleResponse.json();
+
+    expect(patchRuleResponse.status).toBe(200);
+    expect(patchedRule).toMatchObject({ lastSyncedAt: syncedAt, lastMatchCount: 7 });
+
+    const wishlistWithRules = await (
+      await t.fetch(`/wishlists/${createdWishlist.id}`, { headers })
+    ).json();
+    expect(wishlistWithRules.rules).toHaveLength(1);
+    expect(wishlistWithRules.rules[0].id).toBe(createdRule.id);
+
+    const removeRuleResponse = await t.fetch(
+      `/wishlists/${createdWishlist.id}/rules/${createdRule.id}`,
+      {
+        method: "DELETE",
+        headers
+      }
+    );
+
+    expect(removeRuleResponse.status).toBe(204);
+    expect(
+      (await (await t.fetch(`/wishlists/${createdWishlist.id}`, { headers })).json()).rules
+    ).toEqual([]);
+
     const deleteWishlistResponse = await t.fetch(`/wishlists/${createdWishlist.id}`, {
       method: "DELETE",
       headers

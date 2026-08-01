@@ -132,12 +132,28 @@ type NativeWishlistCard = RichCardMetadata & {
   createdAt: string;
 };
 
+type NativeWishlistRule = {
+  id: string;
+  type: "name" | "set";
+  tcg?: TcgCode;
+  query?: string;
+  setCode?: string;
+  setName?: string;
+  includeAllPrintings: boolean;
+  autoSync: boolean;
+  lastSyncedAt?: string;
+  lastMatchCount?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type NativeWishlist = {
   id: string;
   name: string;
   description?: string;
   colorHex?: string;
   cards: NativeWishlistCard[];
+  rules: NativeWishlistRule[];
   totalCards: number;
   ownedCards: number;
   completionPercent: number;
@@ -685,6 +701,10 @@ function asWishlistId(value: string) {
 }
 
 function asWishlistCardId(value: string) {
+  return value as any;
+}
+
+function asWishlistRuleId(value: string) {
   return value as any;
 }
 
@@ -1252,6 +1272,25 @@ http.route({
         return json(wishlist, 201);
       }
 
+      if (segments.length === 2 && segments[1] === "rules") {
+        if (body.type !== "name" && body.type !== "set") {
+          return errorJson(400, "BAD_REQUEST", "type must be 'name' or 'set'");
+        }
+        const rule = await ctx.runMutation(internal.bridge.addWishlistRule, {
+          subject: identity.subject,
+          wishlistId: asWishlistId(segments[0]),
+          type: body.type,
+          tcg: typeof body.tcg === "string" ? (body.tcg as TcgCode) : undefined,
+          query: typeof body.query === "string" ? body.query : undefined,
+          setCode: typeof body.setCode === "string" ? body.setCode : undefined,
+          setName: typeof body.setName === "string" ? body.setName : undefined,
+          includeAllPrintings:
+            typeof body.includeAllPrintings === "boolean" ? body.includeAllPrintings : true,
+          autoSync: typeof body.autoSync === "boolean" ? body.autoSync : true
+        });
+        return json(rule, 201);
+      }
+
       return errorJson(404, "NOT_FOUND", "Route not found");
     } catch (error) {
       return handleConvexError(error, "Failed to create wishlist resource");
@@ -1268,6 +1307,21 @@ http.route({
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/wishlists\//, "").split("/").filter(Boolean);
       const body = await parseJsonBody(request);
+
+      if (segments.length === 3 && segments[1] === "rules") {
+        const rule = await ctx.runMutation(internal.bridge.updateWishlistRule, {
+          subject: identity.subject,
+          wishlistId: asWishlistId(segments[0]),
+          ruleId: asWishlistRuleId(segments[2]),
+          autoSync: typeof body.autoSync === "boolean" ? body.autoSync : undefined,
+          includeAllPrintings:
+            typeof body.includeAllPrintings === "boolean" ? body.includeAllPrintings : undefined,
+          lastSyncedAt: typeof body.lastSyncedAt === "string" ? body.lastSyncedAt : undefined,
+          lastMatchCount:
+            typeof body.lastMatchCount === "number" ? body.lastMatchCount : undefined
+        });
+        return json(rule);
+      }
 
       if (segments.length !== 1) {
         return errorJson(404, "NOT_FOUND", "Route not found");
@@ -1313,6 +1367,15 @@ http.route({
           subject: identity.subject,
           wishlistId: asWishlistId(segments[0]),
           cardId: asWishlistCardId(segments[2])
+        });
+        return noContent();
+      }
+
+      if (segments.length === 3 && segments[1] === "rules") {
+        await ctx.runMutation(internal.bridge.removeWishlistRule, {
+          subject: identity.subject,
+          wishlistId: asWishlistId(segments[0]),
+          ruleId: asWishlistRuleId(segments[2])
         });
         return noContent();
       }

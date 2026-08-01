@@ -152,6 +152,21 @@ export default defineSchema({
     .index("by_wishlist", ["wishlistId"])
     .index("by_wishlist_external_tcg", ["wishlistId", "externalId", "tcg"]),
 
+  wishlistRules: defineTable({
+    wishlistId: v.id("wishlists"),
+    type: v.union(v.literal("name"), v.literal("set")),
+    tcg: v.optional(tcgCode),
+    query: v.optional(v.string()),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    includeAllPrintings: v.boolean(),
+    autoSync: v.boolean(),
+    lastSyncedAt: v.optional(v.number()),
+    lastMatchCount: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  }).index("by_wishlist", ["wishlistId"]),
+
   collectionEntries: defineTable({
     userId: v.id("users"),
     binderId: v.id("binders"),

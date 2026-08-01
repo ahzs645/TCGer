@@ -69,10 +69,117 @@ export const addWishlistCardSchema = z.object({
 });
 export type AddWishlistCardInput = z.infer<typeof addWishlistCardSchema>;
 
+/**
+ * Cards per batch request. Rule expansion can produce hundreds of cards, so
+ * clients chunk large adds instead of sending one giant transaction.
+ */
+export const WISHLIST_CARD_BATCH_SIZE = 100;
+export const WISHLIST_CARD_BATCH_MAX = 500;
+
 export const addWishlistCardsSchema = z.object({
-  cards: z.array(addWishlistCardSchema).min(1, 'At least one card is required')
+  cards: z
+    .array(addWishlistCardSchema)
+    .min(1, 'At least one card is required')
+    .max(WISHLIST_CARD_BATCH_MAX, `At most ${WISHLIST_CARD_BATCH_MAX} cards per request`)
 });
 export type AddWishlistCardsInput = z.infer<typeof addWishlistCardsSchema>;
+
+// ---------------------------------------------------------------------------
+// Wishlist rules ("smart wishlists")
+// ---------------------------------------------------------------------------
+
+/**
+ * A rule describes the cards a wishlist wants in the abstract — "every Darkrai
+ * in Pokemon", "all of Prismatic Evolutions" — so the list can be re-expanded
+ * later and pick up printings that did not exist when it was created.
+ */
+export const wishlistRuleTypeSchema = z.enum(['name', 'set']);
+export type WishlistRuleType = z.infer<typeof wishlistRuleTypeSchema>;
+
+export const createWishlistRuleSchema = z
+  .object({
+    type: wishlistRuleTypeSchema,
+    /** Omitted on a name rule means "search every game". Required for set rules. */
+    tcg: tcgCodeSchema.optional(),
+    /** Name fragment to match. Required for name rules. */
+    query: z.string().trim().min(1).optional(),
+    /** Provider set code. Required for set rules. */
+    setCode: z.string().trim().min(1).optional(),
+    setName: z.string().trim().min(1).optional(),
+    /** Match every printing rather than one entry per distinct card. */
+    includeAllPrintings: z.boolean().default(true),
+    /** Re-expand this rule whenever the wishlist is synced. */
+    autoSync: z.boolean().default(true)
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === 'name' && !value.query) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['query'],
+        message: 'query is required for a name rule'
+      });
+    }
+    if (value.type === 'set') {
+      if (!value.setCode) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['setCode'],
+          message: 'setCode is required for a set rule'
+        });
+      }
+      if (!value.tcg) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['tcg'],
+          message: 'tcg is required for a set rule'
+        });
+      }
+    }
+  });
+export type CreateWishlistRuleInput = z.infer<typeof createWishlistRuleSchema>;
+
+/** Applied by clients after they finish expanding a rule. */
+export const updateWishlistRuleSchema = z.object({
+  autoSync: z.boolean().optional(),
+  includeAllPrintings: z.boolean().optional(),
+  /** ISO timestamp of the sync that just completed. */
+  lastSyncedAt: z.string().optional(),
+  /** How many cards the rule matched on that sync. */
+  lastMatchCount: z.number().int().min(0).optional()
+});
+export type UpdateWishlistRuleInput = z.infer<typeof updateWishlistRuleSchema>;
+
+export interface WishlistRuleResponse {
+  id: string;
+  type: WishlistRuleType;
+  tcg?: TcgCode;
+  query?: string;
+  setCode?: string;
+  setName?: string;
+  includeAllPrintings: boolean;
+  autoSync: boolean;
+  lastSyncedAt?: string;
+  lastMatchCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Human-readable summary of a rule, shared by the web and iOS clients. */
+export function describeWishlistRule(rule: {
+  type: WishlistRuleType;
+  tcg?: string;
+  query?: string;
+  setCode?: string;
+  setName?: string;
+  includeAllPrintings?: boolean;
+}): string {
+  if (rule.type === 'set') {
+    const set = rule.setName ?? rule.setCode ?? 'set';
+    return `Every card in ${set}`;
+  }
+  const scope = rule.includeAllPrintings === false ? 'card' : 'printing';
+  return `Every ${scope} named "${rule.query ?? ''}"`;
+}
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -121,6 +228,8 @@ export interface WishlistResponse {
   description?: string;
   colorHex?: string;
   cards: WishlistCardResponse[];
+  /** Saved expansion rules; empty for a purely manual wishlist. */
+  rules: WishlistRuleResponse[];
   /** Number of unique cards in the wishlist */
   totalCards: number;
   /** Number of unique cards that are owned */

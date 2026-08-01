@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { TcgSet } from '@tcg/api-types';
 
 import { env } from '../../config/env';
-import type { CardDTO, TcgAdapter } from './types';
+import type { CardDTO, CardNameSearchOptions, TcgAdapter } from './types';
 
 const API_ROOT = env.APITCG_API_BASE_URL.replace(/\/+$/, '');
 const TCG_SLUG = 'dragon-ball-super-fusion-world';
@@ -124,6 +124,36 @@ export class DragonBallAdapter implements TcgAdapter {
       'search'
     );
     return products.data.map((product) => this.mapCard(product));
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) return [];
+
+    const products: ApiTcgProduct[] = [];
+    for (let page = 1; page <= MAX_SET_CARD_PAGES; page += 1) {
+      const result = await this.fetchProductPage(
+        { name: trimmed, populate: 'set' },
+        100,
+        page,
+        'name search'
+      );
+      products.push(...result.data);
+      if (products.length >= Math.min(result.total, options.limit) || result.data.length < 100) {
+        break;
+      }
+    }
+
+    const cards = products.slice(0, options.limit).map((product) => this.mapCard(product));
+    if (options.includeAllPrintings) return cards;
+
+    const seen = new Set<string>();
+    return cards.filter((card) => {
+      const key = card.name.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   async fetchCardById(externalId: string): Promise<CardDTO | null> {

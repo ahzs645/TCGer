@@ -254,6 +254,65 @@ paths:
         "400":
           $ref: "#/components/responses/ValidationError"
 
+  /cards/search/all:
+    get:
+      tags: [Cards]
+      summary: Exhaustive name search — every printing matching a name
+      description: >
+        Unlike `/cards/search`, which returns a capped preview page, this pages
+        through the provider for every match. Used to expand wishlist rules such
+        as "every Darkrai". `limit` applies per game, so an all-games search can
+        return up to `limit × games` cards.
+      operationId: searchAllCards
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: tcg
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TcgCode"
+        - name: unique
+          in: query
+          required: false
+          description: >
+            `prints` returns every printing of every matching card; `cards`
+            collapses them to one entry per distinct card.
+          schema:
+            type: string
+            enum: [prints, cards]
+            default: prints
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: Every matching card, up to the limit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cards:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Card"
+                  total:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
   /cards/{tcg}/{cardId}:
     get:
       tags: [Cards]
@@ -659,6 +718,88 @@ paths:
       responses:
         "204":
           description: Card removed from wishlist
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wishlists/{wishlistId}/rules:
+    post:
+      tags: [Wishlists]
+      summary: Add (or refresh) an expansion rule on a wishlist
+      description: >
+        Rules describe the cards a wishlist wants in the abstract — "every
+        Darkrai in Pokémon", "everything in Prismatic Evolutions". Posting a
+        rule that already exists refreshes it instead of duplicating it.
+        Expansion happens client-side: fetch matches from `/cards/search/all`
+        or `/cards/sets/{tcg}/{setCode}`, then POST them to
+        `/wishlists/{wishlistId}/cards/batch`.
+      operationId: addWishlistRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWishlistRuleInput"
+      responses:
+        "201":
+          description: Rule saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistRuleResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /wishlists/{wishlistId}/rules/{ruleId}:
+    patch:
+      tags: [Wishlists]
+      summary: Update a rule (used to record sync results)
+      operationId: updateWishlistRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWishlistRuleInput"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WishlistRuleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Wishlists]
+      summary: Remove a rule (cards it already added stay on the wishlist)
+      operationId: removeWishlistRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/wishlistId"
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Rule removed
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -1434,7 +1575,7 @@ components:
 
     WishlistResponse:
       type: object
-      required: [id, name, cards, totalCards, ownedCards, completionPercent, createdAt, updatedAt]
+      required: [id, name, cards, rules, totalCards, ownedCards, completionPercent, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -1448,6 +1589,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WishlistCardResponse"
+        rules:
+          type: array
+          description: Saved expansion rules; empty for a purely manual wishlist
+          items:
+            $ref: "#/components/schemas/WishlistRuleResponse"
         totalCards:
           type: integer
           description: Number of unique cards in the wishlist
@@ -1465,6 +1611,82 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    WishlistRuleResponse:
+      type: object
+      required: [id, type, includeAllPrintings, autoSync, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [name, set]
+        tcg:
+          $ref: "#/components/schemas/TcgCode"
+        query:
+          type: string
+          description: Name fragment matched by a name rule
+        setCode:
+          type: string
+        setName:
+          type: string
+        includeAllPrintings:
+          type: boolean
+          description: Match every printing rather than one entry per distinct card
+        autoSync:
+          type: boolean
+        lastSyncedAt:
+          type: string
+          format: date-time
+        lastMatchCount:
+          type: integer
+          description: How many cards the rule matched on its last sync
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateWishlistRuleInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [name, set]
+        tcg:
+          $ref: "#/components/schemas/TcgCode"
+        query:
+          type: string
+          description: Required for a name rule
+          minLength: 1
+        setCode:
+          type: string
+          description: Required for a set rule (along with tcg)
+          minLength: 1
+        setName:
+          type: string
+        includeAllPrintings:
+          type: boolean
+          default: true
+        autoSync:
+          type: boolean
+          default: true
+
+    UpdateWishlistRuleInput:
+      type: object
+      properties:
+        autoSync:
+          type: boolean
+        includeAllPrintings:
+          type: boolean
+        lastSyncedAt:
+          type: string
+          format: date-time
+        lastMatchCount:
+          type: integer
+          minimum: 0
 
     CreateWishlistInput:
       type: object

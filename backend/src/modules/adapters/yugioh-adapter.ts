@@ -1,6 +1,6 @@
 import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
-import { CardDTO, CardPrintsResult, TcgAdapter } from './types';
+import { CardDTO, CardNameSearchOptions, CardPrintsResult, TcgAdapter } from './types';
 import {
   canonicalizeYugiohSetCode,
   extractYugiohCollectorNumber,
@@ -113,6 +113,64 @@ export class YugiohAdapter implements TcgAdapter {
       console.error('YugiohAdapter.searchCards error', error);
       return [];
     }
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const pageSize = 100;
+    const matches: YgoCard[] = [];
+    let offset = 0;
+
+    try {
+      // A single card can expand into many printings, so keep pulling base
+      // cards until their expansion would exceed the caller's limit.
+      while (matches.length < options.limit) {
+        const url = new URL(CARDINFO_URL);
+        url.searchParams.set('fname', trimmed);
+        url.searchParams.set('num', String(pageSize));
+        url.searchParams.set('offset', String(offset));
+
+        const response = await rateLimitedFetch(url.toString());
+        if (response.status === 400) {
+          // YGOPRODeck answers 400 once the offset runs past the result set.
+          break;
+        }
+        if (!response.ok) {
+          throw new Error(`YGO name search failed: ${response.status}`);
+        }
+        const payload = (await response.json()) as YgoApiResponse;
+        const data = payload?.data ?? [];
+        if (!data.length) {
+          break;
+        }
+        matches.push(...data);
+        if (data.length < pageSize) {
+          break;
+        }
+        offset += pageSize;
+      }
+    } catch (error) {
+      console.error('YugiohAdapter.fetchCardsByName error', error);
+    }
+
+    if (!options.includeAllPrintings) {
+      return matches.slice(0, options.limit).map((card) => this.mapRepresentativeCard(card));
+    }
+
+    const prints: CardDTO[] = [];
+    for (const card of matches) {
+      for (const printing of this.mapAllPrintings(card)) {
+        prints.push(printing);
+        if (prints.length >= options.limit) {
+          return prints;
+        }
+      }
+    }
+    return prints;
   }
 
   async fetchCardById(externalId: string): Promise<CardDTO | null> {

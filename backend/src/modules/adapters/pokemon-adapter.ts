@@ -2,6 +2,7 @@ import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
 import type {
   CardDTO,
+  CardNameSearchOptions,
   CardPrintsResult,
   PokemonFunctionalAbilityDTO,
   PokemonFunctionalGroupDTO,
@@ -247,6 +248,88 @@ export class PokemonAdapter implements TcgAdapter {
       console.error('PokemonAdapter.searchCards error, falling back to TCGdex:', error);
       return this.searchTCGdex(trimmedQuery);
     }
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const cards = isTCGdex
+      ? await this.fetchTCGdexCardsByName(trimmed, options.limit)
+      : await this.fetchPokemonCardsByName(trimmed, options.limit);
+
+    if (options.includeAllPrintings) {
+      return cards.slice(0, options.limit);
+    }
+    return this.collapseToDistinctCards(cards).slice(0, options.limit);
+  }
+
+  /**
+   * Pages the Pokemon API for every card whose name matches, newest set first.
+   * Each record is already one printing, so no per-card print expansion needed.
+   */
+  private async fetchPokemonCardsByName(name: string, limit: number): Promise<CardDTO[]> {
+    const collected: CardDTO[] = [];
+    const pageSize = PokemonAdapter.MAX_PRINT_PAGE_SIZE;
+    let page = 1;
+
+    try {
+      while (collected.length < limit) {
+        const url = new URL(CARDS_ENDPOINT);
+        url.searchParams.set('q', this.buildNameQuery(name, { wildcard: true }));
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('pageSize', String(Math.min(pageSize, limit - collected.length)));
+        url.searchParams.set('orderBy', '-set.releaseDate,-number');
+
+        const response = await rateLimitedFetch(url.toString(), {
+          headers: this.buildHeaders()
+        });
+        if (!response.ok) {
+          break;
+        }
+        const payload = (await response.json()) as PokemonSearchResponse;
+        const data = payload.data ?? [];
+        if (!data.length) {
+          break;
+        }
+        collected.push(...data.map((card) => this.mapCard(card)));
+
+        const total = payload.totalCount ?? collected.length;
+        if (collected.length >= total || data.length < pageSize) {
+          break;
+        }
+        page += 1;
+      }
+    } catch (error) {
+      console.error('PokemonAdapter.fetchPokemonCardsByName error', error);
+    }
+
+    if (!collected.length) {
+      // Same fallback contract as searchCards: an empty or failing primary
+      // provider should still return TCGdex results rather than nothing.
+      return this.fetchTCGdexCardsByName(name, limit);
+    }
+    return this.deduplicateCards(collected);
+  }
+
+  private async fetchTCGdexCardsByName(name: string, limit: number): Promise<CardDTO[]> {
+    const prints = await this.fetchTCGdexPrintsByName(name);
+    return prints.slice(0, limit);
+  }
+
+  /** One entry per distinct card name, keeping the most recent printing. */
+  private collapseToDistinctCards(cards: CardDTO[]): CardDTO[] {
+    const seen = new Set<string>();
+    return cards.filter((card) => {
+      const key = this.normalizeName(card.name);
+      if (!key || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   private async searchTCGdex(query: string): Promise<CardDTO[]> {
@@ -672,9 +755,15 @@ export class PokemonAdapter implements TcgAdapter {
     return headers;
   }
 
-  private buildNameQuery(query: string): string {
+  private buildNameQuery(query: string, options?: { wildcard?: boolean }): string {
     const safeQuery = query.replace(/"/g, '\\"');
-    return `name:"${safeQuery}"`;
+    if (!options?.wildcard) {
+      return `name:"${safeQuery}"`;
+    }
+    // The API only honours a trailing wildcard on an unquoted term, so single
+    // words widen to a prefix match ("darkrai" → Darkrai VSTAR) while phrases
+    // keep the quoted word match.
+    return /\s/.test(safeQuery) ? `name:"${safeQuery}"` : `name:${safeQuery}*`;
   }
 
   private buildFallback(query: string): CardDTO {

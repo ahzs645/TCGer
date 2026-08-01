@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import * as wishlistsApi from "@/lib/api/wishlists";
+import { syncWishlistRules, type WishlistSyncResult } from "@/lib/wishlists/sync";
 
 export type {
   WishlistResponse,
   WishlistCardResponse,
+  WishlistRuleResponse,
 } from "@/lib/api/wishlists";
 
 export interface WishlistsState {
@@ -38,6 +40,22 @@ export interface WishlistsState {
     wishlistId: string,
     cardId: string,
   ) => Promise<void>;
+  addRule: (
+    token: string,
+    wishlistId: string,
+    input: wishlistsApi.CreateWishlistRuleInput,
+  ) => Promise<wishlistsApi.WishlistRuleResponse>;
+  removeRule: (
+    token: string,
+    wishlistId: string,
+    ruleId: string,
+  ) => Promise<void>;
+  /** Re-expands the wishlist's rules and merges in anything new. */
+  syncWishlist: (
+    token: string,
+    wishlistId: string,
+    options?: { onProgress?: (message: string) => void },
+  ) => Promise<WishlistSyncResult>;
 }
 
 export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
@@ -188,6 +206,64 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
         error instanceof Error
           ? error.message
           : "Failed to remove card from wishlist";
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  },
+
+  addRule: async (
+    token: string,
+    wishlistId: string,
+    input: wishlistsApi.CreateWishlistRuleInput,
+  ) => {
+    try {
+      const rule = await wishlistsApi.addWishlistRule(token, wishlistId, input);
+      await get().fetchWishlists(token);
+      return rule;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to add wishlist rule";
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  },
+
+  removeRule: async (token: string, wishlistId: string, ruleId: string) => {
+    try {
+      await wishlistsApi.removeWishlistRule(token, wishlistId, ruleId);
+      await get().fetchWishlists(token);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove wishlist rule";
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  },
+
+  syncWishlist: async (
+    token: string,
+    wishlistId: string,
+    options?: { onProgress?: (message: string) => void },
+  ) => {
+    const wishlist = get().wishlists.find((entry) => entry.id === wishlistId);
+    if (!wishlist) {
+      throw new Error("Wishlist not found");
+    }
+
+    try {
+      const result = await syncWishlistRules(token, wishlist, wishlist.rules, {
+        onProgress: options?.onProgress,
+      });
+      await get().fetchWishlists(token);
+      if (result.errors.length) {
+        set({ error: result.errors[0] });
+      }
+      return result;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to sync wishlist";
       set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }

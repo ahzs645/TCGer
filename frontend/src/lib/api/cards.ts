@@ -33,6 +33,37 @@ export async function searchCards(
   return payload.cards;
 }
 
+/**
+ * Exhaustive name search: every printing matching a name rather than the
+ * capped preview page {@link searchCards} returns.
+ */
+export async function searchAllCards(
+  token: string,
+  options: {
+    query: string;
+    tcg?: TcgCode;
+    unique?: "prints" | "cards";
+    limit?: number;
+  },
+): Promise<Card[]> {
+  const params = new URLSearchParams({ query: options.query });
+  if (options.tcg) params.set("tcg", options.tcg);
+  if (options.unique) params.set("unique", options.unique);
+  if (options.limit) params.set("limit", String(options.limit));
+  const response = await fetch(
+    `${API_BASE_URL}/cards/search/all?${params.toString()}`,
+    {
+      headers: authHeaders(token),
+      credentials: "include",
+    },
+  );
+  const payload = await readJson<SetCardsResponse>(
+    response,
+    "Failed to search cards",
+  );
+  return payload.cards;
+}
+
 function authHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,

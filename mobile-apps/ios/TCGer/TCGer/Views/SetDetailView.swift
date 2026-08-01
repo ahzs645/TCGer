@@ -21,6 +21,23 @@ struct SetDetailView: View {
     @State private var selectedCardIds: Set<String> = []
     @State private var showingBulkBinderPicker = false
     @State private var isBulkAdding = false
+    @State private var wishlistTarget: WishlistBulkTarget?
+    @State private var wishlistStatus: String?
+
+    /// Which cards a wishlist bulk-add should send.
+    private enum WishlistBulkTarget: String, Identifiable {
+        case wholeSet
+        case selected
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .wholeSet: return "Track Set In"
+            case .selected: return "Add Selected To"
+            }
+        }
+    }
 
     private let apiService = APIService()
 
@@ -206,30 +223,61 @@ struct SetDetailView: View {
                     }
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button {
+                        wishlistTarget = .wholeSet
+                    } label: {
+                        Label("Track this set in a wishlist", systemImage: "heart.text.square")
+                    }
+                    .disabled(cards.isEmpty || isBulkAdding)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
         }
         .safeAreaInset(edge: .bottom) {
             if isSelecting && !selectedCardIds.isEmpty {
-                Button {
-                    showingBulkBinderPicker = true
-                } label: {
-                    HStack {
-                        if isBulkAdding {
-                            ProgressView()
+                VStack(spacing: 8) {
+                    Button {
+                        showingBulkBinderPicker = true
+                    } label: {
+                        HStack {
+                            if isBulkAdding {
+                                ProgressView()
+                            }
+                            Text(
+                                isBulkAdding
+                                    ? "Adding cards…"
+                                    : "Add \(selectedCardIds.count) selected to binder"
+                            )
+                                .fontWeight(.semibold)
                         }
-                        Text(
-                            isBulkAdding
-                                ? "Adding cards…"
-                                : "Add \(selectedCardIds.count) selected to binder"
-                        )
-                            .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isBulkAdding)
+
+                    Button {
+                        wishlistTarget = .selected
+                    } label: {
+                        Text("Add \(selectedCardIds.count) selected to wishlist")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isBulkAdding)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(isBulkAdding)
                 .padding()
                 .background(.regularMaterial)
+            } else if let wishlistStatus {
+                Text(wishlistStatus)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial)
             }
         }
         .task {
@@ -290,6 +338,64 @@ struct SetDetailView: View {
                 Task { await bulkAddSelectedCards(to: binderId) }
             }
         }
+        .sheet(item: $wishlistTarget) { target in
+            WishlistPickerSheet(title: target.title) { wishlist in
+                Task { await addToWishlist(wishlist, target: target) }
+            }
+            .environmentObject(environmentStore)
+        }
+    }
+
+    /// Sends either the whole set (saving a rule so it stays current) or just
+    /// the selected cards to a wishlist.
+    @MainActor
+    private func addToWishlist(_ wishlist: Wishlist, target: WishlistBulkTarget) async {
+        guard let token = environmentStore.authToken else { return }
+        let payload = target == .wholeSet
+            ? cards
+            : cards.filter { selectedCardIds.contains($0.id) }
+        guard !payload.isEmpty else { return }
+
+        isBulkAdding = true
+        wishlistStatus = "Adding \(payload.count) cards to \(wishlist.name)…"
+
+        let service = WishlistSyncService(
+            apiService: apiService,
+            config: environmentStore.serverConfiguration,
+            token: token
+        )
+
+        do {
+            try await service.addCards(payload, toWishlist: wishlist.id) { sent, total in
+                Task { @MainActor in
+                    wishlistStatus = "Adding \(sent) of \(total) cards…"
+                }
+            }
+
+            if target == .wholeSet {
+                _ = try await apiService.addWishlistRule(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    wishlistId: wishlist.id,
+                    type: .set,
+                    tcg: set.tcg,
+                    setCode: set.code,
+                    setName: set.name,
+                    includeAllPrintings: true,
+                    autoSync: true
+                )
+                wishlistStatus = "Tracking \(set.name) in \(wishlist.name)."
+            } else {
+                wishlistStatus = "Added \(payload.count) cards to \(wishlist.name)."
+                selectedCardIds.removeAll()
+                isSelecting = false
+            }
+            HapticManager.notification(.success)
+        } catch {
+            wishlistStatus = error.localizedDescription
+        }
+
+        isBulkAdding = false
     }
 
     private func toggleSelection(_ cardId: String) {

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { TcgSet } from '@tcg/api-types';
 
 import { env } from '../../config/env';
-import type { CardDTO, TcgAdapter } from './types';
+import type { CardDTO, CardNameSearchOptions, TcgAdapter } from './types';
 
 const API_ROOT = env.LORCANA_API_BASE_URL.replace(/\/+$/, '');
 const isRemoteApi = /lorcast\.com$/i.test(new URL(API_ROOT).hostname);
@@ -133,6 +133,20 @@ export class LorcanaAdapter implements TcgAdapter {
     if (!response.ok) throw upstreamError('search', response.status);
     return parseSearch(await response.json(), 'search')
       .slice(0, 20)
+      .map((card) => this.mapCard(card));
+  }
+
+  async fetchCardsByName(name: string, options: CardNameSearchOptions): Promise<CardDTO[]> {
+    const trimmed = name.trim();
+    if (!trimmed) return [];
+
+    const url = new URL(`${API_ROOT}/cards/search`);
+    url.searchParams.set('q', trimmed);
+    url.searchParams.set('unique', options.includeAllPrintings ? 'prints' : 'cards');
+    const response = await rateLimitedFetch(url.toString());
+    if (!response.ok) throw upstreamError('name search', response.status);
+    return parseSearch(await response.json(), 'name search')
+      .slice(0, options.limit)
       .map((card) => this.mapCard(card));
   }
 

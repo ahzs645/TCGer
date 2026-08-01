@@ -1,8 +1,17 @@
 import { z } from 'zod';
-import type { TcgSet } from '@tcg/api-types';
+import {
+  exhaustiveSearchQuerySchema,
+  type ExhaustiveSearchQueryInput,
+  type TcgSet
+} from '@tcg/api-types';
 
 import { adapterRegistry } from '../adapters/adapter-registry';
-import type { CardPrintsResult, CardDTO } from '../adapters/types';
+import type {
+  CardPrintsResult,
+  CardDTO,
+  CardNameSearchOptions,
+  TcgAdapter
+} from '../adapters/types';
 import { logger } from '../../utils/logger';
 
 const searchSchema = z.object({
@@ -62,6 +71,67 @@ export async function searchCards(input: CardSearchInput) {
     );
     return [];
   });
+}
+
+/**
+ * Exhaustive name search used to expand wishlist rules ("every Darkrai").
+ * `limit` applies per game, so an all-games search can return up to
+ * `limit * adapters` cards.
+ */
+export async function searchAllCards(input: ExhaustiveSearchQueryInput): Promise<CardDTO[]> {
+  const { query, tcg, unique, limit } = exhaustiveSearchQuerySchema.parse(input);
+  const options: CardNameSearchOptions = {
+    includeAllPrintings: unique === 'prints',
+    limit
+  };
+
+  if (tcg && tcg !== 'all') {
+    const adapter = adapterRegistry.get(tcg);
+    return runExhaustiveSearch(adapter, query, options);
+  }
+
+  const adapters = adapterRegistry.list();
+  const results = await Promise.allSettled(
+    adapters.map((adapter) =>
+      withProviderTimeout(
+        adapter.game,
+        'exhaustive search',
+        runExhaustiveSearch(adapter, query, options)
+      )
+    )
+  );
+  return results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') return result.value;
+    logger.warn(
+      {
+        provider: adapters[index]?.game,
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : 'Unknown provider exhaustive search failure'
+      },
+      'Card provider exhaustive search failed; returning partial results'
+    );
+    return [];
+  });
+}
+
+async function runExhaustiveSearch(
+  adapter: TcgAdapter,
+  query: string,
+  options: CardNameSearchOptions
+): Promise<CardDTO[]> {
+  if (!adapter.fetchCardsByName) {
+    // No exhaustive support for this game: a capped preview page is still
+    // better than nothing, and callers see the smaller count.
+    logger.info(
+      { provider: adapter.game },
+      'Adapter has no exhaustive name search; falling back to preview search'
+    );
+    const preview = await adapter.searchCards(query);
+    return preview.slice(0, options.limit);
+  }
+  return (await adapter.fetchCardsByName(query, options)).slice(0, options.limit);
 }
 
 export async function getCardPrints(params: { tcg: string; cardId: string }): Promise<CardPrintsResult> {

@@ -52,6 +52,7 @@ import {
   userProfileValidator,
   viewerValidator,
   wishlistCardValidator,
+  wishlistRuleValidator,
   wishlistValidator
 } from "./lib/validators";
 
@@ -307,6 +308,23 @@ function toWishlistCardResponse(
   };
 }
 
+function toWishlistRuleResponse(rule: Doc<"wishlistRules">) {
+  return {
+    id: rule._id,
+    type: rule.type,
+    tcg: rule.tcg,
+    query: rule.query,
+    setCode: rule.setCode,
+    setName: rule.setName,
+    includeAllPrintings: rule.includeAllPrintings,
+    autoSync: rule.autoSync,
+    lastSyncedAt: rule.lastSyncedAt === undefined ? undefined : toIso(rule.lastSyncedAt),
+    lastMatchCount: rule.lastMatchCount,
+    createdAt: toIso(rule.createdAt),
+    updatedAt: toIso(rule.updatedAt)
+  };
+}
+
 async function hydrateWishlist(
   ctx: ReaderCtx,
   wishlist: Doc<"wishlists">,
@@ -315,6 +333,10 @@ async function hydrateWishlist(
   const ownedQuantityMap = ownership ?? (await buildOwnedQuantityMap(ctx, wishlist.userId));
   const cards = await ctx.db
     .query("wishlistCards")
+    .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+    .collect();
+  const rules = await ctx.db
+    .query("wishlistRules")
     .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
     .collect();
 
@@ -330,6 +352,9 @@ async function hydrateWishlist(
     description: wishlist.description,
     colorHex: wishlist.colorHex,
     cards: hydratedCards,
+    rules: rules
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map(toWishlistRuleResponse),
     totalCards,
     ownedCards,
     completionPercent: totalCards > 0 ? Math.round((ownedCards / totalCards) * 100) : 0,
@@ -1767,8 +1792,13 @@ export const deleteWishlist = internalMutation({
       .query("wishlistCards")
       .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
       .collect();
+    const rules = await ctx.db
+      .query("wishlistRules")
+      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+      .collect();
 
     await Promise.all(cards.map((card) => ctx.db.delete(card._id)));
+    await Promise.all(rules.map((rule) => ctx.db.delete(rule._id)));
     await ctx.db.delete(wishlist._id);
     return null;
   }
@@ -1952,6 +1982,167 @@ export const removeWishlistCard = internalMutation({
     }
 
     await ctx.db.delete(card._id);
+    await ctx.db.patch(wishlist._id, { updatedAt: now() });
+    return null;
+  }
+});
+
+export const addWishlistRule = internalMutation({
+  args: {
+    subject: v.string(),
+    wishlistId: v.id("wishlists"),
+    type: v.union(v.literal("name"), v.literal("set")),
+    tcg: v.optional(tcgCodeValidator),
+    query: v.optional(v.string()),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    includeAllPrintings: v.boolean(),
+    autoSync: v.boolean()
+  },
+  returns: wishlistRuleValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+
+    const query = args.query?.trim() || undefined;
+    const setCode = args.setCode?.trim() || undefined;
+
+    if (args.type === "name" && !query) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "query is required for a name rule"
+      });
+    }
+    if (args.type === "set" && (!setCode || !args.tcg)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "tcg and setCode are required for a set rule"
+      });
+    }
+
+    const timestamp = now();
+    const rules = await ctx.db
+      .query("wishlistRules")
+      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+      .collect();
+
+    // Re-adding the same rule refreshes it rather than duplicating it.
+    const existing = rules.find(
+      (rule) =>
+        rule.type === args.type &&
+        rule.tcg === args.tcg &&
+        rule.query === query &&
+        rule.setCode === setCode
+    );
+
+    let ruleId: Id<"wishlistRules">;
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        setName: args.setName?.trim() || existing.setName,
+        includeAllPrintings: args.includeAllPrintings,
+        autoSync: args.autoSync,
+        updatedAt: timestamp
+      });
+      ruleId = existing._id;
+    } else {
+      ruleId = await ctx.db.insert("wishlistRules", {
+        wishlistId: wishlist._id,
+        type: args.type,
+        tcg: args.tcg,
+        query,
+        setCode,
+        setName: args.setName?.trim() || undefined,
+        includeAllPrintings: args.includeAllPrintings,
+        autoSync: args.autoSync,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+    }
+
+    await ctx.db.patch(wishlist._id, { updatedAt: timestamp });
+
+    const rule = await ctx.db.get(ruleId);
+    if (!rule) {
+      throw new ConvexError({
+        code: "INVARIANT",
+        message: "Wishlist rule could not be created"
+      });
+    }
+    return toWishlistRuleResponse(rule);
+  }
+});
+
+export const updateWishlistRule = internalMutation({
+  args: {
+    subject: v.string(),
+    wishlistId: v.id("wishlists"),
+    ruleId: v.id("wishlistRules"),
+    autoSync: v.optional(v.boolean()),
+    includeAllPrintings: v.optional(v.boolean()),
+    lastSyncedAt: v.optional(v.string()),
+    lastMatchCount: v.optional(v.number())
+  },
+  returns: wishlistRuleValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+    const rule = await ctx.db.get(args.ruleId);
+
+    if (!rule || rule.wishlistId !== wishlist._id) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Wishlist rule not found"
+      });
+    }
+
+    const lastSyncedAt =
+      args.lastSyncedAt === undefined ? rule.lastSyncedAt : Date.parse(args.lastSyncedAt);
+    if (lastSyncedAt !== undefined && Number.isNaN(lastSyncedAt)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "lastSyncedAt must be an ISO timestamp"
+      });
+    }
+
+    await ctx.db.patch(rule._id, {
+      autoSync: args.autoSync ?? rule.autoSync,
+      includeAllPrintings: args.includeAllPrintings ?? rule.includeAllPrintings,
+      lastSyncedAt,
+      lastMatchCount: args.lastMatchCount ?? rule.lastMatchCount,
+      updatedAt: now()
+    });
+
+    const updated = await ctx.db.get(rule._id);
+    if (!updated) {
+      throw new ConvexError({
+        code: "INVARIANT",
+        message: "Wishlist rule could not be updated"
+      });
+    }
+    return toWishlistRuleResponse(updated);
+  }
+});
+
+export const removeWishlistRule = internalMutation({
+  args: {
+    subject: v.string(),
+    wishlistId: v.id("wishlists"),
+    ruleId: v.id("wishlistRules")
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+    const rule = await ctx.db.get(args.ruleId);
+
+    if (!rule || rule.wishlistId !== wishlist._id) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Wishlist rule not found"
+      });
+    }
+
+    await ctx.db.delete(rule._id);
     await ctx.db.patch(wishlist._id, { updatedAt: now() });
     return null;
   }
