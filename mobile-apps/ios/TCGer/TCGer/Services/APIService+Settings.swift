@@ -171,7 +171,7 @@ extension APIService {
         return preferences
     }
 
-    struct UpdatePreferencesRequest: Codable, Sendable {
+    struct UpdatePreferencesRequest: Encodable, Sendable {
         let showCardNumbers: Bool?
         let showPricing: Bool?
         let enabledYugioh: Bool?
@@ -180,9 +180,45 @@ extension APIService {
         let enabledOnepiece: Bool?
         let enabledLorcana: Bool?
         let enabledDragonball: Bool?
-        let defaultGame: String?
+        let defaultGame: String??
         let focusedSetOrder: [String]?
         let setCompletionMode: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case showCardNumbers
+            case showPricing
+            case enabledYugioh
+            case enabledMagic
+            case enabledPokemon
+            case enabledOnepiece
+            case enabledLorcana
+            case enabledDragonball
+            case defaultGame
+            case focusedSetOrder
+            case setCompletionMode
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(showCardNumbers, forKey: .showCardNumbers)
+            try container.encodeIfPresent(showPricing, forKey: .showPricing)
+            try container.encodeIfPresent(enabledYugioh, forKey: .enabledYugioh)
+            try container.encodeIfPresent(enabledMagic, forKey: .enabledMagic)
+            try container.encodeIfPresent(enabledPokemon, forKey: .enabledPokemon)
+            try container.encodeIfPresent(enabledOnepiece, forKey: .enabledOnepiece)
+            try container.encodeIfPresent(enabledLorcana, forKey: .enabledLorcana)
+            try container.encodeIfPresent(enabledDragonball, forKey: .enabledDragonball)
+            switch defaultGame {
+            case .none:
+                break
+            case .some(.none):
+                try container.encodeNil(forKey: .defaultGame)
+            case .some(.some(let value)):
+                try container.encode(value, forKey: .defaultGame)
+            }
+            try container.encodeIfPresent(focusedSetOrder, forKey: .focusedSetOrder)
+            try container.encodeIfPresent(setCompletionMode, forKey: .setCompletionMode)
+        }
     }
 
     func updateUserPreferences(
@@ -196,7 +232,7 @@ extension APIService {
         enabledOnepiece: Bool? = nil,
         enabledLorcana: Bool? = nil,
         enabledDragonball: Bool? = nil,
-        defaultGame: String? = nil,
+        defaultGame: String?? = nil,
         focusedSetOrder: [String]? = nil,
         setCompletionMode: String? = nil
     ) async throws -> UserPreferences {

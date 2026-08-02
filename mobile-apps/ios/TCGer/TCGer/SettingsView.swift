@@ -293,7 +293,11 @@ struct SettingsView: View {
                         get: { environmentStore.defaultGame ?? "" },
                         set: { value in
                             environmentStore.defaultGame = value.isEmpty ? nil : value
-                            Task { await updatePreferences(defaultGame: value.isEmpty ? nil : value) }
+                            Task {
+                                await updatePreferences(
+                                    defaultGame: .some(value.isEmpty ? nil : value)
+                                )
+                            }
                         }
                     )) {
                         Text("None").tag("")
@@ -878,7 +882,7 @@ private extension SettingsView {
             return
         }
 
-        await updatePreferences(
+        let disableSucceeded = await updatePreferences(
             enabledYugioh: game == "yugioh" ? false : nil,
             enabledMagic: game == "magic" ? false : nil,
             enabledPokemon: game == "pokemon" ? false : nil,
@@ -886,6 +890,37 @@ private extension SettingsView {
             enabledLorcana: game == "lorcana" ? false : nil,
             enabledDragonball: game == "dragonball" ? false : nil
         )
+
+        if disableSucceeded && environmentStore.defaultGame == game {
+            await clearDefaultGameAfterDisabling()
+        }
+    }
+
+    func clearDefaultGameAfterDisabling() async {
+        await MainActor.run {
+            environmentStore.defaultGame = nil
+        }
+
+        guard environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else { return }
+
+        do {
+            let preferences = try await APIService().updateUserPreferences(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                defaultGame: .some(nil)
+            )
+            await MainActor.run {
+                isApplyingRemotePreferences = true
+                environmentStore.applyUserPreferences(preferences)
+                DispatchQueue.main.async {
+                    isApplyingRemotePreferences = false
+                }
+            }
+        } catch {
+            print("Failed to clear disabled default game: \(error)")
+            await refreshPreferencesIfNeeded()
+        }
     }
 
     func setGameEnabled(_ game: String, enabled: Bool) {
@@ -1112,6 +1147,7 @@ private extension SettingsView {
         }
     }
 
+    @discardableResult
     func updatePreferences(
         showCardNumbers: Bool? = nil,
         showPricing: Bool? = nil,
@@ -1122,17 +1158,16 @@ private extension SettingsView {
         enabledLorcana: Bool? = nil,
         enabledDragonball: Bool? = nil,
         defaultGame: String?? = nil
-    ) async {
+    ) async -> Bool {
         guard !isApplyingRemotePreferences,
               environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
-            return
+            return false
         }
 
         let api = APIService()
 
         do {
-            let resolvedDefaultGame: String? = if case .some(let value) = defaultGame { value } else { nil }
             let prefs = try await api.updateUserPreferences(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -1144,7 +1179,7 @@ private extension SettingsView {
                 enabledOnepiece: enabledOnepiece,
                 enabledLorcana: enabledLorcana,
                 enabledDragonball: enabledDragonball,
-                defaultGame: resolvedDefaultGame
+                defaultGame: defaultGame
             )
 
             await MainActor.run {
@@ -1154,9 +1189,11 @@ private extension SettingsView {
                     isApplyingRemotePreferences = false
                 }
             }
+            return true
         } catch {
             print("Failed to update preferences: \(error)")
             await refreshPreferencesIfNeeded()
+            return false
         }
     }
 

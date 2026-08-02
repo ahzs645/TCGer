@@ -221,7 +221,8 @@ struct AddWishlistRuleSheet: View {
         let sync = WishlistSyncService(
             apiService: apiService,
             config: environmentStore.serverConfiguration,
-            token: token
+            token: token,
+            enabledGames: environmentStore.enabledGames
         )
 
         let now = ISO8601DateFormatter().string(from: Date())

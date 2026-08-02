@@ -306,7 +306,8 @@ struct CardSearchView: View {
         let service = WishlistSyncService(
             apiService: apiService,
             config: environmentStore.serverConfiguration,
-            token: token
+            token: token,
+            enabledGames: environmentStore.enabledGames
         )
 
         do {
@@ -316,13 +317,19 @@ struct CardSearchView: View {
                 query: query,
                 game: selectedGame
             )
+            let enabledGameRawValues = Set(
+                environmentStore.enabledGames.map { $0.rawValue.lowercased() }
+            )
+            let enabledMatches = matches.filter {
+                enabledGameRawValues.contains($0.tcg.lowercased())
+            }
 
-            guard !matches.isEmpty else {
+            guard !enabledMatches.isEmpty else {
                 bulkWishlistStatus = "No cards found for \"\(query)\"."
                 return
             }
 
-            try await service.addCards(matches, toWishlist: wishlistId) { sent, total in
+            try await service.addCards(enabledMatches, toWishlist: wishlistId) { sent, total in
                 Task { @MainActor in
                     bulkWishlistStatus = "Adding \(sent) of \(total) cards…"
                 }
@@ -341,7 +348,7 @@ struct CardSearchView: View {
                 )
             }
 
-            bulkWishlistStatus = "Added \(matches.count) card\(matches.count == 1 ? "" : "s") for \"\(query)\"."
+            bulkWishlistStatus = "Added \(enabledMatches.count) card\(enabledMatches.count == 1 ? "" : "s") for \"\(query)\"."
             HapticManager.notification(.success)
             onCardAdded?()
         } catch {

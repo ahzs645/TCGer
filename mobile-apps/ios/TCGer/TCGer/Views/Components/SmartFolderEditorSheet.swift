@@ -125,6 +125,12 @@ private struct RuleRow: View {
     @Binding var rule: SmartFolderRule
     let games: [TCGGame]
 
+    private var pickerGames: [TCGGame] {
+        guard let currentGame = TCGGame(rawValue: rule.value),
+              !games.contains(currentGame) else { return games }
+        return games + [currentGame]
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: rule.type.systemImage)
@@ -137,9 +143,11 @@ private struct RuleRow: View {
 
                 if rule.type == .tcg {
                     Picker("Game", selection: $rule.value) {
-                        ForEach(games) { game in
+                        ForEach(pickerGames) { game in
                             Label {
-                                Text(game.shortName)
+                                Text(games.contains(game)
+                                     ? game.shortName
+                                     : "\(game.displayName) (disabled)")
                             } icon: {
                                 TCGGameIcon(game: game)
                             }

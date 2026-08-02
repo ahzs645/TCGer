@@ -333,7 +333,8 @@ struct WishlistDetailView: View {
         let service = WishlistSyncService(
             apiService: apiService,
             config: environmentStore.serverConfiguration,
-            token: token
+            token: token,
+            enabledGames: environmentStore.enabledGames
         )
         let snapshot = Wishlist(
             id: wishlist.id,

@@ -406,7 +406,7 @@ final class LocalStore {
         enabledOnepiece: Bool?,
         enabledLorcana: Bool?,
         enabledDragonball: Bool?,
-        defaultGame: String?,
+        defaultGame: String??,
         focusedSetOrder: [String]?,
         setCompletionMode: String?
     ) -> APIService.UserPreferences {

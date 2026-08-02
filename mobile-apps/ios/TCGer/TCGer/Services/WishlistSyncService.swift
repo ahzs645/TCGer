@@ -15,11 +15,18 @@ struct WishlistSyncService {
     private let apiService: APIService
     private let config: ServerConfiguration
     private let token: String
+    private let enabledGames: [TCGGame]
 
-    init(apiService: APIService = APIService(), config: ServerConfiguration, token: String) {
+    init(
+        apiService: APIService = APIService(),
+        config: ServerConfiguration,
+        token: String,
+        enabledGames: [TCGGame]
+    ) {
         self.apiService = apiService
         self.config = config
         self.token = token
+        self.enabledGames = enabledGames
     }
 
     /// Resolves a rule into the cards it currently matches.
@@ -35,14 +42,27 @@ struct WishlistSyncService {
             )
         case .name:
             guard let query = rule.query, !query.isEmpty else { return [] }
-            let game = rule.tcg.flatMap(TCGGame.init(rawValue:)) ?? .all
-            return try await apiService.searchAllCards(
-                config: config,
-                token: token,
-                query: query,
-                game: game,
-                includeAllPrintings: rule.includeAllPrintings
-            )
+            if let game = rule.tcg.flatMap(TCGGame.init(rawValue:)) {
+                return try await apiService.searchAllCards(
+                    config: config,
+                    token: token,
+                    query: query,
+                    game: game,
+                    includeAllPrintings: rule.includeAllPrintings
+                )
+            }
+
+            var matches: [Card] = []
+            for game in enabledGames {
+                matches.append(contentsOf: try await apiService.searchAllCards(
+                    config: config,
+                    token: token,
+                    query: query,
+                    game: game,
+                    includeAllPrintings: rule.includeAllPrintings
+                ))
+            }
+            return matches
         }
     }
 
