@@ -480,15 +480,7 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     }
 
     var tcgDisplayName: String {
-        switch tcg.lowercased() {
-        case "yugioh": return "Yu-Gi-Oh!"
-        case "magic": return "Magic: The Gathering"
-        case "pokemon": return "Pokémon"
-        case "onepiece": return "One Piece"
-        case "lorcana": return "Disney Lorcana"
-        case "dragonball": return "Dragon Ball Super"
-        default: return tcg.capitalized
-        }
+        TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized
     }
 
     var supportsPrintSelection: Bool {
@@ -724,15 +716,7 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     var focusID: String { "\(tcg.lowercased())::\(code.lowercased())" }
 
     var tcgDisplayName: String {
-        switch tcg.lowercased() {
-        case "yugioh": return "Yu-Gi-Oh!"
-        case "magic": return "Magic: The Gathering"
-        case "pokemon": return "Pokémon"
-        case "onepiece": return "One Piece"
-        case "lorcana": return "Disney Lorcana"
-        case "dragonball": return "Dragon Ball Super"
-        default: return tcg.capitalized
-        }
+        TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized
     }
 }
 
@@ -757,6 +741,18 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .onepiece: return "One Piece"
         case .lorcana: return "Disney Lorcana"
         case .dragonball: return "Dragon Ball Super"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .all: return "All"
+        case .yugioh: return "Yu-Gi-Oh!"
+        case .magic: return "Magic"
+        case .pokemon: return "Pokémon"
+        case .onepiece: return "One Piece"
+        case .lorcana: return "Lorcana"
+        case .dragonball: return "Dragon Ball"
         }
     }
 

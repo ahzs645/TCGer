@@ -24,34 +24,15 @@ struct CardSearchView: View {
 
     private let apiService = APIService()
 
-    var availableGames: [TCGGame] {
-        var games: [TCGGame] = [.all]
-        games.append(contentsOf: environmentStore.enabledGames)
-        return games
-    }
-
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 // Game Filter - Only show if more than one game is enabled
                 if environmentStore.enabledGames.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(availableGames) { game in
-                                GameFilterChip(
-                                    game: game,
-                                    isSelected: selectedGame == game
-                                ) {
-                                    selectedGame = game
-                                    if hasSearched && !searchText.isEmpty {
-                                        Task { await performSearch() }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 12)
-                    }
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
                     .background(Color(.systemBackground))
 
                     Divider()
@@ -204,6 +185,11 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
+            .onChange(of: selectedGame) {
+                if hasSearched && !searchText.isEmpty {
+                    Task { await performSearch() }
+                }
+            }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
                    let game = TCGGame(rawValue: defaultGame),
@@ -429,39 +415,6 @@ struct CardSearchView: View {
         } catch {
             errorMessage = error.localizedDescription
             isSearching = false
-        }
-    }
-}
-
-// MARK: - Game Filter Chip
-private struct GameFilterChip: View {
-    let game: TCGGame
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let customIcon = game.iconName {
-                    Image(customIcon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 14, height: 14)
-                        .foregroundColor(isSelected ? .white : .accentColor)
-                } else {
-                    Image(systemName: game.systemIconName)
-                        .font(.caption)
-                        .foregroundColor(isSelected ? .white : .primary)
-                }
-                Text(game.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor : Color(.systemGray5))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(20)
         }
     }
 }

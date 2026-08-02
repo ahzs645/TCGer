@@ -206,6 +206,11 @@ private struct TransactionRow: View {
                         .foregroundColor(typeColor)
                         .cornerRadius(4)
 
+                    if let tcg = transaction.tcg,
+                       !tcg.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        GameBadge(tcg: tcg)
+                    }
+
                     if let platform = transaction.platform, !platform.isEmpty {
                         Text(platform)
                             .font(.caption)
@@ -237,6 +242,7 @@ private struct TransactionRow: View {
 
 private struct CreateTransactionSheet: View {
     let onCreate: (String, String?, String?, Int, Double, String?, String?) -> Void
+    @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var type = "purchase"
     @State private var cardName = ""
@@ -264,9 +270,14 @@ private struct CreateTransactionSheet: View {
                     TextField("Card Name (optional)", text: $cardName)
                     Picker("TCG", selection: $tcg) {
                         Text("None").tag("")
-                        Text("Pokemon").tag("pokemon")
-                        Text("Magic").tag("magic")
-                        Text("Yu-Gi-Oh!").tag("yugioh")
+                        ForEach(environmentStore.enabledGames) { game in
+                            Label {
+                                Text(game.shortName)
+                            } icon: {
+                                TCGGameIcon(game: game)
+                            }
+                            .tag(game.rawValue)
+                        }
                     }
                     Stepper("Quantity: \(quantity)", value: $quantity, in: 1...999)
                 } header: {

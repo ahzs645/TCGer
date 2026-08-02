@@ -18,12 +18,6 @@ struct SetBrowserView: View {
 
     private let apiService = APIService()
 
-    var availableGames: [TCGGame] {
-        var games: [TCGGame] = [.all]
-        games.append(contentsOf: environmentStore.enabledGames)
-        return games
-    }
-
     private var enabledSets: [TcgSet] {
         let enabledGameIDs = Set(environmentStore.enabledGames.map(\.rawValue))
         return sets.filter { enabledGameIDs.contains($0.tcg.lowercased()) }
@@ -80,7 +74,13 @@ struct SetBrowserView: View {
             return [("priority", filteredSets)]
         }
         let groups = Dictionary(grouping: filteredSets, by: { $0.tcg })
-        return groups.sorted { $0.key < $1.key }
+        return groups.sorted {
+            gameSectionIsOrderedBefore(
+                $0.key,
+                $1.key,
+                enabledGames: environmentStore.enabledGames
+            )
+        }
     }
 
     private var focusedSetCount: Int {
@@ -101,20 +101,10 @@ struct SetBrowserView: View {
                 .padding(.bottom, 6)
 
                 if environmentStore.enabledGames.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(availableGames) { game in
-                                SetGameFilterChip(
-                                    game: game,
-                                    isSelected: selectedGame == game
-                                ) {
-                                    selectedGame = game
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 12)
-                    }
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
                     .background(Color(.systemBackground))
                     Divider()
                 }
@@ -239,11 +229,7 @@ struct SetBrowserView: View {
                                     }
                                 }
                             } header: {
-                                Text(
-                                    tcg == "priority"
-                                        ? "Priority"
-                                        : (TCGGame(rawValue: tcg)?.displayName ?? tcg.uppercased())
-                                )
+                                GameSectionHeader(tcg: tcg)
                             }
                         }
                     }
@@ -275,7 +261,6 @@ struct SetBrowserView: View {
             }) {
                 FocusSetPicker(
                     sets: enabledSets,
-                    availableGames: availableGames,
                     initialOrder: environmentStore.focusedSetOrder,
                     onSave: environmentStore.replaceFocusedSetOrder
                 )
@@ -539,9 +524,9 @@ private struct FocusedSetsEmptyState: View {
 
 private struct FocusSetPicker: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let sets: [TcgSet]
-    let availableGames: [TCGGame]
     let initialOrder: [String]
     let onSave: ([String]) -> Void
 
@@ -551,12 +536,10 @@ private struct FocusSetPicker: View {
 
     init(
         sets: [TcgSet],
-        availableGames: [TCGGame],
         initialOrder: [String],
         onSave: @escaping ([String]) -> Void
     ) {
         self.sets = sets
-        self.availableGames = availableGames
         self.initialOrder = initialOrder
         self.onSave = onSave
         _draftOrder = State(initialValue: initialOrder)
@@ -577,27 +560,23 @@ private struct FocusSetPicker: View {
 
     private var groupedSets: [(String, [TcgSet])] {
         Dictionary(grouping: filteredSets, by: \.tcg)
-            .sorted { $0.key < $1.key }
+            .sorted {
+                gameSectionIsOrderedBefore(
+                    $0.key,
+                    $1.key,
+                    enabledGames: environmentStore.enabledGames
+                )
+            }
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if availableGames.count > 2 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(availableGames) { game in
-                                SetGameFilterChip(
-                                    game: game,
-                                    isSelected: selectedGame == game
-                                ) {
-                                    selectedGame = game
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 10)
-                    }
+                if environmentStore.enabledGames.count > 1 {
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
                     Divider()
                 }
 
@@ -625,7 +604,7 @@ private struct FocusSetPicker: View {
                     }
 
                     ForEach(groupedSets, id: \.0) { tcg, tcgSets in
-                        Section(TCGGame(rawValue: tcg)?.displayName ?? tcg.uppercased()) {
+                        Section {
                             ForEach(tcgSets) { set in
                                 Button {
                                     if focusedSetIDs.contains(set.focusID) {
@@ -663,6 +642,8 @@ private struct FocusSetPicker: View {
                                     focusedSetIDs.contains(set.focusID) ? "Focused" : "Not focused"
                                 )
                             }
+                        } header: {
+                            GameSectionHeader(tcg: tcg)
                         }
                     }
                 }
@@ -704,35 +685,49 @@ private struct FocusSetPicker: View {
     }
 }
 
-// MARK: - Game Filter Chip
-private struct SetGameFilterChip: View {
-    let game: TCGGame
-    let isSelected: Bool
-    let action: () -> Void
+private struct GameSectionHeader: View {
+    let tcg: String
 
     var body: some View {
-        Button(action: action) {
+        if tcg == "priority" {
+            Text("Priority")
+        } else if let game = TCGGame(rawValue: tcg) {
             HStack(spacing: 6) {
-                if let customIcon = game.iconName {
-                    Image(customIcon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 14, height: 14)
-                        .foregroundColor(isSelected ? .white : .accentColor)
-                } else {
-                    Image(systemName: game.systemIconName)
-                        .font(.caption)
-                        .foregroundColor(isSelected ? .white : .primary)
-                }
+                TCGGameIcon(game: game, size: 14)
+                    .foregroundStyle(game.brandColor)
                 Text(game.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor : Color(.systemGray5))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(20)
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.gray)
+                Text(tcg.uppercased())
+            }
         }
     }
+}
+
+private func gameSectionIsOrderedBefore(
+    _ left: String,
+    _ right: String,
+    enabledGames: [TCGGame]
+) -> Bool {
+    let leftIndex = enabledGames.firstIndex { $0.rawValue == left.lowercased() }
+    let rightIndex = enabledGames.firstIndex { $0.rawValue == right.lowercased() }
+
+    switch (leftIndex, rightIndex) {
+    case let (leftIndex?, rightIndex?):
+        if leftIndex != rightIndex {
+            return leftIndex < rightIndex
+        }
+    case (_?, nil):
+        return true
+    case (nil, _?):
+        return false
+    case (nil, nil):
+        break
+    }
+
+    return left.localizedCaseInsensitiveCompare(right) == .orderedAscending
 }

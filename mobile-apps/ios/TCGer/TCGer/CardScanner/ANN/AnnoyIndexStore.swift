@@ -27,6 +27,18 @@ actor AnnoyIndexStore: ANNIndexProviding {
         )
     }
 
+    /// In-memory initializer for deterministic tests and replay tooling. It
+    /// exercises the same cosine ranking path without requiring a bundled
+    /// binary index fixture.
+    init(vectors: [[Float]]) {
+        resourceName = ""
+        fileExtension = ""
+        bundle = .main
+        self.vectors = vectors
+        isLoaded = true
+        isAvailable = !vectors.isEmpty
+    }
+
     func nearestNeighbors(
         for vector: [Float],
         limit: Int,

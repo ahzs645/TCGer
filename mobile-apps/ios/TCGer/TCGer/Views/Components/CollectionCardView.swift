@@ -66,7 +66,7 @@ struct CollectionCardView: View {
                 // Game badges
                 HStack(spacing: 4) {
                     ForEach(Array(collection.uniqueGames).sorted(), id: \.self) { game in
-                        GameBadge(game: game)
+                        GameBadge(tcg: game)
                     }
                 }
             }
@@ -102,38 +102,6 @@ struct CollectionCardView: View {
             return hours == 1 ? "1 hour ago" : "\(hours) hours ago"
         } else {
             return "just now"
-        }
-    }
-}
-
-struct GameBadge: View {
-    let game: String
-
-    var body: some View {
-        Text(gameName)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundColor(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(gameColor)
-            .cornerRadius(4)
-    }
-
-    private var gameName: String {
-        switch game.lowercased() {
-        case "yugioh": return "YGO"
-        case "magic": return "MTG"
-        case "pokemon": return "PKM"
-        default: return game.prefix(3).uppercased()
-        }
-    }
-
-    private var gameColor: Color {
-        switch game.lowercased() {
-        case "yugioh": return Color.purple
-        case "magic": return Color.orange
-        case "pokemon": return Color.blue
-        default: return Color.gray
         }
     }
 }

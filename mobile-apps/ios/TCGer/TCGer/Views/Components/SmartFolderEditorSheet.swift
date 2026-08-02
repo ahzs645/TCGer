@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SmartFolderEditorSheet: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var selectedColor: Color
@@ -51,8 +52,11 @@ struct SmartFolderEditorSheet: View {
                 }
 
                 Section {
-                    ForEach(rules) { rule in
-                        RuleRow(rule: rule)
+                    ForEach($rules) { $rule in
+                        RuleRow(
+                            rule: $rule,
+                            games: environmentStore.enabledGames
+                        )
                     }
                     .onDelete { indexSet in
                         rules.remove(atOffsets: indexSet)
@@ -100,7 +104,7 @@ struct SmartFolderEditorSheet: View {
     private func addRule(type: SmartFolderRule.RuleType) {
         let defaultValue: String
         switch type {
-        case .tcg: defaultValue = "pokemon"
+        case .tcg: defaultValue = environmentStore.enabledGames.first?.rawValue ?? ""
         case .rarity: defaultValue = "Rare"
         case .condition: defaultValue = "Near Mint"
         case .setCode: defaultValue = ""
@@ -111,7 +115,8 @@ struct SmartFolderEditorSheet: View {
 }
 
 private struct RuleRow: View {
-    let rule: SmartFolderRule
+    @Binding var rule: SmartFolderRule
+    let games: [TCGGame]
 
     var body: some View {
         HStack(spacing: 8) {
@@ -122,9 +127,24 @@ private struct RuleRow: View {
                 Text(rule.type.rawValue)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(displayValue)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+
+                if rule.type == .tcg {
+                    Picker("Game", selection: $rule.value) {
+                        ForEach(games) { game in
+                            Label {
+                                Text(game.shortName)
+                            } icon: {
+                                TCGGameIcon(game: game)
+                            }
+                            .tag(game.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                } else {
+                    Text(displayValue)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
             }
         }
     }
@@ -132,12 +152,7 @@ private struct RuleRow: View {
     private var displayValue: String {
         switch rule.type {
         case .tcg:
-            switch rule.value.lowercased() {
-            case "pokemon": return "Pokemon"
-            case "magic": return "Magic: The Gathering"
-            case "yugioh": return "Yu-Gi-Oh!"
-            default: return rule.value
-            }
+            return TCGGame(rawValue: rule.value)?.displayName ?? rule.value.capitalized
         case .isFoil: return "Foil cards only"
         default: return rule.value.isEmpty ? "(not set)" : rule.value
         }

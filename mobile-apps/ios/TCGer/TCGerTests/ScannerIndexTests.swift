@@ -1,0 +1,71 @@
+import XCTest
+@testable import TCGer
+
+final class ScannerIndexTests: XCTestCase {
+    func testMetadataEntryDecodingAndGameNormalization() throws {
+        let data = Data(#"{"annIndex":7,"cardId":"abc","name":"Card","game":"yu-gi-oh","setCode":"LOB","setName":"Legend of Blue Eyes","rarity":"Rare","imageURL":"https://example.com/card.jpg","price":1.25}"#.utf8)
+        let entry = try JSONDecoder().decode(CardIndexMetadataEntry.self, from: data)
+
+        XCTAssertEqual(entry.annIndex, 7)
+        XCTAssertEqual(entry.resolvedGame, .yugioh)
+    }
+
+    func testMetadataStoreFiltersByGameAndSetAndBuildsDetails() async {
+        let store = CardIndexMetadataStore(entries: [
+            metadata(index: 0, id: "p1", game: "pokemon", setCode: "sv01"),
+            metadata(index: 1, id: "p2", game: "pokemon", setCode: "sv02"),
+            metadata(index: 2, id: "m1", game: "magic", setCode: "lea")
+        ])
+
+        let pokemonIndices = await store.indices(for: .pokemon)
+        let scopedIndices = await store.indices(for: .pokemon, setCode: "SV02")
+        let magicDetails = await store.details(for: 2)
+
+        XCTAssertEqual(pokemonIndices, [0, 1])
+        XCTAssertEqual(scopedIndices, [1])
+        XCTAssertEqual(magicDetails?.identity.game, .magic)
+        XCTAssertEqual(magicDetails?.identity.id, "m1")
+    }
+
+    func testANNRanksByCosineDistanceAndHonorsAllowedIndices() async throws {
+        let store = AnnoyIndexStore(vectors: [
+            [1, 0],
+            [0.8, 0.2],
+            [0, 1]
+        ])
+
+        let all = try await store.nearestNeighbors(
+            for: [1, 0],
+            limit: 3,
+            allowedIndices: [0, 1, 2]
+        )
+        XCTAssertEqual(all.map(\.index), [0, 1, 2])
+        XCTAssertEqual(all[0].distance, 0, accuracy: 0.000_001)
+
+        let filtered = try await store.nearestNeighbors(
+            for: [1, 0],
+            limit: 3,
+            allowedIndices: [1, 2]
+        )
+        XCTAssertEqual(filtered.map(\.index), [1, 2])
+    }
+
+    private func metadata(
+        index: Int,
+        id: String,
+        game: String,
+        setCode: String
+    ) -> CardIndexMetadataEntry {
+        CardIndexMetadataEntry(
+            annIndex: index,
+            cardId: id,
+            name: id,
+            game: game,
+            setCode: setCode,
+            setName: nil,
+            rarity: nil,
+            imageURL: nil,
+            price: nil
+        )
+    }
+}

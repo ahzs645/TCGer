@@ -151,6 +151,10 @@ struct SealedInventoryView: View {
 private struct SealedLedgerRow: View {
     let ledger: SealedOpeningLedger
 
+    private var tcg: String? {
+        ledger.cards.first?.tcg
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -171,9 +175,14 @@ private struct SealedLedgerRow: View {
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
-            Text("\(ledger.activeCopies) active · \(ledger.soldCopies) sold")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if let tcg, !tcg.isEmpty {
+                    GameBadge(tcg: tcg)
+                }
+                Text("\(ledger.activeCopies) active · \(ledger.soldCopies) sold")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -210,6 +219,8 @@ private struct SealedInventoryRow: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
+                    GameBadge(tcg: item.product.tcg)
+
                     Text(item.product.productType.capitalized)
                         .font(.caption2)
                         .padding(.horizontal, 6)
@@ -242,6 +253,7 @@ private struct SealedProductCatalogSheet: View {
     @State private var products: [SealedProduct] = []
     @State private var isLoading = true
     @State private var searchText = ""
+    @State private var selectedGame: TCGGame = .all
     @State private var selectedProduct: SealedProduct?
     @State private var quantity = 1
     @State private var priceText = ""
@@ -249,9 +261,16 @@ private struct SealedProductCatalogSheet: View {
     private let apiService = APIService()
 
     private var filteredProducts: [SealedProduct] {
-        if searchText.isEmpty { return products }
+        let game = environmentStore.enabledGames.count == 1
+            ? environmentStore.enabledGames[0]
+            : selectedGame
+        let gameFiltered = game == .all
+            ? products
+            : products.filter { $0.tcg.caseInsensitiveCompare(game.rawValue) == .orderedSame }
+
+        if searchText.isEmpty { return gameFiltered }
         let query = searchText.lowercased()
-        return products.filter { $0.name.lowercased().contains(query) }
+        return gameFiltered.filter { $0.name.lowercased().contains(query) }
     }
 
     var body: some View {
@@ -271,36 +290,50 @@ private struct SealedProductCatalogSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(filteredProducts) { product in
-                        Button {
-                            selectedProduct = product
-                        } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(product.name)
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                    HStack(spacing: 6) {
-                                        Text(product.productType.capitalized)
-                                            .font(.caption2)
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(Color.accentColor.opacity(0.15))
-                                            .foregroundColor(.accentColor)
-                                            .cornerRadius(4)
-                                        if let msrp = product.msrp {
-                                            Text("MSRP $\(String(format: "%.2f", msrp))")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
+                    VStack(spacing: 0) {
+                        if environmentStore.enabledGames.count > 1 {
+                            GamePickerPills(
+                                selection: $selectedGame,
+                                games: environmentStore.gamePickerGames
+                            )
+                            .background(Color(.systemBackground))
+
+                            Divider()
+                        }
+
+                        List(filteredProducts) { product in
+                            Button {
+                                selectedProduct = product
+                            } label: {
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(product.name)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        HStack(spacing: 6) {
+                                            GameBadge(tcg: product.tcg)
+
+                                            Text(product.productType.capitalized)
+                                                .font(.caption2)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Color.accentColor.opacity(0.15))
+                                                .foregroundColor(.accentColor)
+                                                .cornerRadius(4)
+                                            if let msrp = product.msrp {
+                                                Text("MSRP $\(String(format: "%.2f", msrp))")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
                                         }
                                     }
+                                    Spacer()
+                                    Image(systemName: "plus.circle")
+                                        .foregroundColor(.accentColor)
                                 }
-                                Spacer()
-                                Image(systemName: "plus.circle")
-                                    .foregroundColor(.accentColor)
                             }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     .searchable(text: $searchText, prompt: "Search products")
                 }

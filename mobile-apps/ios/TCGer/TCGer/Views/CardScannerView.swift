@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -8,6 +9,7 @@ struct CardScannerView: View {
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var selectedCardForBinder: Card?
     @State private var showingRecentDebugCaptures = false
+    @State private var selectedTestImage: PhotosPickerItem?
     let scope: CardScanScope?
 
     init(scope: CardScanScope? = nil) {
@@ -45,6 +47,10 @@ struct CardScannerView: View {
         }
         .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
             syncSelectedModeWithModules()
+        }
+        .onChange(of: selectedTestImage, initial: false) { _, item in
+            guard let item else { return }
+            Task { await scanSelectedTestImage(item) }
         }
         .sheet(item: $viewModel.latestResult, onDismiss: {
             viewModel.clearResult()
@@ -283,6 +289,10 @@ struct CardScannerView: View {
                 debugCaptureControls
             }
 
+            if showTestingTools || isSimulator {
+                testImageControls
+            }
+
             Button(action: {
                 viewModel.capturePhoto()
             }) {
@@ -381,6 +391,49 @@ struct CardScannerView: View {
         .padding(.horizontal)
     }
 
+    private var testImageControls: some View {
+        HStack(spacing: 12) {
+            PhotosPicker(selection: $selectedTestImage, matching: .images) {
+                Label("Test Photo", systemImage: "photo")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(accentColor(for: viewModel.selectedMode))
+
+            Button {
+                guard let image = UIImage(named: "BossOrders")?.cgImage else {
+                    viewModel.errorMessage = "The bundled Boss's Orders scanner fixture is unavailable."
+                    return
+                }
+                Task { await viewModel.scan(image: image) }
+            } label: {
+                Label("Demo", systemImage: "testtube.2")
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+        }
+        .disabled(isProcessingPhoto)
+        .padding(12)
+        .background(Color.black.opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Scanner test image controls")
+    }
+
+    private func scanSelectedTestImage(_ item: PhotosPickerItem) async {
+        defer { selectedTestImage = nil }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                viewModel.errorMessage = "The selected photo did not provide image data."
+                return
+            }
+            await viewModel.scan(imageData: data)
+        } catch is CancellationError {
+            return
+        } catch {
+            viewModel.errorMessage = "Unable to load the selected scanner photo: \(error.localizedDescription)"
+        }
+    }
+
     private func accentColor(for mode: ScanMode) -> Color {
         switch mode {
         case .pokemon: return Color.red
@@ -446,6 +499,14 @@ struct CardScannerView: View {
 }
 
 private extension CardScannerView {
+    var isSimulator: Bool {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
+    }
+
     var availableScanModes: [ScanMode] {
         ScanMode.allCases.filter { environmentStore.isGameEnabled($0.tcgGame) }
     }

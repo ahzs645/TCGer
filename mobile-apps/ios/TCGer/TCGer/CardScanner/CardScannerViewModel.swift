@@ -160,6 +160,35 @@ final class CardScannerViewModel: ObservableObject {
         cameraController.capturePhoto()
     }
 
+    /// Runs the production recognition pipeline on an already-decoded image.
+    /// This is deliberately camera-independent so Simulator, fixtures, and
+    /// imported recordings exercise the same coordinator as a real capture.
+    func scan(image: CGImage, source: ScanInvocationKind = .photoCapture) async {
+        guard let context else {
+            state = .error("Scanner context unavailable.")
+            return
+        }
+        if !context.serverConfiguration.isOnDevice, context.authToken == nil {
+            state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
+            return
+        }
+
+        isProcessingPhoto = true
+        state = .processing
+        defer { isProcessingPhoto = false }
+
+        let result = await coordinator.scan(image: image, context: context, source: source)
+        apply(result)
+    }
+
+    func scan(imageData: Data, source: ScanInvocationKind = .photoCapture) async {
+        guard let image = Self.makeCGImage(from: imageData) else {
+            state = .error("Unable to decode the selected scanner image.")
+            return
+        }
+        await scan(image: image, source: source)
+    }
+
     func clearResult() {
         latestResult = nil
         errorMessage = nil
@@ -192,33 +221,23 @@ final class CardScannerViewModel: ObservableObject {
 
     private func handleCapturedPhoto(_ photo: AVCapturePhoto) async {
         defer { isProcessingPhoto = false }
-
-        if isSimulator {
-            state = .error("Card scanning is not supported in the iOS Simulator.")
-            return
-        }
-
         guard let cgImage = makeCGImage(from: photo) else {
             state = .error("Unable to process captured photo.")
             return
         }
+        await scan(image: cgImage)
+    }
 
-        guard let context else {
-            state = .error("Scanner context unavailable.")
-            return
-        }
-
-        let result = await coordinator.scan(image: cgImage, context: context, source: .photoCapture)
-
+    private func apply(_ result: Result<CardScanResult, CardScannerError>) {
         switch result {
         case .success(let scanResult):
             latestResult = scanResult
             state = .result(scanResult)
-            HapticManager.notification(.success)
+            if !isSimulator { HapticManager.notification(.success) }
         case .failure(let error):
             errorMessage = error.errorDescription ?? error.localizedDescription
             state = .ready
-            HapticManager.notification(.error)
+            if !isSimulator { HapticManager.notification(.error) }
         }
     }
 
@@ -296,8 +315,17 @@ final class CardScannerViewModel: ObservableObject {
 
     private func makeCGImage(from photo: AVCapturePhoto) -> CGImage? {
         guard let data = photo.fileDataRepresentation() else { return nil }
+        return Self.makeCGImage(from: data)
+    }
+
+    nonisolated private static func makeCGImage(from data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 2_048
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     nonisolated private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {

@@ -14,45 +14,9 @@ import Combine
 import CoreMedia
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import VideoToolbox
 @preconcurrency import Vision
-
-// MARK: - Recording model (exportable run for later re-analysis)
-
-/// One analyzed frame: the pipeline's decision plus a reference to the saved
-/// image, so a recorded run can be re-opened and reviewed off-device.
-struct RecordedScanFrame: Codable {
-    let index: Int
-    let timestampSeconds: Double
-    let mode: String
-    let pipeline: String
-    let elapsedMs: Double
-    let detectedCount: Int
-    let segmentationConfidence: Double?
-    /// Four normalized corners (Vision space, origin bottom-left): TL, TR, BR, BL.
-    let quad: [[Double]]?
-    let identified: Bool
-    let bestMatchName: String?
-    let bestMatchCardId: String?
-    let bestMatchSetCode: String?
-    let bestMatchSetName: String?
-    let confidence: Double?
-    let strategy: String?
-    let alternatives: [String]
-    let imageFile: String
-}
-
-struct RecordedScanBundle: Codable {
-    struct Summary: Codable {
-        let capturedAt: String
-        let frameCount: Int
-        let mode: String
-        let pipeline: String
-        let app: String
-    }
-    let summary: Summary
-    let frames: [RecordedScanFrame]
-}
 
 // MARK: - Log model
 
@@ -165,6 +129,49 @@ final class ScannerDebugViewModel: ObservableObject {
 
     func configure(environment: EnvironmentStore) {
         environmentStore = environment
+    }
+
+    func replay(_ replay: ScannerReplayImport) async throws -> ScannerReplayReport {
+        guard let environmentStore else {
+            throw NSError(
+                domain: "ScannerDebug",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Scanner environment is unavailable."]
+            )
+        }
+        if let recordedMode = ScanMode.allCases.first(where: {
+            $0.rawValue.caseInsensitiveCompare(replay.recording.summary.mode) == .orderedSame
+                || $0.displayName.caseInsensitiveCompare(replay.recording.summary.mode) == .orderedSame
+        }) {
+            mode = recordedMode
+        }
+
+        let context = CardScannerContext(
+            mode: mode,
+            enginePreference: .localOnly,
+            serverConfiguration: environmentStore.serverConfiguration,
+            authToken: environmentStore.authToken,
+            showPricing: environmentStore.showPricing,
+            saveDebugCapture: false,
+            captureNotes: nil,
+            setCode: nil
+        )
+        let coordinator = embeddingOnly ? embeddingCoordinator : fullCoordinator
+        statusMessage = "Replaying \(replay.recording.frames.count) recorded frames…"
+        let report = await CardScannerReplayRunner(coordinator: coordinator).run(
+            replay: replay,
+            context: context
+        )
+        statusMessage = String(
+            format: "Replay complete · %.0f%% top-1 · %.0fms mean",
+            report.accuracyRate * 100,
+            report.meanLatencyMs
+        )
+        log(
+            report.changedFrames == 0 ? .success : .warn,
+            "replay \(report.processedFrames)/\(report.totalFrames) · top-1 \(Int(report.accuracyRate * 100))% · top-5 \(Int(report.topFiveRecall * 100))% · \(report.falsePositiveRegressions) false-positive · \(report.missRegressions) missed · \(report.strategyChangedFrames) strategy changes"
+        )
+        return report
     }
 
     func start() {
@@ -284,6 +291,7 @@ final class ScannerDebugViewModel: ObservableObject {
         var confidence: Double?
         var strategy: String?
         var alternatives: [String] = []
+        var alternativeCardIds: [String] = []
         if case .success(let result) = scan {
             identified = true
             let candidate = result.primary
@@ -294,6 +302,7 @@ final class ScannerDebugViewModel: ObservableObject {
             confidence = candidate.confidence.score
             strategy = candidate.originatingStrategy.displayName
             alternatives = result.alternatives.prefix(5).map { $0.details.identity.name }
+            alternativeCardIds = result.alternatives.prefix(5).map { $0.details.identity.id }
         }
 
         let quadPoints: [[Double]]? = quad.map { q in
@@ -323,6 +332,9 @@ final class ScannerDebugViewModel: ObservableObject {
                 confidence: confidence,
                 strategy: strategy,
                 alternatives: alternatives,
+                alternativeCardIds: alternativeCardIds,
+                expectedCardId: nil,
+                expectedNoMatch: nil,
                 imageFile: fileName
             )
         )
@@ -547,7 +559,10 @@ struct ScannerDebugView: View {
 
     @State private var exportURL: URL?
     @State private var showingExport = false
-    @State private var exportError: String?
+    @State private var toolError: String?
+    @State private var showingReplayImporter = false
+    @State private var isReplaying = false
+    @State private var replayReport: ScannerReplayReport?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -567,16 +582,26 @@ struct ScannerDebugView: View {
                 ScanDebugShareSheet(url: url)
             }
         }
+        .fileImporter(
+            isPresented: $showingReplayImporter,
+            allowedContentTypes: [.folder, .json, .image],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls): importAndReplay(urls)
+            case .failure(let error): toolError = error.localizedDescription
+            }
+        }
         .alert(
-            "Export Failed",
+            "Scanner Tool Error",
             isPresented: Binding(
-                get: { exportError != nil },
-                set: { if !$0 { exportError = nil } }
+                get: { toolError != nil },
+                set: { if !$0 { toolError = nil } }
             )
         ) {
-            Button("OK", role: .cancel) { exportError = nil }
+            Button("OK", role: .cancel) { toolError = nil }
         } message: {
-            Text(exportError ?? "")
+            Text(toolError ?? "")
         }
     }
 
@@ -693,6 +718,44 @@ struct ScannerDebugView: View {
                 .disabled(viewModel.recordedFrameCount == 0)
             }
 
+            Button {
+                showingReplayImporter = true
+            } label: {
+                if isReplaying {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Import & Replay Recording", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isReplaying || viewModel.isRunning)
+
+            if let replayReport {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(
+                        format: "%d/%d frames · %.0f%% top-1 · %.0f%% top-5",
+                        replayReport.processedFrames,
+                        replayReport.totalFrames,
+                        replayReport.accuracyRate * 100,
+                        replayReport.topFiveRecall * 100
+                    ))
+                    Text(String(
+                        format: "%d changed · %d false-positive · %d missed · %d strategy · %.0fms mean / %.0fms p95",
+                        replayReport.changedFrames,
+                        replayReport.falsePositiveRegressions,
+                        replayReport.missRegressions,
+                        replayReport.strategyChangedFrames,
+                        replayReport.meanLatencyMs,
+                        replayReport.p95LatencyMs
+                    ))
+                }
+                .font(.caption2.monospacedDigit())
+                .foregroundColor(replayReport.changedFrames == 0 ? .green : .orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             HStack {
                 Text(viewModel.recordedFrameCount > 0
                     ? "\(viewModel.recordedFrameCount) frame\(viewModel.recordedFrameCount == 1 ? "" : "s") saved · images + results"
@@ -713,7 +776,23 @@ struct ScannerDebugView: View {
             exportURL = try viewModel.buildRecordingExport()
             showingExport = true
         } catch {
-            exportError = error.localizedDescription
+            toolError = error.localizedDescription
+        }
+    }
+
+    private func importAndReplay(_ urls: [URL]) {
+        isReplaying = true
+        replayReport = nil
+        Task {
+            defer { isReplaying = false }
+            do {
+                let replay = try ScannerReplayDocumentLoader.load(urls: urls)
+                replayReport = try await viewModel.replay(replay)
+            } catch is CancellationError {
+                return
+            } catch {
+                toolError = error.localizedDescription
+            }
         }
     }
 

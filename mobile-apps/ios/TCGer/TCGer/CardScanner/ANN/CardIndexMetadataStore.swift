@@ -44,6 +44,14 @@ actor CardIndexMetadataStore {
         supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
     }
 
+    /// In-memory initializer for unit tests and imported replay manifests.
+    init(entries: [CardIndexMetadataEntry]) {
+        cache = entries.reduce(into: [:]) { result, entry in
+            result[entry.annIndex] = entry
+        }
+        supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
+    }
+
     func entry(for index: Int) -> CardIndexMetadataEntry? {
         cache[index]
     }

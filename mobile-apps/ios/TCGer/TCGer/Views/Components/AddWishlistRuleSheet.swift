@@ -23,7 +23,7 @@ struct AddWishlistRuleSheet: View {
     @State private var includeAllPrintings = true
     @State private var keepUpdated = true
 
-    @State private var setGame: TCGGame = .pokemon
+    @State private var setGame: TCGGame = .all
     @State private var sets: [TcgSet] = []
     @State private var selectedSetCode: String = ""
     @State private var isLoadingSets = false
@@ -36,6 +36,15 @@ struct AddWishlistRuleSheet: View {
 
     private var availableGames: [TCGGame] {
         environmentStore.enabledGames
+    }
+
+    private var preferredSetGame: TCGGame? {
+        if let defaultGame = environmentStore.defaultGame,
+           let game = TCGGame(rawValue: defaultGame),
+           availableGames.contains(game) {
+            return game
+        }
+        return availableGames.first
     }
 
     private var canSubmit: Bool {
@@ -66,9 +75,13 @@ struct AddWishlistRuleSheet: View {
                             .textInputAutocapitalization(.words)
 
                         Picker("Game", selection: $selectedGame) {
-                            Text("All Games").tag(TCGGame.all)
-                            ForEach(availableGames) { game in
-                                Text(game.displayName).tag(game)
+                            ForEach(environmentStore.gamePickerGames) { game in
+                                Label {
+                                    Text(game.shortName)
+                                } icon: {
+                                    TCGGameIcon(game: game)
+                                }
+                                .tag(game)
                             }
                         }
 
@@ -84,12 +97,19 @@ struct AddWishlistRuleSheet: View {
                     Section {
                         Picker("Game", selection: $setGame) {
                             ForEach(availableGames) { game in
-                                Text(game.displayName).tag(game)
+                                Label {
+                                    Text(game.shortName)
+                                } icon: {
+                                    TCGGameIcon(game: game)
+                                }
+                                .tag(game)
                             }
                         }
                         .onChange(of: setGame) {
                             selectedSetCode = ""
-                            Task { await loadSets() }
+                            if mode == .set {
+                                Task { await loadSets() }
+                            }
                         }
 
                         if isLoadingSets {
@@ -152,6 +172,7 @@ struct AddWishlistRuleSheet: View {
                 }
             }
             .task {
+                setGame = preferredSetGame ?? .all
                 if mode == .set { await loadSets() }
             }
             .onChange(of: mode) {
@@ -159,17 +180,13 @@ struct AddWishlistRuleSheet: View {
                     Task { await loadSets() }
                 }
             }
-            .onAppear {
-                if let firstGame = availableGames.first, !availableGames.contains(setGame) {
-                    setGame = firstGame
-                }
-            }
         }
     }
 
     @MainActor
     private func loadSets() async {
-        guard let token = environmentStore.authToken else { return }
+        guard let token = environmentStore.authToken,
+              availableGames.contains(setGame) else { return }
         isLoadingSets = true
         defer { isLoadingSets = false }
 
