@@ -34,15 +34,7 @@ struct SetArtworkView: View {
     }
 
     private var accentColor: Color {
-        switch set.tcg.lowercased() {
-        case "pokemon": return .red
-        case "magic": return .orange
-        case "yugioh": return .purple
-        case "onepiece": return .blue
-        case "lorcana": return .pink
-        case "dragonball": return .orange
-        default: return .secondary
-        }
+        TCGGame(rawValue: set.tcg.lowercased())?.brandColor ?? .gray
     }
 
     var body: some View {

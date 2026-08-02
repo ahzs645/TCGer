@@ -253,6 +253,8 @@ struct CollectionCardRow: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
+                            GameBadge(tcg: card.tcg, showsName: true)
+
                             if let conditionSummary = conditionSummary() {
                                 MetaTagChip(
                                     title: "Condition",

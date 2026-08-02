@@ -104,7 +104,14 @@ struct SmartFolderEditorSheet: View {
     private func addRule(type: SmartFolderRule.RuleType) {
         let defaultValue: String
         switch type {
-        case .tcg: defaultValue = environmentStore.enabledGames.first?.rawValue ?? ""
+        case .tcg:
+            if let defaultGame = environmentStore.defaultGame,
+               let game = TCGGame(rawValue: defaultGame),
+               environmentStore.enabledGames.contains(game) {
+                defaultValue = game.rawValue
+            } else {
+                defaultValue = environmentStore.enabledGames.first?.rawValue ?? ""
+            }
         case .rarity: defaultValue = "Rare"
         case .condition: defaultValue = "Near Mint"
         case .setCode: defaultValue = ""

@@ -152,7 +152,9 @@ private struct SealedLedgerRow: View {
     let ledger: SealedOpeningLedger
 
     private var tcg: String? {
-        ledger.cards.first?.tcg
+        ledger.cards.first {
+            !$0.tcg.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }?.tcg
     }
 
     var body: some View {
@@ -265,7 +267,11 @@ private struct SealedProductCatalogSheet: View {
             ? environmentStore.enabledGames[0]
             : selectedGame
         let gameFiltered = game == .all
-            ? products
+            ? products.filter { product in
+                environmentStore.enabledGames.contains {
+                    $0.rawValue.caseInsensitiveCompare(product.tcg) == .orderedSame
+                }
+            }
             : products.filter { $0.tcg.caseInsensitiveCompare(game.rawValue) == .orderedSame }
 
         if searchText.isEmpty { return gameFiltered }

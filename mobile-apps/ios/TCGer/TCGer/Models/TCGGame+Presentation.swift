@@ -14,9 +14,9 @@ extension TCGGame {
         case .onepiece:
             return Color(red: 205 / 255, green: 47 / 255, blue: 58 / 255)
         case .lorcana:
-            return Color(red: 176 / 255, green: 141 / 255, blue: 47 / 255)
+            return Color(red: 143 / 255, green: 110 / 255, blue: 30 / 255)
         case .dragonball:
-            return Color(red: 232 / 255, green: 100 / 255, blue: 27 / 255)
+            return Color(red: 204 / 255, green: 78 / 255, blue: 15 / 255)
         }
     }
 }

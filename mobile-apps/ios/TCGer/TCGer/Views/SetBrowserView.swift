@@ -242,6 +242,12 @@ struct SetBrowserView: View {
                 chooseInitialScopeIfNeeded()
                 await loadSets()
             }
+            .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
             .refreshable {
                 await loadSets(useCache: false)
             }
@@ -286,6 +292,12 @@ struct SetBrowserView: View {
         guard !didChooseInitialScope else { return }
         browserScope = environmentStore.focusedSetIDs.isEmpty ? .browse : .focused
         didChooseInitialScope = true
+    }
+
+    private func validateSelectedGame() {
+        if selectedGame != .all && !environmentStore.enabledGames.contains(selectedGame) {
+            selectedGame = .all
+        }
     }
 
     private var completionModeBinding: Binding<SetCompletionMode> {
@@ -449,6 +461,10 @@ private struct SetRow: View {
     let progressTotal: Int
     let isFocused: Bool
 
+    private var gameBrandColor: Color {
+        TCGGame(rawValue: set.tcg.lowercased())?.brandColor ?? .accentColor
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             SetArtworkView(set: set)
@@ -471,7 +487,7 @@ private struct SetRow: View {
                             .foregroundColor(.secondary)
                     }
 
-                    if let releaseDate = set.releaseDate {
+                    if let releaseDate = set.formattedReleaseDate {
                         Text(releaseDate)
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -483,7 +499,7 @@ private struct SetRow: View {
                         value: Double(min(ownedCount, progressTotal)),
                         total: Double(progressTotal)
                     )
-                    .tint(ownedCount >= progressTotal ? .green : .accentColor)
+                    .tint(ownedCount >= progressTotal ? .green : gameBrandColor)
                     Text("\(ownedCount) of \(progressTotal) owned")
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -656,6 +672,12 @@ private struct FocusSetPicker: View {
             .navigationTitle("Focus Sets")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search sets")
+            .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
+            .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
             .safeAreaInset(edge: .bottom) {
                 Text("\(draftOrder.count) selected")
                     .font(.footnote.weight(.medium))
@@ -683,6 +705,12 @@ private struct FocusSetPicker: View {
             }
         }
     }
+
+    private func validateSelectedGame() {
+        if selectedGame != .all && !environmentStore.enabledGames.contains(selectedGame) {
+            selectedGame = .all
+        }
+    }
 }
 
 private struct GameSectionHeader: View {
@@ -706,28 +734,4 @@ private struct GameSectionHeader: View {
             }
         }
     }
-}
-
-private func gameSectionIsOrderedBefore(
-    _ left: String,
-    _ right: String,
-    enabledGames: [TCGGame]
-) -> Bool {
-    let leftIndex = enabledGames.firstIndex { $0.rawValue == left.lowercased() }
-    let rightIndex = enabledGames.firstIndex { $0.rawValue == right.lowercased() }
-
-    switch (leftIndex, rightIndex) {
-    case let (leftIndex?, rightIndex?):
-        if leftIndex != rightIndex {
-            return leftIndex < rightIndex
-        }
-    case (_?, nil):
-        return true
-    case (nil, _?):
-        return false
-    case (nil, nil):
-        break
-    }
-
-    return left.localizedCaseInsensitiveCompare(right) == .orderedAscending
 }

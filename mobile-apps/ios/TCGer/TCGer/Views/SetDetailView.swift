@@ -66,6 +66,10 @@ struct SetDetailView: View {
         )
     }
 
+    private var gameBrandColor: Color {
+        TCGGame(rawValue: set.tcg.lowercased())?.brandColor ?? .accentColor
+    }
+
     private var displayedCards: [Card] {
         cards
             .filter { card in
@@ -130,11 +134,14 @@ struct SetDetailView: View {
                         HStack {
                             SetArtworkView(set: set, size: 44)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(set.code.uppercased())
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.accentColor)
-                                if let releaseDate = set.releaseDate {
+                                HStack(spacing: 6) {
+                                    Text(set.code.uppercased())
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(gameBrandColor)
+                                    GameBadge(tcg: set.tcg, showsName: true)
+                                }
+                                if let releaseDate = set.formattedReleaseDate {
                                     Text("Released: \(releaseDate)")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -164,10 +171,10 @@ struct SetDetailView: View {
                                 Text("\(percent)%")
                                     .font(.caption)
                                     .fontWeight(.bold)
-                                    .foregroundColor(percent == 100 ? .green : .accentColor)
+                                    .foregroundColor(percent == 100 ? .green : gameBrandColor)
                             }
                             ProgressView(value: Double(ownedCount), total: Double(max(1, total)))
-                                .tint(percent == 100 ? .green : .accentColor)
+                                .tint(percent == 100 ? .green : gameBrandColor)
                         }
                         .padding(.horizontal)
                         .padding(.bottom, 4)

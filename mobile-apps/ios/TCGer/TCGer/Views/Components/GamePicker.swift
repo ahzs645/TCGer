@@ -6,6 +6,30 @@ extension EnvironmentStore {
     }
 }
 
+func gameSectionIsOrderedBefore(
+    _ left: String,
+    _ right: String,
+    enabledGames: [TCGGame]
+) -> Bool {
+    let leftIndex = enabledGames.firstIndex { $0.rawValue == left.lowercased() }
+    let rightIndex = enabledGames.firstIndex { $0.rawValue == right.lowercased() }
+
+    switch (leftIndex, rightIndex) {
+    case let (leftIndex?, rightIndex?):
+        if leftIndex != rightIndex {
+            return leftIndex < rightIndex
+        }
+    case (_?, nil):
+        return true
+    case (nil, _?):
+        return false
+    case (nil, nil):
+        break
+    }
+
+    return left.localizedCaseInsensitiveCompare(right) == .orderedAscending
+}
+
 struct TCGGameIcon: View {
     let game: TCGGame
     var size: CGFloat = 14
@@ -23,6 +47,7 @@ struct TCGGameIcon: View {
             }
         }
         .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }
 
@@ -48,8 +73,10 @@ struct GamePickerPills: View {
                         .background(selection == game ? selectedColor(for: game) : Color(.systemGray5))
                         .foregroundStyle(selection == game ? Color.white : Color.primary)
                         .clipShape(Capsule())
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(selection == game ? [.isSelected] : [])
                 }
             }
             .padding(.horizontal)
@@ -68,24 +95,14 @@ struct GamePickerMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(games) { game in
-                Button {
-                    selection = game
-                } label: {
+            Picker("Game", selection: $selection) {
+                ForEach(games) { game in
                     Label {
-                        HStack {
-                            Text(game.shortName)
-                            if selection == game {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+                        Text(game.shortName)
                     } icon: {
-                        if let iconName = game.iconName {
-                            Image(iconName)
-                        } else {
-                            Image(systemName: game.systemIconName)
-                        }
+                        Image(systemName: game.systemIconName)
                     }
+                    .tag(game)
                 }
             }
         } label: {
@@ -127,7 +144,7 @@ struct GameBadge: View {
                 Text(tcg.prefix(3).uppercased())
             }
         }
-        .font(.system(size: 9, weight: .semibold))
+        .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(badgeColor)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)

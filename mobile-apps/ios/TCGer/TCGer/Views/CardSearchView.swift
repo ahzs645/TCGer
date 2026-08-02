@@ -442,7 +442,9 @@ private struct SearchResultsList: View {
         }
 
         let groups = Dictionary(grouping: filteredCards, by: { $0.tcg })
-        return groups.sorted { $0.key < $1.key }
+        return groups.sorted {
+            gameSectionIsOrderedBefore($0.key, $1.key, enabledGames: enabledGames)
+        }
     }
 
     var body: some View {
@@ -607,6 +609,26 @@ private struct CardCell: View {
 
 // MARK: - Initial Search View
 private struct InitialSearchView: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+
+    private var searchDescription: String {
+        let gameNames = environmentStore.enabledGames.map(\.shortName)
+        guard !gameNames.isEmpty else {
+            return "Search cards by name, set, or code."
+        }
+
+        let gameList: String
+        switch gameNames.count {
+        case 1:
+            gameList = gameNames[0]
+        case 2:
+            gameList = gameNames.joined(separator: " or ")
+        default:
+            gameList = "\(gameNames.dropLast().joined(separator: ", ")), or \(gameNames.last!)"
+        }
+        return "Search for \(gameList) cards by name, set, or code."
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
@@ -615,7 +637,7 @@ private struct InitialSearchView: View {
             Text("Search Your TCG Collection")
                 .font(.title2)
                 .fontWeight(.semibold)
-            Text("Search for Yu-Gi-Oh!, Magic, or Pokémon cards by name, set, or code.")
+            Text(searchDescription)
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)

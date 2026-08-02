@@ -718,6 +718,17 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     var tcgDisplayName: String {
         TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized
     }
+
+    var formattedReleaseDate: String? {
+        guard let releaseDate else { return nil }
+        let parser = Date.ISO8601FormatStyle(timeZone: .gmt)
+            .year()
+            .month()
+            .day()
+            .dateSeparator(.dash)
+        guard let date = try? parser.parse(releaseDate) else { return releaseDate }
+        return date.formatted(Date.FormatStyle(timeZone: .gmt).month(.abbreviated).year())
+    }
 }
 
 // MARK: - Game Filter

@@ -300,7 +300,9 @@ private struct SearchResultsList: View {
         }
 
         let groups = Dictionary(grouping: filteredCards, by: { $0.tcg })
-        return groups.sorted { $0.key < $1.key }
+        return groups.sorted {
+            gameSectionIsOrderedBefore($0.key, $1.key, enabledGames: enabledGames)
+        }
     }
 
     var body: some View {

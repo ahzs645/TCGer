@@ -450,9 +450,6 @@ private struct WishlistRuleRow: View {
 
     private var subtitle: String? {
         var parts: [String] = []
-        if let tcg = rule.tcg, let game = TCGGame(rawValue: tcg) {
-            parts.append(game.displayName)
-        }
         if let count = rule.lastMatchCount {
             parts.append("\(count) matched")
         }
@@ -471,10 +468,17 @@ private struct WishlistRuleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rule.summary)
                     .font(.subheadline)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                if rule.tcg != nil || subtitle != nil {
+                    HStack(spacing: 6) {
+                        if let tcg = rule.tcg {
+                            GameBadge(tcg: tcg, showsName: true)
+                        }
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -522,11 +526,14 @@ private struct WishlistCardRow: View {
                     .fontWeight(.medium)
                     .lineLimit(2)
 
-                if let setName = card.setName {
-                    Text(setName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                HStack(spacing: 6) {
+                    if let setName = card.setName {
+                        Text(setName)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    GameBadge(tcg: card.tcg)
                 }
 
                 if let rarity = card.rarity {

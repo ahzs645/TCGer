@@ -224,111 +224,23 @@ struct SettingsView: View {
 
                 // TCG Modules Section
                 Section {
-                    Toggle(isOn: $environmentStore.enabledYugioh) {
-                        HStack {
-                            Image("YugiohIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(.accentColor)
-                            Text("Yu-Gi-Oh!")
+                    ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
+                        TCGModuleToggleRow(
+                            game: game,
+                            isOn: gameEnabledBinding(for: game),
+                            isEnabled: canEditPreferences
+                        ) { isOn in
+                            Task {
+                                await handleGameToggle(
+                                    game: game.rawValue,
+                                    displayName: game.displayName,
+                                    isOn: isOn
+                                )
+                            }
                         }
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledYugioh) {
-                        Task {
-                            await handleGameToggle(
-                                game: "yugioh",
-                                displayName: "Yu-Gi-Oh!",
-                                isOn: environmentStore.enabledYugioh
-                            )
-                        }
-                    }
-                    catalogInstallProgress(for: .yugioh)
 
-                    Toggle(isOn: $environmentStore.enabledMagic) {
-                        HStack {
-                            Image("MTGIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(.accentColor)
-                            Text("Magic: The Gathering")
-                        }
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledMagic) {
-                        Task {
-                            await handleGameToggle(
-                                game: "magic",
-                                displayName: "Magic: The Gathering",
-                                isOn: environmentStore.enabledMagic
-                            )
-                        }
-                    }
-                    catalogInstallProgress(for: .magic)
-
-                    Toggle(isOn: $environmentStore.enabledPokemon) {
-                        HStack {
-                            Image("PokemonIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(.accentColor)
-                            Text("Pokémon")
-                        }
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledPokemon) {
-                        Task {
-                            await handleGameToggle(
-                                game: "pokemon",
-                                displayName: "Pokémon",
-                                isOn: environmentStore.enabledPokemon
-                            )
-                        }
-                    }
-                    catalogInstallProgress(for: .pokemon)
-
-                    Toggle(isOn: $environmentStore.enabledOnepiece) {
-                        Label("One Piece", systemImage: "sail.boat.fill")
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledOnepiece) {
-                        Task {
-                            await handleGameToggle(
-                                game: "onepiece",
-                                displayName: "One Piece",
-                                isOn: environmentStore.enabledOnepiece
-                            )
-                        }
-                    }
-
-                    Toggle(isOn: $environmentStore.enabledLorcana) {
-                        Label("Disney Lorcana", systemImage: "wand.and.stars")
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledLorcana) {
-                        Task {
-                            await handleGameToggle(
-                                game: "lorcana",
-                                displayName: "Disney Lorcana",
-                                isOn: environmentStore.enabledLorcana
-                            )
-                        }
-                    }
-
-                    Toggle(isOn: $environmentStore.enabledDragonball) {
-                        Label("Dragon Ball Super", systemImage: "flame.fill")
-                    }
-                    .disabled(!canEditPreferences)
-                    .onChange(of: environmentStore.enabledDragonball) {
-                        Task {
-                            await handleGameToggle(
-                                game: "dragonball",
-                                displayName: "Dragon Ball Super",
-                                isOn: environmentStore.enabledDragonball
-                            )
+                        if TCGGame.catalogGames.contains(game) {
+                            catalogInstallProgress(for: game)
                         }
                     }
                 } header: {
@@ -385,12 +297,9 @@ struct SettingsView: View {
                         }
                     )) {
                         Text("None").tag("")
-                        Text("Yu-Gi-Oh!").tag("yugioh")
-                        Text("Magic: The Gathering").tag("magic")
-                        Text("Pokémon").tag("pokemon")
-                        Text("One Piece").tag("onepiece")
-                        Text("Disney Lorcana").tag("lorcana")
-                        Text("Dragon Ball Super").tag("dragonball")
+                        ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
+                            Text(game.displayName).tag(game.rawValue)
+                        }
                     }
                     .disabled(!canEditPreferences)
                 } header: {
@@ -991,6 +900,18 @@ private extension SettingsView {
         }
     }
 
+    func gameEnabledBinding(for game: TCGGame) -> Binding<Bool> {
+        switch game {
+        case .yugioh: return $environmentStore.enabledYugioh
+        case .magic: return $environmentStore.enabledMagic
+        case .pokemon: return $environmentStore.enabledPokemon
+        case .onepiece: return $environmentStore.enabledOnepiece
+        case .lorcana: return $environmentStore.enabledLorcana
+        case .dragonball: return $environmentStore.enabledDragonball
+        case .all: return .constant(false)
+        }
+    }
+
     @ViewBuilder
     func catalogInstallProgress(for game: TCGGame) -> some View {
         if catalogStore.installingGames.contains(game) {
@@ -1293,6 +1214,27 @@ private extension SettingsView {
                 isExporting = false
             }
             print("Export failed: \(error)")
+        }
+    }
+}
+
+private struct TCGModuleToggleRow: View {
+    let game: TCGGame
+    @Binding var isOn: Bool
+    let isEnabled: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            HStack(spacing: 8) {
+                TCGGameIcon(game: game, size: 20)
+                    .foregroundStyle(game.brandColor)
+                Text(game.displayName)
+            }
+        }
+        .disabled(!isEnabled)
+        .onChange(of: isOn) {
+            onChange(isOn)
         }
     }
 }

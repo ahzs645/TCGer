@@ -38,13 +38,17 @@ struct AddWishlistRuleSheet: View {
         environmentStore.enabledGames
     }
 
-    private var preferredSetGame: TCGGame? {
+    private var preferredDefaultGame: TCGGame? {
         if let defaultGame = environmentStore.defaultGame,
            let game = TCGGame(rawValue: defaultGame),
            availableGames.contains(game) {
             return game
         }
-        return availableGames.first
+        return nil
+    }
+
+    private var preferredSetGame: TCGGame? {
+        preferredDefaultGame ?? availableGames.first
     }
 
     private var canSubmit: Bool {
@@ -172,6 +176,7 @@ struct AddWishlistRuleSheet: View {
                 }
             }
             .task {
+                selectedGame = preferredDefaultGame ?? .all
                 setGame = preferredSetGame ?? .all
                 if mode == .set { await loadSets() }
             }
