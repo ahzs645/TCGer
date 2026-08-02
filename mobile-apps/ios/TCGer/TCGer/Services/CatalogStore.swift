@@ -157,6 +157,9 @@ nonisolated struct CatalogSetEntry: Decodable, Hashable, Sendable {
     let serie: String?
     let releasedAt: String?
     let count: Int
+    let standardCount: Int?
+    let iconUrl: String?
+    let logoUrl: String?
 }
 
 /// The in-memory pack row intentionally contains only fields needed by offline
@@ -611,7 +614,10 @@ extension TCGGame {
         case .yugioh: return "YugiohCardBack"
         case .magic: return "MagicCardBack"
         case .pokemon: return "PokemonCardBack"
-        case .onepiece, .lorcana, .dragonball, .all: return nil
+        case .onepiece: return "OnePieceCardBack"
+        case .lorcana: return "LorcanaCardBack"
+        case .dragonball: return "DragonBallCardBack"
+        case .all: return nil
         }
     }
 }

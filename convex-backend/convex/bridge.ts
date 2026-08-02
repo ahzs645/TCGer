@@ -210,7 +210,9 @@ function toUserPreferences(viewer: Doc<"users">) {
     enabledOnepiece: viewer.enabledOnepiece ?? false,
     enabledLorcana: viewer.enabledLorcana ?? false,
     enabledDragonball: viewer.enabledDragonball ?? false,
-    defaultGame: viewer.defaultGame ?? null
+    defaultGame: viewer.defaultGame ?? null,
+    focusedSetOrder: viewer.focusedSetOrder ?? [],
+    setCompletionMode: viewer.setCompletionMode ?? "standard"
   };
 }
 
@@ -2260,7 +2262,9 @@ export const updateViewerPreferences = internalMutation({
     enabledOnepiece: v.optional(v.boolean()),
     enabledLorcana: v.optional(v.boolean()),
     enabledDragonball: v.optional(v.boolean()),
-    defaultGame: v.optional(nullableTcgCode)
+    defaultGame: v.optional(nullableTcgCode),
+    focusedSetOrder: v.optional(v.array(v.string())),
+    setCompletionMode: v.optional(v.union(v.literal("standard"), v.literal("master")))
   },
   returns: userPreferencesValidator,
   handler: async (ctx, args) => {
@@ -2289,6 +2293,8 @@ export const updateViewerPreferences = internalMutation({
       enabledDragonball: args.enabledDragonball ?? viewer.enabledDragonball ?? false,
       defaultGame:
         args.defaultGame === undefined ? viewer.defaultGame : args.defaultGame ?? undefined,
+      focusedSetOrder: args.focusedSetOrder ?? viewer.focusedSetOrder ?? [],
+      setCompletionMode: args.setCompletionMode ?? viewer.setCompletionMode ?? "standard",
       updatedAt: now()
     });
 

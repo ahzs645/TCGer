@@ -166,7 +166,9 @@ final class LocalStore {
             enabledOnepiece: false,
             enabledLorcana: false,
             enabledDragonball: false,
-            defaultGame: nil
+            defaultGame: nil,
+            focusedSetOrder: [],
+            setCompletionMode: SetCompletionMode.standard.rawValue
         )
         self.user = User(
             id: Constants.userId,
@@ -404,7 +406,9 @@ final class LocalStore {
         enabledOnepiece: Bool?,
         enabledLorcana: Bool?,
         enabledDragonball: Bool?,
-        defaultGame: String?
+        defaultGame: String?,
+        focusedSetOrder: [String]?,
+        setCompletionMode: String?
     ) -> APIService.UserPreferences {
         preferences = APIService.UserPreferences(
             showCardNumbers: showCardNumbers ?? preferences.showCardNumbers,
@@ -415,7 +419,9 @@ final class LocalStore {
             enabledOnepiece: enabledOnepiece ?? preferences.enabledOnepiece,
             enabledLorcana: enabledLorcana ?? preferences.enabledLorcana,
             enabledDragonball: enabledDragonball ?? preferences.enabledDragonball,
-            defaultGame: defaultGame ?? preferences.defaultGame
+            defaultGame: defaultGame ?? preferences.defaultGame,
+            focusedSetOrder: focusedSetOrder ?? preferences.focusedSetOrder,
+            setCompletionMode: setCompletionMode ?? preferences.setCompletionMode
         )
         user = User(
             id: user.id,
@@ -644,8 +650,9 @@ final class LocalStore {
                 tcg: first.tcg,
                 releaseDate: nil,
                 totalCards: cards.count,
-                iconUrl: nil,
-                logoUrl: nil
+                standardCards: nil,
+                iconUrl: first.setSymbolUrl,
+                logoUrl: first.setLogoUrl
             )
             if !preserveExisting || setsByID[set.id] == nil {
                 setsByID[set.id] = set
@@ -1355,6 +1362,9 @@ final class LocalStore {
         case "pokemon": return "PokemonCardBack"
         case "magic": return "MagicCardBack"
         case "yugioh": return "YugiohCardBack"
+        case "onepiece": return "OnePieceCardBack"
+        case "lorcana": return "LorcanaCardBack"
+        case "dragonball": return "DragonBallCardBack"
         default: return nil
         }
     }

@@ -10,7 +10,7 @@ import {
   getCardPrints,
   searchCards,
   searchAllCards,
-  getSets,
+  getSetsWithStatus,
   getSetCards
 } from '../../modules/cards/cards.service';
 import { asyncHandler } from '../../utils/async-handler';
@@ -43,8 +43,8 @@ cardsRouter.get(
   '/sets',
   asyncHandler(async (req, res) => {
     const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
-    const sets = await getSets(tcg);
-    res.json({ sets, total: sets.length });
+    const { sets, failedProviders } = await getSetsWithStatus(tcg);
+    res.json({ sets, total: sets.length, failedProviders });
   })
 );
 

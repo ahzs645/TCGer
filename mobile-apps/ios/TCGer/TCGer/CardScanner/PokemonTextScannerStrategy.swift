@@ -51,7 +51,11 @@ final class PokemonTextScannerStrategy: ScanStrategy {
                     game: context.mode.tcgGame
                 )
 
-                let trimmedCards = searchResponse.cards.prefix(5)
+                let scopedCards = searchResponse.cards.filter { card in
+                    guard let setCode = context.setCode else { return true }
+                    return card.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+                }
+                let trimmedCards = scopedCards.prefix(5)
                 guard !trimmedCards.isEmpty else { continue }
 
                 for (offset, card) in trimmedCards.enumerated() {

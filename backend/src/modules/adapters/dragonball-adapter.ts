@@ -248,6 +248,7 @@ export class DragonBallAdapter implements TcgAdapter {
       releasedAt: product.release_date ?? set?.release_date ?? undefined,
       imageUrl: image?.large ?? image?.medium ?? image?.small ?? undefined,
       imageUrlSmall: image?.small ?? image?.medium ?? image?.large ?? undefined,
+      setLogoUrl: set?.logo ?? undefined,
       attributes: {
         ...attributes,
         color: findAttribute('color'),

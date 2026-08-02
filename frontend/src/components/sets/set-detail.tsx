@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardImage } from "@/components/cards/card-image";
+import { SetSymbol } from "@/components/cards/set-symbol";
 import {
   Card as UiCard,
   CardContent,
@@ -404,20 +405,33 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
           </Link>
         </Button>
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{GAME_LABELS[tcg]}</Badge>
-              <Badge variant="secondary">{setCode.toUpperCase()}</Badge>
-              {releaseDate && (
-                <span className="text-xs text-muted-foreground">
-                  Released {releaseDate}
-                </span>
-              )}
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <SetSymbol
+                symbolUrl={set?.iconUrl}
+                logoUrl={set?.logoUrl}
+                setCode={setCode}
+                setName={setTitle}
+                tcg={tcg}
+                size="lg"
+                className="max-h-10 max-w-10"
+              />
             </div>
-            <h1 className="text-3xl font-heading font-semibold">{setTitle}</h1>
-            <p className="text-sm text-muted-foreground">
-              Track every unique printing in {selectedCollectionName}.
-            </p>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{GAME_LABELS[tcg]}</Badge>
+                <Badge variant="secondary">{setCode.toUpperCase()}</Badge>
+                {releaseDate && (
+                  <span className="text-xs text-muted-foreground">
+                    Released {releaseDate}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-3xl font-heading font-semibold">{setTitle}</h1>
+              <p className="text-sm text-muted-foreground">
+                Track every unique printing in {selectedCollectionName}.
+              </p>
+            </div>
           </div>
           <Select
             value={collectionId}

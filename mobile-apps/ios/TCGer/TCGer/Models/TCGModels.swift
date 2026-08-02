@@ -713,10 +713,15 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     let tcg: String
     let releaseDate: String?
     let totalCards: Int?
+    /// The numbered checklist total, excluding secret and alternate cards when known.
+    let standardCards: Int?
     let iconUrl: String?
     let logoUrl: String?
 
     var id: String { "\(tcg)-\(code)" }
+
+    /// A normalized identifier used for device-local set preferences.
+    var focusID: String { "\(tcg.lowercased())::\(code.lowercased())" }
 
     var tcgDisplayName: String {
         switch tcg.lowercased() {

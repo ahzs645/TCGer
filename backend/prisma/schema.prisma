@@ -25,6 +25,8 @@ model User {
   enabledLorcana           Boolean                   @default(false)
   enabledDragonball        Boolean                   @default(false)
   defaultGame              String?
+  focusedSetOrder          String[]                  @default([])
+  setCompletionMode        String                    @default("standard")
   sessions                 Session[]
   accounts                 Account[]
   binders                  Binder[]

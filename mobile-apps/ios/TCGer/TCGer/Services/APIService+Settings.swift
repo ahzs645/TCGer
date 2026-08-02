@@ -80,6 +80,8 @@ extension APIService {
         let enabledLorcana: Bool
         let enabledDragonball: Bool
         let defaultGame: String?
+        let focusedSetOrder: [String]
+        let setCompletionMode: String
 
         private enum CodingKeys: String, CodingKey {
             case showCardNumbers
@@ -91,6 +93,8 @@ extension APIService {
             case enabledLorcana
             case enabledDragonball
             case defaultGame
+            case focusedSetOrder
+            case setCompletionMode
         }
 
         init(
@@ -102,7 +106,9 @@ extension APIService {
             enabledOnepiece: Bool,
             enabledLorcana: Bool,
             enabledDragonball: Bool,
-            defaultGame: String?
+            defaultGame: String?,
+            focusedSetOrder: [String] = [],
+            setCompletionMode: String = SetCompletionMode.standard.rawValue
         ) {
             self.showCardNumbers = showCardNumbers
             self.showPricing = showPricing
@@ -113,6 +119,9 @@ extension APIService {
             self.enabledLorcana = enabledLorcana
             self.enabledDragonball = enabledDragonball
             self.defaultGame = defaultGame
+            self.focusedSetOrder = FocusedSetOrder.normalized(focusedSetOrder)
+            self.setCompletionMode = SetCompletionMode(rawValue: setCompletionMode)?.rawValue
+                ?? SetCompletionMode.standard.rawValue
         }
 
         init(from decoder: Decoder) throws {
@@ -126,6 +135,11 @@ extension APIService {
             enabledLorcana = try container.decodeIfPresent(Bool.self, forKey: .enabledLorcana) ?? false
             enabledDragonball = try container.decodeIfPresent(Bool.self, forKey: .enabledDragonball) ?? false
             defaultGame = try container.decodeIfPresent(String.self, forKey: .defaultGame)
+            focusedSetOrder = FocusedSetOrder.normalized(
+                try container.decodeIfPresent([String].self, forKey: .focusedSetOrder) ?? []
+            )
+            setCompletionMode = try container.decodeIfPresent(String.self, forKey: .setCompletionMode)
+                ?? SetCompletionMode.standard.rawValue
         }
     }
 
@@ -167,6 +181,8 @@ extension APIService {
         let enabledLorcana: Bool?
         let enabledDragonball: Bool?
         let defaultGame: String?
+        let focusedSetOrder: [String]?
+        let setCompletionMode: String?
     }
 
     func updateUserPreferences(
@@ -180,7 +196,9 @@ extension APIService {
         enabledOnepiece: Bool? = nil,
         enabledLorcana: Bool? = nil,
         enabledDragonball: Bool? = nil,
-        defaultGame: String? = nil
+        defaultGame: String? = nil,
+        focusedSetOrder: [String]? = nil,
+        setCompletionMode: String? = nil
     ) async throws -> UserPreferences {
         if config.isOnDevice {
             return LocalStore.shared.updateUserPreferences(
@@ -192,7 +210,9 @@ extension APIService {
                 enabledOnepiece: enabledOnepiece,
                 enabledLorcana: enabledLorcana,
                 enabledDragonball: enabledDragonball,
-                defaultGame: defaultGame
+                defaultGame: defaultGame,
+                focusedSetOrder: focusedSetOrder,
+                setCompletionMode: setCompletionMode
             )
         }
 
@@ -205,7 +225,9 @@ extension APIService {
             enabledOnepiece: enabledOnepiece,
             enabledLorcana: enabledLorcana,
             enabledDragonball: enabledDragonball,
-            defaultGame: defaultGame
+            defaultGame: defaultGame,
+            focusedSetOrder: focusedSetOrder,
+            setCompletionMode: setCompletionMode
         )
 
         let (data, response) = try await makeRequest(

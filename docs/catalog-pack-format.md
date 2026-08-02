@@ -52,7 +52,9 @@ Games are independent — a pack may be absent (client treats that game as "no c
       "name": "Chilling Reign",
       "serie": "swsh",
       "releasedAt": "2021-06-18",
-      "count": 233
+      "count": 233,
+      "iconUrl": "https://assets.tcgdex.net/univ/swsh/swsh6/symbol.webp",
+      "logoUrl": "https://assets.tcgdex.net/en/swsh/swsh6/logo.webp"
     }
   ],
   "cards": [
@@ -67,6 +69,10 @@ Games are independent — a pack may be absent (client treats that game as "no c
   ]
 }
 ```
+
+Set fields — common: `code`, `name`, `count`; optional: `serie`, `releasedAt`,
+`iconUrl`, `logoUrl`. Clients should render `iconUrl`, then `logoUrl`, then a
+set-code badge when neither image is available.
 
 Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `type?`.
 `setName` is NOT stored per card; clients join via the `sets` array by `setCode`.

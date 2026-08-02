@@ -179,7 +179,9 @@ export const userPreferencesValidator = v.object({
   enabledOnepiece: v.boolean(),
   enabledLorcana: v.boolean(),
   enabledDragonball: v.boolean(),
-  defaultGame: v.union(tcgCodeValidator, v.null())
+  defaultGame: v.union(tcgCodeValidator, v.null()),
+  focusedSetOrder: v.array(v.string()),
+  setCompletionMode: v.union(v.literal("standard"), v.literal("master"))
 });
 
 export const appSettingsValidator = v.object({

@@ -449,7 +449,8 @@ final class ScannerDebugViewModel: ObservableObject {
             authToken: environmentStore.authToken,
             showPricing: environmentStore.showPricing,
             saveDebugCapture: false,
-            captureNotes: nil
+            captureNotes: nil,
+            setCode: nil
         )
         let coordinator = embeddingOnly ? embeddingCoordinator : fullCoordinator
         let started = Date()

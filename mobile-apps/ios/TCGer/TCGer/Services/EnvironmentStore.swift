@@ -76,8 +76,12 @@ final class EnvironmentStore: ObservableObject {
     @Published var smartFolders: [SmartFolder]
     @Published var tabOrder: [AppTab]
     @Published var hiddenTabs: Set<AppTab>
+    @Published private(set) var focusedSetOrder: [String]
+    @Published private(set) var setCompletionMode: SetCompletionMode
+    @Published var setBrowserSort: SetBrowserSort
 
     private var cancellables = Set<AnyCancellable>()
+    private var setPreferencesSyncTask: Task<Void, Never>?
     private let storage = UserDefaults.standard
 
     private enum Keys {
@@ -104,6 +108,9 @@ final class EnvironmentStore: ObservableObject {
         static let smartFolders = "tcg.smartFolders"
         static let tabOrder = "tcg.tabs.order"
         static let hiddenTabs = "tcg.tabs.hidden"
+        static let focusedSetIDs = "tcg.sets.focused"
+        static let setCompletionMode = "tcg.sets.completionMode"
+        static let setBrowserSort = "tcg.sets.browserSort"
     }
 
     /// Phone-only mode has no account. These stand in for the session the rest
@@ -238,6 +245,16 @@ final class EnvironmentStore: ObservableObject {
         } else {
             hiddenTabs = []
         }
+
+        focusedSetOrder = FocusedSetOrder.normalized(
+            storage.stringArray(forKey: Keys.focusedSetIDs) ?? []
+        )
+        setCompletionMode = SetCompletionMode(
+            rawValue: storage.string(forKey: Keys.setCompletionMode) ?? ""
+        ) ?? .standard
+        setBrowserSort = SetBrowserSort(
+            rawValue: storage.string(forKey: Keys.setBrowserSort) ?? ""
+        ) ?? .newest
 
         if serverConfiguration.isOnDevice {
             enableLocalSession(force: false)
@@ -446,6 +463,27 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $focusedSetOrder
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value, forKey: Keys.focusedSetIDs)
+            }
+            .store(in: &cancellables)
+
+        $setCompletionMode
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.rawValue, forKey: Keys.setCompletionMode)
+            }
+            .store(in: &cancellables)
+
+        $setBrowserSort
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value.rawValue, forKey: Keys.setBrowserSort)
+            }
+            .store(in: &cancellables)
+
         Task(priority: .utility) {
             await CatalogStore.shared.configure(
                 enabledGames: serverConfiguration.isOnDevice ? enabledGames : []
@@ -501,6 +539,62 @@ final class EnvironmentStore: ObservableObject {
     func resetTabBar() {
         tabOrder = AppTab.defaultOrder
         hiddenTabs = []
+    }
+
+    // MARK: - Focused Sets
+
+    var focusedSetIDs: Set<String> {
+        Set(focusedSetOrder)
+    }
+
+    func isFocused(on set: TcgSet) -> Bool {
+        focusedSetIDs.contains(set.focusID)
+    }
+
+    func setFocus(on set: TcgSet, focused: Bool) {
+        if focused {
+            if !focusedSetIDs.contains(set.focusID) {
+                focusedSetOrder.append(set.focusID)
+            }
+        } else {
+            focusedSetOrder.removeAll { $0 == set.focusID }
+        }
+        queueSetPreferencesSync()
+    }
+
+    func toggleFocus(on set: TcgSet) {
+        setFocus(on: set, focused: !isFocused(on: set))
+    }
+
+    func replaceFocusedSetOrder(_ order: [String]) {
+        focusedSetOrder = FocusedSetOrder.normalized(order)
+        queueSetPreferencesSync()
+    }
+
+    func updateSetCompletionMode(_ mode: SetCompletionMode) {
+        guard setCompletionMode != mode else { return }
+        setCompletionMode = mode
+        queueSetPreferencesSync()
+    }
+
+    private func queueSetPreferencesSync() {
+        setPreferencesSyncTask?.cancel()
+        let order = focusedSetOrder
+        let completionMode = setCompletionMode
+        let configuration = serverConfiguration
+        guard let token = authToken else { return }
+
+        setPreferencesSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            _ = try? await APIService().updateUserPreferences(
+                config: configuration,
+                token: token,
+                focusedSetOrder: order,
+                setCompletionMode: completionMode.rawValue
+            )
+            self?.setPreferencesSyncTask = nil
+        }
     }
 
     func isGameEnabled(_ game: TCGGame) -> Bool {
@@ -611,8 +705,14 @@ final class EnvironmentStore: ObservableObject {
         smartFolders = []
         tabOrder = AppTab.defaultOrder
         hiddenTabs = []
+        focusedSetOrder = []
+        setCompletionMode = .standard
+        setBrowserSort = .newest
         storage.removeObject(forKey: Keys.tabOrder)
         storage.removeObject(forKey: Keys.hiddenTabs)
+        storage.removeObject(forKey: Keys.focusedSetIDs)
+        storage.removeObject(forKey: Keys.setCompletionMode)
+        storage.removeObject(forKey: Keys.setBrowserSort)
         storage.removeObject(forKey: Keys.server)
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
@@ -641,6 +741,8 @@ final class EnvironmentStore: ObservableObject {
         enabledLorcana = preferences.enabledLorcana
         enabledDragonball = preferences.enabledDragonball
         defaultGame = preferences.defaultGame
+        focusedSetOrder = FocusedSetOrder.normalized(preferences.focusedSetOrder)
+        setCompletionMode = SetCompletionMode(rawValue: preferences.setCompletionMode) ?? .standard
     }
 
     // MARK: - Widget Data

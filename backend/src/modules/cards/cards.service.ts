@@ -147,13 +147,19 @@ export async function getCardPrints(params: { tcg: string; cardId: string }): Pr
   return adapter.fetchCardPrints(cardId);
 }
 
-export async function getSets(tcg?: string): Promise<TcgSet[]> {
+export interface SetCatalogResult {
+  sets: TcgSet[];
+  failedProviders: string[];
+}
+
+export async function getSetsWithStatus(tcg?: string): Promise<SetCatalogResult> {
   if (tcg) {
     const adapter = adapterRegistry.get(tcg);
     if (!adapter.fetchSets) {
-      return [];
+      return { sets: [], failedProviders: [adapter.game] };
     }
-    return adapter.fetchSets();
+    const sets = await adapter.fetchSets();
+    return { sets, failedProviders: sets.length ? [] : [adapter.game] };
   }
 
   const adapters = adapterRegistry.list();
@@ -164,7 +170,12 @@ export async function getSets(tcg?: string): Promise<TcgSet[]> {
         : Promise.resolve([])
     )
   );
-  return results
+  const failedProviders = results.flatMap((result, index) => {
+    if (result.status === 'rejected') return [adapters[index]!.game];
+    if (adapters[index]?.fetchSets && result.value.length === 0) return [adapters[index]!.game];
+    return [];
+  });
+  const sets = results
     .flatMap((result, index) => {
       if (result.status === 'fulfilled') return result.value;
       logger.warn(
@@ -178,6 +189,11 @@ export async function getSets(tcg?: string): Promise<TcgSet[]> {
       return [];
     })
     .sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
+  return { sets, failedProviders };
+}
+
+export async function getSets(tcg?: string): Promise<TcgSet[]> {
+  return (await getSetsWithStatus(tcg)).sets;
 }
 
 export async function getSetCards(tcg: string, setCode: string): Promise<CardDTO[]> {

@@ -9,6 +9,7 @@ import {
   extractYugiohCollectorNumber,
   extractYugiohSetPrefix
 } from '../modules/adapters/yugioh-set-code';
+import { resolveTcgdexAssetUrl } from '../modules/adapters/tcgdex-assets';
 
 type SupportedGame = 'pokemon' | 'magic' | 'yugioh';
 
@@ -25,6 +26,9 @@ interface CatalogSet {
   serie?: string;
   releasedAt?: string;
   count: number;
+  standardCount?: number;
+  iconUrl?: string;
+  logoUrl?: string;
 }
 
 interface CatalogCard {
@@ -77,7 +81,9 @@ interface TcgdexSetSummary {
 interface TcgdexSetDetail extends TcgdexSetSummary {
   serie?: { id?: string };
   releaseDate?: string;
-  cardCount?: { total?: number };
+  cardCount?: { total?: number; official?: number };
+  logo?: string;
+  symbol?: string;
   cards?: Array<{
     id: string;
     localId?: string;
@@ -295,7 +301,10 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         name: detail.name,
         serie: detail.serie?.id,
         releasedAt: detail.releaseDate,
-        count: detail.cardCount?.total ?? detail.cards?.length ?? setCards.length
+        count: detail.cardCount?.total ?? detail.cards?.length ?? setCards.length,
+        standardCount: detail.cardCount?.official,
+        iconUrl: resolveTcgdexAssetUrl(detail.symbol),
+        logoUrl: resolveTcgdexAssetUrl(detail.logo)
       });
       cards.push(
         ...setCards.map((card) => ({
@@ -437,7 +446,8 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
         code: card.set,
         name: card.set_name,
         releasedAt: card.released_at,
-        count: 1
+        count: 1,
+        iconUrl: `https://svgs.scryfall.io/sets/${encodeURIComponent(card.set)}.svg`
       });
     }
 

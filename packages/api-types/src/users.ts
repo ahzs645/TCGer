@@ -15,7 +15,9 @@ export const updatePreferencesSchema = z
     enabledOnepiece: z.boolean().optional(),
     enabledLorcana: z.boolean().optional(),
     enabledDragonball: z.boolean().optional(),
-    defaultGame: tcgCodeSchema.nullable().optional()
+    defaultGame: tcgCodeSchema.nullable().optional(),
+    focusedSetOrder: z.array(z.string().min(1).max(200)).max(100).optional(),
+    setCompletionMode: z.enum(['standard', 'master']).optional()
   })
   .refine(
     (data) => Object.values(data).some((v) => v !== undefined),
@@ -64,4 +66,6 @@ export interface UserPreferences {
   enabledLorcana: boolean;
   enabledDragonball: boolean;
   defaultGame: TcgCode | null;
+  focusedSetOrder: string[];
+  setCompletionMode: 'standard' | 'master';
 }

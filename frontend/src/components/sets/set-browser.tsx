@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,11 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   CheckCircle2,
-  LibraryBig,
   Loader2,
   Search,
 } from "lucide-react";
 
+import { SetSymbol } from "@/components/cards/set-symbol";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -416,18 +415,15 @@ export function SetBrowser() {
                 >
                     <CardHeader className="flex flex-row items-start gap-3 space-y-0">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        {set.iconUrl || set.logoUrl ? (
-                          <Image
-                            src={set.iconUrl ?? set.logoUrl ?? ""}
-                            alt=""
-                            width={40}
-                            height={40}
-                            className="h-10 w-10 object-contain"
-                            unoptimized
-                          />
-                        ) : (
-                          <LibraryBig className="h-6 w-6 text-muted-foreground" />
-                        )}
+                        <SetSymbol
+                          symbolUrl={set.iconUrl}
+                          logoUrl={set.logoUrl}
+                          setCode={set.code}
+                          setName={set.name}
+                          tcg={set.tcg}
+                          size="lg"
+                          className="max-h-10 max-w-10"
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <CardTitle className="line-clamp-2 text-base">

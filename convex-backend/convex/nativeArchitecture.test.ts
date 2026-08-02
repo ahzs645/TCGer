@@ -910,6 +910,29 @@ describe("convex native architecture", () => {
       });
     }
 
+    const setPreferencesResponse = await t.fetch("/users/me/preferences", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        focusedSetOrder: ["pokemon::sv3pt5", "magic::lea"],
+        setCompletionMode: "master"
+      })
+    });
+    expect(setPreferencesResponse.status).toBe(200);
+    expect(await setPreferencesResponse.json()).toMatchObject({
+      focusedSetOrder: ["pokemon::sv3pt5", "magic::lea"],
+      setCompletionMode: "master"
+    });
+
+    const duplicateFocusResponse = await t.fetch("/users/me/preferences", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        focusedSetOrder: ["pokemon::sv3pt5", "pokemon::sv3pt5"]
+      })
+    });
+    expect(duplicateFocusResponse.status).toBe(400);
+
     const invalidDefaultResponse = await t.fetch("/users/me/preferences", {
       method: "PATCH",
       headers,

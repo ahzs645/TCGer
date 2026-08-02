@@ -41,6 +41,7 @@ final class CardScannerViewModel: ObservableObject {
     @Published var captureNotes = "" {
         didSet { rebuildContext() }
     }
+    private(set) var scanScope: CardScanScope?
 
     let cameraController = CardScannerCameraController()
     private let coordinator: CardScannerCoordinator
@@ -82,6 +83,14 @@ final class CardScannerViewModel: ObservableObject {
         }
         rebuildContext()
         prepareCameraIfPossible()
+    }
+
+    func updateScope(_ scope: CardScanScope?) {
+        scanScope = scope
+        if let mode = scope?.scanMode {
+            selectedMode = mode
+        }
+        rebuildContext()
     }
 
     func prepareCameraIfPossible() {
@@ -175,7 +184,8 @@ final class CardScannerViewModel: ObservableObject {
             saveDebugCapture: saveDebugCapture,
             captureNotes: captureNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil
-                : captureNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+                : captureNotes.trimmingCharacters(in: .whitespacesAndNewlines),
+            setCode: scanScope?.setCode
         )
         lastAnalysisDate = .distantPast
     }

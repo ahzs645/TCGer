@@ -204,19 +204,23 @@ const useGameConfig = () => {
 * Smooth Transitions: Animated transitions when switching games
 9. Set Expansion Symbols
 
-Expansion symbols (the small set icons found on physical cards) are displayed uniformly across all three TCGs using the `SetSymbol` component.
+Expansion artwork is displayed consistently across supported games using the
+`SetSymbol` component and an icon → logo → set-code fallback chain.
 
 **Symbol sources by TCG:**
 * **Pokemon**: `setSymbolUrl` for the expansion icon (from pokemontcg.io or TCGdex) and `setLogoUrl` for the full set branding logo.
 * **MTG**: Scryfall SVG symbols (`https://svgs.scryfall.io/sets/{code}.svg`). Used for both the symbol and logo variants.
-* **Yu-Gi-Oh!**: No universal set symbol images exist. The component displays a styled letter label derived from the TCG set prefix (e.g., `LOB`, `MRD`, `DUEA`).
+* **Dragon Ball Fusion World**: API TCG set logos when supplied by the provider.
+* **Yu-Gi-Oh!, One Piece, and Lorcana**: Their configured providers do not
+  expose canonical expansion artwork, so the component displays a styled set
+  code such as `LOB`, `OP-01`, or `3`.
 
 **Fallback behavior:**
 * If no symbol image URL is available, or if the image fails to load, a colored letter-label box is shown instead.
 * The label shows the first 1-5 characters of the set code in uppercase.
-* Label colors are TCG-themed: red for Pokemon, amber for MTG, violet for Yu-Gi-Oh.
+* Label colors are TCG-themed for all supported games.
 
-**Component usage:** `<SetSymbol>` accepts `symbolUrl`, `logoUrl`, `setCode`, `setName`, `tcg`, `variant` (symbol or logo), and `size` (xs, sm, md, lg). It is integrated into card search previews, collection table rows, collection detail panels, and wishlist card items.
+**Component usage:** `<SetSymbol>` accepts `symbolUrl`, `logoUrl`, `setCode`, `setName`, `tcg`, `variant` (symbol or logo), and `size` (xs, sm, md, lg). It is integrated into the set browser and detail header, card search previews, collection table rows, collection detail panels, and wishlist card items.
 
 10. Advanced Features
 * Comparison Mode: Compare cards across different games

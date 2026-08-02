@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { TcgCode } from "@/types/card";
 
@@ -72,14 +72,36 @@ export function SetSymbol({
   size = "sm",
   className,
 }: SetSymbolProps) {
-  const imageUrl =
-    variant === "logo" ? (logoUrl ?? symbolUrl) : (symbolUrl ?? logoUrl);
+  const imageUrls = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (variant === "logo" ? [logoUrl, symbolUrl] : [symbolUrl, logoUrl]).filter(
+            (url): url is string => Boolean(url),
+          ),
+        ),
+      ),
+    [logoUrl, symbolUrl, variant],
+  );
+  const [imageIndex, setImageIndex] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const imageUrl = imageUrls[imageIndex];
+
+  useEffect(() => {
+    setImageIndex(0);
+    setImgFailed(false);
+    setImgLoaded(false);
+  }, [imageUrls]);
 
   const handleError = useCallback(() => {
+    if (imageIndex + 1 < imageUrls.length) {
+      setImageIndex((current) => current + 1);
+      setImgLoaded(false);
+      return;
+    }
     setImgFailed(true);
-  }, []);
+  }, [imageIndex, imageUrls.length]);
 
   const handleLoad = useCallback(() => {
     setImgLoaded(true);
@@ -118,6 +140,7 @@ export function SetSymbol({
           </span>
         )}
         <Image
+          key={imageUrl}
           src={imageUrl!}
           alt={title}
           width={sizeConfig.icon}

@@ -57,6 +57,14 @@ actor CardIndexMetadataStore {
         Set(cache.values.lazy.filter { $0.resolvedGame == game }.map(\.annIndex))
     }
 
+    func indices(for game: TCGGame, setCode: String?) -> Set<Int> {
+        guard let setCode else { return indices(for: game) }
+        return Set(cache.values.lazy.filter {
+            $0.resolvedGame == game &&
+                $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+        }.map(\.annIndex))
+    }
+
     private nonisolated static func makeDetails(from entry: CardIndexMetadataEntry) -> CardDetails {
         let identity = CardIdentity(
             id: entry.cardId,

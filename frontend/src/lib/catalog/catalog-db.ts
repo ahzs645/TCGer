@@ -13,6 +13,8 @@ export interface CatalogSet {
   serie?: string;
   releasedAt?: string;
   count?: number;
+  iconUrl?: string;
+  logoUrl?: string;
 }
 
 export interface CatalogCard {

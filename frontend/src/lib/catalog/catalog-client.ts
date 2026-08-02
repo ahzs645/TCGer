@@ -118,7 +118,9 @@ function isCatalogSet(value: unknown): value is CatalogSet {
     isString(value.name) &&
     isOptionalString(value.serie) &&
     isOptionalString(value.releasedAt) &&
-    isOptionalNumber(value.count)
+    isOptionalNumber(value.count) &&
+    isOptionalString(value.iconUrl) &&
+    isOptionalString(value.logoUrl)
   );
 }
 

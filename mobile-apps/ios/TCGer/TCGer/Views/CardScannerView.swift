@@ -3,10 +3,16 @@ import UIKit
 
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var selectedCardForBinder: Card?
     @State private var showingRecentDebugCaptures = false
+    let scope: CardScanScope?
+
+    init(scope: CardScanScope? = nil) {
+        self.scope = scope
+    }
 
     var body: some View {
         ZStack {
@@ -23,7 +29,10 @@ struct CardScannerView: View {
         }
         .onAppear {
             viewModel.updateEnvironment(environmentStore)
-            syncSelectedModeWithModules()
+            viewModel.updateScope(scope)
+            if scope == nil {
+                syncSelectedModeWithModules()
+            }
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
@@ -90,6 +99,37 @@ struct CardScannerView: View {
 
     @ViewBuilder
     private var topStatusOverlay: some View {
+        VStack(spacing: 10) {
+            if let scope {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.headline)
+                            .frame(width: 34, height: 34)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    .foregroundStyle(.white)
+
+                    Text("Scanning \(scope.setName)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+
+                    Spacer()
+                }
+            }
+
+            statusContent
+        }
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
         switch viewModel.state {
         case .unauthorized:
             VStack(spacing: 12) {
@@ -210,13 +250,15 @@ struct CardScannerView: View {
     private var bottomControls: some View {
         VStack(spacing: 16) {
             if hasEnabledScanModes {
-                Picker("Mode", selection: $viewModel.selectedMode) {
-                    ForEach(availableScanModes) { mode in
-                        Text(mode.displayName).tag(mode)
+                if scope == nil {
+                    Picker("Mode", selection: $viewModel.selectedMode) {
+                        ForEach(availableScanModes) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
 
                 if availableScanEngines.count > 1 {
                     Picker("Matcher", selection: $viewModel.selectedEngine) {

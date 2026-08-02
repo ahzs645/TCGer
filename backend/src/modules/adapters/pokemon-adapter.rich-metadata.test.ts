@@ -19,6 +19,12 @@ describe('PokemonAdapter rich TCGdex mapping', () => {
       stage: 'Basic',
       language: 'en',
       regulationMark: 'G',
+      set: {
+        id: 'sv01',
+        name: 'Scarlet & Violet',
+        symbol: 'https://assets.tcgdex.net/univ/sv/sv01/symbol',
+        logo: 'https://assets.tcgdex.net/en/sv/sv01/logo'
+      },
       variants: {
         normal: true,
         holo: true
@@ -49,5 +55,11 @@ describe('PokemonAdapter rich TCGdex mapping', () => {
     expect(mapped.language).toBe('en');
     expect(mapped.pokemonPrint?.finishes).toEqual(['normal', 'holo']);
     expect(mapped.baseExternalId).toBe(expectedIdentity.key);
+    expect(mapped.setSymbolUrl).toBe(
+      'https://assets.tcgdex.net/univ/sv/sv01/symbol.webp'
+    );
+    expect(mapped.setLogoUrl).toBe(
+      'https://assets.tcgdex.net/en/sv/sv01/logo.webp'
+    );
   });
 });

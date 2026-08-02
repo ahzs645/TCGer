@@ -126,6 +126,12 @@ extension APIService {
     struct SetsResponse: Decodable {
         let sets: [TcgSet]
         let total: Int
+        let failedProviders: [String]?
+    }
+
+    struct SetCatalogResult: Sendable {
+        let sets: [TcgSet]
+        let failedProviders: [String]
     }
 
     func getSets(
@@ -133,6 +139,14 @@ extension APIService {
         token: String,
         tcg: String? = nil
     ) async throws -> [TcgSet] {
+        try await getSetsWithStatus(config: config, token: token, tcg: tcg).sets
+    }
+
+    func getSetsWithStatus(
+        config: ServerConfiguration,
+        token: String,
+        tcg: String? = nil
+    ) async throws -> SetCatalogResult {
         if config.isOnDevice {
             if let tcg, let game = TCGGame(rawValue: tcg) {
                 if TCGGame.catalogGames.contains(game) {
@@ -141,7 +155,10 @@ extension APIService {
             } else {
                 await prepareLocalCatalog(for: .all)
             }
-            return LocalStore.shared.getSets(tcg: tcg)
+            return SetCatalogResult(
+                sets: LocalStore.shared.getSets(tcg: tcg),
+                failedProviders: []
+            )
         }
 
         let queryItems = tcg.map { [URLQueryItem(name: "tcg", value: $0)] } ?? []
@@ -163,7 +180,10 @@ extension APIService {
             throw APIError.decodingError
         }
 
-        return setsResponse.sets
+        return SetCatalogResult(
+            sets: setsResponse.sets,
+            failedProviders: setsResponse.failedProviders ?? []
+        )
     }
 
     func getSetCards(

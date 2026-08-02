@@ -79,6 +79,24 @@ final class CardScannerCoordinator {
                     source: source,
                     apiService: apiService
                 ) {
+                    if let setCode = context.setCode {
+                        let scopedCandidates = ([result.primary] + result.alternatives).filter {
+                            $0.details.identity.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+                        }
+                        guard let primary = scopedCandidates.first else {
+                            sawCleanNoMatch = true
+                            continue
+                        }
+                        result = CardScanResult(
+                            mode: result.mode,
+                            capturedImage: result.capturedImage,
+                            primary: primary,
+                            alternatives: Array(scopedCandidates.dropFirst()),
+                            elapsed: result.elapsed,
+                            debugCapture: result.debugCapture,
+                            debugCaptureError: result.debugCaptureError
+                        )
+                    }
                     let elapsed = Date().timeIntervalSince(start)
                     result = CardScanResult(
                         mode: result.mode,

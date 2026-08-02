@@ -25,7 +25,8 @@ const product = {
     _id: 'dragon-ball-super-fusion-world-awakened-pulse',
     name: 'Awakened Pulse',
     code: 'FB01',
-    release_date: '2024-02-23T00:00:00.000Z'
+    release_date: '2024-02-23T00:00:00.000Z',
+    logo: 'https://images.example/awakened-pulse-logo.png'
   },
   code: 'FB01-001',
   cardNumber: '001',
@@ -87,7 +88,8 @@ describe('DragonBallAdapter APITCG contract', () => {
         setName: 'Awakened Pulse',
         rarity: 'L',
         collectorNumber: '001',
-        imageUrl: 'https://images.example/goku-large.jpg'
+        imageUrl: 'https://images.example/goku-large.jpg',
+        setLogoUrl: 'https://images.example/awakened-pulse-logo.png'
       })
     ]);
     expect(cards[0]?.attributes).toEqual(

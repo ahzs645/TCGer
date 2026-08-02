@@ -69,7 +69,9 @@ export async function getUserPreferences(userId: string) {
     enabledOnepiece: true,
     enabledLorcana: true,
     enabledDragonball: true,
-    defaultGame: true
+    defaultGame: true,
+    focusedSetOrder: true,
+    setCompletionMode: true
   } as const;
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -93,7 +95,9 @@ export async function updateUserPreferences(userId: string, input: UpdatePrefere
     enabledOnepiece: true,
     enabledLorcana: true,
     enabledDragonball: true,
-    defaultGame: true
+    defaultGame: true,
+    focusedSetOrder: true,
+    setCompletionMode: true
   } as const;
   const user = await prisma.user.update({
     where: { id: userId },

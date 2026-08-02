@@ -21,6 +21,9 @@ const CARD_BACK_IMAGES: Record<string, string> = {
   pokemon: "/card-backs/pokemon.png",
   magic: "/card-backs/magic.png",
   yugioh: "/card-backs/yugioh.png",
+  onepiece: "/card-backs/onepiece.jpg",
+  lorcana: "/card-backs/lorcana.png",
+  dragonball: "/card-backs/dragonball.jpg",
 };
 
 export const GENERIC_CARD_PLACEHOLDER = "/images/card-placeholder.jpg";

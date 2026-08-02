@@ -23,6 +23,8 @@ struct SetDetailView: View {
     @State private var isBulkAdding = false
     @State private var wishlistTarget: WishlistBulkTarget?
     @State private var wishlistStatus: String?
+    @State private var showingSetScanner = false
+    @State private var collectionRevision = 0
 
     /// Which cards a wishlist bulk-add should send.
     private enum WishlistBulkTarget: String, Identifiable {
@@ -40,6 +42,29 @@ struct SetDetailView: View {
     }
 
     private let apiService = APIService()
+
+    private var scanScope: CardScanScope? {
+        guard let game = TCGGame(rawValue: set.tcg.lowercased()) else { return nil }
+        let scope = CardScanScope(game: game, setCode: set.code, setName: set.name)
+        return scope.scanMode == nil ? nil : scope
+    }
+
+    private var completionCards: [Card] {
+        cards.filter {
+            SetProgressCalculator.includes(
+                $0,
+                in: set,
+                mode: environmentStore.setCompletionMode
+            )
+        }
+    }
+
+    private var completionModeBinding: Binding<SetCompletionMode> {
+        Binding(
+            get: { environmentStore.setCompletionMode },
+            set: { environmentStore.updateSetCompletionMode($0) }
+        )
+    }
 
     private var displayedCards: [Card] {
         cards
@@ -103,6 +128,7 @@ struct SetDetailView: View {
                     // Set Info Header
                     VStack(spacing: 8) {
                         HStack {
+                            SetArtworkView(set: set, size: 44)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(set.code.uppercased())
                                     .font(.caption)
@@ -125,8 +151,8 @@ struct SetDetailView: View {
 
                     // Set Completion Progress
                     if ownershipLoaded && !cards.isEmpty {
-                        let ownedCount = cards.filter { ownedCardIds.contains($0.id) }.count
-                        let total = cards.count
+                        let ownedCount = completionCards.filter { ownedCardIds.contains($0.id) }.count
+                        let total = completionCards.count
                         let percent = total > 0 ? Int((Double(ownedCount) / Double(total)) * 100) : 0
 
                         VStack(spacing: 6) {
@@ -195,6 +221,8 @@ struct SetDetailView: View {
                                 .onTapGesture {
                                     if isSelecting {
                                         toggleSelection(card.id)
+                                    } else {
+                                        Task { await handleCardSelection(card) }
                                     }
                                 }
                                 .cardPreviewContextMenu(card: card, onSelect: {
@@ -216,6 +244,23 @@ struct SetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button {
+                    environmentStore.toggleFocus(on: set)
+                } label: {
+                    Image(systemName: "scope")
+                }
+                .foregroundStyle(
+                    environmentStore.isFocused(on: set)
+                        ? Color.accentColor
+                        : Color.secondary
+                )
+                .accessibilityLabel(
+                    environmentStore.isFocused(on: set)
+                        ? "Stop focusing on this set"
+                        : "Focus on this set"
+                )
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button(isSelecting ? "Done" : "Select") {
                     isSelecting.toggle()
                     if !isSelecting {
@@ -225,12 +270,28 @@ struct SetDetailView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    if scanScope != nil {
+                        Button {
+                            showingSetScanner = true
+                        } label: {
+                            Label("Scan cards from this set", systemImage: "viewfinder")
+                        }
+                    }
+
                     Button {
                         wishlistTarget = .wholeSet
                     } label: {
                         Label("Track this set in a wishlist", systemImage: "heart.text.square")
                     }
                     .disabled(cards.isEmpty || isBulkAdding)
+
+                    Divider()
+
+                    Picker("Completion goal", selection: completionModeBinding) {
+                        ForEach(SetCompletionMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -283,6 +344,19 @@ struct SetDetailView: View {
         .task {
             await loadCards()
             await loadOwnershipData()
+        }
+        .refreshable {
+            await loadCards()
+            await loadOwnershipData(useCache: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
+            collectionRevision += 1
+        }
+        .task(id: collectionRevision) {
+            guard collectionRevision > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            await loadOwnershipData(useCache: false)
         }
         .sheet(isPresented: $showingPrintSelection) {
             if let card = selectedCard {
@@ -343,6 +417,12 @@ struct SetDetailView: View {
                 Task { await addToWishlist(wishlist, target: target) }
             }
             .environmentObject(environmentStore)
+        }
+        .fullScreenCover(isPresented: $showingSetScanner) {
+            if let scanScope {
+                CardScannerView(scope: scanScope)
+                    .environmentObject(environmentStore)
+            }
         }
     }
 
@@ -505,14 +585,14 @@ struct SetDetailView: View {
     }
 
     @MainActor
-    private func loadOwnershipData() async {
+    private func loadOwnershipData(useCache: Bool = true) async {
         guard let token = environmentStore.authToken else { return }
 
         do {
             let collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
                 token: token,
-                useCache: true
+                useCache: useCache
             )
             self.collections = collections
             var ids = Set<String>()

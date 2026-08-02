@@ -63,7 +63,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             return nil
         }
 
-        let allowedIndices = await metadataStore.indices(for: context.mode.tcgGame)
+        let allowedIndices = await metadataStore.indices(
+            for: context.mode.tcgGame,
+            setCode: context.setCode
+        )
         guard !allowedIndices.isEmpty else {
             throw CardScannerError.ineligibleMode
         }

@@ -17,6 +17,7 @@ import {
   normalizePokemonEnergy,
   normalizePokemonName
 } from './pokemon-normalization';
+import { resolveTcgdexAssetUrl } from './tcgdex-assets';
 
 const POKEMON_TCG_IO_API_ROOT = 'https://api.pokemontcg.io/v2';
 const configuredPokemonApiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
@@ -487,6 +488,7 @@ export class PokemonAdapter implements TcgAdapter {
         id: string;
         name: string;
         releaseDate?: string;
+        printedTotal?: number;
         total?: number;
         images?: { symbol?: string; logo?: string };
       }> };
@@ -497,8 +499,9 @@ export class PokemonAdapter implements TcgAdapter {
         tcg: this.game,
         releaseDate: s.releaseDate,
         totalCards: s.total,
-        iconUrl: s.images?.symbol,
-        logoUrl: s.images?.logo
+        standardCards: s.printedTotal ?? s.total,
+        iconUrl: resolveTcgdexAssetUrl(s.images?.symbol),
+        logoUrl: resolveTcgdexAssetUrl(s.images?.logo)
       })).sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
     } catch (error) {
       console.error('PokemonAdapter.fetchSets error', error);
@@ -595,8 +598,8 @@ export class PokemonAdapter implements TcgAdapter {
       collectorNumber: card.localId ?? card.id,
       imageUrl,
       imageUrlSmall,
-      setSymbolUrl: card.set?.symbol,
-      setLogoUrl: card.set?.logo,
+      setSymbolUrl: resolveTcgdexAssetUrl(card.set?.symbol),
+      setLogoUrl: resolveTcgdexAssetUrl(card.set?.logo),
       regulationMark: card.regulationMark,
       language: card.language,
       supertype: card.category,

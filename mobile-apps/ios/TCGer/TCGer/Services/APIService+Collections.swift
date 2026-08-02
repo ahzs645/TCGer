@@ -600,6 +600,7 @@ extension APIService {
                 newTags: newTags,
                 card: card
             )
+            NotificationCenter.default.post(name: .collectionDidChange, object: nil)
             return
         }
 
@@ -677,6 +678,9 @@ extension APIService {
             }
             throw APIError.serverError(status: response.statusCode)
         }
+
+        try? CacheManager.shared.remove(forKey: CacheManager.CacheKey.collections)
+        NotificationCenter.default.post(name: .collectionDidChange, object: nil)
     }
 
     func updateCardInBinder(

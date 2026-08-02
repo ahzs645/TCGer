@@ -313,6 +313,17 @@ struct CardScannerContext: Sendable {
     let showPricing: Bool
     let saveDebugCapture: Bool
     let captureNotes: String?
+    let setCode: String?
+}
+
+struct CardScanScope: Hashable, Sendable {
+    let game: TCGGame
+    let setCode: String
+    let setName: String
+
+    var scanMode: ScanMode? {
+        ScanMode.allCases.first { $0.tcgGame == game }
+    }
 }
 
 enum ScanInvocationKind: Sendable {

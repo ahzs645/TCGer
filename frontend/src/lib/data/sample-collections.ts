@@ -45,7 +45,6 @@ export const SAMPLE_COLLECTIONS: SampleCollection[] = [
         imageUrl: "https://images.ygoprodeck.com/images/cards/46986414.jpg",
         imageUrlSmall:
           "https://images.ygoprodeck.com/images/cards_small/46986414.jpg",
-        setSymbolUrl: "https://ygoprodeck.com/pics/icons/sets/SDY-EN.png",
         attributes: {
           type: "Monster / Spellcaster",
           attribute: "DARK",
@@ -128,7 +127,6 @@ export const SAMPLE_COLLECTIONS: SampleCollection[] = [
         imageUrl: "https://images.ygoprodeck.com/images/cards/74677422.jpg",
         imageUrlSmall:
           "https://images.ygoprodeck.com/images/cards_small/74677422.jpg",
-        setSymbolUrl: "https://ygoprodeck.com/pics/icons/sets/SDK-EN.png",
         attributes: {
           type: "Monster / Dragon",
           attribute: "LIGHT",
@@ -178,7 +176,6 @@ export const SAMPLE_COLLECTIONS: SampleCollection[] = [
         imageUrl: "https://images.ygoprodeck.com/images/cards/14558127.jpg",
         imageUrlSmall:
           "https://images.ygoprodeck.com/images/cards_small/14558127.jpg",
-        setSymbolUrl: "https://ygoprodeck.com/pics/icons/sets/DUDE-EN.png",
         attributes: {
           type: "Monster / Zombie / Tuner",
           attribute: "FIRE",

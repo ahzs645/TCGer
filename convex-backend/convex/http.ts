@@ -882,6 +882,34 @@ http.route({
           `defaultGame must be one of: ${TCG_CODES.join(", ")}, or null`
         );
       }
+      if (Object.prototype.hasOwnProperty.call(body, "focusedSetOrder")) {
+        const order = body.focusedSetOrder;
+        if (
+          !Array.isArray(order) ||
+          order.length > 100 ||
+          order.some(
+            (value) => typeof value !== "string" || value.length < 1 || value.length > 200
+          ) ||
+          new Set(order).size !== order.length
+        ) {
+          return errorJson(
+            400,
+            "VALIDATION_ERROR",
+            "focusedSetOrder must contain up to 100 unique set identifiers"
+          );
+        }
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(body, "setCompletionMode") &&
+        body.setCompletionMode !== "standard" &&
+        body.setCompletionMode !== "master"
+      ) {
+        return errorJson(
+          400,
+          "VALIDATION_ERROR",
+          "setCompletionMode must be standard or master"
+        );
+      }
       const preferences = await ctx.runMutation(internal.bridge.updateViewerPreferences, {
         subject: identity.subject,
         showCardNumbers:
@@ -898,7 +926,14 @@ http.route({
         enabledDragonball:
           typeof body.enabledDragonball === "boolean" ? body.enabledDragonball : undefined,
         defaultGame:
-          body.defaultGame === null || isTcgCode(body.defaultGame) ? body.defaultGame : undefined
+          body.defaultGame === null || isTcgCode(body.defaultGame) ? body.defaultGame : undefined,
+        focusedSetOrder: Array.isArray(body.focusedSetOrder)
+          ? (body.focusedSetOrder as string[])
+          : undefined,
+        setCompletionMode:
+          body.setCompletionMode === "standard" || body.setCompletionMode === "master"
+            ? body.setCompletionMode
+            : undefined
       });
       return json(preferences);
     } catch (error) {

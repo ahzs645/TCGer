@@ -37,7 +37,9 @@ Each TCG adapter populates set symbol and logo URLs where available:
 
 - **Pokemon**: `setSymbolUrl` (expansion icon from pokemontcg.io / TCGdex) and `setLogoUrl` (set branding logo).
 - **MTG**: Scryfall SVG symbols (`https://svgs.scryfall.io/sets/{code}.svg`) used for both symbol and logo.
-- **Yu-Gi-Oh**: No standard set symbol images exist; the frontend displays a styled letter label derived from the TCG set prefix (e.g., `LOB`, `MRD`).
+- **Dragon Ball Fusion World**: provider set logos when API TCG supplies them.
+- **Yu-Gi-Oh!, One Piece, and Lorcana**: a TCG-colored set-code badge because
+  the configured providers do not expose canonical expansion artwork.
 
 The frontend `SetSymbol` component renders the image when available and falls back to a TCG-colored letter label when the image is missing or fails to load.
 

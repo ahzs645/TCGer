@@ -107,6 +107,8 @@ export function catalogCardToCard(
     rarity: card.rarity,
     collectorNumber: card.collectorNumber,
     releasedAt: set?.releasedAt,
+    setSymbolUrl: set?.iconUrl,
+    setLogoUrl: set?.logoUrl,
     supertype: card.type,
     ...(Object.keys(attributes).length > 0 ? { attributes } : {}),
     ...deriveCatalogImageUrls(tcg, card, set),
@@ -207,6 +209,8 @@ export async function getSets(tcg: CatalogTcgCode): Promise<TcgSet[]> {
     tcg,
     releaseDate: set.releasedAt,
     totalCards: set.count,
+    iconUrl: set.iconUrl,
+    logoUrl: set.logoUrl,
   }));
 }
 

@@ -191,6 +191,7 @@ export const tcgSetSchema = z.object({
   tcg: tcgCodeSchema,
   releaseDate: z.string().optional(),
   totalCards: z.number().optional(),
+  standardCards: z.number().optional(),
   iconUrl: z.string().optional(),
   logoUrl: z.string().optional()
 });

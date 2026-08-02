@@ -32,6 +32,8 @@ export default defineSchema({
     enabledLorcana: v.optional(v.boolean()),
     enabledDragonball: v.optional(v.boolean()),
     defaultGame: v.optional(tcgCode),
+    focusedSetOrder: v.optional(v.array(v.string())),
+    setCompletionMode: v.optional(v.union(v.literal("standard"), v.literal("master"))),
     createdAt: v.number(),
     updatedAt: v.number()
   })

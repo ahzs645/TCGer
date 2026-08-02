@@ -1,0 +1,3 @@
+ALTER TABLE "User"
+ADD COLUMN "focusedSetOrder" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "setCompletionMode" TEXT NOT NULL DEFAULT 'standard';
