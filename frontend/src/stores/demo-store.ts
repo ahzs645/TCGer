@@ -120,6 +120,8 @@ export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   enabledLorcana: false,
   enabledDragonball: false,
   defaultGame: null,
+  focusedSetOrder: [],
+  setCompletionMode: 'standard',
 };
 
 /* ------------------------------------------------------------------ */

@@ -79,9 +79,11 @@ See [`cloudflare/README.md`](../cloudflare/README.md) for initial bucket, custom
 domain, CORS, cache-rule, and credential setup.
 
 The TCGer Xcode target runs `scripts/ios-assets.sh check` before compiling.
-Debug builds emit a warning and continue when assets are absent, preserving
-clean-clone simulator development. Release builds hard-fail so an app cannot be
-shipped without valid catalogs, model/index resources, and rejection gate.
+Builds emit a warning and continue when generated assets are absent, preserving
+clean-clone development and Xcode Cloud archives; the app then uses its remote
+catalog and on-device scanner fallbacks. Set the `REQUIRE_IOS_ASSETS` build
+setting to `YES` for distributions that must bundle valid catalogs and scanner
+model/index resources.
 
 ## Web / PWA behavior
 
@@ -114,12 +116,11 @@ shipped without valid catalogs, model/index resources, and rejection gate.
 
 ## Known limitations
 
-- **Clean clones don't include generated packs/model/index files.** A fresh
-  checkout must run `bash scripts/ios-assets.sh build` before a complete Release
-  build is possible (Debug degrades gracefully: clients show catalogs as
-  unavailable and fall back to seeded demo behavior). Production clients can
-  download the same generated artifacts from R2 and fall back to bundled/seeded
-  data when neither the network nor an on-device cached pack is available.
+- **Clean clones don't include generated packs/model/index files.** Run
+  `bash scripts/ios-assets.sh build` before builds that set
+  `REQUIRE_IOS_ASSETS=YES`. Other builds warn and continue: production clients
+  can download catalog artifacts from R2 and fall back to bundled/seeded data
+  when neither the network nor an on-device cached pack is available.
 - Yu-Gi-Oh has one row per Konami card (representative printing), not one per
   print — see the format spec for the exact identity rules.
 - Card-image hosting is separate from catalog distribution and remains on the

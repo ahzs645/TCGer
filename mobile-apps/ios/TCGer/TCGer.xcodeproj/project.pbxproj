@@ -280,7 +280,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "ASSET_SCRIPT=\"${SRCROOT}/../../../scripts/ios-assets.sh\"\nif \"${ASSET_SCRIPT}\" check; then\n  exit 0\nfi\n\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  echo \"error: Required iOS catalogs/scanner assets are missing or invalid. Run: bash scripts/ios-assets.sh build\"\n  exit 1\nfi\n\necho \"warning: iOS catalogs/scanner assets are missing or invalid; Debug continues. Run: bash scripts/ios-assets.sh build\"\nexit 0\n";
+			shellScript = "ASSET_SCRIPT=\"${SRCROOT}/../../../scripts/ios-assets.sh\"\nif \"${ASSET_SCRIPT}\" check; then\n  exit 0\nfi\n\nif [ \"${REQUIRE_IOS_ASSETS:-NO}\" = \"YES\" ]; then\n  echo \"error: Required iOS catalogs/scanner assets are missing or invalid. Run: bash scripts/ios-assets.sh build\"\n  exit 1\nfi\n\necho \"warning: Optional iOS catalogs/scanner assets are missing or invalid; the app will use its remote and on-device fallbacks. Run: bash scripts/ios-assets.sh build, or set REQUIRE_IOS_ASSETS=YES to enforce bundled assets.\"\nexit 0\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
