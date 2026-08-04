@@ -11,7 +11,7 @@ struct DecodedRemoteImage {
 enum RemoteImageDecoder {
     static func decode(
         data: Data,
-        response: HTTPURLResponse,
+        response: URLResponse,
         url: URL
     ) async -> DecodedRemoteImage? {
         guard isSVG(data: data, response: response, url: url) else {
@@ -28,10 +28,10 @@ enum RemoteImageDecoder {
 
     nonisolated static func isSVG(
         data: Data,
-        response: HTTPURLResponse,
+        response: URLResponse,
         url: URL
     ) -> Bool {
-        if response.value(forHTTPHeaderField: "Content-Type")?
+        if (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")?
             .lowercased()
             .contains("image/svg+xml") == true {
             return true

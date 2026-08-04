@@ -398,14 +398,7 @@ private struct CardCell: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 if let rarity = card.rarity {
-                    Text(rarity)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.2))
-                        .foregroundColor(.accentColor)
-                        .cornerRadius(4)
+                    PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
                 }
 
                 Text(card.name)

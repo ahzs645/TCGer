@@ -106,6 +106,32 @@ private final class CachedImageLoader: ObservableObject {
             return
         }
 
+        if url.isFileURL {
+            do {
+                let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                let response = URLResponse(
+                    url: url,
+                    mimeType: url.pathExtension.lowercased() == "svg"
+                        ? "image/svg+xml"
+                        : "image/webp",
+                    expectedContentLength: data.count,
+                    textEncodingName: nil
+                )
+                guard let decoded = await RemoteImageDecoder.decode(
+                    data: data,
+                    response: response,
+                    url: url
+                ) else {
+                    throw URLError(.cannotDecodeContentData)
+                }
+                cache.store(decoded.image, data: decoded.cacheData, for: url)
+                phase = .success(Image(uiImage: decoded.image))
+            } catch {
+                phase = .failure(error)
+            }
+            return
+        }
+
         guard NetworkMonitor.shared.isConnected else {
             return
         }

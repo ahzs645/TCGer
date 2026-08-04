@@ -1,0 +1,110 @@
+{
+  "formatVersion": 1,
+  "source": "User-provided Pokémon TCG Vectors archive",
+  "sourceDirectory": "Rarities",
+  "sourceLicense": null,
+  "artworkCount": 9,
+  "assets": {
+    "amazing-rare": {
+      "labels": [
+        "Amazing Rare"
+      ],
+      "sourceFile": "Amazing Rare Holo.svg",
+      "vector": {
+        "file": "amazing-rare.836e292370c47b8f.svg",
+        "sha256": "836e292370c47b8f53f76f8f7005b30538307068dfbd86d0aa31ac0223205a0b",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/amazing-rare.836e292370c47b8f.svg"
+      }
+    },
+    "common": {
+      "labels": [
+        "Common"
+      ],
+      "sourceFile": "Common.svg",
+      "vector": {
+        "file": "common.2b7fcc0607f1c064.svg",
+        "sha256": "2b7fcc0607f1c0648b609eac530c58ae07ccf984b697dbf52db1ec7c258d80b0",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/common.2b7fcc0607f1c064.svg"
+      }
+    },
+    "uncommon": {
+      "labels": [
+        "Uncommon"
+      ],
+      "sourceFile": "Uncommon.svg",
+      "vector": {
+        "file": "uncommon.371e5b180b55f4cc.svg",
+        "sha256": "371e5b180b55f4cc84e8c8730d8a0e32ee1185883e016926c3caaab3dfcac60b",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/uncommon.371e5b180b55f4cc.svg"
+      }
+    },
+    "rare": {
+      "labels": [
+        "Rare"
+      ],
+      "sourceFile": "Rare.svg",
+      "vector": {
+        "file": "rare.8a6867507251dba0.svg",
+        "sha256": "8a6867507251dba037567789c58b244f452f7da77879e711d28ab2898af32e16",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare.8a6867507251dba0.svg"
+      }
+    },
+    "rare-holo": {
+      "labels": [
+        "Holo Rare",
+        "Rare Holo"
+      ],
+      "sourceFile": "Rare Holo.svg",
+      "vector": {
+        "file": "rare-holo.aab14d7ee57de99c.svg",
+        "sha256": "aab14d7ee57de99c6774c9c650e4a29df19f40d52d3004b972857435aa68efbb",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare-holo.aab14d7ee57de99c.svg"
+      }
+    },
+    "shiny-rare": {
+      "labels": [
+        "Shiny Rare",
+        "Shiny rare"
+      ],
+      "sourceFile": "Rare Shiny.svg",
+      "vector": {
+        "file": "shiny-rare.3c897980286fa765.svg",
+        "sha256": "3c897980286fa7658141a1c4aa8a5a2f31a9fbe3a78f9000eb4e28702424050c",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-rare.3c897980286fa765.svg"
+      }
+    },
+    "shiny-ultra-rare": {
+      "labels": [
+        "Shiny Ultra Rare"
+      ],
+      "sourceFile": "Ultra Rare Shiny.svg",
+      "vector": {
+        "file": "shiny-ultra-rare.ff4a91c850802de4.svg",
+        "sha256": "ff4a91c850802de437dd5ac08ffc9239d97fabe837da7a56bb7b45791ff4b9e0",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-ultra-rare.ff4a91c850802de4.svg"
+      }
+    },
+    "ultra-rare": {
+      "labels": [
+        "Ultra Rare"
+      ],
+      "sourceFile": "Ultra Rare.svg",
+      "vector": {
+        "file": "ultra-rare.7d1e866dc5030fa7.svg",
+        "sha256": "7d1e866dc5030fa71108685b097cccfdfc7c1a53a961620d1d721ff034abbcf4",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/ultra-rare.7d1e866dc5030fa7.svg"
+      }
+    },
+    "promo": {
+      "labels": [
+        "Promo"
+      ],
+      "sourceFile": "Promo.svg",
+      "vector": {
+        "file": "promo.bd2c7eb45121f553.svg",
+        "sha256": "bd2c7eb45121f553e18fc2c8bbf2216868bbedf614d15a219311e8d9bf4f2403",
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/promo.bd2c7eb45121f553.svg"
+      }
+    }
+  }
+}

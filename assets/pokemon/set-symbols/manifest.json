@@ -1,0 +1,1264 @@
+{
+  "formatVersion": 1,
+  "source": "User-provided Pokémon TCG Vectors archive",
+  "sourceLicense": null,
+  "setCount": 157,
+  "assets": {
+    "base2": {
+      "setName": "Jungle",
+      "sourceFile": "1b Jungle.svg",
+      "vector": {
+        "filename": "base2.89bacb80a2ace093.svg",
+        "sha256": "89bacb80a2ace0931f91068ba3d2235c85f70361ef452fc1b26f373d7501f48c"
+      }
+    },
+    "basep": {
+      "setName": "Wizards Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "basep.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "base3": {
+      "setName": "Fossil",
+      "sourceFile": "1c Fossil.svg",
+      "vector": {
+        "filename": "base3.b3c5281ec9a5b36c.svg",
+        "sha256": "b3c5281ec9a5b36c9fe331747727ac447f8480f14c9dc44533aeef89feab199a"
+      }
+    },
+    "base4": {
+      "setName": "Base Set 2",
+      "sourceFile": "1d Base Set 2.svg",
+      "vector": {
+        "filename": "base4.29ede0a44e243b84.svg",
+        "sha256": "29ede0a44e243b846d11df9e1f7f6d9695e8a29a89a4d23f3f738d6c97b1da03"
+      }
+    },
+    "base5": {
+      "setName": "Team Rocket",
+      "sourceFile": "1e Team Rocket.svg",
+      "vector": {
+        "filename": "base5.f4e789a333cce9d2.svg",
+        "sha256": "f4e789a333cce9d2df5c0342a5d038f4db4cbf9a7e1d0659276e231eb902cd49"
+      }
+    },
+    "gym1": {
+      "setName": "Gym Heroes",
+      "sourceFile": "1f Gym Heroes.svg",
+      "vector": {
+        "filename": "gym1.c4c08adef035aca1.svg",
+        "sha256": "c4c08adef035aca106d447748216689050dbb0ec37ef77d820b8ad329867966c"
+      }
+    },
+    "gym2": {
+      "setName": "Gym Challenge",
+      "sourceFile": "1g Gym Challenge.svg",
+      "vector": {
+        "filename": "gym2.66438d5ec4f55231.svg",
+        "sha256": "66438d5ec4f55231191e0fdbab90979598d25a4cba5463cde75404b5aebf9a28"
+      }
+    },
+    "neo1": {
+      "setName": "Neo Genesis",
+      "sourceFile": "2a Neo Genesis.svg",
+      "vector": {
+        "filename": "neo1.e80e547f919a3131.svg",
+        "sha256": "e80e547f919a3131d23cc81c145b0b0245bb7f517aa7d2541857b66d9ed331e4"
+      }
+    },
+    "neo2": {
+      "setName": "Neo Discovery",
+      "sourceFile": "2b Neo Discovery.svg",
+      "vector": {
+        "filename": "neo2.922d8f3fe9bf5072.svg",
+        "sha256": "922d8f3fe9bf507287ea9f64687e55fe609f7a8deb34cc911aa3ee980b1da871"
+      }
+    },
+    "si1": {
+      "setName": "Southern Islands",
+      "sourceFile": "2ßa Southern Islands.svg",
+      "vector": {
+        "filename": "si1.e3614138fdf9aad0.svg",
+        "sha256": "e3614138fdf9aad0e098fd3d0f38a1abff0860020c6802fc2d0f72fbb00d0bc9"
+      }
+    },
+    "neo3": {
+      "setName": "Neo Revelation",
+      "sourceFile": "2c Neo Revelation.svg",
+      "vector": {
+        "filename": "neo3.ec6d69e95878eb58.svg",
+        "sha256": "ec6d69e95878eb58ed83535bdc9486640d87b692d80f3adc2eea63e1f03453d8"
+      }
+    },
+    "neo4": {
+      "setName": "Neo Destiny",
+      "sourceFile": "2d Neo Destiny.svg",
+      "vector": {
+        "filename": "neo4.77d80d4d9262f46c.svg",
+        "sha256": "77d80d4d9262f46cd7a3b91d0f82d960127b059322716c0f7386aa8b402e39f1"
+      }
+    },
+    "lc": {
+      "setName": "Legendary Collection",
+      "sourceFile": "2e Legendary Collection.svg",
+      "vector": {
+        "filename": "lc.60cda76bb0bc146b.svg",
+        "sha256": "60cda76bb0bc146b21bfb8dce0121809e63fe898e5bea329dcb47b8be42dcf06"
+      }
+    },
+    "ecard1": {
+      "setName": "Expedition Base Set",
+      "sourceFile": "2f Expedition.svg",
+      "vector": {
+        "filename": "ecard1.beacc6f8cb48db0f.svg",
+        "sha256": "beacc6f8cb48db0f69c37fdb7bb6894affc21290d98ba1b9cfdfed54f92d11bb"
+      }
+    },
+    "bog": {
+      "setName": "Best of game",
+      "sourceFile": "2ßc Best of Game.svg",
+      "vector": {
+        "filename": "bog.1d665295927c5c53.svg",
+        "sha256": "1d665295927c5c53281c3c568d6d52c44afb3cfca64860fa0284562373dea46c"
+      }
+    },
+    "ecard2": {
+      "setName": "Aquapolis",
+      "sourceFile": "2g Aquapolis.svg",
+      "vector": {
+        "filename": "ecard2.aae0436e2e593f85.svg",
+        "sha256": "aae0436e2e593f8588456ff83cfb2a8f91e552f52756aed354495a88505180aa"
+      }
+    },
+    "ecard3": {
+      "setName": "Skyridge",
+      "sourceFile": "2h Skyridge.svg",
+      "vector": {
+        "filename": "ecard3.2d62fb008f19d868.svg",
+        "sha256": "2d62fb008f19d868c998eb24bdf8c231886be9762c128d54ceb6b82ca235f6cb"
+      }
+    },
+    "ex1": {
+      "setName": "Ruby & Sapphire",
+      "sourceFile": "3a ex Ruby and Sapphire.svg",
+      "vector": {
+        "filename": "ex1.fad8cd36c6a40bba.svg",
+        "sha256": "fad8cd36c6a40bba05c7e02ad6263093f5fdf19a8dc3d9dc25d8cdab7a4d832c"
+      }
+    },
+    "ex2": {
+      "setName": "Sandstorm",
+      "sourceFile": "3b ex Sandstorm.svg",
+      "vector": {
+        "filename": "ex2.1863daec89a7579a.svg",
+        "sha256": "1863daec89a7579a7aaeb5960854870e4dc99bae5ccbcd77d7b43a56a7f2794e"
+      }
+    },
+    "np": {
+      "setName": "Nintendo Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "np.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "ex3": {
+      "setName": "Dragon",
+      "sourceFile": "3c ex Dragon.svg",
+      "vector": {
+        "filename": "ex3.82451b54044f3298.svg",
+        "sha256": "82451b54044f3298d856d72ada68803c2eb46e53443d2f4e7729f6aedf7e8c3b"
+      }
+    },
+    "ex4": {
+      "setName": "Team Magma vs Team Aqua",
+      "sourceFile": "3d ex Team Magma vs Team Aqua.svg",
+      "vector": {
+        "filename": "ex4.108f3efc7ff86a9a.svg",
+        "sha256": "108f3efc7ff86a9a0ce45aa0233a96bb60be9fb4c117df3e2c9976c0b90e8efb"
+      }
+    },
+    "ex5": {
+      "setName": "Hidden Legends",
+      "sourceFile": "3e ex Hidden Legends.svg",
+      "vector": {
+        "filename": "ex5.2474fd298cf0af55.svg",
+        "sha256": "2474fd298cf0af55864d95fce20926c808c103ad9d3f79d0f30a906107712908"
+      }
+    },
+    "tk-ex-latia": {
+      "setName": "EX trainer Kit (Latias)",
+      "sourceFile": "Ta Latias.svg",
+      "vector": {
+        "filename": "tk-ex-latia.e160c628160c6958.svg",
+        "sha256": "e160c628160c6958bd2786f21aa6c5897138f2c9bf56c12cb2ce58bc5d450401"
+      }
+    },
+    "tk-ex-latio": {
+      "setName": "EX trainer Kit (Latios)",
+      "sourceFile": "Ta Latios.svg",
+      "vector": {
+        "filename": "tk-ex-latio.08d03c4e480d68dc.svg",
+        "sha256": "08d03c4e480d68dc96d57a633da442b8cb89a24e46d7d60d1151bc8c6a16ebf1"
+      }
+    },
+    "pop1": {
+      "setName": "POP Series 1",
+      "sourceFile": "Pb Pop 1.svg",
+      "vector": {
+        "filename": "pop1.50da150f0511ea9d.svg",
+        "sha256": "50da150f0511ea9d3b23645881d7cb76fe4cfffb5afa3611b0206512fe25fa31"
+      }
+    },
+    "ex6": {
+      "setName": "FireRed & LeafGreen",
+      "sourceFile": "3f ex FireRed and LeafGreen.svg",
+      "vector": {
+        "filename": "ex6.4b6a2661f343b5a3.svg",
+        "sha256": "4b6a2661f343b5a358fef3037b93d8c8bed33e7bae7be80153771620798c2c29"
+      }
+    },
+    "ex7": {
+      "setName": "Team Rocket Returns",
+      "sourceFile": "3g ex Team Rocket Returns.svg",
+      "vector": {
+        "filename": "ex7.c5866c5dc7b64da9.svg",
+        "sha256": "c5866c5dc7b64da9cca03709503496f819806f490b4cd2eccea4765ec85723f6"
+      }
+    },
+    "ex8": {
+      "setName": "Deoxys",
+      "sourceFile": "3h ex Deoxys.svg",
+      "vector": {
+        "filename": "ex8.4802e07416d1cc33.svg",
+        "sha256": "4802e07416d1cc337752dc9f97e6ec94cdf659e5f4ebe49325cbe15f88bb5e06"
+      }
+    },
+    "ex9": {
+      "setName": "Emerald",
+      "sourceFile": "3i ex Emerald.svg",
+      "vector": {
+        "filename": "ex9.ea946c65c9ca6e22.svg",
+        "sha256": "ea946c65c9ca6e22370fcb36762f33cfd2f30ce7a624426a5155f6bede54ce26"
+      }
+    },
+    "pop2": {
+      "setName": "POP Series 2",
+      "sourceFile": "Pc Pop 2.svg",
+      "vector": {
+        "filename": "pop2.f6b8352f8a695ba8.svg",
+        "sha256": "f6b8352f8a695ba82fccaf330d5713690469775a838e199d15619ffa78b2f552"
+      }
+    },
+    "ex10": {
+      "setName": "Unseen Forces",
+      "sourceFile": "3j ex Unseen Forces.svg",
+      "vector": {
+        "filename": "ex10.2e060745a96a7c77.svg",
+        "sha256": "2e060745a96a7c77d7fa84ff289019ac2e2a2b5b6fcd3947c0490ed45fde3dc8"
+      }
+    },
+    "exu": {
+      "setName": "Unseen Forces Unown Collection",
+      "sourceFile": "3j ex Unseen Forces.svg",
+      "vector": {
+        "filename": "exu.2e060745a96a7c77.svg",
+        "sha256": "2e060745a96a7c77d7fa84ff289019ac2e2a2b5b6fcd3947c0490ed45fde3dc8"
+      }
+    },
+    "ex11": {
+      "setName": "Delta Species",
+      "sourceFile": "3k ex Delta Species.svg",
+      "vector": {
+        "filename": "ex11.69ec6153f9bd8909.svg",
+        "sha256": "69ec6153f9bd8909e4cf522b0b053a95f92472eff5ee863035a6305fe0705f37"
+      }
+    },
+    "ex12": {
+      "setName": "Legend Maker",
+      "sourceFile": "3l ex Legend Maker.svg",
+      "vector": {
+        "filename": "ex12.04c1e1a19b3da1dd.svg",
+        "sha256": "04c1e1a19b3da1dde3b8d79750be6c31d26f4da68b1780623aacd31f06624a8c"
+      }
+    },
+    "tk-ex-m": {
+      "setName": "EX trainer Kit 2 (Minun)",
+      "sourceFile": "Tb Minun.svg",
+      "vector": {
+        "filename": "tk-ex-m.dd6d5c3c997e0cb8.svg",
+        "sha256": "dd6d5c3c997e0cb8d9b9ebe177b6fef65ffcdbdfea99dd5a3b077b20e10582d6"
+      }
+    },
+    "tk-ex-p": {
+      "setName": "EX trainer Kit 2 (Plusle)",
+      "sourceFile": "Tb Plusle.svg",
+      "vector": {
+        "filename": "tk-ex-p.59e84bded5bb3356.svg",
+        "sha256": "59e84bded5bb33560e6109956d74c48917e46a5e1556ac5b1bd80ff213ad1120"
+      }
+    },
+    "pop3": {
+      "setName": "POP Series 3",
+      "sourceFile": "Pd Pop 3.svg",
+      "vector": {
+        "filename": "pop3.6337ec18d71aca02.svg",
+        "sha256": "6337ec18d71aca029c180b814918a6e24af1c22d107d3c895d83382cf564ce73"
+      }
+    },
+    "ex13": {
+      "setName": "Holon Phantoms",
+      "sourceFile": "3m ex Holon Phantoms.svg",
+      "vector": {
+        "filename": "ex13.938e452da13ad730.svg",
+        "sha256": "938e452da13ad730766ae4d4c411ee437bd8f1f549539847ebfa757380244d1b"
+      }
+    },
+    "pop4": {
+      "setName": "POP Series 4",
+      "sourceFile": "Pe Pop 4.svg",
+      "vector": {
+        "filename": "pop4.cbbf30a9e29fe6b2.svg",
+        "sha256": "cbbf30a9e29fe6b2367e1f74488cc053b04a05af3bdfb4320a61e9e7d919c1cb"
+      }
+    },
+    "ex14": {
+      "setName": "Crystal Guardians",
+      "sourceFile": "3n ex Crystal Guardians.svg",
+      "vector": {
+        "filename": "ex14.b31068a5bd7e5040.svg",
+        "sha256": "b31068a5bd7e5040af107b6e3ec4aced21f6ec97ad68b5e68de3ab54dc5ba947"
+      }
+    },
+    "ex15": {
+      "setName": "Dragon Frontiers",
+      "sourceFile": "3o ex Dragon Frontiers.svg",
+      "vector": {
+        "filename": "ex15.d104977d93b023f8.svg",
+        "sha256": "d104977d93b023f8d92b4d7914e5c616fdda00725fb5088cb002ff3d886b2695"
+      }
+    },
+    "ex16": {
+      "setName": "Power Keepers",
+      "sourceFile": "3p ex Power Keepers.svg",
+      "vector": {
+        "filename": "ex16.00e9831ba4f9ec37.svg",
+        "sha256": "00e9831ba4f9ec373c37011f19ec2bad7807fd8c98851b17f6360ed7886d858f"
+      }
+    },
+    "pop5": {
+      "setName": "POP Series 5",
+      "sourceFile": "Pf Pop 5.svg",
+      "vector": {
+        "filename": "pop5.f703e42d0f5c1969.svg",
+        "sha256": "f703e42d0f5c1969c139b5b388a96737b587ebeeb1c34f43a26f746c95776180"
+      }
+    },
+    "dpp": {
+      "setName": "DP Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "dpp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "dp1": {
+      "setName": "Diamond & Pearl",
+      "sourceFile": "4a Diamond and Pearl.svg",
+      "vector": {
+        "filename": "dp1.1ff44950dd8f1be1.svg",
+        "sha256": "1ff44950dd8f1be141914ad78747302f7c11a6d939728ad389201e7513fc7b05"
+      }
+    },
+    "dp2": {
+      "setName": "Mysterious Treasures",
+      "sourceFile": "4b Mysterious Treasures.svg",
+      "vector": {
+        "filename": "dp2.476748d1eec7fd11.svg",
+        "sha256": "476748d1eec7fd117dd528849adf2e15ec9269ab0d92a66fe3c6b7ed555a458d"
+      }
+    },
+    "tk-dp-l": {
+      "setName": "DP trainer Kit (Lucario)",
+      "sourceFile": "Tc Lucario.svg",
+      "vector": {
+        "filename": "tk-dp-l.c510b97d09bcfe2e.svg",
+        "sha256": "c510b97d09bcfe2e98856277c14744fc6cb67f85f7c19a95bf86eecaa695dfd3"
+      }
+    },
+    "tk-dp-m": {
+      "setName": "DP trainer Kit (Manaphy)",
+      "sourceFile": "Tc Manaphy.svg",
+      "vector": {
+        "filename": "tk-dp-m.a6878cbc3b65eead.svg",
+        "sha256": "a6878cbc3b65eeadbb2090394b810e11ce778a4c5ff9e3d36012e2a710de9636"
+      }
+    },
+    "pop6": {
+      "setName": "POP Series 6",
+      "sourceFile": "Pg Pop 6.svg",
+      "vector": {
+        "filename": "pop6.2b2a005c9241bdb8.svg",
+        "sha256": "2b2a005c9241bdb8988400c66c4ba7eb1d1457a21b988892fff59889c9672097"
+      }
+    },
+    "dp3": {
+      "setName": "Secret Wonders",
+      "sourceFile": "4c Secret Wonders.svg",
+      "vector": {
+        "filename": "dp3.56eacc456f7b4c94.svg",
+        "sha256": "56eacc456f7b4c94a796d7a1746d3d7246ec50b805099086217da8fb6d6a6e55"
+      }
+    },
+    "dp4": {
+      "setName": "Great Encounters",
+      "sourceFile": "4d Great Encounters.svg",
+      "vector": {
+        "filename": "dp4.5a8cbf02be0d8f98.svg",
+        "sha256": "5a8cbf02be0d8f98b7589e0e7df57046f554415204cc29e9b431f5161eb642df"
+      }
+    },
+    "pop7": {
+      "setName": "POP Series 7",
+      "sourceFile": "Ph Pop 7.svg",
+      "vector": {
+        "filename": "pop7.95cb51a224e87e4c.svg",
+        "sha256": "95cb51a224e87e4c8e6dbeaef8a3bdc7ec4296a38785f28fa78ae0abe994b681"
+      }
+    },
+    "dp5": {
+      "setName": "Majestic Dawn",
+      "sourceFile": "4e Majestic Dawn.svg",
+      "vector": {
+        "filename": "dp5.4e4997a63af891e3.svg",
+        "sha256": "4e4997a63af891e3c4f7680f7ab7fd90b0ebe7cc581c97ef066605348dd04966"
+      }
+    },
+    "dp6": {
+      "setName": "Legends Awakened",
+      "sourceFile": "4f Legends Awakened.svg",
+      "vector": {
+        "filename": "dp6.38b7d61a24025ec5.svg",
+        "sha256": "38b7d61a24025ec5a425257fbe734e31a6aef9bf7fc1f2e1fc9a6b96cd5f36e2"
+      }
+    },
+    "pop8": {
+      "setName": "POP Series 8",
+      "sourceFile": "Pi Pop 8.svg",
+      "vector": {
+        "filename": "pop8.af6451f5f1988ace.svg",
+        "sha256": "af6451f5f1988ace1f1c74dfbd5eb2db2fdb045e64896c8f6190429d899064fc"
+      }
+    },
+    "dp7": {
+      "setName": "Stormfront",
+      "sourceFile": "4g Stormfront.svg",
+      "vector": {
+        "filename": "dp7.c0da72fd4c6807b3.svg",
+        "sha256": "c0da72fd4c6807b38583f1d3e34e58b8e916b7dcd6ac5751e6fb1623a729f556"
+      }
+    },
+    "pl1": {
+      "setName": "Platinum",
+      "sourceFile": "4h Platinum.svg",
+      "vector": {
+        "filename": "pl1.a93f7d8a0310a684.svg",
+        "sha256": "a93f7d8a0310a684db5c629dfa29c16020d42bf3bde4f4acc80c295b23e61132"
+      }
+    },
+    "pop9": {
+      "setName": "POP Series 9",
+      "sourceFile": "Pj Pop 9.svg",
+      "vector": {
+        "filename": "pop9.b213a963c73200a6.svg",
+        "sha256": "b213a963c73200a6ad2b0418ee6ccf230a0de33b77fdfa883c6e8046c998c570"
+      }
+    },
+    "pl2": {
+      "setName": "Rising Rivals",
+      "sourceFile": "4i Rising Rivals.svg",
+      "vector": {
+        "filename": "pl2.adbd6e7d595ef645.svg",
+        "sha256": "adbd6e7d595ef645fb4a8deb03c807acf0e903dc8bdf30866c1987143aef50b9"
+      }
+    },
+    "pl3": {
+      "setName": "Supreme Victors",
+      "sourceFile": "4j Supreme Victors.svg",
+      "vector": {
+        "filename": "pl3.c81f739d8b9ac327.svg",
+        "sha256": "c81f739d8b9ac3270cb7b6c2591367cf8acfb6ed4dcad399f37f461f2cc30b4f"
+      }
+    },
+    "pl4": {
+      "setName": "Arceus",
+      "sourceFile": "4k Arceus.svg",
+      "vector": {
+        "filename": "pl4.f2944360cc9b972c.svg",
+        "sha256": "f2944360cc9b972c78640fb1854e73759c038d8cf686cc21f7d6452e2e181af8"
+      }
+    },
+    "ru1": {
+      "setName": "Pokémon Rumble",
+      "sourceFile": "4ßa Rumble.svg",
+      "vector": {
+        "filename": "ru1.bf67fb9e05b98018.svg",
+        "sha256": "bf67fb9e05b98018bbcb9a12e2f26e3cdc77d722170b9349d3d353e2b4d51a3f"
+      }
+    },
+    "hgssp": {
+      "setName": "HGSS Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "hgssp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "tk-hs-r": {
+      "setName": "HS trainer Kit (Raichu)",
+      "sourceFile": "Td Raichu.svg",
+      "vector": {
+        "filename": "tk-hs-r.28cfef04c436a1c9.svg",
+        "sha256": "28cfef04c436a1c9d6c65e83d1ff37c2c77eb7864d882115aea2998660f4fbfc"
+      }
+    },
+    "tk-hs-g": {
+      "setName": "HS trainer Kit (Gyarados)",
+      "sourceFile": "Td Gyarados.svg",
+      "vector": {
+        "filename": "tk-hs-g.8526e02cdc403b0b.svg",
+        "sha256": "8526e02cdc403b0be9254c8952861ccd9bfcbd6eb43677ab99ceb03d6eefd824"
+      }
+    },
+    "hgss2": {
+      "setName": "Unleashed",
+      "sourceFile": "4m Unleashed.svg",
+      "vector": {
+        "filename": "hgss2.4069045307ac3a9c.svg",
+        "sha256": "4069045307ac3a9cad1b665f9473841470cb34655d35f0cb58c34cca45e65e5e"
+      }
+    },
+    "hgss3": {
+      "setName": "Undaunted",
+      "sourceFile": "4n Undaunted.svg",
+      "vector": {
+        "filename": "hgss3.610ff76ca86e7c62.svg",
+        "sha256": "610ff76ca86e7c62c4144d6d928f11bee5b684222b24e50dd68b14b875077f9e"
+      }
+    },
+    "hgss4": {
+      "setName": "Triumphant",
+      "sourceFile": "4o Triumphant.svg",
+      "vector": {
+        "filename": "hgss4.787b812e61b3c480.svg",
+        "sha256": "787b812e61b3c480ecd000594da38ece168a4b3d13c7a7b44a07d28c363da323"
+      }
+    },
+    "col1": {
+      "setName": "Call of Legends",
+      "sourceFile": "4p Call of Legends.svg",
+      "vector": {
+        "filename": "col1.d8c6f151d18fe47d.svg",
+        "sha256": "d8c6f151d18fe47dcae63cdb29e3eb0471658259ebf1f566a989e6ca1b402c7a"
+      }
+    },
+    "bw1": {
+      "setName": "Black & White",
+      "sourceFile": "5a Black and White.svg",
+      "vector": {
+        "filename": "bw1.188703ba5eefa5de.svg",
+        "sha256": "188703ba5eefa5deaa509d214ec1b07f4bedd439949174d13f3448c20e3f0f8b"
+      }
+    },
+    "bwp": {
+      "setName": "BW Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "bwp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "2011bw": {
+      "setName": "McDonald's Collection 2011",
+      "sourceFile": "Ma McDonalds 2011.svg",
+      "vector": {
+        "filename": "2011bw.90af672312ed813d.svg",
+        "sha256": "90af672312ed813d7b32b049255eb3c3814abb712301d043fef4c8782135a42a"
+      }
+    },
+    "bw2": {
+      "setName": "Emerging Powers",
+      "sourceFile": "5b Emerging Powers.svg",
+      "vector": {
+        "filename": "bw2.d09dd5a44a4e449e.svg",
+        "sha256": "d09dd5a44a4e449e674053bda61372e7dfa92154b7c00183bbf8be5f6ca83c46"
+      }
+    },
+    "tk-bw-z": {
+      "setName": "BW trainer Kit (Zoroark)",
+      "sourceFile": "Te Zoroark.svg",
+      "vector": {
+        "filename": "tk-bw-z.a15415acdf2a65e2.svg",
+        "sha256": "a15415acdf2a65e25dee724f24874f77e9b6a3dec4d806d4e5e8980bfe5f2efe"
+      }
+    },
+    "tk-bw-e": {
+      "setName": "BW trainer Kit (Excadrill)",
+      "sourceFile": "Te Excadrill.svg",
+      "vector": {
+        "filename": "tk-bw-e.55ab11afaa010956.svg",
+        "sha256": "55ab11afaa010956fadf0886e6fce44fe3579544cf94330b6032f7764fb07195"
+      }
+    },
+    "bw3": {
+      "setName": "Noble Victories",
+      "sourceFile": "5c Noble Victories.svg",
+      "vector": {
+        "filename": "bw3.b3065feaa0ed905c.svg",
+        "sha256": "b3065feaa0ed905caf82768cbba2121657b3622e7a0b70683ae2f1095baac456"
+      }
+    },
+    "bw4": {
+      "setName": "Next Destinies",
+      "sourceFile": "5d Next Destinies.svg",
+      "vector": {
+        "filename": "bw4.2b863e12c3f7a359.svg",
+        "sha256": "2b863e12c3f7a359a1c2c6bd5fa8efc9d1b18e016dc247626d0f2304f1be255a"
+      }
+    },
+    "bw5": {
+      "setName": "Dark Explorers",
+      "sourceFile": "5e Dark Explorers.svg",
+      "vector": {
+        "filename": "bw5.3efc144d14008d8e.svg",
+        "sha256": "3efc144d14008d8e7eb9363d599234ddabc6d259a57cd587f6002873f057f515"
+      }
+    },
+    "2012bw": {
+      "setName": "McDonald's Collection 2012",
+      "sourceFile": "Mb McDonalds 2012.svg",
+      "vector": {
+        "filename": "2012bw.eab3a1965f0e3c85.svg",
+        "sha256": "eab3a1965f0e3c852447423d205d0fdef671f2ee7fadfcb8536963a587964b41"
+      }
+    },
+    "bw6": {
+      "setName": "Dragons Exalted",
+      "sourceFile": "5f Dragons Exalted.svg",
+      "vector": {
+        "filename": "bw6.3959f7d64fe28477.svg",
+        "sha256": "3959f7d64fe28477b8b88dee121106f071b522eb9996707ad1f764f71381d22a"
+      }
+    },
+    "dv1": {
+      "setName": "Dragon Vault",
+      "sourceFile": "5ßa Dragon Vault.svg",
+      "vector": {
+        "filename": "dv1.0a74f9fffc12adc0.svg",
+        "sha256": "0a74f9fffc12adc01b7af73cfd309b6e829e4c2cf3e7a25ea9393ae0475e178c"
+      }
+    },
+    "bw7": {
+      "setName": "Boundaries Crossed",
+      "sourceFile": "5g Boundaries Crossed.svg",
+      "vector": {
+        "filename": "bw7.cb2b0dac0bcf9dff.svg",
+        "sha256": "cb2b0dac0bcf9dffce154c942752c57d44e43171ed4ce8874516d849f0d4f77a"
+      }
+    },
+    "bw8": {
+      "setName": "Plasma Storm",
+      "sourceFile": "5h Plasma Storm.svg",
+      "vector": {
+        "filename": "bw8.58d7d4c5dd796231.svg",
+        "sha256": "58d7d4c5dd7962313ceb79d66c4193e28c7414b5171f5684d4ae942a198d04be"
+      }
+    },
+    "bw9": {
+      "setName": "Plasma Freeze",
+      "sourceFile": "5i Plasma Frost.svg",
+      "vector": {
+        "filename": "bw9.bda94db538a700e7.svg",
+        "sha256": "bda94db538a700e76df0b60495cf33ca3e5e4b09cdfb3f111d8e8490f33d4566"
+      }
+    },
+    "bw10": {
+      "setName": "Plasma Blast",
+      "sourceFile": "5j Plasma Blast.svg",
+      "vector": {
+        "filename": "bw10.42b564034e8a2c83.svg",
+        "sha256": "42b564034e8a2c8310fb59fb612dd28e362308a4b2146c689501809dfb2946ea"
+      }
+    },
+    "xyp": {
+      "setName": "XY Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "xyp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "bw11": {
+      "setName": "Legendary Treasures",
+      "sourceFile": "5k Legendary Treasures.svg",
+      "vector": {
+        "filename": "bw11.4bca50ffae3c17f1.svg",
+        "sha256": "4bca50ffae3c17f1568e298ced23477bfdb2598a29cbf7206147d69772bb3ef1"
+      }
+    },
+    "xy0": {
+      "setName": "Kalos Starter Set",
+      "sourceFile": "6ßa Kalos Starter Set.svg",
+      "vector": {
+        "filename": "xy0.73f5a9a8b68b55d2.svg",
+        "sha256": "73f5a9a8b68b55d2ce74b1621a02b63cb7f3b00e9f412b4ced8fa53692f0314f"
+      }
+    },
+    "xy1": {
+      "setName": "XY",
+      "sourceFile": "6a XY.svg",
+      "vector": {
+        "filename": "xy1.574178ee509dfe11.svg",
+        "sha256": "574178ee509dfe1189b2ef3b464766a58d38046ab2434fb10908472bf5405063"
+      }
+    },
+    "tk-xy-sy": {
+      "setName": "XY trainer Kit (Sylveon)",
+      "sourceFile": "Tf Sylveon.svg",
+      "vector": {
+        "filename": "tk-xy-sy.b62e4d41fecca6ba.svg",
+        "sha256": "b62e4d41fecca6ba8ef722e9b7707d12471d052d08cd724eef8fe0741a6c36c1"
+      }
+    },
+    "tk-xy-n": {
+      "setName": "XY trainer Kit (Noivern)",
+      "sourceFile": "Tf Noivern.svg",
+      "vector": {
+        "filename": "tk-xy-n.a688d4ed45278aab.svg",
+        "sha256": "a688d4ed45278aaba75e0aad677d5ba5d20002866a2030405bd97f2b6152c534"
+      }
+    },
+    "xy2": {
+      "setName": "Flashfire",
+      "sourceFile": "6b Flashfire.svg",
+      "vector": {
+        "filename": "xy2.e8effb281e1b2a62.svg",
+        "sha256": "e8effb281e1b2a629f3f883070ace70a92deec60f568630fb2ed160485183e83"
+      }
+    },
+    "2014xy": {
+      "setName": "McDonald's Collection 2014",
+      "sourceFile": "Md McDonalds 2014.svg",
+      "vector": {
+        "filename": "2014xy.c065304cad800510.svg",
+        "sha256": "c065304cad800510cdd2cd423affde55aab2ae6323578d77006c26ce98ea2467"
+      }
+    },
+    "xy3": {
+      "setName": "Furious Fists",
+      "sourceFile": "6c Furious Fists.svg",
+      "vector": {
+        "filename": "xy3.320683424c7299c1.svg",
+        "sha256": "320683424c7299c1c83b74ba15b926841181698668fe3d6c826a3195e921290c"
+      }
+    },
+    "tk-xy-b": {
+      "setName": "XY trainer Kit (Bisharp)",
+      "sourceFile": "Tg Bisharp.svg",
+      "vector": {
+        "filename": "tk-xy-b.254423a3d4198415.svg",
+        "sha256": "254423a3d41984158171187c29f50d9e3016b67b540aba70963d84d020ab3e42"
+      }
+    },
+    "tk-xy-w": {
+      "setName": "XY trainer Kit (Wigglytuff)",
+      "sourceFile": "Tg Wigglytuff.svg",
+      "vector": {
+        "filename": "tk-xy-w.d2025584546ab866.svg",
+        "sha256": "d2025584546ab8668d4fe3d9f91727e98bfd5c440ce8ac7b5dc98924621d6920"
+      }
+    },
+    "xy4": {
+      "setName": "Phantom Forces",
+      "sourceFile": "6d Phantom Forces.svg",
+      "vector": {
+        "filename": "xy4.898e3137bb38ef1d.svg",
+        "sha256": "898e3137bb38ef1db1bfe6cf25ec42641701725c286426b7b95f7187123ea384"
+      }
+    },
+    "xy5": {
+      "setName": "Primal Clash",
+      "sourceFile": "6e Primal Clash.svg",
+      "vector": {
+        "filename": "xy5.1a6d6a6de3e099fc.svg",
+        "sha256": "1a6d6a6de3e099fc8201a63f04850dc5b69225d484c1f35bb65622caaa3c6025"
+      }
+    },
+    "dc1": {
+      "setName": "Double Crisis",
+      "sourceFile": "6ßb Double Crisis.svg",
+      "vector": {
+        "filename": "dc1.5bd3047274ed9976.svg",
+        "sha256": "5bd3047274ed99763f6bac9f42d7907560aaaa1595c1e583f45fd261fbe74538"
+      }
+    },
+    "tk-xy-latia": {
+      "setName": "XY trainer Kit (Latias)",
+      "sourceFile": "Th Latias.svg",
+      "vector": {
+        "filename": "tk-xy-latia.e5e66d29ae691a3f.svg",
+        "sha256": "e5e66d29ae691a3f9ee1d375a50f319e312aaee961be74a069e4fcd42641497a"
+      }
+    },
+    "tk-xy-latio": {
+      "setName": "XY trainer Kit (Latios)",
+      "sourceFile": "Th Latios.svg",
+      "vector": {
+        "filename": "tk-xy-latio.3fa92fd314b4faa9.svg",
+        "sha256": "3fa92fd314b4faa9f8f16cd40d18571a36f989f794aa4705d58861b79fbdfa63"
+      }
+    },
+    "xy6": {
+      "setName": "Roaring Skies",
+      "sourceFile": "6f Roaring Skies.svg",
+      "vector": {
+        "filename": "xy6.a3da591957844486.svg",
+        "sha256": "a3da591957844486498becd09706c5a1b16a9b5ed29727c0ab6bb0ce3a7b05dc"
+      }
+    },
+    "xy7": {
+      "setName": "Ancient Origins",
+      "sourceFile": "6g Ancient Origins.svg",
+      "vector": {
+        "filename": "xy7.ccf35c9f5de0bc04.svg",
+        "sha256": "ccf35c9f5de0bc0405d5a8e1470b59e8c5063d1cc2a7a73908b95312e7d36c26"
+      }
+    },
+    "xy8": {
+      "setName": "BREAKthrough",
+      "sourceFile": "6h BREAKthrough.svg",
+      "vector": {
+        "filename": "xy8.592284c1f77b59e7.svg",
+        "sha256": "592284c1f77b59e70728b3dc0c66b1a79e4eddc00d890b7af13bed9ab3ec628d"
+      }
+    },
+    "2015xy": {
+      "setName": "McDonald's Collection 2015",
+      "sourceFile": "Me McDonalds 2015.svg",
+      "vector": {
+        "filename": "2015xy.6ffa1a53fad6e394.svg",
+        "sha256": "6ffa1a53fad6e3946670c777420d29e1b19ba4f7ae1a7666402e85c91217e0fc"
+      }
+    },
+    "xy9": {
+      "setName": "BREAKpoint",
+      "sourceFile": "6i BREAKpoint.svg",
+      "vector": {
+        "filename": "xy9.f303fa5ce840206b.svg",
+        "sha256": "f303fa5ce840206b806410b6dfbafba64c3f6cb33aeda03922e87b4de5a5c1da"
+      }
+    },
+    "g1": {
+      "setName": "Generations",
+      "sourceFile": "6ßc Generations.svg",
+      "vector": {
+        "filename": "g1.121f527c1ab41c01.svg",
+        "sha256": "121f527c1ab41c018f96b45efdd60e53fee14c9e8a2c126fbfc9ccebf3d988ce"
+      }
+    },
+    "tk-xy-su": {
+      "setName": "XY trainer Kit (Suicune)",
+      "sourceFile": "Ti Suicune.svg",
+      "vector": {
+        "filename": "tk-xy-su.8a9eaaed611112fd.svg",
+        "sha256": "8a9eaaed611112fdf865d3421b0532509f1a03327b313c7e5b19f913e49738e9"
+      }
+    },
+    "tk-xy-p": {
+      "setName": "XY trainer Kit (Pikachu Libre)",
+      "sourceFile": "Tg Pikachu Libre.svg",
+      "vector": {
+        "filename": "tk-xy-p.0b3165037c4bdd95.svg",
+        "sha256": "0b3165037c4bdd95bd11888236f9dc53d0513998d020c6dfd7c1ba53d4c0579c"
+      }
+    },
+    "xy10": {
+      "setName": "Fates Collide",
+      "sourceFile": "6j Fates Collide.svg",
+      "vector": {
+        "filename": "xy10.14da95e59d24db9c.svg",
+        "sha256": "14da95e59d24db9c6f03d6005f5442596d97a735ad2bc971993c6233a5e2cdb5"
+      }
+    },
+    "xy11": {
+      "setName": "Steam Siege",
+      "sourceFile": "6k Steam Siege.svg",
+      "vector": {
+        "filename": "xy11.1f1390c1d402019b.svg",
+        "sha256": "1f1390c1d402019b03be070bd1c1cdc004bb90307a4fae1c4a851a7a435d0593"
+      }
+    },
+    "2016xy": {
+      "setName": "McDonald's Collection 2016",
+      "sourceFile": "Mf McDonalds 2016.svg",
+      "vector": {
+        "filename": "2016xy.0fe6035f9ec7b714.svg",
+        "sha256": "0fe6035f9ec7b71459649b91592e74e1fac86d192f7426190142eac3facfa8db"
+      }
+    },
+    "xy12": {
+      "setName": "Evolutions",
+      "sourceFile": "6l Evolutions.svg",
+      "vector": {
+        "filename": "xy12.a15c9c7dce1ab97f.svg",
+        "sha256": "a15c9c7dce1ab97ff70456f60be116cfc93fa86cd99a1a2ba97c41321102f957"
+      }
+    },
+    "smp": {
+      "setName": "SM Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "smp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "sm1": {
+      "setName": "Sun & Moon",
+      "sourceFile": "7a Sun and Moon.svg",
+      "vector": {
+        "filename": "sm1.c9372b1fc045482e.svg",
+        "sha256": "c9372b1fc045482e21905abf329699a94457d03383281b9f21e864bb125266d6"
+      }
+    },
+    "tk-sm-r": {
+      "setName": "SM trainer Kit (Alolan Raichu)",
+      "sourceFile": "Tj Alolan Raichu.svg",
+      "vector": {
+        "filename": "tk-sm-r.02a807f0273fd879.svg",
+        "sha256": "02a807f0273fd879529aa9847bd23956e47016e1f4617f6fe701b786803db1bd"
+      }
+    },
+    "tk-sm-l": {
+      "setName": "SM trainer Kit (Lycanroc)",
+      "sourceFile": "Tj Lycanroc.svg",
+      "vector": {
+        "filename": "tk-sm-l.744d25a2de160445.svg",
+        "sha256": "744d25a2de160445a8f7e982adf58696593b3b77c06085062879a615e07e763a"
+      }
+    },
+    "sm2": {
+      "setName": "Guardians Rising",
+      "sourceFile": "7b Guardians Rising.svg",
+      "vector": {
+        "filename": "sm2.d04b4119f3f85578.svg",
+        "sha256": "d04b4119f3f85578bacf9ec33777047202c8860c30cba9e3fee4b2d7488ebfc9"
+      }
+    },
+    "2017sm": {
+      "setName": "McDonald's Collection 2017",
+      "sourceFile": "Mg McDonalds 2017.svg",
+      "vector": {
+        "filename": "2017sm.494b801e45ccb7e8.svg",
+        "sha256": "494b801e45ccb7e8bc67414e6b26a2654a6eda1cca36c6a1865b0e6a2e931caa"
+      }
+    },
+    "sm3": {
+      "setName": "Burning Shadows",
+      "sourceFile": "7c Burning Shadows.svg",
+      "vector": {
+        "filename": "sm3.d50c45296d376e5a.svg",
+        "sha256": "d50c45296d376e5aeacb6db0387c2de3be8dfbb7b23c5dea9e3379f43629ca55"
+      }
+    },
+    "sm3.5": {
+      "setName": "Shining Legends",
+      "sourceFile": "7ßa Shining Legends.svg",
+      "vector": {
+        "filename": "sm3.5.a6df98d91cad8b3e.svg",
+        "sha256": "a6df98d91cad8b3e4c97e786d0ecf080fdf01154a97829d61a3145a24d93d55d"
+      }
+    },
+    "sm4": {
+      "setName": "Crimson Invasion",
+      "sourceFile": "7d Crimson Invasion.svg",
+      "vector": {
+        "filename": "sm4.1cb017c7c6a4f6ee.svg",
+        "sha256": "1cb017c7c6a4f6ee98280aaefe6522fa26bf61f2e535ff658eeea6d95f8969ed"
+      }
+    },
+    "sm5": {
+      "setName": "Ultra Prism",
+      "sourceFile": "7e Ultra Prism.svg",
+      "vector": {
+        "filename": "sm5.653b83da256679a7.svg",
+        "sha256": "653b83da256679a7c35b052abc1fc08f3da8430dad36018ec7116a694c0c2215"
+      }
+    },
+    "sm6": {
+      "setName": "Forbidden Light",
+      "sourceFile": "7f Forbidden Light.svg",
+      "vector": {
+        "filename": "sm6.1be377b6deee90c2.svg",
+        "sha256": "1be377b6deee90c285d7f21ab8c1386c7e411aa94255dc8a190be87dab7c7399"
+      }
+    },
+    "sm7": {
+      "setName": "Celestial Storm",
+      "sourceFile": "7g Celestial Storm.svg",
+      "vector": {
+        "filename": "sm7.71af1914370739d0.svg",
+        "sha256": "71af1914370739d0f174e90d409a90435149e512ffee5665b7f3feb98197e486"
+      }
+    },
+    "sm7.5": {
+      "setName": "Dragon Majesty",
+      "sourceFile": "7ßb Dragon Majesty.svg",
+      "vector": {
+        "filename": "sm7.5.6797709c560cae4d.svg",
+        "sha256": "6797709c560cae4d2f2620223877f48443aca8fee3ee1de845b311dbd5c2359c"
+      }
+    },
+    "2018sm": {
+      "setName": "McDonald's Collection 2018",
+      "sourceFile": "Mh McDonalds 2018.svg",
+      "vector": {
+        "filename": "2018sm.362d44d015a83f2f.svg",
+        "sha256": "362d44d015a83f2f5e2f5fc397684288b932e2d8bb544ed884cac1c5152e0d5f"
+      }
+    },
+    "sm8": {
+      "setName": "Lost Thunder",
+      "sourceFile": "7h Lost Thunder.svg",
+      "vector": {
+        "filename": "sm8.9f5adadedf9ada31.svg",
+        "sha256": "9f5adadedf9ada31eca8e47f865ff1e61c9e164a05ea8a0553ede1814dfaec9d"
+      }
+    },
+    "sm9": {
+      "setName": "Team Up",
+      "sourceFile": "7i Team Up.svg",
+      "vector": {
+        "filename": "sm9.239534ca6a469d3b.svg",
+        "sha256": "239534ca6a469d3bccbc879924434547dc76bdc6e4528587c07aaaa9aeb558ef"
+      }
+    },
+    "det1": {
+      "setName": "Detective Pikachu",
+      "sourceFile": "7ßc Detective Pikachu.svg",
+      "vector": {
+        "filename": "det1.98b9aa69ae0bea82.svg",
+        "sha256": "98b9aa69ae0bea8227b9c151cbe603452c443cbfe253304c2bba025728ff261c"
+      }
+    },
+    "sm10": {
+      "setName": "Unbroken Bonds",
+      "sourceFile": "7j Unbroken Bonds.svg",
+      "vector": {
+        "filename": "sm10.34cd2ed610606a10.svg",
+        "sha256": "34cd2ed610606a10efa05c88d4417a44a9f2919529808f197f1b7d288c853992"
+      }
+    },
+    "sm11": {
+      "setName": "Unified Minds",
+      "sourceFile": "7k Unified Minds.svg",
+      "vector": {
+        "filename": "sm11.c6a833459bf42466.svg",
+        "sha256": "c6a833459bf424662a53d4f0787fbcbef576f9f8ac9e1cd8d5ce5d0869b6c06e"
+      }
+    },
+    "sma": {
+      "setName": "Hidden Fates Shiny Vault",
+      "sourceFile": "7ßd Hidden Fates.svg",
+      "vector": {
+        "filename": "sma.246f4f78cbb3b591.svg",
+        "sha256": "246f4f78cbb3b591bc7cf463c628b6a6cb563fe388da3e1c562e351a48a3256a"
+      }
+    },
+    "sm115": {
+      "setName": "Hidden Fates",
+      "sourceFile": "7ßd Hidden Fates.svg",
+      "vector": {
+        "filename": "sm115.246f4f78cbb3b591.svg",
+        "sha256": "246f4f78cbb3b591bc7cf463c628b6a6cb563fe388da3e1c562e351a48a3256a"
+      }
+    },
+    "2019sm": {
+      "setName": "McDonald's Collection 2019",
+      "sourceFile": "Mi McDonalds 2019.svg",
+      "vector": {
+        "filename": "2019sm.077fb891d0f6a8fc.svg",
+        "sha256": "077fb891d0f6a8fcf0b40c081a566942d953e0fdb928ad99d2592c8af3f73efa"
+      }
+    },
+    "sm12": {
+      "setName": "Cosmic Eclipse",
+      "sourceFile": "7l Cosmic Eclipse.svg",
+      "vector": {
+        "filename": "sm12.a428566cd5eb3d99.svg",
+        "sha256": "a428566cd5eb3d9973b9cec1e04a3517849980be9c16d60301fa4daed2734d04"
+      }
+    },
+    "swshp": {
+      "setName": "SWSH Black Star Promos",
+      "sourceFile": "Pa Blackstar Promos.svg",
+      "vector": {
+        "filename": "swshp.9917d68cf99f050a.svg",
+        "sha256": "9917d68cf99f050a421d7aaecda3761eef309371f3c753c270498cd084aef176"
+      }
+    },
+    "swsh1": {
+      "setName": "Sword & Shield",
+      "sourceFile": "8a Sword and Shield.svg",
+      "vector": {
+        "filename": "swsh1.9e8493051258b16a.svg",
+        "sha256": "9e8493051258b16ad664930fa680fc9586d170277ad2442cbf110421dd0b3ac7"
+      }
+    },
+    "swsh2": {
+      "setName": "Rebel Clash",
+      "sourceFile": "8b Rebel Clash.svg",
+      "vector": {
+        "filename": "swsh2.b11867a3d430d5d8.svg",
+        "sha256": "b11867a3d430d5d8fcd11299e720858910d73c5d254813474876cf2ae6d9bfaa"
+      }
+    },
+    "swsh3": {
+      "setName": "Darkness Ablaze",
+      "sourceFile": "8c Darkness Ablaze.svg",
+      "vector": {
+        "filename": "swsh3.0277d8d69c58e572.svg",
+        "sha256": "0277d8d69c58e572b431e919d7f1a058e9e458e3305911b72b7a61647dfd7546"
+      }
+    },
+    "fut2020": {
+      "setName": "Pokémon Futsal 2020",
+      "sourceFile": "Pk Futsal.svg",
+      "vector": {
+        "filename": "fut2020.25351c01af4de9b3.svg",
+        "sha256": "25351c01af4de9b333f2ca80710513480646f4e3aca9621a3e95b7c70212e6dd"
+      }
+    },
+    "swsh3.5": {
+      "setName": "Champion's Path",
+      "sourceFile": "8ßa Champion's Path.svg",
+      "vector": {
+        "filename": "swsh3.5.6a49d44a308cfa0b.svg",
+        "sha256": "6a49d44a308cfa0bc3535a540b1a60cf1305adb4e1a2dd862049a072ff3d8be3"
+      }
+    },
+    "swsh4": {
+      "setName": "Vivid Voltage",
+      "sourceFile": "8d Vivid Voltage.svg",
+      "vector": {
+        "filename": "swsh4.bf3a4d3d871b6ef1.svg",
+        "sha256": "bf3a4d3d871b6ef112acc04503f14e3ad2c6b1a04bf6f5ae10c9534b85c67423"
+      }
+    },
+    "2021swsh": {
+      "setName": "McDonald's Collection 2021",
+      "sourceFile": "Mj McDonalds 2021.svg",
+      "vector": {
+        "filename": "2021swsh.de80eb937c6d698f.svg",
+        "sha256": "de80eb937c6d698f31de8abbacb5b45c52ef3c62f3dbde7f12242f8c2fe33f07"
+      }
+    },
+    "swsh4.5sv": {
+      "setName": "Shining Fates Shiny Vault",
+      "sourceFile": "8ßb Shining Fates.svg",
+      "vector": {
+        "filename": "swsh4.5sv.3123752422cca000.svg",
+        "sha256": "3123752422cca000cc64f1b49403e838c1482d9494eec0c0bc976e22bd6aa924"
+      }
+    },
+    "swsh4.5": {
+      "setName": "Shining Fates",
+      "sourceFile": "8ßb Shining Fates.svg",
+      "vector": {
+        "filename": "swsh4.5.3123752422cca000.svg",
+        "sha256": "3123752422cca000cc64f1b49403e838c1482d9494eec0c0bc976e22bd6aa924"
+      }
+    },
+    "swsh5": {
+      "setName": "Battle Styles",
+      "sourceFile": "8e Battle Styles.svg",
+      "vector": {
+        "filename": "swsh5.09d7f90602254a4a.svg",
+        "sha256": "09d7f90602254a4aa426c81017b5b6bd03e87ca673762cd28dd327f38757f751"
+      }
+    },
+    "swsh6": {
+      "setName": "Chilling Reign",
+      "sourceFile": "8f Chilling Reign.svg",
+      "vector": {
+        "filename": "swsh6.43947113c80fd7b1.svg",
+        "sha256": "43947113c80fd7b111c89a3503e5d40279220b012c4eb097213d7223dfab46e0"
+      }
+    },
+    "swsh7": {
+      "setName": "Evolving Skies",
+      "sourceFile": "8g Evolving Skies.svg",
+      "vector": {
+        "filename": "swsh7.221dce62dbc174bf.svg",
+        "sha256": "221dce62dbc174bf5b2b9b2510a49284dab0912878203175e72d26c5aca7db67"
+      }
+    },
+    "cel25cc": {
+      "setName": "Celebrations Classic Collection",
+      "sourceFile": "8ßc Celebrations.svg",
+      "vector": {
+        "filename": "cel25cc.e2b4bed0584c98ee.svg",
+        "sha256": "e2b4bed0584c98eeb5c2b569598564bf9b5ba9355ed47cf3b7500cd8d1fa234b"
+      }
+    },
+    "cel25": {
+      "setName": "Celebrations",
+      "sourceFile": "8ßc Celebrations.svg",
+      "vector": {
+        "filename": "cel25.e2b4bed0584c98ee.svg",
+        "sha256": "e2b4bed0584c98eeb5c2b569598564bf9b5ba9355ed47cf3b7500cd8d1fa234b"
+      }
+    },
+    "swsh8": {
+      "setName": "Fusion Strike",
+      "sourceFile": "8h Fusion Strike.svg",
+      "vector": {
+        "filename": "swsh8.685fec51a9431566.svg",
+        "sha256": "685fec51a9431566a8c0ec89aff64c68d6d778b1b136d68ff78dc7c51d3bbc6b"
+      }
+    },
+    "swsh9": {
+      "setName": "Brilliant Stars",
+      "sourceFile": "8i Brilliant Stars.svg",
+      "vector": {
+        "filename": "swsh9.c08926744a1497c2.svg",
+        "sha256": "c08926744a1497c2779a8bc3e12a25203a1cb724ee46a14a91dd3e7022f11b82"
+      }
+    },
+    "swsh9.5tg": {
+      "setName": "Brilliant Stars Trainer Gallery",
+      "sourceFile": "8i Brilliant Stars.svg",
+      "vector": {
+        "filename": "swsh9.5tg.c08926744a1497c2.svg",
+        "sha256": "c08926744a1497c2779a8bc3e12a25203a1cb724ee46a14a91dd3e7022f11b82"
+      }
+    },
+    "swsh10.5tg": {
+      "setName": "Astral Radiance Trainer Gallery",
+      "sourceFile": "8j Astral Radiance.svg",
+      "vector": {
+        "filename": "swsh10.5tg.afd25c7f4758e373.svg",
+        "sha256": "afd25c7f4758e373a77e32dafca84c1600430d0e901aa5e46abd2a6780e1d128"
+      }
+    },
+    "swsh10": {
+      "setName": "Astral Radiance",
+      "sourceFile": "8j Astral Radiance.svg",
+      "vector": {
+        "filename": "swsh10.afd25c7f4758e373.svg",
+        "sha256": "afd25c7f4758e373a77e32dafca84c1600430d0e901aa5e46abd2a6780e1d128"
+      }
+    }
+  }
+}

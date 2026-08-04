@@ -1,13 +1,7 @@
 import { resolveTcgdexAssetUrl } from './tcgdex-assets';
+import { POKEMON_SET_VECTOR_ICON_URLS } from './pokemon-set-vector-icons.generated';
 
-/**
- * Approved vector set-symbol sources, keyed by the TCGdex set id.
- *
- * Keep this list intentionally explicit. Pokémon's public catalog providers
- * currently expose raster symbols, while third-party vector collections have
- * incomplete coverage or unclear/non-commercial redistribution terms.
- */
-export const POKEMON_SET_VECTOR_ICON_URLS: Readonly<Record<string, string>> = Object.freeze({});
+export { POKEMON_SET_VECTOR_ICON_URLS } from './pokemon-set-vector-icons.generated';
 
 export interface PokemonSetArtwork {
   iconUrl?: string;
@@ -26,8 +20,7 @@ export function resolvePokemonSetArtwork(
 
   return {
     iconUrl: vectorIconUrl ?? webpSymbolUrl,
-    iconFallbackUrl:
-      vectorIconUrl && webpSymbolUrl && vectorIconUrl !== webpSymbolUrl ? webpSymbolUrl : undefined,
+    iconFallbackUrl: vectorIconUrl && webpSymbolUrl !== vectorIconUrl ? webpSymbolUrl : undefined,
     logoUrl: resolveTcgdexAssetUrl(logo),
   };
 }
