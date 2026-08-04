@@ -708,6 +708,7 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     /// The numbered checklist total, excluding secret and alternate cards when known.
     let standardCards: Int?
     let iconUrl: String?
+    var iconFallbackUrl: String? = nil
     let logoUrl: String?
 
     var id: String { "\(tcg)-\(code)" }

@@ -24,6 +24,18 @@ interface SearchIndexEntry {
 interface SearchIndex {
   version: number;
   entries: SearchIndexEntry[];
+  entriesById: Map<string, Card>;
+  entriesByName: Map<string, Card[]>;
+}
+
+export interface CatalogCardLookup {
+  key: string;
+  externalId?: string;
+  name: string;
+  setCode?: string;
+  setName?: string;
+  collectorNumber?: string;
+  rarity?: string;
 }
 
 const searchIndexes = new Map<CatalogTcgCode, SearchIndex>();
@@ -34,6 +46,82 @@ export function normalizeCatalogText(value: string): string {
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase()
     .trim();
+}
+
+function normalizeCatalogIdentifier(value?: string): string {
+  return value ? normalizeCatalogText(value).replace(/[^a-z0-9]/g, "") : "";
+}
+
+function normalizeCollectorNumber(value?: string): string {
+  return normalizeCatalogIdentifier(value).replace(
+    /^([a-z]*?)0+(?=\d)/,
+    "$1",
+  );
+}
+
+function catalogMatchScore(
+  lookup: CatalogCardLookup,
+  candidate: Card,
+): number {
+  const lookupSetCode = normalizeCatalogIdentifier(lookup.setCode);
+  const candidateSetCode = normalizeCatalogIdentifier(candidate.setCode);
+  const lookupSetName = normalizeCatalogText(lookup.setName ?? "");
+  const candidateSetName = normalizeCatalogText(candidate.setName ?? "");
+  const lookupCollector = normalizeCollectorNumber(lookup.collectorNumber);
+  const candidateCollector = normalizeCollectorNumber(
+    candidate.collectorNumber,
+  );
+
+  let score = 0;
+  const setCodeMatches =
+    Boolean(lookupSetCode) && lookupSetCode === candidateSetCode;
+  const setNameMatches =
+    Boolean(lookupSetName) && lookupSetName === candidateSetName;
+  const collectorMatches =
+    Boolean(lookupCollector) && lookupCollector === candidateCollector;
+
+  if (setCodeMatches) score += 400;
+  if (setNameMatches) score += 300;
+  if (collectorMatches) score += 200;
+  if (setCodeMatches && collectorMatches) score += 600;
+  if (setNameMatches && collectorMatches) score += 500;
+  if (
+    lookup.rarity &&
+    normalizeCatalogText(lookup.rarity) ===
+      normalizeCatalogText(candidate.rarity ?? "")
+  ) {
+    score += 10;
+  }
+  return score;
+}
+
+/**
+ * Selects a catalog printing for a persisted card without ever accepting a
+ * partial-name match. Older demo records often only have a display set code,
+ * so exact name is the safe final fallback when printing metadata differs.
+ */
+export function selectBestCatalogCardMatch(
+  lookup: CatalogCardLookup,
+  candidates: Card[],
+): Card | undefined {
+  const normalizedName = normalizeCatalogText(lookup.name);
+  const exactNameCandidates = candidates.filter(
+    (candidate) => normalizeCatalogText(candidate.name) === normalizedName,
+  );
+  if (!exactNameCandidates.length) return undefined;
+
+  return [...exactNameCandidates].sort((left, right) => {
+    const scoreDifference =
+      catalogMatchScore(lookup, right) - catalogMatchScore(lookup, left);
+    if (scoreDifference) return scoreDifference;
+    return (
+      (left.setCode ?? "").localeCompare(right.setCode ?? "") ||
+      (left.collectorNumber ?? "").localeCompare(
+        right.collectorNumber ?? "",
+      ) ||
+      left.id.localeCompare(right.id)
+    );
+  })[0];
 }
 
 function encodePathSegment(value: string): string {
@@ -166,7 +254,21 @@ async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null
       left.card.id.localeCompare(right.card.id),
   );
 
-  const index = { version: installed.version, entries };
+  const entriesById = new Map<string, Card>();
+  const entriesByName = new Map<string, Card[]>();
+  for (const entry of entries) {
+    entriesById.set(entry.card.id, entry.card);
+    const named = entriesByName.get(entry.normalizedName) ?? [];
+    named.push(entry.card);
+    entriesByName.set(entry.normalizedName, named);
+  }
+
+  const index = {
+    version: installed.version,
+    entries,
+    entriesById,
+    entriesByName,
+  };
   searchIndexes.set(tcg, index);
   return index;
 }
@@ -206,6 +308,31 @@ export async function searchCatalog(
   return ranked.flat().slice(0, limit);
 }
 
+export async function matchCatalogCards(
+  tcg: CatalogTcgCode,
+  lookups: CatalogCardLookup[],
+): Promise<Map<string, Card>> {
+  const matches = new Map<string, Card>();
+  if (!lookups.length) return matches;
+
+  const index = await buildSearchIndex(tcg);
+  if (!index) return matches;
+
+  for (const lookup of lookups) {
+    const directMatch = lookup.externalId
+      ? index.entriesById.get(lookup.externalId)
+      : undefined;
+    const match =
+      directMatch ??
+      selectBestCatalogCardMatch(
+        lookup,
+        index.entriesByName.get(normalizeCatalogText(lookup.name)) ?? [],
+      );
+    if (match) matches.set(lookup.key, match);
+  }
+  return matches;
+}
+
 export async function getSets(tcg: CatalogTcgCode): Promise<TcgSet[]> {
   const installed = await getInstalledCatalog(tcg);
   if (!installed) return [];
@@ -216,6 +343,7 @@ export async function getSets(tcg: CatalogTcgCode): Promise<TcgSet[]> {
     releaseDate: set.releasedAt,
     totalCards: set.count,
     iconUrl: set.iconUrl,
+    iconFallbackUrl: set.iconFallbackUrl,
     logoUrl: set.logoUrl,
   }));
 }

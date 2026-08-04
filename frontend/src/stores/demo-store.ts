@@ -1,8 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
+import {
+  matchCatalogCards,
+  type CatalogCardLookup,
+} from "@/lib/catalog/catalog-search";
+import {
+  isCatalogGame,
+  type CatalogTcgCode,
+} from "@/lib/catalog/catalog-types";
 import type {
   AddWishlistCardInput,
+  Card,
   CardDataPayload,
   CollectionCardCopy,
   UpdateCardInput,
@@ -350,6 +359,67 @@ function seedWishlists(): DemoWishlist[] {
   ];
 }
 
+function isSyntheticDemoCardId(value: string): boolean {
+  return /^(?:ygo|mtg|pkm)-\d+$/i.test(value);
+}
+
+function splitSeedPrintingCode(value: string): {
+  setCode?: string;
+  collectorNumber?: string;
+} {
+  const separator = value.lastIndexOf("-");
+  if (separator <= 0 || separator === value.length - 1) {
+    return { setCode: value || undefined };
+  }
+  return {
+    setCode: value.slice(0, separator),
+    collectorNumber: value.slice(separator + 1),
+  };
+}
+
+function catalogLookupForCard(
+  key: string,
+  card: DemoBinderCard | DemoWishlistCard,
+): CatalogCardLookup {
+  const currentSeed = isSyntheticDemoCardId(card.cardId)
+    ? DEMO_CARDS.find((candidate) => candidate.id === card.cardId)
+    : undefined;
+  const seedPrinting = isSyntheticDemoCardId(card.cardId)
+    ? splitSeedPrintingCode(card.setCode)
+    : {};
+  return {
+    key,
+    externalId: card.cardData?.externalId,
+    name: card.cardData?.name ?? currentSeed?.name ?? card.name,
+    setCode: card.cardData?.setCode ?? seedPrinting.setCode ?? card.setCode,
+    setName: card.cardData?.setName ?? card.setName,
+    collectorNumber:
+      card.cardData?.collectorNumber ?? seedPrinting.collectorNumber,
+    rarity: card.cardData?.rarity ?? card.rarity,
+  };
+}
+
+function needsCatalogImage(
+  card: DemoBinderCard | DemoWishlistCard,
+): boolean {
+  return !card.cardData?.imageUrl && !card.cardData?.imageUrlSmall;
+}
+
+function catalogCardData(card: Card): CardDataPayload {
+  const { id, ...data } = card;
+  return { ...data, externalId: id };
+}
+
+function mergeCatalogCardData(
+  existing: CardDataPayload | AddWishlistCardInput | undefined,
+  card: Card,
+): CardDataPayload {
+  return {
+    ...existing,
+    ...catalogCardData(card),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Store interface                                                     */
 /* ------------------------------------------------------------------ */
@@ -364,6 +434,7 @@ interface DemoState {
   // Lifecycle
   init: () => void;
   resetDemo: () => void;
+  enrichCardsFromCatalog: (tcg?: CatalogTcgCode) => Promise<number>;
 
   // Profile
   updateProfile: (data: Partial<DemoProfile>) => void;
@@ -447,6 +518,89 @@ export const useDemoStore = create<DemoState>()(
           binders: seedBinders(),
           wishlists: seedWishlists(),
         });
+      },
+
+      enrichCardsFromCatalog: async (requestedTcg) => {
+        const snapshot = get();
+        const lookups = new Map<CatalogTcgCode, CatalogCardLookup[]>();
+        const addLookup = (
+          key: string,
+          card: DemoBinderCard | DemoWishlistCard,
+        ) => {
+          if (
+            !needsCatalogImage(card) ||
+            !isCatalogGame(card.tcg) ||
+            (requestedTcg && card.tcg !== requestedTcg)
+          ) {
+            return;
+          }
+          const gameLookups = lookups.get(card.tcg) ?? [];
+          gameLookups.push(catalogLookupForCard(key, card));
+          lookups.set(card.tcg, gameLookups);
+        };
+
+        for (const binder of snapshot.binders) {
+          for (const card of binder.cards) {
+            addLookup(`binder:${card.id}`, card);
+          }
+        }
+        for (const wishlist of snapshot.wishlists) {
+          for (const card of wishlist.cards) {
+            addLookup(`wishlist:${card.id}`, card);
+          }
+        }
+        if (!lookups.size) return 0;
+
+        const matches = new Map<string, Card>();
+        await Promise.all(
+          Array.from(lookups, async ([game, gameLookups]) => {
+            try {
+              const gameMatches = await matchCatalogCards(game, gameLookups);
+              for (const [key, card] of gameMatches) {
+                if (card.imageUrl || card.imageUrlSmall) {
+                  matches.set(key, card);
+                }
+              }
+            } catch {
+              // Demo collections remain usable when IndexedDB is unavailable.
+            }
+          }),
+        );
+        if (!matches.size) return 0;
+
+        set((state) => ({
+          binders: state.binders.map((binder) => ({
+            ...binder,
+            cards: binder.cards.map((card) => {
+              const match = matches.get(`binder:${card.id}`);
+              if (!match || !needsCatalogImage(card)) return card;
+              return {
+                ...card,
+                name: match.name,
+                setCode: match.setCode ?? card.setCode,
+                setName: match.setName ?? card.setName,
+                rarity: match.rarity ?? card.rarity,
+                cardData: mergeCatalogCardData(card.cardData, match),
+              };
+            }),
+          })),
+          wishlists: state.wishlists.map((wishlist) => ({
+            ...wishlist,
+            cards: wishlist.cards.map((card) => {
+              const match = matches.get(`wishlist:${card.id}`);
+              if (!match || !needsCatalogImage(card)) return card;
+              return {
+                ...card,
+                name: match.name,
+                setCode: match.setCode ?? card.setCode,
+                setName: match.setName ?? card.setName,
+                rarity: match.rarity ?? card.rarity,
+                cardData: mergeCatalogCardData(card.cardData, match),
+              };
+            }),
+          })),
+        }));
+        return matches.size;
       },
 
       updateProfile: (data) => {

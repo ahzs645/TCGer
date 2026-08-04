@@ -3,6 +3,32 @@ import XCTest
 
 @MainActor
 final class ScannerReplayRunnerTests: XCTestCase {
+    func testRecordingDirectoryPackagesAsNonEmptyZip() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scanner-export-test-\(UUID().uuidString)", isDirectory: true)
+        let frames = root.appendingPathComponent("frames", isDirectory: true)
+        try FileManager.default.createDirectory(at: frames, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try Data(#"{"summary":{"frameCount":1}}"#.utf8)
+            .write(to: root.appendingPathComponent("results.json"))
+        try Data([0xFF, 0xD8, 0xFF, 0xD9])
+            .write(to: frames.appendingPathComponent("frame-0001.jpg"))
+
+        let archiveURL = try ScannerDebugViewModel.packageDirectoryForExport(root)
+        defer {
+            try? FileManager.default.removeItem(at: archiveURL)
+        }
+        let archive = try Data(contentsOf: archiveURL)
+
+        XCTAssertEqual(Array(archive.prefix(4)), [0x50, 0x4B, 0x03, 0x04])
+        XCTAssertNotNil(archive.range(of: Data("results.json".utf8)))
+        XCTAssertNotNil(archive.range(of: Data("frame-0001.jpg".utf8)))
+        XCTAssertGreaterThan(archive.count, 100)
+    }
+
     func testLegacyRecordingDecodesWithoutNewLabelFields() throws {
         let data = Data(#"""
         {

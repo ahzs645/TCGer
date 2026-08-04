@@ -81,7 +81,7 @@ export const DEMO_CARDS: DemoCard[] = [
   { id: 'pkm-017', tcg: 'pokemon', name: 'Rayquaza VMAX', setCode: 'EVS-218', setName: 'Evolving Skies', rarity: 'Alt Art VMAX', price: 195.00 },
   { id: 'pkm-018', tcg: 'pokemon', name: 'Lugia VSTAR', setCode: 'SIT-139', setName: 'Silver Tempest', rarity: 'VSTAR', price: 22.00 },
   { id: 'pkm-019', tcg: 'pokemon', name: 'Giratina VSTAR', setCode: 'LOR-131', setName: 'Lost Origin', rarity: 'VSTAR', price: 16.50 },
-  { id: 'pkm-020', tcg: 'pokemon', name: 'Palkia VSTAR', setCode: 'ASR-040', setName: 'Astral Radiance', rarity: 'VSTAR', price: 9.75 }
+  { id: 'pkm-020', tcg: 'pokemon', name: 'Origin Forme Palkia VSTAR', setCode: 'ASR-040', setName: 'Astral Radiance', rarity: 'VSTAR', price: 9.75 }
 ];
 
 const GAME_LABELS: Record<DemoTcg, string> = {

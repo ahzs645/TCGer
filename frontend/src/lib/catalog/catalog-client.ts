@@ -120,6 +120,7 @@ function isCatalogSet(value: unknown): value is CatalogSet {
     isOptionalString(value.releasedAt) &&
     isOptionalNumber(value.count) &&
     isOptionalString(value.iconUrl) &&
+    isOptionalString(value.iconFallbackUrl) &&
     isOptionalString(value.logoUrl)
   );
 }

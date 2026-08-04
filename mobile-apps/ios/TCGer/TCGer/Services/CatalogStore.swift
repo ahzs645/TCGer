@@ -195,6 +195,7 @@ nonisolated struct CatalogSetEntry: Decodable, Hashable, Sendable {
     let count: Int
     let standardCount: Int?
     let iconUrl: String?
+    let iconFallbackUrl: String?
     let logoUrl: String?
 }
 

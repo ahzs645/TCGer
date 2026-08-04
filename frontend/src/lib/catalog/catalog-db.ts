@@ -14,6 +14,7 @@ export interface CatalogSet {
   releasedAt?: string;
   count?: number;
   iconUrl?: string;
+  iconFallbackUrl?: string;
   logoUrl?: string;
 }
 

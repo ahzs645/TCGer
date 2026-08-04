@@ -8,6 +8,8 @@ import type { TcgCode } from "@/types/card";
 interface SetSymbolProps {
   /** URL to the set expansion symbol image (small icon on cards) */
   symbolUrl?: string;
+  /** Raster symbol used if the primary vector symbol cannot be loaded */
+  symbolFallbackUrl?: string;
   /** URL to the set logo (larger branding image) */
   logoUrl?: string;
   /** Set code to derive fallback letters from (e.g., 'xy7', 'LOB', 'aer') */
@@ -64,6 +66,7 @@ function deriveLabel(setCode?: string, tcg?: TcgCode): string {
 
 export function SetSymbol({
   symbolUrl,
+  symbolFallbackUrl,
   logoUrl,
   setCode,
   setName,
@@ -76,12 +79,14 @@ export function SetSymbol({
     () =>
       Array.from(
         new Set(
-          (variant === "logo" ? [logoUrl, symbolUrl] : [symbolUrl, logoUrl]).filter(
-            (url): url is string => Boolean(url),
-          ),
+          (
+            variant === "logo"
+              ? [logoUrl, symbolUrl, symbolFallbackUrl]
+              : [symbolUrl, symbolFallbackUrl, logoUrl]
+          ).filter((url): url is string => Boolean(url)),
         ),
       ),
-    [logoUrl, symbolUrl, variant],
+    [logoUrl, symbolFallbackUrl, symbolUrl, variant],
   );
   const [imageIndex, setImageIndex] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);

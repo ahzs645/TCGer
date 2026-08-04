@@ -5,25 +5,21 @@ import SwiftUI
 struct SetArtworkView: View {
     let set: TcgSet
     var size: CGFloat = 32
-    @State private var iconFailed = false
+    @State private var artworkIndex = 0
 
-    private var iconURL: URL? {
-        self.set.iconUrl.flatMap(URL.init(string:))
-    }
-
-    private var logoURL: URL? {
-        self.set.logoUrl.flatMap(URL.init(string:))
+    private var artworkURLs: [URL] {
+        var seen = Set<URL>()
+        return [set.iconUrl, set.iconFallbackUrl, set.logoUrl]
+            .compactMap { $0.flatMap(URL.init(string:)) }
+            .filter { seen.insert($0).inserted }
     }
 
     private var artworkURL: URL? {
-        if !iconFailed, let iconURL {
-            return iconURL
-        }
-        return logoURL
+        artworkURLs.indices.contains(artworkIndex) ? artworkURLs[artworkIndex] : nil
     }
 
-    private var canTryLogo: Bool {
-        !iconFailed && iconURL != nil && logoURL != nil && iconURL != logoURL
+    private var canTryNextArtwork: Bool {
+        artworkIndex + 1 < artworkURLs.count
     }
 
     private var label: String {
@@ -51,8 +47,8 @@ struct SetArtworkView: View {
                     case .failure:
                         fallbackBadge
                             .onAppear {
-                                if canTryLogo {
-                                    iconFailed = true
+                                if canTryNextArtwork {
+                                    artworkIndex += 1
                                 }
                             }
                     @unknown default:
@@ -66,7 +62,7 @@ struct SetArtworkView: View {
         .frame(width: size, height: size)
         .accessibilityLabel(set.name)
         .onChange(of: set.id) {
-            iconFailed = false
+            artworkIndex = 0
         }
     }
 

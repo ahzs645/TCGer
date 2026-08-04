@@ -12,7 +12,7 @@ import {
   extractYugiohCollectorNumber,
   extractYugiohSetPrefix
 } from '../modules/adapters/yugioh-set-code';
-import { resolveTcgdexAssetUrl } from '../modules/adapters/tcgdex-assets';
+import { resolvePokemonSetArtwork } from '../modules/adapters/pokemon-set-artwork';
 
 type SupportedGame =
   | 'pokemon'
@@ -37,6 +37,7 @@ interface CatalogSet {
   count: number;
   standardCount?: number;
   iconUrl?: string;
+  iconFallbackUrl?: string;
   logoUrl?: string;
 }
 
@@ -400,6 +401,7 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
       if (!setCards.length) {
         continue;
       }
+      const artwork = resolvePokemonSetArtwork(detail.id, detail.symbol, detail.logo);
       sets.push({
         code: detail.id,
         name: detail.name,
@@ -407,8 +409,7 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         releasedAt: detail.releaseDate,
         count: detail.cardCount?.total ?? detail.cards?.length ?? setCards.length,
         standardCount: detail.cardCount?.official,
-        iconUrl: resolveTcgdexAssetUrl(detail.symbol),
-        logoUrl: resolveTcgdexAssetUrl(detail.logo)
+        ...artwork
       });
       cards.push(
         ...setCards.map((card) => ({

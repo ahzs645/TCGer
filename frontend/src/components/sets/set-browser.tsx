@@ -417,6 +417,7 @@ export function SetBrowser() {
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
                         <SetSymbol
                           symbolUrl={set.iconUrl}
+                          symbolFallbackUrl={set.iconFallbackUrl}
                           logoUrl={set.logoUrl}
                           setCode={set.code}
                           setName={set.name}

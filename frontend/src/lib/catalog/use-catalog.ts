@@ -12,6 +12,10 @@ import {
   removeCatalog,
 } from "./catalog-client";
 import { getInstalledCatalogs, type InstalledCatalogPack } from "./catalog-db";
+import { isDemoMode } from "@/lib/demo-mode";
+import { useAuthStore } from "@/stores/auth";
+import { useCollectionsStore } from "@/stores/collections";
+import { useDemoStore } from "@/stores/demo-store";
 import {
   CATALOG_GAMES,
   isCatalogGame,
@@ -86,6 +90,28 @@ function dispatchCatalogChanged(): void {
   }
 }
 
+function isDemoExperience(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    isDemoMode() ||
+    window.location.pathname === "/demo" ||
+    window.location.pathname.startsWith("/demo/")
+  );
+}
+
+async function enrichVisibleDemoCollections(
+  tcg: CatalogTcgCode,
+): Promise<void> {
+  if (!isDemoExperience()) return;
+  await useDemoStore.getState().enrichCardsFromCatalog(tcg);
+
+  const token = useAuthStore.getState().token;
+  const collections = useCollectionsStore.getState();
+  if (token && collections.hasFetched) {
+    await collections.fetchCollections(token);
+  }
+}
+
 export function requestCatalogPrompt(tcg: TcgCode): void {
   if (typeof window === "undefined" || !isCatalogGame(tcg)) return;
   window.dispatchEvent(
@@ -139,6 +165,7 @@ export function useCatalog() {
         await downloadCatalog(tcg, (value) => {
           setProgress((current) => ({ ...current, [tcg]: value }));
         });
+        await enrichVisibleDemoCollections(tcg);
         setProgress((current) => ({ ...current, [tcg]: undefined }));
         await refresh();
         dispatchCatalogChanged();

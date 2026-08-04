@@ -113,12 +113,14 @@ final class ScannerDebugViewModel: ObservableObject {
     private var lastAnalysis = Date.distantPast
     private var isAnalyzing = false
     private let isSimulator: Bool
+    var isCameraAvailable: Bool { !isSimulator }
 
     private let maxLogs = 200
 
     init() {
 #if targetEnvironment(simulator)
         isSimulator = true
+        statusMessage = "Live capture requires a physical device. Replay tools remain available."
 #else
         isSimulator = false
 #endif
@@ -222,16 +224,18 @@ final class ScannerDebugViewModel: ObservableObject {
     // MARK: - Recording
 
     func setRecording(_ on: Bool) {
-        isRecording = on
         if on {
             startNewRecordingSession()
+            isRecording = true
             log(.info, "Recording started — analyzed frames will be saved for export.")
         } else {
+            isRecording = false
             log(.info, "Recording paused (\(recordedFrames.count) frames kept).")
         }
     }
 
     func clearRecording() {
+        isRecording = false
         recordedFrames.removeAll()
         recordedFrameCount = 0
         if let dir = recordingSessionDir {
@@ -271,7 +275,11 @@ final class ScannerDebugViewModel: ObservableObject {
         mode: String,
         pipeline: String
     ) {
-        guard recordedFrames.count < maxRecordedFrames else { return }
+        guard recordedFrames.count < maxRecordedFrames else {
+            isRecording = false
+            log(.warn, "Recording stopped at the \(maxRecordedFrames)-frame safety limit.")
+            return
+        }
         guard let dir = ensureRecordingSessionDir() else { return }
 
         let index = recordedFrames.count + 1
@@ -365,13 +373,21 @@ final class ScannerDebugViewModel: ObservableObject {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let jsonData = try encoder.encode(bundle)
-        try jsonData.write(to: dir.appendingPathComponent("results.json"))
+        try jsonData.write(to: dir.appendingPathComponent("results.json"), options: .atomic)
 
-        return try ScannerDebugViewModel.zipDirectory(dir)
+        let archiveURL = try ScannerDebugViewModel.packageDirectoryForExport(dir)
+        let values = try archiveURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true, (values.fileSize ?? 0) > 0 else {
+            throw NSError(
+                domain: "ScannerDebug", code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "The recording archive was created, but it is empty."]
+            )
+        }
+        return archiveURL
     }
 
     /// Zip a directory into a single `.zip` using the OS file coordinator.
-    nonisolated private static func zipDirectory(_ directory: URL) throws -> URL {
+    nonisolated static func packageDirectoryForExport(_ directory: URL) throws -> URL {
         let coordinator = NSFileCoordinator()
         var coordinatorError: NSError?
         var result: Result<URL, Error>?
@@ -559,28 +575,50 @@ struct ScannerDebugView: View {
 
     @State private var exportURL: URL?
     @State private var showingExport = false
+    @State private var exportFilename = "TCGer Scanner Recording"
+    @State private var exportConfirmation: String?
     @State private var toolError: String?
     @State private var showingReplayImporter = false
     @State private var isReplaying = false
     @State private var replayReport: ScannerReplayReport?
 
     var body: some View {
-        VStack(spacing: 0) {
-            cameraPane
-            controls
-            Divider()
-            identificationPane
-            Divider()
-            logPane
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                cameraPane
+                primaryActions
+                configurationPane
+                recordingPane
+                identificationPane
+                if let replayReport {
+                    replayReportPane(replayReport)
+                }
+                logPane
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Scanner Debug")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { viewModel.configure(environment: environmentStore) }
         .onDisappear { viewModel.stop() }
-        .sheet(isPresented: $showingExport) {
-            if let url = exportURL {
-                ScanDebugShareSheet(url: url)
+        .fileExporter(
+            isPresented: $showingExport,
+            item: exportURL,
+            contentTypes: [.zip],
+            defaultFilename: exportFilename
+        ) { result in
+            switch result {
+            case .success(let url):
+                exportConfirmation = "Saved \(url.lastPathComponent)"
+                viewModel.log(.success, "exported \(url.lastPathComponent)")
+            case .failure(let error):
+                toolError = "Export failed: \(error.localizedDescription)"
             }
+            exportURL = nil
+        } onCancellation: {
+            exportURL = nil
         }
         .fileImporter(
             isPresented: $showingReplayImporter,
@@ -609,6 +647,15 @@ struct ScannerDebugView: View {
         ZStack {
             Color.black
             CardScannerCameraPreview(controller: viewModel.cameraController)
+            if !viewModel.isCameraAvailable {
+                VStack(spacing: 8) {
+                    Image(systemName: "iphone.and.arrow.forward")
+                        .font(.largeTitle)
+                    Text("Device camera required")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.white.opacity(0.55))
+            }
             GeometryReader { geo in
                 if let quad = viewModel.quad {
                     Path { path in
@@ -623,95 +670,169 @@ struct ScannerDebugView: View {
             }
             .allowsHitTesting(false)
 
-            VStack {
+            VStack(spacing: 0) {
                 HStack {
-                    Text(viewModel.isRunning ? "● LIVE" : "○ IDLE")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(viewModel.isRunning ? .green : .white.opacity(0.7))
+                    Label(
+                        viewModel.isRunning ? "Live" : "Idle",
+                        systemImage: viewModel.isRunning ? "dot.radiowaves.left.and.right" : "camera.fill"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(viewModel.isRunning ? .green : .white.opacity(0.75))
                     Spacer()
-                    Text("\(viewModel.frameCount) frames · \(Int(viewModel.lastFrameMs))ms")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.white.opacity(0.8))
+                    if viewModel.isRecording {
+                        Label("REC", systemImage: "record.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.red)
+                    }
                 }
-                .padding(8)
-                .background(Color.black.opacity(0.35))
+                .padding(12)
+
                 Spacer()
+
+                HStack(alignment: .bottom, spacing: 12) {
+                    Text(viewModel.statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(viewModel.frameCount) frames")
+                        Text("\(Int(viewModel.lastFrameMs)) ms")
+                    }
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.8))
+                }
+                .padding(12)
+                .background(.black.opacity(0.55))
             }
         }
-        .frame(height: 320)
+        .frame(height: viewModel.isCameraAvailable ? 300 : 230)
         .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Scanner camera preview")
+        .accessibilityValue(viewModel.statusMessage)
     }
 
-    private var controls: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Button {
-                    viewModel.isRunning ? viewModel.stop() : viewModel.start()
-                } label: {
-                    Label(
-                        viewModel.isRunning ? "Stop" : "Start",
-                        systemImage: viewModel.isRunning ? "stop.fill" : "play.fill"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(viewModel.isRunning ? .red : .green)
+    private var primaryActions: some View {
+        HStack(spacing: 12) {
+            Button {
+                viewModel.isRunning ? viewModel.stop() : viewModel.start()
+            } label: {
+                Label(
+                    scannerActionTitle,
+                    systemImage: viewModel.isCameraAvailable
+                        ? (viewModel.isRunning ? "stop.fill" : "play.fill")
+                        : "iphone"
+                )
+                .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(viewModel.isRunning ? .red : .green)
+            .controlSize(.large)
+            .disabled(!viewModel.isCameraAvailable)
 
+            Button {
+                viewModel.setRecording(!viewModel.isRecording)
+                exportConfirmation = nil
+            } label: {
+                Label(
+                    viewModel.isRecording ? "Pause" : "Record",
+                    systemImage: viewModel.isRecording ? "pause.fill" : "record.circle"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(viewModel.isRecording ? .red : .accentColor)
+            .controlSize(.large)
+            .disabled(!viewModel.isCameraAvailable)
+        }
+    }
+
+    private var scannerActionTitle: String {
+        guard viewModel.isCameraAvailable else { return "Device Only" }
+        return viewModel.isRunning ? "Stop Scanner" : "Start Scanner"
+    }
+
+    private var configurationPane: some View {
+        DebugPanel(title: "Scan Configuration", systemImage: "slider.horizontal.3") {
             Picker("Mode", selection: $viewModel.mode) {
                 ForEach(ScanMode.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
+            .disabled(viewModel.isRunning)
 
-            Toggle(isOn: $viewModel.embeddingOnly) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("On-device embedding only")
-                        .font(.subheadline)
-                    Text("DINOv2 + OCR, fully offline (no server). Off = full local-first pipeline.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            HStack {
-                Text("Throttle")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Slider(value: $viewModel.throttle, in: 0.2...2.0, step: 0.1)
-                Text(String(format: "%.1fs", viewModel.throttle))
-                    .font(.caption.monospacedDigit())
-                    .frame(width: 36, alignment: .trailing)
-            }
-
-            recordingControls
-
-            Text(viewModel.statusMessage)
+            Toggle("Offline embedding only", isOn: $viewModel.embeddingOnly)
+            .disabled(viewModel.isRunning)
+            Text("DINOv2 + OCR. Turn this off to exercise the full local-first pipeline.")
                 .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Analysis interval")
+                        .font(.subheadline)
+                    Spacer()
+                    Text(String(format: "%.1f seconds", viewModel.throttle))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $viewModel.throttle, in: 0.2...2.0, step: 0.1)
+            }
         }
-        .padding(12)
     }
 
-    private var recordingControls: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Button {
-                    viewModel.setRecording(!viewModel.isRecording)
-                } label: {
-                    Label(
-                        viewModel.isRecording ? "Recording" : "Record",
-                        systemImage: viewModel.isRecording ? "record.circle.fill" : "record.circle"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(viewModel.isRecording ? .red : .accentColor)
+    private var recordingPane: some View {
+        DebugPanel(title: "Recording & Replay", systemImage: "record.circle") {
+            HStack(spacing: 12) {
+                MetricTile(
+                    value: "\(viewModel.recordedFrameCount)",
+                    label: "Saved frames",
+                    tint: viewModel.recordedFrameCount == 0 ? .secondary : .blue
+                )
+                MetricTile(
+                    value: viewModel.isRecording
+                        ? "Active"
+                        : (viewModel.recordedFrameCount > 0 ? "Paused" : "Idle"),
+                    label: "Recorder",
+                    tint: viewModel.isRecording ? .red : .secondary
+                )
+            }
 
+            Text(viewModel.recordedFrameCount > 0
+                 ? "The archive includes every saved frame plus results.json for regression testing."
+                 : "Start recording, then run the scanner to capture analyzed frames and their results.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let exportConfirmation {
+                Label(exportConfirmation, systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 10) {
                 Button {
                     exportRecording()
                 } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    Label("Save Archive", systemImage: "square.and.arrow.down")
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.recordedFrameCount == 0)
+
+                Button {
+                    viewModel.clearRecording()
+                    exportConfirmation = nil
+                } label: {
+                    Label("Clear", systemImage: "trash")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -725,58 +846,27 @@ struct ScannerDebugView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else {
-                    Label("Import & Replay Recording", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Replay Extracted Recording", systemImage: "arrow.triangle.2.circlepath")
                         .frame(maxWidth: .infinity)
                 }
             }
             .buttonStyle(.bordered)
             .disabled(isReplaying || viewModel.isRunning)
 
-            if let replayReport {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(String(
-                        format: "%d/%d frames · %.0f%% top-1 · %.0f%% top-5",
-                        replayReport.processedFrames,
-                        replayReport.totalFrames,
-                        replayReport.accuracyRate * 100,
-                        replayReport.topFiveRecall * 100
-                    ))
-                    Text(String(
-                        format: "%d changed · %d false-positive · %d missed · %d strategy · %.0fms mean / %.0fms p95",
-                        replayReport.changedFrames,
-                        replayReport.falsePositiveRegressions,
-                        replayReport.missRegressions,
-                        replayReport.strategyChangedFrames,
-                        replayReport.meanLatencyMs,
-                        replayReport.p95LatencyMs
-                    ))
-                }
-                .font(.caption2.monospacedDigit())
-                .foregroundColor(replayReport.changedFrames == 0 ? .green : .orange)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            HStack {
-                Text(viewModel.recordedFrameCount > 0
-                    ? "\(viewModel.recordedFrameCount) frame\(viewModel.recordedFrameCount == 1 ? "" : "s") saved · images + results"
-                    : "Record to save each analyzed frame and its result for later re-analysis.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                Spacer()
-                if viewModel.recordedFrameCount > 0 {
-                    Button("Clear") { viewModel.clearRecording() }
-                        .font(.caption2)
-                }
-            }
+            Text("To replay a saved archive, unzip it in Files and select the extracted folder.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
     private func exportRecording() {
         do {
             exportURL = try viewModel.buildRecordingExport()
+            exportFilename = "TCGer-Scanner-\(Self.exportDateFormatter.string(from: Date()))"
+            exportConfirmation = nil
             showingExport = true
         } catch {
-            toolError = error.localizedDescription
+            toolError = "Export failed: \(error.localizedDescription)"
         }
     }
 
@@ -797,77 +887,129 @@ struct ScannerDebugView: View {
     }
 
     private var identificationPane: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Identification")
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.secondary)
+        DebugPanel(title: "Latest Identification", systemImage: "rectangle.and.text.magnifyingglass") {
             if let result = viewModel.latestResult {
                 let candidate = result.primary
-                HStack {
-                    Text(candidate.details.identity.name)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(candidate.details.identity.name)
+                            .font(.headline)
+                        Text(candidate.details.identity.setName ?? candidate.details.identity.setCode ?? "Unknown set")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
                     Text(String(format: "%.0f%%", candidate.confidence.score * 100))
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundColor(.green)
+                        .font(.title3.weight(.bold).monospacedDigit())
+                        .foregroundStyle(confidenceColor(candidate.confidence.score))
                 }
-                Text("\(candidate.originatingStrategy.displayName) · \(candidate.details.identity.setName ?? candidate.details.identity.setCode ?? "—")")
+
+                Label(candidate.originatingStrategy.displayName, systemImage: "point.3.connected.trianglepath.dotted")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
+
                 if !result.alternatives.isEmpty {
-                    Text("Alts: " + result.alternatives.prefix(3).map { $0.details.identity.name }.joined(separator: ", "))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    Divider()
+                    Text("Alternatives")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(Array(result.alternatives.prefix(3).enumerated()), id: \.offset) { _, alternative in
+                        HStack {
+                            Text(alternative.details.identity.name)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(String(format: "%.0f%%", alternative.confidence.score * 100))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.caption)
+                    }
                 }
             } else {
-                Text("No identification yet.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                ContentUnavailableView(
+                    "No Result Yet",
+                    systemImage: "rectangle.dashed",
+                    description: Text("Start the scanner and hold a card inside the camera frame.")
+                )
+                .frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+    }
+
+    private func replayReportPane(_ report: ScannerReplayReport) -> some View {
+        DebugPanel(title: "Replay Report", systemImage: "chart.bar.xaxis") {
+            HStack(spacing: 12) {
+                MetricTile(
+                    value: String(format: "%.0f%%", report.accuracyRate * 100),
+                    label: "Top 1",
+                    tint: report.changedFrames == 0 ? .green : .orange
+                )
+                MetricTile(
+                    value: String(format: "%.0f%%", report.topFiveRecall * 100),
+                    label: "Top 5",
+                    tint: .blue
+                )
+                MetricTile(
+                    value: "\(report.changedFrames)",
+                    label: "Changed",
+                    tint: report.changedFrames == 0 ? .green : .orange
+                )
+            }
+
+            Text(String(
+                format: "%d/%d processed · %d false-positive · %d missed · %d strategy changes · %.0f ms mean / %.0f ms p95",
+                report.processedFrames,
+                report.totalFrames,
+                report.falsePositiveRegressions,
+                report.missRegressions,
+                report.strategyChangedFrames,
+                report.meanLatencyMs,
+                report.p95LatencyMs
+            ))
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
     }
 
     private var logPane: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Log")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Button("Clear") { viewModel.clearLogs() }
+        DebugPanel(title: "Pipeline Log", systemImage: "text.alignleft") {
+            if viewModel.logs.isEmpty {
+                Text("Pipeline events will appear here once scanning starts.")
                     .font(.caption)
-            }
-            .padding(.horizontal, 12)
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(viewModel.logs) { entry in
-                            HStack(alignment: .top, spacing: 6) {
-                                Text(Self.timeFormatter.string(from: entry.time))
-                                    .foregroundColor(.secondary)
-                                Text(entry.message)
-                                    .foregroundColor(entry.level.color)
-                            }
-                            .font(.system(.caption2, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .id(entry.id)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(viewModel.logs.suffix(40).reversed())) { entry in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(entry.level.color)
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 5)
+                            Text(Self.timeFormatter.string(from: entry.time))
+                                .foregroundStyle(.secondary)
+                            Text(entry.message)
+                                .foregroundStyle(entry.level.color)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
                         }
-                    }
-                    .padding(.horizontal, 12)
-                }
-                .onChange(of: viewModel.logs.count) {
-                    if let last = viewModel.logs.last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                        .font(.system(.caption2, design: .monospaced))
                     }
                 }
             }
+
+            Button("Clear Log", systemImage: "trash") {
+                viewModel.clearLogs()
+            }
+            .font(.caption)
+            .disabled(viewModel.logs.isEmpty)
         }
-        .frame(maxHeight: .infinity)
-        .padding(.vertical, 8)
+    }
+
+    private func confidenceColor(_ score: Double) -> Color {
+        if score >= 0.85 { return .green }
+        if score >= 0.65 { return .orange }
+        return .red
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -875,18 +1017,69 @@ struct ScannerDebugView: View {
         f.dateFormat = "HH:mm:ss.SSS"
         return f
     }()
+
+    private static let exportDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return f
+    }()
 }
 
-// MARK: - Share sheet
+// MARK: - Debug UI components
 
-/// Presents a recorded-run `.zip` via the system share sheet so it can be saved
-/// to Files, AirDropped, or sent off-device for later re-analysis.
-private struct ScanDebugShareSheet: UIViewControllerRepresentable {
-    let url: URL
+private struct DebugPanel<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder let content: Content
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    init(
+        title: String,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.content = content()
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        }
+    }
+}
+
+private struct MetricTile: View {
+    let value: String
+    let label: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(tint.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
 }

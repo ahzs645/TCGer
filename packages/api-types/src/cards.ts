@@ -193,6 +193,7 @@ export const tcgSetSchema = z.object({
   totalCards: z.number().optional(),
   standardCards: z.number().optional(),
   iconUrl: z.string().optional(),
+  iconFallbackUrl: z.string().optional(),
   logoUrl: z.string().optional()
 });
 export type TcgSet = z.infer<typeof tcgSetSchema>;

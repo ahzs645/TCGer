@@ -107,11 +107,11 @@ function toCollectionCard(
     id: card.id,
     cardId: card.cardId,
     externalId: card.cardData?.externalId ?? card.cardId,
-    name: card.name,
+    name: card.cardData?.name ?? card.name,
     tcg: card.tcg,
-    setCode: card.setCode,
-    setName: card.setName,
-    rarity: card.rarity,
+    setCode: card.cardData?.setCode ?? card.setCode,
+    setName: card.cardData?.setName ?? card.setName,
+    rarity: card.cardData?.rarity ?? card.rarity,
     languageCode: card.cardData?.language,
     quantity: card.quantity,
     condition: card.condition,
@@ -139,12 +139,12 @@ function toWishlistCard(card: DemoWishlistCard) {
   return {
     ...card.cardData,
     id: card.id,
-    externalId: card.cardId,
+    externalId: card.cardData?.externalId ?? card.cardId,
     tcg: card.tcg,
-    name: card.name,
-    setCode: card.setCode,
-    setName: card.setName,
-    rarity: card.rarity,
+    name: card.cardData?.name ?? card.name,
+    setCode: card.cardData?.setCode ?? card.setCode,
+    setName: card.cardData?.setName ?? card.setName,
+    rarity: card.cardData?.rarity ?? card.rarity,
     owned: store().isCardInCollection(card.cardId),
     ownedQuantity: store().getOwnedQuantity(card.cardId),
     createdAt: card.addedAt,
@@ -456,13 +456,15 @@ function handleAuth(
 /*  Collections handlers                                                */
 /* ------------------------------------------------------------------ */
 
-function handleCollections(
+async function handleCollections(
   method: string,
   segments: string[],
   body?: unknown,
 ): Promise<Response> {
   // GET /collections
   if (segments.length === 0 && method === "GET") {
+    store().init();
+    await store().enrichCardsFromCatalog();
     return json(store().binders.map(toBinder));
   }
 
@@ -612,13 +614,15 @@ function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
 /*  Wishlists handlers                                                  */
 /* ------------------------------------------------------------------ */
 
-function handleWishlists(
+async function handleWishlists(
   method: string,
   segments: string[],
   body?: unknown,
 ): Promise<Response> {
   // GET /wishlists
   if (segments.length === 0 && method === "GET") {
+    store().init();
+    await store().enrichCardsFromCatalog();
     return json(store().wishlists.map(toWishlist));
   }
 
@@ -638,6 +642,7 @@ function handleWishlists(
 
   // GET /wishlists/:id
   if (segments.length === 1 && method === "GET") {
+    await store().enrichCardsFromCatalog();
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
     );

@@ -52,6 +52,7 @@ extension CatalogStore {
             totalCards: set.count,
             standardCards: set.standardCount,
             iconUrl: set.iconUrl,
+            iconFallbackUrl: set.iconFallbackUrl,
             logoUrl: set.logoUrl
         )
     }
