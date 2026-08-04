@@ -165,6 +165,11 @@ card in the Sinnoh video falls into one of three classes):
 
 Perspective rectification (2026-07-02, "what people do online" applied):
 
+- The benchmark harness now exposes `--rectify-mode none|rescue|always`;
+  `--rectify` remains an alias for `rescue`. See
+  `docs/manabox-inspired-geometry-experiment.md` for the decision, test matrix,
+  metrics, and promotion gates.
+
 - `backend/src/scripts/card-rectify.ts` — pure-TS quad refinement + homography
   warp: Sobel edge scan per side -> RANSAC line fit (median rejection is NOT
   enough; fingers create contiguous outlier blocks) with 30-degree orientation

@@ -7,6 +7,9 @@ struct SealedInventoryView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingCatalog = false
+    @State private var showingBarcodeScanner = false
+    @State private var scannedProduct: SealedProduct?
+    @State private var barcodeError: String?
 
     private let apiService = APIService()
 
@@ -76,7 +79,14 @@ struct SealedInventoryView: View {
             }
             .navigationTitle("Sealed Products")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        showingBarcodeScanner = true
+                    } label: {
+                        Image(systemName: "barcode.viewfinder")
+                    }
+                    .accessibilityLabel("Scan sealed product barcode")
+
                     Button {
                         showingCatalog = true
                     } label: {
@@ -93,6 +103,30 @@ struct SealedInventoryView: View {
                     }
                 })
                 .environmentObject(environmentStore)
+            }
+            .sheet(isPresented: $showingBarcodeScanner) {
+                SealedBarcodeScannerSheet { barcode in
+                    Task { await findProduct(barcode: barcode) }
+                }
+            }
+            .sheet(item: $scannedProduct) { product in
+                ScannedSealedProductSheet(product: product) { quantity, purchasePrice in
+                    Task {
+                        await addToInventory(
+                            productId: product.id,
+                            quantity: quantity,
+                            purchasePrice: purchasePrice
+                        )
+                    }
+                }
+            }
+            .alert("Barcode Scan", isPresented: Binding(
+                get: { barcodeError != nil },
+                set: { if !$0 { barcodeError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(barcodeError ?? "Unable to look up that barcode.")
             }
         }
     }
@@ -131,6 +165,24 @@ struct SealedInventoryView: View {
             HapticManager.notification(.success)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func findProduct(barcode: String) async {
+        let token = environmentStore.authToken ?? ""
+        if !environmentStore.serverConfiguration.isOnDevice, token.isEmpty {
+            barcodeError = "Sign in before looking up sealed products."
+            return
+        }
+        do {
+            scannedProduct = try await apiService.getSealedProduct(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                barcode: barcode
+            )
+        } catch {
+            barcodeError = error.localizedDescription
         }
     }
 

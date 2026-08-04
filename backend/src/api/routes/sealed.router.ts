@@ -20,6 +20,24 @@ sealedRouter.get('/products', asyncHandler(async (req, res) => {
   res.json(products);
 }));
 
+sealedRouter.get('/products/barcode/:barcode', asyncHandler(async (req, res) => {
+  const barcode = sealedService.normalizeSealedProductBarcode(req.params.barcode);
+  if (!barcode) {
+    return res.status(400).json({
+      error: 'BAD_REQUEST',
+      message: 'Barcode must contain 8 to 14 digits.'
+    });
+  }
+  const product = await sealedService.getSealedProductByBarcode(barcode);
+  if (!product) {
+    return res.status(404).json({
+      error: 'NOT_FOUND',
+      message: 'No sealed product matches this barcode.'
+    });
+  }
+  return res.json(product);
+}));
+
 // Pack opening simulation
 sealedRouter.post('/open-pack', asyncHandler(async (req, res) => {
   const { tcg, setCode } = req.body;

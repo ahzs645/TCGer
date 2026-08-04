@@ -67,6 +67,8 @@ type RejectionGate = {
   source: string;
 };
 
+type RectifyMode = 'none' | 'rescue' | 'always';
+
 type EmbeddingIndex = {
   model: string;
   dtype: string;
@@ -112,6 +114,23 @@ function parseArgs() {
   const video = args.get('video');
   if (!video) throw new Error('Missing --video /path/to/video.mp4');
 
+  const requestedRectifyMode = args.get('rectify-mode');
+  if (
+    requestedRectifyMode !== undefined &&
+    requestedRectifyMode !== 'none' &&
+    requestedRectifyMode !== 'rescue' &&
+    requestedRectifyMode !== 'always'
+  ) {
+    throw new Error(
+      `Invalid --rectify-mode ${requestedRectifyMode}; expected none, rescue, or always`,
+    );
+  }
+  const rectifyMode: RectifyMode = requestedRectifyMode
+    ? requestedRectifyMode
+    : args.has('rectify')
+      ? 'rescue'
+      : 'none';
+
   return {
     video,
     outDir: args.get('out-dir') ?? '/tmp/tcger-live-video-stream',
@@ -127,7 +146,7 @@ function parseArgs() {
     nativeBackend: args.has('native-backend'),
     startSeconds: Number(args.get('start-seconds') ?? '0'),
     endSeconds: args.has('end-seconds') ? Number(args.get('end-seconds')) : null,
-    rectify: args.has('rectify'),
+    rectifyMode,
     titleOcr: args.has('title-ocr'),
   };
 }
@@ -149,8 +168,11 @@ Options:
                         runs only — timings no longer approximate any browser backend
   --start-seconds <n>   start sampling at this video timestamp (default: 0)
   --end-seconds <n>     stop sampling at this video timestamp (default: video end)
-  --rectify             refine the card quad inside each box and warpPerspective the
-                        crop flat before embedding/OCR (falls back to the plain crop)
+  --rectify             alias for --rectify-mode rescue
+  --rectify-mode <mode> quad/perspective policy: none, rescue, or always.
+                        rescue only retries below-threshold plain crops and keeps the
+                        better result; always is an A/B benchmark mode, not a recommended
+                        production default (default: none)
   --title-ocr           embedding-independent fallback: when the cascade still fails
                         on a card-face crop, OCR the title band and match card names,
                         letting the embedding pick the print within the matched name`);
@@ -447,6 +469,24 @@ function matchEmbedding(query: Float32Array, index: EmbeddingIndex, topK = 5): C
   });
 }
 
+function evaluateEmbeddingQuery(
+  query: Float32Array,
+  index: EmbeddingIndex,
+  gate: RejectionGate | null,
+): {
+  candidates: Candidate[];
+  cardFaceScore: number | null;
+  gated: boolean;
+} {
+  const cardFaceScore = gate ? gateScore(gate, query) : null;
+  const gated = Boolean(gate && cardFaceScore !== null && cardFaceScore < gate.threshold);
+  return {
+    candidates: gated ? [] : matchEmbedding(query, index, 5),
+    cardFaceScore,
+    gated,
+  };
+}
+
 function chooseFrameBestMatch(proposalMatches: ProposalMatch[]): Candidate | null {
   const accepted = proposalMatches
     .flatMap((proposalMatch) => proposalMatch.candidates)
@@ -558,6 +598,8 @@ async function main() {
   let detectedBoxes = 0;
   let embeddedBoxes = 0;
   let gateRejectedBoxes = 0;
+  let rectifyAttempts = 0;
+  let rectifySuccesses = 0;
   let rectifiedBoxes = 0;
   let rectifyFallbacks = 0;
   let titleOcrHits = 0;
@@ -582,25 +624,27 @@ async function main() {
       try {
         const crop = await cropDetection(file, box);
         const query = await embed(crop.rgba, crop.width, crop.height);
-        if (gate) {
-          cardFaceScore = gateScore(gate, query);
-          if (cardFaceScore < gate.threshold) {
-            gateRejectedBoxes++;
-          } else {
-            candidates = matchEmbedding(query, index, 5);
-          }
-        } else {
-          candidates = matchEmbedding(query, index, 5);
-        }
+        const plainEvaluation = evaluateEmbeddingQuery(query, index, gate);
+        candidates = plainEvaluation.candidates;
+        cardFaceScore = plainEvaluation.cardFaceScore;
         embeddedBoxes++;
 
-        // Rescue cascade: blanket rectification measurably degrades crops
-        // that already match well, so warp only when the plain crop failed to
-        // clear the threshold — strictly additive for coverage.
-        const gated = cardFaceScore !== null && gate && cardFaceScore < gate.threshold;
+        // Geometry-policy experiment:
+        // - rescue: only retry a non-gated, below-threshold plain crop and keep
+        //   the better score. This is the production recommendation.
+        // - always: evaluate the rectified crop as the primary input even when
+        //   the plain crop is good. This intentionally recreates the blanket
+        //   policy for A/B measurement; prior results show it can lose cards.
+        let gated = plainEvaluation.gated;
         let bestQuery = query;
         let rectifiedImage: RgbaImage | null = null;
-        if (options.rectify && !gated && candidates[0]?.passedThreshold !== true) {
+        const shouldRectify =
+          options.rectifyMode === 'always' ||
+          (options.rectifyMode === 'rescue' &&
+            !plainEvaluation.gated &&
+            candidates[0]?.passedThreshold !== true);
+        if (shouldRectify) {
+          rectifyAttempts++;
           const padded = await cropDetection(file, box, 0.1);
           const rectified = rectifyCardCrop(
             { data: padded.rgba, width: padded.width, height: padded.height },
@@ -612,26 +656,36 @@ async function main() {
             },
           );
           if (rectified.method === 'quad') {
+            rectifySuccesses++;
             rectifiedImage = rectified.image;
             const rescueQuery = await embed(
               rectified.image.data,
               rectified.image.width,
               rectified.image.height,
             );
-            const rescueGateScore = gate ? gateScore(gate, rescueQuery) : null;
-            if (!gate || (rescueGateScore !== null && rescueGateScore >= gate.threshold)) {
-              const rescue = matchEmbedding(rescueQuery, index, 5);
-              if ((rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)) {
-                rectifiedBoxes++;
-                candidates = rescue;
-                bestQuery = rescueQuery;
-                if (rescueGateScore !== null) cardFaceScore = rescueGateScore;
-              }
+            const rectifiedEvaluation = evaluateEmbeddingQuery(rescueQuery, index, gate);
+            if (options.rectifyMode === 'always') {
+              rectifiedBoxes++;
+              candidates = rectifiedEvaluation.candidates;
+              bestQuery = rescueQuery;
+              cardFaceScore = rectifiedEvaluation.cardFaceScore;
+              gated = rectifiedEvaluation.gated;
+            } else if (
+              !rectifiedEvaluation.gated &&
+              (rectifiedEvaluation.candidates[0]?.confidence ?? 0) >
+                (candidates[0]?.confidence ?? 0)
+            ) {
+              rectifiedBoxes++;
+              candidates = rectifiedEvaluation.candidates;
+              bestQuery = rescueQuery;
+              cardFaceScore = rectifiedEvaluation.cardFaceScore;
+              gated = false;
             }
           } else {
             rectifyFallbacks++;
           }
         }
+        if (gated) gateRejectedBoxes++;
 
         // Title-band OCR fallback: the embedding-independent path for crops
         // the embedding cannot place (dark art + glare). Name comes from the
@@ -756,9 +810,17 @@ async function main() {
       ? { source: gate.source, threshold: gate.threshold, rejectedBoxes: gateRejectedBoxes }
       : null,
     fullResCrops: options.fullResCrops,
-    rectify: options.rectify
-      ? { rectifiedBoxes, fallbacks: rectifyFallbacks }
-      : null,
+    rectify:
+      options.rectifyMode !== 'none'
+        ? {
+            mode: options.rectifyMode,
+            attempts: rectifyAttempts,
+            successes: rectifySuccesses,
+            selected: rectifiedBoxes,
+            rectifiedBoxes,
+            fallbacks: rectifyFallbacks,
+          }
+        : null,
     titleOcr: options.titleOcr ? { hits: titleOcrHits } : null,
     elapsedMs,
     effectiveFps: frames.length / (elapsedMs / 1000),

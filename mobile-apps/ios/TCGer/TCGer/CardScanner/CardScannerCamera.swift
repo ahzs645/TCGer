@@ -4,16 +4,21 @@ import CoreMedia
 import SwiftUI
 
 final class CardScannerCameraController: NSObject, ObservableObject {
+    @Published private(set) var isTorchAvailable = false
+    @Published private(set) var isTorchEnabled = false
+
     let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "card.scanner.session.queue")
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let videoOutputQueue = DispatchQueue(label: "card.scanner.video.queue")
     private var isConfigured = false
+    private var videoDevice: AVCaptureDevice?
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
     var onPhotoCaptureError: ((Error) -> Void)?
     var onSampleBuffer: ((CMSampleBuffer) -> Void)?
+    var onPreviewFrameChange: ((CGRect) -> Void)?
 
     override init() {
         super.init()
@@ -46,6 +51,8 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         }
 
         session.addInput(deviceInput)
+        videoDevice = device
+        publishTorchState(available: device.hasTorch, enabled: device.torchMode == .on)
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
@@ -77,6 +84,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     func stopRunning() {
         sessionQueue.async { [weak self] in
             guard let self, self.session.isRunning else { return }
+            self.setTorchEnabledOnSessionQueue(false)
             self.session.stopRunning()
         }
     }
@@ -89,6 +97,71 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
     func canCapturePhoto() -> Bool {
         photoOutput.connection(with: .video) != nil
+    }
+
+    func previewFrameDidChange(_ frame: CGRect) {
+        onPreviewFrameChange?(frame)
+    }
+
+    func toggleTorch() {
+        setTorchEnabled(!isTorchEnabled)
+    }
+
+    func setTorchEnabled(_ enabled: Bool) {
+        sessionQueue.async { [weak self] in
+            self?.setTorchEnabledOnSessionQueue(enabled)
+        }
+    }
+
+    func focus(at devicePoint: CGPoint) {
+        sessionQueue.async { [weak self] in
+            guard let device = self?.videoDevice else { return }
+            do {
+                try device.lockForConfiguration()
+                defer { device.unlockForConfiguration() }
+
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = devicePoint
+                }
+                if device.isFocusModeSupported(.autoFocus) {
+                    device.focusMode = .autoFocus
+                }
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = devicePoint
+                }
+                if device.isExposureModeSupported(.continuousAutoExposure) {
+                    device.exposureMode = .continuousAutoExposure
+                }
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func setTorchEnabledOnSessionQueue(_ enabled: Bool) {
+        guard let device = videoDevice, device.hasTorch else {
+            publishTorchState(available: false, enabled: false)
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if enabled {
+                try device.setTorchModeOn(level: min(0.5, AVCaptureDevice.maxAvailableTorchLevel))
+            } else {
+                device.torchMode = .off
+            }
+            publishTorchState(available: true, enabled: enabled)
+        } catch {
+            publishTorchState(available: true, enabled: device.torchMode == .on)
+        }
+    }
+
+    private func publishTorchState(available: Bool, enabled: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isTorchAvailable = available
+            self?.isTorchEnabled = enabled
+        }
     }
 }
 
@@ -160,6 +233,7 @@ final class CameraPreviewController: UIViewController {
         super.viewDidLoad()
         view = previewView
         previewView.previewLayer.session = controller.session
+        previewView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(focusCamera(_:))))
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -168,8 +242,43 @@ final class CameraPreviewController: UIViewController {
         controller.startRunning()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        controller.previewFrameDidChange(view.convert(view.bounds, to: nil))
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         controller.stopRunning()
+    }
+
+    @objc private func focusCamera(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: previewView)
+        let devicePoint = previewView.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+        controller.focus(at: devicePoint)
+        showFocusIndicator(at: point)
+    }
+
+    private func showFocusIndicator(at point: CGPoint) {
+        let indicator = UIView(frame: CGRect(x: 0, y: 0, width: 64, height: 64))
+        indicator.center = point
+        indicator.layer.borderColor = UIColor.systemYellow.cgColor
+        indicator.layer.borderWidth = 2
+        indicator.layer.cornerRadius = 12
+        indicator.alpha = 0
+        indicator.isUserInteractionEnabled = false
+        previewView.addSubview(indicator)
+
+        UIView.animate(withDuration: 0.15, animations: {
+            indicator.alpha = 1
+            indicator.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
+        }) { _ in
+            UIView.animate(withDuration: 0.35, delay: 0.45, options: [.curveEaseOut]) {
+                indicator.alpha = 0
+                indicator.transform = .identity
+            } completion: { _ in
+                indicator.removeFromSuperview()
+            }
+        }
     }
 }

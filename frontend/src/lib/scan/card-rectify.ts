@@ -149,9 +149,19 @@ function fitLine(points: Point[], vertical: boolean): Line | null {
   const INLIER_DISTANCE = 4;
   let bestInliers: Point[] = [];
 
+  // A deterministic LCG keeps offline A/B runs and the browser implementation
+  // on the same RANSAC path. Math.random() made geometry-policy comparisons
+  // noisy even when every frame and model artifact was unchanged.
+  let randomState =
+    (Math.imul(points.length, 0x9e3779b1) ^ (vertical ? 0x51ed270b : 0x68bc21eb)) >>> 0;
+  const nextPointIndex = (): number => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return randomState % points.length;
+  };
+
   for (let iter = 0; iter < 300; iter++) {
-    const p = points[Math.floor(Math.random() * points.length)]!;
-    const q = points[Math.floor(Math.random() * points.length)]!;
+    const p = points[nextPointIndex()]!;
+    const q = points[nextPointIndex()]!;
     const dx = q.x - p.x;
     const dy = q.y - p.y;
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) continue;

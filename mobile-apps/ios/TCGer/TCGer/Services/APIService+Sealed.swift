@@ -46,6 +46,50 @@ extension APIService {
         return products
     }
 
+    func getSealedProduct(
+        config: ServerConfiguration,
+        token: String,
+        barcode: String
+    ) async throws -> SealedProduct {
+        let normalized = barcode.filter(\.isNumber)
+        guard (8...14).contains(normalized.count) else {
+            throw APIError.serverError(status: 400, message: "Barcode must contain 8 to 14 digits.")
+        }
+        if config.isOnDevice {
+            let equivalents = Set([
+                normalized,
+                normalized.count == 12 ? "0\(normalized)" : normalized,
+                normalized.count == 13 && normalized.hasPrefix("0")
+                    ? String(normalized.dropFirst())
+                    : normalized
+            ])
+            guard let product = LocalStore.shared.getSealedProducts().first(where: {
+                guard let upc = $0.upc else { return false }
+                return equivalents.contains(upc.filter(\.isNumber))
+            }) else {
+                throw APIError.serverError(status: 404, message: "No sealed product matches this barcode.")
+            }
+            return product
+        }
+
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/products/barcode/\(normalized)",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let product = try? JSONDecoder().decode(SealedProduct.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return product
+    }
+
     func getUserSealedInventory(
         config: ServerConfiguration,
         token: String

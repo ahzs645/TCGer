@@ -33,6 +33,10 @@ final class CardScannerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
+    @Published private(set) var sessionResults: [CardScanResult] = []
+    @Published private(set) var liveCandidateName: String?
+    @Published private(set) var liveConfirmationCount = 0
+    @Published private(set) var liveConfirmationRequired = 2
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -50,6 +54,9 @@ final class CardScannerViewModel: ObservableObject {
     private let isSimulator: Bool
     private var lastAnalysisDate: Date = .distantPast
     private let analysisInterval: TimeInterval = 1.0
+    private var previewFrame: CGRect?
+    private var guideFrame: CGRect?
+    private var liveConsensus = LiveScanConsensus()
 
     init(coordinator: CardScannerCoordinator? = nil) {
 #if targetEnvironment(simulator)
@@ -70,6 +77,15 @@ final class CardScannerViewModel: ObservableObject {
                 await self.handleSampleBuffer(sampleBuffer)
             }
         }
+        cameraController.onPreviewFrameChange = { [weak self] frame in
+            Task { @MainActor in
+                self?.previewFrame = frame
+            }
+        }
+    }
+
+    func updateGuideFrame(_ frame: CGRect) {
+        guideFrame = frame
     }
 
     func updateEnvironment(_ environment: EnvironmentStore) {
@@ -202,6 +218,24 @@ final class CardScannerViewModel: ObservableObject {
         lastAnalysisDate = .distantPast
     }
 
+    func presentSessionResult(_ result: CardScanResult) {
+        latestResult = result
+        state = .result(result)
+    }
+
+    func removeSessionResult(id: CardScanResult.ID) {
+        sessionResults.removeAll { $0.id == id }
+        if latestResult?.id == id {
+            clearResult()
+        }
+    }
+
+    func clearSession() {
+        sessionResults.removeAll()
+        liveConsensus.reset()
+        resetLiveConfirmation()
+    }
+
     private func rebuildContext() {
         guard let environmentStore else { return }
         context = CardScannerContext(
@@ -217,6 +251,8 @@ final class CardScannerViewModel: ObservableObject {
             setCode: scanScope?.setCode
         )
         lastAnalysisDate = .distantPast
+        liveConsensus.reset()
+        resetLiveConfirmation()
     }
 
     private func handleCapturedPhoto(_ photo: AVCapturePhoto) async {
@@ -225,12 +261,13 @@ final class CardScannerViewModel: ObservableObject {
             state = .error("Unable to process captured photo.")
             return
         }
-        await scan(image: cgImage)
+        await scan(image: guideCroppedImage(from: cgImage))
     }
 
     private func apply(_ result: Result<CardScanResult, CardScannerError>) {
         switch result {
         case .success(let scanResult):
+            appendToSession(scanResult)
             latestResult = scanResult
             state = .result(scanResult)
             if !isSimulator { HapticManager.notification(.success) }
@@ -267,8 +304,9 @@ final class CardScannerViewModel: ObservableObject {
         isAnalyzingFrame = true
         lastAnalysisDate = now
         let coordinator = self.coordinator
+        let guideGeometry = scannerGuideGeometry
 
-        Task.detached(priority: .userInitiated) { [weak self, context] in
+        Task.detached(priority: .userInitiated) { [weak self, context, guideGeometry] in
             guard let self else { return }
             guard let cgImage = CardScannerViewModel.makeCGImage(from: sampleBuffer) else {
                 await MainActor.run {
@@ -277,20 +315,25 @@ final class CardScannerViewModel: ObservableObject {
                 return
             }
 
-            let result = await coordinator.scan(image: cgImage, context: context, source: .livePreview)
+            let framedImage = guideGeometry.flatMap {
+                ScannerGuideCropper().crop(cgImage, using: $0)
+            } ?? cgImage
+            let result = await coordinator.scan(image: framedImage, context: context, source: .livePreview)
 
             await MainActor.run {
                 self.isAnalyzingFrame = false
                 switch result {
                 case .success(let scanResult):
-                    self.latestResult = scanResult
-                    self.state = .result(scanResult)
+                    self.handleLiveSuccess(scanResult)
                 case .failure(let error):
                     switch error {
                     case .noMatch:
+                        _ = self.liveConsensus.observeNoMatch()
+                        self.resetLiveConfirmation()
                         break
                     default:
                         // Keep live scanning failures non-blocking to avoid locking the scanner UI.
+                        self.resetLiveConfirmation()
                         self.state = .ready
                     }
                 }
@@ -316,6 +359,50 @@ final class CardScannerViewModel: ObservableObject {
     private func makeCGImage(from photo: AVCapturePhoto) -> CGImage? {
         guard let data = photo.fileDataRepresentation() else { return nil }
         return Self.makeCGImage(from: data)
+    }
+
+    private var scannerGuideGeometry: ScannerGuideGeometry? {
+        guard let previewFrame, let guideFrame else { return nil }
+        return ScannerGuideGeometry(previewFrame: previewFrame, guideFrame: guideFrame)
+    }
+
+    private func guideCroppedImage(from image: CGImage) -> CGImage {
+        guard let scannerGuideGeometry else { return image }
+        return ScannerGuideCropper().crop(image, using: scannerGuideGeometry) ?? image
+    }
+
+    private func handleLiveSuccess(_ result: CardScanResult) {
+        let identity = result.primary.details.identity
+        let key = "\(identity.game.rawValue):\(identity.id)"
+
+        switch liveConsensus.observe(key: key) {
+        case .pending(let count, let required):
+            liveCandidateName = identity.name
+            liveConfirmationCount = count
+            liveConfirmationRequired = required
+            state = .ready
+        case .accepted:
+            appendToSession(result)
+            resetLiveConfirmation()
+            state = .ready
+            if !isSimulator { HapticManager.notification(.success) }
+        case .duplicateSuppressed, .cleared:
+            resetLiveConfirmation()
+            state = .ready
+        }
+    }
+
+    private func appendToSession(_ result: CardScanResult) {
+        sessionResults.append(result)
+        if sessionResults.count > 100 {
+            sessionResults.removeFirst(sessionResults.count - 100)
+        }
+    }
+
+    private func resetLiveConfirmation() {
+        liveCandidateName = nil
+        liveConfirmationCount = 0
+        liveConfirmationRequired = 2
     }
 
     nonisolated private static func makeCGImage(from data: Data) -> CGImage? {

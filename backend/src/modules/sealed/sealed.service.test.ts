@@ -2,7 +2,8 @@ jest.mock('../../lib/prisma', () => ({
   prisma: {
     sealedProduct: {
       findMany: jest.fn(),
-      findUnique: jest.fn()
+      findUnique: jest.fn(),
+      findFirst: jest.fn()
     },
     sealedInventory: {
       findMany: jest.fn(),
@@ -26,7 +27,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import {
   addSealedInventory,
+  getSealedProductByBarcode,
   getSealedProducts,
+  normalizeSealedProductBarcode,
   updateSealedInventory
 } from './sealed.service';
 
@@ -116,5 +119,22 @@ describe('sealed response serialization', () => {
       expect(typeof response.purchasePrice).toBe('number');
       expect(typeof response.product.msrp).toBe('number');
     }
+  });
+
+  test('normalizes UPC input and looks up UPC-A/EAN-13 equivalents', async () => {
+    jest.mocked(prisma.sealedProduct.findFirst).mockResolvedValue({
+      ...product,
+      upc: '820650855221'
+    });
+
+    expect(normalizeSealedProductBarcode('8206-5085 5221')).toBe('820650855221');
+    expect(normalizeSealedProductBarcode('not-a-barcode')).toBeNull();
+    await expect(getSealedProductByBarcode('820650855221')).resolves.toMatchObject({
+      id: product.id,
+      upc: '820650855221'
+    });
+    expect(prisma.sealedProduct.findFirst).toHaveBeenCalledWith({
+      where: { upc: { in: ['820650855221', '0820650855221'] } }
+    });
   });
 });

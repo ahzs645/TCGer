@@ -5,6 +5,11 @@ import UIKit
 final class BackendHashScannerStrategy: ScanStrategy {
     let kind: ScanStrategyKind = .serverHash
     let supportsLiveScanning: Bool = false
+    private let cropper: CardCropper
+
+    init(cropper: CardCropper = CardCropper()) {
+        self.cropper = cropper
+    }
 
     func supports(_ mode: ScanMode) -> Bool {
         switch mode {
@@ -35,7 +40,12 @@ final class BackendHashScannerStrategy: ScanStrategy {
             throw CardScannerError.missingAuthToken
         }
 
-        guard let imageData = UIImage(cgImage: image).jpegData(compressionQuality: 0.88) else {
+        // The visible guide has already removed most background. Normalize the
+        // card perspective before upload as well, so local and server matchers
+        // see the same card-shaped input and no surrounding scene is uploaded.
+        let preparedImage = try cropper.bestCrop(from: image) ?? image
+
+        guard let imageData = UIImage(cgImage: preparedImage).jpegData(compressionQuality: 0.88) else {
             throw CardScannerError.underlying(
                 NSError(
                     domain: "TCGer.CardScanner",
@@ -98,7 +108,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
 
         return CardScanResult(
             mode: context.mode,
-            capturedImage: image,
+            capturedImage: preparedImage,
             primary: primary,
             alternatives: alternatives,
             elapsed: 0,

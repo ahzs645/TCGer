@@ -88,6 +88,30 @@ export async function getSealedProduct(productId: string) {
   return product ? serializeSealedProduct(product) : null;
 }
 
+export function normalizeSealedProductBarcode(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^[\d\s-]+$/.test(trimmed)) return null;
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 8 && digits.length <= 14 ? digits : null;
+}
+
+export async function getSealedProductByBarcode(barcode: string) {
+  const normalized = normalizeSealedProductBarcode(barcode);
+  if (!normalized) return null;
+
+  // UPC-A and EAN-13 may represent the same code with a leading zero.
+  const equivalents = new Set([normalized]);
+  if (normalized.length === 12) equivalents.add(`0${normalized}`);
+  if (normalized.length === 13 && normalized.startsWith('0')) {
+    equivalents.add(normalized.slice(1));
+  }
+
+  const product = await prisma.sealedProduct.findFirst({
+    where: { upc: { in: [...equivalents] } },
+  });
+  return product ? serializeSealedProduct(product) : null;
+}
+
 // ---------------------------------------------------------------------------
 // Sealed Inventory
 // ---------------------------------------------------------------------------

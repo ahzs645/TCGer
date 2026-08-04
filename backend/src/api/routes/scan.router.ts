@@ -22,6 +22,11 @@ import {
 import { uploadImages } from '../../utils/upload';
 import { asyncHandler } from '../../utils/async-handler';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
+import {
+  admitCardScan,
+  CardScanImageValidationError,
+  validateCardScanImage,
+} from '../middleware/card-scan-admission';
 
 export const scanRouter = Router();
 scanRouter.use(requireAuth);
@@ -242,6 +247,7 @@ function serializeDebugCapture(
  */
 scanRouter.post(
   '/',
+  admitCardScan,
   uploadImages.single('image'),
   asyncHandler(async (req, res) => {
     const authReq = req as AuthRequest;
@@ -280,6 +286,17 @@ scanRouter.post(
       }
 
       const imageBuffer = await fs.readFile(file.path);
+      try {
+        await validateCardScanImage(imageBuffer);
+      } catch (error) {
+        if (error instanceof CardScanImageValidationError) {
+          return res.status(error.statusCode).json({
+            error: error.statusCode === 413 ? 'PAYLOAD_TOO_LARGE' : 'BAD_REQUEST',
+            message: error.message,
+          });
+        }
+        throw error;
+      }
 
       let result;
       try {

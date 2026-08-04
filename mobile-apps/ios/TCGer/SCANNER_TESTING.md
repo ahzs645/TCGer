@@ -9,6 +9,11 @@ The scanner has three complementary test layers:
 3. Live Scanner Debug records physical-device camera sessions and replays them
    against later model/index builds.
 
+Camera scans first map the visible guide through the aspect-fill preview into
+photo pixels. Vision rectangle detection and perspective correction then run
+inside that guide crop. Imported Simulator fixtures intentionally skip the
+camera-guide crop because the selected image is already the scanner input.
+
 ## Command-line setup
 
 This Mac currently has Xcode installed while `xcode-select` points at Command
@@ -96,6 +101,10 @@ Minimum capture matrix:
 | Image quality | blur, glare, low light, motion, finger occlusion |
 | Open set | card back, pack, hand, playmat, empty background |
 | Scene | one card, multiple cards, card entering/leaving frame |
+
+Also verify the sealed-inventory barcode button with UPC-A, EAN-13, a code that
+is not in the product catalog, and a denied-camera-permission run. Barcode
+detection stays on-device; only the decoded digits are sent for product lookup.
 
 Record at least one clean control and one negative control in every device test
 session. Preserve the app build, model/index revision, selected pipeline, and

@@ -2,12 +2,22 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+private struct ScannerGuideFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next.width > 0, next.height > 0 {
+            value = next
+        }
+    }
+}
+
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @StateObject private var viewModel = CardScannerViewModel()
-    @State private var selectedCardForBinder: Card?
     @State private var showingRecentDebugCaptures = false
     @State private var selectedTestImage: PhotosPickerItem?
     let scope: CardScanScope?
@@ -52,36 +62,31 @@ struct CardScannerView: View {
             guard let item else { return }
             Task { await scanSelectedTestImage(item) }
         }
+        .onPreferenceChange(ScannerGuideFramePreferenceKey.self) { frame in
+            viewModel.updateGuideFrame(frame)
+        }
         .sheet(item: $viewModel.latestResult, onDismiss: {
             viewModel.clearResult()
         }) { result in
             ScanResultSheet(
                 result: result,
                 color: accentColor(for: viewModel.selectedMode),
-                onAddToBinder: { candidate in
-                    guard let card = candidate.details.sourceCard ?? makeCard(from: candidate) else {
-                        return
-                    }
-                    selectedCardForBinder = card
+                onAddCard: { card, binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
+                    try await addCardToBinder(
+                        card: card,
+                        binderId: binderId,
+                        quantity: quantity,
+                        condition: condition,
+                        language: language,
+                        notes: notes,
+                        isFoil: isFoil,
+                        variant: variant,
+                        isSigned: isSigned,
+                        isAltered: isAltered
+                    )
                 }
             )
             .presentationDetents([.medium, .large])
-        }
-        .sheet(item: $selectedCardForBinder) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
-                try await addCardToBinder(
-                    card: card,
-                    binderId: binderId,
-                    quantity: quantity,
-                    condition: condition,
-                    language: language,
-                    notes: notes,
-                    isFoil: isFoil,
-                    variant: variant,
-                    isSigned: isSigned,
-                    isAltered: isAltered
-                )
-            }
         }
         .sheet(isPresented: $showingRecentDebugCaptures) {
             RecentDebugCapturesSheet(
@@ -106,29 +111,11 @@ struct CardScannerView: View {
     @ViewBuilder
     private var topStatusOverlay: some View {
         VStack(spacing: 10) {
-            if let scope {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.headline)
-                            .frame(width: 34, height: 34)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .foregroundStyle(.white)
-
-                    Text("Scanning \(scope.setName)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-
-                    Spacer()
-                }
-            }
+            ScannerCameraToolbar(
+                cameraController: viewModel.cameraController,
+                scopeTitle: scope.map { "Scanning \($0.setName)" },
+                onDismiss: scope == nil ? nil : { dismiss() }
+            )
 
             statusContent
         }
@@ -249,8 +236,17 @@ struct CardScannerView: View {
                         .padding(.top, height / 2 + 24),
                     alignment: .bottom
                 )
+                .background {
+                    GeometryReader { guideGeometry in
+                        Color.clear.preference(
+                            key: ScannerGuideFramePreferenceKey.self,
+                            value: guideGeometry.frame(in: .global)
+                        )
+                    }
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .allowsHitTesting(false)
     }
 
     private var bottomControls: some View {
@@ -293,6 +289,20 @@ struct CardScannerView: View {
                 testImageControls
             }
 
+            if !viewModel.sessionResults.isEmpty || viewModel.liveConfirmationCount > 0 {
+                ScannerSessionTray(
+                    results: viewModel.sessionResults,
+                    pendingCardName: viewModel.liveCandidateName,
+                    pendingCount: viewModel.liveConfirmationCount,
+                    pendingRequired: viewModel.liveConfirmationRequired,
+                    color: accentColor(for: viewModel.selectedMode),
+                    onSelect: viewModel.presentSessionResult,
+                    onRemove: viewModel.removeSessionResult,
+                    onClear: viewModel.clearSession
+                )
+                .padding(.horizontal)
+            }
+
             Button(action: {
                 viewModel.capturePhoto()
             }) {
@@ -321,6 +331,8 @@ struct CardScannerView: View {
                 !hasEnabledScanModes
             )
             .buttonStyle(.plain)
+            .accessibilityLabel("Scan card")
+            .accessibilityHint("Captures the card inside the guide")
             .padding(.bottom, 12)
 
             if hasEnabledScanModes && isModeSupported {
@@ -442,24 +454,6 @@ struct CardScannerView: View {
         }
     }
 
-    private func makeCard(from candidate: CardScanCandidate) -> Card? {
-        let details = candidate.details
-        guard details.identity.game != .all else { return nil }
-        return Card(
-            id: details.identity.id,
-            name: details.identity.name,
-            tcg: details.identity.game.rawValue,
-            setCode: details.identity.setCode,
-            setName: details.identity.setName,
-            rarity: details.rarity,
-            imageUrl: details.imageURL?.absoluteString,
-            imageUrlSmall: details.imageURL?.absoluteString,
-            price: details.price,
-            collectorNumber: nil,
-            releasedAt: nil
-        )
-    }
-
     @MainActor
     private func addCardToBinder(
         card: Card,
@@ -574,23 +568,47 @@ private extension CardScannerView {
 
 private struct ScanResultSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedCandidate: CardScanCandidate
+    @State private var cardToAdd: Card?
     @State private var debugCapture: APIService.ScanDebugCaptureResponse?
     @State private var debugCaptureError: String?
     @State private var isUpdatingDebugCapture = false
 
     let result: CardScanResult
     let color: Color
-    let onAddToBinder: (CardScanCandidate) -> Void
+    let onAddCard: (
+        Card,
+        String,
+        Int,
+        String?,
+        String?,
+        String?,
+        Bool,
+        Bool,
+        Bool,
+        CardCopyVariant
+    ) async throws -> Void
 
     init(
         result: CardScanResult,
         color: Color,
-        onAddToBinder: @escaping (CardScanCandidate) -> Void
+        onAddCard: @escaping (
+            Card,
+            String,
+            Int,
+            String?,
+            String?,
+            String?,
+            Bool,
+            Bool,
+            Bool,
+            CardCopyVariant
+        ) async throws -> Void
     ) {
         self.result = result
         self.color = color
-        self.onAddToBinder = onAddToBinder
+        self.onAddCard = onAddCard
         _selectedCandidate = State(initialValue: result.primary)
         _debugCapture = State(initialValue: result.debugCapture)
         _debugCaptureError = State(initialValue: result.debugCaptureError)
@@ -614,12 +632,33 @@ private struct ScanResultSheet: View {
             }
             .navigationTitle("Scan Result")
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add to Binder") {
-                        onAddToBinder(selectedCandidate)
+                        cardToAdd = candidateCard
                     }
                     .disabled(candidateCard == nil)
                 }
+            }
+        }
+        .sheet(item: $cardToAdd) { card in
+            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
+                try await onAddCard(
+                    card,
+                    binderId,
+                    quantity,
+                    condition,
+                    language,
+                    notes,
+                    isFoil,
+                    isSigned,
+                    isAltered,
+                    variant
+                )
             }
         }
     }

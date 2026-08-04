@@ -74,10 +74,12 @@ struct CardEmbeddingEncoder {
     }
 }
 
-struct BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
+final class BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     private let modelName: String
     private let fileExtension: String
     private let bundle: Bundle
+    private let lock = NSLock()
+    private var cachedModel: MLModel?
 
     init(
         modelName: String = "CardEmbeddings",
@@ -94,10 +96,29 @@ struct BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     }
 
     func makeModel() throws -> MLModel {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let cachedModel {
+            return cachedModel
+        }
+
         guard let url = bundle.url(forResource: modelName, withExtension: fileExtension) else {
             throw CardEmbeddingEncoder.EncoderError.modelUnavailable
         }
-        return try MLModel(contentsOf: url)
+
+        let configuration = MLModelConfiguration()
+        #if targetEnvironment(simulator)
+        // Simulator GPU support varies by host OS/Xcode pairing. CPU inference
+        // keeps scanner fixtures deterministic and avoids MPSGraph failures.
+        configuration.computeUnits = .cpuOnly
+        #else
+        configuration.computeUnits = .all
+        #endif
+
+        let model = try MLModel(contentsOf: url, configuration: configuration)
+        cachedModel = model
+        return model
     }
 }
 
