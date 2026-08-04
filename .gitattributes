@@ -1,4 +1,0 @@
-purplemana-0.3.65-decompiled/xapk/config.arm64_v8a.apk filter=lfs diff=lfs merge=lfs -text
-purplemana-0.3.65-decompiled/hermes-decompiled.js filter=lfs diff=lfs merge=lfs -text
-purplemana-0.3.65-decompiled/tools/jadx-1.5.3/lib/jadx-1.5.3-all.jar filter=lfs diff=lfs merge=lfs -text
-purplemana-0.3.65-decompiled/tools/jadx-1.5.3.zip filter=lfs diff=lfs merge=lfs -text
