@@ -5,6 +5,7 @@ struct ScannerCameraToolbar: View {
     @ObservedObject var cameraController: CardScannerCameraController
     let scopeTitle: String?
     let onDismiss: (() -> Void)?
+    @Binding var automaticallyShowResults: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -30,6 +31,20 @@ struct ScannerCameraToolbar: View {
             }
 
             Spacer()
+
+            Menu {
+                Toggle(isOn: $automaticallyShowResults) {
+                    Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.headline)
+                    .frame(width: 38, height: 38)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .foregroundStyle(.white)
+            .accessibilityLabel("Scanner options")
+            .accessibilityValue(automaticallyShowResults ? "Automatic results on" : "Automatic results off")
 
             if cameraController.isTorchAvailable {
                 Button(action: cameraController.toggleTorch) {
@@ -57,45 +72,35 @@ struct ScannerSessionTray: View {
     let onClear: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Label("Scan Session", systemImage: "rectangle.stack.fill")
-                    .font(.subheadline.weight(.semibold))
-                Text("\(results.count)")
-                    .font(.caption.bold())
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(color.opacity(0.22), in: Capsule())
-
-                Spacer()
-
-                if !results.isEmpty {
-                    Button("Clear", action: onClear)
-                        .font(.caption.weight(.semibold))
-                        .accessibilityHint("Removes every card from this scan session")
-                }
-            }
-            .foregroundStyle(.white)
+        HStack(spacing: 10) {
+            Label("\(results.count)", systemImage: "rectangle.stack.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .frame(height: 42)
+                .background(color.opacity(0.24), in: Capsule())
+                .accessibilityLabel("\(results.count) cards in this scan session")
 
             if let pendingCardName, pendingCount > 0 {
-                HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text("Hold steady")
+                            .font(.caption.weight(.semibold))
+                        Text(pendingCardName)
+                            .font(.caption)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text("\(pendingCount)/\(pendingRequired)")
+                            .font(.caption.monospacedDigit())
+                    }
                     ProgressView(value: Double(pendingCount), total: Double(max(pendingRequired, 1)))
                         .tint(color)
-                    Text("Hold still for \(pendingCardName) · \(pendingCount)/\(pendingRequired)")
-                        .font(.caption)
-                        .lineLimit(1)
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .accessibilityElement(children: .combine)
-            }
-
-            if results.isEmpty {
-                Text("Confirmed cards collect here while the camera stays open.")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.78))
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 10) {
+                    LazyHStack(spacing: 8) {
                         ForEach(Array(results.reversed())) { result in
                             ScannerSessionCard(
                                 result: result,
@@ -107,9 +112,23 @@ struct ScannerSessionTray: View {
                     }
                 }
             }
+
+            if !results.isEmpty {
+                Button(action: onClear) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.14), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .accessibilityLabel("Clear scan session")
+                .accessibilityHint("Removes every card from this scan session")
+            }
         }
-        .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(height: 58)
+        .padding(.horizontal, 8)
+        .background(.ultraThinMaterial, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Scan session with \(results.count) cards")
     }
@@ -127,8 +146,8 @@ private struct ScannerSessionCard: View {
                 Image(uiImage: UIImage(cgImage: result.capturedImage))
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 38, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(width: 30, height: 42)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(result.primary.details.identity.name)
@@ -141,9 +160,10 @@ private struct ScannerSessionCard: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(color)
                 }
-                .frame(width: 108, alignment: .leading)
+                .frame(width: 86, alignment: .leading)
             }
-            .padding(8)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)

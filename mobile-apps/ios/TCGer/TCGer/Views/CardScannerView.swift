@@ -17,6 +17,7 @@ struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
+    @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
     @State private var selectedTestImage: PhotosPickerItem?
@@ -31,15 +32,20 @@ struct CardScannerView: View {
             CardScannerCameraPreview(controller: viewModel.cameraController)
                 .ignoresSafeArea()
 
-            VStack {
-                topStatusOverlay
-                Spacer()
-                framingOverlay
-                bottomControls
-            }
-            .padding()
+            framingOverlay
+        }
+        .overlay(alignment: .top) {
+            topStatusOverlay
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+        }
+        .overlay(alignment: .bottom) {
+            bottomControls
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
         }
         .onAppear {
+            viewModel.setAutomaticallyPresentsResults(automaticallyShowResults)
             viewModel.updateEnvironment(environmentStore)
             viewModel.updateScope(scope)
             if scope == nil {
@@ -48,6 +54,9 @@ struct CardScannerView: View {
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
+        }
+        .onChange(of: automaticallyShowResults, initial: false) { _, enabled in
+            viewModel.setAutomaticallyPresentsResults(enabled)
         }
         .onChange(of: environmentStore.enabledYugioh, initial: false) { _, _ in
             syncSelectedModeWithModules()
@@ -114,7 +123,8 @@ struct CardScannerView: View {
             ScannerCameraToolbar(
                 cameraController: viewModel.cameraController,
                 scopeTitle: scope.map { "Scanning \($0.setName)" },
-                onDismiss: scope == nil ? nil : { dismiss() }
+                onDismiss: scope == nil ? nil : { dismiss() },
+                automaticallyShowResults: $automaticallyShowResults
             )
 
             statusContent
@@ -221,21 +231,35 @@ struct CardScannerView: View {
 
     private var framingOverlay: some View {
         GeometryReader { geometry in
-            let width = min(geometry.size.width - 32, geometry.size.height * 0.7)
+            let topClearance: CGFloat = 72
+            let bottomClearance: CGFloat = 176
+            let availableHeight = max(0, geometry.size.height - topClearance - bottomClearance)
+            let width = min(geometry.size.width - 48, availableHeight / 1.4)
             let height = width * 1.4
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(accentColor(for: viewModel.selectedMode).opacity(0.9), lineWidth: 3)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
+
+                ScannerCornerGuide()
+                    .stroke(
+                        accentColor(for: viewModel.selectedMode),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                    )
+
+                Text(framingInstruction)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
                 .frame(width: width, height: height)
-                .overlay(
-                    Text(viewModel.selectedMode.description)
-                        .font(.footnote)
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.black.opacity(0.55))
-                        .cornerRadius(10)
-                        .padding(.top, height / 2 + 24),
-                    alignment: .bottom
-                )
                 .background {
                     GeometryReader { guideGeometry in
                         Color.clear.preference(
@@ -244,41 +268,16 @@ struct CardScannerView: View {
                         )
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .position(
+                    x: geometry.size.width / 2,
+                    y: topClearance + availableHeight / 2
+                )
         }
         .allowsHitTesting(false)
     }
 
     private var bottomControls: some View {
-        VStack(spacing: 16) {
-            if hasEnabledScanModes {
-                if scope == nil {
-                    Picker("Mode", selection: $viewModel.selectedMode) {
-                        ForEach(availableScanModes) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                }
-
-                if availableScanEngines.count > 1 {
-                    Picker("Matcher", selection: $viewModel.selectedEngine) {
-                        ForEach(availableScanEngines) { engine in
-                            Text(engine.displayName).tag(engine)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                }
-            } else {
-                Text("Turn on at least one game module in Settings to access scanning.")
-                    .font(.footnote)
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-
+        VStack(spacing: 10) {
             // Debug captures are stored on the server, so the control is
             // pointless without one.
             if hasEnabledScanModes && isModeSupported && !environmentStore.serverConfiguration.isOnDevice {
@@ -300,48 +299,114 @@ struct CardScannerView: View {
                     onRemove: viewModel.removeSessionResult,
                     onClear: viewModel.clearSession
                 )
-                .padding(.horizontal)
             }
 
-            Button(action: {
-                viewModel.capturePhoto()
-            }) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(width: 84, height: 84)
-                    Circle()
-                        .fill(accentColor(for: viewModel.selectedMode))
-                        .frame(width: 68, height: 68)
-                    if isProcessingPhoto {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Image(systemName: "camera.aperture")
-                            .font(.title)
-                            .foregroundColor(.white)
+            HStack(spacing: 12) {
+                gameControl
+
+                Spacer(minLength: 0)
+
+                Button(action: viewModel.capturePhoto) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.16))
+                            .frame(width: 76, height: 76)
+                        Circle()
+                            .fill(accentColor(for: viewModel.selectedMode))
+                            .frame(width: 62, height: 62)
+                        if isProcessingPhoto {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Image(systemName: "camera.aperture")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                        }
                     }
                 }
-            }
-            .disabled(
-                isProcessingPhoto ||
-                isUnauthorized ||
-                viewModel.latestResult != nil ||
-                !isModeSupported ||
-                !hasEnabledScanModes
-            )
-            .buttonStyle(.plain)
-            .accessibilityLabel("Scan card")
-            .accessibilityHint("Captures the card inside the guide")
-            .padding(.bottom, 12)
+                .disabled(
+                    isProcessingPhoto ||
+                    isUnauthorized ||
+                    viewModel.latestResult != nil ||
+                    !isModeSupported ||
+                    !hasEnabledScanModes
+                )
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scan card")
+                .accessibilityHint("Captures the card inside the guide")
 
-            if hasEnabledScanModes && isModeSupported {
-                Text(scanEngineDescription)
-                    .font(.footnote)
-                    .foregroundColor(.white.opacity(0.88))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                Spacer(minLength: 0)
+
+                engineControl
             }
+        }
+        .animation(.snappy, value: viewModel.liveConfirmationCount)
+        .animation(.snappy, value: viewModel.sessionResults.count)
+    }
+
+    @ViewBuilder
+    private var gameControl: some View {
+        if scope == nil, availableScanModes.count > 1 {
+            Menu {
+                ForEach(availableScanModes) { mode in
+                    Button {
+                        viewModel.selectedMode = mode
+                    } label: {
+                        if mode == viewModel.selectedMode {
+                            Label(mode.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(mode.displayName)
+                        }
+                    }
+                }
+            } label: {
+                ScannerOptionLabel(
+                    title: viewModel.selectedMode.displayName,
+                    systemImage: "rectangle.stack"
+                )
+            }
+            .accessibilityLabel("Card game")
+            .accessibilityValue(viewModel.selectedMode.displayName)
+        } else {
+            ScannerOptionLabel(
+                title: hasEnabledScanModes ? viewModel.selectedMode.displayName : "No games",
+                systemImage: "rectangle.stack"
+            )
+            .accessibilityLabel("Card game")
+            .accessibilityValue(hasEnabledScanModes ? viewModel.selectedMode.displayName : "No enabled games")
+        }
+    }
+
+    @ViewBuilder
+    private var engineControl: some View {
+        if availableScanEngines.count > 1 {
+            Menu {
+                ForEach(availableScanEngines) { engine in
+                    Button {
+                        viewModel.selectedEngine = engine
+                    } label: {
+                        if engine == viewModel.selectedEngine {
+                            Label(engine.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(engine.displayName)
+                        }
+                    }
+                }
+            } label: {
+                ScannerOptionLabel(
+                    title: viewModel.selectedEngine.displayName,
+                    systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
+                )
+            }
+            .accessibilityLabel("Scan method")
+            .accessibilityValue(viewModel.selectedEngine.displayName)
+        } else {
+            ScannerOptionLabel(
+                title: availableScanEngines.first?.displayName ?? "Unavailable",
+                systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
+            )
+            .accessibilityLabel("Scan method")
+            .accessibilityValue(availableScanEngines.first?.displayName ?? "Unavailable")
         }
     }
 
@@ -552,17 +617,55 @@ private extension CardScannerView {
         return false
     }
 
-    var scanEngineDescription: String {
-        switch viewModel.selectedEngine {
-        case .automatic:
-            return "Live preview stays on-device. The shutter keeps the current automatic fallback order for the selected game."
-        case .localOnly:
-            return "Everything runs on this phone using the bundled fingerprint and hash databases. No server or internet required."
-        case .serverHash:
-            return "Live preview is disabled for this mode. The shutter sends the capture to the server hash matcher."
-        case .serverEmbedding:
-            return "Live preview is disabled for this mode. The shutter sends the capture to the server embedding matcher."
+    var framingInstruction: String {
+        viewModel.supportsLivePreview(viewModel.selectedMode)
+            ? "Center one card · Hold steady"
+            : "Center one card · Tap to scan"
+    }
+}
+
+private struct ScannerOptionLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
+        .foregroundStyle(.white)
+        .frame(width: 96, height: 48)
+        .background(.ultraThinMaterial, in: Capsule())
+        .contentShape(Capsule())
+    }
+}
+
+private struct ScannerCornerGuide: Shape {
+    func path(in rect: CGRect) -> Path {
+        let cornerLength = min(34, min(rect.width, rect.height) * 0.16)
+        var path = Path()
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + cornerLength))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + cornerLength, y: rect.minY))
+
+        path.move(to: CGPoint(x: rect.maxX - cornerLength, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cornerLength))
+
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - cornerLength))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - cornerLength, y: rect.maxY))
+
+        path.move(to: CGPoint(x: rect.minX + cornerLength, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cornerLength))
+
+        return path
     }
 }
 

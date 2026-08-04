@@ -57,6 +57,7 @@ final class CardScannerViewModel: ObservableObject {
     private var previewFrame: CGRect?
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
+    private var automaticallyPresentsResults = false
 
     init(coordinator: CardScannerCoordinator? = nil) {
 #if targetEnvironment(simulator)
@@ -86,6 +87,10 @@ final class CardScannerViewModel: ObservableObject {
 
     func updateGuideFrame(_ frame: CGRect) {
         guideFrame = frame
+    }
+
+    func setAutomaticallyPresentsResults(_ enabled: Bool) {
+        automaticallyPresentsResults = enabled
     }
 
     func updateEnvironment(_ environment: EnvironmentStore) {
@@ -268,8 +273,14 @@ final class CardScannerViewModel: ObservableObject {
         switch result {
         case .success(let scanResult):
             appendToSession(scanResult)
-            latestResult = scanResult
-            state = .result(scanResult)
+            if automaticallyPresentsResults {
+                latestResult = scanResult
+                state = .result(scanResult)
+            } else if isSimulator {
+                state = .error("Card scanning is not supported in the iOS Simulator.")
+            } else {
+                state = .ready
+            }
             if !isSimulator { HapticManager.notification(.success) }
         case .failure(let error):
             errorMessage = error.errorDescription ?? error.localizedDescription

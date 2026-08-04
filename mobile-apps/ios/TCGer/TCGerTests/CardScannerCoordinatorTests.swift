@@ -3,6 +3,53 @@ import XCTest
 
 @MainActor
 final class CardScannerCoordinatorTests: XCTestCase {
+    func testSuccessfulManualScanStaysInSessionByDefault() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .match(cardID: "session-card"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+
+        await viewModel.scan(image: ScannerTestImage.solid())
+
+        XCTAssertEqual(viewModel.sessionResults.map(\.primary.details.identity.id), ["session-card"])
+        XCTAssertNil(viewModel.latestResult)
+    }
+
+    func testSuccessfulManualScanCanAutomaticallyPresentResult() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .match(cardID: "presented-card"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.setAutomaticallyPresentsResults(true)
+        viewModel.updateEnvironment(environment)
+
+        await viewModel.scan(image: ScannerTestImage.solid())
+
+        XCTAssertEqual(viewModel.sessionResults.map(\.primary.details.identity.id), ["presented-card"])
+        XCTAssertEqual(viewModel.latestResult?.primary.details.identity.id, "presented-card")
+    }
+
     func testStrategiesRunInModePriorityOrderAndContinueAfterFailures() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(
