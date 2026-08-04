@@ -69,10 +69,11 @@ struct WishlistDetailView: View {
     var body: some View {
         NavigationView {
             List {
-                // Header
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if isEditing {
+                // Header — only rendered when it has content, otherwise the
+                // section shows up as an empty card under the navigation title.
+                if isEditing {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
                             TextField("Wishlist Name", text: $editedName)
                                 .font(.title2)
                                 .fontWeight(.bold)
@@ -84,16 +85,17 @@ struct WishlistDetailView: View {
                                 .lineLimit(3...6)
                             ColorPickerGrid(selectedColor: $selectedColor)
                                 .padding(.top, 8)
-                        } else {
-                            if let desc = wishlist.description, !desc.isEmpty {
-                                Text(desc)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
                         }
+                        .listRowSeparator(.hidden)
                     }
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color(.systemBackground))
+                } else if let desc = wishlist.description,
+                          !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Section {
+                        Text(desc)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .listRowSeparator(.hidden)
+                    }
                 }
 
                 // Completion Progress
@@ -181,14 +183,14 @@ struct WishlistDetailView: View {
                                 showingAddCards = true
                             } label: {
                                 Label("Add Cards", systemImage: "plus")
+                                    .labelStyle(.titleAndIcon)
                             }
                             .buttonStyle(.borderedProminent)
-                            Button {
+                            Button("Add a whole set or every printing") {
                                 showingBulkAdd = true
-                            } label: {
-                                Label("Add a whole set or every printing", systemImage: "square.stack.3d.up")
                             }
-                            .buttonStyle(.bordered)
+                            .font(.footnote)
+                            .buttonStyle(.borderless)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 20)

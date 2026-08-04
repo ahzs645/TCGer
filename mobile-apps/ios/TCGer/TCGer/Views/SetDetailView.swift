@@ -85,13 +85,26 @@ struct SetDetailView: View {
             .sorted { left, right in
                 switch cardSort {
                 case .collectorNumber:
-                    let leftNumber = left.collectorNumber ?? left.id
-                    let rightNumber = right.collectorNumber ?? right.id
-                    return leftNumber.localizedStandardCompare(rightNumber) == .orderedAscending
+                    return Self.isBeforeByCollectorNumber(left, right)
                 case .name:
                     return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+                case .rarity:
+                    // Rarest first, so the chase cards sit at the top of the grid.
+                    let leftRank = CardRarityRank.rank(for: left.rarity)
+                    let rightRank = CardRarityRank.rank(for: right.rarity)
+                    if leftRank != rightRank {
+                        return leftRank > rightRank
+                    }
+                    // Same tier: keep the set's own order so the grid stays scannable.
+                    return Self.isBeforeByCollectorNumber(left, right)
                 }
             }
+    }
+
+    private static func isBeforeByCollectorNumber(_ left: Card, _ right: Card) -> Bool {
+        let leftNumber = left.collectorNumber ?? left.id
+        let rightNumber = right.collectorNumber ?? right.id
+        return leftNumber.localizedStandardCompare(rightNumber) == .orderedAscending
     }
 
     var body: some View {
@@ -683,12 +696,14 @@ private enum SetCardFilter: String, CaseIterable, Identifiable {
 private enum SetCardSort: String, CaseIterable, Identifiable {
     case collectorNumber
     case name
+    case rarity
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .collectorNumber: return "Collector number"
         case .name: return "Name"
+        case .rarity: return "Rarity"
         }
     }
 }

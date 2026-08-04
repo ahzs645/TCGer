@@ -8,6 +8,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         static let strongAcceptanceScore: Double = 0.70
         /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
         static let ocrMargin: Double = 0.1
+        /// Abstain when a *different* card trails the winner by less than this
+        /// and OCR could not confirm the winner. Live-scan data shows true
+        /// matches separate from the runner-up by ≥0.03 while false positives
+        /// on busy scenes win by ≤0.03; same-name printings are exempt because
+        /// the name identification is still correct.
+        static let ambiguityMargin: Double = 0.02
     }
 
     let kind: ScanStrategyKind = .mlDetector
@@ -156,6 +162,17 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         }
 
         guard primary.confidence.score >= Configuration.strongAcceptanceScore || ocrVerified else {
+            return nil
+        }
+
+        // Ambiguity guard: a near-tied runner-up that is a different card means
+        // the embedding alone cannot tell the two apart on this frame. Without
+        // OCR confirmation, abstain and let a cleaner frame decide.
+        if !ocrVerified,
+           let rival = ranked.first(where: {
+               $0.id != primary.id && $0.details.identity.name != primary.details.identity.name
+           }),
+           primary.confidence.score - rival.confidence.score < Configuration.ambiguityMargin {
             return nil
         }
 

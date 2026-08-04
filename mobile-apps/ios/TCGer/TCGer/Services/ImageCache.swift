@@ -126,8 +126,16 @@ final class ImageCache {
         cacheDirectory.appendingPathComponent(Self.fileName(for: url))
     }
 
+    /// Bumped whenever `RemoteImageDecoder`'s SVG rasterisation changes, so previously
+    /// stored (v1: top-left cropped) renders are re-fetched instead of served forever.
+    /// Only salts vector URLs — raster card art is unaffected and stays cached.
+    private static let svgRenderVersion = 2
+
     private static func fileName(for url: URL) -> String {
-        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let identity = url.pathExtension.lowercased() == "svg"
+            ? "svg-v\(svgRenderVersion)|\(url.absoluteString)"
+            : url.absoluteString
+        let digest = SHA256.hash(data: Data(identity.utf8))
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         return "\(hex).img"
     }

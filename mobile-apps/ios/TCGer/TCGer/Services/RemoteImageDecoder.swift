@@ -98,12 +98,28 @@ private final class SVGSnapshotRenderer: NSObject, WKNavigationDelegate {
         webView.scrollView.isScrollEnabled = false
         webView.navigationDelegate = self
         active = ActiveRequest(webView: webView, continuation: request.continuation)
-        webView.load(
-            request.data,
-            mimeType: "image/svg+xml",
-            characterEncodingName: "utf-8",
-            baseURL: URL(fileURLWithPath: "/")
-        )
+        webView.loadHTMLString(Self.wrapperHTML(for: request.data), baseURL: nil)
+    }
+
+    /// Loading SVG data directly as an `image/svg+xml` document renders it at its
+    /// intrinsic size — for artwork that declares only a `viewBox` (e.g. the Pokémon
+    /// set symbols, `viewBox="0 0 2000 2000"`) that is far larger than the snapshot
+    /// rect, so the snapshot captures only the top-left corner and the symbol looks
+    /// cropped. Embedding it as an `<img>` with `object-fit: contain` makes it scale
+    /// to the render box regardless of the declared dimensions.
+    private static func wrapperHTML(for data: Data) -> String {
+        let base64 = data.base64EncodedString()
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+        <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent; }
+        img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        </style>
+        <body><img src="data:image/svg+xml;base64,\(base64)"></body>
+        </html>
+        """
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
