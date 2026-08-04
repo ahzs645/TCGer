@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SealedInventoryView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var inventory: [SealedInventoryItem] = []
     @State private var ledgers: [SealedOpeningLedger] = []
@@ -13,9 +15,24 @@ struct SealedInventoryView: View {
 
     private let apiService = APIService()
 
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationView {
-            Group {
+        Group {
+            if parentProvidesNavigation {
+                sealedInventoryContent
+            } else {
+                NavigationView {
+                    sealedInventoryContent
+                }
+            }
+        }
+    }
+
+    private var sealedInventoryContent: some View {
+        Group {
                 if isLoading {
                     ProgressView("Loading sealed inventory...")
                 } else if let error = errorMessage {
@@ -76,8 +93,8 @@ struct SealedInventoryView: View {
                     }
                     .listStyle(.plain)
                 }
-            }
-            .navigationTitle("Sealed Products")
+        }
+        .navigationTitle("Sealed Products")
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
@@ -120,14 +137,13 @@ struct SealedInventoryView: View {
                     }
                 }
             }
-            .alert("Barcode Scan", isPresented: Binding(
-                get: { barcodeError != nil },
-                set: { if !$0 { barcodeError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(barcodeError ?? "Unable to look up that barcode.")
-            }
+        .alert("Barcode Scan", isPresented: Binding(
+            get: { barcodeError != nil },
+            set: { if !$0 { barcodeError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(barcodeError ?? "Unable to look up that barcode.")
         }
     }
 

@@ -93,7 +93,7 @@ struct SettingsView: View {
             if parentProvidesNavigation {
                 settingsContent
             } else {
-                NavigationStack {
+                NavigationView {
                     settingsContent
                 }
             }

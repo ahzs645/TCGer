@@ -59,16 +59,15 @@ struct ContentView: View {
     }
 
     private var moreTabsView: some View {
-        NavigationStack {
+        NavigationView {
             List(overflowTabs) { tab in
-                NavigationLink(value: tab) {
+                NavigationLink {
+                    destination(for: tab, parentProvidesNavigation: true)
+                } label: {
                     Label(tab.title, systemImage: tab.systemImage)
                 }
             }
             .navigationTitle("More")
-            .navigationDestination(for: AppTab.self) { tab in
-                destination(for: tab, parentProvidesNavigation: true)
-            }
         }
     }
 
@@ -76,15 +75,15 @@ struct ContentView: View {
     private func destination(for tab: AppTab, parentProvidesNavigation: Bool = false) -> some View {
         switch tab {
         case .home:
-            DashboardView()
+            DashboardView(parentProvidesNavigation: parentProvidesNavigation)
         case .collections:
-            CollectionsView()
+            CollectionsView(parentProvidesNavigation: parentProvidesNavigation)
         case .sets:
-            SetBrowserView()
+            SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
         case .wishlists:
-            WishlistsView()
+            WishlistsView(parentProvidesNavigation: parentProvidesNavigation)
         case .sealed:
-            SealedInventoryView()
+            SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
         case .scan:
             CardScannerView()
         case .settings:

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct DashboardView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
     @State private var collections: [Collection] = []
@@ -13,9 +15,27 @@ struct DashboardView: View {
         Array(collections.filter { !$0.isUnsortedBinder }.prefix(3))
     }
 
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationView {
-            ScrollView {
+        Group {
+            if parentProvidesNavigation {
+                dashboardContent
+            } else {
+                NavigationView {
+                    dashboardContent
+                }
+            }
+        }
+        .task {
+            await loadData()
+        }
+    }
+
+    private var dashboardContent: some View {
+        ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
                         ProgressView("Loading your collection...")
@@ -83,10 +103,6 @@ struct DashboardView: View {
                 case .tiltTester:
                     TiltTesterView(cards: collections.flatMap { $0.cards })
                 }
-            }
-        }
-        .task {
-            await loadData()
         }
     }
 

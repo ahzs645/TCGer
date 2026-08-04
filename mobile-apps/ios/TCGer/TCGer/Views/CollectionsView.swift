@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CollectionsView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
     @State private var collections: [Collection] = []
@@ -21,9 +23,36 @@ struct CollectionsView: View {
         return visible
     }
 
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationView {
-            Group {
+        Group {
+            if parentProvidesNavigation {
+                collectionsContent
+            } else {
+                NavigationView {
+                    collectionsContent
+                }
+            }
+        }
+        .task {
+            await loadCollections()
+        }
+        .sheet(item: $selectedSmartFolder) { folder in
+            SmartFolderDetailView(folder: folder)
+                .environmentObject(environmentStore)
+        }
+        .sheet(isPresented: $showingSmartFolderEditor) {
+            SmartFolderEditorSheet { folder in
+                environmentStore.smartFolders.append(folder)
+            }
+        }
+    }
+
+    private var collectionsContent: some View {
+        Group {
                 if isLoading {
                     ProgressView("Loading binders...")
                 } else if let error = errorMessage {
@@ -167,19 +196,6 @@ struct CollectionsView: View {
                     }
                 }
             )
-        }
-        .task {
-            await loadCollections()
-        }
-        .sheet(item: $selectedSmartFolder) { folder in
-            SmartFolderDetailView(folder: folder)
-                .environmentObject(environmentStore)
-        }
-        .sheet(isPresented: $showingSmartFolderEditor) {
-            SmartFolderEditorSheet { folder in
-                environmentStore.smartFolders.append(folder)
-            }
-        }
     }
 
     @MainActor

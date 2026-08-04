@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct WishlistsView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var wishlists: [Wishlist] = []
     @State private var isLoading = true
@@ -13,94 +15,108 @@ struct WishlistsView: View {
 
     private let apiService = APIService()
 
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationView {
-            Group {
-                if isLoading {
-                    ProgressView("Loading wishlists...")
-                } else if let error = errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-                        Text("Failed to Load Wishlists")
-                            .font(.headline)
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Button("Try Again") {
-                            Task { await loadWishlists() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if wishlists.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "heart.slash")
-                            .font(.system(size: 50))
-                            .foregroundColor(.secondary)
-                        Text("No Wishlists Yet")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text("Create a wishlist to track cards you want")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Button {
-                            showingCreateSheet = true
-                        } label: {
-                            Label("Create Wishlist", systemImage: "plus")
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List {
-                        ForEach(wishlists) { wishlist in
-                            Button {
-                                selectedWishlist = wishlist
-                            } label: {
-                                WishlistRow(wishlist: wishlist)
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    Task { await deleteWishlist(wishlist) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
+        Group {
+            if parentProvidesNavigation {
+                wishlistContent
+            } else {
+                NavigationView {
+                    wishlistContent
                 }
             }
-            .navigationTitle("Wishlists")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+        }
+    }
+
+    private var wishlistContent: some View {
+        Group {
+            if isLoading {
+                ProgressView("Loading wishlists...")
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.orange)
+                    Text("Failed to Load Wishlists")
+                        .font(.headline)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Try Again") {
+                        Task { await loadWishlists() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if wishlists.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "heart.slash")
+                        .font(.system(size: 50))
+                        .foregroundColor(.secondary)
+                    Text("No Wishlists Yet")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text("Create a wishlist to track cards you want")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                     Button {
                         showingCreateSheet = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label("Create Wishlist", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(wishlists) { wishlist in
+                        Button {
+                            selectedWishlist = wishlist
+                        } label: {
+                            WishlistRow(wishlist: wishlist)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                Task { await deleteWishlist(wishlist) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                 }
+                .listStyle(.plain)
             }
-            .refreshable {
-                await loadWishlists()
+        }
+        .navigationTitle("Wishlists")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingCreateSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                }
             }
-            .task {
-                await loadWishlists()
-            }
-            .sheet(isPresented: $showingCreateSheet) {
-                createWishlistSheet
-            }
-            .sheet(item: $selectedWishlist) { wishlist in
-                WishlistDetailView(wishlist: wishlist, onUpdate: {
-                    Task { await loadWishlists() }
-                })
-                .environmentObject(environmentStore)
-            }
+        }
+        .refreshable {
+            await loadWishlists()
+        }
+        .task {
+            await loadWishlists()
+        }
+        .sheet(isPresented: $showingCreateSheet) {
+            createWishlistSheet
+        }
+        .sheet(item: $selectedWishlist) { wishlist in
+            WishlistDetailView(wishlist: wishlist, onUpdate: {
+                Task { await loadWishlists() }
+            })
+            .environmentObject(environmentStore)
         }
     }
 

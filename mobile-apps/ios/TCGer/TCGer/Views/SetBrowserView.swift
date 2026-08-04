@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SetBrowserView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var sets: [TcgSet] = []
     @State private var isLoading = true
@@ -87,9 +89,24 @@ struct SetBrowserView: View {
         enabledSets.filter { environmentStore.isFocused(on: $0) }.count
     }
 
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        Group {
+            if parentProvidesNavigation {
+                setBrowserContent
+            } else {
+                NavigationView {
+                    setBrowserContent
+                }
+            }
+        }
+    }
+
+    private var setBrowserContent: some View {
+        VStack(spacing: 0) {
                 Picker("Set view", selection: $browserScope) {
                     ForEach(SetBrowserScope.allCases) { scope in
                         Text(scope.title).tag(scope)
@@ -235,8 +252,8 @@ struct SetBrowserView: View {
                     }
                     .listStyle(.insetGrouped)
                 }
-            }
-            .navigationTitle("Sets")
+        }
+        .navigationTitle("Sets")
             .searchable(text: $searchText, prompt: "Search sets...")
             .task {
                 chooseInitialScopeIfNeeded()
@@ -260,17 +277,16 @@ struct SetBrowserView: View {
                 guard !Task.isCancelled else { return }
                 await refreshOwnership(useCache: false)
             }
-            .sheet(isPresented: $showingFocusPicker, onDismiss: {
-                if !environmentStore.focusedSetIDs.isEmpty {
-                    browserScope = .focused
-                }
-            }) {
-                FocusSetPicker(
-                    sets: enabledSets,
-                    initialOrder: environmentStore.focusedSetOrder,
-                    onSave: environmentStore.replaceFocusedSetOrder
-                )
+        .sheet(isPresented: $showingFocusPicker, onDismiss: {
+            if !environmentStore.focusedSetIDs.isEmpty {
+                browserScope = .focused
             }
+        }) {
+            FocusSetPicker(
+                sets: enabledSets,
+                initialOrder: environmentStore.focusedSetOrder,
+                onSave: environmentStore.replaceFocusedSetOrder
+            )
         }
     }
 
