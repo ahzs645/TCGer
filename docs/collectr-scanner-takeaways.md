@@ -4,6 +4,9 @@
 > [app-reviews/collectr-android-2.5.5.md](app-reviews/collectr-android-2.5.5.md).
 > Use [app-reviews/template.md](app-reviews/template.md) for future app reviews.
 
+Compare Collectr's ideas against the other recovered scanners in the canonical
+[cross-app experiment plan](scanner-app-comparison-and-experiment-plan.md).
+
 ## Adopted
 
 ### Make the guide define the scan input

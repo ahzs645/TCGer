@@ -25,6 +25,8 @@ struct AddCardToBinderSheet: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
+    @State private var wishlistCard: Card?
+    @State private var didAddToWishlist = false
 
     private let apiService = APIService()
 
@@ -120,6 +122,19 @@ struct AddCardToBinderSheet: View {
                     Text("Choose which binder to add this card to")
                 }
 
+                Section {
+                    Button {
+                        wishlistCard = card
+                    } label: {
+                        Label("Add to Wishlist", systemImage: "heart")
+                    }
+                    .disabled(isAdding)
+                } header: {
+                    Text("Wishlist")
+                } footer: {
+                    Text("Track this card without adding a copy to a binder")
+                }
+
                 // Card Details
                 Section {
                     Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
@@ -185,7 +200,7 @@ struct AddCardToBinderSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add to Binder")
+            .navigationTitle("Add Card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -212,6 +227,16 @@ struct AddCardToBinderSheet: View {
                 edition = "1st Edition"
             }
             await loadCollections()
+        }
+        .sheet(item: $wishlistCard, onDismiss: {
+            if didAddToWishlist {
+                didAddToWishlist = false
+                dismiss()
+            }
+        }) { card in
+            AddToWishlistSheet(card: card) {
+                didAddToWishlist = true
+            }
         }
     }
 

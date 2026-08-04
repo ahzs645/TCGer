@@ -9,6 +9,7 @@ struct CardSearchView: View {
     @State private var errorMessage: String?
     @State private var hasSearched = false
     @State private var selectedCard: Card?
+    @State private var detailCard: Card?
     @State private var addCardSuccessMessage: String?
     @State private var showingPrintSelection = false
     @State private var selectedPrint: Card?
@@ -18,11 +19,17 @@ struct CardSearchView: View {
     @State private var isAddingAllMatches = false
     @State private var bulkWishlistStatus: String?
     @State private var keepWishlistUpdated = true
+    @State private var showingFilters = false
+    @State private var searchFilters = CardSearchFilterState()
 
     var addToWishlistId: String?
     var onCardAdded: (() -> Void)?
 
     private let apiService = APIService()
+
+    private var filteredSearchResults: [Card] {
+        searchResults.filter { searchFilters.matches($0, game: selectedGame) }
+    }
 
     var body: some View {
         NavigationView {
@@ -30,13 +37,24 @@ struct CardSearchView: View {
                 // Game Filter - Only show if more than one game is enabled
                 if environmentStore.enabledGames.count > 1 {
                     GamePickerPills(
-                        selection: $selectedGame,
+                        selection: Binding(
+                            get: { selectedGame },
+                            set: { selectGame($0) }
+                        ),
                         games: environmentStore.gamePickerGames
                     )
                     .background(Color(.systemBackground))
 
                     Divider()
                 }
+
+                CardSearchFilterBar(
+                    filters: searchFilters,
+                    onOpen: { showingFilters = true },
+                    onClear: clearSearchFilters
+                )
+
+                Divider()
 
                 // Bulk add banner — only when this search is feeding a wishlist
                 if let wishlistId = addToWishlistId,
@@ -93,17 +111,24 @@ struct CardSearchView: View {
                     }
                 } else if hasSearched && searchResults.isEmpty {
                     EmptySearchView()
+                } else if hasSearched && filteredSearchResults.isEmpty {
+                    FilteredSearchEmptyView {
+                        clearSearchFilters()
+                    }
                 } else if !hasSearched {
                     InitialSearchView()
                 } else {
                     SearchResultsList(
-                        cards: searchResults,
+                        cards: filteredSearchResults,
                         selectedGame: selectedGame,
                         enabledGames: environmentStore.enabledGames,
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
                             Task { await handleCardSelection(card) }
+                        },
+                        onShowDetails: { card in
+                            detailCard = card
                         },
                         onAddToWishlist: { card in
                             if let wishlistId = addToWishlistId {
@@ -119,6 +144,27 @@ struct CardSearchView: View {
             .searchable(text: $searchText, prompt: "Search for cards...")
             .onSubmit(of: .search) {
                 Task { await performSearch() }
+            }
+            .sheet(isPresented: $showingFilters) {
+                CardSearchFilterSheet(
+                    game: selectedGame,
+                    filters: searchFilters,
+                    resultCards: searchResults
+                ) { game, filters in
+                    selectedGame = game
+                    searchFilters = filters
+                    if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Task { await performSearch() }
+                    }
+                }
+                .environmentObject(environmentStore)
+            }
+            .sheet(item: $detailCard) { card in
+                CardDetailSheet(
+                    card: card,
+                    showPricing: environmentStore.showPricing,
+                    showCardNumbers: environmentStore.showCardNumbers
+                )
             }
             .sheet(isPresented: $showingPrintSelection) {
                 if let card = selectedCard {
@@ -185,11 +231,6 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
-            .onChange(of: selectedGame) {
-                if hasSearched && !searchText.isEmpty {
-                    Task { await performSearch() }
-                }
-            }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
                    let game = TCGGame(rawValue: defaultGame),
@@ -271,6 +312,27 @@ struct CardSearchView: View {
     private func validateSelectedGame() {
         if !environmentStore.isGameEnabled(selectedGame) {
             selectedGame = .all
+            searchFilters.clearIncompatibleValues(for: .all)
+            if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Task { await performSearch() }
+            }
+        }
+    }
+
+    private func selectGame(_ game: TCGGame) {
+        guard game != selectedGame else { return }
+        selectedGame = game
+        searchFilters.clearIncompatibleValues(for: game)
+        if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Task { await performSearch() }
+        }
+    }
+
+    private func clearSearchFilters() {
+        guard searchFilters.isActive else { return }
+        searchFilters = CardSearchFilterState()
+        if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Task { await performSearch() }
         }
     }
 
@@ -321,7 +383,8 @@ struct CardSearchView: View {
                 environmentStore.enabledGames.map { $0.rawValue.lowercased() }
             )
             let enabledMatches = matches.filter {
-                enabledGameRawValues.contains($0.tcg.lowercased())
+                enabledGameRawValues.contains($0.tcg.lowercased()) &&
+                    searchFilters.matches($0, game: selectedGame)
             }
 
             guard !enabledMatches.isEmpty else {
@@ -335,7 +398,7 @@ struct CardSearchView: View {
                 }
             }
 
-            if keepWishlistUpdated {
+            if keepWishlistUpdated && !searchFilters.isActive {
                 _ = try await apiService.addWishlistRule(
                     config: environmentStore.serverConfiguration,
                     token: token,
@@ -395,7 +458,8 @@ struct CardSearchView: View {
 
     @MainActor
     private func performSearch() async {
-        guard !searchText.isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             hasSearched = false
             searchResults = []
             return
@@ -411,18 +475,66 @@ struct CardSearchView: View {
         hasSearched = true
 
         do {
-            let response = try await apiService.searchCards(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                query: searchText,
-                game: selectedGame
-            )
-            searchResults = response.cards
+            if let set = searchFilters.set {
+                let cards = try await apiService.getSetCards(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    tcg: set.tcg,
+                    setCode: set.code
+                )
+                searchResults = cards.filter { $0.matchesSearchText(query) }
+            } else if searchFilters.hasDetailFilters {
+                searchResults = try await apiService.searchAllCards(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    query: query,
+                    game: selectedGame
+                )
+            } else {
+                let response = try await apiService.searchCards(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    query: query,
+                    game: selectedGame
+                )
+                searchResults = response.cards
+            }
             isSearching = false
         } catch {
             errorMessage = error.localizedDescription
             isSearching = false
         }
+    }
+}
+
+private extension Card {
+    func matchesSearchText(_ query: String) -> Bool {
+        name.localizedCaseInsensitiveContains(query) ||
+            collectorNumber?.localizedCaseInsensitiveContains(query) == true ||
+            rarity?.localizedCaseInsensitiveContains(query) == true ||
+            setCode?.localizedCaseInsensitiveContains(query) == true
+    }
+}
+
+private struct FilteredSearchEmptyView: View {
+    let onClear: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("No Cards Match These Filters")
+                .font(.headline)
+            Text("Try another set or remove one of the filters.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Clear Filters", action: onClear)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -434,6 +546,7 @@ private struct SearchResultsList: View {
     let showPricing: Bool
     let showCardNumbers: Bool
     let onCardTap: (Card) -> Void
+    let onShowDetails: (Card) -> Void
     var onAddToWishlist: ((Card) -> Void)?
 
     // Group cards by TCG
@@ -464,10 +577,20 @@ private struct SearchResultsList: View {
                             GridItem(.flexible())
                         ], spacing: 16) {
                             ForEach(tcgCards) { card in
-                                CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
-                                    .cardPreviewContextMenu(card: card, onSelect: { onCardTap(card) }, onAddToWishlist: {
-                                        onAddToWishlist?(card)
-                                    })
+                                Button {
+                                    onCardTap(card)
+                                } label: {
+                                    CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint("Opens the add card form")
+                                .cardPreviewContextMenu(
+                                    card: card,
+                                    primaryActionTitle: "Add Card",
+                                    onSelect: { onCardTap(card) },
+                                    onShowDetails: { onShowDetails(card) },
+                                    onAddToWishlist: { onAddToWishlist?(card) }
+                                )
                             }
                         }
                     } header: {

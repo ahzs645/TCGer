@@ -9,6 +9,8 @@ attempt a contour-derived homography only when the normal crop is not accepted.
 This document translates the ManaBox 4.1.11 review into an implementation and
 validation plan for TCGer. The recovered evidence is in
 [the ManaBox scanner report](../manabox-4.1.11-decompiled/SCAN_ANALYSIS.md).
+The broader geometry/descriptor/temporal matrix is maintained in the
+[cross-app scanner comparison](scanner-app-comparison-and-experiment-plan.md).
 
 ## What ManaBox proves
 
@@ -67,10 +69,10 @@ only needs to refine the four edges inside that region.
 The offline live-stream harness uses the same rectifier implementation. It now
 supports three explicit policies:
 
-| Mode | Behavior | Intended use |
-| --- | --- | --- |
-| `none` | Embed only the normal detector crop | Baseline |
-| `rescue` | Rectify only a non-gated crop that failed recognition; keep the higher-scoring result | Production candidate |
+| Mode     | Behavior                                                                                  | Intended use              |
+| -------- | ----------------------------------------------------------------------------------------- | ------------------------- |
+| `none`   | Embed only the normal detector crop                                                       | Baseline                  |
+| `rescue` | Rectify only a non-gated crop that failed recognition; keep the higher-scoring result     | Production candidate      |
 | `always` | Use the rectified crop whenever a valid quad is found, even when the normal crop was good | Negative-control/ablation |
 
 `--rectify` remains an alias for `--rectify-mode rescue`.
@@ -105,11 +107,11 @@ contrast normalization harmful when it did not match index preprocessing.
 
 The July 2 Sinnoh benchmark already compared the policies on one video:
 
-| Policy | Committed observations | Precision | Ground-truth windows found |
-| --- | ---: | ---: | ---: |
-| Normal crop | 275 | 93.8% | 85/91 |
-| Always/blanket rectify | 252 | 91.7% | 81/91 |
-| Rescue cascade | 287 | 93.0% | 87/91 |
+| Policy                 | Committed observations | Precision | Ground-truth windows found |
+| ---------------------- | ---------------------: | --------: | -------------------------: |
+| Normal crop            |                    275 |     93.8% |                      85/91 |
+| Always/blanket rectify |                    252 |     91.7% |                      81/91 |
+| Rescue cascade         |                    287 |     93.0% |                      87/91 |
 
 Blanket rectification lost already-correct crops; one observed cause was a
 small geometric shift on a good holo crop. Rescue rectification recovered two
@@ -226,17 +228,17 @@ browser/iOS hardware for latency and memory decisions.
 
 Every mode should be evaluated on these slices:
 
-| Area | Required cases |
-| --- | --- |
-| Games | Pokémon, MTG, Yu-Gi-Oh once each index is available |
-| Geometry | Flat, rotated, strong keystone, edge-clipped, partial frame |
-| Background | Plain light/dark, playmat, clutter, cards in hand |
-| Card style | Normal border, borderless/full-art, dark art, trainer/energy |
-| Surface | Matte, sleeve, foil, strong glare |
-| Occlusion | No fingers, one edge covered, two edges covered |
-| Motion/quality | Sharp still, blur, low light, compression |
-| Open set | Card back, pack, hand, empty background, non-card rectangle |
-| Scene | One card, multiple cards, card entering/leaving frame |
+| Area           | Required cases                                               |
+| -------------- | ------------------------------------------------------------ |
+| Games          | Pokémon, MTG, Yu-Gi-Oh once each index is available          |
+| Geometry       | Flat, rotated, strong keystone, edge-clipped, partial frame  |
+| Background     | Plain light/dark, playmat, clutter, cards in hand            |
+| Card style     | Normal border, borderless/full-art, dark art, trainer/energy |
+| Surface        | Matte, sleeve, foil, strong glare                            |
+| Occlusion      | No fingers, one edge covered, two edges covered              |
+| Motion/quality | Sharp still, blur, low light, compression                    |
+| Open set       | Card back, pack, hand, empty background, non-card rectangle  |
+| Scene          | One card, multiple cards, card entering/leaving frame        |
 
 For a smaller geometry-specific fixture set, label the four true corners as
 well as card identity. That permits corner error and warp validity to be scored
@@ -296,3 +298,9 @@ perspective correction as a guarded rescue. The next work is reproducible
 cross-game validation and iOS policy alignment—not a second customer-visible
 scanner mode and not a wholesale HOG rewrite.
 
+Purplemana 0.3.65 adds a second geometry hypothesis: a compact learned
+four-corner model can replace threshold/contour localization while keeping the
+same perspective-warp boundary. See
+[`purplemana-scanner-takeaways.md`](purplemana-scanner-takeaways.md). Test a
+TCGer-owned keypoint refiner against contour rescue; do not ship Purplemana's
+public model or change the rescue-only policy without replay evidence.

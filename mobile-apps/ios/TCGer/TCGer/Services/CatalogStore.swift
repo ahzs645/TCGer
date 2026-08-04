@@ -172,6 +172,9 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let rarity: String?
     let type: String?
     let types: [String]?
+    let colors: [String]?
+    let race: String?
+    let level: Int?
     let konamiId: Int?
 }
 

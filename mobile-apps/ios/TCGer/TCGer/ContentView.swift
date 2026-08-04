@@ -24,11 +24,30 @@ struct ContentView: View {
         environmentStore.visibleTabs.filter(isAvailable)
     }
 
+    /// Keep the tab count at five so SwiftUI does not hand overflow tabs to
+    /// UIKit's automatic More navigation controller. That controller would wrap
+    /// destinations which already own a navigation stack, producing two bars.
+    private var primaryTabs: [AppTab] {
+        guard tabs.count > 5 else { return tabs }
+        return Array(tabs.prefix(4))
+    }
+
+    private var overflowTabs: [AppTab] {
+        guard tabs.count > 5 else { return [] }
+        return Array(tabs.dropFirst(4))
+    }
+
     var body: some View {
         TabView {
-            ForEach(tabs) { tab in
+            ForEach(primaryTabs) { tab in
                 Tab(tab.title, systemImage: tab.systemImage) {
                     destination(for: tab)
+                }
+            }
+
+            if !overflowTabs.isEmpty {
+                Tab("More", systemImage: "ellipsis") {
+                    moreTabsView
                 }
             }
         }
@@ -39,8 +58,22 @@ struct ContentView: View {
         }
     }
 
+    private var moreTabsView: some View {
+        NavigationStack {
+            List(overflowTabs) { tab in
+                NavigationLink(value: tab) {
+                    Label(tab.title, systemImage: tab.systemImage)
+                }
+            }
+            .navigationTitle("More")
+            .navigationDestination(for: AppTab.self) { tab in
+                destination(for: tab, parentProvidesNavigation: true)
+            }
+        }
+    }
+
     @ViewBuilder
-    private func destination(for tab: AppTab) -> some View {
+    private func destination(for tab: AppTab, parentProvidesNavigation: Bool = false) -> some View {
         switch tab {
         case .home:
             DashboardView()
@@ -55,7 +88,7 @@ struct ContentView: View {
         case .scan:
             CardScannerView()
         case .settings:
-            SettingsView()
+            SettingsView(parentProvidesNavigation: parentProvidesNavigation)
         }
     }
 

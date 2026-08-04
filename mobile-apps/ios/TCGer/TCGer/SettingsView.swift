@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct SettingsView: View {
+    let parentProvidesNavigation: Bool
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
     @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
@@ -33,6 +35,10 @@ struct SettingsView: View {
     @State private var showingRemoveSampleAlert = false
     @State private var showingEraseLocalDataAlert = false
     @State private var versionTapCount = 0
+
+    init(parentProvidesNavigation: Bool = false) {
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
 
     /// True when running fully on-device with no backend server.
     private var isLocalMode: Bool {
@@ -83,8 +89,19 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationView {
-            List {
+        Group {
+            if parentProvidesNavigation {
+                settingsContent
+            } else {
+                NavigationStack {
+                    settingsContent
+                }
+            }
+        }
+    }
+
+    private var settingsContent: some View {
+        List {
                 // Account Section — a server concept; phone-only mode has no
                 // account, profile, or sign-in state to show.
                 if !isLocalMode {
@@ -645,8 +662,8 @@ struct SettingsView: View {
                 } header: {
                     Text("About")
                 }
-            }
-            .navigationTitle("Settings")
+        }
+        .navigationTitle("Settings")
             .task {
                 sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                 await refreshProfileIfNeeded()
@@ -755,10 +772,9 @@ struct SettingsView: View {
                     }
                 }
             }
-            .task(id: environmentStore.serverConfiguration.baseURL) {
-                await refreshServerStatus()
-                await refreshAppSettingsIfNeeded()
-            }
+        .task(id: environmentStore.serverConfiguration.baseURL) {
+            await refreshServerStatus()
+            await refreshAppSettingsIfNeeded()
         }
     }
 

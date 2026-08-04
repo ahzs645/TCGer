@@ -4,6 +4,8 @@ The full reverse-engineering report is in
 [`manabox-4.1.11-decompiled/SCAN_ANALYSIS.md`](../manabox-4.1.11-decompiled/SCAN_ANALYSIS.md).
 The implementation recommendation and reproducible geometry-policy test are in
 [`manabox-inspired-geometry-experiment.md`](manabox-inspired-geometry-experiment.md).
+The canonical factorized comparison with Collectr, Purplemana, and TCGer is in
+[`scanner-app-comparison-and-experiment-plan.md`](scanner-app-comparison-and-experiment-plan.md).
 
 ## The important difference from Collectr
 
@@ -19,16 +21,16 @@ TCGer's local-first scanner.
 
 ## Recommended decisions
 
-| ManaBox observation | TCGer decision |
-| --- | --- |
-| Matching index, mapping DB, and catalog revision are version-coupled | Enforce one compatibility manifest across encoder, index, metadata, gate, and catalog. |
-| One visual index row expands to several printings | Group identical artwork/visual references; use set constraints and OCR for exact-print resolution. |
-| Set locks are applied during candidate resolution | Add/retain early allowed-index filtering for selected game/set scope. |
-| Dedicated image worker, reusable frame buffer, one frame in flight | Keep scanner inference isolated and explicitly backpressured on web and iOS. |
-| 51k x 384 float vectors use exact native search successfully | Keep exact search while game/set partitioning meets latency; measure before adding ANN complexity. |
-| 53.5 MB background download becomes 81.4 MB of matching assets | Keep TCGer's int8 packed index and per-game downloads. |
-| Missing assets, metered download, progress, cancel, and unpack are first-class flows | Treat offline asset installation and atomic updates as scanner product work. |
-| Quick mode, same-card override, and restored sessions | Add these workflow controls independently of recognition accuracy. |
+| ManaBox observation                                                                  | TCGer decision                                                                                     |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Matching index, mapping DB, and catalog revision are version-coupled                 | Enforce one compatibility manifest across encoder, index, metadata, gate, and catalog.             |
+| One visual index row expands to several printings                                    | Group identical artwork/visual references; use set constraints and OCR for exact-print resolution. |
+| Set locks are applied during candidate resolution                                    | Add/retain early allowed-index filtering for selected game/set scope.                              |
+| Dedicated image worker, reusable frame buffer, one frame in flight                   | Keep scanner inference isolated and explicitly backpressured on web and iOS.                       |
+| 51k x 384 float vectors use exact native search successfully                         | Keep exact search while game/set partitioning meets latency; measure before adding ANN complexity. |
+| 53.5 MB background download becomes 81.4 MB of matching assets                       | Keep TCGer's int8 packed index and per-game downloads.                                             |
+| Missing assets, metered download, progress, cancel, and unpack are first-class flows | Treat offline asset installation and atomic updates as scanner product work.                       |
+| Quick mode, same-card override, and restored sessions                                | Add these workflow controls independently of recognition accuracy.                                 |
 
 ## Keep TCGer's stronger recognition stack
 

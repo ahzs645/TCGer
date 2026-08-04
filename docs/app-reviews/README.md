@@ -6,10 +6,16 @@ proprietary code or depend on private services.
 
 ## Reviews
 
-| App | Version | Platform | Review | Main result |
-| --- | --- | --- | --- | --- |
-| Collectr | 2.5.5 (735) | Android | [collectr-android-2.5.5.md](collectr-android-2.5.5.md) | Server-side card matching; local crop and barcode decode |
-| ManaBox | 4.1.11 (2687) | Android | [manabox-android-4.1.11.md](manabox-android-4.1.11.md) | Local OpenCV/HOG matching over a downloaded index |
+| App        | Version       | Platform | Review                                                       | Main result                                                         |
+| ---------- | ------------- | -------- | ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Collectr   | 2.5.5 (735)   | Android  | [collectr-android-2.5.5.md](collectr-android-2.5.5.md)       | Server-side card matching; local crop and barcode decode            |
+| ManaBox    | 4.1.11 (2687) | Android  | [manabox-android-4.1.11.md](manabox-android-4.1.11.md)       | Local OpenCV/HOG matching over a downloaded index                   |
+| Purplemana | 0.3.65        | Android  | [purplemana-android-0.3.65.md](purplemana-android-0.3.65.md) | Learned corners, local perspective warp/pHash, remote hash matching |
+
+Use the
+[cross-app scanner comparison and experiment plan](../scanner-app-comparison-and-experiment-plan.md)
+to compare transferable ideas on shared fixtures. Per-app reviews preserve
+evidence; the comparison plan defines the controlled TCGer tests.
 
 Start every new review from [template.md](template.md). Name it
 `<app>-<platform>-<version>.md` so findings from different releases are not

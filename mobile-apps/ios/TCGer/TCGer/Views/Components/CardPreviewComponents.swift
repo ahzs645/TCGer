@@ -102,15 +102,115 @@ struct CardPreviewContextView: View {
     }
 }
 
+/// Read-only details reached from a card's context menu.
+struct CardDetailSheet: View {
+    let card: Card
+    let showPricing: Bool
+    let showCardNumbers: Bool
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    CardArtworkImage(card: card, useFullResolution: true)
+                        .frame(maxWidth: 420)
+                        .frame(maxWidth: .infinity)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(card.name)
+                            .font(.title2.bold())
+
+                        Text(card.tcgDisplayName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    details
+                }
+                .padding()
+            }
+            .navigationTitle("Card Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private var details: some View {
+        VStack(spacing: 0) {
+            if let setName = card.setName {
+                detailRow("Set", value: setName)
+            }
+            if showCardNumbers, let collectorNumber = card.collectorNumber {
+                detailRow("Card Number", value: collectorNumber)
+            }
+            if let rarity = card.rarity {
+                detailRow("Rarity", value: rarity)
+            }
+            if let supertype = card.supertype {
+                detailRow("Type", value: supertype)
+            }
+            if let types = card.types, !types.isEmpty {
+                detailRow("Energy", value: types.joined(separator: ", "))
+            }
+            if let regulationMark = card.regulationMark {
+                detailRow("Regulation Mark", value: regulationMark)
+            }
+            if let releasedAt = card.releasedAt {
+                detailRow("Released", value: releasedAt.formatted(date: .abbreviated, time: .omitted))
+            }
+            if showPricing, let price = card.price {
+                detailRow("Market Price", value: price.formatted(.currency(code: "USD")))
+            }
+            if card.formatLegality?.standard == true {
+                detailRow("Standard", value: "Legal")
+            }
+            if card.formatLegality?.expanded == true {
+                detailRow("Expanded", value: "Legal")
+            }
+        }
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func detailRow(_ label: String, value: String) -> some View {
+        LabeledContent(label, value: value)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .overlay(alignment: .bottom) {
+                Divider()
+                    .padding(.leading, 14)
+            }
+    }
+}
+
 private struct CardPreviewContextMenuModifier: ViewModifier {
     let card: Card
+    let primaryActionTitle: String
     let onSelect: (() -> Void)?
+    let onShowDetails: (() -> Void)?
     let onAddToWishlist: (() -> Void)?
 
     func body(content: Content) -> some View {
         content.contextMenu {
             if let onSelect {
-                Button("Select this print", action: onSelect)
+                Button(primaryActionTitle, action: onSelect)
+                Divider()
+            }
+            if let onShowDetails {
+                Button {
+                    onShowDetails()
+                } label: {
+                    Label("Card Details", systemImage: "info.circle")
+                }
                 Divider()
             }
             if let onAddToWishlist {
@@ -130,8 +230,22 @@ private struct CardPreviewContextMenuModifier: ViewModifier {
 
 extension View {
     /// Attaches a context menu preview for the given card, using an optional selection action.
-    func cardPreviewContextMenu(card: Card, onSelect: (() -> Void)? = nil, onAddToWishlist: (() -> Void)? = nil) -> some View {
-        modifier(CardPreviewContextMenuModifier(card: card, onSelect: onSelect, onAddToWishlist: onAddToWishlist))
+    func cardPreviewContextMenu(
+        card: Card,
+        primaryActionTitle: String = "Select this print",
+        onSelect: (() -> Void)? = nil,
+        onShowDetails: (() -> Void)? = nil,
+        onAddToWishlist: (() -> Void)? = nil
+    ) -> some View {
+        modifier(
+            CardPreviewContextMenuModifier(
+                card: card,
+                primaryActionTitle: primaryActionTitle,
+                onSelect: onSelect,
+                onShowDetails: onShowDetails,
+                onAddToWishlist: onAddToWishlist
+            )
+        )
     }
 }
 

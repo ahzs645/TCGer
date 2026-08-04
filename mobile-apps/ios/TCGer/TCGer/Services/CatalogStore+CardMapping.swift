@@ -5,6 +5,21 @@ extension CatalogStore {
         let set = set(for: entry)
         let fullImageURL = imageURL(for: entry, thumbnail: false)?.absoluteString
         let thumbnailURL = imageURL(for: entry, thumbnail: true)?.absoluteString
+        var attributes: [String: JSONValue] = [:]
+
+        switch entry.tcg {
+        case .magic:
+            if let type = entry.card.type { attributes["type_line"] = .string(type) }
+            if let colors = entry.card.colors {
+                attributes["colors"] = .array(colors.map(JSONValue.string))
+            }
+        case .yugioh:
+            if let type = entry.card.type { attributes["type"] = .string(type) }
+            if let race = entry.card.race { attributes["race"] = .string(race) }
+            if let level = entry.card.level { attributes["level"] = .number(Double(level)) }
+        case .pokemon, .all, .onepiece, .lorcana, .dragonball:
+            break
+        }
 
         return Card(
             id: entry.card.id,
@@ -22,6 +37,7 @@ extension CatalogStore {
             types: entry.tcg == .pokemon ? entry.card.types : nil,
             setSymbolUrl: set?.iconUrl,
             setLogoUrl: set?.logoUrl,
+            attributes: attributes.isEmpty ? nil : attributes,
             printingKey: entry.tcg == .yugioh ? entry.card.id : nil,
             artworkId: entry.card.konamiId.map(String.init)
         )
