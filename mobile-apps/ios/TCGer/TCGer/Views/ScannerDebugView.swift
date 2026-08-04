@@ -250,6 +250,79 @@ final class ScannerDebugViewModel: ObservableObject {
         _ = ensureRecordingSessionDir()
     }
 
+#if targetEnvironment(simulator)
+    /// Seeds the recorder with realistic local data so the export UI can be
+    /// exercised end to end without a physical camera.
+    func loadSampleRecording() throws {
+        startNewRecordingSession()
+        guard let dir = recordingSessionDir else {
+            throw NSError(
+                domain: "ScannerDebug", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create the sample recording folder."]
+            )
+        }
+
+        let colors: [UIColor] = [.systemYellow, .systemBlue, .systemPurple]
+        var sampleFrames: [RecordedScanFrame] = []
+        for index in 1...3 {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let renderer = UIGraphicsImageRenderer(
+                size: CGSize(width: 480, height: 672),
+                format: format
+            )
+            let image = renderer.image { context in
+                colors[index - 1].setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 480, height: 672))
+                UIColor.white.withAlphaComponent(0.88).setFill()
+                UIBezierPath(
+                    roundedRect: CGRect(x: 44, y: 52, width: 392, height: 568),
+                    cornerRadius: 28
+                ).fill()
+                colors[index - 1].withAlphaComponent(0.3).setFill()
+                UIBezierPath(ovalIn: CGRect(x: 110, y: 145, width: 260, height: 260)).fill()
+            }
+            guard let jpeg = image.jpegData(compressionQuality: 0.75) else {
+                throw NSError(
+                    domain: "ScannerDebug", code: 6,
+                    userInfo: [NSLocalizedDescriptionKey: "Could not create a sample frame image."]
+                )
+            }
+
+            let imageFile = String(format: "frames/frame-%04d.jpg", index)
+            try jpeg.write(to: dir.appendingPathComponent(imageFile), options: .atomic)
+            let identified = index < 3
+            sampleFrames.append(RecordedScanFrame(
+                index: index,
+                timestampSeconds: Double(index - 1) * 0.7,
+                mode: ScanMode.pokemon.displayName,
+                pipeline: "simulator sample",
+                elapsedMs: 42 + Double(index * 8),
+                detectedCount: 1,
+                segmentationConfidence: 0.94 - Double(index) * 0.03,
+                quad: [[0.12, 0.91], [0.88, 0.9], [0.86, 0.08], [0.14, 0.09]],
+                identified: identified,
+                bestMatchName: identified ? "Sample Card \(index)" : nil,
+                bestMatchCardId: identified ? "sample-card-\(index)" : nil,
+                bestMatchSetCode: identified ? "SIM" : nil,
+                bestMatchSetName: identified ? "Simulator Samples" : nil,
+                confidence: identified ? 0.92 - Double(index) * 0.04 : nil,
+                strategy: identified ? "Simulator sample" : nil,
+                alternatives: identified ? ["Alternate Sample"] : [],
+                alternativeCardIds: identified ? ["sample-alternate"] : [],
+                expectedCardId: nil,
+                expectedNoMatch: nil,
+                imageFile: imageFile
+            ))
+        }
+
+        recordedFrames = sampleFrames
+        recordedFrameCount = sampleFrames.count
+        isRecording = false
+        log(.success, "Loaded \(sampleFrames.count) simulator sample frames for export testing.")
+    }
+#endif
+
     private func ensureRecordingSessionDir() -> URL? {
         if let dir = recordingSessionDir { return dir }
         let base = FileManager.default.temporaryDirectory
@@ -573,7 +646,7 @@ struct ScannerDebugView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @StateObject private var viewModel = ScannerDebugViewModel()
 
-    @State private var exportURL: URL?
+    @State private var exportDocument: ScannerRecordingDocument?
     @State private var showingExport = false
     @State private var exportFilename = "TCGer Scanner Recording"
     @State private var exportConfirmation: String?
@@ -605,8 +678,8 @@ struct ScannerDebugView: View {
         .onDisappear { viewModel.stop() }
         .fileExporter(
             isPresented: $showingExport,
-            item: exportURL,
-            contentTypes: [.zip],
+            document: exportDocument,
+            contentType: .zip,
             defaultFilename: exportFilename
         ) { result in
             switch result {
@@ -616,9 +689,7 @@ struct ScannerDebugView: View {
             case .failure(let error):
                 toolError = "Export failed: \(error.localizedDescription)"
             }
-            exportURL = nil
-        } onCancellation: {
-            exportURL = nil
+            exportDocument = nil
         }
         .fileImporter(
             isPresented: $showingReplayImporter,
@@ -856,12 +927,30 @@ struct ScannerDebugView: View {
             Text("To replay a saved archive, unzip it in Files and select the extracted folder.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+
+#if targetEnvironment(simulator)
+            Button {
+                do {
+                    try viewModel.loadSampleRecording()
+                    exportConfirmation = nil
+                } catch {
+                    toolError = error.localizedDescription
+                }
+            } label: {
+                Label("Load Sample Recording", systemImage: "doc.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityHint("Creates three local sample frames so Save Archive can be tested in Simulator.")
+#endif
         }
     }
 
     private func exportRecording() {
         do {
-            exportURL = try viewModel.buildRecordingExport()
+            exportDocument = try ScannerRecordingDocument(
+                fileURL: viewModel.buildRecordingExport()
+            )
             exportFilename = "TCGer-Scanner-\(Self.exportDateFormatter.string(from: Date()))"
             exportConfirmation = nil
             showingExport = true
@@ -1081,5 +1170,29 @@ private struct MetricTile: View {
         .padding(10)
         .background(tint.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+private struct ScannerRecordingDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+
+    private let archiveData: Data
+
+    init(fileURL: URL) throws {
+        archiveData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+        guard !archiveData.isEmpty else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents, !data.isEmpty else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        archiveData = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: archiveData)
     }
 }
