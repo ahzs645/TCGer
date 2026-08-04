@@ -650,6 +650,7 @@ struct ScannerDebugView: View {
     @State private var showingExport = false
     @State private var exportFilename = "TCGer Scanner Recording"
     @State private var exportConfirmation: String?
+    @State private var shareArchive: ShareableArchive?
     @State private var toolError: String?
     @State private var showingReplayImporter = false
     @State private var isReplaying = false
@@ -690,6 +691,9 @@ struct ScannerDebugView: View {
                 toolError = "Export failed: \(error.localizedDescription)"
             }
             exportDocument = nil
+        }
+        .sheet(item: $shareArchive) { archive in
+            ShareSheet(items: [archive.url])
         }
         .fileImporter(
             isPresented: $showingReplayImporter,
@@ -900,6 +904,15 @@ struct ScannerDebugView: View {
                 .disabled(viewModel.recordedFrameCount == 0)
 
                 Button {
+                    shareRecording()
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.recordedFrameCount == 0)
+
+                Button {
                     viewModel.clearRecording()
                     exportConfirmation = nil
                 } label: {
@@ -956,6 +969,22 @@ struct ScannerDebugView: View {
             showingExport = true
         } catch {
             toolError = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func shareRecording() {
+        do {
+            // Move the zip to a stable, human-readable filename so the share
+            // sheet (AirDrop, Messages, Files) shows a meaningful name.
+            let zip = try viewModel.buildRecordingExport()
+            let named = FileManager.default.temporaryDirectory
+                .appendingPathComponent("TCGer-Scanner-\(Self.exportDateFormatter.string(from: Date())).zip")
+            try? FileManager.default.removeItem(at: named)
+            try FileManager.default.moveItem(at: zip, to: named)
+            exportConfirmation = nil
+            shareArchive = ShareableArchive(url: named)
+        } catch {
+            toolError = "Share failed: \(error.localizedDescription)"
         }
     }
 
@@ -1195,4 +1224,21 @@ private struct ScannerRecordingDocument: FileDocument {
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: archiveData)
     }
+}
+
+// MARK: - Archive sharing
+
+private struct ShareableArchive: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
