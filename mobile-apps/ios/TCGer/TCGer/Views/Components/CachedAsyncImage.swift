@@ -120,12 +120,16 @@ private final class CachedImageLoader: ObservableObject {
                 throw URLError(.badServerResponse)
             }
 
-            guard let uiImage = UIImage(data: data) else {
+            guard let decoded = await RemoteImageDecoder.decode(
+                data: data,
+                response: httpResponse,
+                url: url
+            ) else {
                 throw URLError(.cannotDecodeContentData)
             }
 
-            cache.store(uiImage, data: data, for: url)
-            phase = .success(Image(uiImage: uiImage))
+            cache.store(decoded.image, data: decoded.cacheData, for: url)
+            phase = .success(Image(uiImage: decoded.image))
         } catch {
             phase = .failure(error)
         }

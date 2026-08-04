@@ -45,6 +45,12 @@ export function deriveCatalogImageUrls(
   card: CatalogCard,
   set?: CatalogSet,
 ): CatalogImageUrls {
+  const stored = {
+    imageUrl: card.imageUrl ?? card.imageUrlSmall,
+    imageUrlSmall: card.imageUrlSmall ?? card.imageUrl,
+  };
+  if (stored.imageUrl || stored.imageUrlSmall) return stored;
+
   if (tcg === "pokemon" && set?.serie && card.setCode && card.collectorNumber) {
     const root = `https://assets.tcgdex.net/en/${encodePathSegment(
       set.serie,

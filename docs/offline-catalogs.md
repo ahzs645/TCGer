@@ -17,9 +17,12 @@ feature works and how to maintain it.
 | Pokémon (tcgdex)                                        |  23,444 |  214 |         ~1.8 MB |
 | Magic (Scryfall, paper prints)                          | 106,826 |  986 |        ~20.7 MB |
 | Yu-Gi-Oh (YGOPRODeck, representative printing per card) |  14,471 |  454 |         ~3.4 MB |
+| One Piece (OPTCG API sets and starter decks)             |   4,023 |   51 |         ~1.1 MB |
+| Lorcana (Lorcast)                                        |   3,192 |   22 |         ~1.1 MB |
 
-Packs store no image URLs — clients derive them from card ids and the existing
-per-game image sources. While an image loads (or offline), clients show the
+Pokémon, Magic, and Yu-Gi-Oh card image URLs are derived from compact identifiers.
+One Piece, Lorcana, and Dragon Ball store provider image URLs because those sources
+do not expose an equivalent stable derivation rule. While an image loads (or offline), clients show the
 per-game card back instead of a gray placeholder:
 `Assets.xcassets/CardBacks/*` on iOS, `frontend/public/card-backs/*.png` on web.
 
@@ -37,7 +40,7 @@ bash scripts/ios-assets.sh build
 bash scripts/ios-assets.sh check
 ```
 
-`build` generates and synchronizes all three catalog packs, converts the web
+`build` generates and synchronizes the available catalog packs, converts the web
 embedding artifact into the compact iOS index, copies the tracked card-face
 gate fixture, and converts DINOv2 to Core ML when the required Python packages
 are available. If the web embedding source or Core ML Python packages are
@@ -51,17 +54,19 @@ cd backend
 npx --no-install tsx src/scripts/build-catalog-packs.ts --sync
 ```
 
-This fetches from tcgdex, the Scryfall bulk `default_cards` file (~558 MB
-download, streamed), and YGOPRODeck; writes `data/catalog/` (canonical output);
+This fetches from tcgdex, Scryfall's compressed `default_cards` JSONL feed,
+YGOPRODeck, OPTCG API, and Lorcast; writes `data/catalog/` (canonical output);
 and `--sync` copies packs + manifest to the two consumers:
 
 - `frontend/public/catalog/` — served same-origin to the web app.
 - `mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/` — bundled into the iOS app
   by the existing Xcode synchronized-resources setup.
 
-Options: `--game pokemon|magic|yugioh` (rebuild one game; other games'
+Options: `--game pokemon|magic|yugioh|onepiece|lorcana|dragonball` (rebuild one game; other games'
 manifest entries are preserved), `--limit <n>` (fast test builds),
 `--out <dir>`.
+Dragon Ball generation requires `APITCG_API_KEY`; without it, the default build
+generates the five anonymous-provider catalogs and preserves any existing Dragon Ball entry.
 
 Versioning is automatic: regenerating unchanged content keeps a game's
 `version`; changed content increments it. Pack filenames include the version and

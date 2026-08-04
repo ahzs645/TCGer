@@ -65,6 +65,9 @@ struct SetArtworkView: View {
         }
         .frame(width: size, height: size)
         .accessibilityLabel(set.name)
+        .onChange(of: set.id) {
+            iconFailed = false
+        }
     }
 
     private var fallbackBadge: some View {

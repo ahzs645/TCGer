@@ -70,7 +70,9 @@ final class CardSearchFilterTests: XCTestCase {
                 colors: ["U"],
                 race: nil,
                 level: nil,
-                konamiId: nil
+                konamiId: nil,
+                imageUrl: nil,
+                imageUrlSmall: nil
             )
         )
 

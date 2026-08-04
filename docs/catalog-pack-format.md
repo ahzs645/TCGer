@@ -11,7 +11,7 @@ from `frontend/public/catalog/` for local development.
 - Canonical build output: `data/catalog/` at the repo root (gitignored).
   - `data/catalog/manifest.json`
   - `data/catalog/{game}.v{version}.{sha-prefix}.pack.json` (uncompressed;
-    game = `pokemon | magic | yugioh`)
+    game = `pokemon | magic | yugioh | onepiece | lorcana | dragonball`)
 - Synced copies (both gitignored, each with a committed README explaining regeneration):
   - `frontend/public/catalog/` — served same-origin to the PWA.
   - `mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/` — bundled into the app
@@ -74,7 +74,8 @@ Set fields — common: `code`, `name`, `count`; optional: `serie`, `releasedAt`,
 `iconUrl`, `logoUrl`. Clients should render `iconUrl`, then `logoUrl`, then a
 set-code badge when neither image is available.
 
-Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `type?`.
+Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `type?`,
+`imageUrl?`, `imageUrlSmall?`.
 `setName` is NOT stored per card; clients join via the `sets` array by `setCode`.
 Per game extras (all optional):
 
@@ -82,6 +83,8 @@ Per game extras (all optional):
 - magic: `manaCost`, `colors` (string[]). `id` is the Scryfall print UUID.
 - yugioh: `race`, `atk`, `def`, `level`, `konamiId` (number). `konamiId` is the
   representative artwork/image id used to derive the YGOPRODeck image URL.
+- onepiece, lorcana, dragonball: provider image URLs are stored because their
+  current CDNs do not expose a stable derivation rule from the compact card id.
 
 ### Yu-Gi-Oh identity and set convention
 
@@ -128,6 +131,9 @@ iOS asset names `PokemonCardBack` / `MagicCardBack` / `YugiohCardBack`
 | pokemon | tcgdex (`https://api.tcgdex.net/v2/en`)                              | ~23.4k            | ~5 MB    |
 | magic   | Scryfall bulk `default_cards` (~558 MB download, streamed + trimmed) | ~96k paper prints | ~15 MB   |
 | yugioh  | YGOPRODeck `cardinfo.php`                                            | ~14.5k            | ~4–8 MB  |
+| onepiece | OPTCG API set and starter-deck dumps                                | ~4k               | ~1.1 MB  |
+| lorcana | Lorcast per-set card endpoints                                       | ~3.2k             | ~1.1 MB  |
+| dragonball | API TCG Fusion World products (requires `APITCG_API_KEY`)          | provider-dependent | provider-dependent |
 
 Magic includes every `default_cards` record whose `games` contains `paper`.
 Pure-digital records are excluded. Paper tokens, emblems, and art-series cards

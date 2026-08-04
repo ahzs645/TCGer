@@ -1,6 +1,7 @@
 import Combine
 import CryptoKit
 import Foundation
+import OSLog
 
 nonisolated protocol CatalogSource: Sendable {
     func data(for filename: String) async throws -> Data
@@ -89,10 +90,14 @@ actor RemoteCatalogSource: CatalogSource {
                 withIntermediateDirectories: true
             )
             try data.write(to: cachedURL, options: .atomic)
-            return data
+            return filename == "manifest.json"
+                ? await preferredManifestData(remote: data)
+                : data
         } catch {
             if let cached = try? Data(contentsOf: cachedURL, options: .mappedIfSafe) {
-                return cached
+                return filename == "manifest.json"
+                    ? await preferredManifestData(remote: cached)
+                    : cached
             }
             return try await fallback.data(for: filename)
         }
@@ -111,6 +116,37 @@ actor RemoteCatalogSource: CatalogSource {
             filename != ".." &&
             !filename.contains("/") &&
             !filename.contains("\\")
+    }
+
+    private func preferredManifestData(remote: Data) async -> Data {
+        guard let bundled = try? await fallback.data(for: "manifest.json") else {
+            return remote
+        }
+        return Self.mergeManifest(remote: remote, bundled: bundled)
+    }
+
+    nonisolated static func mergeManifest(remote: Data, bundled: Data) -> Data {
+        let decoder = JSONDecoder()
+        guard let bundledManifest = try? decoder.decode(CatalogManifest.self, from: bundled) else {
+            return remote
+        }
+        guard let remoteManifest = try? decoder.decode(CatalogManifest.self, from: remote),
+              remoteManifest.formatVersion == bundledManifest.formatVersion else {
+            return bundled
+        }
+
+        var games = remoteManifest.games
+        for (game, bundledEntry) in bundledManifest.games {
+            if games[game].map({ $0.version < bundledEntry.version }) ?? true {
+                games[game] = bundledEntry
+            }
+        }
+        let merged = CatalogManifest(
+            formatVersion: remoteManifest.formatVersion,
+            generatedAt: max(remoteManifest.generatedAt, bundledManifest.generatedAt),
+            games: games
+        )
+        return (try? JSONEncoder().encode(merged)) ?? remote
     }
 }
 
@@ -136,13 +172,13 @@ nonisolated enum CatalogAssetConfiguration {
     }
 }
 
-nonisolated struct CatalogManifest: Decodable, Sendable {
+nonisolated struct CatalogManifest: Codable, Sendable {
     let formatVersion: Int
     let generatedAt: String
     let games: [String: CatalogManifestGame]
 }
 
-nonisolated struct CatalogManifestGame: Decodable, Sendable {
+nonisolated struct CatalogManifestGame: Codable, Sendable {
     let version: Int
     let cardCount: Int
     let setCount: Int
@@ -176,6 +212,8 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let race: String?
     let level: Int?
     let konamiId: Int?
+    let imageUrl: String?
+    let imageUrlSmall: String?
 }
 
 nonisolated struct CatalogEntry: Hashable, Sendable {
@@ -191,6 +229,7 @@ nonisolated enum CatalogInstallState: Equatable {
 @MainActor
 final class CatalogStore: ObservableObject {
     static let shared = CatalogStore()
+    private static let logger = Logger(subsystem: "firstform.TCGer", category: "CatalogStore")
 
     enum StoreError: LocalizedError {
         case resourceUnavailable(String)
@@ -420,6 +459,9 @@ final class CatalogStore: ObservableObject {
             try await load(game, metadata: metadata)
         } catch {
             // A missing or invalid generated resource degrades to the seed catalog.
+            Self.logger.error(
+                "Failed to load the \(game.rawValue, privacy: .public) catalog: \(error.localizedDescription, privacy: .public)"
+            )
             loadedPacks.removeValue(forKey: game)
         }
     }
@@ -504,6 +546,13 @@ final class CatalogStore: ObservableObject {
     }
 
     func imageURL(for entry: CatalogEntry, thumbnail: Bool) -> URL? {
+        let storedURL = thumbnail
+            ? entry.card.imageUrlSmall ?? entry.card.imageUrl
+            : entry.card.imageUrl ?? entry.card.imageUrlSmall
+        if let storedURL, let url = URL(string: storedURL) {
+            return url
+        }
+
         switch entry.tcg {
         case .pokemon:
             guard let setCode = entry.card.setCode,
@@ -568,14 +617,19 @@ final class CatalogStore: ObservableObject {
 
         let source = self.source
         let file = metadata.file
-        let data = try await source.data(for: file)
+        var data = try await source.data(for: file)
         installProgress[game] = 0.3
 
-        let digest = await Task.detached(priority: .utility) {
-            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        }.value
-        guard digest == metadata.sha256 else {
-            throw StoreError.checksumMismatch(expected: game)
+        var digest = await Self.digest(for: data)
+        if digest != metadata.sha256 {
+            // Immutable filenames make this unusual, but a truncated or legacy
+            // cache entry should heal itself instead of permanently blocking an update.
+            await source.remove(file)
+            data = try await source.data(for: file)
+            digest = await Self.digest(for: data)
+            guard digest == metadata.sha256 else {
+                throw StoreError.checksumMismatch(expected: game)
+            }
         }
 
         let pack = try await Task.detached(priority: .utility) {
@@ -595,6 +649,12 @@ final class CatalogStore: ObservableObject {
         installProgress[game] = 1
     }
 
+    nonisolated private static func digest(for data: Data) async -> String {
+        await Task.detached(priority: .utility) {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }.value
+    }
+
     private func name(_ name: String, hasPrefix query: String) -> Bool {
         name.range(
             of: query,
@@ -610,7 +670,14 @@ final class CatalogStore: ObservableObject {
 }
 
 extension TCGGame {
-    static let catalogGames: [TCGGame] = [.yugioh, .magic, .pokemon]
+    static let catalogGames: [TCGGame] = [
+        .yugioh,
+        .magic,
+        .pokemon,
+        .onepiece,
+        .lorcana,
+        .dragonball
+    ]
 
     var cardBackAssetName: String? {
         switch self {

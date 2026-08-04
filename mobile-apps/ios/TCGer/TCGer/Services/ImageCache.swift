@@ -91,12 +91,14 @@ final class ImageCache {
                     guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                         continue
                     }
-                    guard let image = await MainActor.run(body: { UIImage(data: data) }) else {
+                    guard let decoded = await RemoteImageDecoder.decode(
+                        data: data,
+                        response: httpResponse,
+                        url: url
+                    ) else {
                         continue
                     }
-                    await MainActor.run {
-                        self.store(image, data: data, for: url)
-                    }
+                    self.store(decoded.image, data: decoded.cacheData, for: url)
                 } catch {
                     continue
                 }

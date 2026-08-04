@@ -46,6 +46,9 @@ const EMPTY_STATES: CatalogGameStates = {
   pokemon: { status: "unavailable" },
   magic: { status: "unavailable" },
   yugioh: { status: "unavailable" },
+  onepiece: { status: "unavailable" },
+  lorcana: { status: "unavailable" },
+  dragonball: { status: "unavailable" },
 };
 
 function buildStates(

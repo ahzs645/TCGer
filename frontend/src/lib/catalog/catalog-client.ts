@@ -141,7 +141,9 @@ function isCatalogCard(value: unknown): value is CatalogCard {
     isOptionalNumber(value.atk) &&
     isOptionalNumber(value.def) &&
     isOptionalNumber(value.level) &&
-    isOptionalNumber(value.konamiId)
+    isOptionalNumber(value.konamiId) &&
+    isOptionalString(value.imageUrl) &&
+    isOptionalString(value.imageUrlSmall)
   );
 }
 

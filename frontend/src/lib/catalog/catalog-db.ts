@@ -33,6 +33,8 @@ export interface CatalogCard {
   def?: number;
   level?: number;
   konamiId?: number;
+  imageUrl?: string;
+  imageUrlSmall?: string;
 }
 
 export interface CatalogPack {

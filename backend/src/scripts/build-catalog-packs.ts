@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
+import { Readable } from 'node:stream';
+import { createGunzip } from 'node:zlib';
 import {
   buildYugiohPrintingKey
 } from '../modules/adapters/yugioh-printing-key';
@@ -11,7 +14,13 @@ import {
 } from '../modules/adapters/yugioh-set-code';
 import { resolveTcgdexAssetUrl } from '../modules/adapters/tcgdex-assets';
 
-type SupportedGame = 'pokemon' | 'magic' | 'yugioh';
+type SupportedGame =
+  | 'pokemon'
+  | 'magic'
+  | 'yugioh'
+  | 'onepiece'
+  | 'lorcana'
+  | 'dragonball';
 
 interface BuildCliOptions {
   games: SupportedGame[];
@@ -47,6 +56,8 @@ interface CatalogCard {
   def?: number;
   level?: number;
   konamiId?: number;
+  imageUrl?: string;
+  imageUrlSmall?: string;
 }
 
 interface CatalogPack {
@@ -95,6 +106,7 @@ interface ScryfallBulkIndex {
   data?: Array<{
     type?: string;
     download_uri?: string;
+    jsonl_download_uri?: string;
   }>;
 }
 
@@ -138,11 +150,78 @@ interface YgoCard {
   }>;
 }
 
+interface OnePieceSet {
+  set_name?: string;
+  set_id?: string;
+  structure_deck_name?: string;
+  structure_deck_id?: string;
+}
+
+interface OnePieceCard {
+  card_name?: string;
+  card_set_id?: string;
+  set_id?: string;
+  set_name?: string;
+  card_image_id?: string;
+  card_image?: string;
+  card_rarity?: string;
+  rarity?: string;
+  card_type?: string;
+}
+
+interface LorcastSet {
+  id: string;
+  name: string;
+  code?: string;
+  released_at?: string;
+  card_count?: number;
+}
+
+interface LorcastCard {
+  id: string;
+  name: string;
+  version?: string;
+  released_at?: string;
+  collector_number?: string;
+  rarity?: string;
+  type?: string[];
+  set?: { id?: string; code?: string; name?: string };
+  image_uris?: {
+    digital?: { small?: string; normal?: string; large?: string };
+    small?: string;
+    normal?: string;
+    large?: string;
+  };
+}
+
+interface ApiTcgSet {
+  _id: string;
+  name: string;
+  code?: string;
+  release_date?: string;
+  logo?: string;
+}
+
+interface ApiTcgProduct {
+  _id: string | number;
+  name: string;
+  set?: string | ApiTcgSet;
+  release_date?: string;
+  code?: string;
+  cardNumber?: string;
+  images?: Array<{ small?: string; medium?: string; large?: string }>;
+  attributes?: Record<string, string | number | boolean | null>;
+}
+
 const REPO_ROOT = resolve(__dirname, '../../..');
 const DEFAULT_OUT_DIR = resolve(REPO_ROOT, 'data/catalog');
 const POKEMON_API_ROOT = 'https://api.tcgdex.net/v2/en';
 const SCRYFALL_BULK_INDEX_URL = 'https://api.scryfall.com/bulk-data';
 const YUGIOH_CARDS_URL = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
+const ONEPIECE_API_ROOT = 'https://optcgapi.com/api';
+const LORCANA_API_ROOT = 'https://api.lorcast.com/v0';
+const APITCG_API_ROOT = 'https://api.apitcg.com';
+const DRAGONBALL_TCG_SLUG = 'dragon-ball-super-fusion-world';
 const POKEMON_CONCURRENCY = 8;
 const USER_AGENT = 'TCGer-catalog-pack-builder/1.0';
 
@@ -160,15 +239,24 @@ function parseOptionalInteger(flagName: string, value: string | undefined): numb
 
 function parseSupportedGame(value: string | undefined): SupportedGame {
   const normalized = (value ?? '').trim().toLowerCase();
-  if (normalized === 'pokemon' || normalized === 'magic' || normalized === 'yugioh') {
+  if (
+    normalized === 'pokemon' ||
+    normalized === 'magic' ||
+    normalized === 'yugioh' ||
+    normalized === 'onepiece' ||
+    normalized === 'lorcana' ||
+    normalized === 'dragonball'
+  ) {
     return normalized;
   }
-  throw new Error('game must be one of: pokemon, magic, yugioh');
+  throw new Error(
+    'game must be one of: pokemon, magic, yugioh, onepiece, lorcana, dragonball'
+  );
 }
 
 function printUsage(): void {
   console.log(`Usage:
-  bunx tsx backend/src/scripts/build-catalog-packs.ts [--game pokemon|magic|yugioh] [--out <dir>] [--limit <n>] [--sync]
+  bunx tsx backend/src/scripts/build-catalog-packs.ts [--game pokemon|magic|yugioh|onepiece|lorcana|dragonball] [--out <dir>] [--limit <n>] [--sync]
 
 Defaults:
   --game all
@@ -219,7 +307,14 @@ function parseOptions(argv: string[]): BuildCliOptions | null {
   return {
     games: values.has('game')
       ? [parseSupportedGame(values.get('game'))]
-      : ['pokemon', 'magic', 'yugioh'],
+      : [
+          'pokemon',
+          'magic',
+          'yugioh',
+          'onepiece',
+          'lorcana',
+          ...(process.env.APITCG_API_KEY ? (['dragonball'] as const) : [])
+        ],
     outDir: resolve(values.get('out') ?? DEFAULT_OUT_DIR),
     limit: parseOptionalInteger('limit', values.get('limit')),
     sync: flags.has('sync') || values.get('sync') === 'true'
@@ -232,14 +327,19 @@ function sleep(durationMs: number): Promise<void> {
   });
 }
 
-async function fetchWithRetry(url: string, label: string): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  label: string,
+  headers: Record<string, string> = {}
+): Promise<Response> {
   const maxAttempts = 4;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await fetch(url, {
         headers: {
           Accept: 'application/json',
-          'User-Agent': USER_AGENT
+          'User-Agent': USER_AGENT,
+          ...headers
         }
       });
       if (response.ok) {
@@ -263,8 +363,12 @@ async function fetchWithRetry(url: string, label: string): Promise<Response> {
   throw new Error(`${label} failed after ${maxAttempts} attempts`);
 }
 
-async function fetchJson<T>(url: string, label: string): Promise<T> {
-  const response = await fetchWithRetry(url, label);
+async function fetchJson<T>(
+  url: string,
+  label: string,
+  headers?: Record<string, string>
+): Promise<T> {
+  const response = await fetchWithRetry(url, label, headers);
   return (await response.json()) as T;
 }
 
@@ -400,12 +504,32 @@ async function* streamJsonArray(response: Response): AsyncGenerator<unknown> {
   }
 }
 
+async function* streamGzippedJsonLines(response: Response): AsyncGenerator<unknown> {
+  if (!response.body) {
+    throw new Error('Scryfall JSONL response had no body');
+  }
+
+  const compressed = Readable.fromWeb(response.body as never);
+  const gunzip = createGunzip();
+  const lines = createInterface({ input: compressed.pipe(gunzip), crlfDelay: Infinity });
+  try {
+    for await (const line of lines) {
+      if (line.trim()) yield JSON.parse(line) as unknown;
+    }
+  } finally {
+    lines.close();
+    compressed.destroy();
+    gunzip.destroy();
+  }
+}
+
 async function buildMagicPack(updatedAt: string, limit?: number): Promise<CatalogPack> {
   const index = await fetchJson<ScryfallBulkIndex>(
     SCRYFALL_BULK_INDEX_URL,
     'Scryfall bulk-data index'
   );
-  const bulkUrl = index.data?.find((entry) => entry.type === 'default_cards')?.download_uri;
+  const bulkEntry = index.data?.find((entry) => entry.type === 'default_cards');
+  const bulkUrl = bulkEntry?.jsonl_download_uri ?? bulkEntry?.download_uri;
   if (!bulkUrl) {
     throw new Error('Scryfall bulk-data index did not contain default_cards');
   }
@@ -414,7 +538,10 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
   const cards: CatalogCard[] = [];
   const sets = new Map<string, CatalogSet>();
 
-  for await (const value of streamJsonArray(response)) {
+  const values = bulkEntry?.jsonl_download_uri
+    ? streamGzippedJsonLines(response)
+    : streamJsonArray(response);
+  for await (const value of values) {
     const card = value as ScryfallBulkCard;
     if (
       !card.id ||
@@ -528,6 +655,227 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
   };
 }
 
+function onePieceSetCode(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
+async function buildOnePiecePack(updatedAt: string, limit?: number): Promise<CatalogPack> {
+  const [setRows, deckRows, setCards, starterCards] = await Promise.all([
+    fetchJson<OnePieceSet[]>(`${ONEPIECE_API_ROOT}/allSets/`, 'One Piece set list'),
+    fetchJson<OnePieceSet[]>(`${ONEPIECE_API_ROOT}/allDecks/`, 'One Piece deck list'),
+    fetchJson<OnePieceCard[]>(`${ONEPIECE_API_ROOT}/allSetCards/`, 'One Piece set cards'),
+    fetchJson<OnePieceCard[]>(`${ONEPIECE_API_ROOT}/allSTCards/`, 'One Piece starter cards')
+  ]);
+
+  const names = new Map<string, string>();
+  for (const row of [...setRows, ...deckRows]) {
+    const code = onePieceSetCode(row.set_id ?? row.structure_deck_id);
+    const name = row.set_name ?? row.structure_deck_name;
+    if (code && name) names.set(code, name);
+  }
+
+  const sourceCards = [...setCards, ...starterCards];
+  const selectedCards = limit ? sourceCards.slice(0, limit) : sourceCards;
+  const cards: CatalogCard[] = [];
+  const sets = new Map<string, CatalogSet>();
+
+  for (const card of selectedCards) {
+    const id = card.card_image_id ?? card.card_set_id;
+    const name = card.card_name?.trim();
+    if (!id || !name) continue;
+    const setCode = onePieceSetCode(card.set_id);
+    const imageUrl = card.card_image?.trim() || undefined;
+    cards.push({
+      id,
+      name,
+      setCode,
+      collectorNumber: card.card_set_id,
+      rarity: card.rarity ?? card.card_rarity,
+      type: card.card_type,
+      imageUrl,
+      imageUrlSmall: imageUrl
+    });
+
+    if (setCode) {
+      const existing = sets.get(setCode);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        sets.set(setCode, {
+          code: setCode,
+          name: card.set_name ?? names.get(setCode) ?? setCode,
+          count: 1
+        });
+      }
+    }
+  }
+
+  return {
+    formatVersion: 1,
+    tcg: 'onepiece',
+    version: 1,
+    updatedAt,
+    sets: [...sets.values()],
+    cards
+  };
+}
+
+function lorcastImages(card: LorcastCard): { imageUrl?: string; imageUrlSmall?: string } {
+  const images = card.image_uris?.digital ?? card.image_uris ?? {};
+  return {
+    imageUrl: images.large ?? images.normal ?? images.small,
+    imageUrlSmall: images.small ?? images.normal ?? images.large
+  };
+}
+
+async function buildLorcanaPack(updatedAt: string, limit?: number): Promise<CatalogPack> {
+  const payload = await fetchJson<{ results?: LorcastSet[] }>(
+    `${LORCANA_API_ROOT}/sets`,
+    'Lorcast set list'
+  );
+  const cards: CatalogCard[] = [];
+  const sets: CatalogSet[] = [];
+
+  for (const set of payload.results ?? []) {
+    if (limit && cards.length >= limit) break;
+    const code = set.code ?? set.id;
+    const setCards = await fetchJson<LorcastCard[]>(
+      `${LORCANA_API_ROOT}/sets/${encodeURIComponent(code)}/cards`,
+      `Lorcast set ${code}`
+    );
+    const remaining = limit ? limit - cards.length : Number.POSITIVE_INFINITY;
+    const selectedCards = setCards.slice(0, remaining);
+    sets.push({
+      code,
+      name: set.name,
+      releasedAt: set.released_at,
+      count: set.card_count ?? setCards.length
+    });
+    cards.push(
+      ...selectedCards.map((card) => {
+        const collectorNumber = card.collector_number?.trim();
+        const cardSetCode = card.set?.code ?? code;
+        return {
+          id: collectorNumber ? `${cardSetCode}:${collectorNumber}` : card.id,
+          name: card.version ? `${card.name} - ${card.version}` : card.name,
+          setCode: cardSetCode,
+          collectorNumber,
+          rarity: card.rarity,
+          type: card.type?.join(' · '),
+          ...lorcastImages(card)
+        };
+      })
+    );
+    // Lorcast asks clients to leave 50–100 ms between requests.
+    await sleep(100);
+  }
+
+  return {
+    formatVersion: 1,
+    tcg: 'lorcana',
+    version: 1,
+    updatedAt,
+    sets,
+    cards
+  };
+}
+
+function dragonBallAttribute(
+  attributes: Record<string, string | number | boolean | null>,
+  ...names: string[]
+): string | number | boolean | null | undefined {
+  const normalized = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  return Object.entries(attributes).find(([key]) =>
+    normalized.includes(key.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  )?.[1];
+}
+
+async function buildDragonBallPack(updatedAt: string, limit?: number): Promise<CatalogPack> {
+  const apiKey = process.env.APITCG_API_KEY;
+  if (!apiKey) {
+    throw new Error('APITCG_API_KEY is required to build the dragonball catalog');
+  }
+  const headers = { 'x-api-key': apiKey };
+  const setUrl = new URL(`${APITCG_API_ROOT}/api/${DRAGONBALL_TCG_SLUG}/sets`);
+  setUrl.searchParams.set('limit', '100');
+  const setPayload = await fetchJson<{ data?: ApiTcgSet[] }>(
+    setUrl.toString(),
+    'API TCG Dragon Ball set list',
+    headers
+  );
+  const setById = new Map((setPayload.data ?? []).map((set) => [set._id, set] as const));
+  const setByCode = new Map(
+    (setPayload.data ?? []).flatMap((set) => (set.code ? [[set.code, set] as const] : []))
+  );
+  const cards: CatalogCard[] = [];
+  let page = 1;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (cards.length < total && (!limit || cards.length < limit)) {
+    const pageUrl = new URL(`${APITCG_API_ROOT}/api/products`);
+    pageUrl.searchParams.set('tcg', DRAGONBALL_TCG_SLUG);
+    pageUrl.searchParams.set('type', 'card');
+    pageUrl.searchParams.set('populate', 'set');
+    pageUrl.searchParams.set('limit', '100');
+    pageUrl.searchParams.set('page', String(page));
+    const payload = await fetchJson<{ data?: ApiTcgProduct[]; total?: number }>(
+      pageUrl.toString(),
+      `API TCG Dragon Ball cards page ${page}`,
+      headers
+    );
+    total = payload.total ?? 0;
+    const products = payload.data ?? [];
+    if (!products.length) break;
+    for (const product of products) {
+      if (limit && cards.length >= limit) break;
+      const attributes = product.attributes ?? {};
+      const set =
+        typeof product.set === 'object'
+          ? product.set
+          : product.set
+            ? setById.get(product.set) ?? setByCode.get(product.set)
+            : undefined;
+      const image = product.images?.[0];
+      cards.push({
+        id: String(product._id),
+        name: product.name,
+        setCode: set?.code ?? set?._id ?? (typeof product.set === 'string' ? product.set : undefined),
+        collectorNumber: product.cardNumber ?? product.code,
+        rarity: String(dragonBallAttribute(attributes, 'rarity') ?? '') || undefined,
+        type: String(dragonBallAttribute(attributes, 'type', 'card type') ?? '') || undefined,
+        imageUrl: image?.large ?? image?.medium ?? image?.small,
+        imageUrlSmall: image?.small ?? image?.medium ?? image?.large
+      });
+    }
+    page += 1;
+  }
+
+  const counts = new Map<string, number>();
+  for (const card of cards) {
+    if (card.setCode) counts.set(card.setCode, (counts.get(card.setCode) ?? 0) + 1);
+  }
+  const sets = (setPayload.data ?? []).map((set) => {
+    const code = set.code ?? set._id;
+    return {
+      code,
+      name: set.name,
+      releasedAt: set.release_date,
+      count: counts.get(code) ?? counts.get(set._id) ?? 0,
+      logoUrl: set.logo
+    };
+  });
+
+  return {
+    formatVersion: 1,
+    tcg: 'dragonball',
+    version: 1,
+    updatedAt,
+    sets,
+    cards
+  };
+}
+
 async function loadExistingManifest(outDir: string): Promise<CatalogManifest | undefined> {
   try {
     return JSON.parse(
@@ -603,8 +951,7 @@ async function writePack(
 
 async function syncOutputs(
   outDir: string,
-  manifest: CatalogManifest,
-  builtGames: SupportedGame[]
+  manifest: CatalogManifest
 ): Promise<void> {
   const destinations = [
     resolve(REPO_ROOT, 'frontend/public/catalog'),
@@ -612,8 +959,18 @@ async function syncOutputs(
   ];
   for (const destination of destinations) {
     await mkdir(destination, { recursive: true });
+    const currentFiles = new Set(
+      Object.values(manifest.games)
+        .map((entry) => entry?.file)
+        .filter((file): file is string => Boolean(file))
+    );
+    for (const filename of await readdir(destination)) {
+      if (filename.endsWith('.pack.json') && !currentFiles.has(filename)) {
+        await unlink(resolve(destination, filename));
+      }
+    }
     await copyFile(resolve(outDir, 'manifest.json'), resolve(destination, 'manifest.json'));
-    for (const game of builtGames) {
+    for (const game of Object.keys(manifest.games) as SupportedGame[]) {
       const entry = manifest.games[game];
       if (entry) {
         await copyFile(resolve(outDir, entry.file), resolve(destination, entry.file));
@@ -644,7 +1001,13 @@ async function main(): Promise<void> {
         ? await buildPokemonPack(generatedAt, options.limit)
         : game === 'magic'
           ? await buildMagicPack(generatedAt, options.limit)
-          : await buildYugiohPack(generatedAt, options.limit);
+          : game === 'yugioh'
+            ? await buildYugiohPack(generatedAt, options.limit)
+            : game === 'onepiece'
+              ? await buildOnePiecePack(generatedAt, options.limit)
+              : game === 'lorcana'
+                ? await buildLorcanaPack(generatedAt, options.limit)
+                : await buildDragonBallPack(generatedAt, options.limit);
     manifest.games[game] = await writePack(
       options.outDir,
       pack,
@@ -658,7 +1021,7 @@ async function main(): Promise<void> {
     `${JSON.stringify(manifest, null, 2)}\n`
   );
   if (options.sync) {
-    await syncOutputs(options.outDir, manifest, options.games);
+    await syncOutputs(options.outDir, manifest);
     console.log('Synced catalog packs to web and iOS resources.');
   }
 }

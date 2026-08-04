@@ -100,7 +100,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = process.argv[2];
-const games = ['pokemon', 'magic', 'yugioh'];
+const requiredGames = ['pokemon', 'magic', 'yugioh', 'onepiece', 'lorcana'];
+const knownGames = new Set([...requiredGames, 'dragonball']);
 const failures = [];
 const successes = [];
 
@@ -141,9 +142,6 @@ function validatePack(packFile, game, manifestEntry) {
   if (!manifestEntry) return;
   const byteCount = Buffer.byteLength(parsed.contents);
   const digest = crypto.createHash('sha256').update(parsed.contents).digest('hex');
-  if (manifestEntry.file !== `${game}.pack.json`) {
-    fail(packFile, `manifest file must be ${game}.pack.json, got ${manifestEntry.file}`);
-  }
   if (manifestEntry.bytes !== byteCount) {
     fail(packFile, `manifest bytes ${manifestEntry.bytes} != actual ${byteCount}`);
   }
@@ -176,10 +174,25 @@ function validateCatalogDirectory(directory) {
     }
   }
 
-  for (const game of games) {
-    const entry = manifest?.games?.[game];
-    if (manifest && !entry) fail(manifestFile, `missing games.${game}`);
-    validatePack(path.join(directory, `${game}.pack.json`), game, entry);
+  for (const game of requiredGames) {
+    if (manifest && !manifest.games?.[game]) fail(manifestFile, `missing games.${game}`);
+  }
+
+  for (const [game, entry] of Object.entries(manifest?.games ?? {})) {
+    if (!knownGames.has(game)) {
+      fail(manifestFile, `unsupported game ${game}`);
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') {
+      fail(manifestFile, `games.${game} must be an object`);
+      continue;
+    }
+    const expectedPattern = new RegExp(`^${game}\\.v${entry.version}\\.[a-f0-9]{16}\\.pack\\.json$`);
+    if (typeof entry.file !== 'string' || !expectedPattern.test(entry.file)) {
+      fail(manifestFile, `games.${game}.file is not a content-addressed pack filename: ${entry.file}`);
+      continue;
+    }
+    validatePack(path.join(directory, entry.file), game, entry);
   }
 
   if (failures.length === before) {

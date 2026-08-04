@@ -15,6 +15,7 @@ import {
   searchDemoCards,
   DEMO_CARDS,
   type DemoCard,
+  type DemoTcg,
 } from "@/lib/data/demo-cards";
 import { isCatalogInstalled } from "@/lib/catalog/catalog-client";
 import {
@@ -186,6 +187,10 @@ function demoCardToSearchResult(dc: DemoCard) {
 
 const DEMO_TCGS: readonly CatalogTcgCode[] = CATALOG_GAMES;
 
+function isSeededDemoGame(game: CatalogTcgCode): game is DemoTcg {
+  return game === "pokemon" || game === "magic" || game === "yugioh";
+}
+
 function demoOwnedCards(tcg?: TcgCode): Card[] {
   const cards = new Map<string, Card>();
   for (const binder of store().binders) {
@@ -293,7 +298,9 @@ async function demoSearchCards(query: string, tcg?: TcgCode): Promise<Card[]> {
       if (!isCatalogGame(game)) return [];
       const installed = await isCatalogInstalled(game);
       if (installed) return searchCatalog(query, game);
-      return searchDemoCards(query, game).map(demoCardToSearchResult);
+      return isSeededDemoGame(game)
+        ? searchDemoCards(query, game).map(demoCardToSearchResult)
+        : [];
     }),
   );
   const owned = demoOwnedCards(tcg).filter((card) =>
