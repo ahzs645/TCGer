@@ -124,8 +124,26 @@ struct CollectionCardRow: View {
         card.copies.contains { $0.isFoil == true || $0.collectibleVariant.isFoil }
     }
 
+    private var finishLabels: [String] {
+        uniquePreservingOrder(card.copies.compactMap { copy -> String? in
+            let variant = copy.collectibleVariant
+            guard let code = variant.finishCode else { return nil }
+            return variant.finishLabel ?? PokemonFinishOption.label(for: code)
+        })
+    }
+
+    /// A single unambiguous finish (Holo, Non-Holo, …) is promoted to the
+    /// header next to the language chip; mixed finishes stay in the badge row.
+    private var headerFinishLabel: String? {
+        finishLabels.count == 1 ? finishLabels.first : nil
+    }
+
     private var variantLabels: [String] {
-        uniquePreservingOrder(card.copies.flatMap { $0.collectibleVariant.labels })
+        var labels = uniquePreservingOrder(card.copies.flatMap { $0.collectibleVariant.labels })
+        if let headerFinishLabel {
+            labels.removeAll { $0 == headerFinishLabel }
+        }
+        return labels
     }
 
     private var hasAnySigned: Bool {
@@ -187,15 +205,21 @@ struct CollectionCardRow: View {
 
                         Spacer()
 
-                        if let code = languageCode() {
-                            Text(code)
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(colorScheme == .dark ? 0.24 : 0.12))
-                                .clipShape(Capsule())
+                        HStack(spacing: 6) {
+                            if let finish = headerFinishLabel {
+                                AttributeBadge(icon: "circle.hexagongrid", label: finish, color: .indigo)
+                            }
+
+                            if let code = languageCode() {
+                                Text(code)
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue.opacity(colorScheme == .dark ? 0.24 : 0.12))
+                                    .clipShape(Capsule())
+                            }
                         }
                     }
 
@@ -228,7 +252,7 @@ struct CollectionCardRow: View {
                                 )
                             }
 
-                            if hasAnyFoil {
+                            if hasAnyFoil, finishLabels.isEmpty {
                                 AttributeBadge(icon: "sparkles", label: "Foil", color: .yellow)
                             }
                             ForEach(variantLabels.prefix(3), id: \.self) { label in
@@ -367,9 +391,10 @@ struct CollectionCardRow: View {
                     .minimumScaleFactor(0.85)
             }
             .font(.caption2)
+            .fontWeight(.medium)
             .foregroundColor(color)
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(color.opacity(colorScheme == .dark ? 0.22 : 0.12))
             .clipShape(Capsule())
         }
@@ -423,9 +448,10 @@ struct CollectionCardRow: View {
                     .lineLimit(1)
             }
             .font(.caption2)
+            .fontWeight(.medium)
             .foregroundColor(color)
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(color.opacity(colorScheme == .dark ? 0.22 : 0.12))
             .clipShape(Capsule())
         }

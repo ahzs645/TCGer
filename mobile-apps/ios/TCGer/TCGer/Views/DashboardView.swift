@@ -48,7 +48,10 @@ struct DashboardView: View {
                         // Stats Section
                         StatsSection(
                             collections: collections,
-                            showPricing: environmentStore.showPricing
+                            showPricing: environmentStore.showPricing,
+                            onOpenCollections: {
+                                environmentStore.openTab(.collections)
+                            }
                         )
 
                         // Frontend entry for the tilt demo is disabled for now.
@@ -148,6 +151,7 @@ private enum ActiveSheet: Identifiable {
 private struct StatsSection: View {
     let collections: [Collection]
     let showPricing: Bool
+    let onOpenCollections: () -> Void
 
     var totalCards: Int {
         collections.reduce(0) { $0 + $1.uniqueCards }
@@ -167,22 +171,29 @@ private struct StatsSection: View {
                 .font(.headline)
 
             HStack(spacing: 12) {
-                StatItem(title: "Binders", value: "\(collections.count)", color: .blue, icon: "folder.fill")
-                StatItem(title: "Unique Cards", value: "\(totalCards)", color: .indigo, icon: "rectangle.stack.fill")
+                statButton(StatItem(title: "Binders", value: "\(collections.count)", color: .blue, icon: "folder.fill"))
+                statButton(StatItem(title: "Unique Cards", value: "\(totalCards)", color: .indigo, icon: "rectangle.stack.fill"))
             }
 
             HStack(spacing: 12) {
-                StatItem(title: "Total Copies", value: "\(totalCopies)", color: .orange, icon: "square.on.square")
+                statButton(StatItem(title: "Total Copies", value: "\(totalCopies)", color: .orange, icon: "square.on.square"))
                 if showPricing {
-                    StatItem(
+                    statButton(StatItem(
                         title: "Est. Value",
                         value: totalValue.priceText,
                         color: .green,
                         icon: "dollarsign.circle.fill"
-                    )
+                    ))
                 }
             }
         }
+    }
+
+    private func statButton(_ item: StatItem) -> some View {
+        Button(action: onOpenCollections) {
+            item
+        }
+        .buttonStyle(.plain)
     }
 }
 

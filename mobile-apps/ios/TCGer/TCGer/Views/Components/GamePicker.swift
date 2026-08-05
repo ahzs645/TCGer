@@ -155,10 +155,11 @@ struct GameBadge: View {
                 Text(tcg.prefix(3).uppercased())
             }
         }
-        .font(.system(size: 10, weight: .semibold))
+        .font(.caption2)
+        .fontWeight(.semibold)
         .foregroundStyle(badgeColor)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .background(badgeColor.opacity(0.15))
         .clipShape(Capsule())
         .accessibilityLabel(game?.shortName ?? tcg)

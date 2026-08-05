@@ -778,6 +778,12 @@ final class EnvironmentStore: ObservableObject {
         }
     }
 
+    /// Programmatic tab switches (e.g. tapping a dashboard overview tile) go
+    /// through the deep-link pipeline so tab visibility rules still apply.
+    func openTab(_ tab: AppTab) {
+        pendingDeepLinkTab = tab
+    }
+
     func updateWidgetData(collections: [Collection]) {
         guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
 

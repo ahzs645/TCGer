@@ -144,86 +144,96 @@ struct CollectionDetailView: View {
 
     @ViewBuilder
     private var filtersSectionContent: some View {
-        if showFilters {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Button {
-                        showFilters = false
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                            .font(.title3)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showFilters.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Hide filters")
-                    Spacer()
-                }
-
-                HStack(spacing: 10) {
-                    tagFilterMenu
-                    conditionFilterMenu
-                    // Sort picker
-                    Menu {
-                        ForEach(CardSortOption.allCases, id: \.self) { option in
-                            Button {
-                                sortOption = option
-                            } label: {
-                                Label(option.rawValue, systemImage: option.systemImage)
-                                if sortOption == option {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.up.arrow.down")
-                            Text(sortOption.rawValue)
-                        }
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
-                        .cornerRadius(8)
-                    }
-                }
-
-                HStack(spacing: 12) {
-                    TextField("Min $", text: $minPriceFilter)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Max $", text: $maxPriceFilter)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                HStack(spacing: 12) {
-                    if hasActiveFilters {
-                        Button("Clear All Filters") {
-                            clearFilters()
-                        }
-                        .font(.caption)
-                    }
-                }
-            }
-            .padding(.vertical, 4)
-        } else {
-            Button {
-                showFilters = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
+                } label: {
+                    Image(systemName: showFilters
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle")
                         .font(.title3)
-                    if activeFilterCount > 0 {
-                        Text("\(activeFilterCount)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(showFilters ? "Hide filters" : "Show filters")
+
+                if showFilters {
+                    Text("Filters")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                } else if activeFilterCount > 0 {
+                    Text("\(activeFilterCount)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if showFilters, hasActiveFilters {
+                    Button("Clear All") {
+                        clearFilters()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+            }
+
+            if showFilters {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        sortMenu
+                        tagFilterMenu
+                        conditionFilterMenu
+                        priceFilterFields
                     }
                 }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Show filters")
-            .padding(.vertical, 4)
         }
+        .padding(.vertical, 4)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(CardSortOption.allCases, id: \.self) { option in
+                Button {
+                    sortOption = option
+                } label: {
+                    Label(option.rawValue, systemImage: option.systemImage)
+                    if sortOption == option {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        } label: {
+            filterChipLabel(text: sortOption.rawValue, icon: "arrow.up.arrow.down")
+        }
+    }
+
+    private var priceFilterFields: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "dollarsign.circle")
+                .font(.caption)
+            TextField("Min", text: $minPriceFilter)
+                .keyboardType(.decimalPad)
+                .frame(width: 44)
+            Text("–")
+                .foregroundColor(.secondary)
+            TextField("Max", text: $maxPriceFilter)
+                .keyboardType(.decimalPad)
+                .frame(width: 44)
+        }
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(hasPriceFilter ? Color.accentColor.opacity(0.15) : Color(.secondarySystemBackground))
+        .clipShape(Capsule())
+    }
+
+    private var hasPriceFilter: Bool {
+        !minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var tagFilterMenu: some View {
@@ -251,7 +261,7 @@ struct CollectionDetailView: View {
                 }
             }
         } label: {
-            filterMenuLabel(text: "Tags", icon: "tag")
+            filterChipLabel(text: "Tags", icon: "tag", activeCount: selectedTagFilters.count)
         }
     }
 
@@ -280,22 +290,37 @@ struct CollectionDetailView: View {
                 }
             }
         } label: {
-            filterMenuLabel(text: "Condition", icon: "line.3.horizontal.decrease.circle")
+            filterChipLabel(text: "Condition", icon: "checkmark.seal", activeCount: selectedConditionFilters.count)
         }
     }
 
-    private func filterMenuLabel(text: String, icon: String) -> some View {
-        HStack {
+    private func filterChipLabel(text: String, icon: String, activeCount: Int = 0) -> some View {
+        HStack(spacing: 5) {
             Image(systemName: icon)
             Text(text)
-            Spacer()
+                .lineLimit(1)
+                .fixedSize()
+            if activeCount > 0 {
+                Text("\(activeCount)")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.accentColor)
+                    .clipShape(Capsule())
+            }
             Image(systemName: "chevron.down")
                 .font(.caption2)
+                .foregroundColor(.secondary)
         }
+        .font(.caption)
+        .fontWeight(.medium)
+        .foregroundColor(activeCount > 0 ? .accentColor : .primary)
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 7)
+        .background(activeCount > 0 ? Color.accentColor.opacity(0.15) : Color(.secondarySystemBackground))
+        .clipShape(Capsule())
     }
 
     var body: some View {
