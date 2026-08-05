@@ -53,7 +53,6 @@ struct EditCollectionCardSheet: View {
     @State private var certNumber: String
     @State private var storageLocation: String
 
-    private let conditions = ["", "Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = [""] + PokemonCardLanguage.allCases.map(\.rawValue)
 
     private var supportsPrintSelection: Bool {
@@ -118,7 +117,7 @@ struct EditCollectionCardSheet: View {
         self.onSave = onSave
 
         _quantity = State(initialValue: max(1, card.quantity))
-        _conditionSelection = State(initialValue: copyDetails?.condition ?? card.condition ?? "")
+        _conditionSelection = State(initialValue: (copyDetails?.condition ?? card.condition).map(CardCondition.canonicalize) ?? "")
         _languageSelection = State(initialValue: copyDetails?.language ?? card.language ?? "")
         _notes = State(initialValue: copyDetails?.notes ?? card.notes ?? "")
         _isFoil = State(initialValue: copyDetails?.isFoil ?? false)
@@ -143,7 +142,10 @@ struct EditCollectionCardSheet: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
+                        CachedAsyncImage(
+                            url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
+                            tcg: card.tcg
+                        ) { phase in
                             switch phase {
                             case .success(let image):
                                 image.resizable().aspectRatio(contentMode: .fit)
@@ -269,12 +271,7 @@ struct EditCollectionCardSheet: View {
                 }
 
                 Section {
-                    Picker("Condition", selection: $conditionSelection) {
-                        Text("Unspecified").tag("")
-                        ForEach(conditions.filter { !$0.isEmpty }, id: \.self) { option in
-                            Text(option).tag(option)
-                        }
-                    }
+                    ConditionPicker(selection: $conditionSelection, includeUnspecified: true)
 
                     Picker("Language", selection: $languageSelection) {
                         Text("Unspecified").tag("")

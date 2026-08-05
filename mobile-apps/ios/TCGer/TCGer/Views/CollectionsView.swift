@@ -16,11 +16,7 @@ struct CollectionsView: View {
 
     private let apiService = APIService()
     private var displayCollections: [Collection] {
-        var visible = collections.filter { !$0.isUnsortedBinder }
-        if let unsorted = collections.first(where: { $0.isUnsortedBinder }), !unsorted.cards.isEmpty {
-            visible.append(unsorted)
-        }
-        return visible
+        collections.sortedForDisplay(hidingEmptyUnsortedLibrary: true)
     }
 
     init(parentProvidesNavigation: Bool = false) {

@@ -750,7 +750,7 @@ struct BinderPageReviewView: View {
                         binderId: binderID,
                         cardId: card.id,
                         quantity: 1,
-                        condition: "Near Mint",
+                        condition: CardCondition.nearMint.rawValue,
                         language: "English",
                         notes: nil,
                         price: card.price,
@@ -785,11 +785,7 @@ struct BinderPageReviewView: View {
     }
 
     private func sortCollections() {
-        collections.sort { lhs, rhs in
-            if lhs.id == Collection.unsortedBinderId { return true }
-            if rhs.id == Collection.unsortedBinderId { return false }
-            return lhs.updatedAt > rhs.updatedAt
-        }
+        collections = collections.sortedForDisplay()
     }
 
     private func makeCard(from candidate: CardScanCandidate) -> Card? {

@@ -9,11 +9,6 @@ struct CollectionCardRow: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isCopiesExpanded = false
 
-    private let conditionPriority = [
-        "GEM MINT", "MINT", "NEAR MINT", "NM", "LIGHTLY PLAYED", "LP",
-        "MODERATE PLAY", "MP", "HEAVY PLAY", "HP", "DAMAGED", "DMG", "POOR"
-    ]
-
     init(
         card: CollectionCard,
         showPricing: Bool,
@@ -52,14 +47,7 @@ struct CollectionCardRow: View {
         }
         let unique = uniquePreservingOrder(values)
         guard !unique.isEmpty else { return nil }
-        let sorted = unique.sorted { lhs, rhs in
-            let leftIndex = conditionPriority.firstIndex(of: lhs) ?? conditionPriority.count
-            let rightIndex = conditionPriority.firstIndex(of: rhs) ?? conditionPriority.count
-            if leftIndex == rightIndex {
-                return lhs < rhs
-            }
-            return leftIndex < rightIndex
-        }
+        let sorted = CardCondition.sorted(unique)
         if sorted.count == 1 {
             return sorted[0]
         }
@@ -295,7 +283,7 @@ struct CollectionCardRow: View {
                     }
 
                     if showPricing, let price = card.price {
-                        Text("$\(String(format: "%.2f", price * Double(card.quantity)))")
+                        Text((price * Double(card.quantity)).priceText)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.green)

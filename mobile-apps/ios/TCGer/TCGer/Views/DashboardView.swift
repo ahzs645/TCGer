@@ -12,7 +12,7 @@ struct DashboardView: View {
 
     private let apiService = APIService()
     private var recentCollections: [Collection] {
-        Array(collections.filter { !$0.isUnsortedBinder }.prefix(3))
+        Array(collections.sortedForDisplay().filter { !$0.isUnsortedBinder }.prefix(3))
     }
 
     init(parentProvidesNavigation: Bool = false) {
@@ -176,7 +176,7 @@ private struct StatsSection: View {
                 if showPricing {
                     StatCard(
                         title: "Est. Value",
-                        value: "$\(String(format: "%.2f", totalValue))",
+                        value: totalValue.priceText,
                         icon: "dollarsign.circle.fill"
                     )
                 }
@@ -267,7 +267,7 @@ private struct CollectionRowView: View {
                 Spacer()
 
                 if showPricing {
-                    Text("$\(String(format: "%.2f", collection.totalValue))")
+                    Text(collection.totalValue.priceText)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)

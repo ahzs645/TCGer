@@ -134,22 +134,12 @@ struct CollectionDetailView: View {
     }
 
     private var binderConditionOptions: [String] {
-        let preferredOrder = ["MINT", "NEAR MINT", "EXCELLENT", "GOOD", "LIGHT PLAYED", "PLAYED", "POOR", "NM", "LP", "MP", "HP", "DMG"]
-
         var seen = Set<String>()
         let allConditions = cards.flatMap { card in
             card.copies.compactMap(\.condition) + [card.condition].compactMap { $0 }
         }
         let normalized = allConditions.compactMap(normalizeFilterValue).filter { seen.insert($0).inserted }
-
-        return normalized.sorted { lhs, rhs in
-            let leftIndex = preferredOrder.firstIndex(of: lhs) ?? preferredOrder.count
-            let rightIndex = preferredOrder.firstIndex(of: rhs) ?? preferredOrder.count
-            if leftIndex == rightIndex {
-                return lhs < rhs
-            }
-            return leftIndex < rightIndex
-        }
+        return CardCondition.sorted(normalized)
     }
 
     @ViewBuilder

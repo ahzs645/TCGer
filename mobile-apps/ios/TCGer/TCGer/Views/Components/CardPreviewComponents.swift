@@ -168,7 +168,7 @@ struct CardDetailSheet: View {
                 detailRow("Released", value: releasedAt.formatted(date: .abbreviated, time: .omitted))
             }
             if showPricing, let price = card.price {
-                detailRow("Market Price", value: price.formatted(.currency(code: "USD")))
+                detailRow("Market Price", value: price.priceText)
             }
             if card.formatLegality?.standard == true {
                 detailRow("Standard", value: "Legal")

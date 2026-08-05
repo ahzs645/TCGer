@@ -804,7 +804,7 @@ private struct SetCardCell: View {
                 }
 
                 if showPricing, let price = card.price {
-                    Text("$\(String(format: "%.2f", price))")
+                    Text(price.priceText)
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)

@@ -551,6 +551,23 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+extension Array where Element == Collection {
+    /// Canonical binder ordering for every screen that lists binders: the
+    /// Unsorted Library first, then binders by most recent update. Pass
+    /// `hidingEmptyUnsortedLibrary: true` on screens that only surface the
+    /// library once it contains cards.
+    func sortedForDisplay(hidingEmptyUnsortedLibrary: Bool = false) -> [Collection] {
+        let ordered = sorted { lhs, rhs in
+            if lhs.isUnsortedBinder != rhs.isUnsortedBinder {
+                return lhs.isUnsortedBinder
+            }
+            return lhs.updatedAt > rhs.updatedAt
+        }
+        guard hidingEmptyUnsortedLibrary else { return ordered }
+        return ordered.filter { !$0.isUnsortedBinder || !$0.cards.isEmpty }
+    }
+}
+
 struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let cardId: String

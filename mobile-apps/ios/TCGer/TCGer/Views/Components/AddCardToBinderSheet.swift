@@ -10,7 +10,7 @@ struct AddCardToBinderSheet: View {
     @State private var collections: [Collection] = []
     @State private var selectedBinderId: String?
     @State private var quantity: Int = 1
-    @State private var condition: String = "Near Mint"
+    @State private var condition: String = CardCondition.nearMint.rawValue
     @State private var language: String = "English"
     @State private var notes: String = ""
     @State private var isFoil: Bool = false
@@ -30,7 +30,6 @@ struct AddCardToBinderSheet: View {
 
     private let apiService = APIService()
 
-    private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = PokemonCardLanguage.allCases.map(\.rawValue)
     private var finishOptions: [PokemonFinishOption] {
         PokemonFinishOption.options(for: card, includeCatalog: true)
@@ -139,11 +138,7 @@ struct AddCardToBinderSheet: View {
                 Section {
                     Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
 
-                    Picker("Condition", selection: $condition) {
-                        ForEach(conditions, id: \.self) { cond in
-                            Text(cond).tag(cond)
-                        }
-                    }
+                    ConditionPicker(selection: $condition)
 
                     Picker("Language", selection: $language) {
                         ForEach(languages, id: \.self) { lang in
@@ -255,12 +250,7 @@ struct AddCardToBinderSheet: View {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
                 token: token
-            )
-            collections.sort { lhs, rhs in
-                if lhs.id == "__library__" { return true }
-                if rhs.id == "__library__" { return false }
-                return lhs.updatedAt > rhs.updatedAt
-            }
+            ).sortedForDisplay()
             // Auto-select first binder if only one exists
             if selectedBinderId == nil {
                 selectedBinderId = collections.first?.id

@@ -155,7 +155,7 @@ private struct FinanceStatBlock: View {
             Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text("$\(String(format: "%.2f", abs(value)))")
+            Text(abs(value).priceText)
                 .font(.subheadline)
                 .fontWeight(.bold)
                 .foregroundColor(color)
@@ -222,7 +222,7 @@ private struct TransactionRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(transaction.type == "purchase" ? "-" : "+")$\(String(format: "%.2f", transaction.amount))")
+                Text("\(transaction.type == "purchase" ? "-" : "+")\(transaction.amount.priceText)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(typeColor)

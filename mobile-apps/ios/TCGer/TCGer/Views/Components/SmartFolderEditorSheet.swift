@@ -20,8 +20,6 @@ struct SmartFolderEditorSheet: View {
         _rules = State(initialValue: folder?.rules ?? [])
     }
 
-    private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
-
     var body: some View {
         NavigationView {
             Form {
@@ -113,7 +111,7 @@ struct SmartFolderEditorSheet: View {
                 defaultValue = environmentStore.enabledGames.first?.rawValue ?? ""
             }
         case .rarity: defaultValue = "Rare"
-        case .condition: defaultValue = "Near Mint"
+        case .condition: defaultValue = CardCondition.nearMint.rawValue
         case .setCode: defaultValue = ""
         case .isFoil: defaultValue = "true"
         }

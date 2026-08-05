@@ -18,7 +18,7 @@ struct CollectionStatsCard: View {
             items.insert(
                 (
                     "Total Value",
-                    String(format: "$%.2f", collection.totalValue),
+                    collection.totalValue.priceText,
                     .green,
                     "dollarsign.circle.fill"
                 ),

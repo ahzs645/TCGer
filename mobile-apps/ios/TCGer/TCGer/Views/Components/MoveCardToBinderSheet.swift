@@ -196,7 +196,7 @@ struct MoveCardToBinderSheet: View {
                 config: environmentStore.serverConfiguration,
                 token: token
             )
-            availableBinders = fetched.filter { $0.id != sourceBinderId }
+            availableBinders = fetched.filter { $0.id != sourceBinderId }.sortedForDisplay()
             if selectedBinderId == nil {
                 selectedBinderId = availableBinders.first?.id
             }

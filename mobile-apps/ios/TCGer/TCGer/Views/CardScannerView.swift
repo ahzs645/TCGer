@@ -947,7 +947,7 @@ private struct ScanResultSheet: View {
             }
 
             if environmentStore.showPricing, let price = selectedCandidate.details.price {
-                Label(String(format: "$%.2f", price), systemImage: "dollarsign.circle")
+                Label(price.priceText, systemImage: "dollarsign.circle")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

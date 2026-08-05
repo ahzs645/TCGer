@@ -48,7 +48,7 @@ struct CollectionCardView: View {
                 Spacer()
 
                 if showPricing {
-                    Text("$\(collection.totalValue, specifier: "%.2f")")
+                    Text(collection.totalValue.priceText)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)

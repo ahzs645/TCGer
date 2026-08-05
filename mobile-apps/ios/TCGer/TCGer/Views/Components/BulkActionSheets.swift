@@ -7,21 +7,16 @@ struct BulkConditionSheet: View {
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let conditions = [
-        "MINT", "NEAR MINT", "EXCELLENT", "GOOD",
-        "LIGHT PLAYED", "PLAYED", "POOR"
-    ]
-
     var body: some View {
         NavigationView {
             List {
                 Section {
-                    ForEach(conditions, id: \.self) { condition in
+                    ForEach(CardCondition.allCases) { condition in
                         Button {
-                            onSelect(condition)
+                            onSelect(condition.rawValue)
                             dismiss()
                         } label: {
-                            Text(condition)
+                            Text(condition.rawValue)
                         }
                     }
                 } header: {
@@ -127,7 +122,7 @@ struct BulkMoveSheet: View {
                 token: token,
                 useCache: true
             )
-            binders = collections.filter { $0.id != sourceBinderId && !$0.isUnsortedBinder }
+            binders = collections.filter { $0.id != sourceBinderId && !$0.isUnsortedBinder }.sortedForDisplay()
             isLoading = false
         } catch {
             isLoading = false
