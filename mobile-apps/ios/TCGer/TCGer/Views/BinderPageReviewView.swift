@@ -20,8 +20,7 @@ struct BinderPageReviewView: View {
     @State private var isLoadingCollections = true
     @State private var isAdding = false
     @State private var isCreatingBinder = false
-    @State private var showingCreateBinderAlert = false
-    @State private var newBinderName = ""
+    @State private var showingCreateBinderSheet = false
     @State private var errorMessage: String?
     @State private var showsAllCards = false
     @State private var statusFilter: BinderCardDetectionStatus?
@@ -105,18 +104,10 @@ struct BinderPageReviewView: View {
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
         }
-        .alert("New Binder", isPresented: $showingCreateBinderAlert) {
-            TextField("Binder name", text: $newBinderName)
-            Button("Cancel", role: .cancel) { newBinderName = "" }
-            Button("Create") {
-                Task { await createBinder() }
+        .sheet(isPresented: $showingCreateBinderSheet) {
+            CreateBinderSheet { name, description, colorHex in
+                await createBinder(name: name, description: description, colorHex: colorHex)
             }
-            .disabled(
-                isCreatingBinder ||
-                    newBinderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            )
-        } message: {
-            Text("Create a binder and use it as the target for every page in this scan session.")
         }
     }
 
@@ -484,8 +475,7 @@ struct BinderPageReviewView: View {
             }
 
             Button {
-                newBinderName = ""
-                showingCreateBinderAlert = true
+                showingCreateBinderSheet = true
             } label: {
                 ZStack {
                     Circle()
@@ -703,8 +693,8 @@ struct BinderPageReviewView: View {
     }
 
     @MainActor
-    private func createBinder() async {
-        let name = newBinderName.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func createBinder(name: String, description: String?, colorHex: String?) async {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, !isCreatingBinder else { return }
         guard let token = requestToken else {
             errorMessage = "Not authenticated"
@@ -719,14 +709,13 @@ struct BinderPageReviewView: View {
                 config: environmentStore.serverConfiguration,
                 token: token,
                 name: name,
-                description: nil,
-                colorHex: nil
+                description: description,
+                colorHex: colorHex
             )
             collections.removeAll { $0.id == collection.id }
             collections.append(collection)
             sortCollections()
             viewModel.selectedBinderID = collection.id
-            newBinderName = ""
             NotificationCenter.default.post(name: .collectionDidChange, object: collection)
         } catch {
             errorMessage = error.localizedDescription
