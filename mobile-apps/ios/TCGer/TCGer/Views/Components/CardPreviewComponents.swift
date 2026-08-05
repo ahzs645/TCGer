@@ -288,3 +288,40 @@ extension Card {
 extension CollectionCard {
     var previewCard: Card { Card.preview(from: self) }
 }
+
+extension WishlistCard {
+    /// Preview-capable card built from a wishlist entry, mirroring
+    /// `CollectionCard.previewCard`.
+    var previewCard: Card {
+        Card(
+            id: externalId,
+            name: name,
+            tcg: tcg,
+            setCode: setCode,
+            setName: setName,
+            rarity: rarity,
+            imageUrl: imageUrl,
+            imageUrlSmall: imageUrlSmall,
+            price: nil,
+            collectorNumber: collectorNumber,
+            releasedAt: releasedAt.flatMap(ISO8601DateFormatter().date),
+            supertype: supertype,
+            formatLegality: formatLegality,
+            dexEntries: dexEntries,
+            region: region,
+            setSymbolUrl: setSymbolUrl,
+            setLogoUrl: setLogoUrl,
+            regulationMark: regulationMark,
+            language: language,
+            pokemonPrint: pokemonPrint,
+            attributes: attributes,
+            provenance: provenance,
+            legalityPeriods: legalityPeriods,
+            evolution: evolution,
+            functionalIdentity: functionalIdentity,
+            baseExternalId: baseExternalId,
+            printingKey: printingKey,
+            artworkId: artworkId
+        )
+    }
+}

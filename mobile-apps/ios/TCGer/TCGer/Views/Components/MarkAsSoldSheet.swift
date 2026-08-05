@@ -15,17 +15,8 @@ struct MarkAsSoldSheet: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        if let url = card.imageUrlSmall ?? card.imageUrl, let imageURL = URL(string: url) {
-                            CachedAsyncImage(url: imageURL, tcg: card.tcg) { phase in
-                                if case .success(let image) = phase {
-                                    image.resizable().aspectRatio(contentMode: .fit)
-                                } else {
-                                    Rectangle().fill(Color(.systemGray5))
-                                }
-                            }
+                        CardArtworkImage(card: card.previewCard, useFullResolution: false)
                             .frame(width: 40, height: 56)
-                            .cornerRadius(4)
-                        }
                         VStack(alignment: .leading, spacing: 4) {
                             Text(card.name)
                                 .font(.subheadline)

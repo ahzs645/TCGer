@@ -142,25 +142,8 @@ struct EditCollectionCardSheet: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        CachedAsyncImage(
-                            url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
-                            tcg: card.tcg
-                        ) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fit)
-                            case .empty, .failure:
-                                Rectangle()
-                                    .fill(Color(.systemGray5))
-                                    .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                            @unknown default:
-                                Rectangle()
-                                    .fill(Color(.systemGray5))
-                                    .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                            }
-                        }
-                        .frame(width: 60, height: 84)
-                        .cornerRadius(6)
+                        CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                            .frame(width: 60, height: 84)
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text(card.name)

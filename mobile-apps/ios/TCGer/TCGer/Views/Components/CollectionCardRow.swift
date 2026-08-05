@@ -170,32 +170,8 @@ struct CollectionCardRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                CachedAsyncImage(
-                    url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
-                    tcg: card.tcg
-                ) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .empty, .failure:
-                        Rectangle()
-                            .fill(previewCardBackgroundColor)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            )
-                    @unknown default:
-                        Rectangle()
-                            .fill(previewCardBackgroundColor)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                }
-                .frame(width: 74, height: 104)
+                CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                    .frame(width: 74, height: 104)
                 .background(previewCardBackgroundColor)
                 .cornerRadius(8)
                 .overlay(

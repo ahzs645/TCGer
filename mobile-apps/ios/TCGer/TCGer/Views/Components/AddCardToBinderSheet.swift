@@ -65,46 +65,10 @@ struct AddCardToBinderSheet: View {
                         .padding(.vertical, 8)
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
-                            Menu {
-                                ForEach(collections) { collection in
-                                    Button {
-                                        selectedBinderId = collection.id
-                                    } label: {
-                                        HStack(spacing: 10) {
-                                            Circle()
-                                                .fill(Color.fromHex(collection.colorHex))
-                                                .frame(width: 14, height: 14)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(collection.name)
-                                                if let description = collection.description, !description.isEmpty {
-                                                    Text(description)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Circle()
-                                        .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
-                                        .frame(width: 14, height: 14)
-                                    Text(collection(for: selectedBinderId)?.name ?? "Select a binder...")
-                                        .foregroundColor(selectedBinderId == nil ? .secondary : .primary)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color(.systemGray6))
-                                )
-                            }
+                            BinderPickerMenu(
+                                binders: collections,
+                                selectedBinderId: $selectedBinderId
+                            )
                             HStack(spacing: 8) {
                                 Circle()
                                     .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
@@ -320,30 +284,8 @@ private struct CardPreviewRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(card: card) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .empty, .failure:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                }
-            }
-            .frame(width: 60, height: 84)
-            .cornerRadius(4)
+            CardArtworkImage(card: card, useFullResolution: false)
+                .frame(width: 60, height: 84)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name)

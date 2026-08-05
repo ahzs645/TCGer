@@ -498,30 +498,8 @@ private struct WishlistCardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(
-                url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
-                tcg: card.tcg
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure, .empty:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                }
-            }
-            .frame(width: 50, height: 70)
-            .cornerRadius(4)
+            CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                .frame(width: 50, height: 70)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name)
