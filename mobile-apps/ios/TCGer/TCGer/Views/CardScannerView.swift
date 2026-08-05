@@ -16,11 +16,13 @@ private struct ScannerGuideFramePreferenceKey: PreferenceKey {
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
     @State private var selectedTestImage: PhotosPickerItem?
+    @State private var bottomControlsHeight: CGFloat = 120
     let scope: CardScanScope?
 
     init(scope: CardScanScope? = nil) {
@@ -43,7 +45,13 @@ struct CardScannerView: View {
             bottomControls
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    bottomControlsHeight = height
+                }
         }
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             viewModel.setAutomaticallyPresentsResults(automaticallyShowResults)
             viewModel.updateEnvironment(environmentStore)
@@ -140,7 +148,8 @@ struct CardScannerView: View {
             ScannerCameraToolbar(
                 cameraController: viewModel.cameraController,
                 scopeTitle: scope.map { "Scanning \($0.setName)" },
-                onDismiss: scope == nil ? nil : { dismiss() },
+                onDismiss: (scope != nil || isPresented) ? { dismiss() } : nil,
+                dismissIcon: scope == nil ? "chevron.left" : "xmark",
                 automaticallyShowResults: $automaticallyShowResults
             )
 
@@ -249,7 +258,9 @@ struct CardScannerView: View {
     private var framingOverlay: some View {
         GeometryReader { geometry in
             let topClearance: CGFloat = 72
-            let bottomClearance: CGFloat = 176
+            // The guide shrinks as the bottom controls grow (session tray,
+            // testing tools) so they never cover it.
+            let bottomClearance: CGFloat = bottomControlsHeight + 20
             let availableHeight = max(0, geometry.size.height - topClearance - bottomClearance)
             let width = min(geometry.size.width - 48, availableHeight / 1.4)
             let height = width * 1.4
@@ -289,14 +300,13 @@ struct CardScannerView: View {
                     x: geometry.size.width / 2,
                     y: topClearance + availableHeight / 2
                 )
+                .animation(.snappy, value: bottomControlsHeight)
         }
         .allowsHitTesting(false)
     }
 
     private var bottomControls: some View {
         VStack(spacing: 10) {
-            captureModeControl
-
             // Debug captures are stored on the server, so the control is
             // pointless without one.
             if hasEnabledScanModes && isModeSupported && !environmentStore.serverConfiguration.isOnDevice {
@@ -320,6 +330,11 @@ struct CardScannerView: View {
                     onRemove: viewModel.removeSessionResult,
                     onClear: viewModel.clearSession
                 )
+            }
+
+            HStack {
+                Spacer(minLength: 0)
+                captureModeControl
             }
 
             HStack(spacing: 12) {
@@ -368,15 +383,29 @@ struct CardScannerView: View {
     }
 
     private var captureModeControl: some View {
-        Picker("Capture mode", selection: $viewModel.captureMode) {
+        HStack(spacing: 2) {
             ForEach(ScannerCaptureMode.allCases) { mode in
-                Text(mode.displayName).tag(mode)
+                Button {
+                    viewModel.captureMode = mode
+                } label: {
+                    Label(mode.displayName, systemImage: mode.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background {
+                            if viewModel.captureMode == mode {
+                                Capsule().fill(.white)
+                            }
+                        }
+                        .foregroundStyle(viewModel.captureMode == mode ? .black : .white)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
-        .padding(5)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(3)
+        .background(.ultraThinMaterial, in: Capsule())
         .disabled(isProcessingPhoto)
+        .animation(.snappy, value: viewModel.captureMode)
         .accessibilityLabel("Scanner capture mode")
     }
 

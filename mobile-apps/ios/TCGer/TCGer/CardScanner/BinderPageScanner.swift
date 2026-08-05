@@ -16,6 +16,13 @@ enum ScannerCaptureMode: String, CaseIterable, Identifiable, Sendable {
         case .binder: return "Binder"
         }
     }
+
+    var systemImage: String {
+        switch self {
+        case .card: return "rectangle.portrait"
+        case .binder: return "square.grid.3x3"
+        }
+    }
 }
 
 nonisolated struct BinderNormalizedQuad: Sendable {

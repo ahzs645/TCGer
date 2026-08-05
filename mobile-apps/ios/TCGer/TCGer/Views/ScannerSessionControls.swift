@@ -5,15 +5,16 @@ struct ScannerCameraToolbar: View {
     @ObservedObject var cameraController: CardScannerCameraController
     let scopeTitle: String?
     let onDismiss: (() -> Void)?
+    var dismissIcon: String = "xmark"
     @Binding var automaticallyShowResults: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             if let onDismiss {
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+                    Image(systemName: dismissIcon)
                         .font(.headline)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .foregroundStyle(.white)
@@ -39,7 +40,7 @@ struct ScannerCameraToolbar: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.headline)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
             }
             .foregroundStyle(.white)
@@ -50,7 +51,7 @@ struct ScannerCameraToolbar: View {
                 Button(action: cameraController.toggleTorch) {
                     Image(systemName: cameraController.isTorchEnabled ? "flashlight.on.fill" : "flashlight.off.fill")
                         .font(.headline)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .foregroundStyle(cameraController.isTorchEnabled ? Color.yellow : Color.white)
