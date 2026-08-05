@@ -110,15 +110,12 @@ struct CardScannerView: View {
             )
             .presentationDetents([.medium, .large])
         }
-        .fullScreenCover(item: $viewModel.latestBinderPageResult, onDismiss: {
+        .fullScreenCover(item: $viewModel.binderReviewPresentation, onDismiss: {
             viewModel.finishBinderPageReview()
-        }) { result in
+        }) { presentation in
             BinderPageReviewView(
-                result: result,
-                sessionPagesScanned: viewModel.binderPagesScanned,
-                sessionCardsScanned: viewModel.binderCardsScanned,
-                sessionCardsAdded: viewModel.binderCardsAdded,
-                onCardsAdded: viewModel.recordBinderCardsAdded
+                viewModel: viewModel,
+                initialPageIndex: presentation.initialPageIndex
             )
             .environmentObject(environmentStore)
         }
@@ -411,16 +408,34 @@ struct CardScannerView: View {
 
     private var binderSessionSummary: some View {
         HStack(spacing: 10) {
-            Label("\(viewModel.binderPagesScanned) pages", systemImage: "rectangle.stack")
-            Text("·")
-            Text("\(viewModel.binderCardsScanned) cards")
-            if viewModel.binderCardsAdded > 0 {
-                Text("·")
-                Text("\(viewModel.binderCardsAdded) added")
+            Button {
+                viewModel.reopenBinderReview()
+            } label: {
+                HStack(spacing: 8) {
+                    Label("\(viewModel.binderPagesScanned) pages", systemImage: "rectangle.stack")
+                    Text("·")
+                    Text("\(viewModel.binderCardsScanned) cards")
+                    if viewModel.binderCardsAdded > 0 {
+                        Text("·")
+                        Text("\(viewModel.binderCardsAdded) added")
+                    }
+                    Label("Review", systemImage: "chevron.right")
+                        .fontWeight(.semibold)
+                }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                "Review \(viewModel.binderPagesScanned) binder pages, " +
+                    "\(viewModel.binderCardsScanned) detected cards, " +
+                    "\(viewModel.binderCardsAdded) added"
+            )
+
             Spacer(minLength: 0)
-            Button("Clear") { viewModel.clearBinderSession() }
-                .font(.caption.weight(.semibold))
+            Button("Clear") {
+                viewModel.clearBinderSession()
+            }
+            .font(.caption.weight(.semibold))
+            .accessibilityHint("Clears all scanned binder pages and their review changes")
         }
         .font(.caption)
         .foregroundStyle(.white)

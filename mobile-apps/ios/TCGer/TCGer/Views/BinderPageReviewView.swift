@@ -3,42 +3,35 @@ import UIKit
 
 struct BinderPageReviewView: View {
     private struct DetectionReference: Identifiable {
-        let id: UUID
+        let pageID: UUID
+        let detectionID: UUID
+
+        var id: String { "\(pageID.uuidString)-\(detectionID.uuidString)" }
     }
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
-    let result: BinderPageScanResult
-    let sessionPagesScanned: Int
-    let sessionCardsScanned: Int
-    let sessionCardsAdded: Int
-    let onCardsAdded: (Int) -> Void
+    @ObservedObject var viewModel: CardScannerViewModel
 
-    @State private var detections: [BinderCardDetection]
+    @State private var currentPageIndex: Int
     @State private var selectedDetection: DetectionReference?
     @State private var collections: [Collection] = []
-    @State private var selectedBinderID: String?
     @State private var isLoadingCollections = true
     @State private var isAdding = false
-    @State private var addedDetectionIDs: Set<UUID> = []
+    @State private var isCreatingBinder = false
+    @State private var showingCreateBinderAlert = false
+    @State private var newBinderName = ""
     @State private var errorMessage: String?
 
     private let apiService = APIService()
 
     init(
-        result: BinderPageScanResult,
-        sessionPagesScanned: Int,
-        sessionCardsScanned: Int,
-        sessionCardsAdded: Int,
-        onCardsAdded: @escaping (Int) -> Void
+        viewModel: CardScannerViewModel,
+        initialPageIndex: Int
     ) {
-        self.result = result
-        self.sessionPagesScanned = sessionPagesScanned
-        self.sessionCardsScanned = sessionCardsScanned
-        self.sessionCardsAdded = sessionCardsAdded
-        self.onCardsAdded = onCardsAdded
-        _detections = State(initialValue: result.detections)
+        self.viewModel = viewModel
+        _currentPageIndex = State(initialValue: initialPageIndex)
     }
 
     var body: some View {
@@ -46,10 +39,20 @@ struct BinderPageReviewView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     sessionSummary
-                    pagePreview
-                    detectionSummary
-                    binderControls
-                    actionControls
+                    if let record = currentRecord {
+                        pageNavigation
+                        pagePreview(record: record)
+                        allPagesStrip
+                        detectionSummary(record: record)
+                        binderControls
+                        actionControls(record: record)
+                    } else {
+                        ContentUnavailableView(
+                            "No Pages to Review",
+                            systemImage: "rectangle.stack.badge.minus",
+                            description: Text("Scan a binder page to begin a review session.")
+                        )
+                    }
                 }
                 .padding()
             }
@@ -58,22 +61,30 @@ struct BinderPageReviewView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                        .disabled(isAdding)
+                        .disabled(isAdding || isCreatingBinder)
                 }
             }
         }
         .task { await loadCollections() }
+        .onChange(of: viewModel.binderPages.count, initial: false) { _, count in
+            guard count > 0 else {
+                dismiss()
+                return
+            }
+            currentPageIndex = min(currentPageIndex, count - 1)
+        }
         .sheet(item: $selectedDetection) { selection in
-            if let index = detections.firstIndex(where: { $0.id == selection.id }) {
+            if let detection = detectionBinding(for: selection),
+               let record = viewModel.binderPages.first(where: { $0.id == selection.pageID }) {
                 BinderCardDetectionDetailView(
-                    detection: $detections[index],
-                    game: result.mode.tcgGame
+                    detection: detection,
+                    game: record.result.mode.tcgGame
                 )
                     .presentationDetents([.medium, .large])
             }
         }
         .alert(
-            "Unable to Add Cards",
+            "Binder Review Error",
             isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -83,15 +94,28 @@ struct BinderPageReviewView: View {
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
         }
+        .alert("New Binder", isPresented: $showingCreateBinderAlert) {
+            TextField("Binder name", text: $newBinderName)
+            Button("Cancel", role: .cancel) { newBinderName = "" }
+            Button("Create") {
+                Task { await createBinder() }
+            }
+            .disabled(
+                isCreatingBinder ||
+                    newBinderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
+        } message: {
+            Text("Create a binder and use it as the target for every page in this scan session.")
+        }
     }
 
     private var sessionSummary: some View {
         HStack(spacing: 0) {
-            summaryMetric(value: sessionPagesScanned, label: "Pages")
+            summaryMetric(value: viewModel.binderPagesScanned, label: "Pages")
             Divider().frame(height: 34)
-            summaryMetric(value: sessionCardsScanned, label: "Detected")
+            summaryMetric(value: viewModel.binderCardsScanned, label: "Detected")
             Divider().frame(height: 34)
-            summaryMetric(value: sessionCardsAdded, label: "Added")
+            summaryMetric(value: viewModel.binderCardsAdded, label: "Added")
         }
         .padding(.vertical, 12)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -108,18 +132,48 @@ struct BinderPageReviewView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var pagePreview: some View {
+    private var pageNavigation: some View {
+        HStack {
+            Button {
+                showPage(at: currentPageIndex - 1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .disabled(currentPageIndex <= 0 || isAdding)
+            .accessibilityLabel("Previous page")
+
+            Spacer()
+            Text("Page \(currentPageIndex + 1) of \(viewModel.binderPages.count)")
+                .font(.headline)
+            Spacer()
+
+            Button {
+                showPage(at: currentPageIndex + 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .disabled(currentPageIndex >= viewModel.binderPages.count - 1 || isAdding)
+            .accessibilityLabel("Next reviewed page")
+        }
+    }
+
+    private func pagePreview(record: BinderPageRecord) -> some View {
         GeometryReader { geometry in
-            let imageSize = CGSize(width: result.capturedImage.width, height: result.capturedImage.height)
+            let image = record.result.capturedImage
+            let imageSize = CGSize(width: image.width, height: image.height)
             let fittedRect = aspectFitRect(imageSize: imageSize, containerSize: geometry.size)
 
             ZStack {
-                Image(uiImage: UIImage(cgImage: result.capturedImage))
+                Image(uiImage: UIImage(cgImage: image))
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                ForEach(Array(detections.enumerated()), id: \.element.id) { index, detection in
+                ForEach(Array(record.detections.enumerated()), id: \.element.id) { index, detection in
                     let path = quadPath(for: detection.quad, in: fittedRect)
                     path
                         .fill(statusColor(detection.status).opacity(0.08))
@@ -132,7 +186,10 @@ struct BinderPageReviewView: View {
                         .contentShape(path)
                         .opacity(detection.isIncluded ? 1 : 0.42)
                         .onTapGesture {
-                            selectedDetection = DetectionReference(id: detection.id)
+                            selectedDetection = DetectionReference(
+                                pageID: record.id,
+                                detectionID: detection.id
+                            )
                         }
 
                     let points = detection.quad.points(in: fittedRect)
@@ -149,7 +206,7 @@ struct BinderPageReviewView: View {
             }
         }
         .aspectRatio(
-            CGFloat(result.capturedImage.width) / CGFloat(result.capturedImage.height),
+            CGFloat(record.result.capturedImage.width) / CGFloat(record.result.capturedImage.height),
             contentMode: .fit
         )
         .frame(maxWidth: .infinity)
@@ -161,27 +218,92 @@ struct BinderPageReviewView: View {
         )
     }
 
-    private var detectionSummary: some View {
+    private var allPagesStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("All Pages")
+                .font(.headline)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(viewModel.binderPages.enumerated()), id: \.element.id) { index, record in
+                        pageThumbnail(record: record, index: index)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func pageThumbnail(record: BinderPageRecord, index: Int) -> some View {
+        let includedCount = includedDetections(in: record).count
+        let allAdded = includedCount > 0 && includedDetections(in: record).allSatisfy {
+            record.addedDetectionIDs.contains($0.id)
+        }
+
+        return Button {
+            showPage(at: index)
+        } label: {
+            VStack(spacing: 5) {
+                Image(uiImage: UIImage(cgImage: record.result.capturedImage))
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 64, height: 78)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .topTrailing) {
+                        if allAdded {
+                            Image(systemName: "checkmark.circle.fill")
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, .green)
+                                .padding(4)
+                        }
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(index == currentPageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
+                    }
+
+                Text(allAdded ? "All added" : "\(includedCount)/\(record.detections.count) included")
+                    .font(.caption2.weight(index == currentPageIndex ? .semibold : .regular))
+                    .foregroundStyle(index == currentPageIndex ? Color.accentColor : Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+            .frame(width: 88)
+        }
+        .buttonStyle(.plain)
+        .disabled(isAdding)
+        .accessibilityLabel(
+            "Page \(index + 1), \(includedCount) of \(record.detections.count) included" +
+                (allAdded ? ", all added" : "")
+        )
+    }
+
+    private func detectionSummary(record: BinderPageRecord) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Detected Cards")
                     .font(.headline)
                 Spacer()
-                Text("\(includedDetections.count) included")
+                Text("\(includedDetections(in: record).count) included")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            if detections.isEmpty {
+            if record.detections.isEmpty {
                 ContentUnavailableView(
                     "No Cards Detected",
                     systemImage: "rectangle.dashed",
                     description: Text("Retake the page with even lighting and the full pocket grid visible.")
                 )
             } else {
-                ForEach(Array(detections.enumerated()), id: \.element.id) { index, detection in
+                ForEach(Array(record.detections.enumerated()), id: \.element.id) { index, detection in
                     Button {
-                        selectedDetection = DetectionReference(id: detection.id)
+                        selectedDetection = DetectionReference(
+                            pageID: record.id,
+                            detectionID: detection.id
+                        )
                     } label: {
                         HStack(spacing: 12) {
                             Image(uiImage: UIImage(cgImage: detection.crop))
@@ -226,41 +348,64 @@ struct BinderPageReviewView: View {
                     Text("Loading binders…")
                         .foregroundStyle(.secondary)
                 }
-            } else if collections.isEmpty {
-                Text("Create a binder first, then return to add this page.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             } else {
-                Picker("Binder", selection: $selectedBinderID) {
-                    ForEach(collections) { collection in
-                        Text(collection.name).tag(Optional(collection.id))
+                HStack(spacing: 10) {
+                    if collections.isEmpty {
+                        Text("No binders yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Picker("Binder", selection: $viewModel.selectedBinderID) {
+                            ForEach(collections) { collection in
+                                Text(collection.name).tag(Optional(collection.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    Button {
+                        newBinderName = ""
+                        showingCreateBinderAlert = true
+                    } label: {
+                        if isCreatingBinder {
+                            ProgressView()
+                        } else {
+                            Label("New Binder", systemImage: "plus")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isCreatingBinder)
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding()
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private var actionControls: some View {
+    private func actionControls(record: BinderPageRecord) -> some View {
         VStack(spacing: 12) {
             Button {
-                Task { await addIncludedCards() }
+                Task { await addIncludedCards(from: record) }
             } label: {
                 HStack {
                     if isAdding {
                         ProgressView().tint(.white)
                     }
-                    Text(addButtonTitle)
+                    Text(addButtonTitle(for: record))
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(isAdding || selectedBinderID == nil || remainingIncludedDetections.isEmpty)
+            .disabled(
+                isAdding ||
+                    isCreatingBinder ||
+                    viewModel.selectedBinderID == nil ||
+                    remainingIncludedDetections(in: record).isEmpty
+            )
 
             Button {
                 dismiss()
@@ -271,23 +416,50 @@ struct BinderPageReviewView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isAdding)
+            .disabled(isAdding || isCreatingBinder)
         }
     }
 
-    private var includedDetections: [BinderCardDetection] {
-        detections.filter { $0.isIncluded && $0.selectedCandidate != nil }
+    private var currentRecord: BinderPageRecord? {
+        guard viewModel.binderPages.indices.contains(currentPageIndex) else { return nil }
+        return viewModel.binderPages[currentPageIndex]
     }
 
-    private var remainingIncludedDetections: [BinderCardDetection] {
-        includedDetections.filter { !addedDetectionIDs.contains($0.id) }
+    private func includedDetections(in record: BinderPageRecord) -> [BinderCardDetection] {
+        record.detections.filter { $0.isIncluded && $0.selectedCandidate != nil }
     }
 
-    private var addButtonTitle: String {
-        if remainingIncludedDetections.isEmpty, !addedDetectionIDs.isEmpty {
+    private func remainingIncludedDetections(in record: BinderPageRecord) -> [BinderCardDetection] {
+        includedDetections(in: record).filter { !record.addedDetectionIDs.contains($0.id) }
+    }
+
+    private func addButtonTitle(for record: BinderPageRecord) -> String {
+        let remaining = remainingIncludedDetections(in: record)
+        if remaining.isEmpty, !record.addedDetectionIDs.isEmpty {
             return "Cards Added"
         }
-        return "Add \(remainingIncludedDetections.count) Cards to Binder"
+        return "Add \(remaining.count) Cards to Binder"
+    }
+
+    private func showPage(at index: Int) {
+        guard viewModel.binderPages.indices.contains(index) else { return }
+        selectedDetection = nil
+        withAnimation(.snappy) {
+            currentPageIndex = index
+        }
+    }
+
+    private func detectionBinding(for selection: DetectionReference) -> Binding<BinderCardDetection>? {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
+              let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
+                where: { $0.id == selection.detectionID }
+              )
+        else { return nil }
+
+        return Binding(
+            get: { viewModel.binderPages[pageIndex].detections[detectionIndex] },
+            set: { viewModel.binderPages[pageIndex].detections[detectionIndex] = $0 }
+        )
     }
 
     private func detectionSubtitle(index: Int, detection: BinderCardDetection) -> String {
@@ -333,7 +505,7 @@ struct BinderPageReviewView: View {
 
     @MainActor
     private func loadCollections() async {
-        guard let token = environmentStore.authToken else {
+        guard environmentStore.serverConfiguration.isOnDevice || environmentStore.authToken != nil else {
             errorMessage = "Not authenticated"
             isLoadingCollections = false
             return
@@ -342,14 +514,15 @@ struct BinderPageReviewView: View {
         do {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
-                token: token
+                token: environmentStore.authToken
             )
-            collections.sort { lhs, rhs in
-                if lhs.id == Collection.unsortedBinderId { return true }
-                if rhs.id == Collection.unsortedBinderId { return false }
-                return lhs.updatedAt > rhs.updatedAt
+            sortCollections()
+            if let selectedBinderID = viewModel.selectedBinderID,
+               collections.contains(where: { $0.id == selectedBinderID }) {
+                viewModel.selectedBinderID = selectedBinderID
+            } else {
+                viewModel.selectedBinderID = collections.first?.id
             }
-            selectedBinderID = selectedBinderID ?? collections.first?.id
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -357,24 +530,50 @@ struct BinderPageReviewView: View {
     }
 
     @MainActor
-    private func addIncludedCards() async {
-        guard let binderID = selectedBinderID else { return }
-        guard let token = environmentStore.authToken else {
+    private func createBinder() async {
+        let name = newBinderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !isCreatingBinder else { return }
+        guard let token = requestToken else {
             errorMessage = "Not authenticated"
             return
         }
 
-        let pending = remainingIncludedDetections
+        isCreatingBinder = true
+        defer { isCreatingBinder = false }
+
+        do {
+            let collection = try await apiService.createCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                name: name,
+                description: nil,
+                colorHex: nil
+            )
+            collections.removeAll { $0.id == collection.id }
+            collections.append(collection)
+            sortCollections()
+            viewModel.selectedBinderID = collection.id
+            newBinderName = ""
+            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func addIncludedCards(from record: BinderPageRecord) async {
+        guard let binderID = viewModel.selectedBinderID else { return }
+        guard let token = requestToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        let pending = remainingIncludedDetections(in: record)
         guard !pending.isEmpty else { return }
 
         isAdding = true
         var addedThisAttempt = 0
-        defer {
-            isAdding = false
-            if addedThisAttempt > 0 {
-                onCardsAdded(addedThisAttempt)
-            }
-        }
+        defer { isAdding = false }
 
         for detection in pending {
             guard let candidate = detection.selectedCandidate,
@@ -399,7 +598,9 @@ struct BinderPageReviewView: View {
                     isAltered: false,
                     card: card
                 )
-                addedDetectionIDs.insert(detection.id)
+                if let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == record.id }) {
+                    viewModel.binderPages[pageIndex].addedDetectionIDs.insert(detection.id)
+                }
                 addedThisAttempt += 1
             } catch {
                 errorMessage = "Added \(addedThisAttempt) of \(pending.count) cards. \(error.localizedDescription)"
@@ -409,6 +610,21 @@ struct BinderPageReviewView: View {
 
         if addedThisAttempt > 0 {
             HapticManager.notification(.success)
+        }
+    }
+
+    private var requestToken: String? {
+        if environmentStore.serverConfiguration.isOnDevice {
+            return environmentStore.authToken ?? ""
+        }
+        return environmentStore.authToken
+    }
+
+    private func sortCollections() {
+        collections.sort { lhs, rhs in
+            if lhs.id == Collection.unsortedBinderId { return true }
+            if rhs.id == Collection.unsortedBinderId { return false }
+            return lhs.updatedAt > rhs.updatedAt
         }
     }
 

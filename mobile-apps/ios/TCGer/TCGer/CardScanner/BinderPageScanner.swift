@@ -109,6 +109,38 @@ nonisolated struct BinderPageScanResult: Identifiable, @unchecked Sendable {
     }
 }
 
+nonisolated struct BinderPageRecord: Identifiable, @unchecked Sendable {
+    let result: BinderPageScanResult
+    var detections: [BinderCardDetection]
+    var addedDetectionIDs: Set<UUID>
+    let scannedAt: Date
+    let pageNumber: Int
+
+    var id: UUID { result.id }
+
+    init(
+        result: BinderPageScanResult,
+        scannedAt: Date = Date(),
+        pageNumber: Int
+    ) {
+        self.result = result
+        self.detections = result.detections
+        self.addedDetectionIDs = []
+        self.scannedAt = scannedAt
+        self.pageNumber = pageNumber
+    }
+}
+
+nonisolated struct BinderReviewPresentation: Identifiable, Sendable {
+    let id: UUID
+    let initialPageIndex: Int
+
+    init(id: UUID = UUID(), initialPageIndex: Int) {
+        self.id = id
+        self.initialPageIndex = initialPageIndex
+    }
+}
+
 actor BinderPageScanner {
     private enum Configuration {
         static let maximumObservations = 18

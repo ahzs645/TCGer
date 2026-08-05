@@ -37,7 +37,9 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
     @Published var latestResult: CardScanResult?
-    @Published var latestBinderPageResult: BinderPageScanResult?
+    @Published var binderPages: [BinderPageRecord] = []
+    @Published var binderReviewPresentation: BinderReviewPresentation?
+    @Published var selectedBinderID: String?
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
@@ -45,9 +47,6 @@ final class CardScannerViewModel: ObservableObject {
     @Published private(set) var liveCandidateName: String?
     @Published private(set) var liveConfirmationCount = 0
     @Published private(set) var liveConfirmationRequired = 2
-    @Published private(set) var binderPagesScanned = 0
-    @Published private(set) var binderCardsScanned = 0
-    @Published private(set) var binderCardsAdded = 0
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -70,6 +69,17 @@ final class CardScannerViewModel: ObservableObject {
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
     private var automaticallyPresentsResults = false
+    private var nextBinderPageNumber = 1
+
+    var binderPagesScanned: Int { binderPages.count }
+
+    var binderCardsScanned: Int {
+        binderPages.reduce(0) { $0 + $1.detections.count }
+    }
+
+    var binderCardsAdded: Int {
+        binderPages.reduce(0) { $0 + $1.addedDetectionIDs.count }
+    }
 
     init(coordinator: CardScannerCoordinator? = nil) {
 #if targetEnvironment(simulator)
@@ -252,9 +262,17 @@ final class CardScannerViewModel: ObservableObject {
 
         do {
             let result = try await binderPageScanner.scan(image: image, context: context)
-            binderPagesScanned += 1
-            binderCardsScanned += result.detections.count
-            latestBinderPageResult = result
+            let record = BinderPageRecord(result: result, pageNumber: nextBinderPageNumber)
+            nextBinderPageNumber += 1
+            binderPages.append(record)
+            if binderPages.count > 30 {
+                // Full-resolution captures are session-only; bound retained memory by
+                // dropping the oldest page after 30 scans.
+                binderPages.removeFirst(binderPages.count - 30)
+            }
+            binderReviewPresentation = BinderReviewPresentation(
+                initialPageIndex: binderPages.count - 1
+            )
             state = .ready
             if !isSimulator { HapticManager.notification(.success) }
         } catch {
@@ -278,7 +296,7 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     func finishBinderPageReview() {
-        latestBinderPageResult = nil
+        binderReviewPresentation = nil
         errorMessage = nil
         if isSimulator {
             state = .error("Card scanning is not supported in the iOS Simulator.")
@@ -289,14 +307,18 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    func recordBinderCardsAdded(_ count: Int) {
-        binderCardsAdded += max(0, count)
+    func reopenBinderReview() {
+        guard !binderPages.isEmpty else { return }
+        binderReviewPresentation = BinderReviewPresentation(
+            initialPageIndex: binderPages.count - 1
+        )
     }
 
     func clearBinderSession() {
-        binderPagesScanned = 0
-        binderCardsScanned = 0
-        binderCardsAdded = 0
+        binderReviewPresentation = nil
+        binderPages.removeAll()
+        selectedBinderID = nil
+        nextBinderPageNumber = 1
     }
 
     func presentSessionResult(_ result: CardScanResult) {
