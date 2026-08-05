@@ -47,7 +47,7 @@ struct CollectionCardRow: View {
         }
         let unique = uniquePreservingOrder(values)
         guard !unique.isEmpty else { return nil }
-        let sorted = CardCondition.sorted(unique)
+        let sorted = CardCondition.sorted(unique).map(CardCondition.shortCode)
         if sorted.count == 1 {
             return sorted[0]
         }
@@ -69,32 +69,7 @@ struct CollectionCardRow: View {
 
     private func languageCode() -> String? {
         guard let language = languageSummary() else { return nil }
-        let normalizedLanguage = language.trimmingCharacters(in: .whitespacesAndNewlines)
-        let mapping: [String: String] = [
-            "english": "EN",
-            "japanese": "JP",
-            "german": "DE",
-            "french": "FR",
-            "italian": "IT",
-            "spanish": "ES",
-            "portuguese": "PT",
-            "korean": "KO",
-            "chinese": "ZH"
-        ]
-
-        if let mapped = mapping[normalizedLanguage.lowercased()] {
-            return mapped
-        }
-
-        let compact = normalizedLanguage
-            .components(separatedBy: CharacterSet.letters.inverted)
-            .joined()
-            .uppercased()
-
-        if compact.count >= 2 {
-            return String(compact.prefix(2))
-        }
-        return compact.isEmpty ? nil : compact
+        return CardLanguage.code(for: language)
     }
 
     private func notesSummary() -> String? {
@@ -247,7 +222,7 @@ struct CollectionCardRow: View {
                                 MetaTagChip(
                                     title: "Condition",
                                     value: conditionSummary,
-                                    icon: "line.3.horizontal.decrease",
+                                    icon: "checkmark.seal",
                                     color: .orange
                                 )
                             }

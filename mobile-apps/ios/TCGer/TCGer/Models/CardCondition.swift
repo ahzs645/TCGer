@@ -48,6 +48,27 @@ enum CardCondition: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Short trade abbreviation (NM, LP, …) for a stored condition string, for
+    /// compact chips. Unknown values pass through unchanged so nothing is
+    /// silently dropped.
+    static func shortCode(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch trimmed.uppercased() {
+        case "GEM MINT": return "GM"
+        case "MINT": return "M"
+        case "NEAR MINT", "NM": return "NM"
+        case "EXCELLENT", "EX": return "EX"
+        case "LIGHTLY PLAYED", "LIGHT PLAYED", "LP": return "LP"
+        case "GOOD": return "GD"
+        case "MODERATE PLAY", "MODERATELY PLAYED", "MP": return "MP"
+        case "PLAYED": return "PL"
+        case "HEAVY PLAY", "HEAVILY PLAYED", "HP": return "HP"
+        case "POOR": return "PR"
+        case "DAMAGED", "DMG": return "DMG"
+        default: return trimmed
+        }
+    }
+
     /// Rank for sorting arbitrary stored condition strings best-first.
     /// Unknown values sort after all known ones.
     static func sortRank(_ value: String) -> Int {

@@ -153,6 +153,12 @@ private struct StatsSection: View {
     let showPricing: Bool
     let onOpenCollections: () -> Void
 
+    /// Matches the widget and Recent Binders: the Unsorted Library pseudo-binder
+    /// is not counted as a binder.
+    var binderCount: Int {
+        collections.filter { !$0.isUnsortedBinder }.count
+    }
+
     var totalCards: Int {
         collections.reduce(0) { $0 + $1.uniqueCards }
     }
@@ -171,7 +177,7 @@ private struct StatsSection: View {
                 .font(.headline)
 
             HStack(spacing: 12) {
-                statButton(StatItem(title: "Binders", value: "\(collections.count)", color: .blue, icon: "folder.fill"))
+                statButton(StatItem(title: "Binders", value: "\(binderCount)", color: .blue, icon: "folder.fill"))
                 statButton(StatItem(title: "Unique Cards", value: "\(totalCards)", color: .indigo, icon: "rectangle.stack.fill"))
             }
 

@@ -50,6 +50,9 @@ struct CollectionStatsCard: View {
 
             if !activeGames.isEmpty {
                 HStack(spacing: 10) {
+                    Text("GAMES")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                     ForEach(activeGames) { game in
                         ZStack {
                             Circle()
