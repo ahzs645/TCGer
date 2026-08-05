@@ -76,6 +76,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var smartFolders: [SmartFolder]
     @Published var tabOrder: [AppTab]
     @Published var hiddenTabs: Set<AppTab>
+    @Published private(set) var pendingDeepLinkTab: AppTab?
     @Published private(set) var focusedSetOrder: [String]
     @Published private(set) var setCompletionMode: SetCompletionMode
     @Published var setBrowserSort: SetBrowserSort
@@ -111,6 +112,7 @@ final class EnvironmentStore: ObservableObject {
         static let focusedSetIDs = "tcg.sets.focused"
         static let setCompletionMode = "tcg.sets.completionMode"
         static let setBrowserSort = "tcg.sets.browserSort"
+        static let scannerPendingMode = "scanner.pendingMode"
     }
 
     /// Phone-only mode has no account. These stand in for the session the rest
@@ -129,6 +131,7 @@ final class EnvironmentStore: ObservableObject {
     }
 
     init() {
+        pendingDeepLinkTab = nil
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
             // A previously-saved empty config falls back to on-device mode so a
@@ -749,6 +752,32 @@ final class EnvironmentStore: ObservableObject {
 
     static let appGroupSuite = "group.firstform.TCGer.shared"
 
+    func handleDeepLink(_ url: URL) {
+        guard url.scheme?.lowercased() == "tcger",
+              let host = url.host?.lowercased() else { return }
+
+        switch host {
+        case "scan":
+            let game = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name.lowercased() == "game" })?
+                .value?
+                .lowercased()
+            if let game, ["pokemon", "yugioh", "mtg"].contains(game) {
+                storage.set(game, forKey: Keys.scannerPendingMode)
+            } else {
+                storage.removeObject(forKey: Keys.scannerPendingMode)
+            }
+            pendingDeepLinkTab = .scan
+        case "wishlists", "wishlist":
+            pendingDeepLinkTab = .wishlists
+        case "binder", "collections":
+            pendingDeepLinkTab = .collections
+        default:
+            break
+        }
+    }
+
     func updateWidgetData(collections: [Collection]) {
         guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
 
@@ -775,6 +804,43 @@ final class EnvironmentStore: ObservableObject {
             }
         if let encoded = try? JSONSerialization.data(withJSONObject: recentCards) {
             shared.set(encoded, forKey: "widget.recentCards")
+        }
+
+        let binders: [[String: Any]] = collections
+            .filter { !$0.isUnsortedBinder }
+            .map { collection in
+                [
+                    "id": collection.id,
+                    "name": collection.name,
+                    "uniqueCards": collection.uniqueCards,
+                    "totalCopies": collection.totalCopies,
+                    "totalValue": collection.totalValue,
+                    "colorHex": collection.colorHex ?? "#007AFF",
+                ]
+            }
+        if let encoded = try? JSONSerialization.data(withJSONObject: binders) {
+            shared.set(encoded, forKey: "widget.binders")
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func updateWishlistWidgetData(wishlists: [Wishlist]) {
+        guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
+
+        let widgetWishlists: [[String: Any]] = wishlists.map { wishlist in
+            [
+                "id": wishlist.id,
+                "name": wishlist.name,
+                "colorHex": wishlist.colorHex ?? "#FF2D55",
+                "completionPercent": wishlist.completionPercent,
+                "ownedCards": wishlist.ownedCards,
+                "totalCards": wishlist.totalCards,
+                "neededCardNames": Array(wishlist.cards.lazy.filter { !$0.owned }.prefix(4).map(\.name)),
+            ]
+        }
+        if let encoded = try? JSONSerialization.data(withJSONObject: widgetWishlists) {
+            shared.set(encoded, forKey: "widget.wishlists")
         }
 
         WidgetCenter.shared.reloadAllTimelines()

@@ -17,7 +17,7 @@ extension ScanStrategy {
     var supportsLiveScanning: Bool { false }
 }
 
-final class CardScannerCoordinator {
+final class CardScannerCoordinator: @unchecked Sendable {
     private let strategies: [ScanStrategy]
     private let apiService: APIService
 
@@ -157,7 +157,7 @@ final class CardScannerCoordinator {
                 switch strategy.kind {
                 case .artworkFingerprint, .perceptualHash, .mlDetector:
                     return true
-                case .textOCR, .serverHash, .serverEmbedding:
+                case .manual, .textOCR, .serverHash, .serverEmbedding:
                     return false
                 }
             }
@@ -176,6 +176,8 @@ final class CardScannerCoordinator {
 
     private func priority(of strategy: ScanStrategy, for mode: ScanMode) -> Int {
         switch (mode, strategy.kind) {
+        case (_, .manual):
+            return 5
         case (.pokemon, .artworkFingerprint), (.mtg, .perceptualHash):
             return 0
         case (_, .artworkFingerprint), (_, .perceptualHash):

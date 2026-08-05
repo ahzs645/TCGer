@@ -50,7 +50,12 @@ struct CardScannerView: View {
             viewModel.updateScope(scope)
             if scope == nil {
                 syncSelectedModeWithModules()
+                consumePendingScanMode()
             }
+        }
+        .onReceive(environmentStore.$pendingDeepLinkTab) { tab in
+            guard tab == .scan, scope == nil else { return }
+            consumePendingScanMode()
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
@@ -96,6 +101,18 @@ struct CardScannerView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(item: $viewModel.latestBinderPageResult, onDismiss: {
+            viewModel.finishBinderPageReview()
+        }) { result in
+            BinderPageReviewView(
+                result: result,
+                sessionPagesScanned: viewModel.binderPagesScanned,
+                sessionCardsScanned: viewModel.binderCardsScanned,
+                sessionCardsAdded: viewModel.binderCardsAdded,
+                onCardsAdded: viewModel.recordBinderCardsAdded
+            )
+            .environmentObject(environmentStore)
         }
         .sheet(isPresented: $showingRecentDebugCaptures) {
             RecentDebugCapturesSheet(
@@ -176,7 +193,7 @@ struct CardScannerView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                Text("Identifying card...")
+                Text(viewModel.captureMode == .binder ? "Scanning binder page..." : "Identifying card...")
                     .font(.callout)
                     .foregroundColor(.white)
             }
@@ -278,6 +295,8 @@ struct CardScannerView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 10) {
+            captureModeControl
+
             // Debug captures are stored on the server, so the control is
             // pointless without one.
             if hasEnabledScanModes && isModeSupported && !environmentStore.serverConfiguration.isOnDevice {
@@ -288,7 +307,9 @@ struct CardScannerView: View {
                 testImageControls
             }
 
-            if !viewModel.sessionResults.isEmpty || viewModel.liveConfirmationCount > 0 {
+            if viewModel.captureMode == .binder, viewModel.binderPagesScanned > 0 {
+                binderSessionSummary
+            } else if !viewModel.sessionResults.isEmpty || viewModel.liveConfirmationCount > 0 {
                 ScannerSessionTray(
                     results: viewModel.sessionResults,
                     pendingCardName: viewModel.liveCandidateName,
@@ -332,8 +353,10 @@ struct CardScannerView: View {
                     !hasEnabledScanModes
                 )
                 .buttonStyle(.plain)
-                .accessibilityLabel("Scan card")
-                .accessibilityHint("Captures the card inside the guide")
+                .accessibilityLabel(viewModel.captureMode == .binder ? "Scan binder page" : "Scan card")
+                .accessibilityHint(viewModel.captureMode == .binder
+                    ? "Captures and identifies every card on the page"
+                    : "Captures the card inside the guide")
 
                 Spacer(minLength: 0)
 
@@ -342,6 +365,39 @@ struct CardScannerView: View {
         }
         .animation(.snappy, value: viewModel.liveConfirmationCount)
         .animation(.snappy, value: viewModel.sessionResults.count)
+    }
+
+    private var captureModeControl: some View {
+        Picker("Capture mode", selection: $viewModel.captureMode) {
+            ForEach(ScannerCaptureMode.allCases) { mode in
+                Text(mode.displayName).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(5)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .disabled(isProcessingPhoto)
+        .accessibilityLabel("Scanner capture mode")
+    }
+
+    private var binderSessionSummary: some View {
+        HStack(spacing: 10) {
+            Label("\(viewModel.binderPagesScanned) pages", systemImage: "rectangle.stack")
+            Text("·")
+            Text("\(viewModel.binderCardsScanned) cards")
+            if viewModel.binderCardsAdded > 0 {
+                Text("·")
+                Text("\(viewModel.binderCardsAdded) added")
+            }
+            Spacer(minLength: 0)
+            Button("Clear") { viewModel.clearBinderSession() }
+                .font(.caption.weight(.semibold))
+        }
+        .font(.caption)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Color.black.opacity(0.48), in: Capsule())
     }
 
     @ViewBuilder
@@ -481,7 +537,7 @@ struct CardScannerView: View {
                     viewModel.errorMessage = "The bundled Boss's Orders scanner fixture is unavailable."
                     return
                 }
-                Task { await viewModel.scan(image: image) }
+                Task { await viewModel.scanCurrentCaptureMode(image: image) }
             } label: {
                 Label("Demo", systemImage: "testtube.2")
             }
@@ -592,11 +648,24 @@ private extension CardScannerView {
         }
     }
 
+    /// Deep links (tcger://scan?game=…) stash the requested game under this key
+    /// because the scanner may not be on screen when the URL arrives.
+    func consumePendingScanMode() {
+        let defaults = UserDefaults.standard
+        guard let raw = defaults.string(forKey: "scanner.pendingMode") else { return }
+        defaults.removeObject(forKey: "scanner.pendingMode")
+        guard let mode = ScanMode(rawValue: raw), availableScanModes.contains(mode) else { return }
+        viewModel.selectedMode = mode
+    }
+
     var isModeSupported: Bool {
         viewModel.isModeSupported(viewModel.selectedMode)
     }
 
     var isProcessingPhoto: Bool {
+        if viewModel.isProcessingPhoto {
+            return true
+        }
         if case .processing = viewModel.state {
             return true
         }
@@ -618,7 +687,10 @@ private extension CardScannerView {
     }
 
     var framingInstruction: String {
-        viewModel.supportsLivePreview(viewModel.selectedMode)
+        if viewModel.captureMode == .binder {
+            return "Fit the full binder page · Tap to scan"
+        }
+        return viewModel.supportsLivePreview(viewModel.selectedMode)
             ? "Center one card · Hold steady"
             : "Center one card · Tap to scan"
     }

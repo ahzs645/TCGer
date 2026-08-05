@@ -29,7 +29,15 @@ final class CardScannerViewModel: ObservableObject {
             rebuildContext()
         }
     }
+    @Published var captureMode: ScannerCaptureMode = .card {
+        didSet {
+            lastAnalysisDate = .distantPast
+            liveConsensus.reset()
+            resetLiveConfirmation()
+        }
+    }
     @Published var latestResult: CardScanResult?
+    @Published var latestBinderPageResult: BinderPageScanResult?
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
@@ -37,6 +45,9 @@ final class CardScannerViewModel: ObservableObject {
     @Published private(set) var liveCandidateName: String?
     @Published private(set) var liveConfirmationCount = 0
     @Published private(set) var liveConfirmationRequired = 2
+    @Published private(set) var binderPagesScanned = 0
+    @Published private(set) var binderCardsScanned = 0
+    @Published private(set) var binderCardsAdded = 0
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -49,6 +60,7 @@ final class CardScannerViewModel: ObservableObject {
 
     let cameraController = CardScannerCameraController()
     private let coordinator: CardScannerCoordinator
+    private let binderPageScanner: BinderPageScanner
     private var environmentStore: EnvironmentStore?
     private var context: CardScannerContext?
     private let isSimulator: Bool
@@ -65,7 +77,9 @@ final class CardScannerViewModel: ObservableObject {
 #else
         isSimulator = false
 #endif
-        self.coordinator = coordinator ?? CardScannerCoordinator.makeDefault()
+        let resolvedCoordinator = coordinator ?? CardScannerCoordinator.makeDefault()
+        self.coordinator = resolvedCoordinator
+        self.binderPageScanner = BinderPageScanner(coordinator: resolvedCoordinator)
         cameraController.onPhotoCapture = { [weak self] photo in
             Task { await self?.handleCapturedPhoto(photo) }
         }
@@ -207,7 +221,47 @@ final class CardScannerViewModel: ObservableObject {
             state = .error("Unable to decode the selected scanner image.")
             return
         }
-        await scan(image: image, source: source)
+        if captureMode == .binder {
+            await scanBinderPage(image: image)
+        } else {
+            await scan(image: image, source: source)
+        }
+    }
+
+    func scanCurrentCaptureMode(image: CGImage) async {
+        if captureMode == .binder {
+            await scanBinderPage(image: image)
+        } else {
+            await scan(image: image)
+        }
+    }
+
+    func scanBinderPage(image: CGImage) async {
+        guard let context else {
+            state = .error("Scanner context unavailable.")
+            return
+        }
+        if !context.serverConfiguration.isOnDevice, context.authToken == nil {
+            state = .error(CardScannerError.missingAuthToken.errorDescription ?? "Not authenticated")
+            return
+        }
+
+        isProcessingPhoto = true
+        state = .processing
+        defer { isProcessingPhoto = false }
+
+        do {
+            let result = try await binderPageScanner.scan(image: image, context: context)
+            binderPagesScanned += 1
+            binderCardsScanned += result.detections.count
+            latestBinderPageResult = result
+            state = .ready
+            if !isSimulator { HapticManager.notification(.success) }
+        } catch {
+            errorMessage = error.localizedDescription
+            state = .ready
+            if !isSimulator { HapticManager.notification(.error) }
+        }
     }
 
     func clearResult() {
@@ -221,6 +275,28 @@ final class CardScannerViewModel: ObservableObject {
             state = .idle
         }
         lastAnalysisDate = .distantPast
+    }
+
+    func finishBinderPageReview() {
+        latestBinderPageResult = nil
+        errorMessage = nil
+        if isSimulator {
+            state = .error("Card scanning is not supported in the iOS Simulator.")
+        } else if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+            state = .ready
+        } else {
+            state = .idle
+        }
+    }
+
+    func recordBinderCardsAdded(_ count: Int) {
+        binderCardsAdded += max(0, count)
+    }
+
+    func clearBinderSession() {
+        binderPagesScanned = 0
+        binderCardsScanned = 0
+        binderCardsAdded = 0
     }
 
     func presentSessionResult(_ result: CardScanResult) {
@@ -266,7 +342,11 @@ final class CardScannerViewModel: ObservableObject {
             state = .error("Unable to process captured photo.")
             return
         }
-        await scan(image: guideCroppedImage(from: cgImage))
+        if captureMode == .binder {
+            await scanBinderPage(image: cgImage)
+        } else {
+            await scan(image: guideCroppedImage(from: cgImage))
+        }
     }
 
     private func apply(_ result: Result<CardScanResult, CardScannerError>) {
@@ -301,6 +381,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private func handleSampleBuffer(_ sampleBuffer: CMSampleBuffer) async {
         guard !isSimulator else { return }
+        guard captureMode == .card else { return }
         guard case .ready = state else { return }
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
@@ -333,6 +414,9 @@ final class CardScannerViewModel: ObservableObject {
 
             await MainActor.run {
                 self.isAnalyzingFrame = false
+                guard self.captureMode == .card else {
+                    return
+                }
                 switch result {
                 case .success(let scanResult):
                     self.handleLiveSuccess(scanResult)
@@ -357,7 +441,8 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     func supportsLivePreview(_ mode: ScanMode) -> Bool {
-        coordinator.supportsLiveScanning(for: mode, preferredEngine: selectedEngine)
+        guard captureMode == .card else { return false }
+        return coordinator.supportsLiveScanning(for: mode, preferredEngine: selectedEngine)
     }
 
     private func normalizeSelectedEngine() {

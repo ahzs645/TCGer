@@ -17,6 +17,9 @@ struct TCGerApp: App {
                 .environmentObject(environmentStore)
                 .preferredColorScheme(environmentStore.appColorScheme.colorScheme)
                 .tint(environmentStore.accentColorChoice.color)
+                .onOpenURL { url in
+                    environmentStore.handleDeepLink(url)
+                }
         }
     }
 }

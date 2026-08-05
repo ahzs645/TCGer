@@ -3,11 +3,15 @@
 //  TCGer
 //
 
+import Combine
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var showingSearch = false
+    @State private var selectedTab = AppTab.home.rawValue
+
+    private static let moreTabSelection = "__more__"
 
     private var canViewDashboardWithoutAuth: Bool {
         guard let settings = environmentStore.appSettings else { return false }
@@ -38,15 +42,15 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ForEach(primaryTabs) { tab in
-                Tab(tab.title, systemImage: tab.systemImage) {
+                Tab(tab.title, systemImage: tab.systemImage, value: tab.rawValue) {
                     destination(for: tab)
                 }
             }
 
             if !overflowTabs.isEmpty {
-                Tab("More", systemImage: "ellipsis") {
+                Tab("More", systemImage: "ellipsis", value: Self.moreTabSelection) {
                     moreTabsView
                 }
             }
@@ -55,6 +59,16 @@ struct ContentView: View {
         .environment(\.showingSearch, $showingSearch)
         .sheet(isPresented: $showingSearch) {
             CardSearchView()
+        }
+        .onAppear {
+            reconcileSelection()
+            applyDeepLink(environmentStore.pendingDeepLinkTab)
+        }
+        .onChange(of: tabs) {
+            reconcileSelection()
+        }
+        .onReceive(environmentStore.$pendingDeepLinkTab.dropFirst()) { tab in
+            applyDeepLink(tab)
         }
     }
 
@@ -104,6 +118,26 @@ struct ContentView: View {
         case .sets, .wishlists, .scan:
             return environmentStore.isAuthenticated
         }
+    }
+
+    private func applyDeepLink(_ tab: AppTab?) {
+        guard let tab, tabs.contains(tab) else { return }
+
+        if primaryTabs.contains(tab) {
+            selectedTab = tab.rawValue
+        } else if overflowTabs.contains(tab) {
+            selectedTab = Self.moreTabSelection
+        }
+    }
+
+    private func reconcileSelection() {
+        if selectedTab == Self.moreTabSelection, !overflowTabs.isEmpty {
+            return
+        }
+        if primaryTabs.contains(where: { $0.rawValue == selectedTab }) {
+            return
+        }
+        selectedTab = primaryTabs.first?.rawValue ?? Self.moreTabSelection
     }
 }
 

@@ -169,10 +169,12 @@ struct WishlistsView: View {
         errorMessage = nil
 
         do {
-            wishlists = try await apiService.getWishlists(
+            let loadedWishlists = try await apiService.getWishlists(
                 config: environmentStore.serverConfiguration,
                 token: token
             )
+            wishlists = loadedWishlists
+            environmentStore.updateWishlistWidgetData(wishlists: loadedWishlists)
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -195,6 +197,7 @@ struct WishlistsView: View {
                 colorHex: newWishlistColor.toHex()
             )
             wishlists.insert(wishlist, at: 0)
+            environmentStore.updateWishlistWidgetData(wishlists: wishlists)
             resetCreateForm()
             showingCreateSheet = false
         } catch {
@@ -213,6 +216,7 @@ struct WishlistsView: View {
                 id: wishlist.id
             )
             wishlists.removeAll { $0.id == wishlist.id }
+            environmentStore.updateWishlistWidgetData(wishlists: wishlists)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -280,6 +280,7 @@ struct CardScanResult: Identifiable {
 }
 
 enum ScanStrategyKind: String, Sendable {
+    case manual
     case textOCR
     case perceptualHash
     case mlDetector
@@ -289,6 +290,8 @@ enum ScanStrategyKind: String, Sendable {
 
     var displayName: String {
         switch self {
+        case .manual:
+            return "Manual Selection"
         case .textOCR:
             return "Text OCR"
         case .perceptualHash:

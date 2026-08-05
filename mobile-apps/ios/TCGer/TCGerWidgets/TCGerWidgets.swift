@@ -17,6 +17,10 @@ struct CollectionStatsProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CollectionStatsEntry) -> Void) {
+        if context.isPreview && !SharedDataReader.hasData {
+            completion(placeholder(in: context))
+            return
+        }
         let entry = CollectionStatsEntry(
             date: .now,
             totalBinders: SharedDataReader.totalBinders,
@@ -45,40 +49,43 @@ struct CollectionStatsWidgetView: View {
     @Environment(\.widgetFamily) var family
 
     var body: some View {
-        if !entry.hasData {
-            VStack(spacing: 6) {
-                Image(systemName: "square.stack.3d.up")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-                Text("Open TCGer to sync")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .containerBackground(.fill.tertiary, for: .widget)
-        } else if family == .systemSmall {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+        Group {
+            if !entry.hasData {
+                VStack(spacing: 6) {
                     Image(systemName: "square.stack.3d.up")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                    Spacer()
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("Open TCGer to sync")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
+                .containerBackground(.fill.tertiary, for: .widget)
+            } else if family == .systemSmall {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.title3)
+                            .foregroundStyle(.tint)
+                        Spacer()
+                    }
 
-                Spacer()
+                    Spacer()
 
-                StatRow(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
-                StatRow(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
-                StatRow(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
+                    StatRow(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
+                    StatRow(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
+                    StatRow(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
+                }
+                .containerBackground(.fill.tertiary, for: .widget)
+            } else {
+                HStack(spacing: 16) {
+                    StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
+                    StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique Cards")
+                    StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Total Copies")
+                }
+                .containerBackground(.fill.tertiary, for: .widget)
             }
-            .containerBackground(.fill.tertiary, for: .widget)
-        } else {
-            HStack(spacing: 16) {
-                StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
-                StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique Cards")
-                StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Total Copies")
-            }
-            .containerBackground(.fill.tertiary, for: .widget)
         }
+        .widgetURL(URL(string: "tcger://collections"))
     }
 }
 
@@ -142,6 +149,10 @@ struct RecentCardsProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RecentCardsEntry) -> Void) {
+        if context.isPreview && SharedDataReader.recentCards.isEmpty {
+            completion(placeholder(in: context))
+            return
+        }
         let entry = RecentCardsEntry(
             date: .now,
             cards: SharedDataReader.recentCards,
@@ -165,51 +176,54 @@ struct RecentCardsWidgetView: View {
     var entry: RecentCardsEntry
 
     var body: some View {
-        if !entry.hasData || entry.cards.isEmpty {
-            VStack(spacing: 6) {
-                Image(systemName: "rectangle.portrait.on.rectangle.portrait")
-                    .font(.title2)
-                    .foregroundColor(.secondary)
-                Text("No recent cards")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text("Open TCGer to sync")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            .containerBackground(.fill.tertiary, for: .widget)
-        } else {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Recent Cards")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-
-                ForEach(entry.cards.prefix(3)) { card in
-                    HStack(spacing: 8) {
-                        tcgIcon(for: card.tcg)
-                            .frame(width: 14, height: 14)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(card.name)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-                            if let setName = card.setName {
-                                Text(setName)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        Spacer()
-                    }
+        Group {
+            if !entry.hasData || entry.cards.isEmpty {
+                VStack(spacing: 6) {
+                    Image(systemName: "rectangle.portrait.on.rectangle.portrait")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("No recent cards")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Open TCGer to sync")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
+                .containerBackground(.fill.tertiary, for: .widget)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recent Cards")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
 
-                Spacer(minLength: 0)
+                    ForEach(entry.cards.prefix(3)) { card in
+                        HStack(spacing: 8) {
+                            tcgIcon(for: card.tcg)
+                                .frame(width: 14, height: 14)
+
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(card.name)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .lineLimit(1)
+                                if let setName = card.setName {
+                                    Text(setName)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .containerBackground(.fill.tertiary, for: .widget)
             }
-            .containerBackground(.fill.tertiary, for: .widget)
         }
+        .widgetURL(URL(string: "tcger://collections"))
     }
 
     @ViewBuilder
@@ -268,5 +282,9 @@ struct TCGerWidgets: WidgetBundle {
     var body: some Widget {
         CollectionStatsWidget()
         RecentCardsWidget()
+        ScannerShortcutWidget()
+        WishlistWidget()
+        BinderWidget()
+        ScannerControlWidget()
     }
 }
