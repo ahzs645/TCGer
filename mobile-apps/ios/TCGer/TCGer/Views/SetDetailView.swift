@@ -411,19 +411,15 @@ struct SetDetailView: View {
             currentPrintOptions = []
             addSheetCard = nil
         }) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
-                try await addCardToBinder(
-                    card: card,
+            AddCardToBinderSheet(card: card) { binderId, details in
+                try await apiService.addCardToBinder(
+                    config: environmentStore.serverConfiguration,
+                    token: environmentStore.authToken,
                     binderId: binderId,
-                    quantity: quantity,
-                    condition: condition,
-                    language: language,
-                    notes: notes,
-                    isFoil: isFoil,
-                    variant: variant,
-                    isSigned: isSigned,
-                    isAltered: isAltered
+                    card: card,
+                    details: details
                 )
+                ownedCardIds.insert(card.id)
             }
         }
         .sheet(isPresented: $showingBulkBinderPicker) {
@@ -566,43 +562,6 @@ struct SetDetailView: View {
                 }
             }
         }
-    }
-
-    @MainActor
-    private func addCardToBinder(
-        card: Card,
-        binderId: String,
-        quantity: Int,
-        condition: String?,
-        language: String?,
-        notes: String?,
-        isFoil: Bool = false,
-        variant: CardCopyVariant = .empty,
-        isSigned: Bool = false,
-        isAltered: Bool = false
-    ) async throws {
-        guard let token = environmentStore.authToken else {
-            throw APIService.APIError.unauthorized
-        }
-
-        try await apiService.addCardToBinder(
-            config: environmentStore.serverConfiguration,
-            token: token,
-            binderId: binderId,
-            cardId: card.id,
-            quantity: quantity,
-            condition: condition,
-            language: language,
-            notes: notes,
-            price: card.price,
-            acquisitionPrice: nil,
-            isFoil: isFoil,
-            variant: variant,
-            isSigned: isSigned,
-            isAltered: isAltered,
-            card: card
-        )
-        ownedCardIds.insert(card.id)
     }
 
     @MainActor
@@ -804,7 +763,7 @@ private struct SetCardCell: View {
                 }
 
                 if showPricing, let price = card.price {
-                    Text("$\(String(format: "%.2f", price))")
+                    Text(price.priceText)
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)

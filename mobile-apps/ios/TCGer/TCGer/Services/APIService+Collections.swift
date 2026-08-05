@@ -964,3 +964,53 @@ extension APIService {
         }
     }
 }
+
+// MARK: - Add-to-binder convenience
+
+/// Everything a screen collects about the copy being added to a binder.
+/// Bundled so sheet callbacks and the service helper share one shape instead
+/// of every view repeating the endpoint's full argument list.
+struct BinderCardAddDetails: Sendable {
+    var quantity: Int = 1
+    var condition: String? = nil
+    var language: String? = nil
+    var notes: String? = nil
+    var isFoil: Bool = false
+    var variant: CardCopyVariant = .empty
+    var isSigned: Bool = false
+    var isAltered: Bool = false
+}
+
+extension APIService {
+    /// The one service-layer path for "add this card to a binder", used by
+    /// search, set browsing, the scanner, and binder-scan review alike.
+    func addCardToBinder(
+        config: ServerConfiguration,
+        token: String?,
+        binderId: String,
+        card: Card,
+        details: BinderCardAddDetails = BinderCardAddDetails()
+    ) async throws {
+        guard let token else {
+            throw APIError.unauthorized
+        }
+
+        try await addCardToBinder(
+            config: config,
+            token: token,
+            binderId: binderId,
+            cardId: card.id,
+            quantity: details.quantity,
+            condition: details.condition,
+            language: details.language,
+            notes: details.notes,
+            price: card.price,
+            acquisitionPrice: nil,
+            isFoil: details.isFoil,
+            variant: details.variant,
+            isSigned: details.isSigned,
+            isAltered: details.isAltered,
+            card: card
+        )
+    }
+}

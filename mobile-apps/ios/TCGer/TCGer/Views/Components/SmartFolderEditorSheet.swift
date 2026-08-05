@@ -20,8 +20,6 @@ struct SmartFolderEditorSheet: View {
         _rules = State(initialValue: folder?.rules ?? [])
     }
 
-    private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
-
     var body: some View {
         NavigationView {
             Form {
@@ -113,7 +111,7 @@ struct SmartFolderEditorSheet: View {
                 defaultValue = environmentStore.enabledGames.first?.rawValue ?? ""
             }
         case .rarity: defaultValue = "Rare"
-        case .condition: defaultValue = "Near Mint"
+        case .condition: defaultValue = CardCondition.nearMint.rawValue
         case .setCode: defaultValue = ""
         case .isFoil: defaultValue = "true"
         }
@@ -144,13 +142,10 @@ private struct RuleRow: View {
                 if rule.type == .tcg {
                     Picker("Game", selection: $rule.value) {
                         ForEach(pickerGames) { game in
-                            Label {
-                                Text(games.contains(game)
-                                     ? game.shortName
-                                     : "\(game.displayName) (disabled)")
-                            } icon: {
-                                TCGGameIcon(game: game)
-                            }
+                            GameLabel(
+                                game: game,
+                                text: games.contains(game) ? nil : "\(game.displayName) (disabled)"
+                            )
                             .tag(game.rawValue)
                         }
                     }

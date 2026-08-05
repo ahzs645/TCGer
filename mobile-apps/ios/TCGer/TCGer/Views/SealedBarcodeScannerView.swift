@@ -126,7 +126,7 @@ struct ScannedSealedProductSheet: View {
                         LabeledContent("Barcode", value: upc)
                     }
                     if let msrp = product.msrp {
-                        LabeledContent("MSRP", value: String(format: "$%.2f", msrp))
+                        LabeledContent("MSRP", value: msrp.priceText)
                     }
                 }
 

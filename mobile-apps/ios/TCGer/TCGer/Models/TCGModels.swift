@@ -551,6 +551,23 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+extension Array where Element == Collection {
+    /// Canonical binder ordering for every screen that lists binders: the
+    /// Unsorted Library first, then binders by most recent update. Pass
+    /// `hidingEmptyUnsortedLibrary: true` on screens that only surface the
+    /// library once it contains cards.
+    func sortedForDisplay(hidingEmptyUnsortedLibrary: Bool = false) -> [Collection] {
+        let ordered = sorted { lhs, rhs in
+            if lhs.isUnsortedBinder != rhs.isUnsortedBinder {
+                return lhs.isUnsortedBinder
+            }
+            return lhs.updatedAt > rhs.updatedAt
+        }
+        guard hidingEmptyUnsortedLibrary else { return ordered }
+        return ordered.filter { !$0.isUnsortedBinder || !$0.cards.isEmpty }
+    }
+}
+
 struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let cardId: String
@@ -632,6 +649,41 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
             isOversized: isOversized ?? false,
             isPeelOff: isPeelOff ?? false
         )
+    }
+}
+
+extension CollectionCardCopy {
+    /// Serial number when present, otherwise "Copy #n" for position `index`.
+    func displayTitle(index: Int) -> String {
+        if let serial = serialNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !serial.isEmpty {
+            return serial
+        }
+        return "Copy #\(index + 1)"
+    }
+
+    /// "Condition • Language" summary, nil when neither is set.
+    var detailLine: String? {
+        let parts = [condition, language].compactMap { value -> String? in
+            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+                return nil
+            }
+            return trimmed
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
+    }
+
+    /// Comma-separated tag labels, nil when there are none.
+    var tagsLine: String? {
+        let labels = tags.map(\.label).filter { !$0.isEmpty }
+        return labels.isEmpty ? nil : labels.joined(separator: ", ")
+    }
+
+    /// Trimmed notes, nil when empty.
+    var normalizedNotes: String? {
+        guard let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 }
 

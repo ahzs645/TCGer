@@ -5,12 +5,12 @@ struct AddCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: Card
-    let onAdd: (String, Int, String?, String?, String?, Bool, Bool, Bool, CardCopyVariant) async throws -> Void
+    let onAdd: (String, BinderCardAddDetails) async throws -> Void
 
     @State private var collections: [Collection] = []
     @State private var selectedBinderId: String?
     @State private var quantity: Int = 1
-    @State private var condition: String = "Near Mint"
+    @State private var condition: String = CardCondition.nearMint.rawValue
     @State private var language: String = "English"
     @State private var notes: String = ""
     @State private var isFoil: Bool = false
@@ -30,7 +30,6 @@ struct AddCardToBinderSheet: View {
 
     private let apiService = APIService()
 
-    private let conditions = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = PokemonCardLanguage.allCases.map(\.rawValue)
     private var finishOptions: [PokemonFinishOption] {
         PokemonFinishOption.options(for: card, includeCatalog: true)
@@ -66,46 +65,10 @@ struct AddCardToBinderSheet: View {
                         .padding(.vertical, 8)
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
-                            Menu {
-                                ForEach(collections) { collection in
-                                    Button {
-                                        selectedBinderId = collection.id
-                                    } label: {
-                                        HStack(spacing: 10) {
-                                            Circle()
-                                                .fill(Color.fromHex(collection.colorHex))
-                                                .frame(width: 14, height: 14)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(collection.name)
-                                                if let description = collection.description, !description.isEmpty {
-                                                    Text(description)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Circle()
-                                        .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
-                                        .frame(width: 14, height: 14)
-                                    Text(collection(for: selectedBinderId)?.name ?? "Select a binder...")
-                                        .foregroundColor(selectedBinderId == nil ? .secondary : .primary)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color(.systemGray6))
-                                )
-                            }
+                            BinderPickerMenu(
+                                binders: collections,
+                                selectedBinderId: $selectedBinderId
+                            )
                             HStack(spacing: 8) {
                                 Circle()
                                     .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
@@ -139,11 +102,7 @@ struct AddCardToBinderSheet: View {
                 Section {
                     Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
 
-                    Picker("Condition", selection: $condition) {
-                        ForEach(conditions, id: \.self) { cond in
-                            Text(cond).tag(cond)
-                        }
-                    }
+                    ConditionPicker(selection: $condition)
 
                     Picker("Language", selection: $language) {
                         ForEach(languages, id: \.self) { lang in
@@ -255,12 +214,7 @@ struct AddCardToBinderSheet: View {
             collections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
                 token: token
-            )
-            collections.sort { lhs, rhs in
-                if lhs.id == "__library__" { return true }
-                if rhs.id == "__library__" { return false }
-                return lhs.updatedAt > rhs.updatedAt
-            }
+            ).sortedForDisplay()
             // Auto-select first binder if only one exists
             if selectedBinderId == nil {
                 selectedBinderId = collections.first?.id
@@ -287,23 +241,25 @@ struct AddCardToBinderSheet: View {
         do {
             try await onAdd(
                 binderId,
-                quantity,
-                condition,
-                language,
-                notes.isEmpty ? nil : notes,
-                card.tcg.lowercased() == "pokemon"
-                    ? PokemonFinishOption.isFoil(finishCode)
-                    : isFoil,
-                isSigned,
-                isAltered,
-                CardCopyVariant(
-                    finishCode: finishCode.isEmpty ? nil : finishCode,
-                    finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
-                    edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
-                    stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
-                    isSealedPromo: isSealedPromo,
-                    isOversized: isOversized,
-                    isPeelOff: isPeelOff
+                BinderCardAddDetails(
+                    quantity: quantity,
+                    condition: condition,
+                    language: language,
+                    notes: notes.isEmpty ? nil : notes,
+                    isFoil: card.tcg.lowercased() == "pokemon"
+                        ? PokemonFinishOption.isFoil(finishCode)
+                        : isFoil,
+                    variant: CardCopyVariant(
+                        finishCode: finishCode.isEmpty ? nil : finishCode,
+                        finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
+                        edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
+                        stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
+                        isSealedPromo: isSealedPromo,
+                        isOversized: isOversized,
+                        isPeelOff: isPeelOff
+                    ),
+                    isSigned: isSigned,
+                    isAltered: isAltered
                 )
             )
             isAdding = false
@@ -328,30 +284,8 @@ private struct CardPreviewRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(card: card) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .empty, .failure:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                }
-            }
-            .frame(width: 60, height: 84)
-            .cornerRadius(4)
+            CardArtworkImage(card: card, useFullResolution: false)
+                .frame(width: 60, height: 84)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name)
@@ -394,8 +328,8 @@ private struct CardPreviewRow: View {
                     collectorNumber: nil,
                     releasedAt: nil
                 ),
-                onAdd: { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, _ in
-                    print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered)")
+                onAdd: { binderId, details in
+                    print("Adding to binder \(binderId): \(details.quantity)x \(details.condition ?? "N/A") foil:\(details.isFoil) signed:\(details.isSigned) altered:\(details.isAltered)")
                 }
             )
             .environmentObject(environmentStore)

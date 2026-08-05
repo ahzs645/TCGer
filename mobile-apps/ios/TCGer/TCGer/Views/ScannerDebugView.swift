@@ -865,17 +865,17 @@ struct ScannerDebugView: View {
     private var recordingPane: some View {
         DebugPanel(title: "Recording & Replay", systemImage: "record.circle") {
             HStack(spacing: 12) {
-                MetricTile(
+                StatItem(
+                    title: "Saved frames",
                     value: "\(viewModel.recordedFrameCount)",
-                    label: "Saved frames",
-                    tint: viewModel.recordedFrameCount == 0 ? .secondary : .blue
+                    color: viewModel.recordedFrameCount == 0 ? .secondary : .blue
                 )
-                MetricTile(
+                StatItem(
+                    title: "Recorder",
                     value: viewModel.isRecording
                         ? "Active"
                         : (viewModel.recordedFrameCount > 0 ? "Paused" : "Idle"),
-                    label: "Recorder",
-                    tint: viewModel.isRecording ? .red : .secondary
+                    color: viewModel.isRecording ? .red : .secondary
                 )
             }
 
@@ -1057,20 +1057,20 @@ struct ScannerDebugView: View {
     private func replayReportPane(_ report: ScannerReplayReport) -> some View {
         DebugPanel(title: "Replay Report", systemImage: "chart.bar.xaxis") {
             HStack(spacing: 12) {
-                MetricTile(
+                StatItem(
+                    title: "Top 1",
                     value: String(format: "%.0f%%", report.accuracyRate * 100),
-                    label: "Top 1",
-                    tint: report.changedFrames == 0 ? .green : .orange
+                    color: report.changedFrames == 0 ? .green : .orange
                 )
-                MetricTile(
+                StatItem(
+                    title: "Top 5",
                     value: String(format: "%.0f%%", report.topFiveRecall * 100),
-                    label: "Top 5",
-                    tint: .blue
+                    color: .blue
                 )
-                MetricTile(
+                StatItem(
+                    title: "Changed",
                     value: "\(report.changedFrames)",
-                    label: "Changed",
-                    tint: report.changedFrames == 0 ? .green : .orange
+                    color: report.changedFrames == 0 ? .green : .orange
                 )
             }
 
@@ -1175,30 +1175,6 @@ private struct DebugPanel<Content: View>: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         }
-    }
-}
-
-private struct MetricTile: View {
-    let value: String
-    let label: String
-    let tint: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value)
-                .font(.headline.monospacedDigit())
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(tint.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

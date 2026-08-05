@@ -89,6 +89,21 @@ struct GamePickerPills: View {
     }
 }
 
+/// Standard label for a game in menus and pickers: short name (or custom
+/// text) plus the game icon. Use this instead of hand-rolling Label rows.
+struct GameLabel: View {
+    let game: TCGGame
+    var text: String? = nil
+
+    var body: some View {
+        Label {
+            Text(text ?? game.shortName)
+        } icon: {
+            TCGGameIcon(game: game)
+        }
+    }
+}
+
 struct GamePickerMenu: View {
     @Binding var selection: TCGGame
     let games: [TCGGame]
@@ -97,12 +112,8 @@ struct GamePickerMenu: View {
         Menu {
             Picker("Game", selection: $selection) {
                 ForEach(games) { game in
-                    Label {
-                        Text(game.shortName)
-                    } icon: {
-                        Image(systemName: game.systemIconName)
-                    }
-                    .tag(game)
+                    GameLabel(game: game)
+                        .tag(game)
                 }
             }
         } label: {

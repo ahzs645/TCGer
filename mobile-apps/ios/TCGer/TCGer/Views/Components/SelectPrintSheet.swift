@@ -35,7 +35,7 @@ struct SelectPrintSheet: View {
                     ProgressView("Loading prints...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error = errorMessage {
-                    ErrorView(message: error)
+                    ErrorView(title: "Failed to Load Prints", message: error)
                 } else if prints.isEmpty {
                     EmptyPrintsView()
                 } else {
@@ -229,27 +229,6 @@ private struct EmptyPrintsView: View {
                 .fontWeight(.semibold)
             Text("This card doesn't have multiple printings available.")
                 .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Error View
-private struct ErrorView: View {
-    let message: String
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            Text("Failed to Load Prints")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)

@@ -36,23 +36,9 @@ struct WishlistsView: View {
             if isLoading {
                 ProgressView("Loading wishlists...")
             } else if let error = errorMessage {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 50))
-                        .foregroundColor(.orange)
-                    Text("Failed to Load Wishlists")
-                        .font(.headline)
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    Button("Try Again") {
-                        Task { await loadWishlists() }
-                    }
-                    .buttonStyle(.borderedProminent)
+                ErrorView(title: "Failed to Load Wishlists", message: error) {
+                    Task { await loadWishlists() }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if wishlists.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "heart.slash")
@@ -123,19 +109,12 @@ struct WishlistsView: View {
     private var createWishlistSheet: some View {
         NavigationView {
             Form {
-                Section {
-                    TextField("Wishlist Name", text: $newWishlistName)
-                    TextField("Description (optional)", text: $newWishlistDescription, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Details")
-                }
-
-                Section {
-                    ColorPickerGrid(selectedColor: $newWishlistColor)
-                } header: {
-                    Text("Color")
-                }
+                NameDescriptionColorSections(
+                    namePlaceholder: "Wishlist Name",
+                    name: $newWishlistName,
+                    description: $newWishlistDescription,
+                    selectedColor: $newWishlistColor
+                )
             }
             .navigationTitle("New Wishlist")
             .navigationBarTitleDisplayMode(.inline)

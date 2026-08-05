@@ -9,11 +9,6 @@ struct CollectionCardRow: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isCopiesExpanded = false
 
-    private let conditionPriority = [
-        "GEM MINT", "MINT", "NEAR MINT", "NM", "LIGHTLY PLAYED", "LP",
-        "MODERATE PLAY", "MP", "HEAVY PLAY", "HP", "DAMAGED", "DMG", "POOR"
-    ]
-
     init(
         card: CollectionCard,
         showPricing: Bool,
@@ -52,14 +47,7 @@ struct CollectionCardRow: View {
         }
         let unique = uniquePreservingOrder(values)
         guard !unique.isEmpty else { return nil }
-        let sorted = unique.sorted { lhs, rhs in
-            let leftIndex = conditionPriority.firstIndex(of: lhs) ?? conditionPriority.count
-            let rightIndex = conditionPriority.firstIndex(of: rhs) ?? conditionPriority.count
-            if leftIndex == rightIndex {
-                return lhs < rhs
-            }
-            return leftIndex < rightIndex
-        }
+        let sorted = CardCondition.sorted(unique)
         if sorted.count == 1 {
             return sorted[0]
         }
@@ -182,32 +170,8 @@ struct CollectionCardRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                CachedAsyncImage(
-                    url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
-                    tcg: card.tcg
-                ) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .empty, .failure:
-                        Rectangle()
-                            .fill(previewCardBackgroundColor)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            )
-                    @unknown default:
-                        Rectangle()
-                            .fill(previewCardBackgroundColor)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                }
-                .frame(width: 74, height: 104)
+                CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                    .frame(width: 74, height: 104)
                 .background(previewCardBackgroundColor)
                 .cornerRadius(8)
                 .overlay(
@@ -295,7 +259,7 @@ struct CollectionCardRow: View {
                     }
 
                     if showPricing, let price = card.price {
-                        Text("$\(String(format: "%.2f", price * Double(card.quantity)))")
+                        Text((price * Double(card.quantity)).priceText)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.green)
@@ -472,37 +436,6 @@ struct CollectionCardRow: View {
         let index: Int
         @Environment(\.colorScheme) private var colorScheme
 
-        private func normalized(_ value: String?) -> String? {
-            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-                return nil
-            }
-            return trimmed
-        }
-
-        private var title: String {
-            if let serial = normalized(copy.serialNumber) {
-                return serial
-            }
-            return "Copy #\(index + 1)"
-        }
-
-        private var detailLine: String? {
-            var parts: [String] = []
-            if let condition = normalized(copy.condition) {
-                parts.append(condition)
-            }
-            if let language = normalized(copy.language) {
-                parts.append(language)
-            }
-            return parts.isEmpty ? nil : parts.joined(separator: " • ")
-        }
-
-        private var tagsLine: String? {
-            let labels = copy.tags.map { $0.label }.filter { !$0.isEmpty }
-            guard !labels.isEmpty else { return nil }
-            return labels.joined(separator: ", ")
-        }
-
         private var attributeLabels: [String] {
             var labels = copy.collectibleVariant.labels
             if copy.isFoil == true && labels.isEmpty { labels.append("Foil") }
@@ -513,11 +446,11 @@ struct CollectionCardRow: View {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(copy.displayTitle(index: index))
                     .font(.caption)
                     .fontWeight(.semibold)
 
-                if let detailLine {
+                if let detailLine = copy.detailLine {
                     Text(detailLine)
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -538,14 +471,14 @@ struct CollectionCardRow: View {
                     }
                 }
 
-                if let notes = normalized(copy.notes) {
+                if let notes = copy.normalizedNotes {
                     Text(notes)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                 }
 
-                if let tagsLine {
+                if let tagsLine = copy.tagsLine {
                     Text("Tags: \(tagsLine)")
                         .font(.caption2)
                         .foregroundColor(.secondary)

@@ -12,27 +12,12 @@ struct CreateBinderSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section {
-                    TextField("Binder Name", text: $name)
-                } header: {
-                    Text("Name")
-                } footer: {
-                    Text("Give your binder a memorable name")
-                }
-
-                Section {
-                    TextField("Description (optional)", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Description")
-                }
-
-                Section {
-                    ColorPickerGrid(selectedColor: $selectedColor)
-                        .padding(.vertical, 8)
-                } header: {
-                    Text("Binder Color")
-                }
+                NameDescriptionColorSections(
+                    namePlaceholder: "Binder Name",
+                    name: $name,
+                    description: $description,
+                    selectedColor: $selectedColor
+                )
             }
             .navigationTitle("New Binder")
             .navigationBarTitleDisplayMode(.inline)

@@ -748,18 +748,11 @@ struct BinderPageReviewView: View {
                         config: environmentStore.serverConfiguration,
                         token: token,
                         binderId: binderID,
-                        cardId: card.id,
-                        quantity: 1,
-                        condition: "Near Mint",
-                        language: "English",
-                        notes: nil,
-                        price: card.price,
-                        acquisitionPrice: nil,
-                        isFoil: false,
-                        variant: .empty,
-                        isSigned: false,
-                        isAltered: false,
-                        card: card
+                        card: card,
+                        details: BinderCardAddDetails(
+                            condition: CardCondition.nearMint.rawValue,
+                            language: "English"
+                        )
                     )
                     if let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == record.id }) {
                         viewModel.binderPages[pageIndex].addedDetectionIDs.insert(detection.id)
@@ -785,11 +778,7 @@ struct BinderPageReviewView: View {
     }
 
     private func sortCollections() {
-        collections.sort { lhs, rhs in
-            if lhs.id == Collection.unsortedBinderId { return true }
-            if rhs.id == Collection.unsortedBinderId { return false }
-            return lhs.updatedAt > rhs.updatedAt
-        }
+        collections = collections.sortedForDisplay()
     }
 
     private func makeCard(from candidate: CardScanCandidate) -> Card? {
@@ -1001,34 +990,15 @@ private struct BinderCardMatchSearchView: View {
                         description: Text("Search by card name or collector number.")
                     )
                 } else {
-                    List(results) { card in
-                        Button {
-                            onSelect(card)
-                        } label: {
-                            HStack(spacing: 12) {
-                                CachedAsyncImage(url: card.imageUrlSmall.flatMap(URL.init(string:))) { phase in
-                                    switch phase {
-                                    case .success(let image):
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    default:
-                                        Color.secondary.opacity(0.12)
-                                            .overlay(Image(systemName: "rectangle.portrait"))
-                                    }
-                                }
-                                .frame(width: 40, height: 56)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(card.name)
-                                        .foregroundStyle(.primary)
-                                    Text(card.setName ?? card.setCode ?? "Unknown set")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
+                    CardSearchResultsList(
+                        cards: results,
+                        selectedGame: game,
+                        enabledGames: environmentStore.enabledGames,
+                        showPricing: environmentStore.showPricing,
+                        showCardNumbers: environmentStore.showCardNumbers,
+                        primaryActionTitle: "Use This Card",
+                        onCardTap: onSelect
+                    )
                 }
             }
             .navigationTitle("Correct Match")

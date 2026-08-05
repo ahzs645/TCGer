@@ -18,7 +18,7 @@ struct CollectionStatsCard: View {
             items.insert(
                 (
                     "Total Value",
-                    String(format: "$%.2f", collection.totalValue),
+                    collection.totalValue.priceText,
                     .green,
                     "dollarsign.circle.fill"
                 ),
@@ -51,7 +51,13 @@ struct CollectionStatsCard: View {
             if !activeGames.isEmpty {
                 HStack(spacing: 10) {
                     ForEach(activeGames) { game in
-                        GameIcon(game: game)
+                        ZStack {
+                            Circle()
+                                .fill(Color(.tertiarySystemBackground))
+                                .frame(width: 34, height: 34)
+                            TCGGameIcon(game: game, size: 18)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding(.horizontal, 4)
@@ -64,22 +70,27 @@ struct CollectionStatsCard: View {
     }
 }
 
+/// The one stat tile: colored icon bubble (optional), uppercased title, and a
+/// prominent value. Used by the collection stats card, dashboard overview,
+/// finance summary, and scanner debug metrics.
 struct StatItem: View {
     let title: String
     let value: String
     let color: Color
-    let icon: String
+    var icon: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.15))
-                        .frame(width: 28, height: 28)
-                    Image(systemName: icon)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(color)
+                if let icon {
+                    ZStack {
+                        Circle()
+                            .fill(color.opacity(0.15))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: icon)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(color)
+                    }
                 }
 
                 Text(title.uppercased())
@@ -101,29 +112,6 @@ struct StatItem: View {
         .padding(10)
         .background(color.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
-private struct GameIcon: View {
-    let game: TCGGame
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(.tertiarySystemBackground))
-                .frame(width: 34, height: 34)
-
-            if let iconName = game.iconName {
-                Image(iconName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22, height: 22)
-            } else {
-                Image(systemName: game.systemIconName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-        }
     }
 }
 

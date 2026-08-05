@@ -134,22 +134,12 @@ struct CollectionDetailView: View {
     }
 
     private var binderConditionOptions: [String] {
-        let preferredOrder = ["MINT", "NEAR MINT", "EXCELLENT", "GOOD", "LIGHT PLAYED", "PLAYED", "POOR", "NM", "LP", "MP", "HP", "DMG"]
-
         var seen = Set<String>()
         let allConditions = cards.flatMap { card in
             card.copies.compactMap(\.condition) + [card.condition].compactMap { $0 }
         }
         let normalized = allConditions.compactMap(normalizeFilterValue).filter { seen.insert($0).inserted }
-
-        return normalized.sorted { lhs, rhs in
-            let leftIndex = preferredOrder.firstIndex(of: lhs) ?? preferredOrder.count
-            let rightIndex = preferredOrder.firstIndex(of: rhs) ?? preferredOrder.count
-            if leftIndex == rightIndex {
-                return lhs < rhs
-            }
-            return leftIndex < rightIndex
-        }
+        return CardCondition.sorted(normalized)
     }
 
     @ViewBuilder
@@ -319,19 +309,13 @@ struct CollectionDetailView: View {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
                                 if isEditing {
-                                    TextField("Binder Name", text: $editedName)
-                                        .font(.title)
-                                        .fontWeight(.bold)
-                                        .textFieldStyle(.roundedBorder)
-
-                                    TextField("Description (optional)", text: $editedDescription, axis: .vertical)
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                        .textFieldStyle(.roundedBorder)
-                                        .lineLimit(3...6)
-
-                                    ColorPickerGrid(selectedColor: $selectedColor)
-                                        .padding(.top, 12)
+                                    InlineNameDescriptionColorEditor(
+                                        namePlaceholder: "Binder Name",
+                                        name: $editedName,
+                                        description: $editedDescription,
+                                        selectedColor: $selectedColor,
+                                        nameFont: .title
+                                    )
                                 } else {
                                     Text(collection.name)
                                         .font(.title)
@@ -1297,41 +1281,10 @@ private struct CopySelectionSheet: View {
         let copy: CollectionCardCopy
         let index: Int
 
-        private func normalized(_ value: String?) -> String? {
-            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-                return nil
-            }
-            return trimmed
-        }
-
-        private var title: String {
-            if let serial = normalized(copy.serialNumber) {
-                return serial
-            }
-            return "Copy #\(index + 1)"
-        }
-
-        private var detailLine: String? {
-            var parts: [String] = []
-            if let condition = normalized(copy.condition) {
-                parts.append(condition)
-            }
-            if let language = normalized(copy.language) {
-                parts.append(language)
-            }
-            return parts.isEmpty ? nil : parts.joined(separator: " • ")
-        }
-
-        private var tagsLine: String? {
-            let labels = copy.tags.map { $0.label }.filter { !$0.isEmpty }
-            guard !labels.isEmpty else { return nil }
-            return labels.joined(separator: ", ")
-        }
-
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(title)
+                    Text(copy.displayTitle(index: index))
                         .font(.headline)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -1339,20 +1292,20 @@ private struct CopySelectionSheet: View {
                         .foregroundColor(.secondary)
                 }
 
-                if let detailLine {
+                if let detailLine = copy.detailLine {
                     Text(detailLine)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
-                if let notes = normalized(copy.notes) {
+                if let notes = copy.normalizedNotes {
                     Text(notes)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                 }
 
-                if let tagsLine {
+                if let tagsLine = copy.tagsLine {
                     Text("Tags: \(tagsLine)")
                         .font(.caption2)
                         .foregroundColor(.secondary)

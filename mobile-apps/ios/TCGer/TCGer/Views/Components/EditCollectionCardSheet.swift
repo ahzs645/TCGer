@@ -53,7 +53,6 @@ struct EditCollectionCardSheet: View {
     @State private var certNumber: String
     @State private var storageLocation: String
 
-    private let conditions = ["", "Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"]
     private let languages = [""] + PokemonCardLanguage.allCases.map(\.rawValue)
 
     private var supportsPrintSelection: Bool {
@@ -79,25 +78,12 @@ struct EditCollectionCardSheet: View {
 
     private var copyTitle: String? {
         guard let copy = copyDetails else { return nil }
-        if let serial = copy.serialNumber, !serial.isEmpty {
-            return serial
-        }
-        if let index = card.copies.firstIndex(where: { $0.id == copy.id }) {
-            return "Copy #\(index + 1)"
-        }
-        return "Copy"
+        let index = card.copies.firstIndex(where: { $0.id == copy.id }) ?? 0
+        return copy.displayTitle(index: index)
     }
 
     private var copyDetailsLine: String? {
-        guard let copy = copyDetails else { return nil }
-        var parts: [String] = []
-        if let condition = copy.condition, !condition.isEmpty {
-            parts.append(condition)
-        }
-        if let language = copy.language, !language.isEmpty {
-            parts.append(language)
-        }
-        return parts.joined(separator: " • ")
+        copyDetails?.detailLine
     }
 
     init(
@@ -118,7 +104,7 @@ struct EditCollectionCardSheet: View {
         self.onSave = onSave
 
         _quantity = State(initialValue: max(1, card.quantity))
-        _conditionSelection = State(initialValue: copyDetails?.condition ?? card.condition ?? "")
+        _conditionSelection = State(initialValue: (copyDetails?.condition ?? card.condition).map(CardCondition.canonicalize) ?? "")
         _languageSelection = State(initialValue: copyDetails?.language ?? card.language ?? "")
         _notes = State(initialValue: copyDetails?.notes ?? card.notes ?? "")
         _isFoil = State(initialValue: copyDetails?.isFoil ?? false)
@@ -143,22 +129,8 @@ struct EditCollectionCardSheet: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? "")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fit)
-                            case .empty, .failure:
-                                Rectangle()
-                                    .fill(Color(.systemGray5))
-                                    .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                            @unknown default:
-                                Rectangle()
-                                    .fill(Color(.systemGray5))
-                                    .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                            }
-                        }
-                        .frame(width: 60, height: 84)
-                        .cornerRadius(6)
+                        CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                            .frame(width: 60, height: 84)
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text(card.name)
@@ -269,12 +241,7 @@ struct EditCollectionCardSheet: View {
                 }
 
                 Section {
-                    Picker("Condition", selection: $conditionSelection) {
-                        Text("Unspecified").tag("")
-                        ForEach(conditions.filter { !$0.isEmpty }, id: \.self) { option in
-                            Text(option).tag(option)
-                        }
-                    }
+                    ConditionPicker(selection: $conditionSelection, includeUnspecified: true)
 
                     Picker("Language", selection: $languageSelection) {
                         Text("Unspecified").tag("")

@@ -233,15 +233,15 @@ private struct SealedLedgerRow: View {
                     .fontWeight(.semibold)
                 Spacer()
                 Text(
-                    "\(ledger.profitLoss >= 0 ? "+" : "")$\(ledger.profitLoss, specifier: "%.2f")"
+                    "\(ledger.profitLoss >= 0 ? "+" : "")\(ledger.profitLoss.priceText)"
                 )
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(ledger.profitLoss >= 0 ? .green : .red)
             }
             HStack(spacing: 12) {
-                Label("$\(ledger.invested, specifier: "%.2f") in", systemImage: "creditcard")
-                Label("$\(ledger.liveValue, specifier: "%.2f") live", systemImage: "chart.line.uptrend.xyaxis")
-                Label("$\(ledger.realizedProceeds, specifier: "%.2f") sold", systemImage: "banknote")
+                Label("\(ledger.invested.priceText) in", systemImage: "creditcard")
+                Label("\(ledger.liveValue.priceText) live", systemImage: "chart.line.uptrend.xyaxis")
+                Label("\(ledger.realizedProceeds.priceText) sold", systemImage: "banknote")
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -305,7 +305,7 @@ private struct SealedInventoryRow: View {
                 }
 
                 if let price = item.purchasePrice {
-                    Text("$\(String(format: "%.2f", price))")
+                    Text(price.priceText)
                         .font(.caption)
                         .foregroundColor(.green)
                 }
@@ -395,7 +395,7 @@ private struct SealedProductCatalogSheet: View {
                                                 .foregroundColor(.accentColor)
                                                 .cornerRadius(4)
                                             if let msrp = product.msrp {
-                                                Text("MSRP $\(String(format: "%.2f", msrp))")
+                                                Text("MSRP \(msrp.priceText)")
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                             }

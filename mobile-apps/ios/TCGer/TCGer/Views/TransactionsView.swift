@@ -21,9 +21,14 @@ struct TransactionsView: View {
             if let summary {
                 Section {
                     HStack(spacing: 16) {
-                        FinanceStatBlock(title: "Spent", value: summary.totalSpent, color: .red)
-                        FinanceStatBlock(title: "Earned", value: summary.totalEarned, color: .green)
-                        FinanceStatBlock(title: "P/L", value: summary.profitLoss, color: summary.profitLoss >= 0 ? .green : .red)
+                        StatItem(title: "Spent", value: abs(summary.totalSpent).priceText, color: .red, icon: "cart.fill")
+                        StatItem(title: "Earned", value: abs(summary.totalEarned).priceText, color: .green, icon: "banknote")
+                        StatItem(
+                            title: "P/L",
+                            value: abs(summary.profitLoss).priceText,
+                            color: summary.profitLoss >= 0 ? .green : .red,
+                            icon: "chart.line.uptrend.xyaxis"
+                        )
                     }
                     .padding(.vertical, 4)
                 }
@@ -145,25 +150,6 @@ struct TransactionsView: View {
     }
 }
 
-private struct FinanceStatBlock: View {
-    let title: String
-    let value: Double
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Text("$\(String(format: "%.2f", abs(value)))")
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 private struct TransactionRow: View {
     let transaction: Transaction
 
@@ -222,7 +208,7 @@ private struct TransactionRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(transaction.type == "purchase" ? "-" : "+")$\(String(format: "%.2f", transaction.amount))")
+                Text("\(transaction.type == "purchase" ? "-" : "+")\(transaction.amount.priceText)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(typeColor)
@@ -271,12 +257,8 @@ private struct CreateTransactionSheet: View {
                     Picker("TCG", selection: $tcg) {
                         Text("None").tag("")
                         ForEach(environmentStore.enabledGames) { game in
-                            Label {
-                                Text(game.shortName)
-                            } icon: {
-                                TCGGameIcon(game: game)
-                            }
-                            .tag(game.rawValue)
+                            GameLabel(game: game)
+                                .tag(game.rawValue)
                         }
                     }
                     Stepper("Quantity: \(quantity)", value: $quantity, in: 1...999)

@@ -74,17 +74,12 @@ struct WishlistDetailView: View {
                 if isEditing {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            TextField("Wishlist Name", text: $editedName)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Description (optional)", text: $editedDescription, axis: .vertical)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...6)
-                            ColorPickerGrid(selectedColor: $selectedColor)
-                                .padding(.top, 8)
+                            InlineNameDescriptionColorEditor(
+                                namePlaceholder: "Wishlist Name",
+                                name: $editedName,
+                                description: $editedDescription,
+                                selectedColor: $selectedColor
+                            )
                         }
                         .listRowSeparator(.hidden)
                     }
@@ -498,30 +493,8 @@ private struct WishlistCardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(
-                url: URL(string: card.imageUrlSmall ?? card.imageUrl ?? ""),
-                tcg: card.tcg
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure, .empty:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                }
-            }
-            .frame(width: 50, height: 70)
-            .cornerRadius(4)
+            CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                .frame(width: 50, height: 70)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name)
