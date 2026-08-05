@@ -52,7 +52,7 @@ struct CollectionsView: View {
                 if isLoading {
                     ProgressView("Loading binders...")
                 } else if let error = errorMessage {
-                    ErrorView(message: error) {
+                    ErrorView(title: "Error Loading Binders", message: error) {
                         Task { await loadCollections() }
                     }
                 } else if displayCollections.isEmpty {
@@ -265,29 +265,5 @@ private struct CollectionsList: View {
             }
             .padding()
         }
-    }
-}
-
-// MARK: - Error View
-private struct ErrorView: View {
-    let message: String
-    let retryAction: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            Text("Error Loading Binders")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Button("Try Again", action: retryAction)
-                .buttonStyle(.borderedProminent)
-        }
-        .padding()
     }
 }

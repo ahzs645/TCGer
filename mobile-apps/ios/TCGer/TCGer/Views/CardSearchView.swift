@@ -106,7 +106,7 @@ struct CardSearchView: View {
                     ProgressView("Searching...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error = errorMessage {
-                    ErrorView(message: error) {
+                    ErrorView(title: "Search Failed", message: error) {
                         Task { await performSearch() }
                     }
                 } else if hasSearched && searchResults.isEmpty {
@@ -118,7 +118,7 @@ struct CardSearchView: View {
                 } else if !hasSearched {
                     InitialSearchView()
                 } else {
-                    SearchResultsList(
+                    CardSearchResultsList(
                         cards: filteredSearchResults,
                         selectedGame: selectedGame,
                         enabledGames: environmentStore.enabledGames,
@@ -196,19 +196,15 @@ struct CardSearchView: View {
                 currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
-                    try await addCardToBinder(
-                        card: card,
+                AddCardToBinderSheet(card: card) { binderId, details in
+                    try await apiService.addCardToBinder(
+                        config: environmentStore.serverConfiguration,
+                        token: environmentStore.authToken,
                         binderId: binderId,
-                        quantity: quantity,
-                        condition: condition,
-                        language: language,
-                        notes: notes,
-                        isFoil: isFoil,
-                        variant: variant,
-                        isSigned: isSigned,
-                        isAltered: isAltered
+                        card: card,
+                        details: details
                     )
+                    addCardSuccessMessage = "Card added to binder successfully!"
                 }
             }
             .sheet(item: $wishlistSheetCard) { card in
@@ -420,43 +416,6 @@ struct CardSearchView: View {
     }
 
     @MainActor
-    private func addCardToBinder(
-        card: Card,
-        binderId: String,
-        quantity: Int,
-        condition: String?,
-        language: String?,
-        notes: String?,
-        isFoil: Bool = false,
-        variant: CardCopyVariant = .empty,
-        isSigned: Bool = false,
-        isAltered: Bool = false
-    ) async throws {
-        guard let token = environmentStore.authToken else {
-            throw APIService.APIError.unauthorized
-        }
-
-        try await apiService.addCardToBinder(
-            config: environmentStore.serverConfiguration,
-            token: token,
-            binderId: binderId,
-            cardId: card.id,
-            quantity: quantity,
-            condition: condition,
-            language: language,
-            notes: notes,
-            price: card.price,
-            acquisitionPrice: nil,
-            isFoil: isFoil,
-            variant: variant,
-            isSigned: isSigned,
-            isAltered: isAltered,
-            card: card
-        )
-        addCardSuccessMessage = "Card added to binder successfully!"
-    }
-
-    @MainActor
     private func performSearch() async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
@@ -538,198 +497,6 @@ private struct FilteredSearchEmptyView: View {
     }
 }
 
-// MARK: - Search Results List
-private struct SearchResultsList: View {
-    let cards: [Card]
-    let selectedGame: TCGGame
-    let enabledGames: [TCGGame]
-    let showPricing: Bool
-    let showCardNumbers: Bool
-    let onCardTap: (Card) -> Void
-    let onShowDetails: (Card) -> Void
-    var onAddToWishlist: ((Card) -> Void)?
-
-    // Group cards by TCG
-    var groupedCards: [(String, [Card])] {
-        if selectedGame != .all {
-            return [(selectedGame.rawValue, cards)]
-        }
-
-        // Filter cards to only include enabled games
-        let enabledGameRawValues = Set(enabledGames.map { $0.rawValue })
-        let filteredCards = cards.filter { card in
-            enabledGameRawValues.contains(card.tcg)
-        }
-
-        let groups = Dictionary(grouping: filteredCards, by: { $0.tcg })
-        return groups.sorted {
-            gameSectionIsOrderedBefore($0.key, $1.key, enabledGames: enabledGames)
-        }
-    }
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
-                ForEach(groupedCards, id: \.0) { tcg, tcgCards in
-                    Section {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            ForEach(tcgCards) { card in
-                                Button {
-                                    onCardTap(card)
-                                } label: {
-                                    CardCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityHint("Opens the add card form")
-                                .cardPreviewContextMenu(
-                                    card: card,
-                                    primaryActionTitle: "Add Card",
-                                    onSelect: { onCardTap(card) },
-                                    onShowDetails: { onShowDetails(card) },
-                                    onAddToWishlist: { onAddToWishlist?(card) }
-                                )
-                            }
-                        }
-                    } header: {
-                        HStack {
-                            Text(tcgCards.first?.tcgDisplayName ?? tcg.uppercased())
-                                .font(.headline)
-                                .padding(.horizontal)
-                            Spacer()
-                            Text("\(tcgCards.count) cards")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                        }
-                        .padding(.vertical, 8)
-                        .background(Color(.systemBackground))
-                    }
-                }
-            }
-            .padding()
-        }
-    }
-}
-
-// MARK: - Card Cell
-private struct CardCell: View {
-    let card: Card
-    let showPricing: Bool
-    let showCardNumbers: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Card Image
-            CachedAsyncImage(card: card) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            ProgressView()
-                        )
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                @unknown default:
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .aspectRatio(0.7, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
-                        )
-                }
-            }
-            .cornerRadius(8)
-
-            // Card Info
-            VStack(alignment: .leading, spacing: 4) {
-                if let rarity = card.rarity {
-                    PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
-                }
-
-                Text(card.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(2)
-
-                if showCardNumbers, let setName = card.setName {
-                    Text(setName)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-
-                // Pokemon TCG format legality & dex number
-                if card.tcg == "pokemon" {
-                    HStack(spacing: 4) {
-                        if let supertype = card.supertype {
-                            Text(supertype)
-                                .font(.system(size: 9))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Color(.systemGray4))
-                                .cornerRadius(3)
-                        }
-                        if card.formatLegality?.standard == true {
-                            Text("Standard")
-                                .font(.system(size: 9))
-                                .foregroundColor(.green)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Color.green.opacity(0.15))
-                                .cornerRadius(3)
-                        }
-                        if card.formatLegality?.expanded == true {
-                            Text("Expanded")
-                                .font(.system(size: 9))
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Color.blue.opacity(0.15))
-                                .cornerRadius(3)
-                        }
-                        if let dexNum = card.pokedexNumber {
-                            Text("#\(dexNum)")
-                                .font(.system(size: 9))
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Color(.systemGray5))
-                                .cornerRadius(3)
-                        }
-                    }
-                }
-
-                if showPricing, let price = card.price {
-                    Text(price.priceText)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding(8)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-        .contentShape(Rectangle())
-    }
-}
-
 // MARK: - Initial Search View
 private struct InitialSearchView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
@@ -753,63 +520,10 @@ private struct InitialSearchView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary)
-            Text("Search Your TCG Collection")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text(searchDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Empty Search View
-private struct EmptySearchView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "questionmark.folder")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary)
-            Text("No Cards Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("Try a different search term or game filter.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Error View
-private struct ErrorView: View {
-    let message: String
-    let retryAction: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            Text("Search Failed")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Button("Try Again", action: retryAction)
-                .buttonStyle(.borderedProminent)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        SearchPlaceholderView(
+            icon: "magnifyingglass",
+            title: "Search Your TCG Collection",
+            message: searchDescription
+        )
     }
 }

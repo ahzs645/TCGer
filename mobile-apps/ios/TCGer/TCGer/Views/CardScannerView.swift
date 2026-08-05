@@ -93,18 +93,13 @@ struct CardScannerView: View {
             ScanResultSheet(
                 result: result,
                 color: accentColor(for: viewModel.selectedMode),
-                onAddCard: { card, binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
-                    try await addCardToBinder(
-                        card: card,
+                onAddCard: { card, binderId, details in
+                    try await APIService().addCardToBinder(
+                        config: environmentStore.serverConfiguration,
+                        token: environmentStore.authToken,
                         binderId: binderId,
-                        quantity: quantity,
-                        condition: condition,
-                        language: language,
-                        notes: notes,
-                        isFoil: isFoil,
-                        variant: variant,
-                        isSigned: isSigned,
-                        isAltered: isAltered
+                        card: card,
+                        details: details
                     )
                 }
             )
@@ -619,42 +614,6 @@ struct CardScannerView: View {
         }
     }
 
-    @MainActor
-    private func addCardToBinder(
-        card: Card,
-        binderId: String,
-        quantity: Int,
-        condition: String?,
-        language: String?,
-        notes: String?,
-        isFoil: Bool = false,
-        variant: CardCopyVariant = .empty,
-        isSigned: Bool = false,
-        isAltered: Bool = false
-    ) async throws {
-        guard let token = environmentStore.authToken else {
-            throw APIService.APIError.unauthorized
-        }
-
-        let apiService = APIService()
-        try await apiService.addCardToBinder(
-            config: environmentStore.serverConfiguration,
-            token: token,
-            binderId: binderId,
-            cardId: card.id,
-            quantity: quantity,
-            condition: condition,
-            language: language,
-            notes: notes,
-            price: card.price,
-            acquisitionPrice: nil,
-            isFoil: isFoil,
-            variant: variant,
-            isSigned: isSigned,
-            isAltered: isAltered,
-            card: card
-        )
-    }
 }
 
 private extension CardScannerView {
@@ -796,34 +755,12 @@ private struct ScanResultSheet: View {
 
     let result: CardScanResult
     let color: Color
-    let onAddCard: (
-        Card,
-        String,
-        Int,
-        String?,
-        String?,
-        String?,
-        Bool,
-        Bool,
-        Bool,
-        CardCopyVariant
-    ) async throws -> Void
+    let onAddCard: (Card, String, BinderCardAddDetails) async throws -> Void
 
     init(
         result: CardScanResult,
         color: Color,
-        onAddCard: @escaping (
-            Card,
-            String,
-            Int,
-            String?,
-            String?,
-            String?,
-            Bool,
-            Bool,
-            Bool,
-            CardCopyVariant
-        ) async throws -> Void
+        onAddCard: @escaping (Card, String, BinderCardAddDetails) async throws -> Void
     ) {
         self.result = result
         self.color = color
@@ -865,19 +802,8 @@ private struct ScanResultSheet: View {
             }
         }
         .sheet(item: $cardToAdd) { card in
-            AddCardToBinderSheet(card: card) { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, variant in
-                try await onAddCard(
-                    card,
-                    binderId,
-                    quantity,
-                    condition,
-                    language,
-                    notes,
-                    isFoil,
-                    isSigned,
-                    isAltered,
-                    variant
-                )
+            AddCardToBinderSheet(card: card) { binderId, details in
+                try await onAddCard(card, binderId, details)
             }
         }
     }

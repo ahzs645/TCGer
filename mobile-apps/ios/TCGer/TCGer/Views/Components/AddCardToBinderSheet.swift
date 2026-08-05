@@ -5,7 +5,7 @@ struct AddCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: Card
-    let onAdd: (String, Int, String?, String?, String?, Bool, Bool, Bool, CardCopyVariant) async throws -> Void
+    let onAdd: (String, BinderCardAddDetails) async throws -> Void
 
     @State private var collections: [Collection] = []
     @State private var selectedBinderId: String?
@@ -277,23 +277,25 @@ struct AddCardToBinderSheet: View {
         do {
             try await onAdd(
                 binderId,
-                quantity,
-                condition,
-                language,
-                notes.isEmpty ? nil : notes,
-                card.tcg.lowercased() == "pokemon"
-                    ? PokemonFinishOption.isFoil(finishCode)
-                    : isFoil,
-                isSigned,
-                isAltered,
-                CardCopyVariant(
-                    finishCode: finishCode.isEmpty ? nil : finishCode,
-                    finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
-                    edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
-                    stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
-                    isSealedPromo: isSealedPromo,
-                    isOversized: isOversized,
-                    isPeelOff: isPeelOff
+                BinderCardAddDetails(
+                    quantity: quantity,
+                    condition: condition,
+                    language: language,
+                    notes: notes.isEmpty ? nil : notes,
+                    isFoil: card.tcg.lowercased() == "pokemon"
+                        ? PokemonFinishOption.isFoil(finishCode)
+                        : isFoil,
+                    variant: CardCopyVariant(
+                        finishCode: finishCode.isEmpty ? nil : finishCode,
+                        finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
+                        edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
+                        stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
+                        isSealedPromo: isSealedPromo,
+                        isOversized: isOversized,
+                        isPeelOff: isPeelOff
+                    ),
+                    isSigned: isSigned,
+                    isAltered: isAltered
                 )
             )
             isAdding = false
@@ -384,8 +386,8 @@ private struct CardPreviewRow: View {
                     collectorNumber: nil,
                     releasedAt: nil
                 ),
-                onAdd: { binderId, quantity, condition, language, notes, isFoil, isSigned, isAltered, _ in
-                    print("Adding to binder \(binderId): \(quantity)x \(condition ?? "N/A") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered)")
+                onAdd: { binderId, details in
+                    print("Adding to binder \(binderId): \(details.quantity)x \(details.condition ?? "N/A") foil:\(details.isFoil) signed:\(details.isSigned) altered:\(details.isAltered)")
                 }
             )
             .environmentObject(environmentStore)

@@ -41,7 +41,7 @@ struct DashboardView: View {
                         ProgressView("Loading your collection...")
                             .padding()
                     } else if let error = errorMessage {
-                        ErrorView(message: error) {
+                        ErrorView(title: "Error Loading Data", message: error) {
                             Task { await loadData() }
                         }
                     } else {
@@ -297,29 +297,5 @@ private struct EmptyStateView: View {
                 .padding(.horizontal)
         }
         .padding(.vertical, 40)
-    }
-}
-
-// MARK: - Error View
-private struct ErrorView: View {
-    let message: String
-    let retryAction: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            Text("Error Loading Data")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Button("Try Again", action: retryAction)
-                .buttonStyle(.borderedProminent)
-        }
-        .padding()
     }
 }
