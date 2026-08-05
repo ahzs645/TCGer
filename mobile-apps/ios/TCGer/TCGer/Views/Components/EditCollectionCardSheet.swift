@@ -78,25 +78,12 @@ struct EditCollectionCardSheet: View {
 
     private var copyTitle: String? {
         guard let copy = copyDetails else { return nil }
-        if let serial = copy.serialNumber, !serial.isEmpty {
-            return serial
-        }
-        if let index = card.copies.firstIndex(where: { $0.id == copy.id }) {
-            return "Copy #\(index + 1)"
-        }
-        return "Copy"
+        let index = card.copies.firstIndex(where: { $0.id == copy.id }) ?? 0
+        return copy.displayTitle(index: index)
     }
 
     private var copyDetailsLine: String? {
-        guard let copy = copyDetails else { return nil }
-        var parts: [String] = []
-        if let condition = copy.condition, !condition.isEmpty {
-            parts.append(condition)
-        }
-        if let language = copy.language, !language.isEmpty {
-            parts.append(language)
-        }
-        return parts.joined(separator: " • ")
+        copyDetails?.detailLine
     }
 
     init(

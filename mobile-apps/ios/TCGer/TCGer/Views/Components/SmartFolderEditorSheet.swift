@@ -142,13 +142,10 @@ private struct RuleRow: View {
                 if rule.type == .tcg {
                     Picker("Game", selection: $rule.value) {
                         ForEach(pickerGames) { game in
-                            Label {
-                                Text(games.contains(game)
-                                     ? game.shortName
-                                     : "\(game.displayName) (disabled)")
-                            } icon: {
-                                TCGGameIcon(game: game)
-                            }
+                            GameLabel(
+                                game: game,
+                                text: games.contains(game) ? nil : "\(game.displayName) (disabled)"
+                            )
                             .tag(game.rawValue)
                         }
                     }

@@ -80,12 +80,8 @@ struct AddWishlistRuleSheet: View {
 
                         Picker("Game", selection: $selectedGame) {
                             ForEach(environmentStore.gamePickerGames) { game in
-                                Label {
-                                    Text(game.shortName)
-                                } icon: {
-                                    TCGGameIcon(game: game)
-                                }
-                                .tag(game)
+                                GameLabel(game: game)
+                                    .tag(game)
                             }
                         }
 
@@ -101,12 +97,8 @@ struct AddWishlistRuleSheet: View {
                     Section {
                         Picker("Game", selection: $setGame) {
                             ForEach(availableGames) { game in
-                                Label {
-                                    Text(game.shortName)
-                                } icon: {
-                                    TCGGameIcon(game: game)
-                                }
-                                .tag(game)
+                                GameLabel(game: game)
+                                    .tag(game)
                             }
                         }
                         .onChange(of: setGame) {

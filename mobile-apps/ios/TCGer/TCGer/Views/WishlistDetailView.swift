@@ -74,17 +74,12 @@ struct WishlistDetailView: View {
                 if isEditing {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            TextField("Wishlist Name", text: $editedName)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Description (optional)", text: $editedDescription, axis: .vertical)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...6)
-                            ColorPickerGrid(selectedColor: $selectedColor)
-                                .padding(.top, 8)
+                            InlineNameDescriptionColorEditor(
+                                namePlaceholder: "Wishlist Name",
+                                name: $editedName,
+                                description: $editedDescription,
+                                selectedColor: $selectedColor
+                            )
                         }
                         .listRowSeparator(.hidden)
                     }

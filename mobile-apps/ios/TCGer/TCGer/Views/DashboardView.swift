@@ -167,48 +167,22 @@ private struct StatsSection: View {
                 .font(.headline)
 
             HStack(spacing: 12) {
-                StatCard(title: "Binders", value: "\(collections.count)", icon: "folder.fill")
-                StatCard(title: "Unique Cards", value: "\(totalCards)", icon: "rectangle.stack.fill")
+                StatItem(title: "Binders", value: "\(collections.count)", color: .blue, icon: "folder.fill")
+                StatItem(title: "Unique Cards", value: "\(totalCards)", color: .indigo, icon: "rectangle.stack.fill")
             }
 
             HStack(spacing: 12) {
-                StatCard(title: "Total Copies", value: "\(totalCopies)", icon: "square.on.square")
+                StatItem(title: "Total Copies", value: "\(totalCopies)", color: .orange, icon: "square.on.square")
                 if showPricing {
-                    StatCard(
+                    StatItem(
                         title: "Est. Value",
                         value: totalValue.priceText,
+                        color: .green,
                         icon: "dollarsign.circle.fill"
                     )
                 }
             }
         }
-    }
-}
-
-private struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(.accentColor)
-                Spacer()
-            }
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
     }
 }
 
@@ -224,59 +198,12 @@ private struct RecentCollectionsSection: View {
                 .font(.headline)
 
             ForEach(collections) { collection in
-                CollectionRowView(collection: collection, showPricing: showPricing)
+                CollectionCardView(collection: collection, showPricing: showPricing)
                     .onTapGesture {
                         onSelect(collection)
                     }
             }
         }
-    }
-}
-
-private struct CollectionRowView: View {
-    let collection: Collection
-    let showPricing: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color.fromHex(collection.colorHex))
-                    .frame(width: 14, height: 14)
-                    .shadow(color: Color.fromHex(collection.colorHex).opacity(0.4), radius: 4, x: 0, y: 2)
-
-                Text(collection.name)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-            }
-
-            HStack(spacing: 12) {
-                Label("\(collection.uniqueCards) cards", systemImage: "rectangle.stack")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Label("\(collection.totalCopies) copies", systemImage: "square.on.square")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                if showPricing {
-                    Text(collection.totalValue.priceText)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
     }
 }
 

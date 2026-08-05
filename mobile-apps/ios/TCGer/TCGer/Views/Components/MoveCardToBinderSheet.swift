@@ -196,37 +196,6 @@ private struct CopySelectionRow: View {
     let isSelected: Bool
     let onToggle: (Bool) -> Void
 
-    private func normalized(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return nil
-        }
-        return trimmed
-    }
-
-    private var title: String {
-        if let serial = normalized(copy.serialNumber) {
-            return serial
-        }
-        return "Copy #\(index + 1)"
-    }
-
-    private var detailLine: String? {
-        var parts: [String] = []
-        if let condition = normalized(copy.condition) {
-            parts.append(condition)
-        }
-        if let language = normalized(copy.language) {
-            parts.append(language)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " • ")
-    }
-
-    private var tagsLine: String? {
-        let labels = copy.tags.map { $0.label }.filter { !$0.isEmpty }
-        guard !labels.isEmpty else { return nil }
-        return labels.joined(separator: ", ")
-    }
-
     var body: some View {
         Button {
             onToggle(!isSelected)
@@ -237,24 +206,24 @@ private struct CopySelectionRow: View {
                     .font(.title3)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
+                    Text(copy.displayTitle(index: index))
                         .font(.caption)
                         .fontWeight(.semibold)
 
-                    if let detailLine {
+                    if let detailLine = copy.detailLine {
                         Text(detailLine)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
 
-                    if let notes = normalized(copy.notes) {
+                    if let notes = copy.normalizedNotes {
                         Text(notes)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
                     }
 
-                    if let tagsLine {
+                    if let tagsLine = copy.tagsLine {
                         Text("Tags: \(tagsLine)")
                             .font(.caption2)
                             .foregroundColor(.secondary)

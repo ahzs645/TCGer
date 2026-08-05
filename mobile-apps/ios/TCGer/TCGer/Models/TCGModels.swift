@@ -652,6 +652,41 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+extension CollectionCardCopy {
+    /// Serial number when present, otherwise "Copy #n" for position `index`.
+    func displayTitle(index: Int) -> String {
+        if let serial = serialNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !serial.isEmpty {
+            return serial
+        }
+        return "Copy #\(index + 1)"
+    }
+
+    /// "Condition • Language" summary, nil when neither is set.
+    var detailLine: String? {
+        let parts = [condition, language].compactMap { value -> String? in
+            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+                return nil
+            }
+            return trimmed
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
+    }
+
+    /// Comma-separated tag labels, nil when there are none.
+    var tagsLine: String? {
+        let labels = tags.map(\.label).filter { !$0.isEmpty }
+        return labels.isEmpty ? nil : labels.joined(separator: ", ")
+    }
+
+    /// Trimmed notes, nil when empty.
+    var normalizedNotes: String? {
+        guard let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+}
+
 struct CollectionCardTag: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let label: String
