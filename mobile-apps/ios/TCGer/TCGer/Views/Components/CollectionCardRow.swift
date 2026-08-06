@@ -247,9 +247,6 @@ struct CollectionCardRow: View {
                             }
                         }
                     }
-                    // A refreshable ancestor would otherwise give this
-                    // horizontal strip its own vertical pull-to-refresh gesture.
-                    .environment(\.refresh, nil)
 
                     if let notesSummary = notesSummary() {
                         SummaryRow(label: "Notes", value: notesSummary, icon: "note.text")
@@ -393,9 +390,6 @@ struct CollectionCardRow: View {
                         }
                     }
                 }
-                // A refreshable ancestor would otherwise give this horizontal
-                // strip its own vertical pull-to-refresh gesture.
-                .environment(\.refresh, nil)
             }
         }
     }

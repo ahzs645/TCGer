@@ -1966,14 +1966,15 @@ final class LocalStore {
     // MARK: - Wishlist Accessors
 
     func getWishlists() -> [Wishlist] {
-        wishlists.map { applyingOwnership($0) }
+        let maps = ownershipMaps()
+        return wishlists.map { applyingOwnership($0, maps: maps) }
     }
 
     func getWishlist(id: String) throws -> Wishlist {
         guard let wl = wishlists.first(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
-        return applyingOwnership(wl)
+        return applyingOwnership(wl, maps: ownershipMaps())
     }
 
     /// Live ownership from the local binders, keyed by exact printing
@@ -2006,8 +2007,10 @@ final class LocalStore {
 
     /// Rewrites a wishlist's cards and totals with live ownership; the stored
     /// flags only reflect what was true when each card was added.
-    private func applyingOwnership(_ wishlist: Wishlist) -> Wishlist {
-        let maps = ownershipMaps()
+    private func applyingOwnership(
+        _ wishlist: Wishlist,
+        maps: (exact: [String: Int], base: [String: Int])
+    ) -> Wishlist {
         let cards = wishlist.cards.map { card -> WishlistCard in
             var updated = card
             let quantity = ownedQuantity(
@@ -2077,7 +2080,7 @@ final class LocalStore {
         )
         wishlists[idx] = updated
         persist()
-        return applyingOwnership(updated)
+        return applyingOwnership(updated, maps: ownershipMaps())
     }
 
     func deleteWishlist(id: String) {
@@ -2132,7 +2135,7 @@ final class LocalStore {
         let updated = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         wishlists[idx] = updated
         persist()
-        return applyingOwnership(updated)
+        return applyingOwnership(updated, maps: ownershipMaps())
     }
 
     func removeCardFromWishlist(wishlistId: String, cardId: String) {

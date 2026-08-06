@@ -145,10 +145,8 @@ struct SetDetailView: View {
                     // Set Info Header
                     VStack(spacing: 8) {
                         HStack {
-                            SetArtworkView(set: set, size: 44)
+                            SetArtworkView(set: set, size: 44, showsFallback: false)
                             VStack(alignment: .leading, spacing: 4) {
-                                // Full name lives here because the inline nav
-                                // title truncates longer set names.
                                 Text(set.name)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
@@ -266,7 +264,6 @@ struct SetDetailView: View {
                 }
             }
         }
-        .navigationTitle(set.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

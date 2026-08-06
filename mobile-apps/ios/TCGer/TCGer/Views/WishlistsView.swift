@@ -4,15 +4,14 @@ struct WishlistsView: View {
     let parentProvidesNavigation: Bool
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
-    @State private var wishlists: [Wishlist] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    @EnvironmentObject private var wishlistStore: WishlistStore
     @State private var showingCreateSheet = false
     @State private var selectedWishlist: Wishlist?
     @State private var newWishlistName = ""
     @State private var newWishlistDescription = ""
     @State private var newWishlistColor: Color = .blue
     @State private var newWishlistMatchAnyPrinting = false
+    @State private var actionErrorMessage: String?
 
     private let apiService = APIService()
 
@@ -34,13 +33,14 @@ struct WishlistsView: View {
 
     private var wishlistContent: some View {
         Group {
-            if isLoading {
+            if wishlistStore.isLoading && !wishlistStore.hasLoaded {
                 ProgressView("Loading wishlists...")
-            } else if let error = errorMessage {
+            } else if let error = wishlistStore.errorMessage,
+                      wishlistStore.wishlists.isEmpty {
                 ErrorView(title: "Failed to Load Wishlists", message: error) {
-                    Task { await loadWishlists() }
+                    Task { await loadWishlists(force: true) }
                 }
-            } else if wishlists.isEmpty {
+            } else if wishlistStore.wishlists.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "heart.slash")
                         .font(.system(size: 50))
@@ -61,7 +61,7 @@ struct WishlistsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(wishlists) { wishlist in
+                    ForEach(wishlistStore.wishlists) { wishlist in
                         Button {
                             selectedWishlist = wishlist
                         } label: {
@@ -91,19 +91,29 @@ struct WishlistsView: View {
             }
         }
         .refreshable {
-            await loadWishlists()
+            await loadWishlists(force: true)
         }
         .task {
             await loadWishlists()
+        }
+        .onChange(of: wishlistStore.revision) {
+            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists)
         }
         .sheet(isPresented: $showingCreateSheet) {
             createWishlistSheet
         }
         .sheet(item: $selectedWishlist) { wishlist in
             WishlistDetailView(wishlist: wishlist, onUpdate: {
-                Task { await loadWishlists() }
+                Task { await loadWishlists(force: true) }
             })
             .environmentObject(environmentStore)
+        }
+        .alert("Wishlist Error", isPresented: actionErrorIsPresented) {
+            Button("OK", role: .cancel) {
+                actionErrorMessage = nil
+            }
+        } message: {
+            Text(actionErrorMessage ?? "Something went wrong.")
         }
     }
 
@@ -144,28 +154,16 @@ struct WishlistsView: View {
     }
 
     @MainActor
-    private func loadWishlists() async {
+    private func loadWishlists(force: Bool = false) async {
         guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            isLoading = false
             return
         }
 
-        isLoading = wishlists.isEmpty
-        errorMessage = nil
-
-        do {
-            let loadedWishlists = try await apiService.getWishlists(
-                config: environmentStore.serverConfiguration,
-                token: token
-            )
-            wishlists = loadedWishlists
-            environmentStore.updateWishlistWidgetData(wishlists: loadedWishlists)
-            isLoading = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
-        }
+        await wishlistStore.load(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            force: force
+        )
     }
 
     @MainActor
@@ -183,12 +181,11 @@ struct WishlistsView: View {
                 colorHex: newWishlistColor.toHex(),
                 matchAnyPrinting: newWishlistMatchAnyPrinting
             )
-            wishlists.insert(wishlist, at: 0)
-            environmentStore.updateWishlistWidgetData(wishlists: wishlists)
+            wishlistStore.insert(wishlist)
             resetCreateForm()
             showingCreateSheet = false
         } catch {
-            errorMessage = error.localizedDescription
+            actionErrorMessage = error.localizedDescription
         }
     }
 
@@ -202,11 +199,21 @@ struct WishlistsView: View {
                 token: token,
                 id: wishlist.id
             )
-            wishlists.removeAll { $0.id == wishlist.id }
-            environmentStore.updateWishlistWidgetData(wishlists: wishlists)
+            wishlistStore.remove(id: wishlist.id)
         } catch {
-            errorMessage = error.localizedDescription
+            actionErrorMessage = error.localizedDescription
         }
+    }
+
+    private var actionErrorIsPresented: Binding<Bool> {
+        Binding(
+            get: { actionErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    actionErrorMessage = nil
+                }
+            }
+        )
     }
 
     private func resetCreateForm() {

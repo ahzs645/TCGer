@@ -5,6 +5,7 @@ import SwiftUI
 struct SetArtworkView: View {
     let set: TcgSet
     var size: CGFloat = 32
+    var showsFallback = true
     @State private var artworkIndex = 0
 
     private var artworkURLs: [URL] {
@@ -35,34 +36,50 @@ struct SetArtworkView: View {
 
     var body: some View {
         Group {
-            if let artworkURL {
-                CachedAsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .empty:
-                        ProgressView()
-                    case .failure:
-                        fallbackBadge
-                            .onAppear {
-                                if canTryNextArtwork {
-                                    artworkIndex += 1
-                                }
+            if artworkURL != nil || showsFallback {
+                Group {
+                    if let artworkURL {
+                        CachedAsyncImage(url: artworkURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            case .empty:
+                                ProgressView()
+                            case .failure:
+                                unavailableArtwork
+                            @unknown default:
+                                unavailableArtwork
                             }
-                    @unknown default:
+                        }
+                    } else {
                         fallbackBadge
                     }
                 }
-            } else {
-                fallbackBadge
+                .frame(width: size, height: size)
+                .accessibilityLabel(set.name)
             }
         }
-        .frame(width: size, height: size)
-        .accessibilityLabel(set.name)
         .onChange(of: set.id) {
             artworkIndex = 0
+        }
+    }
+
+    @ViewBuilder
+    private var unavailableArtwork: some View {
+        if canTryNextArtwork {
+            ProgressView()
+                .onAppear {
+                    artworkIndex += 1
+                }
+        } else if showsFallback {
+            fallbackBadge
+        } else {
+            Color.clear
+                .onAppear {
+                    artworkIndex = artworkURLs.count
+                }
         }
     }
 

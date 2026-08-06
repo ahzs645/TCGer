@@ -305,7 +305,7 @@ struct WishlistDetailView: View {
                 )
                 .environmentObject(environmentStore)
             }
-            .task {
+            .refreshable {
                 await refreshWishlist()
             }
         }
