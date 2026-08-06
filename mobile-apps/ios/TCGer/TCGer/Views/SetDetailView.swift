@@ -147,6 +147,12 @@ struct SetDetailView: View {
                         HStack {
                             SetArtworkView(set: set, size: 44)
                             VStack(alignment: .leading, spacing: 4) {
+                                // Full name lives here because the inline nav
+                                // title truncates longer set names.
+                                Text(set.name)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 HStack(spacing: 6) {
                                     Text(set.code.uppercased())
                                         .font(.caption)
