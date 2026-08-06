@@ -260,31 +260,44 @@ async function requireWishlistForUser(
   return wishlist;
 }
 
-async function buildOwnedQuantityMap(ctx: ReaderCtx, userId: Id<"users">) {
+/**
+ * Ownership keyed by exact printing ("tcg:externalId") and by base card
+ * ("tcg:baseExternalId", falling back to externalId) so wishlists can match
+ * any printing.
+ */
+type OwnershipMaps = { exact: Map<string, number>; base: Map<string, number> };
+
+async function buildOwnershipMaps(ctx: ReaderCtx, userId: Id<"users">): Promise<OwnershipMaps> {
   const entries = await ctx.db
     .query("collectionEntries")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
 
   const ownedCards = await Promise.all(entries.map((entry) => ctx.db.get(entry.cardId)));
-  const ownership = new Map<string, number>();
+  const exact = new Map<string, number>();
+  const base = new Map<string, number>();
 
   for (const [index, card] of ownedCards.entries()) {
     if (!card) {
       continue;
     }
-    const key = `${card.tcg}:${card.externalId}`;
-    ownership.set(key, (ownership.get(key) ?? 0) + entries[index]!.quantity);
+    const exactKey = `${card.tcg}:${card.externalId}`;
+    exact.set(exactKey, (exact.get(exactKey) ?? 0) + entries[index]!.quantity);
+    const baseKey = `${card.tcg}:${card.baseExternalId ?? card.externalId}`;
+    base.set(baseKey, (base.get(baseKey) ?? 0) + entries[index]!.quantity);
   }
 
-  return ownership;
+  return { exact, base };
 }
 
 function toWishlistCardResponse(
   card: Doc<"wishlistCards">,
-  ownership: Map<string, number>
+  ownership: OwnershipMaps,
+  matchAnyPrinting: boolean
 ) {
-  const ownedQuantity = ownership.get(`${card.tcg}:${card.externalId}`) ?? 0;
+  const ownedQuantity = matchAnyPrinting
+    ? ownership.base.get(`${card.tcg}:${card.baseExternalId ?? card.externalId}`) ?? 0
+    : ownership.exact.get(`${card.tcg}:${card.externalId}`) ?? 0;
 
   return {
     id: card._id,
@@ -331,9 +344,9 @@ function toWishlistRuleResponse(rule: Doc<"wishlistRules">) {
 async function hydrateWishlist(
   ctx: ReaderCtx,
   wishlist: Doc<"wishlists">,
-  ownership?: Map<string, number>
+  ownership?: OwnershipMaps
 ) {
-  const ownedQuantityMap = ownership ?? (await buildOwnedQuantityMap(ctx, wishlist.userId));
+  const ownershipMaps = ownership ?? (await buildOwnershipMaps(ctx, wishlist.userId));
   const cards = await ctx.db
     .query("wishlistCards")
     .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
@@ -344,7 +357,9 @@ async function hydrateWishlist(
     .collect();
 
   const hydratedCards = cards
-    .map((card) => toWishlistCardResponse(card, ownedQuantityMap))
+    .map((card) =>
+      toWishlistCardResponse(card, ownershipMaps, wishlist.matchAnyPrinting ?? false)
+    )
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const ownedCards = hydratedCards.filter((card) => card.owned).length;
   const totalCards = hydratedCards.length;
@@ -354,6 +369,7 @@ async function hydrateWishlist(
     name: wishlist.name,
     description: wishlist.description,
     colorHex: wishlist.colorHex,
+    matchAnyPrinting: wishlist.matchAnyPrinting ?? false,
     cards: hydratedCards,
     rules: rules
       .sort((left, right) => left.createdAt - right.createdAt)
@@ -1683,7 +1699,7 @@ export const listWishlists = internalQuery({
       .query("wishlists")
       .withIndex("by_user", (q) => q.eq("userId", viewer._id))
       .collect();
-    const ownership = await buildOwnedQuantityMap(ctx, viewer._id);
+    const ownership = await buildOwnershipMaps(ctx, viewer._id);
     const hydrated = await Promise.all(
       wishlists.map((wishlist) => hydrateWishlist(ctx, wishlist, ownership))
     );
@@ -1710,7 +1726,8 @@ export const createWishlist = internalMutation({
     subject: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
-    colorHex: v.optional(v.string())
+    colorHex: v.optional(v.string()),
+    matchAnyPrinting: v.optional(v.boolean())
   },
   returns: wishlistValidator,
   handler: async (ctx, args) => {
@@ -1739,12 +1756,13 @@ export const createWishlist = internalMutation({
       name,
       description: args.description?.trim() || undefined,
       colorHex: validateColorHex(args.colorHex),
+      matchAnyPrinting: args.matchAnyPrinting ?? false,
       createdAt: timestamp,
       updatedAt: timestamp
     });
 
     const wishlist = await requireWishlistForUser(ctx, wishlistId, viewer._id);
-    return await hydrateWishlist(ctx, wishlist, new Map());
+    return await hydrateWishlist(ctx, wishlist, { exact: new Map(), base: new Map() });
   }
 });
 
@@ -1754,7 +1772,8 @@ export const updateWishlist = internalMutation({
     wishlistId: v.id("wishlists"),
     name: v.optional(v.string()),
     description: v.optional(nullableString),
-    colorHex: v.optional(nullableString)
+    colorHex: v.optional(nullableString),
+    matchAnyPrinting: v.optional(v.boolean())
   },
   returns: wishlistValidator,
   handler: async (ctx, args) => {
@@ -1789,6 +1808,10 @@ export const updateWishlist = internalMutation({
           : args.colorHex === null
             ? undefined
             : validateColorHex(args.colorHex),
+      matchAnyPrinting:
+        args.matchAnyPrinting === undefined
+          ? wishlist.matchAnyPrinting
+          : args.matchAnyPrinting,
       updatedAt: now()
     });
 
@@ -1900,7 +1923,11 @@ export const addWishlistCard = internalMutation({
       });
     }
 
-    return toWishlistCardResponse(card, await buildOwnedQuantityMap(ctx, viewer._id));
+    return toWishlistCardResponse(
+      card,
+      await buildOwnershipMaps(ctx, viewer._id),
+      wishlist.matchAnyPrinting ?? false
+    );
   }
 });
 

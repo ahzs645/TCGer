@@ -12,6 +12,7 @@ struct WishlistsView: View {
     @State private var newWishlistName = ""
     @State private var newWishlistDescription = ""
     @State private var newWishlistColor: Color = .blue
+    @State private var newWishlistMatchAnyPrinting = false
 
     private let apiService = APIService()
 
@@ -115,6 +116,12 @@ struct WishlistsView: View {
                     description: $newWishlistDescription,
                     selectedColor: $newWishlistColor
                 )
+
+                Section {
+                    Toggle("Any printing counts as owned", isOn: $newWishlistMatchAnyPrinting)
+                } footer: {
+                    Text("On: owning any printing of a card checks it off. Off: only the exact printing on the list counts.")
+                }
             }
             .navigationTitle("New Wishlist")
             .navigationBarTitleDisplayMode(.inline)
@@ -173,7 +180,8 @@ struct WishlistsView: View {
                 token: token,
                 name: name,
                 description: newWishlistDescription.isEmpty ? nil : newWishlistDescription,
-                colorHex: newWishlistColor.toHex()
+                colorHex: newWishlistColor.toHex(),
+                matchAnyPrinting: newWishlistMatchAnyPrinting
             )
             wishlists.insert(wishlist, at: 0)
             environmentStore.updateWishlistWidgetData(wishlists: wishlists)
@@ -205,6 +213,7 @@ struct WishlistsView: View {
         newWishlistName = ""
         newWishlistDescription = ""
         newWishlistColor = .blue
+        newWishlistMatchAnyPrinting = false
     }
 }
 

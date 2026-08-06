@@ -711,6 +711,86 @@ describe("convex native architecture", () => {
     expect(libraryPatchResponse.status).toBe(400);
   });
 
+  test("matches wishlist ownership by any printing when enabled", async () => {
+    const t = createTestConvex();
+    const headers = {
+      Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
+      "x-tcger-user-id": "user_printing",
+      "x-tcger-user-email": "printing@example.com",
+      "x-tcger-username": "printing"
+    };
+
+    // Own one printing of the card.
+    const addOwnedResponse = await t.fetch("/collections/cards", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: {
+          tcg: "pokemon",
+          externalId: "pikachu-promo",
+          baseExternalId: "pikachu-base",
+          name: "Pikachu"
+        }
+      })
+    });
+    expect(addOwnedResponse.status).toBe(201);
+
+    // Wishlist an exact-matching wishlist with a DIFFERENT printing.
+    const exactWishlistResponse = await t.fetch("/wishlists", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Exact Printings" })
+    });
+    const exactWishlist = await exactWishlistResponse.json();
+    const exactCardResponse = await t.fetch(`/wishlists/${exactWishlist.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        externalId: "pikachu-holo",
+        baseExternalId: "pikachu-base",
+        tcg: "pokemon",
+        name: "Pikachu"
+      })
+    });
+    const exactCard = await exactCardResponse.json();
+    expect(exactCard.owned).toBe(false);
+
+    // The same card on an any-printing wishlist counts as owned.
+    const anyWishlistResponse = await t.fetch("/wishlists", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Any Printing", matchAnyPrinting: true })
+    });
+    const anyWishlist = await anyWishlistResponse.json();
+    expect(anyWishlist.matchAnyPrinting).toBe(true);
+    const anyCardResponse = await t.fetch(`/wishlists/${anyWishlist.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        externalId: "pikachu-holo",
+        baseExternalId: "pikachu-base",
+        tcg: "pokemon",
+        name: "Pikachu"
+      })
+    });
+    const anyCard = await anyCardResponse.json();
+    expect(anyCard.owned).toBe(true);
+    expect(anyCard.ownedQuantity).toBe(1);
+
+    // Toggling the flag off flips the card back to needed on the next read.
+    const disableResponse = await t.fetch(`/wishlists/${anyWishlist.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ matchAnyPrinting: false })
+    });
+    const disabled = await disableResponse.json();
+    expect(disableResponse.status).toBe(200);
+    expect(disabled.matchAnyPrinting).toBe(false);
+    expect(disabled.cards[0].owned).toBe(false);
+  });
+
   test("mirrors wishlist REST routes over Convex HTTP actions", async () => {
     const t = createTestConvex();
     const headers = {

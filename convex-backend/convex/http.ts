@@ -164,6 +164,7 @@ type NativeWishlist = {
   name: string;
   description?: string;
   colorHex?: string;
+  matchAnyPrinting?: boolean;
   cards: NativeWishlistCard[];
   rules: NativeWishlistRule[];
   totalCards: number;
@@ -1155,7 +1156,9 @@ http.route({
         subject: identity.subject,
         name: typeof body.name === "string" ? body.name : "",
         description: typeof body.description === "string" ? body.description : undefined,
-        colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined
+        colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined,
+        matchAnyPrinting:
+          typeof body.matchAnyPrinting === "boolean" ? body.matchAnyPrinting : undefined
       })) as NativeWishlist;
       return json(wishlist, 201);
     } catch (error) {
@@ -1280,7 +1283,9 @@ http.route({
             ? body.description
             : undefined,
         colorHex:
-          typeof body.colorHex === "string" || body.colorHex === null ? body.colorHex : undefined
+          typeof body.colorHex === "string" || body.colorHex === null ? body.colorHex : undefined,
+        matchAnyPrinting:
+          typeof body.matchAnyPrinting === "boolean" ? body.matchAnyPrinting : undefined
       });
       return json(wishlist);
     } catch (error) {

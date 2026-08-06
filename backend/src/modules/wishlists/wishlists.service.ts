@@ -129,6 +129,51 @@ function mapWishlistRule(rule: WishlistRule): WishlistRuleResponse {
   };
 }
 
+/**
+ * Ownership across the user's binders, keyed two ways: by exact printing
+ * ("tcg:externalId") and by base card ("tcg:baseExternalId", falling back to
+ * externalId for cards without one) so wishlists can match any printing.
+ */
+async function buildOwnershipMaps(userId: string) {
+  const ownedCards = await prisma.collection.findMany({
+    where: { userId },
+    select: {
+      card: {
+        select: {
+          externalId: true,
+          baseExternalId: true,
+          tcgGame: { select: { code: true } }
+        }
+      },
+      quantity: true
+    }
+  });
+
+  const exact = new Map<string, number>();
+  const base = new Map<string, number>();
+  for (const entry of ownedCards) {
+    const code = entry.card.tcgGame.code;
+    const exactKey = `${code}:${entry.card.externalId}`;
+    exact.set(exactKey, (exact.get(exactKey) ?? 0) + entry.quantity);
+    const baseKey = `${code}:${entry.card.baseExternalId ?? entry.card.externalId}`;
+    base.set(baseKey, (base.get(baseKey) ?? 0) + entry.quantity);
+  }
+  return { exact, base };
+}
+
+function ownedQuantityFor(
+  card: WishlistCard,
+  matchAnyPrinting: boolean,
+  maps: { exact: Map<string, number>; base: Map<string, number> }
+): number {
+  if (matchAnyPrinting) {
+    const metadata = asJsonObject(card.tcgSpecific);
+    const baseId = (metadata.baseExternalId as string | undefined) ?? card.externalId;
+    return maps.base.get(`${card.tcg}:${baseId}`) ?? 0;
+  }
+  return maps.exact.get(`${card.tcg}:${card.externalId}`) ?? 0;
+}
+
 export async function getUserWishlists(userId: string): Promise<WishlistResponse[]> {
   const wishlists = await prisma.wishlist.findMany({
     where: { userId },
@@ -136,30 +181,12 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
     orderBy: { createdAt: 'desc' }
   });
 
-  // Get all user's collection cards to check ownership
-  const ownedCards = await prisma.collection.findMany({
-    where: { userId },
-    select: {
-      card: {
-        select: { externalId: true, tcgGame: { select: { code: true } } }
-      },
-      quantity: true
-    }
-  });
-
-  // Build ownership map: "tcg:externalId" → total quantity
-  const ownershipMap = new Map<string, number>();
-  for (const entry of ownedCards) {
-    const key = `${entry.card.tcgGame.code}:${entry.card.externalId}`;
-    ownershipMap.set(key, (ownershipMap.get(key) ?? 0) + entry.quantity);
-  }
+  const maps = await buildOwnershipMaps(userId);
 
   return wishlists.map((wishlist) => {
-    const cards: WishlistCardResponse[] = wishlist.cards.map((card) => {
-      const ownershipKey = `${card.tcg}:${card.externalId}`;
-      const ownedQuantity = ownershipMap.get(ownershipKey) ?? 0;
-      return mapWishlistCard(card, ownedQuantity);
-    });
+    const cards: WishlistCardResponse[] = wishlist.cards.map((card) =>
+      mapWishlistCard(card, ownedQuantityFor(card, wishlist.matchAnyPrinting, maps))
+    );
 
     const totalCards = cards.length;
     const ownedCards = cards.filter((c) => c.owned).length;
@@ -170,6 +197,7 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
       name: wishlist.name,
       description: wishlist.description ?? undefined,
       colorHex: wishlist.colorHex ?? undefined,
+      matchAnyPrinting: wishlist.matchAnyPrinting,
       cards,
       rules: wishlist.rules.map(mapWishlistRule),
       totalCards,
@@ -191,28 +219,11 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
     throw new Error('Wishlist not found');
   }
 
-  // Get ownership data
-  const ownedCards = await prisma.collection.findMany({
-    where: { userId },
-    select: {
-      card: {
-        select: { externalId: true, tcgGame: { select: { code: true } } }
-      },
-      quantity: true
-    }
-  });
+  const maps = await buildOwnershipMaps(userId);
 
-  const ownershipMap = new Map<string, number>();
-  for (const entry of ownedCards) {
-    const key = `${entry.card.tcgGame.code}:${entry.card.externalId}`;
-    ownershipMap.set(key, (ownershipMap.get(key) ?? 0) + entry.quantity);
-  }
-
-  const cards: WishlistCardResponse[] = wishlist.cards.map((card) => {
-    const ownershipKey = `${card.tcg}:${card.externalId}`;
-    const ownedQuantity = ownershipMap.get(ownershipKey) ?? 0;
-    return mapWishlistCard(card, ownedQuantity);
-  });
+  const cards: WishlistCardResponse[] = wishlist.cards.map((card) =>
+    mapWishlistCard(card, ownedQuantityFor(card, wishlist.matchAnyPrinting, maps))
+  );
 
   const totalCards = cards.length;
   const ownedCount = cards.filter((c) => c.owned).length;
@@ -223,6 +234,7 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
     name: wishlist.name,
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
+    matchAnyPrinting: wishlist.matchAnyPrinting,
     cards,
     rules: wishlist.rules.map(mapWishlistRule),
     totalCards,
@@ -242,7 +254,8 @@ export async function createWishlist(
       userId,
       name: input.name,
       description: input.description,
-      colorHex: input.colorHex
+      colorHex: input.colorHex,
+      matchAnyPrinting: input.matchAnyPrinting ?? false
     },
     include: { cards: true, rules: true }
   });
@@ -252,6 +265,7 @@ export async function createWishlist(
     name: wishlist.name,
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
+    matchAnyPrinting: wishlist.matchAnyPrinting,
     cards: [],
     rules: [],
     totalCards: 0,
@@ -280,7 +294,8 @@ export async function updateWishlist(
     data: {
       name: input.name,
       description: input.description,
-      colorHex: input.colorHex
+      colorHex: input.colorHex,
+      matchAnyPrinting: input.matchAnyPrinting
     }
   });
 
@@ -362,14 +377,25 @@ export async function addCardToWishlist(
   });
 
   // Check ownership. Each physical copy is its own collection row, so the
-  // quantities must be summed to match the list endpoints.
+  // quantities must be summed to match the list endpoints. When the wishlist
+  // matches any printing, count copies sharing the card's base identity too.
+  const baseId = input.baseExternalId ?? input.externalId;
   const owned = await prisma.collection.aggregate({
     where: {
       userId,
-      card: {
-        externalId: input.externalId,
-        tcgGame: { code: input.tcg }
-      }
+      card: wishlist.matchAnyPrinting
+        ? {
+            tcgGame: { code: input.tcg },
+            OR: [
+              { externalId: input.externalId },
+              { externalId: baseId },
+              { baseExternalId: baseId }
+            ]
+          }
+        : {
+            externalId: input.externalId,
+            tcgGame: { code: input.tcg }
+          }
     },
     _sum: { quantity: true }
   });

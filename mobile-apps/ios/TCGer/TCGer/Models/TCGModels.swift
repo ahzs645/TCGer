@@ -862,8 +862,13 @@ struct Wishlist: Identifiable, Codable, Hashable, Sendable {
     /// Optional so wishlists saved by older builds (and servers that predate
     /// smart wishlists) still decode.
     var rules: [WishlistRule]? = nil
+    /// When true, owning any printing of a card counts it as owned; the
+    /// default (nil/false) requires the exact printing. Optional so older
+    /// stores and servers still decode.
+    var matchAnyPrinting: Bool? = nil
 
     var expansionRules: [WishlistRule] { rules ?? [] }
+    var matchesAnyPrinting: Bool { matchAnyPrinting ?? false }
 }
 
 /// A saved expansion rule: "every Darkrai", "everything in Prismatic

@@ -1464,7 +1464,8 @@ final class LocalStore {
                 completionPercent: remaining.isEmpty ? 0 : Int((Double(remaining.filter { $0.owned }.count) / Double(remaining.count)) * 100),
                 createdAt: wishlist.createdAt,
                 updatedAt: LocalStore.isoFormatter.string(from: Date()),
-                rules: wishlist.rules
+                rules: wishlist.rules,
+                matchAnyPrinting: wishlist.matchAnyPrinting
             )
         }
 
@@ -1975,27 +1976,45 @@ final class LocalStore {
         return applyingOwnership(wl)
     }
 
-    /// Live ownership from the local binders: "tcg:externalId" → total copies.
-    /// Mirrors the server, which cross-references wishlists against the
-    /// collection on every read instead of storing ownership.
-    private func ownershipByCardKey() -> [String: Int] {
-        var map: [String: Int] = [:]
+    /// Live ownership from the local binders, keyed by exact printing
+    /// ("tcg:externalId") and by base card ("tcg:baseExternalId", falling back
+    /// to externalId). Mirrors the server, which cross-references wishlists
+    /// against the collection on every read instead of storing ownership.
+    private func ownershipMaps() -> (exact: [String: Int], base: [String: Int]) {
+        var exact: [String: Int] = [:]
+        var base: [String: Int] = [:]
         for collection in collections {
             for card in collection.cards {
-                let key = "\(card.tcg):\(card.externalId ?? card.cardId)"
-                map[key, default: 0] += card.quantity
+                let externalId = card.externalId ?? card.cardId
+                exact["\(card.tcg):\(externalId)", default: 0] += card.quantity
+                base["\(card.tcg):\(card.baseExternalId ?? externalId)", default: 0] += card.quantity
             }
         }
-        return map
+        return (exact, base)
+    }
+
+    private func ownedQuantity(
+        for card: WishlistCard,
+        matchAnyPrinting: Bool,
+        maps: (exact: [String: Int], base: [String: Int])
+    ) -> Int {
+        if matchAnyPrinting {
+            return maps.base["\(card.tcg):\(card.baseExternalId ?? card.externalId)"] ?? 0
+        }
+        return maps.exact["\(card.tcg):\(card.externalId)"] ?? 0
     }
 
     /// Rewrites a wishlist's cards and totals with live ownership; the stored
     /// flags only reflect what was true when each card was added.
     private func applyingOwnership(_ wishlist: Wishlist) -> Wishlist {
-        let ownership = ownershipByCardKey()
+        let maps = ownershipMaps()
         let cards = wishlist.cards.map { card -> WishlistCard in
             var updated = card
-            let quantity = ownership["\(card.tcg):\(card.externalId)"] ?? 0
+            let quantity = ownedQuantity(
+                for: card,
+                matchAnyPrinting: wishlist.matchesAnyPrinting,
+                maps: maps
+            )
             updated.owned = quantity > 0
             updated.ownedQuantity = quantity
             return updated
@@ -2012,20 +2031,32 @@ final class LocalStore {
             completionPercent: cards.isEmpty ? 0 : Int((Double(ownedCount) / Double(cards.count)) * 100),
             createdAt: wishlist.createdAt,
             updatedAt: wishlist.updatedAt,
-            rules: wishlist.rules
+            rules: wishlist.rules,
+            matchAnyPrinting: wishlist.matchAnyPrinting
         )
     }
 
-    func createWishlist(name: String, description: String?, colorHex: String?) -> Wishlist {
+    func createWishlist(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        matchAnyPrinting: Bool? = nil
+    ) -> Wishlist {
         let now = LocalStore.isoFormatter.string(from: Date())
-        let wl = Wishlist(id: "local-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now)
+        let wl = Wishlist(id: "local-wishlist-\(nextWishlistId)", name: name, description: description, colorHex: colorHex, cards: [], totalCards: 0, ownedCards: 0, completionPercent: 0, createdAt: now, updatedAt: now, matchAnyPrinting: matchAnyPrinting ?? false)
         nextWishlistId += 1
         wishlists.insert(wl, at: 0)
         persist()
         return wl
     }
 
-    func updateWishlist(id: String, name: String?, description: String?, colorHex: String?) throws -> Wishlist {
+    func updateWishlist(
+        id: String,
+        name: String?,
+        description: String?,
+        colorHex: String?,
+        matchAnyPrinting: Bool? = nil
+    ) throws -> Wishlist {
         guard let idx = wishlists.firstIndex(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
@@ -2041,7 +2072,8 @@ final class LocalStore {
             completionPercent: wl.completionPercent,
             createdAt: wl.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date()),
-            rules: wl.rules
+            rules: wl.rules,
+            matchAnyPrinting: matchAnyPrinting ?? wl.matchAnyPrinting
         )
         wishlists[idx] = updated
         persist()
@@ -2059,10 +2091,10 @@ final class LocalStore {
         }
         let now = LocalStore.isoFormatter.string(from: Date())
         let wl = wishlists[idx]
-        let ownership = ownershipByCardKey()
+        let maps = ownershipMaps()
 
         if var existing = wl.cards.first(where: { $0.externalId == card.id && $0.tcg == card.tcg }) {
-            let quantity = ownership["\(existing.tcg):\(existing.externalId)"] ?? 0
+            let quantity = ownedQuantity(for: existing, matchAnyPrinting: wl.matchesAnyPrinting, maps: maps)
             existing.owned = quantity > 0
             existing.ownedQuantity = quantity
             return existing
@@ -2073,7 +2105,7 @@ final class LocalStore {
         cards.append(wc)
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         persist()
-        let quantity = ownership["\(wc.tcg):\(wc.externalId)"] ?? 0
+        let quantity = ownedQuantity(for: wc, matchAnyPrinting: wl.matchesAnyPrinting, maps: maps)
         wc.owned = quantity > 0
         wc.ownedQuantity = quantity
         return wc
@@ -2252,7 +2284,8 @@ final class LocalStore {
             completionPercent: cards.isEmpty ? 0 : Int((Double(ownedCards) / Double(cards.count)) * 100),
             createdAt: wishlist.createdAt,
             updatedAt: updatedAt,
-            rules: rules
+            rules: rules,
+            matchAnyPrinting: wishlist.matchAnyPrinting
         )
     }
 

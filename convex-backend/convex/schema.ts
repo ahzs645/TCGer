@@ -129,6 +129,7 @@ export default defineSchema({
     name: v.string(),
     description: v.optional(v.string()),
     colorHex: v.optional(v.string()),
+    matchAnyPrinting: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number()
   })

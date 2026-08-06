@@ -252,6 +252,7 @@ export const wishlistValidator = v.object({
   name: v.string(),
   description: v.optional(v.string()),
   colorHex: v.optional(v.string()),
+  matchAnyPrinting: v.optional(v.boolean()),
   cards: v.array(wishlistCardValidator),
   rules: v.array(wishlistRuleValidator),
   totalCards: v.number(),
