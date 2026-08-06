@@ -377,6 +377,7 @@ export async function hydrateBinderSummary(ctx: ReaderCtx, binder: Doc<"binders"
     name: binder.name,
     description: binder.description,
     colorHex: binder.colorHex,
+    defaultCondition: binder.defaultCondition,
     containerType: binder.containerType,
     imageUrl: binder.imageUrl,
     associatedTcg: binder.associatedTcg,
@@ -433,7 +434,7 @@ export async function addEntryForViewer(
     newTags?: Array<{ label: string; colorHex: string }>;
   }
 ) {
-  await requireBinderForUser(ctx, args.binderId, userId);
+  const binder = await requireBinderForUser(ctx, args.binderId, userId);
   const timestamp = now();
   const cardId = await upsertCard(ctx, args.card);
   const quantity = args.quantity ?? 1;
@@ -449,7 +450,9 @@ export async function addEntryForViewer(
     binderId: args.binderId,
     cardId,
     quantity,
-    condition: args.condition,
+    // An omitted condition falls back to the binder's default, matching the
+    // Express backend.
+    condition: args.condition ?? binder.defaultCondition,
     language: args.language,
     notes: args.notes,
     price: args.price,
@@ -615,8 +618,10 @@ export async function bulkAddForViewer(
   const binderIds = new Set(
     resolvedRows.map((row) => row.binderId).filter((id): id is Id<"binders"> => Boolean(id))
   );
+  const binderDefaultConditions = new Map<Id<"binders">, string | undefined>();
   for (const binderId of binderIds) {
-    await requireBinderForUser(ctx, binderId, userId);
+    const binder = await requireBinderForUser(ctx, binderId, userId);
+    binderDefaultConditions.set(binderId, binder.defaultCondition);
   }
 
   const allTagIds = new Set(
@@ -642,7 +647,7 @@ export async function bulkAddForViewer(
         binderId: row.binderId!,
         cardId,
         quantity: 1,
-        condition: row.condition,
+        condition: row.condition ?? binderDefaultConditions.get(row.binderId!),
         language: row.language,
         notes: row.notes,
         price: row.price,

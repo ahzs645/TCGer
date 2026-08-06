@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireViewer } from "./lib/auth";
 import { hydrateBinderDetail, hydrateBinderSummary } from "./lib/library";
-import { now, requireBinderForUser, validateColorHex } from "./lib/domain";
+import { now, requireBinderForUser, validateColorHex, validateCondition } from "./lib/domain";
 import {
   binderDetailValidator,
   binderSummaryValidator,
@@ -45,6 +45,7 @@ export const create = mutation({
     name: v.string(),
     description: v.optional(v.string()),
     colorHex: v.optional(v.string()),
+    defaultCondition: v.optional(v.string()),
     containerType: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     associatedTcg: v.optional(tcgCodeValidator),
@@ -61,6 +62,7 @@ export const create = mutation({
       name: args.name.trim(),
       description: args.description?.trim() || undefined,
       colorHex: validateColorHex(args.colorHex),
+      defaultCondition: validateCondition(args.defaultCondition),
       containerType: args.containerType?.trim() || undefined,
       imageUrl: args.imageUrl?.trim() || undefined,
       associatedTcg: args.associatedTcg,

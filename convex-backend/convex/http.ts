@@ -109,6 +109,7 @@ type NativeBinderDetail = {
   name: string;
   description?: string;
   colorHex?: string;
+  defaultCondition?: string;
   containerType?: string;
   imageUrl?: string;
   associatedTcg?: TcgCode;
@@ -288,6 +289,7 @@ function toLegacyBinder(binder: NativeBinderDetail) {
     name: binder.name,
     description: binder.description ?? "",
     colorHex: binder.colorHex,
+    defaultCondition: binder.defaultCondition,
     containerType: binder.containerType,
     imageUrl: binder.imageUrl,
     associatedTcg: binder.associatedTcg,
@@ -1381,6 +1383,8 @@ http.route({
         name: typeof body.name === "string" ? body.name : "",
         description: typeof body.description === "string" ? body.description : undefined,
         colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined,
+        defaultCondition:
+          typeof body.defaultCondition === "string" ? body.defaultCondition : undefined,
         containerType:
           typeof body.containerType === "string" ? body.containerType : undefined,
         imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
@@ -1813,6 +1817,10 @@ http.route({
           name: typeof body.name === "string" ? body.name : undefined,
           description: typeof body.description === "string" ? body.description : undefined,
           colorHex: typeof body.colorHex === "string" ? body.colorHex : undefined,
+          defaultCondition:
+            body.defaultCondition === null || typeof body.defaultCondition === "string"
+              ? body.defaultCondition
+              : undefined,
           containerType:
             body.containerType === null || typeof body.containerType === "string"
               ? body.containerType

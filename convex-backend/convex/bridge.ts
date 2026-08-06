@@ -14,7 +14,8 @@ import {
   requireBinderForUser,
   requireEntryForUser,
   toIso,
-  validateColorHex
+  validateColorHex,
+  validateCondition
 } from "./lib/domain";
 import {
   addEntryForViewer,
@@ -787,6 +788,7 @@ export const createBinder = internalMutation({
     name: v.string(),
     description: v.optional(v.string()),
     colorHex: v.optional(v.string()),
+    defaultCondition: v.optional(v.string()),
     containerType: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     associatedTcg: v.optional(tcgCodeValidator),
@@ -813,6 +815,7 @@ export const createBinder = internalMutation({
       name: trimmedName,
       description: args.description?.trim() || undefined,
       colorHex: validateColorHex(args.colorHex),
+      defaultCondition: validateCondition(args.defaultCondition),
       containerType: args.containerType?.trim() || undefined,
       imageUrl: args.imageUrl?.trim() || undefined,
       associatedTcg: args.associatedTcg,
@@ -833,6 +836,7 @@ export const updateBinder = internalMutation({
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     colorHex: v.optional(v.string()),
+    defaultCondition: v.optional(v.union(v.string(), v.null())),
     containerType: v.optional(v.union(v.string(), v.null())),
     imageUrl: v.optional(v.union(v.string(), v.null())),
     associatedTcg: v.optional(v.union(tcgCodeValidator, v.null())),
@@ -843,6 +847,14 @@ export const updateBinder = internalMutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const binder = await requireBinderForUser(ctx, args.binderId, viewer._id);
+    if (binder.kind === "library") {
+      // Parity with the Express backend, where the Unsorted Library is not a
+      // real binder and has no update endpoint.
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "The Unsorted Library cannot be edited"
+      });
+    }
     const timestamp = now();
     await ctx.db.patch(binder._id, {
       name: args.name?.trim() || binder.name,
@@ -850,6 +862,10 @@ export const updateBinder = internalMutation({
         args.description === undefined ? binder.description : args.description?.trim() || undefined,
       colorHex:
         args.colorHex === undefined ? binder.colorHex : validateColorHex(args.colorHex),
+      defaultCondition:
+        args.defaultCondition === undefined
+          ? binder.defaultCondition
+          : validateCondition(args.defaultCondition ?? undefined),
       containerType:
         args.containerType === undefined
           ? binder.containerType

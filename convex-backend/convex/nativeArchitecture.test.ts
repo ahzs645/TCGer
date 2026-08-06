@@ -626,6 +626,91 @@ describe("convex native architecture", () => {
     expect(binderDetail.cards[0].copies[0].imageUrls ?? []).toHaveLength(0);
   });
 
+  test("applies, validates, and clears binder default conditions over Convex HTTP actions", async () => {
+    const t = createTestConvex();
+    const headers = {
+      Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
+      "x-tcger-user-id": "user_condition",
+      "x-tcger-user-email": "condition@example.com",
+      "x-tcger-username": "condition"
+    };
+
+    const createBinderResponse = await t.fetch("/collections", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Graded Binder", defaultCondition: "Near Mint" })
+    });
+    const createdBinder = await createBinderResponse.json();
+
+    expect(createBinderResponse.status).toBe(201);
+    expect(createdBinder.defaultCondition).toBe("Near Mint");
+
+    const rejectedBinderResponse = await t.fetch("/collections", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Bad Binder", defaultCondition: "kinda scuffed" })
+    });
+    expect(rejectedBinderResponse.status).toBe(400);
+
+    const inheritedCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: { tcg: "magic", externalId: "swamp", name: "Swamp" }
+      })
+    });
+    const inheritedCard = await inheritedCardResponse.json();
+
+    expect(inheritedCardResponse.status).toBe(201);
+    expect(inheritedCard.condition).toBe("Near Mint");
+
+    const explicitCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        condition: "Played",
+        cardData: { tcg: "magic", externalId: "island", name: "Island" }
+      })
+    });
+    const explicitCard = await explicitCardResponse.json();
+
+    expect(explicitCardResponse.status).toBe(201);
+    expect(explicitCard.condition).toBe("Played");
+
+    const clearResponse = await t.fetch(`/collections/${createdBinder.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ defaultCondition: "" })
+    });
+    const clearedBinder = await clearResponse.json();
+
+    expect(clearResponse.status).toBe(200);
+    expect(clearedBinder.defaultCondition).toBeUndefined();
+
+    const unspecifiedCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: { tcg: "magic", externalId: "plains", name: "Plains" }
+      })
+    });
+    const unspecifiedCard = await unspecifiedCardResponse.json();
+
+    expect(unspecifiedCardResponse.status).toBe(201);
+    expect(unspecifiedCard.condition).toBeUndefined();
+
+    const libraryPatchResponse = await t.fetch("/collections/__library__", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Renamed Library" })
+    });
+    expect(libraryPatchResponse.status).toBe(400);
+  });
+
   test("mirrors wishlist REST routes over Convex HTTP actions", async () => {
     const t = createTestConvex();
     const headers = {
