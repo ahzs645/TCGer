@@ -527,6 +527,9 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
     let colorHex: String?
+    // Declared with a default so existing memberwise-init call sites keep
+    // compiling; nil means copies added to this binder start "Unspecified".
+    var defaultCondition: String? = nil
 
     static let unsortedBinderId = "__library__"
 

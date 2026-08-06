@@ -173,6 +173,7 @@ model Binder {
   name              String
   description       String?
   colorHex          String?
+  defaultCondition  String?
   containerType     String?
   imageUrl          String?
   associatedTcg     String?

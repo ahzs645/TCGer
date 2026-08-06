@@ -168,8 +168,13 @@ struct CollectionsView: View {
                 await loadCollections()
             }
             .sheet(isPresented: $showingCreateSheet) {
-                CreateBinderSheet { name, description, colorHex in
-                    await createCollection(name: name, description: description, colorHex: colorHex)
+                CreateBinderSheet { name, description, colorHex, defaultCondition in
+                    await createCollection(
+                        name: name,
+                        description: description,
+                        colorHex: colorHex,
+                        defaultCondition: defaultCondition
+                    )
                 }
             }
             .sheet(isPresented: $showingImportSheet) {
@@ -225,7 +230,12 @@ struct CollectionsView: View {
     }
 
     @MainActor
-    private func createCollection(name: String, description: String?, colorHex: String?) async {
+    private func createCollection(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String? = nil
+    ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             return
@@ -237,7 +247,8 @@ struct CollectionsView: View {
                 token: token,
                 name: name,
                 description: description,
-                colorHex: colorHex
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
             )
             collections.append(newCollection)
             showingCreateSheet = false

@@ -237,6 +237,7 @@ extension APIService {
         let name: String
         let description: String?
         let colorHex: String?
+        let defaultCondition: String?
     }
 
     func createCollection(
@@ -244,17 +245,24 @@ extension APIService {
         token: String,
         name: String,
         description: String?,
-        colorHex: String? = nil
+        colorHex: String? = nil,
+        defaultCondition: String? = nil
     ) async throws -> Collection {
         if config.isOnDevice {
             return LocalStore.shared.createCollection(
                 name: name,
                 description: description,
-                colorHex: colorHex
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
             )
         }
 
-        let body = CreateCollectionRequest(name: name, description: description, colorHex: colorHex)
+        let body = CreateCollectionRequest(
+            name: name,
+            description: description,
+            colorHex: colorHex,
+            defaultCondition: defaultCondition
+        )
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections",
@@ -281,6 +289,8 @@ extension APIService {
         let name: String?
         let description: String?
         let colorHex: String?
+        // Empty string clears the binder default; nil leaves it unchanged.
+        let defaultCondition: String?
     }
 
     func updateCollection(
@@ -289,18 +299,25 @@ extension APIService {
         id: String,
         name: String? = nil,
         description: String? = nil,
-        colorHex: String? = nil
+        colorHex: String? = nil,
+        defaultCondition: String? = nil
     ) async throws -> Collection {
         if config.isOnDevice {
             return try LocalStore.shared.updateCollection(
                 id: id,
                 name: name,
                 description: description,
-                colorHex: colorHex
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
             )
         }
 
-        let body = UpdateCollectionRequest(name: name, description: description, colorHex: colorHex)
+        let body = UpdateCollectionRequest(
+            name: name,
+            description: description,
+            colorHex: colorHex,
+            defaultCondition: defaultCondition
+        )
         let (data, response) = try await makeRequest(
             config: config,
             path: "collections/\(id)",

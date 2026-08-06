@@ -938,7 +938,12 @@ final class LocalStore {
         return collection
     }
 
-    func createCollection(name: String, description: String?, colorHex: String?) -> Collection {
+    func createCollection(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String? = nil
+    ) -> Collection {
         let now = LocalStore.isoFormatter.string(from: Date())
         let collection = Collection(
             id: "local-binder-\(nextBinderId)",
@@ -947,7 +952,8 @@ final class LocalStore {
             cards: [],
             createdAt: now,
             updatedAt: now,
-            colorHex: colorHex ?? "4a90e2"
+            colorHex: colorHex ?? "4a90e2",
+            defaultCondition: defaultCondition
         )
         nextBinderId += 1
         collections.append(collection)
@@ -959,12 +965,24 @@ final class LocalStore {
         id: String,
         name: String?,
         description: String?,
-        colorHex: String?
+        colorHex: String?,
+        defaultCondition: String? = nil
     ) throws -> Collection {
+        guard id != Constants.unsortedBinderId else {
+            throw APIService.APIError.serverError(status: 400, message: "The Unsorted Library cannot be edited")
+        }
         guard let index = collections.firstIndex(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Collection not found")
         }
         let existing = collections[index]
+        // Matches the server contract: nil leaves the default condition
+        // unchanged, an empty string clears it.
+        let resolvedDefaultCondition: String?
+        if let defaultCondition {
+            resolvedDefaultCondition = defaultCondition.isEmpty ? nil : defaultCondition
+        } else {
+            resolvedDefaultCondition = existing.defaultCondition
+        }
         let updated = Collection(
             id: existing.id,
             name: name ?? existing.name,
@@ -972,7 +990,8 @@ final class LocalStore {
             cards: existing.cards,
             createdAt: existing.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date()),
-            colorHex: colorHex ?? existing.colorHex
+            colorHex: colorHex ?? existing.colorHex,
+            defaultCondition: resolvedDefaultCondition
         )
         collections[index] = updated
         persist()
@@ -1035,6 +1054,9 @@ final class LocalStore {
         let qty = max(1, quantity)
 
         let binder = collections[binderIndex]
+        // Mirrors the server: an omitted condition falls back to the binder's
+        // default before landing as unspecified.
+        let condition = condition ?? binder.defaultCondition
         var binderCards = binder.cards
         if let existingIndex = binderCards.firstIndex(where: { $0.cardId == resolvedCard.id }) {
             var existing = binderCards[existingIndex]

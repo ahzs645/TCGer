@@ -105,8 +105,13 @@ struct BinderPageReviewView: View {
             Text(errorMessage ?? "An unknown error occurred.")
         }
         .sheet(isPresented: $showingCreateBinderSheet) {
-            CreateBinderSheet { name, description, colorHex in
-                await createBinder(name: name, description: description, colorHex: colorHex)
+            CreateBinderSheet { name, description, colorHex, defaultCondition in
+                await createBinder(
+                    name: name,
+                    description: description,
+                    colorHex: colorHex,
+                    defaultCondition: defaultCondition
+                )
             }
         }
     }
@@ -693,7 +698,12 @@ struct BinderPageReviewView: View {
     }
 
     @MainActor
-    private func createBinder(name: String, description: String?, colorHex: String?) async {
+    private func createBinder(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String? = nil
+    ) async {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, !isCreatingBinder else { return }
         guard let token = requestToken else {
@@ -710,7 +720,8 @@ struct BinderPageReviewView: View {
                 token: token,
                 name: name,
                 description: description,
-                colorHex: colorHex
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
             )
             collections.removeAll { $0.id == collection.id }
             collections.append(collection)
