@@ -4,9 +4,8 @@ struct AddToWishlistSheet: View {
     let card: Card
     var onComplete: (() -> Void)?
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @EnvironmentObject private var wishlistStore: WishlistStore
     @Environment(\.dismiss) private var dismiss
-    @State private var wishlists: [Wishlist] = []
-    @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
     @State private var successMessage: String?
@@ -18,10 +17,10 @@ struct AddToWishlistSheet: View {
     var body: some View {
         NavigationView {
             Group {
-                if isLoading {
+                if wishlistStore.isLoading && !wishlistStore.hasLoaded {
                     ProgressView("Loading wishlists...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if wishlists.isEmpty && !showingCreateNew {
+                } else if wishlistStore.wishlists.isEmpty && !showingCreateNew {
                     VStack(spacing: 16) {
                         Image(systemName: "heart.slash")
                             .font(.system(size: 40))
@@ -56,7 +55,7 @@ struct AddToWishlistSheet: View {
                         }
 
                         Section {
-                            ForEach(wishlists) { wishlist in
+                            ForEach(wishlistStore.wishlists) { wishlist in
                                 Button {
                                     Task { await addToWishlist(wishlist) }
                                 } label: {
@@ -77,11 +76,14 @@ struct AddToWishlistSheet: View {
                                                 .scaleEffect(0.8)
                                         }
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
                                 .disabled(isAdding)
                             }
                         } header: {
-                            if !wishlists.isEmpty {
+                            if !wishlistStore.wishlists.isEmpty {
                                 Text("Add to Wishlist")
                             }
                         }
@@ -126,6 +128,13 @@ struct AddToWishlistSheet: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .alert("Wishlist Error", isPresented: errorIsPresented) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "Something went wrong.")
+            }
         }
         .presentationDetents([.medium, .large])
     }
@@ -133,19 +142,12 @@ struct AddToWishlistSheet: View {
     @MainActor
     private func loadWishlists() async {
         guard let token = environmentStore.authToken else {
-            isLoading = false
             return
         }
-
-        do {
-            wishlists = try await apiService.getWishlists(
-                config: environmentStore.serverConfiguration,
-                token: token
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
+        await wishlistStore.load(
+            config: environmentStore.serverConfiguration,
+            token: token
+        )
     }
 
     @MainActor
@@ -161,6 +163,7 @@ struct AddToWishlistSheet: View {
                 card: card
             )
             successMessage = "Added to \(wishlist.name)"
+            await refreshWishlistStore(token: token)
             HapticManager.notification(.success)
             onComplete?()
             try? await Task.sleep(for: .seconds(1))
@@ -184,6 +187,7 @@ struct AddToWishlistSheet: View {
                 token: token,
                 name: name
             )
+            wishlistStore.insert(wishlist)
             _ = try await apiService.addCardToWishlist(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -191,6 +195,7 @@ struct AddToWishlistSheet: View {
                 card: card
             )
             successMessage = "Added to \(wishlist.name)"
+            await refreshWishlistStore(token: token)
             onComplete?()
             try? await Task.sleep(for: .seconds(1))
             dismiss()
@@ -198,5 +203,26 @@ struct AddToWishlistSheet: View {
             errorMessage = error.localizedDescription
         }
         isAdding = false
+    }
+
+    @MainActor
+    private func refreshWishlistStore(token: String) async {
+        await wishlistStore.load(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            force: true
+        )
+        environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists)
+    }
+
+    private var errorIsPresented: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    errorMessage = nil
+                }
+            }
+        )
     }
 }

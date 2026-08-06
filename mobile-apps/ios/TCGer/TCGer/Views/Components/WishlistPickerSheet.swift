@@ -6,9 +6,8 @@ struct WishlistPickerSheet: View {
     let onSelect: (Wishlist) -> Void
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @EnvironmentObject private var wishlistStore: WishlistStore
     @Environment(\.dismiss) private var dismiss
-    @State private var wishlists: [Wishlist] = []
-    @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var newName = ""
     @State private var isCreating = false
@@ -18,14 +17,14 @@ struct WishlistPickerSheet: View {
     var body: some View {
         NavigationView {
             Group {
-                if isLoading {
+                if wishlistStore.isLoading && !wishlistStore.hasLoaded {
                     ProgressView("Loading wishlists…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        if !wishlists.isEmpty {
+                        if !wishlistStore.wishlists.isEmpty {
                             Section {
-                                ForEach(wishlists) { wishlist in
+                                ForEach(wishlistStore.wishlists) { wishlist in
                                     Button {
                                         onSelect(wishlist)
                                         dismiss()
@@ -40,8 +39,12 @@ struct WishlistPickerSheet: View {
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                             }
+                                            Spacer()
                                         }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             } header: {
                                 Text("Choose a wishlist")
@@ -63,9 +66,9 @@ struct WishlistPickerSheet: View {
                             Text("Or start a new one")
                         }
 
-                        if let errorMessage {
+                        if let pickerErrorMessage {
                             Section {
-                                Text(errorMessage)
+                                Text(pickerErrorMessage)
                                     .font(.footnote)
                                     .foregroundColor(.red)
                             }
@@ -89,18 +92,12 @@ struct WishlistPickerSheet: View {
     @MainActor
     private func load() async {
         guard let token = environmentStore.authToken else {
-            isLoading = false
             return
         }
-        do {
-            wishlists = try await apiService.getWishlists(
-                config: environmentStore.serverConfiguration,
-                token: token
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
+        await wishlistStore.load(
+            config: environmentStore.serverConfiguration,
+            token: token
+        )
     }
 
     @MainActor
@@ -117,10 +114,16 @@ struct WishlistPickerSheet: View {
                 token: token,
                 name: name
             )
+            wishlistStore.insert(wishlist)
             onSelect(wishlist)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var pickerErrorMessage: String? {
+        errorMessage
+            ?? (wishlistStore.wishlists.isEmpty ? wishlistStore.errorMessage : nil)
     }
 }

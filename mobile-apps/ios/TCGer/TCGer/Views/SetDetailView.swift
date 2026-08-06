@@ -267,23 +267,6 @@ struct SetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    environmentStore.toggleFocus(on: set)
-                } label: {
-                    Image(systemName: "scope")
-                }
-                .foregroundStyle(
-                    environmentStore.isFocused(on: set)
-                        ? Color.accentColor
-                        : Color.secondary
-                )
-                .accessibilityLabel(
-                    environmentStore.isFocused(on: set)
-                        ? "Stop focusing on this set"
-                        : "Focus on this set"
-                )
-            }
-            ToolbarItem(placement: .primaryAction) {
                 Button(isSelecting ? "Done" : "Select") {
                     isSelecting.toggle()
                     if !isSelecting {

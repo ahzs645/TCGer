@@ -9,12 +9,10 @@ struct SetBrowserView: View {
     @State private var errorMessage: String?
     @State private var searchText = ""
     @State private var selectedGame: TCGGame = .all
-    @State private var browserScope: SetBrowserScope = .browse
     @State private var progressFilter: SetProgressFilter = .all
     @State private var ownedCardsBySet: [String: Set<String>] = [:]
     @State private var standardOwnedCardsBySet: [String: Set<String>] = [:]
-    @State private var showingFocusPicker = false
-    @State private var didChooseInitialScope = false
+    @State private var addSetsRequest: AddSetsToWishlistRequest?
     @State private var failedProviders: [String] = []
     @State private var collectionRevision = 0
 
@@ -27,10 +25,6 @@ struct SetBrowserView: View {
 
     var filteredSets: [TcgSet] {
         var result = enabledSets
-
-        if browserScope == .focused {
-            result = result.filter { environmentStore.isFocused(on: $0) }
-        }
 
         if selectedGame != .all {
             result = result.filter { $0.tcg == selectedGame.rawValue }
@@ -59,22 +53,10 @@ struct SetBrowserView: View {
             }
         }
 
-        if browserScope == .focused {
-            let priority = Dictionary(
-                uniqueKeysWithValues: environmentStore.focusedSetOrder.enumerated().map { ($1, $0) }
-            )
-            return result.sorted {
-                (priority[$0.focusID] ?? .max) < (priority[$1.focusID] ?? .max)
-            }
-        }
-
         return result.sorted(by: setSortComparator)
     }
 
     var groupedSets: [(String, [TcgSet])] {
-        if browserScope == .focused {
-            return [("priority", filteredSets)]
-        }
         let groups = Dictionary(grouping: filteredSets, by: { $0.tcg })
         return groups.sorted {
             gameSectionIsOrderedBefore(
@@ -83,10 +65,6 @@ struct SetBrowserView: View {
                 enabledGames: environmentStore.enabledGames
             )
         }
-    }
-
-    private var focusedSetCount: Int {
-        enabledSets.filter { environmentStore.isFocused(on: $0) }.count
     }
 
     init(parentProvidesNavigation: Bool = false) {
@@ -107,16 +85,6 @@ struct SetBrowserView: View {
 
     private var setBrowserContent: some View {
         VStack(spacing: 0) {
-                Picker("Set view", selection: $browserScope) {
-                    ForEach(SetBrowserScope.allCases) { scope in
-                        Text(scope.title).tag(scope)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
-
                 if environmentStore.enabledGames.count > 1 {
                     GamePickerPills(
                         selection: $selectedGame,
@@ -155,12 +123,9 @@ struct SetBrowserView: View {
                     Spacer()
 
                     Button {
-                        showingFocusPicker = true
+                        addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [])
                     } label: {
-                        Label(
-                            focusedSetCount == 0 ? "Choose Sets" : "Manage \(focusedSetCount)",
-                            systemImage: "scope"
-                        )
+                        Label("Add Sets", systemImage: "heart.badge.plus")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -205,16 +170,12 @@ struct SetBrowserView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if browserScope == .focused && focusedSetCount == 0 {
-                    FocusedSetsEmptyState {
-                        showingFocusPicker = true
-                    }
                 } else if filteredSets.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: browserScope == .focused ? "scope" : "tray")
+                        Image(systemName: "tray")
                             .font(.system(size: 50))
                             .foregroundColor(.secondary)
-                        Text(browserScope == .focused ? "No Focused Sets Match" : "No Sets Found")
+                        Text("No Sets Found")
                             .font(.title3)
                             .fontWeight(.semibold)
                         Text("Try a different search, game, or progress filter.")
@@ -234,15 +195,14 @@ struct SetBrowserView: View {
                                         SetRow(
                                             set: set,
                                             ownedCount: ownedCount(for: set),
-                                            progressTotal: progressTotal(for: set),
-                                            isFocused: environmentStore.isFocused(on: set)
+                                            progressTotal: progressTotal(for: set)
                                         )
                                     }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        focusAction(for: set)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                        addToWishlistAction(for: set)
                                     }
                                     .contextMenu {
-                                        focusAction(for: set)
+                                        addToWishlistAction(for: set)
                                     }
                                 }
                             } header: {
@@ -256,7 +216,6 @@ struct SetBrowserView: View {
         .navigationTitle("Sets")
             .searchable(text: $searchText, prompt: "Search sets...")
             .task {
-                chooseInitialScopeIfNeeded()
                 await loadSets()
             }
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
@@ -277,37 +236,22 @@ struct SetBrowserView: View {
                 guard !Task.isCancelled else { return }
                 await refreshOwnership(useCache: false)
             }
-        .sheet(isPresented: $showingFocusPicker, onDismiss: {
-            if !environmentStore.focusedSetIDs.isEmpty {
-                browserScope = .focused
-            }
-        }) {
-            FocusSetPicker(
+        .sheet(item: $addSetsRequest) { request in
+            AddSetsToWishlistSheet(
                 sets: enabledSets,
-                initialOrder: environmentStore.focusedSetOrder,
-                onSave: environmentStore.replaceFocusedSetOrder
+                initialSetIDs: request.initialSetIDs
             )
         }
     }
 
     @ViewBuilder
-    private func focusAction(for set: TcgSet) -> some View {
-        let isFocused = environmentStore.isFocused(on: set)
+    private func addToWishlistAction(for set: TcgSet) -> some View {
         Button {
-            environmentStore.toggleFocus(on: set)
+            addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [set.id])
         } label: {
-            Label(
-                isFocused ? "Stop Focusing" : "Add to Focus",
-                systemImage: isFocused ? "scope" : "plus.circle"
-            )
+            Label("Add to Wishlist", systemImage: "heart.badge.plus")
         }
-        .tint(isFocused ? .orange : .accentColor)
-    }
-
-    private func chooseInitialScopeIfNeeded() {
-        guard !didChooseInitialScope else { return }
-        browserScope = environmentStore.focusedSetIDs.isEmpty ? .browse : .focused
-        didChooseInitialScope = true
+        .tint(.pink)
     }
 
     private func validateSelectedGame() {
@@ -456,26 +400,11 @@ private enum SetProgressFilter: String, CaseIterable, Identifiable {
     }
 }
 
-private enum SetBrowserScope: String, CaseIterable, Identifiable {
-    case focused
-    case browse
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .focused: return "Focused"
-        case .browse: return "Browse"
-        }
-    }
-}
-
 // MARK: - Set Row
 private struct SetRow: View {
     let set: TcgSet
     let ownedCount: Int
     let progressTotal: Int
-    let isFocused: Bool
 
     private var gameBrandColor: Color {
         TCGGame(rawValue: set.tcg.lowercased())?.brandColor ?? .accentColor
@@ -483,7 +412,8 @@ private struct SetRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SetArtworkView(set: set)
+            SetArtworkView(set: set, showsFallback: false)
+                .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(set.name)
@@ -527,205 +457,8 @@ private struct SetRow: View {
             }
 
             Spacer()
-
-            if isFocused {
-                Image(systemName: "scope")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tint)
-                    .accessibilityLabel("Focused set")
-            }
         }
         .padding(.vertical, 4)
-    }
-}
-
-private struct FocusedSetsEmptyState: View {
-    let chooseAction: () -> Void
-
-    var body: some View {
-        ContentUnavailableView {
-            Label("Choose Your Focus Sets", systemImage: "scope")
-        } description: {
-            Text("Pick the sets you are actively collecting so their progress stays easy to find.")
-        } actions: {
-            Button("Choose Focus Sets", action: chooseAction)
-                .buttonStyle(.borderedProminent)
-        }
-    }
-}
-
-private struct FocusSetPicker: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var environmentStore: EnvironmentStore
-
-    let sets: [TcgSet]
-    let initialOrder: [String]
-    let onSave: ([String]) -> Void
-
-    @State private var searchText = ""
-    @State private var selectedGame: TCGGame = .all
-    @State private var draftOrder: [String]
-
-    init(
-        sets: [TcgSet],
-        initialOrder: [String],
-        onSave: @escaping ([String]) -> Void
-    ) {
-        self.sets = sets
-        self.initialOrder = initialOrder
-        self.onSave = onSave
-        _draftOrder = State(initialValue: initialOrder)
-    }
-
-    private var focusedSetIDs: Set<String> { Set(draftOrder) }
-
-    private var filteredSets: [TcgSet] {
-        sets.filter { set in
-            let matchesGame = selectedGame == .all || set.tcg == selectedGame.rawValue
-            let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            let matchesSearch = trimmedQuery.isEmpty
-                || set.name.localizedCaseInsensitiveContains(trimmedQuery)
-                || set.code.localizedCaseInsensitiveContains(trimmedQuery)
-            return matchesGame && matchesSearch
-        }
-    }
-
-    private var groupedSets: [(String, [TcgSet])] {
-        Dictionary(grouping: filteredSets, by: \.tcg)
-            .sorted {
-                gameSectionIsOrderedBefore(
-                    $0.key,
-                    $1.key,
-                    enabledGames: environmentStore.enabledGames
-                )
-            }
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if environmentStore.enabledGames.count > 1 {
-                    GamePickerPills(
-                        selection: $selectedGame,
-                        games: environmentStore.gamePickerGames
-                    )
-                    Divider()
-                }
-
-                List {
-                    if searchText.isEmpty, selectedGame == .all, !draftOrder.isEmpty {
-                        Section("Focused — drag to prioritize") {
-                            ForEach(draftOrder, id: \.self) { focusID in
-                                if let set = sets.first(where: { $0.focusID == focusID }) {
-                                    HStack {
-                                        Text(set.name)
-                                        Spacer()
-                                        Text(set.tcgDisplayName)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .onMove { source, destination in
-                                draftOrder.move(fromOffsets: source, toOffset: destination)
-                            }
-                            .onDelete { offsets in
-                                draftOrder.remove(atOffsets: offsets)
-                            }
-                        }
-                    }
-
-                    ForEach(groupedSets, id: \.0) { tcg, tcgSets in
-                        Section {
-                            ForEach(tcgSets) { set in
-                                Button {
-                                    if focusedSetIDs.contains(set.focusID) {
-                                        draftOrder.removeAll { $0 == set.focusID }
-                                    } else {
-                                        draftOrder.append(set.focusID)
-                                    }
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(set.name)
-                                                .foregroundStyle(.primary)
-                                            Text(set.code.uppercased())
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(
-                                            systemName: focusedSetIDs.contains(set.focusID)
-                                                ? "checkmark.circle.fill"
-                                                : "circle"
-                                        )
-                                        .font(.title3)
-                                        .foregroundStyle(
-                                            focusedSetIDs.contains(set.focusID)
-                                                ? Color.accentColor
-                                                : Color.secondary
-                                        )
-                                    }
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(set.name)
-                                .accessibilityValue(
-                                    focusedSetIDs.contains(set.focusID) ? "Focused" : "Not focused"
-                                )
-                            }
-                        } header: {
-                            GameSectionHeader(tcg: tcg)
-                        }
-                    }
-                }
-                .overlay {
-                    if filteredSets.isEmpty {
-                        ContentUnavailableView.search(text: searchText)
-                    }
-                }
-            }
-            .navigationTitle("Focus Sets")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Search sets")
-            .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
-            .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
-            .onChange(of: environmentStore.enabledPokemon) { validateSelectedGame() }
-            .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
-            .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
-            .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
-            .safeAreaInset(edge: .bottom) {
-                Text("\(draftOrder.count) selected")
-                    .font(.footnote.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(.regularMaterial)
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if !draftOrder.isEmpty {
-                        Button("Clear", role: .destructive) {
-                            draftOrder.removeAll()
-                        }
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        onSave(draftOrder)
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    EditButton()
-                }
-            }
-        }
-    }
-
-    private func validateSelectedGame() {
-        if selectedGame != .all && !environmentStore.enabledGames.contains(selectedGame) {
-            selectedGame = .all
-        }
     }
 }
 
@@ -733,9 +466,7 @@ private struct GameSectionHeader: View {
     let tcg: String
 
     var body: some View {
-        if tcg == "priority" {
-            Text("Priority")
-        } else if let game = TCGGame(rawValue: tcg) {
+        if let game = TCGGame(rawValue: tcg) {
             HStack(spacing: 6) {
                 TCGGameIcon(game: game, size: 14)
                     .foregroundStyle(game.brandColor)

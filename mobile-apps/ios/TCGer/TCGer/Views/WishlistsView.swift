@@ -66,6 +66,8 @@ struct WishlistsView: View {
                             selectedWishlist = wishlist
                         } label: {
                             WishlistRow(wishlist: wishlist)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

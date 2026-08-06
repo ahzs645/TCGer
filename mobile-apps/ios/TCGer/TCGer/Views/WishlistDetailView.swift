@@ -20,6 +20,7 @@ struct WishlistDetailView: View {
     @State private var filterOwned: OwnershipFilter = .all
     @State private var rules: [WishlistRule]
     @State private var showingBulkAdd = false
+    @State private var showingAddSets = false
     @State private var isSyncing = false
     @State private var syncStatus: String?
 
@@ -66,6 +67,23 @@ struct WishlistDetailView: View {
     private var totalCount: Int { cards.count }
     private var completionPercent: Int {
         totalCount > 0 ? Int((Double(ownedCount) / Double(totalCount)) * 100) : 0
+    }
+
+    private var currentWishlist: Wishlist {
+        Wishlist(
+            id: wishlist.id,
+            name: wishlist.name,
+            description: wishlist.description,
+            colorHex: wishlist.colorHex,
+            cards: cards,
+            totalCards: cards.count,
+            ownedCards: ownedCount,
+            completionPercent: completionPercent,
+            createdAt: wishlist.createdAt,
+            updatedAt: wishlist.updatedAt,
+            rules: rules,
+            matchAnyPrinting: wishlist.matchAnyPrinting
+        )
     }
 
     var body: some View {
@@ -257,9 +275,14 @@ struct WishlistDetailView: View {
                                     Label("Search for cards", systemImage: "magnifyingglass")
                                 }
                                 Button {
+                                    showingAddSets = true
+                                } label: {
+                                    Label("Add one or more sets", systemImage: "heart.badge.plus")
+                                }
+                                Button {
                                     showingBulkAdd = true
                                 } label: {
-                                    Label("Add every match or a whole set", systemImage: "square.stack.3d.up")
+                                    Label("More bulk options", systemImage: "square.stack.3d.up")
                                 }
                             } label: {
                                 Image(systemName: "plus")
@@ -283,19 +306,7 @@ struct WishlistDetailView: View {
             }
             .sheet(isPresented: $showingBulkAdd) {
                 AddWishlistRuleSheet(
-                    wishlist: Wishlist(
-                        id: wishlist.id,
-                        name: wishlist.name,
-                        description: wishlist.description,
-                        colorHex: wishlist.colorHex,
-                        cards: cards,
-                        totalCards: cards.count,
-                        ownedCards: ownedCount,
-                        completionPercent: completionPercent,
-                        createdAt: wishlist.createdAt,
-                        updatedAt: wishlist.updatedAt,
-                        rules: rules
-                    ),
+                    wishlist: currentWishlist,
                     onComplete: {
                         Task {
                             await refreshWishlist()
@@ -304,6 +315,17 @@ struct WishlistDetailView: View {
                     }
                 )
                 .environmentObject(environmentStore)
+            }
+            .sheet(isPresented: $showingAddSets) {
+                AddSetsToWishlistSheet(
+                    wishlist: currentWishlist,
+                    onComplete: {
+                        Task {
+                            await refreshWishlist()
+                            onUpdate?()
+                        }
+                    }
+                )
             }
             .refreshable {
                 await refreshWishlist()
