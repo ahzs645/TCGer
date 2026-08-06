@@ -1964,13 +1964,56 @@ final class LocalStore {
 
     // MARK: - Wishlist Accessors
 
-    func getWishlists() -> [Wishlist] { wishlists }
+    func getWishlists() -> [Wishlist] {
+        wishlists.map { applyingOwnership($0) }
+    }
 
     func getWishlist(id: String) throws -> Wishlist {
         guard let wl = wishlists.first(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
-        return wl
+        return applyingOwnership(wl)
+    }
+
+    /// Live ownership from the local binders: "tcg:externalId" → total copies.
+    /// Mirrors the server, which cross-references wishlists against the
+    /// collection on every read instead of storing ownership.
+    private func ownershipByCardKey() -> [String: Int] {
+        var map: [String: Int] = [:]
+        for collection in collections {
+            for card in collection.cards {
+                let key = "\(card.tcg):\(card.externalId ?? card.cardId)"
+                map[key, default: 0] += card.quantity
+            }
+        }
+        return map
+    }
+
+    /// Rewrites a wishlist's cards and totals with live ownership; the stored
+    /// flags only reflect what was true when each card was added.
+    private func applyingOwnership(_ wishlist: Wishlist) -> Wishlist {
+        let ownership = ownershipByCardKey()
+        let cards = wishlist.cards.map { card -> WishlistCard in
+            var updated = card
+            let quantity = ownership["\(card.tcg):\(card.externalId)"] ?? 0
+            updated.owned = quantity > 0
+            updated.ownedQuantity = quantity
+            return updated
+        }
+        let ownedCount = cards.filter(\.owned).count
+        return Wishlist(
+            id: wishlist.id,
+            name: wishlist.name,
+            description: wishlist.description,
+            colorHex: wishlist.colorHex,
+            cards: cards,
+            totalCards: cards.count,
+            ownedCards: ownedCount,
+            completionPercent: cards.isEmpty ? 0 : Int((Double(ownedCount) / Double(cards.count)) * 100),
+            createdAt: wishlist.createdAt,
+            updatedAt: wishlist.updatedAt,
+            rules: wishlist.rules
+        )
     }
 
     func createWishlist(name: String, description: String?, colorHex: String?) -> Wishlist {
@@ -2002,7 +2045,7 @@ final class LocalStore {
         )
         wishlists[idx] = updated
         persist()
-        return updated
+        return applyingOwnership(updated)
     }
 
     func deleteWishlist(id: String) {
@@ -2016,16 +2059,23 @@ final class LocalStore {
         }
         let now = LocalStore.isoFormatter.string(from: Date())
         let wl = wishlists[idx]
+        let ownership = ownershipByCardKey()
 
-        if let existing = wl.cards.first(where: { $0.externalId == card.id && $0.tcg == card.tcg }) {
+        if var existing = wl.cards.first(where: { $0.externalId == card.id && $0.tcg == card.tcg }) {
+            let quantity = ownership["\(existing.tcg):\(existing.externalId)"] ?? 0
+            existing.owned = quantity > 0
+            existing.ownedQuantity = quantity
             return existing
         }
 
-        let wc = LocalStore.makeWishlistCard(from: card, at: now)
+        var wc = LocalStore.makeWishlistCard(from: card, at: now)
         var cards = wl.cards
         cards.append(wc)
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         persist()
+        let quantity = ownership["\(wc.tcg):\(wc.externalId)"] ?? 0
+        wc.owned = quantity > 0
+        wc.ownedQuantity = quantity
         return wc
     }
 
@@ -2050,7 +2100,7 @@ final class LocalStore {
         let updated = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         wishlists[idx] = updated
         persist()
-        return updated
+        return applyingOwnership(updated)
     }
 
     func removeCardFromWishlist(wishlistId: String, cardId: String) {

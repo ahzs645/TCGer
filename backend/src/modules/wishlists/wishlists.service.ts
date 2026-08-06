@@ -361,8 +361,9 @@ export async function addCardToWishlist(
     }
   });
 
-  // Check ownership
-  const owned = await prisma.collection.findFirst({
+  // Check ownership. Each physical copy is its own collection row, so the
+  // quantities must be summed to match the list endpoints.
+  const owned = await prisma.collection.aggregate({
     where: {
       userId,
       card: {
@@ -370,10 +371,10 @@ export async function addCardToWishlist(
         tcgGame: { code: input.tcg }
       }
     },
-    select: { quantity: true }
+    _sum: { quantity: true }
   });
 
-  return mapWishlistCard(card, owned?.quantity ?? 0);
+  return mapWishlistCard(card, owned._sum.quantity ?? 0);
 }
 
 export async function removeCardFromWishlist(

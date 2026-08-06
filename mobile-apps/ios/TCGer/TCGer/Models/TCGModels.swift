@@ -914,8 +914,10 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     let setLogoUrl: String?
     let collectorNumber: String?
     let notes: String?
-    let owned: Bool
-    let ownedQuantity: Int
+    // Mutable because ownership is derived from the collections at read time,
+    // not a stored fact about the wishlist entry.
+    var owned: Bool
+    var ownedQuantity: Int
     let createdAt: String
     var releasedAt: String? = nil
     var regulationMark: String? = nil
