@@ -8,6 +8,7 @@ struct CollectionDetailView: View {
     @State private var editedName: String
     @State private var editedDescription: String
     @State private var selectedColor: Color
+    @State private var editedDefaultCondition: String
     @State private var showingAddCard = false
     @State private var errorMessage: String?
     @State private var isSaving = false
@@ -42,6 +43,7 @@ struct CollectionDetailView: View {
         _editedName = State(initialValue: collection.name)
         _editedDescription = State(initialValue: collection.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(collection.colorHex))
+        _editedDefaultCondition = State(initialValue: collection.defaultCondition ?? "")
         _cards = State(initialValue: collection.cards)
     }
 
@@ -146,6 +148,16 @@ struct CollectionDetailView: View {
                                         selectedColor: $selectedColor,
                                         nameFont: .title
                                     )
+                                    HStack {
+                                        Text("Default Condition")
+                                            .font(.subheadline)
+                                        Spacer()
+                                        ConditionPicker(
+                                            selection: $editedDefaultCondition,
+                                            includeUnspecified: true
+                                        )
+                                        .labelsHidden()
+                                    }
                                 } else {
                                     Text(collection.name)
                                         .font(.title)
@@ -154,6 +166,19 @@ struct CollectionDetailView: View {
                                         Text(description)
                                             .font(.body)
                                             .foregroundColor(.secondary)
+                                    }
+                                    if let defaultCondition = collection.defaultCondition, !defaultCondition.isEmpty {
+                                        Text("Default condition: \(defaultCondition)")
+                                            .font(.footnote)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    if collection.isUnsortedBinder && !cards.isEmpty {
+                                        Label(
+                                            "These cards aren't in a binder yet. Select cards, then use Move to file them into one.",
+                                            systemImage: "arrowshape.turn.up.right"
+                                        )
+                                        .font(.footnote)
+                                        .foregroundColor(.secondary)
                                     }
                                 }
                             }
@@ -342,8 +367,12 @@ struct CollectionDetailView: View {
                                     }
                                     .disabled(cards.isEmpty)
 
-                                    Button(action: { isEditing = true }) {
-                                        Text("Edit")
+                                    // The Unsorted Library is a virtual holding
+                                    // area, not a real binder — nothing to edit.
+                                    if !collection.isUnsortedBinder {
+                                        Button(action: { isEditing = true }) {
+                                            Text("Edit")
+                                        }
                                     }
 
                                     Button(action: { showingAddCard = true }) {
@@ -588,6 +617,11 @@ struct CollectionDetailView: View {
 
     @MainActor
     private func saveChanges() async {
+        guard !collection.isUnsortedBinder else {
+            isEditing = false
+            return
+        }
+
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             return
@@ -608,7 +642,11 @@ struct CollectionDetailView: View {
                 id: collection.id,
                 name: editedName,
                 description: editedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editedDescription,
-                colorHex: selectedColor.toHex()
+                colorHex: selectedColor.toHex(),
+                // "" clears the stored default; nil would leave it unchanged.
+                defaultCondition: editedDefaultCondition == (collection.defaultCondition ?? "")
+                    ? nil
+                    : editedDefaultCondition
             )
 
             cards = updated.cards

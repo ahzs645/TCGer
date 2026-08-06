@@ -8,12 +8,14 @@ extension APIService {
         let name: String
         let description: String?
         let colorHex: String?
+        let matchAnyPrinting: Bool?
     }
 
     private struct UpdateWishlistRequest: Encodable {
         let name: String?
         let description: String?
         let colorHex: String?
+        let matchAnyPrinting: Bool?
     }
 
     private struct AddWishlistCardRequest: Encodable {
@@ -156,10 +158,23 @@ extension APIService {
         token: String,
         name: String,
         description: String? = nil,
-        colorHex: String? = nil
+        colorHex: String? = nil,
+        matchAnyPrinting: Bool? = nil
     ) async throws -> Wishlist {
-        if config.isOnDevice { return LocalStore.shared.createWishlist(name: name, description: description, colorHex: colorHex) }
-        let body = CreateWishlistRequest(name: name, description: description, colorHex: colorHex)
+        if config.isOnDevice {
+            return LocalStore.shared.createWishlist(
+                name: name,
+                description: description,
+                colorHex: colorHex,
+                matchAnyPrinting: matchAnyPrinting
+            )
+        }
+        let body = CreateWishlistRequest(
+            name: name,
+            description: description,
+            colorHex: colorHex,
+            matchAnyPrinting: matchAnyPrinting
+        )
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists",
@@ -185,12 +200,24 @@ extension APIService {
         id: String,
         name: String? = nil,
         description: String? = nil,
-        colorHex: String? = nil
+        colorHex: String? = nil,
+        matchAnyPrinting: Bool? = nil
     ) async throws -> Wishlist {
         if config.isOnDevice {
-            return try LocalStore.shared.updateWishlist(id: id, name: name, description: description, colorHex: colorHex)
+            return try LocalStore.shared.updateWishlist(
+                id: id,
+                name: name,
+                description: description,
+                colorHex: colorHex,
+                matchAnyPrinting: matchAnyPrinting
+            )
         }
-        let body = UpdateWishlistRequest(name: name, description: description, colorHex: colorHex)
+        let body = UpdateWishlistRequest(
+            name: name,
+            description: description,
+            colorHex: colorHex,
+            matchAnyPrinting: matchAnyPrinting
+        )
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(id)",

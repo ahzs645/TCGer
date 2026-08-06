@@ -13,6 +13,7 @@ struct WishlistDetailView: View {
     @State private var editedName: String
     @State private var editedDescription: String
     @State private var selectedColor: Color
+    @State private var editedMatchAnyPrinting: Bool
     @State private var isSaving = false
     @State private var showingDeleteConfirmation = false
     @State private var searchText = ""
@@ -38,6 +39,7 @@ struct WishlistDetailView: View {
         _editedName = State(initialValue: wishlist.name)
         _editedDescription = State(initialValue: wishlist.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(wishlist.colorHex))
+        _editedMatchAnyPrinting = State(initialValue: wishlist.matchesAnyPrinting)
     }
 
     private var filteredCards: [WishlistCard] {
@@ -82,6 +84,11 @@ struct WishlistDetailView: View {
                             )
                         }
                         .listRowSeparator(.hidden)
+                    }
+                    Section {
+                        Toggle("Any printing counts as owned", isOn: $editedMatchAnyPrinting)
+                    } footer: {
+                        Text("On: owning any printing of a card checks it off. Off: only the exact printing on the list counts.")
                     }
                 } else if let desc = wishlist.description,
                           !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -413,7 +420,8 @@ struct WishlistDetailView: View {
                 id: wishlist.id,
                 name: editedName,
                 description: editedDescription.isEmpty ? nil : editedDescription,
-                colorHex: selectedColor.toHex()
+                colorHex: selectedColor.toHex(),
+                matchAnyPrinting: editedMatchAnyPrinting
             )
             isEditing = false
             onUpdate?()

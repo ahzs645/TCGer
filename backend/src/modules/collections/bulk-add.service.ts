@@ -153,7 +153,7 @@ export async function commitBulkAdd(
     const [binders, cards] = await Promise.all([
       tx.binder.findMany({
         where: { userId, id: { in: binderIds } },
-        select: { id: true, name: true }
+        select: { id: true, name: true, defaultCondition: true }
       }),
       tx.card.findMany({
         where: { id: { in: cardIds } },
@@ -165,12 +165,20 @@ export async function commitBulkAdd(
       throw new BulkAddValidationError(preview.issues);
     }
 
+    const binderDefaultConditions = new Map(
+      binders.map((binder) => [binder.id, binder.defaultCondition ?? undefined])
+    );
+
     const entryIds: string[] = [];
     for (const row of rows) {
       await ensureCardForCollection(tx, row.cardId, row.cardData);
       for (let index = 0; index < row.quantity; index += 1) {
         const entry = await tx.collection.create({
-          data: buildCollectionCreateInput(userId, row)
+          data: buildCollectionCreateInput(
+            userId,
+            row,
+            binderDefaultConditions.get(row.binderId)
+          )
         });
         await syncCollectionTags(
           tx,
@@ -213,14 +221,15 @@ export async function commitBulkAdd(
 
 function buildCollectionCreateInput(
   userId: string,
-  row: ResolvedBulkAddRow
+  row: ResolvedBulkAddRow,
+  binderDefaultCondition?: string
 ): Prisma.CollectionUncheckedCreateInput {
   return {
     userId,
     cardId: row.cardId,
     binderId: row.binderId === UNSORTED_BINDER_ID ? null : row.binderId,
     quantity: 1,
-    condition: row.condition,
+    condition: row.condition ?? binderDefaultCondition,
     language: row.language,
     notes: row.notes,
     price: row.price,

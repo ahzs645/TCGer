@@ -11,6 +11,9 @@ struct AddCardToBinderSheet: View {
     @State private var selectedBinderId: String?
     @State private var quantity: Int = 1
     @State private var condition: String = CardCondition.nearMint.rawValue
+    // Tracks what the picker was last seeded with, so switching binders only
+    // re-seeds the condition while the user hasn't picked one themselves.
+    @State private var seededCondition: String = CardCondition.nearMint.rawValue
     @State private var language: String = "English"
     @State private var notes: String = ""
     @State private var isFoil: Bool = false
@@ -187,6 +190,9 @@ struct AddCardToBinderSheet: View {
             }
             await loadCollections()
         }
+        .onChange(of: selectedBinderId) { _, _ in
+            applyBinderDefaultCondition()
+        }
         .sheet(item: $wishlistCard, onDismiss: {
             if didAddToWishlist {
                 didAddToWishlist = false
@@ -219,6 +225,7 @@ struct AddCardToBinderSheet: View {
             if selectedBinderId == nil {
                 selectedBinderId = collections.first?.id
             }
+            applyBinderDefaultCondition()
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -275,6 +282,17 @@ struct AddCardToBinderSheet: View {
     private func collection(for id: String?) -> Collection? {
         guard let id else { return nil }
         return collections.first { $0.id == id }
+    }
+
+    /// Seeds the condition picker with the selected binder's default (falling
+    /// back to Near Mint) unless the user already picked a condition manually.
+    private func applyBinderDefaultCondition() {
+        let binderDefault = collection(for: selectedBinderId)?.defaultCondition
+        let seed = CardCondition.canonicalize(binderDefault ?? CardCondition.nearMint.rawValue)
+        if condition == seededCondition {
+            condition = seed
+        }
+        seededCondition = seed
     }
 }
 

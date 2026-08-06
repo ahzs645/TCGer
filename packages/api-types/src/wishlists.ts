@@ -26,14 +26,16 @@ const hexColorRegex = /^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 export const createWishlistSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional(),
+  matchAnyPrinting: z.boolean().optional()
 });
 export type CreateWishlistInput = z.infer<typeof createWishlistSchema>;
 
 export const updateWishlistSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
-  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional(),
+  matchAnyPrinting: z.boolean().optional()
 });
 export type UpdateWishlistInput = z.infer<typeof updateWishlistSchema>;
 
@@ -227,6 +229,12 @@ export interface WishlistResponse {
   name: string;
   description?: string;
   colorHex?: string;
+  /**
+   * When true, a card counts as owned if any printing of it is in the
+   * collection (matched via baseExternalId); otherwise the exact printing
+   * must be owned.
+   */
+  matchAnyPrinting?: boolean;
   cards: WishlistCardResponse[];
   /** Saved expansion rules; empty for a purely manual wishlist. */
   rules: WishlistRuleResponse[];

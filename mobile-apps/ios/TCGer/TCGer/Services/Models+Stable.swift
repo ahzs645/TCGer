@@ -150,6 +150,7 @@ struct StableCollection: Identifiable, Codable {
     let createdAt: String
     let updatedAt: String
     let colorHex: String?
+    let defaultCondition: String?
 
     func asModel() -> Collection {
         Collection(
@@ -159,7 +160,8 @@ struct StableCollection: Identifiable, Codable {
             cards: cards.map { $0.asModel() },
             createdAt: createdAt,
             updatedAt: updatedAt,
-            colorHex: colorHex
+            colorHex: colorHex,
+            defaultCondition: defaultCondition
         )
     }
 }

@@ -527,6 +527,9 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
     let colorHex: String?
+    // Declared with a default so existing memberwise-init call sites keep
+    // compiling; nil means copies added to this binder start "Unspecified".
+    var defaultCondition: String? = nil
 
     static let unsortedBinderId = "__library__"
 
@@ -859,8 +862,13 @@ struct Wishlist: Identifiable, Codable, Hashable, Sendable {
     /// Optional so wishlists saved by older builds (and servers that predate
     /// smart wishlists) still decode.
     var rules: [WishlistRule]? = nil
+    /// When true, owning any printing of a card counts it as owned; the
+    /// default (nil/false) requires the exact printing. Optional so older
+    /// stores and servers still decode.
+    var matchAnyPrinting: Bool? = nil
 
     var expansionRules: [WishlistRule] { rules ?? [] }
+    var matchesAnyPrinting: Bool { matchAnyPrinting ?? false }
 }
 
 /// A saved expansion rule: "every Darkrai", "everything in Prismatic
@@ -911,8 +919,10 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     let setLogoUrl: String?
     let collectorNumber: String?
     let notes: String?
-    let owned: Bool
-    let ownedQuantity: Int
+    // Mutable because ownership is derived from the collections at read time,
+    // not a stored fact about the wishlist entry.
+    var owned: Bool
+    var ownedQuantity: Int
     let createdAt: String
     var releasedAt: String? = nil
     var regulationMark: String? = nil

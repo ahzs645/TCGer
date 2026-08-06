@@ -38,6 +38,60 @@ export function validateColorHex(colorHex: string | undefined): string | undefin
   return trimmed.toLowerCase();
 }
 
+// Every condition spelling the API accepts, uppercased. Kept in sync with
+// KNOWN_CONDITION_VALUES in packages/api-types/src/collections.ts (this
+// package cannot depend on it).
+const KNOWN_CONDITIONS = new Set([
+  "GEM MINT",
+  "GM",
+  "MINT",
+  "M",
+  "NEAR MINT",
+  "NM",
+  "EXCELLENT",
+  "EX",
+  "VERY GOOD",
+  "VG",
+  "GOOD",
+  "GD",
+  "G",
+  "LIGHTLY PLAYED",
+  "LIGHT PLAYED",
+  "LP",
+  "MODERATE PLAY",
+  "MODERATELY PLAYED",
+  "MP",
+  "PLAYED",
+  "PL",
+  "HEAVY PLAY",
+  "HEAVILY PLAYED",
+  "HP",
+  "POOR",
+  "PO",
+  "PR",
+  "DAMAGED",
+  "DMG"
+]);
+
+/// Trims and checks a condition against the known spellings; empty clears to
+/// undefined, unknown values are rejected.
+export function validateCondition(condition: string | undefined): string | undefined {
+  if (condition === undefined) {
+    return undefined;
+  }
+  const trimmed = condition.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (!KNOWN_CONDITIONS.has(trimmed.toUpperCase())) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `Unknown card condition "${trimmed}"`
+    });
+  }
+  return trimmed;
+}
+
 export async function getLibraryBinder(
   ctx: ReaderCtx,
   userId: Id<"users">

@@ -626,6 +626,171 @@ describe("convex native architecture", () => {
     expect(binderDetail.cards[0].copies[0].imageUrls ?? []).toHaveLength(0);
   });
 
+  test("applies, validates, and clears binder default conditions over Convex HTTP actions", async () => {
+    const t = createTestConvex();
+    const headers = {
+      Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
+      "x-tcger-user-id": "user_condition",
+      "x-tcger-user-email": "condition@example.com",
+      "x-tcger-username": "condition"
+    };
+
+    const createBinderResponse = await t.fetch("/collections", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Graded Binder", defaultCondition: "Near Mint" })
+    });
+    const createdBinder = await createBinderResponse.json();
+
+    expect(createBinderResponse.status).toBe(201);
+    expect(createdBinder.defaultCondition).toBe("Near Mint");
+
+    const rejectedBinderResponse = await t.fetch("/collections", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Bad Binder", defaultCondition: "kinda scuffed" })
+    });
+    expect(rejectedBinderResponse.status).toBe(400);
+
+    const inheritedCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: { tcg: "magic", externalId: "swamp", name: "Swamp" }
+      })
+    });
+    const inheritedCard = await inheritedCardResponse.json();
+
+    expect(inheritedCardResponse.status).toBe(201);
+    expect(inheritedCard.condition).toBe("Near Mint");
+
+    const explicitCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        condition: "Played",
+        cardData: { tcg: "magic", externalId: "island", name: "Island" }
+      })
+    });
+    const explicitCard = await explicitCardResponse.json();
+
+    expect(explicitCardResponse.status).toBe(201);
+    expect(explicitCard.condition).toBe("Played");
+
+    const clearResponse = await t.fetch(`/collections/${createdBinder.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ defaultCondition: "" })
+    });
+    const clearedBinder = await clearResponse.json();
+
+    expect(clearResponse.status).toBe(200);
+    expect(clearedBinder.defaultCondition).toBeUndefined();
+
+    const unspecifiedCardResponse = await t.fetch(`/collections/${createdBinder.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: { tcg: "magic", externalId: "plains", name: "Plains" }
+      })
+    });
+    const unspecifiedCard = await unspecifiedCardResponse.json();
+
+    expect(unspecifiedCardResponse.status).toBe(201);
+    expect(unspecifiedCard.condition).toBeUndefined();
+
+    const libraryPatchResponse = await t.fetch("/collections/__library__", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Renamed Library" })
+    });
+    expect(libraryPatchResponse.status).toBe(400);
+  });
+
+  test("matches wishlist ownership by any printing when enabled", async () => {
+    const t = createTestConvex();
+    const headers = {
+      Authorization: "Bearer local-test-token",
+      "x-tcger-bridge-key": TEST_BRIDGE_SECRET,
+      "x-tcger-user-id": "user_printing",
+      "x-tcger-user-email": "printing@example.com",
+      "x-tcger-username": "printing"
+    };
+
+    // Own one printing of the card.
+    const addOwnedResponse = await t.fetch("/collections/cards", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        quantity: 1,
+        cardData: {
+          tcg: "pokemon",
+          externalId: "pikachu-promo",
+          baseExternalId: "pikachu-base",
+          name: "Pikachu"
+        }
+      })
+    });
+    expect(addOwnedResponse.status).toBe(201);
+
+    // Wishlist an exact-matching wishlist with a DIFFERENT printing.
+    const exactWishlistResponse = await t.fetch("/wishlists", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Exact Printings" })
+    });
+    const exactWishlist = await exactWishlistResponse.json();
+    const exactCardResponse = await t.fetch(`/wishlists/${exactWishlist.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        externalId: "pikachu-holo",
+        baseExternalId: "pikachu-base",
+        tcg: "pokemon",
+        name: "Pikachu"
+      })
+    });
+    const exactCard = await exactCardResponse.json();
+    expect(exactCard.owned).toBe(false);
+
+    // The same card on an any-printing wishlist counts as owned.
+    const anyWishlistResponse = await t.fetch("/wishlists", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Any Printing", matchAnyPrinting: true })
+    });
+    const anyWishlist = await anyWishlistResponse.json();
+    expect(anyWishlist.matchAnyPrinting).toBe(true);
+    const anyCardResponse = await t.fetch(`/wishlists/${anyWishlist.id}/cards`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        externalId: "pikachu-holo",
+        baseExternalId: "pikachu-base",
+        tcg: "pokemon",
+        name: "Pikachu"
+      })
+    });
+    const anyCard = await anyCardResponse.json();
+    expect(anyCard.owned).toBe(true);
+    expect(anyCard.ownedQuantity).toBe(1);
+
+    // Toggling the flag off flips the card back to needed on the next read.
+    const disableResponse = await t.fetch(`/wishlists/${anyWishlist.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ matchAnyPrinting: false })
+    });
+    const disabled = await disableResponse.json();
+    expect(disableResponse.status).toBe(200);
+    expect(disabled.matchAnyPrinting).toBe(false);
+    expect(disabled.cards[0].owned).toBe(false);
+  });
+
   test("mirrors wishlist REST routes over Convex HTTP actions", async () => {
     const t = createTestConvex();
     const headers = {

@@ -23,6 +23,61 @@ import type { PokedexEntry, PokemonFormatLegality } from './pokemon';
 
 const hexColorRegex = /^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 
+// Every condition spelling the API accepts, uppercased: canonical grading
+// terms plus the abbreviations and legacy spellings existing clients and
+// CSV imports write. Matching is case-insensitive on the trimmed value.
+export const KNOWN_CONDITION_VALUES = [
+  'GEM MINT',
+  'GM',
+  'MINT',
+  'M',
+  'NEAR MINT',
+  'NM',
+  'EXCELLENT',
+  'EX',
+  'VERY GOOD',
+  'VG',
+  'GOOD',
+  'GD',
+  'G',
+  'LIGHTLY PLAYED',
+  'LIGHT PLAYED',
+  'LP',
+  'MODERATE PLAY',
+  'MODERATELY PLAYED',
+  'MP',
+  'PLAYED',
+  'PL',
+  'HEAVY PLAY',
+  'HEAVILY PLAYED',
+  'HP',
+  'POOR',
+  'PO',
+  'PR',
+  'DAMAGED',
+  'DMG'
+] as const;
+
+const knownConditionSet = new Set<string>(KNOWN_CONDITION_VALUES);
+
+export function isKnownCondition(value: string): boolean {
+  return knownConditionSet.has(value.trim().toUpperCase());
+}
+
+export const conditionValueSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isKnownCondition, {
+    message: 'Unknown card condition'
+  });
+// Update payloads may clear a condition with null or an empty string.
+export const clearableConditionValueSchema = z.union([
+  conditionValueSchema,
+  z.literal(''),
+  z.null()
+]);
+
 export const tagPayloadSchema = z.object({
   label: z.string().min(1, 'Label is required'),
   colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
@@ -75,7 +130,8 @@ const binderPresentationSchema = z.object({
 export const createBinderSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional()
+  colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional(),
+  defaultCondition: conditionValueSchema.optional()
 }).merge(binderPresentationSchema);
 export type CreateBinderInput = z.infer<typeof createBinderSchema>;
 
@@ -83,6 +139,7 @@ export const updateBinderSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   colorHex: z.string().regex(hexColorRegex, 'Invalid color value').optional(),
+  defaultCondition: clearableConditionValueSchema.optional(),
   containerType: z.string().trim().min(1).max(40).nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
   associatedTcg: tcgCodeSchema.nullable().optional(),
@@ -98,7 +155,7 @@ export type UpdateBinderInput = z.infer<typeof updateBinderSchema>;
 export const addCardSchema = z.object({
   cardId: z.string().min(1, 'Card ID is required'),
   quantity: z.number().int().positive().default(1),
-  condition: z.string().optional(),
+  condition: conditionValueSchema.optional(),
   language: z.string().optional(),
   notes: z.string().optional(),
   price: z.number().optional(),
@@ -137,7 +194,7 @@ export const cardOverrideSchema = z.object({
 
 export const updateCardSchema = z
   .object({
-    condition: z.string().nullable().optional(),
+    condition: clearableConditionValueSchema.optional(),
     language: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
     serialNumber: z.string().nullable().optional(),
@@ -221,7 +278,7 @@ export interface UndoCollectionMutationResult {
 // ---------------------------------------------------------------------------
 
 export const bulkAddCopyFieldsSchema = z.object({
-  condition: z.string().trim().min(1).optional(),
+  condition: conditionValueSchema.optional(),
   language: z.string().trim().min(1).optional(),
   notes: z.string().trim().min(1).optional(),
   price: z.number().finite().nonnegative().optional(),
@@ -568,6 +625,7 @@ export interface Binder {
   name: string;
   description?: string;
   colorHex?: string;
+  defaultCondition?: string;
   containerType?: string;
   imageUrl?: string;
   associatedTcg?: TcgCode;

@@ -82,6 +82,9 @@ struct GamePickerPills: View {
             .padding(.horizontal)
             .padding(.vertical, 12)
         }
+        // A refreshable ancestor would otherwise give this horizontal strip
+        // its own vertical pull-to-refresh gesture.
+        .environment(\.refresh, nil)
     }
 
     private func selectedColor(for game: TCGGame) -> Color {

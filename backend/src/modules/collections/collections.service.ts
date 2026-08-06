@@ -714,6 +714,7 @@ export async function getUserBinders(userId: string) {
     name: binder.name,
     description: binder.description ?? '',
     colorHex: binder.colorHex,
+    defaultCondition: binder.defaultCondition ?? undefined,
     containerType: binder.containerType ?? undefined,
     imageUrl: binder.imageUrl ?? undefined,
     associatedTcg: binder.associatedTcg ?? undefined,
@@ -735,6 +736,7 @@ export async function getUserBinders(userId: string) {
     name: 'Unsorted',
     description: 'Cards not yet assigned to a binder',
     colorHex: UNSORTED_BINDER_COLOR,
+    defaultCondition: undefined,
     containerType: undefined,
     imageUrl: undefined,
     associatedTcg: undefined,
@@ -770,6 +772,7 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
       name: input.name,
       description: input.description,
       colorHex: input.colorHex,
+      defaultCondition: input.defaultCondition,
       containerType: input.containerType,
       imageUrl: input.imageUrl,
       associatedTcg: input.associatedTcg,
@@ -783,6 +786,7 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     name: binder.name,
     description: binder.description ?? '',
     colorHex: binder.colorHex,
+    defaultCondition: binder.defaultCondition ?? undefined,
     containerType: binder.containerType ?? undefined,
     imageUrl: binder.imageUrl ?? undefined,
     associatedTcg: binder.associatedTcg ?? undefined,
@@ -810,6 +814,10 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
       name: input.name ?? binder.name,
       description: input.description ?? binder.description,
       colorHex: input.colorHex ?? binder.colorHex,
+      defaultCondition:
+        input.defaultCondition === undefined
+          ? binder.defaultCondition
+          : sanitizeOptionalText(input.defaultCondition),
       containerType:
         input.containerType === undefined ? binder.containerType : input.containerType,
       imageUrl: input.imageUrl === undefined ? binder.imageUrl : input.imageUrl,
@@ -836,6 +844,7 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     name: updated.name,
     description: updated.description ?? '',
     colorHex: updated.colorHex,
+    defaultCondition: updated.defaultCondition ?? undefined,
     containerType: updated.containerType ?? undefined,
     imageUrl: updated.imageUrl ?? undefined,
     associatedTcg: updated.associatedTcg ?? undefined,
@@ -876,6 +885,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
   const copiesToCreate = Math.max(1, input.quantity ?? 1);
   const serialNumber = sanitizeOptionalText(input.serialNumber) ?? undefined;
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
+  const condition = input.condition ?? binder.defaultCondition ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
     await ensureCardForCollection(tx, cardId, input.cardData);
@@ -887,7 +897,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
           cardId,
           binderId,
           quantity: 1,
-          condition: input.condition,
+          condition,
           language: input.language,
           notes: input.notes,
           price: input.price,
