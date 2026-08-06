@@ -94,6 +94,9 @@ struct CollectionFilterBar: View {
                         priceFilterFields
                     }
                 }
+                // A refreshable ancestor would otherwise give this horizontal
+                // strip its own vertical pull-to-refresh gesture.
+                .environment(\.refresh, nil)
             }
         }
         .padding(.vertical, 4)
