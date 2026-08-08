@@ -655,12 +655,14 @@ struct ScannerDebugView: View {
     @State private var showingReplayImporter = false
     @State private var isReplaying = false
     @State private var replayReport: ScannerReplayReport?
+    @State private var assetItems: [ScannerAssetDiagnostics.Item] = []
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 cameraPane
                 primaryActions
+                assetsPane
                 configurationPane
                 recordingPane
                 identificationPane
@@ -675,7 +677,12 @@ struct ScannerDebugView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Scanner Debug")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { viewModel.configure(environment: environmentStore) }
+        .onAppear {
+            viewModel.configure(environment: environmentStore)
+            if assetItems.isEmpty {
+                assetItems = ScannerAssetDiagnostics.run()
+            }
+        }
         .onDisappear { viewModel.stop() }
         .fileExporter(
             isPresented: $showingExport,
@@ -831,6 +838,33 @@ struct ScannerDebugView: View {
     private var scannerActionTitle: String {
         guard viewModel.isCameraAvailable else { return "Device Only" }
         return viewModel.isRunning ? "Stop Scanner" : "Start Scanner"
+    }
+
+    private var assetsPane: some View {
+        DebugPanel(title: "Scanner Assets", systemImage: "shippingbox") {
+            ForEach(assetItems) { item in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: item.isOK ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                        .foregroundStyle(item.isOK ? .green : .red)
+                        .font(.caption)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(.subheadline)
+                        Text(item.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            if assetItems.contains(where: { !$0.isOK }) {
+                Text("Missing generated assets disable their strategies silently. Regenerate with `bash scripts/ios-assets.sh build`, then rebuild the app.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private var configurationPane: some View {

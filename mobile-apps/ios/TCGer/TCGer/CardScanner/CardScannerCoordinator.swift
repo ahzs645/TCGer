@@ -178,7 +178,13 @@ final class CardScannerCoordinator: @unchecked Sendable {
         switch (mode, strategy.kind) {
         case (_, .manual):
             return 5
-        case (.pokemon, .artworkFingerprint), (.mtg, .perceptualHash):
+        // Pokémon leads with the embedding pipeline: it carries the OCR
+        // collector-number tiebreak, the ambiguity abstain, and the card-face
+        // rejection gate, none of which the artwork/HSV matcher has. The
+        // HSV-weighted fingerprint stays as the fallback — on real camera
+        // frames it rarely clears its own 0.90 floor, but on clean frames it
+        // could otherwise short-circuit the better-verified strategy.
+        case (.pokemon, .mlDetector), (.mtg, .perceptualHash):
             return 0
         case (_, .artworkFingerprint), (_, .perceptualHash):
             return 1

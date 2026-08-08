@@ -186,7 +186,11 @@ final class CardScannerViewModel: ObservableObject {
 
         guard case .ready = state else { return }
         guard isModeSupported(selectedMode) else {
-            state = .error("\(selectedMode.displayName) scanning is not available yet.")
+            var message = "\(selectedMode.displayName) scanning is not available yet."
+            if let hint = ScannerAssetDiagnostics.missingAssetHint(for: selectedMode) {
+                message = hint
+            }
+            state = .error(message)
             return
         }
         // Local mode needs no auth token; only require it when a backend is in use.

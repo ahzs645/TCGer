@@ -1,6 +1,72 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-07-01 (evening session: ground truth v2, rejection gate, full-res crops)
+Last updated: 2026-08-08 (iOS scanner diagnosis: asset verification, crop-grade parity fix, strategy priority)
+
+## Session Results 2026-08-08 (iOS "scanning doesn't work" diagnosis)
+
+Context: the shared Drive folder (`pokemon/`) holds the generated iOS scanner
+assets — `CardsIndexVectors.bin` + `CardsIndexMetadata.json` (built Aug 4),
+the older Apr-4 perceptual-hash `index.json`, and `images/` = the card catalog
+webp images per set. These were verified and benchmarked offline (Linux, no
+device) by reproducing the pipeline in Node with `onnx-community/dinov2-small`
+via transformers.js — the exact encoder + processor the index was built with.
+
+Verification results (18 catalog images across A1/base1/bw1 vs the Drive
+21,828 × 384 int8 index):
+
+- Index is HEALTHY. Exact web-parity preprocessing → 18/18 top-1 self
+  retrieval at mean sim 0.9935. Bin header, metadata alignment, and set
+  coverage (all 50 Drive image sets present) all check out.
+- fp32 vs q8 encoder weights: mean top-1 sim 0.9836 vs 0.9935 — the CoreML
+  (fp) vs web (q8) weight difference is NOT a problem.
+- Squash-resize to 224×224 (no shortest-edge-256 + center-crop): mean sim
+  collapses to 0.862 with wrong top-1s ON CLEAN CATALOG IMAGES. The
+  256→center-crop-224 geometry in `CardEmbeddingEncoder` is load-bearing;
+  never regress it.
+- Simulated camera conditions (2° rotation, 360px, mild blur, JPEG68,
+  brightness lift): 12/18 top-1, and wrong cards DO score above the 0.70
+  accept line (0.72–0.77). The OCR tiebreak + ambiguity margin + 2-frame
+  consensus are what stand between this and wrong labels — they matter.
+- The iOS crop color grade (CIExposureAdjust +0.1EV + CIColorControls
+  sat 1.05 / contrast 1.1 / brightness −0.02 in `CardCropper` and
+  `BinderPageScanner`) cost a further 2/18 top-1 under camera conditions and
+  flipped several results to wrong cards. Both indexes (embedding + artwork
+  fingerprint) are built from UNGRADED catalog images. REMOVED this session —
+  contrast-style ops stay OCR-only, consistent with the 2026-07-02 finding.
+- Artwork fingerprint strategy (5% art + 95% HSV, min 0.90): 18/18 on clean
+  catalog images (its own training distribution) but 10/18 under camera
+  conditions with almost every score UNDER its 0.90 floor — on a real phone
+  it mostly abstains. It previously ran at priority 0 for Pokémon and
+  short-circuited the embedding pipeline on clean frames while carrying no
+  OCR verification or ambiguity guard. Priority swapped this session:
+  Pokémon now runs `.mlDetector` (embedding) first, fingerprint as fallback.
+
+Root-cause candidates for "scanning does nothing" on device, in order:
+
+1. MISSING GENERATED ASSETS. `CardEmbeddings.mlpackage`, the index bin, and
+   metadata are gitignored build outputs; when absent the embedding strategy
+   sets `supports() == false` and disappears SILENTLY, leaving only the
+   fingerprint matcher (which abstains on most camera frames) and server
+   strategies (absent in phone-only mode). Note the Drive folder contains the
+   two index files but NO CoreML model — if the .mlpackage is also absent
+   from the local build, this alone explains a scanner that never matches.
+   NEW this session: `ScannerAssetDiagnostics` + a "Scanner Assets" pane in
+   ScannerDebugView show exactly what the installed bundle contains, and the
+   capture-photo error now names the missing files instead of the generic
+   "not available yet".
+2. Crop color grade breaking parity (fixed, above).
+3. Fingerprint short-circuit hiding the verified pipeline (fixed, above).
+
+Still to do on a real device: run the Scanner Assets pane, confirm all green;
+if the model is missing, `bash scripts/ios-assets.sh build` (needs the
+py3.11 coremltools venv) and rebuild. Then re-test live scanning — and feed a
+few real phone captures back into the replay tooling so camera-condition
+numbers replace the synthetic ones above.
+
+Offline repro scripts (scratchpad, not committed): embed Drive catalog images
+with transformers.js, query the int8 index, compare exact/fp32/graded/squashed
+variants, and a JS port of the fingerprint+HSV matcher. Rebuild them from this
+description if needed — or just re-run `eval-recognition.ts` paths.
 
 ## Session Results 2026-07-01
 
