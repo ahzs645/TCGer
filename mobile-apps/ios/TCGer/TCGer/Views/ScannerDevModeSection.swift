@@ -32,7 +32,7 @@ struct ScannerDevModeSection: View {
                         Text(session.url.lastPathComponent)
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
-                        Text("\(session.frameCount) frames · \(Self.sizeFormatter.string(fromByteCount: session.sizeBytes))")
+                        Text("\(session.frameCount) frame\(session.frameCount == 1 ? "" : "s") · \(Self.sizeFormatter.string(fromByteCount: session.sizeBytes))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -57,6 +57,18 @@ struct ScannerDevModeSection: View {
                 Text("No recorded sessions yet.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+            } else {
+                Button {
+                    shareAll()
+                } label: {
+                    Label("Export All Sessions", systemImage: "square.and.arrow.up.on.square")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Text("Bundles every recorded session into one zip to send over AirDrop, Messages, or Files.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .onAppear(perform: refresh)
@@ -71,10 +83,25 @@ struct ScannerDevModeSection: View {
     }
 
     private func share(_ session: ScannerDevModeStore.SessionInfo) {
+        shareDirectory(session.url, as: "TCGer-DevMode-\(session.url.lastPathComponent).zip")
+    }
+
+    /// Zips the whole ScannerDevMode root — every session — into one archive
+    /// so a tester can hand over everything they have collected in one send.
+    private func shareAll() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        shareDirectory(
+            ScannerDevModeStore.rootDirectory(),
+            as: "TCGer-DevMode-All-\(formatter.string(from: Date())).zip"
+        )
+    }
+
+    private func shareDirectory(_ directory: URL, as filename: String) {
         do {
-            let zip = try ScannerDebugViewModel.packageDirectoryForExport(session.url)
-            let named = FileManager.default.temporaryDirectory
-                .appendingPathComponent("TCGer-DevMode-\(session.url.lastPathComponent).zip")
+            let zip = try ScannerDebugViewModel.packageDirectoryForExport(directory)
+            let named = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
             try? FileManager.default.removeItem(at: named)
             try FileManager.default.moveItem(at: zip, to: named)
             errorMessage = nil

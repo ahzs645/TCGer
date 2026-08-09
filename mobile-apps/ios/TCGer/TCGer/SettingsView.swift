@@ -633,6 +633,12 @@ struct SettingsView: View {
                             }
                         }
 
+                        // Tester-facing recording of every scan for model
+                        // retraining. Same section as the debug screen's copy,
+                        // surfaced here so a tester never has to enter Live
+                        // Scanner Debug to enable, review, or export.
+                        ScannerDevModeSection()
+
                         if developerToolsUnlocked {
                             Button(role: .destructive) {
                                 developerToolsUnlocked = false

@@ -33,6 +33,7 @@ struct CardScannerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isPresented) private var isPresented
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
+    @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeRecordingEnabled = false
     @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
@@ -176,12 +177,33 @@ struct CardScannerView: View {
                 gameControl
             }
 
+            if devModeRecordingEnabled {
+                devModeRecordingBadge
+            }
+
             if let photoImportProgress {
                 photoImportStatus(photoImportProgress)
             } else {
                 statusContent
             }
         }
+    }
+
+    /// Always visible while dev-mode recording is on: every scan on this
+    /// screen is being persisted, and that should never be a surprise.
+    private var devModeRecordingBadge: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 8, height: 8)
+            Text("Recording scans for model testing")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.6), in: Capsule())
+        .accessibilityLabel("Dev mode is recording every scan")
     }
 
     private func photoImportStatus(_ progress: ScannerPhotoImportProgress) -> some View {

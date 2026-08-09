@@ -147,9 +147,14 @@ folder as `scanner-labels.json` to use it there.
 
 ### Dev mode recording
 
-Scanner Debug → **Dev Mode Recording** persists every scan that goes through
-the production coordinator — live frames, shutter captures, and photo
-imports — while the toggle is on. Each frame keeps:
+**Dev Mode Recording** persists every scan that goes through the production
+coordinator — live frames, shutter captures, and photo imports — while the
+toggle is on. The toggle (with the session list and exports) lives in two
+places: Settings → the developer tools section, and inside Live Scanner
+Debug. For testers on release builds, developer tools unlock by tapping the
+About → Version row 7 times; debug builds always show them. While enabled,
+the scan screen shows a persistent red "Recording scans for model testing"
+badge, so recording is never a surprise. Each frame keeps:
 
 - the raw input image exactly as the pipeline received it (post guide crop
   for camera frames, untouched for imports), and for shutter captures also
@@ -182,6 +187,11 @@ failures are exactly what retraining needs. Manifests rewrite atomically
 after every scan (a crash loses nothing), a session keeps at most 400
 frames (oldest dropped), and total dev-mode storage is capped at 1.5 GB
 (oldest sessions pruned).
+
+Sessions share individually (one zip per session) or via **Export All
+Sessions**, which bundles the whole `ScannerDevMode` folder into a single
+zip for AirDrop/Messages/Files — the hand-over path for testers sending
+collected data back for labeling and retraining.
 
 ### Recording replay
 
