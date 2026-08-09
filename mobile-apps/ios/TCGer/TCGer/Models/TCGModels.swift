@@ -829,7 +829,8 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .yugioh: return "YugiohIcon"
         case .magic: return "MTGIcon"
         case .pokemon: return "PokemonIcon"
-        case .onepiece, .lorcana, .dragonball: return nil
+        case .onepiece: return "OnePieceIcon"
+        case .lorcana, .dragonball: return nil
         }
     }
 
@@ -839,7 +840,7 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .yugioh: return "suit.club.fill"
         case .magic: return "sparkles"
         case .pokemon: return "bolt.fill"
-        case .onepiece: return "sail.boat.fill"
+        case .onepiece: return "sailboat.fill"
         case .lorcana: return "wand.and.stars"
         case .dragonball: return "flame.fill"
         }
