@@ -12,30 +12,40 @@ import XCTest
 final class RoboflowArchiveDiagnosticTests: XCTestCase {
     func testRoboflowArchivesThroughIOSScanner() async throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let replayDirectory = environment["ROBOFLOW_REPLAY_DIR"] else {
-            throw XCTSkip("Set ROBOFLOW_REPLAY_DIR to run the Roboflow scanner diagnostic.")
-        }
-
         let documents = try XCTUnwrap(
             FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         )
+        let simulatorReplay = documents.appendingPathComponent("TCGer-Roboflow-Replay", isDirectory: true)
+        let diagnosticMarker = simulatorReplay.appendingPathComponent("recognition-diagnostic")
+        let isMarkedSimulatorDiagnostic = FileManager.default.fileExists(atPath: diagnosticMarker.path)
+        guard let replayDirectory = environment["ROBOFLOW_REPLAY_DIR"] ??
+            (isMarkedSimulatorDiagnostic ? "__documents__" : nil)
+        else {
+            throw XCTSkip("Set ROBOFLOW_REPLAY_DIR to run the Roboflow scanner diagnostic.")
+        }
         let root = replayDirectory == "__documents__"
-            ? documents.appendingPathComponent("TCGer-Roboflow-Replay", isDirectory: true)
+            ? simulatorReplay
             : URL(fileURLWithPath: replayDirectory, isDirectory: true)
         let manifestURL = root.appendingPathComponent("roboflow-ios-replay.json")
         let manifest = try JSONDecoder().decode(
             RoboflowReplayManifest.self,
             from: Data(contentsOf: manifestURL)
         )
-        let detectionLimit = Int(environment["ROBOFLOW_DETECTION_PER_DATASET"] ?? "")
+        let detectionLimit = Int(environment["ROBOFLOW_DETECTION_PER_DATASET"] ??
+            (isMarkedSimulatorDiagnostic ? "10" : ""))
         let recognitionPerDataset = Int(environment["ROBOFLOW_RECOGNITION_PER_DATASET"] ?? "10") ?? 10
-        let recognizeAll = environment["ROBOFLOW_RECOGNITION_ALL"] == "1"
+        let recognizeAll = environment["ROBOFLOW_RECOGNITION_ALL"] == "1" || isMarkedSimulatorDiagnostic
         let selectedRecords = selectRecords(manifest.records, perDataset: detectionLimit)
         let recognitionPaths = recognizeAll
             ? Set(selectedRecords.map(\.imagePath))
             : Set(selectRecords(selectedRecords, perDataset: recognitionPerDataset).map(\.imagePath))
 
         let cropper = CardCropper()
+        let encoder = CardEmbeddingEncoder()
+        let indexStore = AnnoyIndexStore()
+        let metadataStore = CardIndexMetadataStore.shared
+        let rejectionGate = CardFaceRejectionGate.loadBundled()
+        let collectorOCR = CollectorNumberOCR()
         let coordinator = CardScannerCoordinator.makeDefault()
         let context = CardScannerContext.test(mode: .pokemon, engine: .localOnly)
         var measurements: [RoboflowImageMeasurement] = []
@@ -66,6 +76,15 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
 
             var recognition: RoboflowRecognitionMeasurement?
             if recognitionPaths.contains(record.imagePath) {
+                let diagnostic = try? await recognitionDiagnostic(
+                    image: image,
+                    cropper: cropper,
+                    encoder: encoder,
+                    indexStore: indexStore,
+                    metadataStore: metadataStore,
+                    rejectionGate: rejectionGate,
+                    collectorOCR: collectorOCR
+                )
                 let recognitionStarted = ContinuousClock.now
                 let result = await coordinator.scan(
                     image: image,
@@ -82,7 +101,8 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
                         confidence: scan.primary.confidence.score,
                         strategy: scan.primary.originatingStrategy.displayName,
                         elapsedMs: recognitionMs,
-                        failure: nil
+                        failure: nil,
+                        diagnostic: diagnostic
                     )
                 case .failure(let failure):
                     recognition = RoboflowRecognitionMeasurement(
@@ -92,7 +112,8 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
                         confidence: nil,
                         strategy: nil,
                         elapsedMs: recognitionMs,
-                        failure: String(describing: failure)
+                        failure: String(describing: failure),
+                        diagnostic: diagnostic
                     )
                 }
             }
@@ -125,14 +146,36 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
             recognitionPerDataset: recognizeAll ? nil : recognitionPerDataset,
             datasets: aggregate(measurements),
             recognitionSamples: measurements.compactMap { measurement in
-                measurement.recognition.map {
-                    RoboflowRecognitionSample(
+                measurement.recognition.map { result in
+                    let expected = RoboflowRecognitionGroundTruth.expected(
+                        for: measurement.imagePath
+                    )
+                    return RoboflowRecognitionSample(
                         dataset: measurement.dataset,
                         imagePath: measurement.imagePath,
-                        result: $0
+                        expectedCardID: expected?.cardID,
+                        expectedName: expected?.name,
+                        nameCorrect: expected.map { result.name == $0.name },
+                        printingCorrect: expected.map { result.cardID == $0.cardID },
+                        result: result
                     )
                 }
             }
+        )
+
+        // Fill correctness from the actual result after encoding the sample
+        // metadata above. Any accepted, labeled frame must be the exact
+        // printing—not merely another card with the same name.
+        let printingErrors = report.recognitionSamples.filter { sample in
+            guard sample.result.matched, let expected = sample.expectedCardID else { return false }
+            return sample.result.cardID != expected
+        }
+        let printingErrorDescription = printingErrors.map { sample in
+            "\(sample.imagePath): \(sample.result.cardID ?? "nil") != \(sample.expectedCardID ?? "nil")"
+        }.joined(separator: ", ")
+        XCTAssertTrue(
+            printingErrors.isEmpty,
+            "Wrong printing accepted: \(printingErrorDescription)"
         )
 
         let reportData = try JSONEncoder.prettyPrinted.encode(report)
@@ -174,6 +217,54 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
         let elapsed = start.duration(to: .now)
         return Double(elapsed.components.seconds) * 1_000
             + Double(elapsed.components.attoseconds) / 1_000_000_000_000_000
+    }
+
+    private func recognitionDiagnostic(
+        image: CGImage,
+        cropper: CardCropper,
+        encoder: CardEmbeddingEncoder,
+        indexStore: AnnoyIndexStore,
+        metadataStore: CardIndexMetadataStore,
+        rejectionGate: CardFaceRejectionGate?,
+        collectorOCR: CollectorNumberOCR
+    ) async throws -> RoboflowRecognitionDiagnostic {
+        let crop = try cropper.bestCrop(from: image) ?? image
+        let embedding = try await encoder.embedding(for: crop)
+        let gateScore = rejectionGate?.cardFaceScore(for: embedding)
+        let allowed = await metadataStore.indices(for: .pokemon)
+        let matches = try await indexStore.nearestNeighbors(
+            for: embedding,
+            limit: 10,
+            allowedIndices: allowed
+        )
+        var candidates: [RoboflowRecognitionCandidate] = []
+        for match in matches {
+            guard let details = await metadataStore.details(for: match.index) else { continue }
+            candidates.append(RoboflowRecognitionCandidate(
+                cardID: details.identity.id,
+                name: details.identity.name,
+                setCode: details.identity.setCode,
+                similarity: 1 - match.distance
+            ))
+        }
+        let footer = collectorOCR.readFooter(from: crop)
+        return RoboflowRecognitionDiagnostic(
+            gateScore: gateScore,
+            gateThreshold: rejectionGate?.threshold,
+            footerPairNumbers: footer.pairNumbers,
+            footerDigitRuns: footer.digitRuns,
+            recognizedText: recognizedText(in: crop),
+            candidates: candidates
+        )
+    }
+
+    private func recognizedText(in image: CGImage) -> [String] {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        request.minimumTextHeight = 0.012
+        try? VNImageRequestHandler(cgImage: image, orientation: .up).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
     }
 
     private func cocoBoundingBox(
@@ -279,6 +370,23 @@ private struct RoboflowRecognitionMeasurement: Codable {
     let strategy: String?
     let elapsedMs: Double
     let failure: String?
+    let diagnostic: RoboflowRecognitionDiagnostic?
+}
+
+private struct RoboflowRecognitionDiagnostic: Codable {
+    let gateScore: Double?
+    let gateThreshold: Double?
+    let footerPairNumbers: [String]
+    let footerDigitRuns: [String]
+    let recognizedText: [String]
+    let candidates: [RoboflowRecognitionCandidate]
+}
+
+private struct RoboflowRecognitionCandidate: Codable {
+    let cardID: String
+    let name: String
+    let setCode: String?
+    let similarity: Double
 }
 
 private struct RoboflowImageMeasurement {
@@ -332,7 +440,67 @@ private struct RoboflowDatasetReport: Codable {
 private struct RoboflowRecognitionSample: Codable {
     let dataset: String
     let imagePath: String
+    let expectedCardID: String?
+    let expectedName: String?
+    let nameCorrect: Bool?
+    let printingCorrect: Bool?
     let result: RoboflowRecognitionMeasurement
+}
+
+private enum RoboflowRecognitionGroundTruth {
+    struct Expected {
+        let cardID: String
+        let name: String
+    }
+
+    static func expected(for imagePath: String) -> Expected? {
+        let filename = (imagePath as NSString).lastPathComponent
+        let stem = filename.components(separatedBy: ".rf.").first ?? filename
+        switch stem {
+        case "1526692_JPG", "Blastoise-Ex-200-4_jpg":
+            return Expected(cardID: "sv03.5-200", name: "Blastoise ex")
+        case "Charizard-Ex-223-2_jpg":
+            return Expected(cardID: "sv03-223", name: "Charizard ex")
+        case "Espeon-Deoxys-SM240-1_jpg":
+            return Expected(cardID: "smp-SM240", name: "Espeon & Deoxys GX")
+        case "Venusaur-ex-198-3_jpg":
+            return Expected(cardID: "sv03.5-198", name: "Venusaur ex")
+        case "zapdos-ex-202-151_jpg":
+            return Expected(cardID: "sv03.5-202", name: "Zapdos ex")
+        case "IMG_1127-Large_jpeg":
+            return Expected(cardID: "swsh12.5-093", name: "Bisharp")
+        case "IMG_1114-Large_jpeg":
+            return Expected(cardID: "swsh12.5-079", name: "Krokorok")
+        case "pro10__WIN_20250214_10_40_37_Pro":
+            return Expected(cardID: "sv03-104", name: "Dugtrio")
+        case "pro2__241_jpg":
+            return Expected(cardID: "gym1-77", name: "Erika's Exeggcute")
+        case "IMG_4734_jpg", "IMG_4758_jpg", "IMG_4793_jpg", "IMG_4826_jpg":
+            return Expected(cardID: "me02-027", name: "Piplup")
+        case "IMG_4901_jpg":
+            return Expected(cardID: "sv01-170", name: "Electric Generator")
+        case "Aerodactyl_-035-110-_35-110-_jpg":
+            return Expected(cardID: "ex13-35", name: "Aerodactyl δ")
+        case "Azumarill_-114-113-_jpg":
+            return Expected(cardID: "ex11-114", name: "Azumarill")
+        case "Dugtrio_-86-214-_086-214-_jpg":
+            return Expected(cardID: "sm10-86", name: "Dugtrio")
+        case "Gym_Badge_-XY208-_jpg":
+            return Expected(cardID: "xyp-XY208", name: "Gym Badge")
+        case "Luxio_-50-172-_050-172-_jpg":
+            return Expected(cardID: "swsh9-050", name: "Luxio")
+        case "Palpitoad_-035-124-_35-124-_jpg":
+            return Expected(cardID: "bw6-35", name: "Palpitoad")
+        case "Roaring_Moon_-109-162-_jpg":
+            return Expected(cardID: "sv05-109", name: "Roaring Moon")
+        case "Thundurus_-035-098-_35-98-_jpg":
+            return Expected(cardID: "bw2-35", name: "Thundurus")
+        case "Dark_Weezing_-14-82-_014-082-_jpg":
+            return Expected(cardID: "base5-14", name: "Dark Weezing")
+        default:
+            return nil
+        }
+    }
 }
 
 private struct RoboflowIOSReport: Codable {

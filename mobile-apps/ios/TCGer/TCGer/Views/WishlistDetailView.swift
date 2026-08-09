@@ -574,5 +574,6 @@ private struct WishlistCardRow: View {
         }
         .padding(.vertical, 4)
         .opacity(card.owned ? 1.0 : 0.85)
+        .cardPreviewContextMenu(card: card.previewCard)
     }
 }

@@ -30,6 +30,7 @@ actor CardIndexMetadataStore {
     static let shared = CardIndexMetadataStore()
 
     private var cache: [Int: CardIndexMetadataEntry] = [:]
+    private var indicesByGameAndName: [TCGGame: [String: Set<Int>]] = [:]
     nonisolated let supportedGames: Set<TCGGame>
 
     init(
@@ -41,6 +42,7 @@ actor CardIndexMetadataStore {
         cache = entries.reduce(into: [:]) { result, entry in
             result[entry.annIndex] = entry
         }
+        indicesByGameAndName = Self.makeNameIndex(entries)
         supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
     }
 
@@ -49,6 +51,7 @@ actor CardIndexMetadataStore {
         cache = entries.reduce(into: [:]) { result, entry in
             result[entry.annIndex] = entry
         }
+        indicesByGameAndName = Self.makeNameIndex(entries)
         supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
     }
 
@@ -71,6 +74,47 @@ actor CardIndexMetadataStore {
             $0.resolvedGame == game &&
                 $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
         }.map(\.annIndex))
+    }
+
+    /// Returns the exact catalog name and printing rows confirmed by OCR.
+    /// Matching is deliberately normalization-only (case, accents and
+    /// punctuation); it does not use edit distance, so noisy text cannot pull
+    /// the embedding search toward an unrelated card.
+    func exactNameMatch(
+        for candidates: [CardTitleOCR.Candidate],
+        game: TCGGame,
+        setCode: String?
+    ) -> (name: String, indices: Set<Int>)? {
+        let names = indicesByGameAndName[game] ?? [:]
+        let matches = candidates.compactMap { candidate -> (String, Set<Int>, Int, Double)? in
+            guard candidate.confidence >= 0.25 else { return nil }
+            let key = CardTitleOCR.normalizedName(candidate.text)
+            guard key.count >= 4, var indices = names[key], !indices.isEmpty else { return nil }
+            if let setCode {
+                indices = indices.filter { cache[$0]?.setCode?.caseInsensitiveCompare(setCode) == .orderedSame }
+            }
+            guard !indices.isEmpty,
+                  let canonicalName = indices.compactMap({ cache[$0]?.name }).first
+            else { return nil }
+            return (canonicalName, indices, key.count, candidate.confidence)
+        }
+        .sorted {
+            if $0.2 != $1.2 { return $0.2 > $1.2 }
+            return $0.3 > $1.3
+        }
+        return matches.first.map { ($0.0, $0.1) }
+    }
+
+    private nonisolated static func makeNameIndex(
+        _ entries: [CardIndexMetadataEntry]
+    ) -> [TCGGame: [String: Set<Int>]] {
+        entries.reduce(into: [:]) { result, entry in
+            let game = entry.resolvedGame
+            guard game != .all else { return }
+            let key = CardTitleOCR.normalizedName(entry.name)
+            guard !key.isEmpty else { return }
+            result[game, default: [:]][key, default: []].insert(entry.annIndex)
+        }
     }
 
     private nonisolated static func makeDetails(from entry: CardIndexMetadataEntry) -> CardDetails {

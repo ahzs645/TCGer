@@ -100,6 +100,65 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertFalse(gate.rejects([1]))
     }
 
+    func testCardTitleNormalizationIgnoresCaseSpacingAndPunctuation() {
+        XCTAssertEqual(CardTitleOCR.normalizedName("Venusaur eX"), "venusaurex")
+        XCTAssertEqual(CardTitleOCR.normalizedName("Venusaur-ex"), "venusaurex")
+        XCTAssertEqual(CardTitleOCR.normalizedName("Erika’s Exeggcute"), "erikasexeggcute")
+    }
+
+    func testMetadataNameMatchIsExactAndReturnsEveryPrinting() async {
+        let entries = [
+            CardIndexMetadataEntry(
+                annIndex: 0,
+                cardId: "set-a-1",
+                name: "Charizard ex",
+                game: "pokemon",
+                setCode: "set-a",
+                setName: nil,
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            ),
+            CardIndexMetadataEntry(
+                annIndex: 1,
+                cardId: "set-b-2",
+                name: "Charizard ex",
+                game: "pokemon",
+                setCode: "set-b",
+                setName: nil,
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            ),
+            CardIndexMetadataEntry(
+                annIndex: 2,
+                cardId: "set-c-3",
+                name: "Charizard",
+                game: "pokemon",
+                setCode: "set-c",
+                setName: nil,
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            )
+        ]
+        let store = CardIndexMetadataStore(entries: entries)
+        let match = await store.exactNameMatch(
+            for: [CardTitleOCR.Candidate(text: "Charizard eX", confidence: 0.9)],
+            game: .pokemon,
+            setCode: nil
+        )
+
+        XCTAssertEqual(match?.name, "Charizard ex")
+        XCTAssertEqual(match?.indices, Set([0, 1]))
+        let noisy = await store.exactNameMatch(
+            for: [CardTitleOCR.Candidate(text: "Charizord ex", confidence: 0.99)],
+            game: .pokemon,
+            setCode: nil
+        )
+        XCTAssertNil(noisy)
+    }
+
     func testDocumentDetectionRejectsLowConfidenceAndImplausibleAreas() {
         XCTAssertTrue(CardCropper.isPlausibleDocumentDetection(
             confidence: 0.9,
