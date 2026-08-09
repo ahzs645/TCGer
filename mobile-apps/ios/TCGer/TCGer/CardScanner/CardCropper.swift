@@ -23,9 +23,19 @@ nonisolated struct CardCropper {
     }
 
     func bestCrop(from image: CGImage) throws -> CGImage? {
+        try preferredCrop(from: image)?.image
+    }
+
+    /// `bestCrop` plus the observation that produced it, so callers recording
+    /// diagnostics can persist the chosen quad alongside the crop.
+    func preferredCrop(
+        from image: CGImage
+    ) throws -> (image: CGImage, observation: VNRectangleObservation)? {
         let rectangles = try detectRectangles(in: image)
-        guard let best = Self.preferredObservation(from: rectangles) else { return nil }
-        return makeNormalizedCrop(from: image, observation: best)
+        guard let best = Self.preferredObservation(from: rectangles),
+              let crop = makeNormalizedCrop(from: image, observation: best)
+        else { return nil }
+        return (crop, best)
     }
 
     /// Vision's rectangle detector reports confidence 1.0 for many interior

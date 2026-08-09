@@ -1007,6 +1007,10 @@ struct ScannerDebugView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            Divider()
+
+            ScannerDevModeSection()
+
 #if targetEnvironment(simulator)
             Button {
                 do {

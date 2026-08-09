@@ -317,6 +317,10 @@ struct CardScannerContext: Sendable {
     let saveDebugCapture: Bool
     let captureNotes: String?
     let setCode: String?
+    /// Dev-mode evidence collector. When present, strategies append per-crop
+    /// attempt evidence (gate scores, candidates, OCR readings, outcome) as
+    /// they work; nil (the default) costs nothing on the normal path.
+    var diagnostics: ScanDiagnostics? = nil
 }
 
 struct CardScanScope: Hashable, Sendable {

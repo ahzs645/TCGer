@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+@preconcurrency import Vision
 
 final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private enum Configuration {
@@ -96,15 +97,23 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let image: CGImage
         let embedding: [Float]
         let gateScore: Double?
+        let kind: ScanDiagnostics.AttemptKind
+        let quad: [[Double]]?
     }
 
-    private func makeAttempt(for image: CGImage) async throws -> CropAttempt? {
+    private func makeAttempt(
+        for image: CGImage,
+        kind: ScanDiagnostics.AttemptKind,
+        quad: [[Double]]? = nil
+    ) async throws -> CropAttempt? {
         let embedding = try await encoder.embedding(for: image)
         guard !embedding.isEmpty else { return nil }
         return CropAttempt(
             image: image,
             embedding: embedding,
-            gateScore: rejectionGate?.cardFaceScore(for: embedding)
+            gateScore: rejectionGate?.cardFaceScore(for: embedding),
+            kind: kind,
+            quad: quad
         )
     }
 
@@ -113,9 +122,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         source: ScanInvocationKind
     ) async throws -> [CropAttempt] {
         var attempts: [CropAttempt] = []
-        if let detected = try cropper.bestCrop(from: image),
-           let attempt = try await makeAttempt(for: detected) {
-            attempts.append(attempt)
+        if let detected = try cropper.preferredCrop(from: image) {
+            let quad = [
+                detected.observation.topLeft, detected.observation.topRight,
+                detected.observation.bottomRight, detected.observation.bottomLeft,
+            ].map { [Double($0.x), Double($0.y)] }
+            if let attempt = try await makeAttempt(
+                for: detected.image,
+                kind: .detectedCrop,
+                quad: quad
+            ) {
+                attempts.append(attempt)
+            }
         }
 
         // An imported image never passed through the camera guide, so the
@@ -127,7 +145,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // Camera captures never take this path.
         if source == .importedPhoto,
            let wholeFrame = cropper.normalizedWholeImage(from: image),
-           let attempt = try await makeAttempt(for: wholeFrame) {
+           let attempt = try await makeAttempt(for: wholeFrame, kind: .wholeFrame) {
             attempts.append(attempt)
             attempts.sort {
                 ($0.gateScore ?? -.greatestFiniteMagnitude) >
@@ -137,7 +155,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         // No detection and no usable whole-frame candidate: embed the raw
         // frame, preserving the historical `bestCrop ?? image` behavior.
-        if attempts.isEmpty, let fallback = try await makeAttempt(for: image) {
+        if attempts.isEmpty, let fallback = try await makeAttempt(for: image, kind: .rawImage) {
             attempts.append(fallback)
         }
         return attempts
@@ -155,10 +173,37 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             rejectionGate.map { score < $0.threshold } ?? false
         } ?? false
 
+        // Dev-mode evidence draft: populated as the stages below run, and
+        // flushed exactly once at whichever exit decides this attempt. All of
+        // it is a no-op when no collector is attached.
+        let diagnostics = context.diagnostics
+        let attemptImageIndex = diagnostics?.registerAttemptImage(cropped) ?? -1
+        var evidenceCandidates: [ScanDiagnostics.Candidate] = []
+        var evidenceTitleName: String?
+        var evidenceTitleCount: Int?
+        var evidenceFooterPairs: [String] = []
+        var evidenceOCRNumber: String?
+        func recordOutcome(_ outcome: ScanDiagnostics.AttemptOutcome) {
+            diagnostics?.record(ScanDiagnostics.Attempt(
+                kind: attempt.kind,
+                quad: attempt.quad,
+                gateScore: gateScore,
+                gateThreshold: rejectionGate?.threshold,
+                topCandidates: evidenceCandidates,
+                titleMatchedName: evidenceTitleName,
+                titlePrintingCount: evidenceTitleCount,
+                footerPairNumbers: evidenceFooterPairs,
+                ocrVerifiedCollectorNumber: evidenceOCRNumber,
+                outcome: outcome,
+                imageIndex: attemptImageIndex
+            ))
+        }
+
         // Keep automatic live scanning lightweight and conservative. A later
         // clear frame can recover naturally; the more expensive OCR rescue is
         // reserved for an intentional shutter/photo capture.
         if gateRejected && source == .livePreview {
+            recordOutcome(.rejectedInput)
             throw CardScannerError.rejectedInput
         }
 
@@ -167,6 +212,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             setCode: context.setCode
         )
         guard !allowedIndices.isEmpty else {
+            recordOutcome(.indexUnavailable)
             throw CardScannerError.ineligibleMode
         }
 
@@ -179,19 +225,34 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             )
         } catch {
             if error is AnnoyIndexStore.StoreError {
+                recordOutcome(.indexUnavailable)
                 return nil
             }
             throw CardScannerError.underlying(error)
         }
-        guard !matches.isEmpty else { return nil }
+        guard !matches.isEmpty else {
+            recordOutcome(.noCandidates)
+            return nil
+        }
 
         var ranked = await makeCandidates(
             from: matches,
             game: context.mode.tcgGame,
             gateScore: gateScore
         )
+        evidenceCandidates = ranked.prefix(5).map {
+            ScanDiagnostics.Candidate(
+                cardID: $0.details.identity.id,
+                name: $0.details.identity.name,
+                similarity: $0.confidence.score
+            )
+        }
         guard var primary = ranked.first else {
-            if gateRejected { throw CardScannerError.rejectedInput }
+            if gateRejected {
+                recordOutcome(.rejectedInput)
+                throw CardScannerError.rejectedInput
+            }
+            recordOutcome(.noCandidates)
             return nil
         }
 
@@ -235,6 +296,15 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     titleRunnerScore = titleMatches.dropFirst().first.map {
                         scoreForDistance($0.distance)
                     }
+                    evidenceTitleName = titleMatch.name
+                    evidenceTitleCount = titleMatch.indices.count
+                    evidenceCandidates = ranked.prefix(5).map {
+                        ScanDiagnostics.Candidate(
+                            cardID: $0.details.identity.id,
+                            name: $0.details.identity.name,
+                            similarity: $0.confidence.score
+                        )
+                    }
                 }
             }
         }
@@ -254,6 +324,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
             }
             let reading = ocr.readFooter(from: cropped)
+            evidenceFooterPairs = reading.pairNumbers
             let pairNumbers = Set(reading.pairNumbers)
             var matched = ocrEligibleCandidates.first { candidate in
                 guard !pairNumbers.isEmpty,
@@ -281,6 +352,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 let collectorNumber = CollectorNumberOCR.collectorNumber(fromCardId: matched.details.identity.id)
                 primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
                 ocrVerified = true
+                evidenceOCRNumber = collectorNumber
             }
         }
 
@@ -288,10 +360,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // confirms a shortlist printing. Title/name evidence alone is not
         // enough to let a back, pack, or unrelated object through.
         if gateRejected && !ocrVerified {
+            recordOutcome(.rejectedInput)
             throw CardScannerError.rejectedInput
         }
 
         guard primary.confidence.score >= Configuration.strongAcceptanceScore || ocrVerified else {
+            recordOutcome(.belowAcceptanceThreshold)
             return nil
         }
 
@@ -304,7 +378,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             guard primary.confidence.score >= 0.85,
                   let titleRunnerScore,
                   primary.confidence.score - titleRunnerScore >= 0.05
-            else { return nil }
+            else {
+                recordOutcome(.titlePrintingUnresolved)
+                return nil
+            }
         }
 
         // Ambiguity guard: a near-tied runner-up that is a different card means
@@ -313,10 +390,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         if !ocrVerified,
            let rival = ranked.first(where: { $0.id != primary.id }),
            primary.confidence.score - rival.confidence.score < Configuration.ambiguityMargin {
+            recordOutcome(.printingAmbiguous)
             return nil
         }
 
         let alternatives = ranked.filter { $0.id != primary.id }
+        recordOutcome(.accepted)
 
         return CardScanResult(
             mode: context.mode,

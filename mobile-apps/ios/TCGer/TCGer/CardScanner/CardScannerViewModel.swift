@@ -228,7 +228,11 @@ final class CardScannerViewModel: ObservableObject {
     /// The default source is `.importedPhoto` because every caller except the
     /// camera shutter supplies an image that never saw the guide crop; the
     /// shutter path passes `.photoCapture` explicitly.
-    func scan(image: CGImage, source: ScanInvocationKind = .importedPhoto) async {
+    func scan(
+        image: CGImage,
+        source: ScanInvocationKind = .importedPhoto,
+        originalImage: CGImage? = nil
+    ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
             return
@@ -242,7 +246,26 @@ final class CardScannerViewModel: ObservableObject {
         state = .processing
         defer { isProcessingPhoto = false }
 
-        let result = await coordinator.scan(image: image, context: context, source: source)
+        var scanContext = context
+        let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
+        scanContext.diagnostics = diagnostics
+        let started = Date()
+        let result = await coordinator.scan(image: image, context: scanContext, source: source)
+        if diagnostics != nil {
+            let elapsedMs = Date().timeIntervalSince(started) * 1_000
+            let mode = scanContext.mode
+            Task.detached(priority: .utility) {
+                await ScannerDevModeStore.shared.record(
+                    image: image,
+                    source: source,
+                    mode: mode,
+                    elapsedMs: elapsedMs,
+                    result: result,
+                    diagnostics: diagnostics,
+                    originalImage: originalImage
+                )
+            }
+        }
         apply(result)
     }
 
@@ -270,7 +293,11 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    func scanBinderPage(image: CGImage, presentsReview: Bool = true) async {
+    func scanBinderPage(
+        image: CGImage,
+        presentsReview: Bool = true,
+        source: ScanInvocationKind = .importedPhoto
+    ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
             return
@@ -286,6 +313,13 @@ final class CardScannerViewModel: ObservableObject {
 
         do {
             let result = try await binderPageScanner.scan(image: image, context: context)
+            recordBinderPageForDevMode(
+                page: image,
+                result: result,
+                error: nil,
+                source: source,
+                mode: context.mode
+            )
             let record = BinderPageRecord(result: result, pageNumber: nextBinderPageNumber)
             nextBinderPageNumber += 1
             binderPages.append(record)
@@ -302,9 +336,82 @@ final class CardScannerViewModel: ObservableObject {
             state = .ready
             if !isSimulator { HapticManager.notification(.success) }
         } catch {
+            recordBinderPageForDevMode(
+                page: image,
+                result: nil,
+                error: error,
+                source: source,
+                mode: context.mode
+            )
             errorMessage = error.localizedDescription
             state = .ready
             if !isSimulator { HapticManager.notification(.error) }
+        }
+    }
+
+    /// Dev-mode capture of a binder page: the raw page image plus one
+    /// evidence attempt per detected card — its quad, crop image, and
+    /// candidate list — so binder pages are full multi-card training data,
+    /// not just an unlabeled photo.
+    private func recordBinderPageForDevMode(
+        page: CGImage,
+        result: BinderPageScanResult?,
+        error: Error?,
+        source: ScanInvocationKind,
+        mode: ScanMode
+    ) {
+        guard ScannerDevModeStore.isEnabled else { return }
+        let diagnostics = ScanDiagnostics()
+        for detection in result?.detections ?? [] {
+            let imageIndex = diagnostics.registerAttemptImage(detection.crop)
+            let quad = [
+                detection.quad.topLeft, detection.quad.topRight,
+                detection.quad.bottomRight, detection.quad.bottomLeft,
+            ].map { [Double($0.x), Double($0.y)] }
+            let outcome: ScanDiagnostics.AttemptOutcome
+            switch detection.status {
+            case .matched: outcome = .accepted
+            case .uncertain: outcome = .printingAmbiguous
+            case .unmatched: outcome = .noCandidates
+            }
+            diagnostics.record(ScanDiagnostics.Attempt(
+                kind: .detectedCrop,
+                quad: quad,
+                gateScore: nil,
+                gateThreshold: nil,
+                topCandidates: detection.candidateOptions.prefix(5).map {
+                    ScanDiagnostics.Candidate(
+                        cardID: $0.details.identity.id,
+                        name: $0.details.identity.name,
+                        similarity: $0.confidence.score
+                    )
+                },
+                titleMatchedName: nil,
+                titlePrintingCount: nil,
+                footerPairNumbers: [],
+                ocrVerifiedCollectorNumber: nil,
+                outcome: outcome,
+                imageIndex: imageIndex
+            ))
+        }
+        let label: String
+        if let result {
+            let matched = result.detections.filter { $0.status == .matched }.count
+            label = "binderPage: \(result.detections.count) detections, \(matched) matched"
+        } else {
+            label = "binderPage error: \(error.map(String.init(describing:)) ?? "unknown")"
+        }
+        let elapsedMs = (result?.elapsed ?? 0) * 1_000
+        Task.detached(priority: .utility) {
+            await ScannerDevModeStore.shared.record(
+                image: page,
+                source: source,
+                mode: mode,
+                elapsedMs: elapsedMs,
+                result: nil,
+                diagnostics: diagnostics,
+                outcomeLabel: label
+            )
         }
     }
 
@@ -391,9 +498,13 @@ final class CardScannerViewModel: ObservableObject {
             return
         }
         if captureMode == .binder {
-            await scanBinderPage(image: cgImage)
+            await scanBinderPage(image: cgImage, source: .photoCapture)
         } else {
-            await scan(image: guideCroppedImage(from: cgImage), source: .photoCapture)
+            await scan(
+                image: guideCroppedImage(from: cgImage),
+                source: .photoCapture,
+                originalImage: cgImage
+            )
         }
     }
 
@@ -460,7 +571,22 @@ final class CardScannerViewModel: ObservableObject {
             let framedImage = guideGeometry.flatMap {
                 ScannerGuideCropper().crop(cgImage, using: $0)
             } ?? cgImage
-            let result = await coordinator.scan(image: framedImage, context: context, source: .livePreview)
+            var scanContext = context
+            let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
+            scanContext.diagnostics = diagnostics
+            let scanStarted = Date()
+            let result = await coordinator.scan(image: framedImage, context: scanContext, source: .livePreview)
+            if diagnostics != nil {
+                let elapsedMs = Date().timeIntervalSince(scanStarted) * 1_000
+                await ScannerDevModeStore.shared.record(
+                    image: framedImage,
+                    source: .livePreview,
+                    mode: scanContext.mode,
+                    elapsedMs: elapsedMs,
+                    result: result,
+                    diagnostics: diagnostics
+                )
+            }
 
             await MainActor.run {
                 self.isAnalyzingFrame = false

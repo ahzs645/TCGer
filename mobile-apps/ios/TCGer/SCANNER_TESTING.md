@@ -145,6 +145,44 @@ The canonical labels for the 50-image recognition sample live at
 `TCGerTests/Fixtures/ReplaySampleLabels.json`; copy that file into a dataset
 folder as `scanner-labels.json` to use it there.
 
+### Dev mode recording
+
+Scanner Debug → **Dev Mode Recording** persists every scan that goes through
+the production coordinator — live frames, shutter captures, and photo
+imports — while the toggle is on. Each frame keeps:
+
+- the raw input image exactly as the pipeline received it (post guide crop
+  for camera frames, untouched for imports), and for shutter captures also
+  the unprocessed sensor photo (`frame-NNNN-original.jpg`) so the
+  guide-cropping stage itself stays inspectable;
+- every crop attempt image (`frame-NNNN-attempt-K.jpg`) with its kind
+  (detected crop / whole frame / raw fallback) and localization quad;
+- the evidence behind the decision: gate score and threshold, top-5 ANN
+  candidates with similarities, exact-title match, footer OCR readings, the
+  verified collector number, and the attempt outcome (`accepted`,
+  `rejectedInput`, `belowAcceptanceThreshold`, `printingAmbiguous`,
+  `titlePrintingUnresolved`, `noCandidates`, `indexUnavailable`) — so an
+  abstention is attributable to a stage, not just visible as "no match".
+
+Sessions are written to `Documents/ScannerDevMode/scan-session-<timestamp>/`
+in the device-recording shape (`results.json` + frames), which means they
+show up in Browse Reference Sets, replay through **Replay Extracted
+Recording** against future model builds, export via
+`scripts/export_scanner_recording_labels.py` for labeling, and can be added
+to the training corpus after review. The per-attempt evidence is a sidecar
+`evidence.json` keyed by frame file, so the shared schema is unchanged.
+Binder pages record the raw page image plus one evidence attempt per
+detected card — its quad, crop image, candidate list, and match status —
+whether the page came from the shutter or an import, and whether or not the
+scan produced any result.
+
+Recording is unconditional while the toggle is on: no-match scans, gate
+rejections, and binder pages with zero detections are all kept, because the
+failures are exactly what retraining needs. Manifests rewrite atomically
+after every scan (a crash loses nothing), a session keeps at most 400
+frames (oldest dropped), and total dev-mode storage is capped at 1.5 GB
+(oldest sessions pruned).
+
 ### Recording replay
 
 For replay, extract the exported recording zip in Files, then choose the
