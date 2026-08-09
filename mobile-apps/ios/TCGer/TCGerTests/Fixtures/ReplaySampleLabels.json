@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "labels": {
+    "1526692_JPG": {
+      "category": "singleCard",
+      "cardId": "sv03.5-200",
+      "name": "Blastoise ex"
+    },
+    "Blastoise-Ex-200-4_jpg": {
+      "category": "singleCard",
+      "cardId": "sv03.5-200",
+      "name": "Blastoise ex"
+    },
+    "Charizard-Ex-223-2_jpg": {
+      "category": "singleCard",
+      "cardId": "sv03-223",
+      "name": "Charizard ex"
+    },
+    "Venusaur-ex-198-3_jpg": {
+      "category": "singleCard",
+      "cardId": "sv03.5-198",
+      "name": "Venusaur ex"
+    },
+    "zapdos-ex-202-151_jpg": {
+      "category": "singleCard",
+      "cardId": "sv03.5-202",
+      "name": "Zapdos ex"
+    },
+    "IMG_1127-Large_jpeg": {
+      "category": "singleCard",
+      "cardId": "swsh12.5-093",
+      "name": "Bisharp"
+    },
+    "IMG_1114-Large_jpeg": {
+      "category": "singleCard",
+      "cardId": "swsh12.5-079",
+      "name": "Krokorok"
+    },
+    "pro10__WIN_20250214_10_40_37_Pro": {
+      "category": "singleCard",
+      "cardId": "sv03-104",
+      "name": "Dugtrio"
+    },
+    "pro2__241_jpg": {
+      "category": "singleCard",
+      "cardId": "gym1-77",
+      "name": "Erika's Exeggcute"
+    },
+    "IMG_4734_jpg": {
+      "category": "singleCard",
+      "cardId": "me02-027",
+      "name": "Piplup"
+    },
+    "IMG_4758_jpg": {
+      "category": "singleCard",
+      "cardId": "me02-027",
+      "name": "Piplup"
+    },
+    "IMG_4793_jpg": {
+      "category": "singleCard",
+      "cardId": "me02-027",
+      "name": "Piplup"
+    },
+    "IMG_4826_jpg": {
+      "category": "singleCard",
+      "cardId": "me02-027",
+      "name": "Piplup"
+    },
+    "IMG_4901_jpg": {
+      "category": "singleCard",
+      "cardId": "sv01-170",
+      "name": "Electric Generator"
+    },
+    "Aerodactyl_-035-110-_35-110-_jpg": {
+      "category": "singleCard",
+      "cardId": "ex13-35",
+      "name": "Aerodactyl δ"
+    },
+    "Azumarill_-114-113-_jpg": {
+      "category": "singleCard",
+      "cardId": "ex11-114",
+      "name": "Azumarill"
+    },
+    "Dugtrio_-86-214-_086-214-_jpg": {
+      "category": "singleCard",
+      "cardId": "sm10-86",
+      "name": "Dugtrio"
+    },
+    "Gym_Badge_-XY208-_jpg": {
+      "category": "singleCard",
+      "cardId": "xyp-XY208",
+      "name": "Gym Badge",
+      "notes": "Eight xyp Gym Badge printings share this frame; only the badge art differs."
+    },
+    "Luxio_-50-172-_050-172-_jpg": {
+      "category": "singleCard",
+      "cardId": "swsh9-050",
+      "name": "Luxio"
+    },
+    "Palpitoad_-035-124-_35-124-_jpg": {
+      "category": "singleCard",
+      "cardId": "bw6-35",
+      "name": "Palpitoad"
+    },
+    "Roaring_Moon_-109-162-_jpg": {
+      "category": "singleCard",
+      "cardId": "sv05-109",
+      "name": "Roaring Moon"
+    },
+    "Thundurus_-035-098-_35-98-_jpg": {
+      "category": "singleCard",
+      "cardId": "bw2-35",
+      "name": "Thundurus"
+    },
+    "Dark_Weezing_-14-82-_014-082-_jpg": {
+      "category": "singleCard",
+      "cardId": "base5-14",
+      "name": "Dark Weezing",
+      "notes": "base5-31 is the same artwork; only the collector number separates them."
+    },
+    "Espeon-Deoxys-SM240-1_jpg": {
+      "category": "outsideIndex",
+      "cardId": "smp-SM240",
+      "name": "Espeon & Deoxys GX",
+      "notes": "smp-SM240 is absent from CardsIndexMetadata.json; the only indexed printing is sm11-72. Coverage gap, not a recall failure."
+    },
+    "8800656_JPG": {
+      "category": "cardBack"
+    },
+    "IMG_0095_jpg": {
+      "category": "cardBack"
+    },
+    "IMG_0105_jpg": {
+      "category": "cardBack"
+    },
+    "Pikachu-Zekrom-GX-SM168-Back_jpg": {
+      "category": "cardBack"
+    },
+    "IMG_1119-Large_jpeg": {
+      "category": "multiCard",
+      "notes": "Four cards laid out on a table."
+    },
+    "IMG_1124-Large_jpeg": {
+      "category": "multiCard",
+      "notes": "Full table layout, roughly twenty cards."
+    },
+    "IMG_1133-Large_jpeg": {
+      "category": "multiCard"
+    },
+    "IMG_1138-Large_jpeg": {
+      "category": "multiCard",
+      "notes": "Three cards on a notebook."
+    },
+    "IMG_1143-Large_jpeg": {
+      "category": "multiCard"
+    },
+    "IMG_4114-min_jpg": {
+      "category": "multiCard",
+      "notes": "Cards spread over a playmat."
+    },
+    "IMG_4118-min_jpg": {
+      "category": "multiCard",
+      "notes": "Japanese cards spread over a playmat."
+    },
+    "pro2__117_jpg": {
+      "category": "multiCard",
+      "notes": "Pokémon Ranger over Fantina and Bede."
+    },
+    "pro1__yt-false-0053_jpg": {
+      "category": "multiCard",
+      "notes": "Binder page, motion blurred."
+    },
+    "IMG_5023_jpg": {
+      "category": "multiCard",
+      "notes": "Binder page, nine cards."
+    },
+    "Zacian_V-UNION_-SWSH163-_jpg": {
+      "category": "multiCard",
+      "notes": "Four V-UNION parts photographed together. With the YOLO detector (2026-08-09) the scanner isolates one quadrant and accepts swshp-SWSH164; all four parts are in frame so this is plausibly correct-for-the-crop, but the exact quadrant has not been visually verified against the catalog."
+    },
+    "pro1__D97ACCA7301AA1AA7CEE25CEDA49DE4E_jpg": {
+      "category": "foreignLanguage",
+      "notes": "Japanese trainer card held in hand."
+    },
+    "pro1__8CC18C1C0DEB599096FACA28F1FEA71A_jpg": {
+      "category": "foreignLanguage"
+    },
+    "pro1__IMG_20230531_161213_jpg": {
+      "category": "foreignLanguage",
+      "notes": "Japanese V card in a sleeve."
+    },
+    "pro6__20250120_132302_jpg": {
+      "category": "foreignLanguage",
+      "notes": "Non-English card, distant on a dark table."
+    },
+    "IMG_1149-Large_jpeg": {
+      "category": "needsLabel",
+      "notes": "Single English card in hand. OCR reads Numel; the printing cannot be pinned from a 640 px replay image."
+    },
+    "pro9__ben_additional3_0057_png": {
+      "category": "needsLabel",
+      "notes": "Single English card held up to camera, backlit."
+    },
+    "pro9__test_0071_png": {
+      "category": "needsLabel",
+      "notes": "Single English Klinklang, 140 HP; printing unverified."
+    },
+    "IMG_4861_jpg": {
+      "category": "needsLabel",
+      "notes": "Single card in a toploader, rotated, glitter background."
+    },
+    "IMG_4933_jpg": {
+      "category": "needsLabel",
+      "notes": "Single English Sneasel, 70 HP, Dig Claws / Scratch; printing unverified."
+    },
+    "IMG_4972_jpg": {
+      "category": "needsLabel",
+      "notes": "Single card in a sleeve, dim and angled."
+    },
+    "IMG_5006_jpg": {
+      "category": "needsLabel",
+      "notes": "Single card in a sleeve, very dark."
+    }
+  }
+}

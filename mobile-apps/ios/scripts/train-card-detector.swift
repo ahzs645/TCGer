@@ -44,6 +44,14 @@ print("Validation metrics: \(detector.validationMetrics)")
 let testMetrics = detector.evaluation(on: source("test"))
 print("Test metrics: \(testMetrics)")
 
+// Present only when the dataset was prepared with --tight-crops: measures the
+// borderless-card regime separately from scene localization.
+let tightTest = root.appendingPathComponent("tight-test", isDirectory: true)
+if FileManager.default.fileExists(atPath: tightTest.path) {
+    let tightMetrics = detector.evaluation(on: source("tight-test"))
+    print("Tight-test metrics: \(tightMetrics)")
+}
+
 let metadata = MLModelMetadata(
     author: "TCGer",
     shortDescription: "Single-class trading card detector trained from Roboflow archives",

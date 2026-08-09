@@ -178,6 +178,44 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         ))
     }
 
+    func testPreferredObservationPrefersTheLargestOfEquallyConfidentRectangles() {
+        // Vision reports confidence 1.0 for the card and for panels printed on
+        // it, so area has to break the tie.
+        let panel = CardCropper.rectangleObservation(
+            for: CGRect(x: 0.1, y: 0.6, width: 0.3, height: 0.2)
+        )
+        let card = CardCropper.rectangleObservation(
+            for: CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9)
+        )
+        let preferred = CardCropper.preferredObservation(from: [panel, card])
+        XCTAssertEqual(CardCropper.normalizedArea(of: try XCTUnwrap(preferred)), 0.81, accuracy: 0.001)
+    }
+
+    func testNormalizedWholeImageMatchesCropTargetAndRotatesLandscape() throws {
+        let cropper = CardCropper(detector: nil)
+        let portrait = try XCTUnwrap(
+            cropper.normalizedWholeImage(from: ScannerTestImage.solid(width: 73, height: 102))
+        )
+        XCTAssertEqual(CGSize(width: portrait.width, height: portrait.height), CGSize(width: 720, height: 1000))
+        // A landscape frame is rotated upright before resizing, mirroring
+        // makeNormalizedCrop's behavior for detected landscape cards.
+        let landscape = try XCTUnwrap(
+            cropper.normalizedWholeImage(from: ScannerTestImage.solid(width: 102, height: 73))
+        )
+        XCTAssertEqual(CGSize(width: landscape.width, height: landscape.height), CGSize(width: 720, height: 1000))
+    }
+
+    func testQuadrilateralAreaIgnoresBoundingBoxInflationFromRotation() {
+        // A card rotated 45 degrees fills half of its axis-aligned bounds.
+        let area = CardCropper.quadrilateralArea(
+            topLeft: CGPoint(x: 0.5, y: 1),
+            topRight: CGPoint(x: 1, y: 0.5),
+            bottomRight: CGPoint(x: 0.5, y: 0),
+            bottomLeft: CGPoint(x: 0, y: 0.5)
+        )
+        XCTAssertEqual(area, 0.5, accuracy: 0.0001)
+    }
+
     func testDocumentDetectionRequiresCardShapedQuadAtAnyRotation() {
         XCTAssertTrue(CardCropper.isCardShaped(
             topLeft: CGPoint(x: 0.2, y: 0.9),

@@ -995,6 +995,18 @@ struct ScannerDebugView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            NavigationLink {
+                ScannerReferenceBrowserView()
+            } label: {
+                Label("Browse Reference Sets", systemImage: "square.stack.3d.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Text("Step through a labeled reference folder one image at a time and compare each result against its expected card.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
 #if targetEnvironment(simulator)
             Button {
                 do {

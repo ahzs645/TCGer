@@ -4,10 +4,10 @@ import XCTest
 @preconcurrency import Vision
 @testable import TCGer
 
-/// Temporary investigation harness for the red `ScannerFixtureTests`
-/// assertions. Prints per-fixture crop geometry, gate score, and top ANN
-/// candidates so the failure can be attributed to localization, the gate, or
-/// retrieval.
+/// Investigation harness for `ScannerFixtureTests` failures. Prints
+/// per-fixture crop geometry, gate score, top ANN candidates, and the
+/// whole-frame arbitration candidate so a failure can be attributed to
+/// localization, the gate, or retrieval without guessing.
 @MainActor
 final class FixtureCropDiagnosticTests: XCTestCase {
     func testDumpFixtureDiagnostics() async throws {
@@ -20,11 +20,23 @@ final class FixtureCropDiagnosticTests: XCTestCase {
         let gate = CardFaceRejectionGate.loadBundled()
         let allowed = await metadataStore.indices(for: .pokemon)
 
+        var inputs: [(name: String, image: CGImage)] = []
         for assetName in assets {
             guard let image = UIImage(named: assetName)?.cgImage else {
                 print("FIXTURE \(assetName): MISSING ASSET")
                 continue
             }
+            inputs.append((assetName, image))
+        }
+        // Mirror of the two-cards fixture composite so its failure mode gets
+        // the same per-signal dump as the single-card assets.
+        if let boss = UIImage(named: "BossOrders"),
+           let pikachu = UIImage(named: "Rayquaza"),
+           let composite = Self.twoCardScene(boss, pikachu).cgImage {
+            inputs.append(("TwoCardsComposite", composite))
+        }
+
+        for (assetName, image) in inputs {
             let detections = (try? detector?.detections(in: image)) ?? []
             let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
             let documentRequest = VNDetectDocumentSegmentationRequest()
@@ -59,6 +71,31 @@ final class FixtureCropDiagnosticTests: XCTestCase {
                 ))
             }
 
+            // The importedPhoto arbitration's other candidate: the whole frame
+            // normalized like a crop. Print its gate score and retrieval so a
+            // lost arbitration is visible in the dump.
+            var wholeSummary = "unavailable"
+            if let wholeFrame = cropper.normalizedWholeImage(from: image) {
+                let wholeEmbedding = try await encoder.embedding(for: wholeFrame)
+                let wholeGate = gate?.cardFaceScore(for: wholeEmbedding) ?? -1
+                let wholeMatches = try await indexStore.nearestNeighbors(
+                    for: wholeEmbedding,
+                    limit: 3,
+                    allowedIndices: allowed
+                )
+                var wholeTops: [String] = []
+                for match in wholeMatches {
+                    guard let details = await metadataStore.details(for: match.index) else { continue }
+                    wholeTops.append(String(
+                        format: "%@ %@ %.3f",
+                        details.identity.id,
+                        details.identity.name,
+                        1 - match.distance
+                    ))
+                }
+                wholeSummary = String(format: "gate %.3f top3 %@", wholeGate, "\(wholeTops)")
+            }
+
             print("""
             FIXTURE \(assetName)
               source \(image.width)x\(image.height) aspect \
@@ -73,7 +110,24 @@ final class FixtureCropDiagnosticTests: XCTestCase {
               gate \(String(format: "%.3f", gateScore)) threshold \
             \(String(format: "%.2f", gate?.threshold ?? -1))
               top5 \(tops)
+              wholeFrame \(wholeSummary)
             """)
+        }
+    }
+
+    /// Same composition as ScannerFixtureTests.multipleCards.
+    private static func twoCardScene(_ first: UIImage, _ second: UIImage) -> UIImage {
+        let size = CGSize(width: first.size.width * 1.55, height: first.size.height)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            UIColor.darkGray.setFill()
+            UIRectFill(CGRect(origin: .zero, size: size))
+            first.draw(in: CGRect(x: 0, y: 0, width: first.size.width, height: first.size.height))
+            second.draw(in: CGRect(
+                x: first.size.width * 0.72,
+                y: first.size.height * 0.08,
+                width: first.size.width * 0.75,
+                height: first.size.height * 0.75
+            ))
         }
     }
 }

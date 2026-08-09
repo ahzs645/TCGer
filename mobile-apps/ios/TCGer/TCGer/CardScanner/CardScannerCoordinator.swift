@@ -141,7 +141,7 @@ final class CardScannerCoordinator: @unchecked Sendable {
                 switch source {
                 case .livePreview:
                     return strategy.supportsLiveScanning
-                case .photoCapture:
+                case .photoCapture, .importedPhoto:
                     return true
                 }
             }
@@ -173,7 +173,7 @@ final class CardScannerCoordinator: @unchecked Sendable {
             return strategiesForMode
         }
 
-        guard source == .photoCapture else {
+        guard source != .livePreview else {
             return []
         }
 

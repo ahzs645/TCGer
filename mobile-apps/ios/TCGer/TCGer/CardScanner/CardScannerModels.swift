@@ -331,7 +331,15 @@ struct CardScanScope: Hashable, Sendable {
 
 enum ScanInvocationKind: Sendable {
     case livePreview
+    /// A camera shutter capture that has already been framed by the on-screen
+    /// guide crop, so the card fills most of the frame with a thin border.
     case photoCapture
+    /// A still image that never passed through the camera guide: photo-library
+    /// imports, Simulator Test Photo/Demo, and test fixtures. The frame may
+    /// already BE the card with no background at all, which the scene-trained
+    /// detector cannot handle — strategies may consider the whole frame as a
+    /// crop candidate for this source only.
+    case importedPhoto
 }
 
 enum CardScannerError: Error, LocalizedError, Sendable {

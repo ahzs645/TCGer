@@ -206,14 +206,17 @@ validateCatalogDirectory(path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/
 
 const scanDirectory = path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex');
 
-const detectorFile = path.join(scanDirectory, 'CardDetector.mlmodel');
+const detectorFile = path.join(scanDirectory, 'CardDetector.mlpackage');
 const detectorBefore = failures.length;
 try {
-  const detector = fs.statSync(detectorFile);
-  if (!detector.isFile()) fail(detectorFile, 'must be a Core ML model file');
-  if (detector.size < 1_000_000) fail(detectorFile, `unexpectedly small model (${detector.size} bytes)`);
+  if (!fs.statSync(detectorFile).isDirectory()) fail(detectorFile, 'must be an .mlpackage directory');
+  const weights = fs.statSync(path.join(detectorFile, 'Data/com.apple.CoreML/weights/weight.bin'));
+  if (weights.size < 1_000_000) fail(detectorFile, `unexpectedly small detector weights (${weights.size} bytes)`);
 } catch (error) {
   fail(detectorFile, error.code === 'ENOENT' ? 'missing trained card detector' : error.message);
+}
+if (failures.length === detectorBefore) {
+  readJson(path.join(detectorFile, 'Manifest.json'), 'card detector package manifest');
 }
 if (failures.length === detectorBefore) successes.push(`${relative(detectorFile)} — trained card detector present`);
 

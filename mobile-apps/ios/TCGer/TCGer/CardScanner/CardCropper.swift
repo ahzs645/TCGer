@@ -24,10 +24,62 @@ nonisolated struct CardCropper {
 
     func bestCrop(from image: CGImage) throws -> CGImage? {
         let rectangles = try detectRectangles(in: image)
-        guard let best = rectangles.max(by: { $0.confidence < $1.confidence }) else {
-            return nil
-        }
+        guard let best = Self.preferredObservation(from: rectangles) else { return nil }
         return makeNormalizedCrop(from: image, observation: best)
+    }
+
+    /// Vision's rectangle detector reports confidence 1.0 for many interior
+    /// rectangles at once, so confidence alone cannot rank them and `max(by:)`
+    /// resolves the tie arbitrarily. Every candidate reaching this point has
+    /// already been constrained to card-like proportions, so the largest one is
+    /// the card and the smaller ones are panels printed on it.
+    static func preferredObservation(
+        from observations: [VNRectangleObservation]
+    ) -> VNRectangleObservation? {
+        observations.max { lhs, rhs in
+            let lhsArea = normalizedArea(of: lhs)
+            let rhsArea = normalizedArea(of: rhs)
+            if abs(lhsArea - rhsArea) > 0.01 { return lhsArea < rhsArea }
+            return lhs.confidence < rhs.confidence
+        }
+    }
+
+    /// Shoelace area of the observed quadrilateral in normalized coordinates.
+    /// A rotated card's `boundingBox` overstates its area; its corners do not.
+    static func normalizedArea(of observation: VNRectangleObservation) -> CGFloat {
+        quadrilateralArea(
+            topLeft: observation.topLeft,
+            topRight: observation.topRight,
+            bottomRight: observation.bottomRight,
+            bottomLeft: observation.bottomLeft
+        )
+    }
+
+    static func quadrilateralArea(
+        topLeft: CGPoint,
+        topRight: CGPoint,
+        bottomRight: CGPoint,
+        bottomLeft: CGPoint
+    ) -> CGFloat {
+        let corners = [topLeft, topRight, bottomRight, bottomLeft]
+        var total: CGFloat = 0
+        for index in corners.indices {
+            let current = corners[index]
+            let next = corners[(index + 1) % corners.count]
+            total += current.x * next.y - next.x * current.y
+        }
+        return abs(total) / 2
+    }
+
+    /// The full frame normalized exactly like a detected crop (rotated to
+    /// portrait, resized to 720×1000). Used when the input image may already
+    /// be a borderless card crop, where every detector fires on interior
+    /// panels instead of the (invisible) card edges.
+    func normalizedWholeImage(from image: CGImage) -> CGImage? {
+        makeNormalizedCrop(
+            from: image,
+            observation: Self.rectangleObservation(for: CGRect(x: 0, y: 0, width: 1, height: 1))
+        )
     }
 
     func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {
@@ -132,7 +184,7 @@ nonisolated struct CardCropper {
         return unionArea > 0 ? intersectionArea / unionArea : 0
     }
 
-    private static func rectangleObservation(for bounds: CGRect) -> VNRectangleObservation {
+    static func rectangleObservation(for bounds: CGRect) -> VNRectangleObservation {
         VNRectangleObservation(
             requestRevision: VNDetectRectanglesRequestRevision1,
             topLeft: CGPoint(x: bounds.minX, y: bounds.maxY),

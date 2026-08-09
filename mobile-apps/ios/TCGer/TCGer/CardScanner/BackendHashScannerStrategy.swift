@@ -28,7 +28,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
-        guard source == .photoCapture else {
+        guard source != .livePreview else {
             return nil
         }
 

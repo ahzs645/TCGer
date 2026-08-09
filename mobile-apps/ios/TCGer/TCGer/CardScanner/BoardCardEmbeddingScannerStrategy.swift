@@ -62,11 +62,95 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
-        let cropped = try cropper.bestCrop(from: image) ?? image
-        let embedding = try await encoder.embedding(for: cropped)
-        guard !embedding.isEmpty else { return nil }
+        let attempts = try await makeCropAttempts(from: image, source: source)
 
-        let gateScore = rejectionGate?.cardFaceScore(for: embedding)
+        // Try the most card-like candidate first; on an abstention fall
+        // through to the next. A retry can only recover an abstention — an
+        // accepted result returns immediately, and every attempt faces the
+        // same gate, OCR, and threshold policy — so extra candidates add
+        // recall without loosening precision.
+        var sawRejection = false
+        for attempt in attempts {
+            do {
+                if let result = try await recognize(
+                    attempt: attempt,
+                    context: context,
+                    source: source
+                ) {
+                    return result
+                }
+            } catch CardScannerError.rejectedInput {
+                sawRejection = true
+            }
+        }
+        // Every attempt abstained. Preserve the explicit open-set rejection if
+        // any attempt positively identified a non-card, so the coordinator
+        // does not let a looser fallback strategy answer instead.
+        if sawRejection { throw CardScannerError.rejectedInput }
+        return nil
+    }
+
+    /// One crop hypothesis for a frame, with its embedding and card-face
+    /// score precomputed so candidates can be ordered before retrieval runs.
+    private struct CropAttempt {
+        let image: CGImage
+        let embedding: [Float]
+        let gateScore: Double?
+    }
+
+    private func makeAttempt(for image: CGImage) async throws -> CropAttempt? {
+        let embedding = try await encoder.embedding(for: image)
+        guard !embedding.isEmpty else { return nil }
+        return CropAttempt(
+            image: image,
+            embedding: embedding,
+            gateScore: rejectionGate?.cardFaceScore(for: embedding)
+        )
+    }
+
+    private func makeCropAttempts(
+        from image: CGImage,
+        source: ScanInvocationKind
+    ) async throws -> [CropAttempt] {
+        var attempts: [CropAttempt] = []
+        if let detected = try cropper.bestCrop(from: image),
+           let attempt = try await makeAttempt(for: detected) {
+            attempts.append(attempt)
+        }
+
+        // An imported image never passed through the camera guide, so the
+        // frame itself may already be the card: on a borderless card crop the
+        // scene-trained detector fires on an interior panel, and no geometric
+        // test can separate that from a real card lying in a scene. Add the
+        // whole frame as a second candidate for this source only, ordered by
+        // card-face score so the more card-like candidate is tried first.
+        // Camera captures never take this path.
+        if source == .importedPhoto,
+           let wholeFrame = cropper.normalizedWholeImage(from: image),
+           let attempt = try await makeAttempt(for: wholeFrame) {
+            attempts.append(attempt)
+            attempts.sort {
+                ($0.gateScore ?? -.greatestFiniteMagnitude) >
+                    ($1.gateScore ?? -.greatestFiniteMagnitude)
+            }
+        }
+
+        // No detection and no usable whole-frame candidate: embed the raw
+        // frame, preserving the historical `bestCrop ?? image` behavior.
+        if attempts.isEmpty, let fallback = try await makeAttempt(for: image) {
+            attempts.append(fallback)
+        }
+        return attempts
+    }
+
+    private func recognize(
+        attempt: CropAttempt,
+        context: CardScannerContext,
+        source: ScanInvocationKind
+    ) async throws -> CardScanResult? {
+        let cropped = attempt.image
+        let embedding = attempt.embedding
+        let gateScore = attempt.gateScore
         let gateRejected = gateScore.map { score in
             rejectionGate.map { score < $0.threshold } ?? false
         } ?? false
@@ -117,7 +201,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // retrieval to one catalog name; collector OCR must still confirm any
         // gate override or close printing decision.
         let initialRival = ranked.first { $0.id != primary.id }
-        let needsTitleEvidence = source == .photoCapture && (
+        let needsTitleEvidence = source != .livePreview && (
             gateRejected ||
                 primary.confidence.score < Configuration.strongAcceptanceScore ||
                 initialRival.map {

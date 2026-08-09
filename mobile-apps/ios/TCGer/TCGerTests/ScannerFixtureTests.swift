@@ -50,7 +50,7 @@ final class ScannerFixtureTests: XCTestCase {
             let result = await Self.coordinator.scan(
                 image: image,
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .photoCapture
+                source: .importedPhoto
             )
             assert(result: result, satisfies: fixture)
         }
@@ -60,12 +60,17 @@ final class ScannerFixtureTests: XCTestCase {
         let supportedCategories: Set<String> = [
             "rotation", "perspective", "blur", "glare", "partialOcclusion", "multipleCards"
         ]
-        let fixtures = try loadManifest().fixtures.filter { supportedCategories.contains($0.category) }
+        // Categories overlap expectations: a multi-card scene is a distorted
+        // *input* but its expectation is noMatch (the single-card recognizer
+        // is supposed to abstain), which the negative test covers.
+        let fixtures = try loadManifest().fixtures.filter {
+            supportedCategories.contains($0.category) && $0.expectation != "noMatch"
+        }
         for fixture in fixtures {
             let result = await Self.coordinator.scan(
                 image: try makeImage(for: fixture),
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .photoCapture
+                source: .importedPhoto
             )
             assert(result: result, satisfies: fixture)
         }
@@ -77,7 +82,7 @@ final class ScannerFixtureTests: XCTestCase {
             let result = await Self.coordinator.scan(
                 image: try makeImage(for: fixture),
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .photoCapture
+                source: .importedPhoto
             )
             guard case .failure(.noMatch) = result else {
                 return XCTFail("\(fixture.id) produced a card match; open-set rejection regressed")

@@ -14,6 +14,32 @@ photo pixels. Vision rectangle detection and perspective correction then run
 inside that guide crop. Imported Simulator fixtures intentionally skip the
 camera-guide crop because the selected image is already the scanner input.
 
+Imports are scanned as `ScanInvocationKind.importedPhoto` (photo-library
+picks, Test Photo, Demo, and the fixture tests); only the camera shutter path
+scans as `.photoCapture`. The distinction exists because an imported image may
+already *be* the card with no background: the scene-trained detector then
+fires on an interior panel, and no geometric test can separate that from a
+real card lying in a scene. For `.importedPhoto` only, the embedding strategy
+also embeds the whole frame and lets the card-face gate arbitrate — whichever
+of {detected crop, whole frame} scores higher as a card face is used. Camera
+captures never take that fallback, so live behavior is unchanged.
+
+Fixture `minimumConfidence` floors assert the production strong-acceptance
+threshold (0.70), not a stricter test-only bar: correct top-1 results at
+0.80–0.88 were failing a legacy 0.90 floor that production would happily
+accept, which hid real crop failures behind threshold noise.
+
+The `two-cards` fixture expects `top5Any`: when the detector can isolate one
+of the cards, correctly identifying it is the desired behavior. What must
+never happen on a multi-card scene is a *confident mislabel* — with the
+pre-2026-08-09 detector, the mixed-region crop retrieved a wrong card at
+0.704 and only the ambiguity margin blocked it, and in that regime the right
+outcome was abstention. If this fixture flips back to no-match after a
+detector change, diagnose which card region the box covers before blessing
+either answer. Its confidence floor is 0.55 (the OCR-verified evidence
+floor), not 0.70: the partially occluded crop is accepted via collector
+number confirmation, which production admits from `minimumEvidenceScore` up.
+
 ## Command-line setup
 
 This Mac currently has Xcode installed while `xcode-select` points at Command
@@ -74,6 +100,52 @@ correct older asset filenames and labels:
 4. `Test Photo` loads any Photos image and sends it through the same
    `CardScannerCoordinator` used by camera capture.
 5. Open Settings → Scanner Tools → Live Scanner Debug to import a recorded run.
+
+### Reference set browser
+
+Scanner Debug → **Browse Reference Sets** steps through a folder of reference
+images one at a time, runs the production coordinator on each, and judges the
+result against that image's label. Use it when a replay report says the number
+moved and you need to see *which* frame moved and why: the pane draws the
+ground-truth box in green, the crop the cropper chose in orange, and shows the
+crop that was actually sent to the encoder next to the top-5 candidates. A wrong
+crop and a wrong match are indistinguishable from the result alone.
+
+Sets are discovered in the app's Documents folder, and on Simulator also under
+`~/Downloads/Reference` on the Mac (via `SIMULATOR_HOST_HOME`, so nothing has to
+be copied into the container). Three folder shapes are recognized:
+
+| Shape | Detected by | Ground truth |
+| --- | --- | --- |
+| Device recording | `results.json` + frames | `expectedCardId` / `expectedNoMatch` per frame |
+| Replay corpus | `roboflow-ios-replay.json` + `datasets/` | COCO card boxes |
+| Image folder | any images, or an `images/` subfolder | none |
+
+Any of them can carry a `scanner-labels.json` keyed by filename stem (Roboflow's
+`.rf.<hash>` suffix is stripped, so labels survive a re-export):
+
+```json
+{
+  "schemaVersion": 1,
+  "labels": {
+    "Charizard-Ex-223-2_jpg": { "category": "singleCard", "cardId": "sv03-223", "name": "Charizard ex" },
+    "IMG_0095_jpg": { "category": "cardBack" }
+  }
+}
+```
+
+`category` is one of `singleCard`, `cardBack`, `multiCard`, `foreignLanguage`,
+`outsideIndex`, or `needsLabel`. Only `singleCard` counts toward recall;
+`cardBack`, `multiCard`, `foreignLanguage`, and `outsideIndex` are cases the
+single-card recognizer is *supposed* to decline, so the summary reports them as
+a separate hard-negative rate. Folding them into one number hides both the real
+recall and the real false-positive rate — a raw "15/50 accepted" is neither.
+
+The canonical labels for the 50-image recognition sample live at
+`TCGerTests/Fixtures/ReplaySampleLabels.json`; copy that file into a dataset
+folder as `scanner-labels.json` to use it there.
+
+### Recording replay
 
 For replay, extract the exported recording zip in Files, then choose the
 extracted folder. You can also select `results.json` and its frame images

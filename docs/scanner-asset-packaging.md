@@ -36,7 +36,7 @@ guard; hard-fails Release builds) validates the generated pieces:
 
 | Asset | Size | Source of truth | Checked by ios-assets.sh |
 |---|---|---|---|
-| `CardDetector.mlmodel` | ~30 MB | trained from the reviewed Roboflow archive set, tracked in git | yes — file + minimum size |
+| `CardDetector.mlpackage` | ~18 MB | YOLO11s trained from the tight-crop-augmented Roboflow set (GPU, ultralytics → Core ML NMS export), tracked in git | yes — package + weights size + manifest |
 | `CardEmbeddings.mlpackage` | ~40 MB | generated (convert-dinov2-coreml.py), tracked in git | yes — package + manifest |
 | `CardsIndexVectors.bin` | ~8 MB | generated (build-ios-index.ts), tracked in git | yes — header, size, count |
 | `CardsIndexMetadata.json` | ~4 MB | generated (build-ios-index.ts), tracked in git | yes — row/annIndex parity with bin |

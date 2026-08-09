@@ -64,11 +64,16 @@ final class ScannerPerformanceTests: XCTestCase {
         let image = try XCTUnwrap(UIImage(named: "BossOrders")?.cgImage)
         let coordinator = CardScannerCoordinator.makeDefault()
 
+        // The bundled fixture is a borderless card crop, i.e. an import — as
+        // .photoCapture the detector would fire on an interior panel and the
+        // scan legitimately abstains. importedPhoto also exercises the
+        // whole-frame retry, so the measured first-scan latency covers the
+        // most expensive import path.
         let firstStarted = Date()
         let first = await coordinator.scan(
             image: image,
             context: .test(engine: .localOnly),
-            source: .photoCapture
+            source: .importedPhoto
         )
         XCTAssertLessThan(Date().timeIntervalSince(firstStarted), Budget.firstScanSeconds)
         guard case .success = first else { return XCTFail("Bundled clean fixture did not scan") }

@@ -225,7 +225,10 @@ final class CardScannerViewModel: ObservableObject {
     /// Runs the production recognition pipeline on an already-decoded image.
     /// This is deliberately camera-independent so Simulator, fixtures, and
     /// imported recordings exercise the same coordinator as a real capture.
-    func scan(image: CGImage, source: ScanInvocationKind = .photoCapture) async {
+    /// The default source is `.importedPhoto` because every caller except the
+    /// camera shutter supplies an image that never saw the guide crop; the
+    /// shutter path passes `.photoCapture` explicitly.
+    func scan(image: CGImage, source: ScanInvocationKind = .importedPhoto) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
             return
@@ -245,7 +248,7 @@ final class CardScannerViewModel: ObservableObject {
 
     func scan(
         imageData: Data,
-        source: ScanInvocationKind = .photoCapture,
+        source: ScanInvocationKind = .importedPhoto,
         presentsBinderReview: Bool = true
     ) async {
         guard let image = Self.makeCGImage(from: imageData) else {
@@ -390,7 +393,7 @@ final class CardScannerViewModel: ObservableObject {
         if captureMode == .binder {
             await scanBinderPage(image: cgImage)
         } else {
-            await scan(image: guideCroppedImage(from: cgImage))
+            await scan(image: guideCroppedImage(from: cgImage), source: .photoCapture)
         }
     }
 

@@ -63,7 +63,7 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
             let detectionStarted = ContinuousClock.now
             let observations = (try? cropper.detectRectangles(in: image)) ?? []
             let detectionMs = milliseconds(since: detectionStarted)
-            let bestObservation = observations.max(by: { $0.confidence < $1.confidence })
+            let bestObservation = CardCropper.preferredObservation(from: observations)
             let cropSucceeded = bestObservation.flatMap {
                 cropper.makeNormalizedCrop(from: image, observation: $0)
             } != nil

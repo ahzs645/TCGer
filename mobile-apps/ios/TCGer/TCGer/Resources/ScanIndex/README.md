@@ -10,7 +10,7 @@ from a fresh clone, so anything not committed simply never ships (which is
 exactly how the scanner silently broke before these were tracked):
 
 - `CardEmbeddings.mlpackage` — DINOv2-small image encoder (`image` 224→`embedding` 384-d).
-- `CardDetector.mlmodel` — one-class Create ML detector used to locate a card before Vision corner refinement.
+- `CardDetector.mlpackage` — one-class YOLO11s detector (ultralytics, trained on GPU, exported to Core ML with NMS) used to locate a card before Vision corner refinement. Compiled to `CardDetector.mlmodelc` in the bundle.
 - `CardsIndexVectors.bin` — packed int8 index (header `[Int32 count, Int32 dim]` + int8 rows, scale 127).
 - `CardsIndexMetadata.json` — `annIndex → {cardId, name, game, setCode, …}`.
 
@@ -44,12 +44,21 @@ cd backend && npx tsx src/scripts/build-ios-index.ts \
   --index ../frontend/public/scan-index/pokemon-embeddings.json
 
 # 3. Card detector (after preparing the downloaded Roboflow archives).
+#    --tight-crops adds the borderless-card training regime — without it the
+#    detector fires on interior panels of already-cropped cards.
 python3 scripts/prepare_createml_card_detector.py \
-  /path/to/ios-replay/datasets /path/to/createml-card-detector
+  /path/to/ios-replay/datasets /path/to/createml-card-detector --tight-crops
+python3 scripts/createml_to_yolo.py \
+  /path/to/createml-card-detector /path/to/yolo-dataset
+# Train YOLO11s on GPU (Colab: unzip dataset, `pip install ultralytics`, then):
+#   YOLO('yolo11s.pt').train(data='data.yaml', epochs=60, imgsz=640, batch=32)
+#   model.export(format='coreml', nms=True, imgsz=640)  -> CardDetector.mlpackage
+# Score any candidate model against Create ML splits without rebuilding the app:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift \
-  mobile-apps/ios/scripts/train-card-detector.swift \
-  /path/to/createml-card-detector \
-  mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardDetector.mlmodel 300
+  mobile-apps/ios/scripts/evaluate-card-detector.swift \
+  CardDetector.mlpackage /path/to/createml-card-detector/tight-test
+# (Legacy on-Mac Create ML path: mobile-apps/ios/scripts/train-card-detector.swift;
+#  clear $TMPDIR/CreateMLModels first — it leaks ~30 MB per training iteration.)
 ```
 
 **Parity note:** the model bakes ImageNet normalization. `CardEmbeddingEncoder`
