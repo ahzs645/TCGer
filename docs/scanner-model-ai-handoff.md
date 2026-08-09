@@ -62,6 +62,14 @@ now; R2 delivery is planned later with the artwork fingerprint database as
 the first asset to move (then the index; the CoreML model stays bundled).
 Rationale and migration order: `docs/scanner-asset-packaging.md`.
 
+ROOT CAUSE CONFIRMED 2026-08-09: the app is built by Xcode Cloud on push,
+from a fresh clone — and the ScanIndex model/index were gitignored, so no
+cloud build ever contained them; the pre-build guard only warns by default.
+Every TestFlight install shipped a scanner with no embedding model/index.
+Fixed by tracking `CardEmbeddings.mlpackage` (rebuilt this session on Linux,
+verified 18/18 top-1 @ 0.970 mean sim against the index), the index bin, and
+metadata in git. Do not move them to LFS (Xcode Cloud can't resolve it).
+
 Still to do on a real device: run the Scanner Assets pane, confirm all green;
 if the model is missing, `bash scripts/ios-assets.sh build` (needs the
 py3.11 coremltools venv) and rebuild. Then re-test live scanning — and feed a

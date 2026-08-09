@@ -1,8 +1,22 @@
 # Scanner asset packaging: bundled now, R2 later
 
-Decision (2026-08-09): **all scanner assets ship inside the iOS app bundle.**
-Remote (Cloudflare R2) delivery is planned but deferred; when it lands, the
-artwork fingerprint database is the first asset to move.
+Decision (2026-08-09): **all scanner assets ship inside the iOS app bundle,
+and the iOS ScanIndex assets are tracked in git.** Remote (Cloudflare R2)
+delivery is planned but deferred; when it lands, the artwork fingerprint
+database is the first asset to move.
+
+Why tracked in git: the app is built by **Xcode Cloud on push**, from a fresh
+clone of the repository. There is no `ci_scripts/` post-clone hook, so a
+gitignored asset can never reach a cloud build — the pre-build guard only
+*warns* by default (`REQUIRE_IOS_ASSETS=YES` makes it fail), so every cloud
+build silently shipped a scanner with no model/index. That was the root cause
+of "scanning does nothing" on TestFlight installs. Tracking the assets makes
+push → Xcode Cloud → TestFlight produce a working scanner with no extra
+build-machine setup. When R2 delivery lands, a `ci_scripts/ci_post_clone.sh`
+download can replace the in-repo copies and shrink the repo again.
+
+Do NOT move these files to Git LFS: Xcode Cloud does not resolve LFS
+pointers, which would silently reintroduce the missing-asset failure.
 
 ## Current state (enforced)
 
@@ -12,9 +26,9 @@ guard; hard-fails Release builds) validates the generated pieces:
 
 | Asset | Size | Source of truth | Checked by ios-assets.sh |
 |---|---|---|---|
-| `CardEmbeddings.mlpackage` | ~40 MB | generated (convert-dinov2-coreml.py) | yes — package + manifest |
-| `CardsIndexVectors.bin` | ~8 MB | generated (build-ios-index.ts) | yes — header, size, count |
-| `CardsIndexMetadata.json` | ~4 MB | generated (build-ios-index.ts) | yes — row/annIndex parity with bin |
+| `CardEmbeddings.mlpackage` | ~40 MB | generated (convert-dinov2-coreml.py), tracked in git | yes — package + manifest |
+| `CardsIndexVectors.bin` | ~8 MB | generated (build-ios-index.ts), tracked in git | yes — header, size, count |
+| `CardsIndexMetadata.json` | ~4 MB | generated (build-ios-index.ts), tracked in git | yes — row/annIndex parity with bin |
 | `CardFaceGate.json` | ~20 KB | tracked, mirrors backend fixture | yes — schema + fixture match |
 | `artwork-fingerprints-pokemon-uint8.json` | ~53 MB | tracked in git | n/a (always present) |
 | `MagicCardHashes.json` | ~0.6 MB | tracked in git | n/a (always present) |
