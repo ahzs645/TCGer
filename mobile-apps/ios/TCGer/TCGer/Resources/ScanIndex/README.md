@@ -1,5 +1,9 @@
 # iOS scanner resources
 
+Packaging policy: all scanner assets ship bundled in the app for now; R2
+delivery is planned later (fingerprint DB first, then the index — see
+`docs/scanner-asset-packaging.md`).
+
 The CoreML model and embedding index bundled by the iOS scanner are large,
 reproducible build outputs and are **gitignored**:
 

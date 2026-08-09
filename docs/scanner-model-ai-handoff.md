@@ -57,6 +57,11 @@ Root-cause candidates for "scanning does nothing" on device, in order:
 2. Crop color grade breaking parity (fixed, above).
 3. Fingerprint short-circuit hiding the verified pipeline (fixed, above).
 
+Packaging decision 2026-08-09: all scanner assets stay bundled in the app for
+now; R2 delivery is planned later with the artwork fingerprint database as
+the first asset to move (then the index; the CoreML model stays bundled).
+Rationale and migration order: `docs/scanner-asset-packaging.md`.
+
 Still to do on a real device: run the Scanner Assets pane, confirm all green;
 if the model is missing, `bash scripts/ios-assets.sh build` (needs the
 py3.11 coremltools venv) and rebuild. Then re-test live scanning — and feed a
