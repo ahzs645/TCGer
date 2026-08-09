@@ -62,6 +62,24 @@ now; R2 delivery is planned later with the artwork fingerprint database as
 the first asset to move (then the index; the CoreML model stays bundled).
 Rationale and migration order: `docs/scanner-asset-packaging.md`.
 
+Per-game fingerprints 2026-08-09: the artwork fingerprint database is now per
+game — `artwork-fingerprints-<TCGGame.rawValue>-uint8.json` (Pokémon's file
+renamed accordingly), bundle first then Documents, legacy filename still
+honored via its own `tcg` field. Loading is lazy per game on first scan
+(previously the ~53 MB JSON parsed eagerly at scanner init for every game).
+To add a game: run backend `build-artwork-fingerprints.ts` for it and drop
+the output in `CardScanner/Resources/` under the per-game name — no code
+changes needed.
+
+OPEN ITEM — gate fallthrough: when `CardFaceRejectionGate` rejects a crop as
+non-card, the embedding strategy returns nil and the coordinator falls
+through to the artwork-fingerprint strategy, which has NO card-face check —
+so a rejected pack/hand/card-back can still be named by the HSV matcher if
+it clears 0.90. Proposed fix: a distinct "non-card detected" signal (e.g.
+`CardScannerError.nonCardDetected`) that stops local matchers for that frame
+while plain no-match keeps falling through. Not yet implemented (awaiting
+go-ahead).
+
 ROOT CAUSE CONFIRMED 2026-08-09: the app is built by Xcode Cloud on push,
 from a fresh clone — and the ScanIndex model/index were gitignored, so no
 cloud build ever contained them; the pre-build guard only warns by default.

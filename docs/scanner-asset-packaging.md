@@ -18,6 +18,16 @@ download can replace the in-repo copies and shrink the repo again.
 Do NOT move these files to Git LFS: Xcode Cloud does not resolve LFS
 pointers, which would silently reintroduce the missing-asset failure.
 
+Caveat — offline catalogs: the catalog packs (`data/catalog`,
+`frontend/public/catalog`, iOS `Resources/Catalogs`) remain gitignored, so
+Xcode Cloud builds ship without them and the app uses its remote/on-device
+fallbacks — degraded, not broken. Consequence: do NOT set
+`REQUIRE_IOS_ASSETS=YES` in the Xcode Cloud workflow yet — the guard checks
+catalogs too and would fail every cloud build. Set it only after catalogs are
+either committed (check their size first) or fetched by a
+`ci_scripts/ci_post_clone.sh`, or after the guard learns to require scanner
+assets separately from catalogs.
+
 ## Current state (enforced)
 
 Everything the scanner needs is in the app bundle, and
