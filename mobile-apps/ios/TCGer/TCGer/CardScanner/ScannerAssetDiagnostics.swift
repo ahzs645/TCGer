@@ -25,6 +25,20 @@ struct ScannerAssetDiagnostics {
     static func run(bundle: Bundle = .main) -> [Item] {
         var items: [Item] = []
 
+        if bundle.url(forResource: "CardDetector", withExtension: "mlmodelc") != nil {
+            items.append(Item(
+                name: "Card detector",
+                isOK: true,
+                detail: "CardDetector.mlmodelc bundled"
+            ))
+        } else {
+            items.append(Item(
+                name: "Card detector",
+                isOK: false,
+                detail: "CardDetector.mlmodelc missing — using Vision rectangle fallback"
+            ))
+        }
+
         // CoreML embedding encoder (compiled from CardEmbeddings.mlpackage).
         if bundle.url(forResource: EmbeddingAsset.model.0, withExtension: EmbeddingAsset.model.1) != nil {
             items.append(Item(name: "Embedding model", isOK: true, detail: "CardEmbeddings.mlmodelc bundled"))

@@ -111,6 +111,12 @@ final class CardScannerCoordinator: @unchecked Sendable {
                 }
                 sawCleanNoMatch = true
             } catch let error as CardScannerError {
+                if case .rejectedInput = error {
+                    // This is an explicit open-set decision, not a strategy
+                    // failure. A looser nearest-neighbor fallback must not
+                    // override it with a confidently wrong card.
+                    return .failure(.noMatch)
+                }
                 if firstError == nil { firstError = error }
             } catch {
                 if firstError == nil { firstError = .underlying(error) }

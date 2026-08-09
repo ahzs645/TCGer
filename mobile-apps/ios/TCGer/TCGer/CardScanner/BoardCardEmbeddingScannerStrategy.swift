@@ -66,7 +66,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // be forced to the nearest card. A missing/mismatched gate disables
         // gating rather than rejecting.
         if let rejectionGate, rejectionGate.rejects(embedding) {
-            return nil
+            throw CardScannerError.rejectedInput
         }
 
         let allowedIndices = await metadataStore.indices(

@@ -69,6 +69,27 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(matches.first?.externalId, "hsv-winner")
     }
 
+    func testArtworkFingerprintAcceptanceRequiresStrengthAndSeparation() {
+        func match(_ id: String, _ score: Float) -> ArtworkFingerprintMatcher.Match {
+            ArtworkFingerprintMatcher.Match(
+                externalId: id,
+                name: id,
+                setCode: nil,
+                similarity: score
+            )
+        }
+
+        XCTAssertFalse(ArtworkFingerprintScannerStrategy.accepts(matches: [
+            match("a", 0.99), match("b", 0.985)
+        ]))
+        XCTAssertFalse(ArtworkFingerprintScannerStrategy.accepts(matches: [
+            match("a", 0.94), match("b", 0.80)
+        ]))
+        XCTAssertTrue(ArtworkFingerprintScannerStrategy.accepts(matches: [
+            match("a", 0.98), match("b", 0.95)
+        ]))
+    }
+
     func testCardFaceGateScoresRejectsAndToleratesDimensionMismatch() {
         let gate = CardFaceRejectionGate(weights: [2, -2], bias: 0, threshold: 0.6)
 
@@ -77,6 +98,68 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertTrue(gate.rejects([0, 1]))
         XCTAssertNil(gate.cardFaceScore(for: [1]))
         XCTAssertFalse(gate.rejects([1]))
+    }
+
+    func testDocumentDetectionRejectsLowConfidenceAndImplausibleAreas() {
+        XCTAssertTrue(CardCropper.isPlausibleDocumentDetection(
+            confidence: 0.9,
+            bounds: CGRect(x: 0.25, y: 0.2, width: 0.4, height: 0.5)
+        ))
+        XCTAssertFalse(CardCropper.isPlausibleDocumentDetection(
+            confidence: 0,
+            bounds: CGRect(x: 0.25, y: 0.2, width: 0.4, height: 0.5)
+        ))
+        XCTAssertFalse(CardCropper.isPlausibleDocumentDetection(
+            confidence: 0.9,
+            bounds: CGRect(x: 0, y: 0, width: 0.98, height: 0.98)
+        ))
+        XCTAssertFalse(CardCropper.isPlausibleDocumentDetection(
+            confidence: 0.9,
+            bounds: CGRect(x: 0.4, y: 0.4, width: 0.05, height: 0.05)
+        ))
+    }
+
+    func testDocumentDetectionRequiresCardShapedQuadAtAnyRotation() {
+        XCTAssertTrue(CardCropper.isCardShaped(
+            topLeft: CGPoint(x: 0.2, y: 0.9),
+            topRight: CGPoint(x: 0.7, y: 0.8),
+            bottomLeft: CGPoint(x: 0.1, y: 0.2),
+            bottomRight: CGPoint(x: 0.6, y: 0.1)
+        ))
+
+        // Same card proportions, but lying sideways.
+        XCTAssertTrue(CardCropper.isCardShaped(
+            topLeft: CGPoint(x: 0.1, y: 0.7),
+            topRight: CGPoint(x: 0.8, y: 0.8),
+            bottomLeft: CGPoint(x: 0.2, y: 0.2),
+            bottomRight: CGPoint(x: 0.9, y: 0.3)
+        ))
+
+        XCTAssertFalse(CardCropper.isCardShaped(
+            topLeft: CGPoint(x: 0.1, y: 0.9),
+            topRight: CGPoint(x: 0.9, y: 0.9),
+            bottomLeft: CGPoint(x: 0.1, y: 0.1),
+            bottomRight: CGPoint(x: 0.9, y: 0.1)
+        ))
+    }
+
+    func testIntersectionOverUnion() {
+        XCTAssertEqual(
+            CardCropper.intersectionOverUnion(
+                CGRect(x: 0, y: 0, width: 1, height: 1),
+                CGRect(x: 0, y: 0, width: 1, height: 1)
+            ),
+            1,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            CardCropper.intersectionOverUnion(
+                CGRect(x: 0, y: 0, width: 0.5, height: 0.5),
+                CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)
+            ),
+            0,
+            accuracy: 0.0001
+        )
     }
 
     private func entry(id: String, vector: [Float]) -> ArtworkFingerprintMatcher.Entry {

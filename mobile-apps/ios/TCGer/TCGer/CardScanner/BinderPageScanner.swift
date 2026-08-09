@@ -25,6 +25,22 @@ enum ScannerCaptureMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Controls whether a single card is recognized continuously from the camera
+/// preview or only after the user deliberately presses the shutter.
+enum ScannerTriggerMode: String, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case manual
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic: return "Automatic"
+        case .manual: return "Manual"
+        }
+    }
+}
+
 nonisolated struct BinderNormalizedQuad: Sendable {
     let topLeft: CGPoint
     let topRight: CGPoint

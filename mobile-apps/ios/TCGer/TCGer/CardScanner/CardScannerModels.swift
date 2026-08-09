@@ -338,6 +338,10 @@ enum CardScannerError: Error, LocalizedError, Sendable {
     case cameraUnavailable
     case permissionDenied
     case noMatch
+    /// A local open-set gate positively identified the input as unsuitable for
+    /// card recognition. The coordinator must not let a looser fallback turn
+    /// this into a confident nearest-neighbor false positive.
+    case rejectedInput
     case ineligibleMode
     case missingAuthToken
     case underlying(Error)
@@ -350,6 +354,8 @@ enum CardScannerError: Error, LocalizedError, Sendable {
             return "Camera access is required to scan cards. Enable it in Settings."
         case .noMatch:
             return "We could not recognize this card. Try adjusting lighting and framing."
+        case .rejectedInput:
+            return "We could not find a clear card face. Center one card and try again."
         case .ineligibleMode:
             return "The selected mode is not supported by the current strategy."
         case .missingAuthToken:

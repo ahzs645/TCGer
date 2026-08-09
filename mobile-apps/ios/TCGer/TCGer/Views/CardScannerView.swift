@@ -13,6 +13,21 @@ private struct ScannerGuideFramePreferenceKey: PreferenceKey {
     }
 }
 
+private enum ScannerGuideLayout {
+    static let cornerRadius: CGFloat = 18
+}
+
+private enum ScannerPhotoPickerMode {
+    case single
+    case bulk
+}
+
+private struct ScannerPhotoImportProgress {
+    let captureMode: ScannerCaptureMode
+    let current: Int
+    let total: Int
+}
+
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
@@ -21,7 +36,9 @@ struct CardScannerView: View {
     @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
-    @State private var selectedTestImage: PhotosPickerItem?
+    @State private var photoPickerMode: ScannerPhotoPickerMode?
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var photoImportProgress: ScannerPhotoImportProgress?
     @State private var bottomControlsHeight: CGFloat = 120
     let scope: CardScanScope?
 
@@ -80,10 +97,16 @@ struct CardScannerView: View {
         .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
             syncSelectedModeWithModules()
         }
-        .onChange(of: selectedTestImage, initial: false) { _, item in
-            guard let item else { return }
-            Task { await scanSelectedTestImage(item) }
+        .onChange(of: selectedPhotoItems, initial: false) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await scanSelectedPhotos(items) }
         }
+        .photosPicker(
+            isPresented: photoPickerIsPresented,
+            selection: $selectedPhotoItems,
+            maxSelectionCount: photoPickerSelectionLimit,
+            matching: .images
+        )
         .onPreferenceChange(ScannerGuideFramePreferenceKey.self) { frame in
             viewModel.updateGuideFrame(frame)
         }
@@ -142,11 +165,36 @@ struct CardScannerView: View {
                 scopeTitle: scope.map { "Scanning \($0.setName)" },
                 onDismiss: (scope != nil || isPresented) ? { dismiss() } : nil,
                 dismissIcon: scope == nil ? "chevron.left" : "xmark",
-                automaticallyShowResults: $automaticallyShowResults
-            )
+                triggerMode: $viewModel.triggerMode,
+                automaticallyShowResults: $automaticallyShowResults,
+                showsTestInputs: showTestingTools || isSimulator,
+                isProcessing: isProcessingPhoto,
+                onLoadPhoto: { presentPhotoPicker(.single) },
+                onLoadPhotos: { presentPhotoPicker(.bulk) },
+                onRunDemo: scanDemoImage
+            ) {
+                gameControl
+            }
 
-            statusContent
+            if let photoImportProgress {
+                photoImportStatus(photoImportProgress)
+            } else {
+                statusContent
+            }
         }
+    }
+
+    private func photoImportStatus(_ progress: ScannerPhotoImportProgress) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            Text("Scanning \(progress.captureMode.displayName.lowercased()) photo \(progress.current) of \(progress.total)…")
+                .font(.callout)
+                .foregroundStyle(.white)
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -249,6 +297,8 @@ struct CardScannerView: View {
 
     private var framingOverlay: some View {
         GeometryReader { geometry in
+            // The game selector shares the camera toolbar row, so one row of
+            // clearance keeps the guide large without putting controls over it.
             let topClearance: CGFloat = 72
             // The guide shrinks as the bottom controls grow (session tray,
             // testing tools) so they never cover it.
@@ -258,10 +308,10 @@ struct CardScannerView: View {
             let height = width * 1.4
 
             ZStack {
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: ScannerGuideLayout.cornerRadius)
                     .strokeBorder(Color.white.opacity(0.42), lineWidth: 1)
 
-                ScannerCornerGuide()
+                ScannerCornerGuide(cornerRadius: ScannerGuideLayout.cornerRadius)
                     .stroke(
                         accentColor(for: viewModel.selectedMode),
                         style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
@@ -305,10 +355,6 @@ struct CardScannerView: View {
                 debugCaptureControls
             }
 
-            if showTestingTools || isSimulator {
-                testImageControls
-            }
-
             if viewModel.captureMode == .binder, viewModel.binderPagesScanned > 0 {
                 binderSessionSummary
             } else if !viewModel.sessionResults.isEmpty || viewModel.liveConfirmationCount > 0 {
@@ -324,81 +370,98 @@ struct CardScannerView: View {
                 )
             }
 
-            HStack {
-                Spacer(minLength: 0)
-                captureModeControl
-            }
-
-            HStack(spacing: 12) {
-                gameControl
-
-                Spacer(minLength: 0)
-
-                Button(action: viewModel.capturePhoto) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.16))
-                            .frame(width: 76, height: 76)
-                        Circle()
-                            .fill(accentColor(for: viewModel.selectedMode))
-                            .frame(width: 62, height: 62)
-                        if isProcessingPhoto {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Image(systemName: "camera.aperture")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                        }
-                    }
+            captureActionControl
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .leading) {
+                    captureModeControl
                 }
-                .disabled(
-                    isProcessingPhoto ||
-                    isUnauthorized ||
-                    viewModel.latestResult != nil ||
-                    !isModeSupported ||
-                    !hasEnabledScanModes
-                )
-                .buttonStyle(.plain)
-                .accessibilityLabel(viewModel.captureMode == .binder ? "Scan binder page" : "Scan card")
-                .accessibilityHint(viewModel.captureMode == .binder
-                    ? "Captures and identifies every card on the page"
-                    : "Captures the card inside the guide")
-
-                Spacer(minLength: 0)
-
-                engineControl
-            }
+                .overlay(alignment: .trailing) {
+                    engineControl
+                }
         }
         .animation(.snappy, value: viewModel.liveConfirmationCount)
         .animation(.snappy, value: viewModel.sessionResults.count)
     }
 
+    @ViewBuilder
+    private var captureActionControl: some View {
+        if viewModel.captureMode == .binder || viewModel.triggerMode == .manual {
+            Button(action: viewModel.capturePhoto) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(width: 76, height: 76)
+                    Circle()
+                        .fill(accentColor(for: viewModel.selectedMode))
+                        .frame(width: 62, height: 62)
+                    if isProcessingPhoto {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "camera.aperture")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .disabled(
+                isProcessingPhoto ||
+                isUnauthorized ||
+                viewModel.latestResult != nil ||
+                !isModeSupported ||
+                !hasEnabledScanModes
+            )
+            .buttonStyle(.plain)
+            .accessibilityLabel(viewModel.captureMode == .binder ? "Scan binder page" : "Scan card")
+            .accessibilityHint(viewModel.captureMode == .binder
+                ? "Captures and identifies every card on the page"
+                : "Captures the card inside the guide")
+        } else {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.16))
+                    .frame(width: 76, height: 76)
+                Circle()
+                    .fill(accentColor(for: viewModel.selectedMode).opacity(0.88))
+                    .frame(width: 62, height: 62)
+                if viewModel.isAnalyzingFrame {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: "viewfinder")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Automatic scanning active")
+            .accessibilityHint("Center one card and hold it steady")
+        }
+    }
+
     private var captureModeControl: some View {
-        HStack(spacing: 2) {
+        Menu {
             ForEach(ScannerCaptureMode.allCases) { mode in
                 Button {
                     viewModel.captureMode = mode
                 } label: {
-                    Label(mode.displayName, systemImage: mode.systemImage)
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background {
-                            if viewModel.captureMode == mode {
-                                Capsule().fill(.white)
-                            }
-                        }
-                        .foregroundStyle(viewModel.captureMode == mode ? .black : .white)
+                    if viewModel.captureMode == mode {
+                        Label(mode.displayName, systemImage: "checkmark")
+                    } else {
+                        Label(mode.displayName, systemImage: mode.systemImage)
+                    }
                 }
-                .buttonStyle(.plain)
             }
+        } label: {
+            ScannerOptionLabel(
+                title: viewModel.captureMode.displayName,
+                systemImage: viewModel.captureMode.systemImage
+            )
         }
-        .padding(3)
-        .background(.ultraThinMaterial, in: Capsule())
         .disabled(isProcessingPhoto)
         .animation(.snappy, value: viewModel.captureMode)
         .accessibilityLabel("Scanner capture mode")
+        .accessibilityValue(viewModel.captureMode.displayName)
     }
 
     private var binderSessionSummary: some View {
@@ -489,19 +552,21 @@ struct CardScannerView: View {
                 }
             } label: {
                 ScannerOptionLabel(
-                    title: viewModel.selectedEngine.displayName,
+                    title: engineControlTitle,
                     systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
                 )
             }
-            .accessibilityLabel("Scan method")
+            .accessibilityLabel("Recognition engine")
             .accessibilityValue(viewModel.selectedEngine.displayName)
+            .accessibilityHint("On-device recognition works privately without a server")
         } else {
             ScannerOptionLabel(
-                title: availableScanEngines.first?.displayName ?? "Unavailable",
+                title: engineControlTitle,
                 systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
             )
-            .accessibilityLabel("Scan method")
+            .accessibilityLabel("Recognition engine")
             .accessibilityValue(availableScanEngines.first?.displayName ?? "Unavailable")
+            .accessibilityHint("On-device recognition works privately without a server")
         }
     }
 
@@ -563,46 +628,69 @@ struct CardScannerView: View {
         .padding(.horizontal)
     }
 
-    private var testImageControls: some View {
-        HStack(spacing: 12) {
-            PhotosPicker(selection: $selectedTestImage, matching: .images) {
-                Label("Test Photo", systemImage: "photo")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(accentColor(for: viewModel.selectedMode))
-
-            Button {
-                guard let image = UIImage(named: "BossOrders")?.cgImage else {
-                    viewModel.errorMessage = "The bundled Boss's Orders scanner fixture is unavailable."
-                    return
-                }
-                Task { await viewModel.scanCurrentCaptureMode(image: image) }
-            } label: {
-                Label("Demo", systemImage: "testtube.2")
-            }
-            .buttonStyle(.bordered)
-            .tint(.white)
+    private func scanDemoImage() {
+        guard !isProcessingPhoto else { return }
+        guard let image = UIImage(named: "BossOrders")?.cgImage else {
+            viewModel.errorMessage = "The bundled Boss's Orders scanner fixture is unavailable."
+            return
         }
-        .disabled(isProcessingPhoto)
-        .padding(12)
-        .background(Color.black.opacity(0.42))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Scanner test image controls")
+        Task { await viewModel.scanCurrentCaptureMode(image: image) }
     }
 
-    private func scanSelectedTestImage(_ item: PhotosPickerItem) async {
-        defer { selectedTestImage = nil }
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                viewModel.errorMessage = "The selected photo did not provide image data."
-                return
+    private func presentPhotoPicker(_ mode: ScannerPhotoPickerMode) {
+        selectedPhotoItems = []
+        photoPickerMode = mode
+    }
+
+    private func scanSelectedPhotos(_ items: [PhotosPickerItem]) async {
+        let captureMode = viewModel.captureMode
+        let isBulkImport = items.count > 1
+        let shouldDeferBinderReview = isBulkImport && captureMode == .binder
+        let shouldSuppressCardSheets = isBulkImport && captureMode == .card && automaticallyShowResults
+        let binderPageCountBeforeImport = viewModel.binderPagesScanned
+        var loadFailureCount = 0
+
+        viewModel.setPhotoImportActive(true)
+        if shouldSuppressCardSheets {
+            viewModel.setAutomaticallyPresentsResults(false)
+        }
+
+        for (index, item) in items.enumerated() {
+            photoImportProgress = ScannerPhotoImportProgress(
+                captureMode: captureMode,
+                current: index + 1,
+                total: items.count
+            )
+
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    loadFailureCount += 1
+                    continue
+                }
+                await viewModel.scan(
+                    imageData: data,
+                    presentsBinderReview: !shouldDeferBinderReview
+                )
+            } catch is CancellationError {
+                break
+            } catch {
+                loadFailureCount += 1
             }
-            await viewModel.scan(imageData: data)
-        } catch is CancellationError {
-            return
-        } catch {
-            viewModel.errorMessage = "Unable to load the selected scanner photo: \(error.localizedDescription)"
+        }
+
+        if shouldDeferBinderReview, viewModel.binderPagesScanned > binderPageCountBeforeImport {
+            viewModel.reopenBinderReview()
+        }
+        if shouldSuppressCardSheets {
+            viewModel.setAutomaticallyPresentsResults(true)
+        }
+        viewModel.setPhotoImportActive(false)
+
+        selectedPhotoItems = []
+        photoImportProgress = nil
+
+        if loadFailureCount > 0 {
+            viewModel.errorMessage = "Unable to load \(loadFailureCount) of \(items.count) selected photos."
         }
     }
 
@@ -666,6 +754,9 @@ private extension CardScannerView {
     }
 
     var isProcessingPhoto: Bool {
+        if photoImportProgress != nil {
+            return true
+        }
         if viewModel.isProcessingPhoto {
             return true
         }
@@ -673,6 +764,28 @@ private extension CardScannerView {
             return true
         }
         return false
+    }
+
+    var photoPickerIsPresented: Binding<Bool> {
+        Binding(
+            get: { photoPickerMode != nil },
+            set: { isPresented in
+                if !isPresented {
+                    photoPickerMode = nil
+                }
+            }
+        )
+    }
+
+    var photoPickerSelectionLimit: Int? {
+        switch photoPickerMode {
+        case .single:
+            return 1
+        case .bulk:
+            return viewModel.captureMode == .binder ? 30 : 100
+        case nil:
+            return 1
+        }
     }
 
     var isUnauthorized: Bool {
@@ -693,9 +806,22 @@ private extension CardScannerView {
         if viewModel.captureMode == .binder {
             return "Fit the full binder page · Tap to scan"
         }
-        return viewModel.supportsLivePreview(viewModel.selectedMode)
+        return viewModel.triggerMode == .automatic && viewModel.supportsLivePreview(viewModel.selectedMode)
             ? "Center one card · Hold steady"
-            : "Center one card · Tap to scan"
+            : "Center one card · Tap shutter"
+    }
+
+    var engineControlTitle: String {
+        switch viewModel.selectedEngine {
+        case .localOnly:
+            return "Offline AI"
+        case .automatic:
+            return "Auto AI"
+        case .serverHash:
+            return "Server Hash"
+        case .serverEmbedding:
+            return "Server AI"
+        }
     }
 }
 
@@ -720,24 +846,43 @@ private struct ScannerOptionLabel: View {
 }
 
 private struct ScannerCornerGuide: Shape {
+    let cornerRadius: CGFloat
+
     func path(in rect: CGRect) -> Path {
         let cornerLength = min(34, min(rect.width, rect.height) * 0.16)
+        let radius = min(cornerRadius, cornerLength, rect.width / 2, rect.height / 2)
         var path = Path()
 
         path.move(to: CGPoint(x: rect.minX, y: rect.minY + cornerLength))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + radius, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
         path.addLine(to: CGPoint(x: rect.minX + cornerLength, y: rect.minY))
 
         path.move(to: CGPoint(x: rect.maxX - cornerLength, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY + radius),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cornerLength))
 
         path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - cornerLength))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
         path.addLine(to: CGPoint(x: rect.maxX - cornerLength, y: rect.maxY))
 
         path.move(to: CGPoint(x: rect.minX + cornerLength, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.maxY - radius),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cornerLength))
 
         return path

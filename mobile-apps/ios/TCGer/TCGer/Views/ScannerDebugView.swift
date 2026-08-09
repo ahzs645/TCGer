@@ -656,6 +656,7 @@ struct ScannerDebugView: View {
     @State private var isReplaying = false
     @State private var replayReport: ScannerReplayReport?
     @State private var assetItems: [ScannerAssetDiagnostics.Item] = []
+    @State private var assetDiagnosticsPresentation: AssetDiagnosticsPresentation?
 
     var body: some View {
         ScrollView {
@@ -701,6 +702,9 @@ struct ScannerDebugView: View {
         }
         .sheet(item: $shareArchive) { archive in
             ShareSheet(items: [archive.url])
+        }
+        .sheet(item: $assetDiagnosticsPresentation) { presentation in
+            ScannerAssetDiagnosticsSheet(items: presentation.items)
         }
         .fileImporter(
             isPresented: $showingReplayImporter,
@@ -842,29 +846,45 @@ struct ScannerDebugView: View {
 
     private var assetsPane: some View {
         DebugPanel(title: "Scanner Assets", systemImage: "shippingbox") {
-            ForEach(assetItems) { item in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: item.isOK ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                        .foregroundStyle(item.isOK ? .green : .red)
-                        .font(.caption)
+            Button {
+                assetDiagnosticsPresentation = AssetDiagnosticsPresentation(items: assetItems)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: assetFailureCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.title3)
+                        .foregroundStyle(assetFailureCount == 0 ? .green : .orange)
+
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name)
-                            .font(.subheadline)
-                        Text(item.detail)
+                        Text(assetFailureCount == 0 ? "All assets ready" : assetIssueSummary)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("View \(assetItems.count) diagnostic checks")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer(minLength: 0)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
+                .contentShape(Rectangle())
             }
-            if assetItems.contains(where: { !$0.isOK }) {
-                Text("Missing generated assets disable their strategies silently. Regenerate with `bash scripts/ios-assets.sh build`, then rebuild the app.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .buttonStyle(.plain)
+            .disabled(assetItems.isEmpty)
+            .accessibilityLabel("Scanner asset diagnostics")
+            .accessibilityValue(assetFailureCount == 0 ? "All assets ready" : assetIssueSummary)
+            .accessibilityHint("Opens the complete scanner asset report")
         }
+    }
+
+    private var assetFailureCount: Int {
+        assetItems.lazy.filter { !$0.isOK }.count
+    }
+
+    private var assetIssueSummary: String {
+        "\(assetFailureCount) \(assetFailureCount == 1 ? "issue" : "issues") found"
     }
 
     private var configurationPane: some View {
@@ -931,7 +951,7 @@ struct ScannerDebugView: View {
                 Button {
                     exportRecording()
                 } label: {
-                    Label("Save Archive", systemImage: "square.and.arrow.down")
+                    Label("Save", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -1209,6 +1229,79 @@ private struct DebugPanel<Content: View>: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         }
+    }
+}
+
+private struct AssetDiagnosticsPresentation: Identifiable {
+    let id = UUID()
+    let items: [ScannerAssetDiagnostics.Item]
+}
+
+private struct ScannerAssetDiagnosticsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let items: [ScannerAssetDiagnostics.Item]
+
+    private var failureCount: Int {
+        items.lazy.filter { !$0.isOK }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(failureCount == 0 ? "All assets ready" : issueSummary)
+                                .font(.headline)
+                            Text("\(items.count) diagnostic checks")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: failureCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(failureCount == 0 ? .green : .orange)
+                    }
+                }
+
+                Section {
+                    ForEach(items) { item in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: item.isOK ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                                .foregroundStyle(item.isOK ? .green : .red)
+                                .font(.caption)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.name)
+                                    .font(.subheadline)
+                                Text(item.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } header: {
+                    Text("Bundled Assets")
+                } footer: {
+                    if failureCount > 0 {
+                        Text("Missing generated assets disable their scanner strategies. Regenerate with `bash scripts/ios-assets.sh build`, then rebuild the app.")
+                    }
+                }
+            }
+            .navigationTitle("Scanner Assets")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var issueSummary: String {
+        "\(failureCount) \(failureCount == 1 ? "issue" : "issues") found"
     }
 }
 

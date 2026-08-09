@@ -50,6 +50,58 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(viewModel.latestResult?.primary.details.identity.id, "presented-card")
     }
 
+    func testManualTriggerModeDisablesLivePreviewWithoutDisablingPhotoScan() {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .mlDetector,
+                    supportsLiveScanning: true,
+                    behavior: .match(cardID: "live-card"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+
+        XCTAssertEqual(viewModel.triggerMode, .manual)
+        XCTAssertFalse(viewModel.supportsLivePreview(.pokemon))
+
+        viewModel.triggerMode = .automatic
+
+        XCTAssertTrue(viewModel.supportsLivePreview(.pokemon))
+
+        viewModel.triggerMode = .manual
+
+        XCTAssertFalse(viewModel.supportsLivePreview(.pokemon))
+        XCTAssertTrue(viewModel.isModeSupported(.pokemon))
+    }
+
+    func testBinderScanCanDeferReviewUntilBulkImportFinishes() async {
+        let coordinator = CardScannerCoordinator(
+            strategies: [],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+        viewModel.captureMode = .binder
+
+        await viewModel.scanBinderPage(
+            image: ScannerTestImage.solid(),
+            presentsReview: false
+        )
+
+        XCTAssertEqual(viewModel.binderPagesScanned, 1)
+        XCTAssertNil(viewModel.binderReviewPresentation)
+
+        viewModel.reopenBinderReview()
+
+        XCTAssertNotNil(viewModel.binderReviewPresentation)
+    }
+
     func testStrategiesRunInModePriorityOrderAndContinueAfterFailures() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(
@@ -111,6 +163,36 @@ final class CardScannerCoordinatorTests: XCTestCase {
         guard case .failure(.noMatch) = result else {
             return XCTFail("A clean no-match should suppress an earlier recoverable error")
         }
+    }
+
+    func testOpenSetRejectionStopsLooserFallbacks() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .mlDetector,
+                    behavior: .failure(.rejectedInput),
+                    recorder: recorder
+                ),
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .match(cardID: "false-positive"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+
+        let result = await coordinator.scan(
+            image: ScannerTestImage.solid(),
+            context: .test(),
+            source: .photoCapture
+        )
+
+        guard case .failure(.noMatch) = result else {
+            return XCTFail("An open-set rejection should end the local matching chain")
+        }
+        XCTAssertEqual(recorder.kinds, [.mlDetector])
     }
 
     func testLocalOnlyFiltersServerAndOCRStrategies() async {

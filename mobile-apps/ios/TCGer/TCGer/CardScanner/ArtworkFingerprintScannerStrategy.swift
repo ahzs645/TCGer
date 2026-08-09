@@ -20,8 +20,8 @@ import Foundation
 /// (see `ArtworkFingerprintMatcher.artworkWeight` for the tuning sweep).
 final class ArtworkFingerprintScannerStrategy: ScanStrategy {
     private enum Config {
-        static let minimumSimilarity: Float = 0.90
         static let confidentSimilarity: Float = 0.95
+        static let minimumCandidateSeparation: Float = 0.015
         static let topN = 5
         static let databaseExtension = "json"
         /// Legacy single-database filename (game declared by its `tcg` field).
@@ -100,7 +100,7 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             topN: Config.topN
         )
 
-        guard let best = matches.first, best.similarity >= Config.minimumSimilarity else {
+        guard Self.accepts(matches: matches) else {
             return nil
         }
 
@@ -141,6 +141,20 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             alternatives: alternatives,
             elapsed: Date().timeIntervalSince(start)
         )
+    }
+
+    /// Cosine scores are nearest-neighbor rankings, not calibrated
+    /// probabilities. Require both a strong absolute score and meaningful
+    /// separation from the next different card before showing a result.
+    static func accepts(matches: [ArtworkFingerprintMatcher.Match]) -> Bool {
+        guard let best = matches.first,
+              best.similarity >= Config.confidentSimilarity
+        else { return false }
+
+        guard let rival = matches.dropFirst().first(where: {
+            $0.externalId != best.externalId && $0.name != best.name
+        }) else { return true }
+        return best.similarity - rival.similarity >= Config.minimumCandidateSeparation
     }
 
     // MARK: - Database Loading

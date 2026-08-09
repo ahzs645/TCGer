@@ -206,6 +206,17 @@ validateCatalogDirectory(path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/
 
 const scanDirectory = path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex');
 
+const detectorFile = path.join(scanDirectory, 'CardDetector.mlmodel');
+const detectorBefore = failures.length;
+try {
+  const detector = fs.statSync(detectorFile);
+  if (!detector.isFile()) fail(detectorFile, 'must be a Core ML model file');
+  if (detector.size < 1_000_000) fail(detectorFile, `unexpectedly small model (${detector.size} bytes)`);
+} catch (error) {
+  fail(detectorFile, error.code === 'ENOENT' ? 'missing trained card detector' : error.message);
+}
+if (failures.length === detectorBefore) successes.push(`${relative(detectorFile)} — trained card detector present`);
+
 const modelDirectory = path.join(scanDirectory, 'CardEmbeddings.mlpackage');
 const modelBefore = failures.length;
 try {

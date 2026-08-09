@@ -1,12 +1,19 @@
 import SwiftUI
 import UIKit
 
-struct ScannerCameraToolbar: View {
+struct ScannerCameraToolbar<LeadingContent: View>: View {
     @ObservedObject var cameraController: CardScannerCameraController
     let scopeTitle: String?
     let onDismiss: (() -> Void)?
     var dismissIcon: String = "xmark"
+    @Binding var triggerMode: ScannerTriggerMode
     @Binding var automaticallyShowResults: Bool
+    let showsTestInputs: Bool
+    let isProcessing: Bool
+    let onLoadPhoto: () -> Void
+    let onLoadPhotos: () -> Void
+    let onRunDemo: () -> Void
+    @ViewBuilder let leadingContent: () -> LeadingContent
 
     var body: some View {
         HStack(spacing: 10) {
@@ -21,6 +28,8 @@ struct ScannerCameraToolbar: View {
                 .accessibilityLabel("Close scanner")
             }
 
+            leadingContent()
+
             if let scopeTitle {
                 Text(scopeTitle)
                     .font(.subheadline.weight(.semibold))
@@ -34,8 +43,47 @@ struct ScannerCameraToolbar: View {
             Spacer()
 
             Menu {
-                Toggle(isOn: $automaticallyShowResults) {
-                    Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
+                Section("Single-card scan") {
+                    ForEach(ScannerTriggerMode.allCases) { mode in
+                        Button {
+                            triggerMode = mode
+                        } label: {
+                            if triggerMode == mode {
+                                Label(mode.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(mode.displayName)
+                            }
+                        }
+                        .disabled(isProcessing)
+                    }
+                }
+
+                Section("Photo library") {
+                    Button(action: onLoadPhoto) {
+                        Label("Load Photo", systemImage: "photo")
+                    }
+                    .disabled(isProcessing)
+
+                    Button(action: onLoadPhotos) {
+                        Label("Load Photos in Bulk", systemImage: "photo.stack")
+                    }
+                    .disabled(isProcessing)
+                }
+
+                if showsTestInputs {
+                    Section("Testing") {
+                        Button(action: onRunDemo) {
+                            Label("Demo", systemImage: "testtube.2")
+                        }
+                        .disabled(isProcessing)
+                    }
+                }
+
+                Section("Results") {
+                    Toggle(isOn: $automaticallyShowResults) {
+                        Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
+                    }
+                    .disabled(isProcessing)
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -45,7 +93,10 @@ struct ScannerCameraToolbar: View {
             }
             .foregroundStyle(.white)
             .accessibilityLabel("Scanner options")
-            .accessibilityValue(automaticallyShowResults ? "Automatic results on" : "Automatic results off")
+            .accessibilityValue(
+                "\(triggerMode.displayName) scan, automatic results "
+                    + (automaticallyShowResults ? "on" : "off")
+            )
 
             if cameraController.isTorchAvailable {
                 Button(action: cameraController.toggleTorch) {
@@ -147,24 +198,29 @@ private struct ScannerSessionCard: View {
                 Image(uiImage: UIImage(cgImage: result.capturedImage))
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 30, height: 42)
+                    .frame(width: 28, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 5))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(result.primary.details.identity.name)
-                        .font(.caption.weight(.semibold))
+                        .font(.caption2.weight(.semibold))
                         .lineLimit(1)
-                    Text(result.primary.details.identity.setCode ?? result.mode.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text(result.primary.confidence.score, format: .percent.precision(.fractionLength(0)))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(color)
+
+                    HStack(spacing: 5) {
+                        Text(result.primary.details.identity.setCode ?? result.mode.displayName)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 2)
+                        Text(result.primary.confidence.score, format: .percent.precision(.fractionLength(0)))
+                            .monospacedDigit()
+                            .foregroundStyle(color)
+                    }
+                    .font(.caption2)
                 }
-                .frame(width: 86, alignment: .leading)
+                .frame(width: 94, alignment: .leading)
             }
             .padding(.horizontal, 7)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)

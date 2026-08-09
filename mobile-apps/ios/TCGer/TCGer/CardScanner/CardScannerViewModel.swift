@@ -36,6 +36,13 @@ final class CardScannerViewModel: ObservableObject {
             resetLiveConfirmation()
         }
     }
+    @Published var triggerMode: ScannerTriggerMode = .manual {
+        didSet {
+            lastAnalysisDate = .distantPast
+            liveConsensus.reset()
+            resetLiveConfirmation()
+        }
+    }
     @Published var latestResult: CardScanResult?
     @Published var binderPages: [BinderPageRecord] = []
     @Published var binderReviewPresentation: BinderReviewPresentation?
@@ -69,6 +76,7 @@ final class CardScannerViewModel: ObservableObject {
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
     private var automaticallyPresentsResults = false
+    private var isPhotoImportActive = false
     private var nextBinderPageNumber = 1
 
     var binderPagesScanned: Int { binderPages.count }
@@ -115,6 +123,10 @@ final class CardScannerViewModel: ObservableObject {
 
     func setAutomaticallyPresentsResults(_ enabled: Bool) {
         automaticallyPresentsResults = enabled
+    }
+
+    func setPhotoImportActive(_ active: Bool) {
+        isPhotoImportActive = active
     }
 
     func updateEnvironment(_ environment: EnvironmentStore) {
@@ -185,6 +197,7 @@ final class CardScannerViewModel: ObservableObject {
         }
 
         guard case .ready = state else { return }
+        guard captureMode == .binder || triggerMode == .manual else { return }
         guard isModeSupported(selectedMode) else {
             var message = "\(selectedMode.displayName) scanning is not available yet."
             if let hint = ScannerAssetDiagnostics.missingAssetHint(for: selectedMode) {
@@ -230,13 +243,17 @@ final class CardScannerViewModel: ObservableObject {
         apply(result)
     }
 
-    func scan(imageData: Data, source: ScanInvocationKind = .photoCapture) async {
+    func scan(
+        imageData: Data,
+        source: ScanInvocationKind = .photoCapture,
+        presentsBinderReview: Bool = true
+    ) async {
         guard let image = Self.makeCGImage(from: imageData) else {
             state = .error("Unable to decode the selected scanner image.")
             return
         }
         if captureMode == .binder {
-            await scanBinderPage(image: image)
+            await scanBinderPage(image: image, presentsReview: presentsBinderReview)
         } else {
             await scan(image: image, source: source)
         }
@@ -250,7 +267,7 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    func scanBinderPage(image: CGImage) async {
+    func scanBinderPage(image: CGImage, presentsReview: Bool = true) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
             return
@@ -274,9 +291,11 @@ final class CardScannerViewModel: ObservableObject {
                 // dropping the oldest page after 30 scans.
                 binderPages.removeFirst(binderPages.count - 30)
             }
-            binderReviewPresentation = BinderReviewPresentation(
-                initialPageIndex: binderPages.count - 1
-            )
+            if presentsReview {
+                binderReviewPresentation = BinderReviewPresentation(
+                    initialPageIndex: binderPages.count - 1
+                )
+            }
             state = .ready
             if !isSimulator { HapticManager.notification(.success) }
         } catch {
@@ -407,7 +426,9 @@ final class CardScannerViewModel: ObservableObject {
 
     private func handleSampleBuffer(_ sampleBuffer: CMSampleBuffer) async {
         guard !isSimulator else { return }
+        guard !isPhotoImportActive else { return }
         guard captureMode == .card else { return }
+        guard triggerMode == .automatic else { return }
         guard case .ready = state else { return }
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
@@ -468,6 +489,7 @@ final class CardScannerViewModel: ObservableObject {
 
     func supportsLivePreview(_ mode: ScanMode) -> Bool {
         guard captureMode == .card else { return false }
+        guard triggerMode == .automatic else { return false }
         return coordinator.supportsLiveScanning(for: mode, preferredEngine: selectedEngine)
     }
 
