@@ -16,7 +16,7 @@ guard; hard-fails Release builds) validates the generated pieces:
 | `CardsIndexVectors.bin` | ~8 MB | generated (build-ios-index.ts) | yes — header, size, count |
 | `CardsIndexMetadata.json` | ~4 MB | generated (build-ios-index.ts) | yes — row/annIndex parity with bin |
 | `CardFaceGate.json` | ~20 KB | tracked, mirrors backend fixture | yes — schema + fixture match |
-| `artwork-fingerprints-uint8.json` | ~53 MB | tracked in git | n/a (always present) |
+| `artwork-fingerprints-pokemon-uint8.json` | ~53 MB | tracked in git | n/a (always present) |
 | `MagicCardHashes.json` | ~0.6 MB | tracked in git | n/a (always present) |
 | Offline catalogs | varies | generated/synchronized | yes — manifest counts + SHA-256 |
 
@@ -43,13 +43,18 @@ reuse both patterns.
 
 Move assets in this order:
 
-1. **`artwork-fingerprints-uint8.json` (main candidate, first to move).**
-   Largest single asset (53 MB), belongs to the *fallback* strategy, and
-   `ArtworkFingerprintScannerStrategy` already knows how to load its database
-   from the Documents directory instead of the bundle — the download path
-   exists. Moving it cuts app size by more than everything else combined.
-   The strategy already degrades cleanly (reports itself unsupported) while
-   the file is absent.
+1. **Artwork fingerprint databases (main candidate, first to move).**
+   Fingerprint databases are per game — `artwork-fingerprints-<tcg>-uint8.json`
+   (`<tcg>` = `TCGGame.rawValue`: pokemon, magic, yugioh, …), loaded lazily on
+   first scan of that game; only Pokémon's exists today. Largest single asset
+   (53 MB), belongs to the *fallback* strategy, and
+   `ArtworkFingerprintScannerStrategy` already checks the Documents directory
+   when a game's file is not in the bundle — the download path exists, and
+   per-game files map 1:1 onto per-game R2 objects. Moving them cuts app size
+   by more than everything else combined. The strategy degrades cleanly
+   (reports the game unsupported) while a file is absent. The pre-per-game
+   filename `artwork-fingerprints-uint8.json` is still honored as a fallback;
+   the game it serves comes from its own `tcg` field.
 2. **`CardsIndexVectors.bin` + `CardsIndexMetadata.json` (~13 MB).** The
    asset that actually goes stale — every new set needs a rebuild. Serve
    behind a manifest carrying `{version, model, dimension, count}`; the app

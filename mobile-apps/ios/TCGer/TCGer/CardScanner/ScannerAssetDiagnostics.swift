@@ -85,16 +85,35 @@ struct ScannerAssetDiagnostics {
             items.append(Item(name: "Rejection gate", isOK: false, detail: "CardFaceGate.json missing — open-set gating disabled"))
         }
 
-        // Artwork fingerprint database (tracked in git).
+        // Artwork fingerprint databases (per game; Pokémon's ships in git).
+        var fingerprintGames: [String] = []
+        for mode in ScanMode.allCases {
+            let resource = "artwork-fingerprints-\(mode.tcgGame.rawValue)-uint8"
+            if let url = bundle.url(forResource: resource, withExtension: "json"),
+               let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                fingerprintGames.append(mode.displayName)
+                items.append(Item(
+                    name: "Fingerprints — \(mode.displayName)",
+                    isOK: true,
+                    detail: String(format: "%.1f MB", Double(size) / 1_000_000)
+                ))
+            }
+        }
         if let url = bundle.url(forResource: "artwork-fingerprints-uint8", withExtension: "json"),
            let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            fingerprintGames.append("legacy")
+            items.append(Item(
+                name: "Fingerprints — legacy file",
+                isOK: true,
+                detail: String(format: "%.1f MB (game declared inside the file)", Double(size) / 1_000_000)
+            ))
+        }
+        if fingerprintGames.isEmpty {
             items.append(Item(
                 name: "Artwork fingerprints",
-                isOK: true,
-                detail: String(format: "%.1f MB", Double(size) / 1_000_000)
+                isOK: false,
+                detail: "no artwork-fingerprints-<game>-uint8.json bundled — fingerprint fallback disabled"
             ))
-        } else {
-            items.append(Item(name: "Artwork fingerprints", isOK: false, detail: "artwork-fingerprints-uint8.json missing"))
         }
 
         // Magic perceptual hash database (tracked in git).

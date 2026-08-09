@@ -5,7 +5,16 @@ import Foundation
 ///
 /// Uses Vision rectangle detection (existing CardCropper) for card localization,
 /// then computes artwork fingerprint + HSV histogram for identification against
-/// a preloaded database of 21,900 Pokemon card fingerprints.
+/// a per-game database of card fingerprints.
+///
+/// Databases are per game — `artwork-fingerprints-<tcg>-uint8.json` (e.g.
+/// `artwork-fingerprints-pokemon-uint8.json`) — looked up in the app bundle
+/// first, then in the Documents directory (the downloaded-database path). The
+/// pre-per-game filename `artwork-fingerprints-uint8.json` is still honored as
+/// a fallback; the game it serves is whatever its own `tcg` field declares.
+///
+/// Loading is lazy, per game, on first use: parsing the ~53 MB Pokémon
+/// database eagerly at init used to block scanner startup for every game.
 ///
 /// Combined score: 5% artwork cosine similarity + 95% HSV cosine similarity
 /// (see `ArtworkFingerprintMatcher.artworkWeight` for the tuning sweep).
@@ -14,17 +23,25 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
         static let minimumSimilarity: Float = 0.90
         static let confidentSimilarity: Float = 0.95
         static let topN = 5
-        /// Path to the artwork fingerprints database in the app bundle.
-        static let databaseFilename = "artwork-fingerprints-uint8"
         static let databaseExtension = "json"
+        /// Legacy single-database filename (game declared by its `tcg` field).
+        static let legacyDatabaseFilename = "artwork-fingerprints-uint8"
+
+        static func databaseFilename(for game: TCGGame) -> String {
+            "artwork-fingerprints-\(game.rawValue)-uint8"
+        }
     }
 
     let kind: ScanStrategyKind = .artworkFingerprint
     let supportsLiveScanning: Bool = true
 
     private let cropper: CardCropper
-    private let database: [ArtworkFingerprintMatcher.Entry]
-    private let supportedModes: Set<ScanMode>
+    private let bundle: Bundle
+    private let fileManager: FileManager
+
+    private let lock = NSLock()
+    private var databases: [ScanMode: [ArtworkFingerprintMatcher.Entry]] = [:]
+    private var legacyResolved = false
 
     init(
         cropper: CardCropper = CardCropper(),
@@ -32,13 +49,24 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
         fileManager: FileManager = .default
     ) {
         self.cropper = cropper
-        let loaded = Self.loadDatabase(bundle: bundle, fileManager: fileManager)
-        database = loaded.entries
-        supportedModes = loaded.entries.isEmpty ? [] : Set([loaded.mode].compactMap { $0 })
+        self.bundle = bundle
+        self.fileManager = fileManager
     }
 
     func supports(_ mode: ScanMode) -> Bool {
-        supportedModes.contains(mode)
+        lock.lock()
+        let cached = databases[mode]
+        let legacyResolved = self.legacyResolved
+        lock.unlock()
+
+        if let cached { return !cached.isEmpty }
+        if databaseURL(named: Config.databaseFilename(for: mode.tcgGame)) != nil {
+            return true
+        }
+        // The legacy file's game is unknown until it is parsed; stay
+        // optimistic and let the first scan resolve it — a wrong guess
+        // surfaces as a clean no-match, and the coordinator moves on.
+        return !legacyResolved && databaseURL(named: Config.legacyDatabaseFilename) != nil
     }
 
     func scan(
@@ -53,6 +81,7 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
+        let database = loadDatabaseIfNeeded(for: context.mode)
         guard !database.isEmpty else { return nil }
 
         // Step 1: Detect and crop the card using Vision
@@ -116,25 +145,56 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
 
     // MARK: - Database Loading
 
-    private static func loadDatabase(
-        bundle: Bundle,
-        fileManager: FileManager
-    ) -> (entries: [ArtworkFingerprintMatcher.Entry], mode: ScanMode?) {
-        guard let url = bundle.url(
-            forResource: Config.databaseFilename,
-            withExtension: Config.databaseExtension
-        ) else {
-            // Try loading from Documents or downloaded location
-            let docsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?
-                .appendingPathComponent("\(Config.databaseFilename).\(Config.databaseExtension)")
-            guard let docsURL, fileManager.fileExists(atPath: docsURL.path) else {
-                print("[ArtworkFP] Database not found in bundle or documents")
-                return ([], nil)
+    /// Loads (and caches) the database for a mode. Internal rather than
+    /// private so performance tests can measure the cold-load cost directly.
+    @discardableResult
+    func loadDatabaseIfNeeded(for mode: ScanMode) -> [ArtworkFingerprintMatcher.Entry] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let cached = databases[mode] { return cached }
+
+        if let url = databaseURL(named: Config.databaseFilename(for: mode.tcgGame)) {
+            let loaded = Self.loadFromURL(url)
+            // A per-game file declaring a different game is a build error:
+            // serve it under its declared game, nothing under this one.
+            let resolvedMode = loaded.mode ?? mode
+            databases[resolvedMode] = loaded.entries
+            if resolvedMode != mode {
+                print("[ArtworkFP] \(url.lastPathComponent) declares tcg \(String(describing: loaded.mode)), not \(mode)")
+                databases[mode] = []
             }
-            return loadFromURL(docsURL)
+            return databases[mode] ?? []
         }
 
-        return loadFromURL(url)
+        if !legacyResolved, let url = databaseURL(named: Config.legacyDatabaseFilename) {
+            legacyResolved = true
+            let loaded = Self.loadFromURL(url)
+            if let resolvedMode = loaded.mode, databases[resolvedMode] == nil {
+                databases[resolvedMode] = loaded.entries
+            }
+            if databases[mode] == nil {
+                databases[mode] = []
+            }
+            return databases[mode] ?? []
+        }
+
+        databases[mode] = []
+        return []
+    }
+
+    private func databaseURL(named name: String) -> URL? {
+        if let url = bundle.url(forResource: name, withExtension: Config.databaseExtension) {
+            return url
+        }
+        // Downloaded-database path (used when a game's database is delivered
+        // out-of-band instead of shipping in the bundle).
+        let docsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("\(name).\(Config.databaseExtension)")
+        guard let docsURL, fileManager.fileExists(atPath: docsURL.path) else {
+            return nil
+        }
+        return docsURL
     }
 
     private static func loadFromURL(
@@ -179,7 +239,7 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
             )
         }
 
-        print("[ArtworkFP] Loaded \(database.count) entries (quantized: \(isQuantized))")
+        print("[ArtworkFP] Loaded \(database.count) entries from \(url.lastPathComponent) (quantized: \(isQuantized))")
         return (database, mode(for: json["tcg"] as? String))
     }
 

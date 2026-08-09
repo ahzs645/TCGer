@@ -16,7 +16,7 @@ final class ScannerPerformanceTests: XCTestCase {
 
     func testBundledScannerPayloadStaysWithinBudget() throws {
         let names = [
-            ("artwork-fingerprints-uint8", "json"),
+            ("artwork-fingerprints-pokemon-uint8", "json"),
             ("MagicCardHashes", "json"),
             ("CardsIndexVectors", "bin"),
             ("CardsIndexMetadata", "json"),
@@ -32,11 +32,14 @@ final class ScannerPerformanceTests: XCTestCase {
 
     func testArtworkDatabaseColdLoadTimeAndMemoryStayWithinBudget() {
         let memoryBefore = residentMemoryBytes()
-        let started = Date()
         let strategy = ArtworkFingerprintScannerStrategy(bundle: .main)
+        // Databases now load lazily per game — time the actual load, not init.
+        let started = Date()
+        let entries = strategy.loadDatabaseIfNeeded(for: .pokemon)
         let elapsed = Date().timeIntervalSince(started)
         let memoryGrowth = residentMemoryBytes().saturatingSubtract(memoryBefore)
 
+        XCTAssertFalse(entries.isEmpty)
         XCTAssertTrue(strategy.supports(.pokemon))
         XCTAssertLessThan(elapsed, Budget.artworkDatabaseLoadSeconds)
         XCTAssertLessThan(memoryGrowth, Budget.artworkLoadMemoryGrowthBytes)
@@ -44,7 +47,8 @@ final class ScannerPerformanceTests: XCTestCase {
 
     func testArtworkDatabasePeakMemoryMetric() {
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            _ = ArtworkFingerprintScannerStrategy(bundle: .main)
+            ArtworkFingerprintScannerStrategy(bundle: .main)
+                .loadDatabaseIfNeeded(for: .pokemon)
         }
     }
 
