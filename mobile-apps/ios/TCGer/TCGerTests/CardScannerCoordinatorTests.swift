@@ -62,13 +62,13 @@ final class CardScannerCoordinatorTests: XCTestCase {
                 StubScanStrategy(
                     kind: .mlDetector,
                     supportsLiveScanning: true,
-                    behavior: .match(cardID: "winner"),
+                    behavior: .noMatch,
                     recorder: recorder
                 ),
                 StubScanStrategy(
                     kind: .artworkFingerprint,
                     supportsLiveScanning: true,
-                    behavior: .noMatch,
+                    behavior: .match(cardID: "winner"),
                     recorder: recorder
                 )
             ],
@@ -85,7 +85,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             return XCTFail("Expected the local fallback strategy to match")
         }
         XCTAssertEqual(scan.primary.details.identity.id, "winner")
-        XCTAssertEqual(recorder.kinds, [.artworkFingerprint, .mlDetector])
+        XCTAssertEqual(recorder.kinds, [.mlDetector, .artworkFingerprint])
     }
 
     func testCleanNoMatchWinsOverEarlierStrategyError() async {
@@ -185,12 +185,12 @@ final class CardScannerCoordinatorTests: XCTestCase {
         let coordinator = CardScannerCoordinator(
             strategies: [
                 StubScanStrategy(
-                    kind: .artworkFingerprint,
+                    kind: .mlDetector,
                     behavior: .match(cardID: "wrong-set", setCode: "sv01"),
                     recorder: recorder
                 ),
                 StubScanStrategy(
-                    kind: .mlDetector,
+                    kind: .artworkFingerprint,
                     behavior: .match(cardID: "right-set", setCode: "sv02"),
                     recorder: recorder
                 )
@@ -207,6 +207,6 @@ final class CardScannerCoordinatorTests: XCTestCase {
             return XCTFail("Expected the in-scope fallback result")
         }
         XCTAssertEqual(scan.primary.details.identity.id, "right-set")
-        XCTAssertEqual(recorder.kinds, [.artworkFingerprint, .mlDetector])
+        XCTAssertEqual(recorder.kinds, [.mlDetector, .artworkFingerprint])
     }
 }

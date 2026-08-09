@@ -70,13 +70,11 @@ struct CardCropper {
             .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
             .cropped(to: CGRect(origin: .zero, size: Configuration.targetSize))
 
-        corrected = corrected
-            .applyingFilter("CIExposureAdjust", parameters: ["inputEV": 0.1])
-            .applyingFilter("CIColorControls", parameters: [
-                "inputSaturation": 1.05,
-                "inputContrast": 1.1,
-                "inputBrightness": -0.02
-            ])
+        // No exposure/contrast/saturation adjustment here: the embedding index
+        // and the artwork-fingerprint database are both built from unmodified
+        // catalog images, so any color grade on the query crop breaks parity.
+        // Contrast-style standardization is measured harmful to the embedding
+        // path (see docs/scanner-model-ai-handoff.md) — keep such ops OCR-only.
 
         return ciContext.createCGImage(corrected, from: corrected.extent)
     }

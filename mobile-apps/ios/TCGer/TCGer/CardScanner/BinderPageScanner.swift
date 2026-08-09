@@ -348,12 +348,9 @@ actor BinderPageScanner {
         corrected = corrected
             .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
             .cropped(to: CGRect(origin: .zero, size: Configuration.targetSize))
-            .applyingFilter("CIExposureAdjust", parameters: ["inputEV": 0.1])
-            .applyingFilter("CIColorControls", parameters: [
-                "inputSaturation": 1.05,
-                "inputContrast": 1.1,
-                "inputBrightness": -0.02
-            ])
+        // No color grade: these crops feed the same recognition strategies as
+        // CardCropper output, and the reference indexes are built from
+        // unmodified catalog images (parity — see docs/scanner-model-ai-handoff.md).
 
         return ciContext.createCGImage(corrected, from: corrected.extent)
     }
