@@ -600,6 +600,10 @@ function asCollectionEntryId(value: string) {
   return value as any;
 }
 
+function asBinderId(value: string) {
+  return value as any;
+}
+
 function asCollectionMutationAuditId(value: string) {
   return value as any;
 }
@@ -1678,6 +1682,13 @@ http.route({
       const identity = await requireBridgeIdentity(ctx, request);
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
+      if (segments.length === 2 && segments[1] === "pages") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        return json(await ctx.runQuery(internal.bridge.listBinderPages, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId)
+        }));
+      }
       if (segments.length !== 1 || segments[0] === "tags" || segments[0] === "export") {
         return errorJson(404, "NOT_FOUND", "Route not found");
       }
@@ -1768,6 +1779,39 @@ http.route({
         return json(findLegacyCardByCopyId(legacyBinder, entry.id) ?? legacyBinder.cards[0], 201);
       }
 
+      if (segments.length === 4 && segments[1] === "pages" && segments[3] === "image") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        const pageNumber = Number.parseInt(segments[2] ?? "", 10);
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+          return errorJson(400, "BAD_REQUEST", "Page number must be a positive integer");
+        }
+        const form = await request.formData();
+        const image = form.get("image");
+        if (!(image instanceof File)) {
+          return errorJson(400, "BAD_REQUEST", "A page image is required");
+        }
+        const storageId = await ctx.storage.store(image);
+        try {
+          const result = await ctx.runMutation(internal.bridge.attachBinderPageImage, {
+            subject: identity.subject,
+            binderId: asBinderId(binderId),
+            pageNumber,
+            storageId
+          });
+          if (result.replacedStorageId) {
+            await ctx.storage.delete(result.replacedStorageId);
+          }
+          const pages = await ctx.runQuery(internal.bridge.listBinderPages, {
+            subject: identity.subject,
+            binderId: asBinderId(binderId)
+          });
+          return json(pages.find((page) => page.pageNumber === pageNumber), 201);
+        } catch (error) {
+          await ctx.storage.delete(storageId);
+          throw error;
+        }
+      }
+
       if (segments.length === 4 && segments[1] === "cards" && segments[3] === "images") {
         const form = await request.formData();
         const files = form.getAll("images").filter((value): value is File => value instanceof File);
@@ -1800,6 +1844,42 @@ http.route({
       return errorJson(404, "NOT_FOUND", "Route not found");
     } catch (error) {
       return handleConvexError(error, "Failed to create resource");
+    }
+  })
+});
+
+http.route({
+  pathPrefix: "/collections/",
+  method: "PUT",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const segments = new URL(request.url).pathname
+        .replace(/^\/collections\//, "")
+        .split("/")
+        .filter(Boolean);
+      if (segments.length !== 3 || segments[1] !== "pages") {
+        return errorJson(404, "NOT_FOUND", "Route not found");
+      }
+      const pageNumber = Number.parseInt(segments[2] ?? "", 10);
+      const body = await parseJsonBody(request);
+      if (!Number.isInteger(pageNumber) || pageNumber < 1 || !Array.isArray(body.placements)) {
+        return errorJson(400, "BAD_REQUEST", "Invalid binder page");
+      }
+      const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+      const capturedAt = typeof body.capturedAt === "string"
+        ? Date.parse(body.capturedAt)
+        : undefined;
+      const page = await ctx.runMutation(internal.bridge.upsertBinderPage, {
+        subject: identity.subject,
+        binderId: asBinderId(binderId),
+        pageNumber,
+        capturedAt: capturedAt !== undefined && Number.isFinite(capturedAt) ? capturedAt : undefined,
+        placements: body.placements
+      });
+      return json(page);
+    } catch (error) {
+      return handleConvexError(error, "Failed to save binder page");
     }
   })
 });
@@ -1973,6 +2053,23 @@ http.route({
           subject: identity.subject,
           entryId: asCollectionEntryId(segments[2])
         });
+        return noContent();
+      }
+
+      if (segments.length === 4 && segments[1] === "pages" && segments[3] === "image") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        const pageNumber = Number.parseInt(segments[2] ?? "", 10);
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+          return errorJson(400, "BAD_REQUEST", "Page number must be a positive integer");
+        }
+        const result = await ctx.runMutation(internal.bridge.removeBinderPageImage, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId),
+          pageNumber
+        });
+        if (result.replacedStorageId) {
+          await ctx.storage.delete(result.replacedStorageId);
+        }
         return noContent();
       }
 

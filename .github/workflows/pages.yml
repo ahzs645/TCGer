@@ -91,6 +91,27 @@ jobs:
           cp -R frontend/out/demo marketing-site/dist/demo
           cp -R frontend/out/_next marketing-site/dist/_next
           cp -R frontend/out/icons marketing-site/dist/icons
+          cp -R frontend/out/card-backs marketing-site/dist/card-backs
+          cp frontend/out/manifest.webmanifest marketing-site/dist/manifest.webmanifest
+          cp frontend/out/pwa-192.png marketing-site/dist/pwa-192.png
+          cp frontend/out/pwa-192-maskable.png marketing-site/dist/pwa-192-maskable.png
+          cp frontend/out/pwa-512.png marketing-site/dist/pwa-512.png
+          cp frontend/out/pwa-512-maskable.png marketing-site/dist/pwa-512-maskable.png
+
+      - name: Verify demo runtime files
+        run: |
+          test -f marketing-site/dist/manifest.webmanifest
+          test -f marketing-site/dist/pwa-192.png
+          test -f marketing-site/dist/pwa-512.png
+          test -f marketing-site/dist/card-backs/pokemon.png
+          test -f marketing-site/dist/card-backs/magic.png
+          test -f marketing-site/dist/card-backs/yugioh.png
+          test -f marketing-site/dist/card-backs/dragonball.jpg
+          test -f marketing-site/dist/card-backs/onepiece.jpg
+          test -f marketing-site/dist/card-backs/lorcana.png
+          test -f marketing-site/dist/demo/sets/magic/MH2/index.txt
+          test -f marketing-site/dist/demo/sets/magic/STA/index.txt
+          test -f marketing-site/dist/demo/sets/yugioh/LOB/index.txt
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

@@ -50,6 +50,85 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(viewModel.latestResult?.primary.details.identity.id, "presented-card")
     }
 
+    func testSessionCandidateCorrectionPersistsAndKeepsOriginalAsAlternative() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .match(cardID: "original-card"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+
+        await viewModel.scan(image: ScannerTestImage.solid())
+        guard let originalResult = viewModel.sessionResults.first else {
+            return XCTFail("Expected a scan result in the session")
+        }
+        viewModel.presentSessionResult(originalResult)
+
+        let correctedCandidate = CardScanCandidate(
+            details: CardDetails(
+                identity: CardIdentity(
+                    id: "corrected-card",
+                    name: "Corrected Card",
+                    game: .pokemon,
+                    setCode: "ME05",
+                    setName: "Mega Evolution"
+                ),
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            ),
+            confidence: CardScanConfidence(score: 0.88, reason: "alternative"),
+            originatingStrategy: .artworkFingerprint
+        )
+
+        viewModel.selectCandidate(correctedCandidate, for: originalResult.id)
+
+        XCTAssertEqual(viewModel.sessionResults.first?.primary.details.identity.id, "corrected-card")
+        XCTAssertEqual(viewModel.latestResult?.primary.details.identity.id, "corrected-card")
+        XCTAssertEqual(
+            viewModel.sessionResults.first?.alternatives.map(\.details.identity.id),
+            ["original-card"]
+        )
+    }
+
+    func testRemovingSessionResultAlsoClearsAddedState() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .match(cardID: "added-card"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+
+        await viewModel.scan(image: ScannerTestImage.solid())
+        guard let resultID = viewModel.sessionResults.first?.id else {
+            return XCTFail("Expected a scan result in the session")
+        }
+
+        viewModel.markSessionResultsAdded([resultID])
+        viewModel.removeSessionResult(id: resultID)
+
+        XCTAssertTrue(viewModel.sessionResults.isEmpty)
+        XCTAssertTrue(viewModel.addedSessionResultIDs.isEmpty)
+    }
+
     func testManualTriggerModeDisablesLivePreviewWithoutDisablingPhotoScan() {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

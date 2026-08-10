@@ -41,6 +41,7 @@ struct CardScannerView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var photoImportProgress: ScannerPhotoImportProgress?
     @State private var bottomControlsHeight: CGFloat = 120
+    @State private var showingSessionReview = false
     let scope: CardScanScope?
 
     init(scope: CardScanScope? = nil) {
@@ -117,6 +118,9 @@ struct CardScannerView: View {
             ScanResultSheet(
                 result: result,
                 color: accentColor(for: viewModel.selectedMode),
+                onSelectCandidate: { candidate in
+                    viewModel.selectCandidate(candidate, for: result.id)
+                },
                 onAddCard: { card, binderId, details in
                     try await APIService().addCardToBinder(
                         config: environmentStore.serverConfiguration,
@@ -128,6 +132,13 @@ struct CardScannerView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(isPresented: $showingSessionReview) {
+            ScannerSessionReviewView(
+                viewModel: viewModel,
+                color: accentColor(for: viewModel.selectedMode)
+            )
+            .environmentObject(environmentStore)
         }
         .fullScreenCover(item: $viewModel.binderReviewPresentation, onDismiss: {
             viewModel.finishBinderPageReview()
@@ -386,23 +397,39 @@ struct CardScannerView: View {
                     pendingCount: viewModel.liveConfirmationCount,
                     pendingRequired: viewModel.liveConfirmationRequired,
                     color: accentColor(for: viewModel.selectedMode),
+                    onReview: { showingSessionReview = true },
                     onSelect: viewModel.presentSessionResult,
                     onRemove: viewModel.removeSessionResult,
                     onClear: viewModel.clearSession
                 )
             }
 
-            captureActionControl
-                .frame(maxWidth: .infinity)
-                .overlay(alignment: .leading) {
-                    captureModeControl
-                }
-                .overlay(alignment: .trailing) {
-                    engineControl
-                }
+            adaptiveCaptureControls
         }
         .animation(.snappy, value: viewModel.liveConfirmationCount)
         .animation(.snappy, value: viewModel.sessionResults.count)
+    }
+
+    @ViewBuilder
+    private var adaptiveCaptureControls: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 12) {
+                captureControlsLayout
+            }
+        } else {
+            captureControlsLayout
+        }
+    }
+
+    private var captureControlsLayout: some View {
+        captureActionControl
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .leading) {
+                captureModeControl
+            }
+            .overlay(alignment: .trailing) {
+                engineControl
+            }
     }
 
     @ViewBuilder
@@ -550,7 +577,8 @@ struct CardScannerView: View {
         } else {
             ScannerOptionLabel(
                 title: hasEnabledScanModes ? viewModel.selectedMode.displayName : "No games",
-                systemImage: "rectangle.stack"
+                systemImage: "rectangle.stack",
+                isInteractive: false
             )
             .accessibilityLabel("Card game")
             .accessibilityValue(hasEnabledScanModes ? viewModel.selectedMode.displayName : "No enabled games")
@@ -584,7 +612,8 @@ struct CardScannerView: View {
         } else {
             ScannerOptionLabel(
                 title: engineControlTitle,
-                systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
+                systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars",
+                isInteractive: false
             )
             .accessibilityLabel("Recognition engine")
             .accessibilityValue(availableScanEngines.first?.displayName ?? "Unavailable")
@@ -850,8 +879,24 @@ private extension CardScannerView {
 private struct ScannerOptionLabel: View {
     let title: String
     let systemImage: String
+    var isInteractive = true
 
     var body: some View {
+        adaptiveLabel
+    }
+
+    @ViewBuilder
+    private var adaptiveLabel: some View {
+        if #available(iOS 26.0, *) {
+            labelContent
+                .glassEffect(.regular.interactive(isInteractive), in: .capsule)
+        } else {
+            labelContent
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    private var labelContent: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
@@ -860,9 +905,8 @@ private struct ScannerOptionLabel: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .frame(width: 96, height: 48)
-        .background(.ultraThinMaterial, in: Capsule())
         .contentShape(Capsule())
     }
 }
@@ -922,15 +966,18 @@ private struct ScanResultSheet: View {
 
     let result: CardScanResult
     let color: Color
+    let onSelectCandidate: (CardScanCandidate) -> Void
     let onAddCard: (Card, String, BinderCardAddDetails) async throws -> Void
 
     init(
         result: CardScanResult,
         color: Color,
+        onSelectCandidate: @escaping (CardScanCandidate) -> Void,
         onAddCard: @escaping (Card, String, BinderCardAddDetails) async throws -> Void
     ) {
         self.result = result
         self.color = color
+        self.onSelectCandidate = onSelectCandidate
         self.onAddCard = onAddCard
         _selectedCandidate = State(initialValue: result.primary)
         _debugCapture = State(initialValue: result.debugCapture)
@@ -1298,6 +1345,7 @@ private struct ScanResultSheet: View {
             ForEach(result.alternatives, id: \.id) { candidate in
                 Button {
                     selectedCandidate = candidate
+                    onSelectCandidate(candidate)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {

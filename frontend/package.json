@@ -12,7 +12,7 @@
     "postbuild:demo": "git checkout -- app/api",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "test": "tsx --test src/lib/catalog/catalog-search.test.ts",
+    "test": "tsx --test src/lib/api/demo-adapter.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts",
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {

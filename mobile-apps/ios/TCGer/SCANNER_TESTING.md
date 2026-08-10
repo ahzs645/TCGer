@@ -11,8 +11,12 @@ The scanner has three complementary test layers:
 
 Camera scans first map the visible guide through the aspect-fill preview into
 photo pixels. Vision rectangle detection and perspective correction then run
-inside that guide crop. Imported Simulator fixtures intentionally skip the
-camera-guide crop because the selected image is already the scanner input.
+inside that guide crop. This applies to binder pages too: the guide says
+"Fit the full binder page" and the capture is cropped to it, so the scanner
+and the review screen see exactly what the user framed (the uncropped sensor
+photo is still preserved in dev-mode recordings as `frame-NNNN-original.jpg`).
+Imported Simulator fixtures intentionally skip the camera-guide crop because
+the selected image is already the scanner input.
 
 Imports are scanned as `ScanInvocationKind.importedPhoto` (photo-library
 picks, Test Photo, Demo, and the fixture tests); only the camera shutter path

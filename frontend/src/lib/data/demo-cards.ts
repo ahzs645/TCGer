@@ -16,6 +16,24 @@ export interface DemoCard {
   price: number;
 }
 
+export function isSyntheticDemoCardId(value: string): boolean {
+  return /^(?:ygo|mtg|pkm)-\d+$/i.test(value);
+}
+
+export function splitDemoPrintingCode(value: string): {
+  setCode?: string;
+  collectorNumber?: string;
+} {
+  const separator = value.lastIndexOf('-');
+  if (separator <= 0 || separator === value.length - 1) {
+    return { setCode: value || undefined };
+  }
+  return {
+    setCode: value.slice(0, separator),
+    collectorNumber: value.slice(separator + 1),
+  };
+}
+
 export const DEMO_CARDS: DemoCard[] = [
   // ── Yu-Gi-Oh! ──────────────────────────────────────────────────────
   { id: 'ygo-001', tcg: 'yugioh', name: 'Blue-Eyes White Dragon', setCode: 'SDK-001', setName: 'Starter Deck: Kaiba', rarity: 'Ultra Rare', price: 24.99 },

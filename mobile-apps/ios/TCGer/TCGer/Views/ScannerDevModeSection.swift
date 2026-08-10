@@ -73,11 +73,13 @@ struct ScannerDevModeSection: View {
     }
 }
 
-/// Submenu listing each recorded session with share and swipe-to-delete.
+/// Submenu listing each recorded session with share and explicit delete actions.
 struct ScannerDevModeSessionsView: View {
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
+    @State private var sessionPendingDeletion: ScannerDevModeStore.SessionInfo?
+    @State private var isConfirmingDeleteAll = false
 
     var body: some View {
         List {
@@ -92,27 +94,39 @@ struct ScannerDevModeSessionsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.displayName(for: session))
                             .font(.subheadline.weight(.semibold))
-                        Text("\(session.frameCount) frame\(session.frameCount == 1 ? "" : "s") · \(DevModeExporter.sizeFormatter.string(fromByteCount: session.sizeBytes))")
+                        Text(Self.details(for: session))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {
-                        do {
-                            shareArchive = try DevModeExporter.zip(session: session)
-                            errorMessage = nil
-                        } catch {
-                            errorMessage = "Share failed: \(error.localizedDescription)"
+                    HStack(spacing: 4) {
+                        Button {
+                            do {
+                                shareArchive = try DevModeExporter.zip(session: session)
+                                errorMessage = nil
+                            } catch {
+                                errorMessage = "Share failed: \(error.localizedDescription)"
+                            }
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .frame(width: 44, height: 44)
                         }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Share \(Self.displayName(for: session))")
+
+                        Button(role: .destructive) {
+                            sessionPendingDeletion = session
+                        } label: {
+                            Image(systemName: "trash")
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Delete \(Self.displayName(for: session))")
                     }
-                    .buttonStyle(.borderless)
                 }
                 .swipeActions {
                     Button(role: .destructive) {
-                        ScannerDevModeStore.deleteSession(at: session.url)
-                        refresh()
+                        sessionPendingDeletion = session
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
@@ -127,14 +141,79 @@ struct ScannerDevModeSessionsView: View {
         }
         .navigationTitle("Recorded Sessions")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Delete All", role: .destructive) {
+                    isConfirmingDeleteAll = true
+                }
+                .disabled(sessions.isEmpty)
+            }
+        }
         .onAppear(perform: refresh)
         .sheet(item: $shareArchive) { archive in
             DevModeActivityView(items: [archive.url])
         }
+        .confirmationDialog(
+            "Delete Recorded Session?",
+            isPresented: isConfirmingSessionDeletion,
+            titleVisibility: .visible,
+            presenting: sessionPendingDeletion
+        ) { session in
+            Button("Delete", role: .destructive) {
+                delete(session)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { session in
+            Text("This permanently deletes \(Self.displayName(for: session)) and all of its recorded frames.")
+        }
+        .confirmationDialog(
+            "Delete All Recorded Sessions?",
+            isPresented: $isConfirmingDeleteAll,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                deleteAll()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes all \(sessions.count) recorded sessions and their frames.")
+        }
+    }
+
+    private var isConfirmingSessionDeletion: Binding<Bool> {
+        Binding(
+            get: { sessionPendingDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    sessionPendingDeletion = nil
+                }
+            }
+        )
     }
 
     private func refresh() {
         sessions = ScannerDevModeStore.listSessions()
+    }
+
+    private func delete(_ session: ScannerDevModeStore.SessionInfo) {
+        do {
+            try ScannerDevModeStore.deleteSession(at: session.url)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Delete failed: \(error.localizedDescription)"
+        }
+        sessionPendingDeletion = nil
+        refresh()
+    }
+
+    private func deleteAll() {
+        do {
+            try ScannerDevModeStore.deleteAllSessions()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Delete all failed: \(error.localizedDescription)"
+        }
+        refresh()
     }
 
     /// "scan-session-20260809-145717" → "Aug 9, 2:57 PM"; falls back to the
@@ -145,6 +224,12 @@ struct ScannerDevModeSessionsView: View {
               let date = parseFormatter.date(from: String(stamp))
         else { return name }
         return displayFormatter.string(from: date)
+    }
+
+    private static func details(for session: ScannerDevModeStore.SessionInfo) -> String {
+        let frameLabel = session.frameCount == 1 ? "frame" : "frames"
+        let size = DevModeExporter.sizeFormatter.string(fromByteCount: session.sizeBytes)
+        return "\(session.frameCount) \(frameLabel) · \(size)"
     }
 
     private static let parseFormatter: DateFormatter = {

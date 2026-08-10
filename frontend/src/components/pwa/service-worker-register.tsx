@@ -12,6 +12,10 @@ export function ServiceWorkerRegister() {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
     if (process.env.NODE_ENV !== "production") return;
+    // The GitHub Pages demo is embedded beneath the marketing site. A root
+    // service worker would claim unrelated pages and request routes that are
+    // intentionally not part of the static demo artifact.
+    if (process.env.NEXT_PUBLIC_DEMO_EXPORT === "true") return;
 
     const register = () => {
       const catalogRoot = new URL(CATALOG_ROOT, window.location.origin);

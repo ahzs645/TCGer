@@ -51,9 +51,11 @@ final class CardScannerViewModel: ObservableObject {
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
     @Published private(set) var sessionResults: [CardScanResult] = []
+    @Published private(set) var addedSessionResultIDs: Set<CardScanResult.ID> = []
     @Published private(set) var liveCandidateName: String?
     @Published private(set) var liveConfirmationCount = 0
     @Published private(set) var liveConfirmationRequired = 2
+    @Published private(set) var nextBinderPageNumber = 1
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -77,7 +79,6 @@ final class CardScannerViewModel: ObservableObject {
     private var liveConsensus = LiveScanConsensus()
     private var automaticallyPresentsResults = false
     private var isPhotoImportActive = false
-    private var nextBinderPageNumber = 1
 
     var binderPagesScanned: Int { binderPages.count }
 
@@ -296,7 +297,8 @@ final class CardScannerViewModel: ObservableObject {
     func scanBinderPage(
         image: CGImage,
         presentsReview: Bool = true,
-        source: ScanInvocationKind = .importedPhoto
+        source: ScanInvocationKind = .importedPhoto,
+        originalImage: CGImage? = nil
     ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
@@ -315,14 +317,24 @@ final class CardScannerViewModel: ObservableObject {
             let result = try await binderPageScanner.scan(image: image, context: context)
             recordBinderPageForDevMode(
                 page: image,
+                original: originalImage,
                 result: result,
                 error: nil,
                 source: source,
                 mode: context.mode
             )
-            let record = BinderPageRecord(result: result, pageNumber: nextBinderPageNumber)
-            nextBinderPageNumber += 1
-            binderPages.append(record)
+            let scannedPageNumber = nextBinderPageNumber
+            let record = BinderPageRecord(result: result, pageNumber: scannedPageNumber)
+            if let existingIndex = binderPages.firstIndex(where: { $0.pageNumber == scannedPageNumber }) {
+                binderPages[existingIndex] = record
+            } else {
+                binderPages.append(record)
+                binderPages.sort { $0.pageNumber < $1.pageNumber }
+            }
+            nextBinderPageNumber = max(
+                scannedPageNumber + 1,
+                (binderPages.map(\.pageNumber).max() ?? 0) + 1
+            )
             if binderPages.count > 30 {
                 // Full-resolution captures are session-only; bound retained memory by
                 // dropping the oldest page after 30 scans.
@@ -330,7 +342,7 @@ final class CardScannerViewModel: ObservableObject {
             }
             if presentsReview {
                 binderReviewPresentation = BinderReviewPresentation(
-                    initialPageIndex: binderPages.count - 1
+                    initialPageIndex: binderPages.firstIndex(where: { $0.pageNumber == scannedPageNumber }) ?? 0
                 )
             }
             state = .ready
@@ -338,6 +350,7 @@ final class CardScannerViewModel: ObservableObject {
         } catch {
             recordBinderPageForDevMode(
                 page: image,
+                original: originalImage,
                 result: nil,
                 error: error,
                 source: source,
@@ -355,6 +368,7 @@ final class CardScannerViewModel: ObservableObject {
     /// not just an unlabeled photo.
     private func recordBinderPageForDevMode(
         page: CGImage,
+        original: CGImage?,
         result: BinderPageScanResult?,
         error: Error?,
         source: ScanInvocationKind,
@@ -410,6 +424,7 @@ final class CardScannerViewModel: ObservableObject {
                 elapsedMs: elapsedMs,
                 result: nil,
                 diagnostics: diagnostics,
+                originalImage: original,
                 outcomeLabel: label
             )
         }
@@ -447,6 +462,15 @@ final class CardScannerViewModel: ObservableObject {
         )
     }
 
+    func prepareToRescanBinderPage(_ pageNumber: Int) {
+        nextBinderPageNumber = max(1, pageNumber)
+        binderReviewPresentation = nil
+    }
+
+    func setNextBinderPageNumber(_ pageNumber: Int) {
+        nextBinderPageNumber = max(1, min(10_000, pageNumber))
+    }
+
     func clearBinderSession() {
         binderReviewPresentation = nil
         binderPages.removeAll()
@@ -461,6 +485,7 @@ final class CardScannerViewModel: ObservableObject {
 
     func removeSessionResult(id: CardScanResult.ID) {
         sessionResults.removeAll { $0.id == id }
+        addedSessionResultIDs.remove(id)
         if latestResult?.id == id {
             clearResult()
         }
@@ -468,8 +493,38 @@ final class CardScannerViewModel: ObservableObject {
 
     func clearSession() {
         sessionResults.removeAll()
+        addedSessionResultIDs.removeAll()
         liveConsensus.reset()
         resetLiveConfirmation()
+    }
+
+    func selectCandidate(_ candidate: CardScanCandidate, for resultID: CardScanResult.ID) {
+        guard let index = sessionResults.firstIndex(where: { $0.id == resultID }) else { return }
+        let result = sessionResults[index]
+        guard result.primary.id != candidate.id else { return }
+
+        var alternatives = [result.primary]
+        alternatives.append(contentsOf: result.alternatives.filter { $0.id != candidate.id })
+        let updatedResult = CardScanResult(
+            id: result.id,
+            mode: result.mode,
+            capturedImage: result.capturedImage,
+            primary: candidate,
+            alternatives: alternatives,
+            elapsed: result.elapsed,
+            debugCapture: result.debugCapture,
+            debugCaptureError: result.debugCaptureError
+        )
+        sessionResults[index] = updatedResult
+
+        if latestResult?.id == resultID {
+            latestResult = updatedResult
+            state = .result(updatedResult)
+        }
+    }
+
+    func markSessionResultsAdded(_ resultIDs: Set<CardScanResult.ID>) {
+        addedSessionResultIDs.formUnion(resultIDs)
     }
 
     private func rebuildContext() {
@@ -498,7 +553,16 @@ final class CardScannerViewModel: ObservableObject {
             return
         }
         if captureMode == .binder {
-            await scanBinderPage(image: cgImage, source: .photoCapture)
+            // The framing guide says "Fit the full binder page" — honor it.
+            // Processing the raw sensor frame made the scanner (and the
+            // review screen) see far more than the user framed: surroundings
+            // ate detector capacity and every card shrank relative to the
+            // frame. The uncropped photo is still preserved for dev mode.
+            await scanBinderPage(
+                image: guideCroppedImage(from: cgImage),
+                source: .photoCapture,
+                originalImage: cgImage
+            )
         } else {
             await scan(
                 image: guideCroppedImage(from: cgImage),
@@ -668,7 +732,9 @@ final class CardScannerViewModel: ObservableObject {
     private func appendToSession(_ result: CardScanResult) {
         sessionResults.append(result)
         if sessionResults.count > 100 {
+            let removedIDs = Set(sessionResults.prefix(sessionResults.count - 100).map(\.id))
             sessionResults.removeFirst(sessionResults.count - 100)
+            addedSessionResultIDs.subtract(removedIDs)
         }
     }
 

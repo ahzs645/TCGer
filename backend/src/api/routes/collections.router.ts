@@ -10,7 +10,8 @@ import {
   collectionImportRequestSchema,
   collectionMutationHistoryQuerySchema,
   undoCollectionMutationSchema,
-  bulkAddRequestSchema
+  bulkAddRequestSchema,
+  upsertBinderPageSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -47,6 +48,12 @@ import {
 } from '../../modules/collections/bulk-add.service';
 import { asyncHandler } from '../../utils/async-handler';
 import { uploadImages, getImagePublicPath, deleteImageFile } from '../../utils/upload';
+import {
+  listBinderPages,
+  removeBinderPageImage,
+  replaceBinderPageImage,
+  upsertBinderPage
+} from '../../modules/collections/binder-pages.service';
 
 export const collectionsRouter = Router();
 
@@ -79,6 +86,86 @@ collectionsRouter.post(
     const input = collectionImportRequestSchema.parse(req.body);
     const preview = await previewCollectionImportSourceForUser(userId, input);
     res.status(preview.valid ? 200 : 422).json(preview);
+  })
+);
+
+collectionsRouter.get(
+  '/:binderId/pages',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    try {
+      res.json(await listBinderPages(userId, req.params.binderId));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Binder not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.put(
+  '/:binderId/pages/:pageNumber',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const pageNumber = Number.parseInt(req.params.pageNumber, 10);
+    const input = upsertBinderPageSchema.parse({ ...req.body, pageNumber });
+    try {
+      res.json(await upsertBinderPage(userId, req.params.binderId, input));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Binder not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.post(
+  '/:binderId/pages/:pageNumber/image',
+  requireAuth,
+  uploadImages.single('image'),
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const pageNumber = Number.parseInt(req.params.pageNumber, 10);
+    const file = req.file;
+    if (!file || !Number.isInteger(pageNumber) || pageNumber < 1) {
+      if (file) deleteImageFile(getImagePublicPath(file.filename));
+      return res.status(400).json({ error: 'BAD_REQUEST', message: 'A valid page image is required' });
+    }
+    const publicPath = getImagePublicPath(file.filename);
+    try {
+      const result = await replaceBinderPageImage(userId, req.params.binderId, pageNumber, publicPath);
+      if (result.replacedImageUrl) deleteImageFile(result.replacedImageUrl);
+      res.status(201).json(result.page);
+    } catch (error) {
+      deleteImageFile(publicPath);
+      if (error instanceof Error && ['Binder not found', 'Binder page not found'].includes(error.message)) {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.delete(
+  '/:binderId/pages/:pageNumber/image',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const pageNumber = Number.parseInt(req.params.pageNumber, 10);
+    try {
+      const removed = await removeBinderPageImage(userId, req.params.binderId, pageNumber);
+      if (removed) deleteImageFile(removed);
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && ['Binder not found', 'Binder page not found'].includes(error.message)) {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
   })
 );
 

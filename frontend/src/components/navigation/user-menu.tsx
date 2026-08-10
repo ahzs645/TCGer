@@ -124,7 +124,7 @@ export function UserMenu() {
 
   return (
     <>
-      <DropdownMenu data-oid="78tbwbv">
+      <DropdownMenu modal={false} data-oid="78tbwbv">
         <DropdownMenuTrigger asChild data-oid="4sopfve">
           <Button
             variant="ghost"

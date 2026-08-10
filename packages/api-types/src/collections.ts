@@ -149,6 +149,57 @@ export const updateBinderSchema = z.object({
 export type UpdateBinderInput = z.infer<typeof updateBinderSchema>;
 
 // ---------------------------------------------------------------------------
+// Persistent binder pages
+// ---------------------------------------------------------------------------
+
+const normalizedCoordinateSchema = z.number().finite().min(0).max(1);
+
+export const binderPagePointSchema = z.object({
+  x: normalizedCoordinateSchema,
+  y: normalizedCoordinateSchema
+});
+export type BinderPagePoint = z.infer<typeof binderPagePointSchema>;
+
+export const binderPageQuadSchema = z.object({
+  topLeft: binderPagePointSchema,
+  topRight: binderPagePointSchema,
+  bottomRight: binderPagePointSchema,
+  bottomLeft: binderPagePointSchema
+});
+export type BinderPageQuad = z.infer<typeof binderPageQuadSchema>;
+
+export const binderPagePlacementSchema = z.object({
+  slotIndex: z.number().int().min(0).max(99),
+  cardId: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  tcg: tcgCodeSchema,
+  setCode: z.string().trim().min(1).optional(),
+  confidence: z.number().finite().min(0).max(1),
+  status: z.enum(['matched', 'uncertain']),
+  quad: binderPageQuadSchema
+});
+export type BinderPagePlacement = z.infer<typeof binderPagePlacementSchema>;
+
+export const upsertBinderPageSchema = z.object({
+  pageNumber: z.number().int().min(1).max(10000),
+  capturedAt: z.string().datetime().optional(),
+  placements: z.array(binderPagePlacementSchema).max(100)
+});
+export type UpsertBinderPageInput = z.infer<typeof upsertBinderPageSchema>;
+
+export interface BinderPage {
+  id: string;
+  binderId: string;
+  pageNumber: number;
+  revision: number;
+  capturedAt: string;
+  imageUrl?: string;
+  placements: BinderPagePlacement[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
 // Card-in-collection request schemas
 // ---------------------------------------------------------------------------
 

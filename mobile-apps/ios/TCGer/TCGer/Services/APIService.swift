@@ -132,6 +132,7 @@ final class LocalStore {
     private var appSettings: AppSettings
     private var tags: [CollectionCardTag]
     private var collections: [Collection]
+    private var binderPages: [SavedBinderPage]
     private var searchCatalog: [Card]
     private var printGroups: [String: [Card]]
     private var nextBinderId: Int
@@ -196,6 +197,7 @@ final class LocalStore {
         )
         self.tags = LocalStore.starterTags
         self.collections = []
+        self.binderPages = []
         self.searchCatalog = []
         self.printGroups = [:]
         self.nextBinderId = 1
@@ -223,6 +225,7 @@ final class LocalStore {
 
     private struct PersistedState: Codable {
         var collections: [Collection]
+        var binderPages: [SavedBinderPage]?
         var tags: [CollectionCardTag]
         var wishlists: [Wishlist]
         var sealedInventory: [SealedInventoryItem]
@@ -259,6 +262,7 @@ final class LocalStore {
         }
 
         collections = state.collections
+        binderPages = state.binderPages ?? []
         tags = state.tags
         wishlists = state.wishlists
         sealedInventory = state.sealedInventory
@@ -300,6 +304,7 @@ final class LocalStore {
         guard let url = LocalStore.storeURL else { return }
         let state = PersistedState(
             collections: collections,
+            binderPages: binderPages,
             tags: tags,
             wishlists: wishlists,
             sealedInventory: sealedInventory,
@@ -326,6 +331,7 @@ final class LocalStore {
             try? FileManager.default.removeItem(at: url)
         }
         collections = []
+        binderPages = []
         wishlists = []
         sealedInventory = []
         transactions = []
@@ -1006,7 +1012,113 @@ final class LocalStore {
             throw APIService.APIError.serverError(status: 404, message: "Collection not found")
         }
         collections.remove(at: index)
+        for page in binderPages where page.binderId == id {
+            removeLocalBinderPageImage(at: page.imageUrl)
+        }
+        binderPages.removeAll { $0.binderId == id }
         persist()
+    }
+
+    func getBinderPages(binderId: String) -> [SavedBinderPage] {
+        binderPages
+            .filter { $0.binderId == binderId }
+            .sorted { $0.pageNumber < $1.pageNumber }
+    }
+
+    func upsertBinderPage(
+        binderId: String,
+        pageNumber: Int,
+        capturedAt: Date,
+        placements: [BinderPagePlacement]
+    ) -> SavedBinderPage {
+        let timestamp = LocalStore.isoFormatter.string(from: Date())
+        let captured = LocalStore.isoFormatter.string(from: capturedAt)
+        let existingIndex = binderPages.firstIndex {
+            $0.binderId == binderId && $0.pageNumber == pageNumber
+        }
+        let existing = existingIndex.map { binderPages[$0] }
+        let page = SavedBinderPage(
+            id: existing?.id ?? "local-page-\(UUID().uuidString)",
+            binderId: binderId,
+            pageNumber: pageNumber,
+            revision: (existing?.revision ?? 0) + 1,
+            capturedAt: captured,
+            imageUrl: existing?.imageUrl,
+            placements: placements,
+            createdAt: existing?.createdAt ?? timestamp,
+            updatedAt: timestamp
+        )
+        if let existingIndex {
+            binderPages[existingIndex] = page
+        } else {
+            binderPages.append(page)
+        }
+        persist()
+        return page
+    }
+
+    func replaceBinderPageImage(
+        binderId: String,
+        pageNumber: Int,
+        imageData: Data
+    ) throws -> SavedBinderPage {
+        guard let index = binderPages.firstIndex(where: {
+            $0.binderId == binderId && $0.pageNumber == pageNumber
+        }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Binder page not found")
+        }
+        guard let directory = Self.binderPageImageDirectory else {
+            throw APIService.APIError.serverError(status: 500, message: "Image storage unavailable")
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("\(UUID().uuidString).jpg")
+        try imageData.write(to: url, options: [.atomic])
+        let existing = binderPages[index]
+        removeLocalBinderPageImage(at: existing.imageUrl)
+        let page = SavedBinderPage(
+            id: existing.id,
+            binderId: existing.binderId,
+            pageNumber: existing.pageNumber,
+            revision: existing.revision,
+            capturedAt: existing.capturedAt,
+            imageUrl: url.absoluteString,
+            placements: existing.placements,
+            createdAt: existing.createdAt,
+            updatedAt: LocalStore.isoFormatter.string(from: Date())
+        )
+        binderPages[index] = page
+        persist()
+        return page
+    }
+
+    func removeBinderPageImage(binderId: String, pageNumber: Int) {
+        guard let index = binderPages.firstIndex(where: {
+            $0.binderId == binderId && $0.pageNumber == pageNumber
+        }) else { return }
+        let existing = binderPages[index]
+        removeLocalBinderPageImage(at: existing.imageUrl)
+        binderPages[index] = SavedBinderPage(
+            id: existing.id,
+            binderId: existing.binderId,
+            pageNumber: existing.pageNumber,
+            revision: existing.revision,
+            capturedAt: existing.capturedAt,
+            imageUrl: nil,
+            placements: existing.placements,
+            createdAt: existing.createdAt,
+            updatedAt: LocalStore.isoFormatter.string(from: Date())
+        )
+        persist()
+    }
+
+    private static var binderPageImageDirectory: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("BinderPageImages", isDirectory: true)
+    }
+
+    private func removeLocalBinderPageImage(at value: String?) {
+        guard let value, let url = URL(string: value), url.isFileURL else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     func getTags() -> [CollectionCardTag] {

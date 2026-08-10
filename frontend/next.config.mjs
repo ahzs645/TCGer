@@ -12,6 +12,9 @@ const distDir = process.env.NEXT_DIST_DIR || '.next';
 
 const nextConfig = {
   distDir,
+  env: {
+    NEXT_PUBLIC_DEMO_EXPORT: isDemoExport ? 'true' : 'false'
+  },
   outputFileTracingRoot: path.join(__dirname, '..'),
   // @huggingface/transformers (client-side embedding scanner) conditionally
   // requires Node-only packages. Exclude them from the browser bundle so the

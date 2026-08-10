@@ -601,7 +601,9 @@ export function AccountSettingsDialog({
               ) : sourceDefaults ? (
                 <div className="space-y-3" data-oid="9c-ywnl">
                   {(
-                    Object.entries(sourceDefaults) as Array<
+                    Object.entries(sourceDefaults).filter(([key]) =>
+                      isSourceKey(key),
+                    ) as Array<
                       [SourceKey, { url: string; label: string }]
                     >
                   ).map(([key, source]) => {
@@ -697,6 +699,10 @@ export function AccountSettingsDialog({
 
 function isLocalCache(url: string) {
   return /localhost|:\d{4}|-bulk|-cache/i.test(url);
+}
+
+function isSourceKey(value: string): value is SourceKey {
+  return Object.prototype.hasOwnProperty.call(SOURCE_NOTES, value);
 }
 
 const SOURCE_NOTES: Record<SourceKey, { remote: string; local: string }> = {

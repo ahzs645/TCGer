@@ -233,6 +233,136 @@ extension APIService {
         return collection
     }
 
+    private struct UpsertBinderPageRequest: Encodable {
+        let pageNumber: Int
+        let capturedAt: String
+        let placements: [BinderPagePlacement]
+    }
+
+    func getBinderPages(
+        config: ServerConfiguration,
+        token: String?,
+        binderId: String
+    ) async throws -> [SavedBinderPage] {
+        if config.isOnDevice {
+            return LocalStore.shared.getBinderPages(binderId: binderId)
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/pages",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let pages = try? JSONDecoder().decode([SavedBinderPage].self, from: data) else {
+            throw APIError.decodingError
+        }
+        return pages
+    }
+
+    func upsertBinderPage(
+        config: ServerConfiguration,
+        token: String?,
+        binderId: String,
+        pageNumber: Int,
+        capturedAt: Date,
+        placements: [BinderPagePlacement]
+    ) async throws -> SavedBinderPage {
+        if config.isOnDevice {
+            return LocalStore.shared.upsertBinderPage(
+                binderId: binderId,
+                pageNumber: pageNumber,
+                capturedAt: capturedAt,
+                placements: placements
+            )
+        }
+        let body = UpsertBinderPageRequest(
+            pageNumber: pageNumber,
+            capturedAt: ISO8601DateFormatter().string(from: capturedAt),
+            placements: placements
+        )
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/pages/\(pageNumber)",
+            method: "PUT",
+            token: token,
+            body: body
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let page = try? JSONDecoder().decode(SavedBinderPage.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return page
+    }
+
+    func replaceBinderPageImage(
+        config: ServerConfiguration,
+        token: String?,
+        binderId: String,
+        pageNumber: Int,
+        imageData: Data
+    ) async throws -> SavedBinderPage {
+        if config.isOnDevice {
+            return try LocalStore.shared.replaceBinderPageImage(
+                binderId: binderId,
+                pageNumber: pageNumber,
+                imageData: imageData
+            )
+        }
+        guard let token else { throw APIError.unauthorized }
+        guard let url = config.endpoint(path: "collections/\(binderId)/pages/\(pageNumber)/image") else {
+            throw APIError.invalidURL
+        }
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"binder-page-\(pageNumber).jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        let (data, response) = try await execute(request)
+        guard response.statusCode == 201 || response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let page = try? JSONDecoder().decode(SavedBinderPage.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return page
+    }
+
+    func removeBinderPageImage(
+        config: ServerConfiguration,
+        token: String?,
+        binderId: String,
+        pageNumber: Int
+    ) async throws {
+        if config.isOnDevice {
+            LocalStore.shared.removeBinderPageImage(binderId: binderId, pageNumber: pageNumber)
+            return
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/pages/\(pageNumber)/image",
+            method: "DELETE",
+            token: token
+        )
+        guard response.statusCode == 204 || response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+    }
+
     struct CreateCollectionRequest: Encodable {
         let name: String
         let description: String?

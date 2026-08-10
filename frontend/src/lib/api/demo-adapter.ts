@@ -14,6 +14,8 @@ import {
 import {
   searchDemoCards,
   DEMO_CARDS,
+  isSyntheticDemoCardId,
+  splitDemoPrintingCode,
   type DemoCard,
   type DemoTcg,
 } from "@/lib/data/demo-cards";
@@ -109,7 +111,16 @@ function toCollectionCard(
     externalId: card.cardData?.externalId ?? card.cardId,
     name: card.cardData?.name ?? card.name,
     tcg: card.tcg,
-    setCode: card.cardData?.setCode ?? card.setCode,
+    setCode:
+      card.cardData?.setCode ??
+      (isSyntheticDemoCardId(card.cardId)
+        ? splitDemoPrintingCode(card.setCode).setCode
+        : card.setCode),
+    collectorNumber:
+      card.cardData?.collectorNumber ??
+      (isSyntheticDemoCardId(card.cardId)
+        ? splitDemoPrintingCode(card.setCode).collectorNumber
+        : undefined),
     setName: card.cardData?.setName ?? card.setName,
     rarity: card.cardData?.rarity ?? card.rarity,
     languageCode: card.cardData?.language,
@@ -142,7 +153,16 @@ function toWishlistCard(card: DemoWishlistCard) {
     externalId: card.cardData?.externalId ?? card.cardId,
     tcg: card.tcg,
     name: card.cardData?.name ?? card.name,
-    setCode: card.cardData?.setCode ?? card.setCode,
+    setCode:
+      card.cardData?.setCode ??
+      (isSyntheticDemoCardId(card.cardId)
+        ? splitDemoPrintingCode(card.setCode).setCode
+        : card.setCode),
+    collectorNumber:
+      card.cardData?.collectorNumber ??
+      (isSyntheticDemoCardId(card.cardId)
+        ? splitDemoPrintingCode(card.setCode).collectorNumber
+        : undefined),
     setName: card.cardData?.setName ?? card.setName,
     rarity: card.cardData?.rarity ?? card.rarity,
     owned: store().isCardInCollection(card.cardId),
@@ -172,12 +192,12 @@ function toWishlist(w: DemoWishlist) {
 }
 
 function demoCardToSearchResult(dc: DemoCard) {
-  const collectorNumber = dc.setCode.match(/-([^-]+)$/)?.[1];
+  const { setCode, collectorNumber } = splitDemoPrintingCode(dc.setCode);
   return {
     id: dc.id,
     tcg: dc.tcg,
     name: dc.name,
-    setCode: dc.setCode,
+    setCode,
     setName: dc.setName,
     rarity: dc.rarity,
     collectorNumber,
@@ -388,7 +408,7 @@ export function handleDemoRequest(
 
   // ── Settings ────────────────────────────────────────────────────
   if (segments[0] === "settings") {
-    return handleSettings(method, body);
+    return handleSettings(method, segments.slice(1), body);
   }
 
   // ── Setup ───────────────────────────────────────────────────────
@@ -823,7 +843,11 @@ function handleUsers(
 /*  Settings handlers                                                   */
 /* ------------------------------------------------------------------ */
 
-function handleSettings(method: string, body?: unknown): Promise<Response> {
+function handleSettings(
+  method: string,
+  segments: string[],
+  body?: unknown,
+): Promise<Response> {
   const defaults = {
     id: 1,
     publicDashboard: true,
@@ -833,9 +857,42 @@ function handleSettings(method: string, body?: unknown): Promise<Response> {
     updatedAt: new Date().toISOString(),
   };
 
-  if (method === "GET") return json(defaults);
-  if (method === "PATCH")
+  if (segments.length === 0 && method === "GET") return json(defaults);
+  if (segments.length === 0 && method === "PATCH")
     return json({ ...defaults, ...(body as Record<string, unknown>) });
+
+  if (segments[0] === "source-defaults" && method === "GET") {
+    return json({
+      scryfall: {
+        url: "https://api.scryfall.com",
+        label: "Scryfall (Magic)",
+      },
+      yugioh: {
+        url: "https://db.ygoprodeck.com/api/v7",
+        label: "YGOPRODeck (Yu-Gi-Oh)",
+      },
+      pokemon: {
+        url: "https://api.scrydex.com/pokemon/v1",
+        label: "Scrydex (Pok\u00e9mon)",
+      },
+      tcgdex: {
+        url: "https://api.tcgdex.net/v2/en",
+        label: "TCGdex (Pok\u00e9mon Variants)",
+      },
+    });
+  }
+
+  if (segments[0] === "test-source" && method === "POST") {
+    const source = (body as { source?: unknown } | undefined)?.source;
+    if (
+      typeof source !== "string" ||
+      !["scryfall", "yugioh", "pokemon", "tcgdex"].includes(source)
+    ) {
+      return json({ message: "Unsupported source" }, 400);
+    }
+    return json({ ok: true, latencyMs: 0 });
+  }
+
   return notFound();
 }
 

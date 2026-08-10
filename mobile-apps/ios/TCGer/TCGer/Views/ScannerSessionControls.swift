@@ -16,6 +16,16 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     @ViewBuilder let leadingContent: () -> LeadingContent
 
     var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 12) {
+                toolbarContent
+            }
+        } else {
+            toolbarContent
+        }
+    }
+
+    private var toolbarContent: some View {
         HStack(spacing: 10) {
             if let onDismiss {
                 Button(action: onDismiss) {
@@ -86,12 +96,9 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     .disabled(isProcessing)
                 }
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.headline)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
+                scannerOptionsLabel
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .accessibilityLabel("Scanner options")
             .accessibilityValue(
                 "\(triggerMode.displayName) scan, automatic results "
@@ -111,6 +118,22 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var scannerOptionsLabel: some View {
+        if #available(iOS 26.0, *) {
+            Image(systemName: "ellipsis")
+                .font(.headline)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            Image(systemName: "ellipsis")
+                .font(.headline)
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+    }
 }
 
 struct ScannerSessionTray: View {
@@ -119,19 +142,29 @@ struct ScannerSessionTray: View {
     let pendingCount: Int
     let pendingRequired: Int
     let color: Color
+    let onReview: () -> Void
     let onSelect: (CardScanResult) -> Void
     let onRemove: (CardScanResult.ID) -> Void
     let onClear: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Label("\(results.count)", systemImage: "rectangle.stack.fill")
+            Button(action: onReview) {
+                HStack(spacing: 6) {
+                    Label("\(results.count)", systemImage: "rectangle.stack.fill")
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10)
                 .frame(height: 42)
                 .background(color.opacity(0.24), in: Capsule())
-                .accessibilityLabel("\(results.count) cards in this scan session")
+            }
+            .buttonStyle(.plain)
+            .disabled(results.isEmpty)
+            .accessibilityLabel("Review \(results.count) scanned cards")
+            .accessibilityHint("Select cards, correct matches, or add them to a binder")
 
             if let pendingCardName, pendingCount > 0 {
                 VStack(alignment: .leading, spacing: 5) {

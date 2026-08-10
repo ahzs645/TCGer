@@ -40,6 +40,17 @@ actor ScannerDevModeStore {
         var id: String { url.lastPathComponent }
     }
 
+    enum SessionDeletionError: LocalizedError {
+        case invalidLocation
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidLocation:
+                return "The selected recording is outside the recordings folder."
+            }
+        }
+    }
+
     private enum Limits {
         /// Matches the live-debug recorder's cap so one session cannot fill
         /// the disk; oldest frames are dropped first.
@@ -198,9 +209,19 @@ actor ScannerDevModeStore {
             .sorted { $0.url.lastPathComponent > $1.url.lastPathComponent }
     }
 
-    nonisolated static func deleteSession(at url: URL) {
-        guard url.path.hasPrefix(rootDirectory().path) else { return }
-        try? FileManager.default.removeItem(at: url)
+    nonisolated static func deleteSession(at url: URL) throws {
+        let root = rootDirectory().standardizedFileURL
+        let session = url.standardizedFileURL
+        guard session.deletingLastPathComponent() == root else {
+            throw SessionDeletionError.invalidLocation
+        }
+        try FileManager.default.removeItem(at: session)
+    }
+
+    nonisolated static func deleteAllSessions() throws {
+        for session in listSessions() {
+            try deleteSession(at: session.url)
+        }
     }
 
     // MARK: Internals
@@ -273,7 +294,7 @@ actor ScannerDevModeStore {
         var total = sessions.reduce(Int64(0)) { $0 + $1.sizeBytes }
         // Oldest first (list is newest-first by name).
         while total > Limits.maxTotalBytes, let oldest = sessions.last {
-            Self.deleteSession(at: oldest.url)
+            try? Self.deleteSession(at: oldest.url)
             total -= oldest.sizeBytes
             sessions.removeLast()
         }

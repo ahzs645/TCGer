@@ -86,6 +86,33 @@ final class ScannerDevModeStoreTests: XCTestCase {
         )
     }
 
+    func testSessionDeletionRemovesOnlyRecordingDirectories() throws {
+        let root = ScannerDevModeStore.rootDirectory()
+        let first = root.appendingPathComponent("scan-session-20260809-184000", isDirectory: true)
+        let second = root.appendingPathComponent("scan-session-20260809-183800", isDirectory: true)
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+
+        try ScannerDevModeStore.deleteSession(at: first)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+
+        try ScannerDevModeStore.deleteAllSessions()
+
+        XCTAssertTrue(ScannerDevModeStore.listSessions().isEmpty)
+    }
+
+    func testSessionDeletionRejectsLocationsOutsideRecordingsFolder() throws {
+        let outsideURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("not-a-scanner-recording", isDirectory: true)
+        try FileManager.default.createDirectory(at: outsideURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outsideURL) }
+
+        XCTAssertThrowsError(try ScannerDevModeStore.deleteSession(at: outsideURL))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outsideURL.path))
+    }
+
     func testViewModelScanRecordsSessionWhenDevModeEnabled() async throws {
         let coordinator = CardScannerCoordinator(
             strategies: [

@@ -129,6 +129,37 @@ const imageMutationValidator = v.object({
   removedStorageId: v.optional(v.id("_storage"))
 });
 
+const binderPagePointValidator = v.object({ x: v.number(), y: v.number() });
+const binderPagePlacementValidator = v.object({
+  slotIndex: v.number(),
+  cardId: v.string(),
+  name: v.string(),
+  tcg: tcgCodeValidator,
+  setCode: v.optional(v.string()),
+  confidence: v.number(),
+  status: v.union(v.literal("matched"), v.literal("uncertain")),
+  quad: v.object({
+    topLeft: binderPagePointValidator,
+    topRight: binderPagePointValidator,
+    bottomRight: binderPagePointValidator,
+    bottomLeft: binderPagePointValidator
+  })
+});
+const binderPageValidator = v.object({
+  id: v.string(),
+  binderId: v.string(),
+  pageNumber: v.number(),
+  revision: v.number(),
+  capturedAt: v.string(),
+  imageUrl: v.optional(v.string()),
+  placements: v.array(binderPagePlacementValidator),
+  createdAt: v.string(),
+  updatedAt: v.string()
+});
+const binderPageImageMutationValidator = v.object({
+  replacedStorageId: v.optional(v.id("_storage"))
+});
+
 const settingsKey = "singleton";
 const betterAuthAdapterApi = components.betterAuth.adapter;
 
@@ -557,6 +588,23 @@ async function requireAdminViewerBySubject(ctx: ReaderCtx, subject: string) {
   return viewer;
 }
 
+async function hydrateBinderPage(ctx: ReaderCtx, page: Doc<"binderPages">) {
+  const imageUrl = page.imageStorageId
+    ? (await ctx.storage.getUrl(page.imageStorageId)) ?? undefined
+    : undefined;
+  return {
+    id: page._id,
+    binderId: page.binderId,
+    pageNumber: page.pageNumber,
+    revision: page.revision,
+    capturedAt: toIso(page.capturedAt),
+    imageUrl,
+    placements: page.placements,
+    createdAt: toIso(page.createdAt),
+    updatedAt: toIso(page.updatedAt)
+  };
+}
+
 async function getTagIdsForEntry(ctx: ReaderCtx, entryId: Id<"collectionEntries">) {
   const assignments = await ctx.db
     .query("collectionEntryTags")
@@ -795,6 +843,125 @@ export const getBinder = internalQuery({
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const binder = await requireBinderForUser(ctx, args.binderId, viewer._id);
     return await hydrateBinderDetail(ctx, binder);
+  }
+});
+
+export const listBinderPages = internalQuery({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders")
+  },
+  returns: v.array(binderPageValidator),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const pages = await ctx.db
+      .query("binderPages")
+      .withIndex("by_binder", (q) => q.eq("binderId", args.binderId))
+      .take(10000);
+    const hydrated = await Promise.all(pages.map((page) => hydrateBinderPage(ctx, page)));
+    return hydrated.sort((left, right) => left.pageNumber - right.pageNumber);
+  }
+});
+
+export const upsertBinderPage = internalMutation({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders"),
+    pageNumber: v.number(),
+    capturedAt: v.optional(v.number()),
+    placements: v.array(binderPagePlacementValidator)
+  },
+  returns: binderPageValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const pageNumber = Math.trunc(args.pageNumber);
+    if (pageNumber < 1 || pageNumber > 10000 || args.placements.length > 100) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "Invalid binder page" });
+    }
+    const existing = await ctx.db
+      .query("binderPages")
+      .withIndex("by_binder_and_page_number", (q) =>
+        q.eq("binderId", args.binderId).eq("pageNumber", pageNumber)
+      )
+      .unique();
+    const timestamp = now();
+    let pageId: Id<"binderPages">;
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        capturedAt: args.capturedAt ?? timestamp,
+        placements: args.placements,
+        revision: existing.revision + 1,
+        updatedAt: timestamp
+      });
+      pageId = existing._id;
+    } else {
+      pageId = await ctx.db.insert("binderPages", {
+        userId: viewer._id,
+        binderId: args.binderId,
+        pageNumber,
+        revision: 1,
+        capturedAt: args.capturedAt ?? timestamp,
+        placements: args.placements,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+    }
+    const page = await ctx.db.get(pageId);
+    if (!page) {
+      throw new ConvexError({ code: "INVARIANT", message: "Binder page was not saved" });
+    }
+    return await hydrateBinderPage(ctx, page);
+  }
+});
+
+export const attachBinderPageImage = internalMutation({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders"),
+    pageNumber: v.number(),
+    storageId: v.id("_storage")
+  },
+  returns: binderPageImageMutationValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const page = await ctx.db
+      .query("binderPages")
+      .withIndex("by_binder_and_page_number", (q) =>
+        q.eq("binderId", args.binderId).eq("pageNumber", Math.trunc(args.pageNumber))
+      )
+      .unique();
+    if (!page) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Binder page not found" });
+    }
+    await ctx.db.patch(page._id, { imageStorageId: args.storageId, updatedAt: now() });
+    return page.imageStorageId ? { replacedStorageId: page.imageStorageId } : {};
+  }
+});
+
+export const removeBinderPageImage = internalMutation({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders"),
+    pageNumber: v.number()
+  },
+  returns: binderPageImageMutationValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const page = await ctx.db
+      .query("binderPages")
+      .withIndex("by_binder_and_page_number", (q) =>
+        q.eq("binderId", args.binderId).eq("pageNumber", Math.trunc(args.pageNumber))
+      )
+      .unique();
+    if (!page) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Binder page not found" });
+    }
+    await ctx.db.patch(page._id, { imageStorageId: undefined, updatedAt: now() });
+    return page.imageStorageId ? { replacedStorageId: page.imageStorageId } : {};
   }
 });
 

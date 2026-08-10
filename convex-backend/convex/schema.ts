@@ -78,6 +78,34 @@ export default defineSchema({
     .index("by_user_name", ["userId", "name"])
     .index("by_share_token", ["shareToken"]),
 
+  binderPages: defineTable({
+    userId: v.id("users"),
+    binderId: v.id("binders"),
+    pageNumber: v.number(),
+    revision: v.number(),
+    capturedAt: v.number(),
+    placements: v.array(v.object({
+      slotIndex: v.number(),
+      cardId: v.string(),
+      name: v.string(),
+      tcg: tcgCode,
+      setCode: v.optional(v.string()),
+      confidence: v.number(),
+      status: v.union(v.literal("matched"), v.literal("uncertain")),
+      quad: v.object({
+        topLeft: v.object({ x: v.number(), y: v.number() }),
+        topRight: v.object({ x: v.number(), y: v.number() }),
+        bottomRight: v.object({ x: v.number(), y: v.number() }),
+        bottomLeft: v.object({ x: v.number(), y: v.number() })
+      })
+    })),
+    imageStorageId: v.optional(v.id("_storage")),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_binder", ["binderId"])
+    .index("by_binder_and_page_number", ["binderId", "pageNumber"]),
+
   cardIdentities: defineTable({
     tcg: tcgCode,
     externalId: v.string(),

@@ -1,15 +1,14 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { DEMO_CARDS } from "@/lib/data/demo-cards";
+import {
+  DEMO_CARDS,
+  splitDemoPrintingCode,
+} from "@/lib/data/demo-cards";
 
 interface StaticSetParam {
   tcg: string;
   setCode: string;
-}
-
-function demoSetCode(setCode: string): string {
-  return setCode.replace(/-[^-]+$/, "");
 }
 
 /**
@@ -24,7 +23,7 @@ export async function getStaticSetParams(): Promise<StaticSetParam[]> {
 
   const params = new Map<string, StaticSetParam>();
   for (const card of DEMO_CARDS) {
-    const setCode = demoSetCode(card.setCode);
+    const setCode = splitDemoPrintingCode(card.setCode).setCode;
     if (!setCode) continue;
     params.set(`${card.tcg}:${setCode}`, { tcg: card.tcg, setCode });
   }

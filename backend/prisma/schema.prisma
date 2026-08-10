@@ -186,9 +186,27 @@ model Binder {
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   collections Collection[]
+  pages       BinderPage[]
 
   @@index([userId, containerType])
   @@index([userId, associatedTcg, associatedSetCode])
+}
+
+model BinderPage {
+  id          String   @id @default(uuid())
+  binderId    String
+  pageNumber  Int
+  revision    Int      @default(1)
+  capturedAt DateTime @default(now())
+  imageUrl    String?
+  placements Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  binder Binder @relation(fields: [binderId], references: [id], onDelete: Cascade)
+
+  @@unique([binderId, pageNumber])
+  @@index([binderId, pageNumber])
 }
 
 model Collection {
