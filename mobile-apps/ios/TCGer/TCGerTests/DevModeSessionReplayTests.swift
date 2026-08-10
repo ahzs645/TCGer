@@ -75,6 +75,11 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-210958/frame-0008.jpg": "pl4-AR3",
         "scan-session-20260809-210958/frame-0009.jpg": "pl4-AR3",
         "scan-session-20260809-210958/frame-0010.jpg": "pl4-AR3",
+        // Two stacked sleeved cards, Giratina LV.X in front. Labeled noMatch
+        // while bad crops made the outcome arbitrary; the pixel-space corner
+        // refinement (2026-08-10) deterministically isolates the front card,
+        // and the user decided single-card mode should identify it.
+        "scan-session-20260809-210958/frame-0011.jpg": "dpp-DP38",
         "scan-session-20260809-210958/frame-0012.jpg": "dpp-DP38",
         "scan-session-20260809-210958/frame-0013.jpg": "dpp-DP30",
         "scan-session-20260809-210958/frame-0014.jpg": "dpp-DP30",
@@ -85,9 +90,6 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-145850/frame-0000.jpg",
         "scan-session-20260809-145850/frame-0001.jpg",
         "scan-session-20260809-145947/frame-0000.jpg",
-        // Two overlapping card faces; accepting either as a clean single-card
-        // result would make the outcome depend on an arbitrary crop.
-        "scan-session-20260809-210958/frame-0011.jpg",
     ]
     /// Frames whose device decision does not reproduce in the Simulator even
     /// on unmodified code (Simulator Vision doc-seg/rectangles diverge from
@@ -105,6 +107,27 @@ final class DevModeSessionReplayTests: XCTestCase {
         // Device accepted the correct Darkrai from its recorded crop; the
         // Simulator chooses lower-scoring whole-frame/detected quads.
         "scan-session-20260809-210958/frame-0007.jpg",
+        // 2026-08-10: first full replay of the reorganized
+        // TCGer-Session-Reference/sessions export. All 15 frames below lose
+        // their device accepts identically on pre-fix (715fe9b2, isolated
+        // worktree control) and post-fix code — the sessions were recorded on
+        // device and never had Simulator floors established. Device attempts
+        // accepted at 0.72+; Simulator Vision picks different quads.
+        "scan-session-20260809-175313/frame-0000.jpg",
+        "scan-session-20260809-175313/frame-0008.jpg",
+        "scan-session-20260809-175313/frame-0015.jpg",
+        "scan-session-20260809-175313/frame-0016.jpg",
+        "scan-session-20260809-175313/frame-0017.jpg",
+        "scan-session-20260809-175313/frame-0020.jpg",
+        "scan-session-20260809-175313/frame-0021.jpg",
+        "scan-session-20260809-175313/frame-0026.jpg",
+        "scan-session-20260809-175313/frame-0029.jpg",
+        "scan-session-20260809-183843/frame-0005.jpg",
+        "scan-session-20260809-183843/frame-0008.jpg",
+        "scan-session-20260809-183843/frame-0017.jpg",
+        "scan-session-20260809-183843/frame-0020.jpg",
+        "scan-session-20260809-211223/frame-0000.jpg",
+        "scan-session-20260809-211223/frame-0015.jpg",
     ]
 
     func testReplayDevModeSessions() async throws {

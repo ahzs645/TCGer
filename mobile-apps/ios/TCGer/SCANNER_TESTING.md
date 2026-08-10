@@ -321,6 +321,22 @@ grayscale NCC against reference art recovered 13 of the 14 wrong top-1s whose
 true card appeared in any variant's top-5. Details and the combined
 zero-regression policy are in `docs/scanner-model-ai-handoff.md`.
 
+Later that day the underlying crop bug was fixed and shipped:
+`CardCropper.isCardShaped` now measures normalized quads in pixel space (the
+normalized band discarded 58/67 correct binder refinements), and
+`BinderPageScanner` gates uncertain review suggestions on an ANN top-2
+margin of 0.05 (`reviewPreselectionMargin`). The evidence dump gained a
+`productionRefined` variant so the shipped refinement can be scored against
+the recorded device quads; on the 67-attempt session it scores 61/67 top-1
+versus 48. Binder replay: candidates 313 -> 366, matched 100 -> 166 across
+68 pages; the 2,336-image scene replay is unchanged at its floors. Eleven
+binder pages and fifteen single-card frames that do not reproduce their
+device baselines in the Simulator on either codebase (verified with a
+pre-fix worktree control) are allowlisted in `BinderSessionReplayTests` /
+`DevModeSessionReplayTests`. The stacked-cards frame `210958/frame-0011` is
+now ground-truth `dpp-DP38` (front card) by user decision. Validation
+details: `docs/scanner-model-ai-handoff.md`.
+
 ### Manual-match catalog search regressions
 
 Image-less catalog variants must remain selectable even though they cannot be

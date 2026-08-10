@@ -993,6 +993,42 @@ final class ScannerOrientationExperimentTests: XCTestCase {
         }
     }
 
+    /// One-off detector/Vision dump for a single image outside the bundled
+    /// fixtures (SINGLE_IMAGE_DIAGNOSTIC_PATH). Prints every detector box so
+    /// multi-card policy guards can be designed from measured geometry.
+    func testSingleImageDetectorDiagnostic() throws {
+        guard let path = ProcessInfo.processInfo.environment["SINGLE_IMAGE_DIAGNOSTIC_PATH"] else {
+            throw XCTSkip("Set SINGLE_IMAGE_DIAGNOSTIC_PATH to an image file.")
+        }
+        let image = try loadImage(URL(fileURLWithPath: path))
+        let detector = try XCTUnwrap(CardObjectDetector.shared)
+        let detections = try detector.detections(in: image)
+        print("SINGLEIMAGE \(image.width)x\(image.height) detections=\(detections.count)")
+        for (offset, detection) in detections.enumerated() {
+            let box = detection.boundingBox.standardized
+            print(String(
+                format: "SINGLEIMAGE box[%d] conf=%.3f x=%.3f y=%.3f w=%.3f h=%.3f area=%.3f",
+                offset, detection.confidence,
+                box.minX, box.minY, box.width, box.height, box.width * box.height
+            ))
+        }
+        for lhs in detections.indices {
+            for rhs in detections.indices where rhs > lhs {
+                let a = detections[lhs].boundingBox.standardized
+                let b = detections[rhs].boundingBox.standardized
+                let inter = a.intersection(b)
+                let interArea = inter.isNull ? 0 : inter.width * inter.height
+                let smaller = min(a.width * a.height, b.width * b.height)
+                print(String(
+                    format: "SINGLEIMAGE overlap[%d,%d] iou=%.3f overSmaller=%.3f",
+                    lhs, rhs,
+                    CardCropper.intersectionOverUnion(a, b),
+                    smaller > 0 ? interArea / smaller : 0
+                ))
+            }
+        }
+    }
+
     private enum CornerSource {
         case documentSegmentation
         case rectangles

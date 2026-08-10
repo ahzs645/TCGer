@@ -222,6 +222,139 @@ would need bundled or cached reference thumbnails, and four IDs had no
 fetchable art). The evaluation scripts live outside the repository; the
 JSONL format is documented in the test.
 
+### Pixel-space isCardShaped fix, shipped and validated (2026-08-10, later)
+
+`CardCropper.isCardShaped` measured its [0.58, 0.9] aspect band on
+Vision-normalized points, which are anisotropic on any non-square image: a
+real card on an 830x1162 binder page measures 0.95 normalized, so the
+sub-image corner refinement discarded 58 of 67 correct refined quads and fell
+back to plain detector boxes. Shipped fix (commit 031cd843): an `imageSize:`
+overload scales corners to pixel space; `refinedObservations` uses it. The
+doc-seg plausibility check (`isPlausibleDocumentDetection`) deliberately
+stays in normalized space — switching it to pixel space measured 0 change on
+the corner-refinement wins but re-admits doc-seg interior panels on
+borderless 720x1000 crops (the normalized band on portrait frames only
+passes quads narrower than a real card, which effectively disables doc-seg
+on second-stage crops, and that is load-bearing).
+
+Validation, all against `~/Downloads/Reference`:
+
+- Binder session replay (68 pages, 8 sessions): candidates 313 -> 366,
+  matched 100 -> 166. Eleven pages sat below their recorded device floors
+  both before and after the fix (verified with a pre-fix worktree control at
+  715fe9b2 — e.g. one page reproduces 0 candidates under both codebases
+  against a device baseline of 2); their post-fix Simulator floors are now
+  encoded in `BinderSessionReplayTests.simulatorCandidateFloors`. Two floor
+  shortfalls are junk candidates no longer retrieving (`ecard3-146`,
+  `lc-92`).
+- 2,336-image scene replay: unchanged at its floors — 2,334 localized, mean
+  IoU 0.928, 18/50 accepted, 16 exact, 0 wrong printings.
+- Policy evidence rerun with a `productionRefined` variant (the shipped
+  refinement): 61/67 top-1 versus 48 for the recorded device quads,
+  37 matched-correct at 0.82 versus 16, 60 strong-correct at 0.72 versus 38.
+  Head-to-head it fixes 16 device top-1s and breaks 2 (both sub-0.72, so
+  they abstain rather than mis-accept). The single matched-wrong at 0.82 is
+  Pocket art-reuse aliasing (`A4-036` over `bw1-25`, margin 0.018) and is
+  exactly what the shipped review-margin gate suppresses.
+- Margin gate re-validated on post-fix crops: wrong strong top-1s max margin
+  0.026, correct median 0.098; the 0.05 gate suppresses all 3 wrong and
+  keeps 52 of 60 correct. Shipped in `BinderPageScanner` as
+  `reviewPreselectionMargin`: uncertain suggestions below the margin stay
+  visible in review but are not auto-included on page confirm
+  (OCR-verified primaries exempt). k=2 hysteresis remains regression-free
+  but is largely obsoleted by the fix (2 corrections with the
+  productionRefined incumbent versus 16 available pre-fix).
+- Behavior change decided by the user: a stacked two-card frame
+  (`210958/frame-0011`, Giratina LV.X in front) is now identified as the
+  front card at 0.87 instead of abstaining. The detector reports ONE box for
+  the stack (conf 0.92, no geometric guard possible) and refinement
+  deterministically isolates the front card; the ground-truth label moved
+  from noMatch to `dpp-DP38`. Fifteen other device accepts that do not
+  reproduce in the Simulator on either codebase are allowlisted in
+  `DevModeSessionReplayTests.knownSimulatorDivergences`.
+
+### 2026-08-10 ledger: everything tested, every decision, forward path
+
+One place to see what the two 2026-08-10 sessions tried, what shipped, what
+was rejected and why, and what deliberately remains. All numbers are
+Simulator, on the 67-attempt binder pseudo-label set unless stated.
+
+Shipped to production (`CardCropper.swift`, `BinderPageScanner.swift`):
+
+1. Pixel-space `isCardShaped` for sub-image corner refinement. 61/67 top-1
+   versus 48; binder replay matched 100 -> 166; scene replay unchanged.
+2. Review-margin gate (`reviewPreselectionMargin = 0.05`): sub-margin
+   uncertain suggestions are review-only, never auto-imported on page
+   confirm; OCR-verified primaries exempt.
+
+Tested and rejected, with the evidence:
+
+3. Pixel-space shape check in `isPlausibleDocumentDetection` — zero benefit
+   on an 11-page A/B (byte-identical results), and it re-admits doc-seg
+   interior panels on borderless crops. Kept normalized, documented in code.
+4. Max-score / k=1 crop arbitration — churn: max-score changed identity ten
+   times (five corrections, five regressions); k=1 hysteresis scored one
+   regression and six strong-wrong at 0.72.
+5. k=2 hysteresis — regression-free but obsoleted by the crop fix (2
+   corrections available versus 16 pre-fix). Reserved as the arbitration
+   rule for the future uncertain-only retry; not shipped.
+6. Laplacian sharpness gate — non-predictive for binder identity errors
+   (median 479 correct versus 490 wrong); errors are geometry, not blur.
+7. Sobel/Hough outer-border proposals — 783 ms/attempt for 53/67 with five
+   regressions, versus 12 ms for 61/67 from the fixed refinement. Dropped;
+   the test-only implementation stays for reference.
+8. Learned dewarping (UVDoc-style) — never built: a rigid card is a
+   homography; survey and measurements agree nothing in the card space
+   uses it.
+
+Measured and validated, awaiting productization:
+
+9. ORB geometric verification (the "stop fixing the crop" signal): correct
+   card median 555 inliers (min 110) versus random-decoy max 53 across 187
+   attempts with 1,870 label-free decoys; survives 0.8x-1.4x crop error and
+   20% shift; auto-resolves 106 of 120 review-queue attempts with two
+   verified identity corrections; verifies art, not printing (collector
+   OCR stays the printing decider); 167 ms per 5-candidate attempt. SIFT
+   tested worse (overlapping separation). Scope: uncertain-result-only
+   post-shutter retry, threshold ~100 inliers + sane homography + 2x margin.
+10. NCC verification re-rank: recovered 13 of 14 wrong top-1s whose true
+    card appeared in any variant top-5; combined margin-gated policy scored
+    59/67 with zero regressions. Blocked on bundling/caching reference
+    thumbnails on device (art was fetched ad hoc; 4 of 378 IDs had none).
+
+Policy and process decisions:
+
+11. Stacked cards: single-card mode now identifies the front card (user
+    decision, see above).
+12. Simulator-divergence attribution must use a `git worktree` control at a
+    pinned commit — a `git stash` control silently ran post-fix code here
+    because a concurrent session committed the working tree mid-run.
+13. Pocket art-reuse aliasing is now a repeat offender (`A2-105` at NCC
+    -0.02; `A4-036` outscoring `bw1-25` at margin 0.018). The margin gate
+    contains it; the index-side audit remains open.
+
+Forward path, in value order:
+
+1. Device build run of the binder + dev-mode replays: settles the learned
+   corner head verdict (doc-seg contributed 0/67 on Simulator in either
+   shape space — consistent with known Simulator/device Vision divergence),
+   and retests the 15 allowlisted single-card frames and 11 binder floors.
+2. ORB verification as the uncertain-only accept signal (evidence complete;
+   no OpenCV dependency needed — ORB was the better and cheaper of the two
+   feature families tested).
+3. Manual corner handles, pre-populated from the verification homography's
+   corrected corners, re-running identification on every edit (doubles as
+   the ground-truth labeling mechanism).
+4. Bundle reference thumbnails, then the NCC re-rank stage and the
+   ANN-versus-NCC disagreement review flag.
+5. Index audit for Pocket art-reuse aliasing.
+
+Not done anywhere: no device runs this session (all Simulator); the ORB/NCC
+stages are not in the app; the offline evaluator (`eval_policies.py`) lives
+in session scratchpads only — regenerate evidence via
+`testAcceptedBinderPolicyEvidence` and rescore (JSONL format documented in
+the test).
+
 ## Session Results 2026-08-09 (21:29 correction/rotation export)
 
 Archive: `TCGer-DevMode-All-20260809-212942.zip`. It adds two sessions:
@@ -1373,6 +1506,9 @@ git diff --check
 - Do not forget non-card negatives; open-set rejection is part of recognition.
 
 ## Immediate Useful Work
+
+The current ranked roadmap is in "2026-08-10 ledger: everything tested,
+every decision, forward path" above. Older generic list:
 
 Best next tasks for a model/scanner AI:
 
