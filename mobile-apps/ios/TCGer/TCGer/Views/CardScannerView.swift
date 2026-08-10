@@ -110,6 +110,7 @@ struct CardScannerView: View {
     @State private var bottomControlsHeight: CGFloat = 120
     @State private var showingSessionReview = false
     @State private var didApplyBinderStart = false
+    @State private var pendingCaptureMode: ScannerCaptureMode?
     let scope: CardScanScope?
     let startingBinderID: String?
     let startingBinderPageNumber: Int?
@@ -443,14 +444,7 @@ struct CardScannerView: View {
                         style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
                     )
 
-                Text(framingInstruction)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(.ultraThinMaterial, in: Capsule())
+                framingInstructionLabel
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
                     .frame(maxHeight: .infinity, alignment: .bottom)
@@ -471,6 +465,28 @@ struct CardScannerView: View {
                 .animation(.snappy, value: bottomControlsHeight)
         }
         .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var framingInstructionLabel: some View {
+        if #available(iOS 26.0, *) {
+            framingInstructionContent
+                .foregroundStyle(.primary)
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            framingInstructionContent
+                .foregroundStyle(.white)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    private var framingInstructionContent: some View {
+        Text(framingInstruction)
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
     }
 
     private var bottomControls: some View {
@@ -582,7 +598,7 @@ struct CardScannerView: View {
         Menu {
             ForEach(ScannerCaptureMode.allCases) { mode in
                 Button {
-                    viewModel.captureMode = mode
+                    requestCaptureMode(mode)
                 } label: {
                     if viewModel.captureMode == mode {
                         Label(mode.displayName, systemImage: "checkmark")
@@ -596,6 +612,26 @@ struct CardScannerView: View {
                 title: viewModel.captureMode.displayName,
                 systemImage: viewModel.captureMode.systemImage
             )
+        }
+        .confirmationDialog(
+            "Discard scanned cards?",
+            isPresented: Binding(
+                get: { pendingCaptureMode != nil },
+                set: { if !$0 { pendingCaptureMode = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Switch & Discard", role: .destructive) {
+                if let mode = pendingCaptureMode {
+                    viewModel.switchCaptureMode(to: mode)
+                }
+                pendingCaptureMode = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCaptureMode = nil
+            }
+        } message: {
+            Text(modeSwitchWarningMessage)
         }
         .disabled(isProcessingPhoto)
         .animation(.snappy, value: viewModel.captureMode)
@@ -914,9 +950,31 @@ private extension CardScannerView {
         return false
     }
 
+    private func requestCaptureMode(_ mode: ScannerCaptureMode) {
+        guard mode != viewModel.captureMode else { return }
+        if viewModel.hasPendingScanWork {
+            pendingCaptureMode = mode
+        } else {
+            viewModel.switchCaptureMode(to: mode)
+        }
+    }
+
+    private var modeSwitchWarningMessage: String {
+        if viewModel.captureMode == .binder {
+            let cards = viewModel.binderCardsScanned
+            let pages = viewModel.binderPagesScanned
+            return "Switching modes deletes the \(cards) card\(cards == 1 ? "" : "s") "
+                + "scanned across \(pages) page\(pages == 1 ? "" : "s") in this session."
+        }
+        let cards = viewModel.sessionResults.count
+        return "Switching modes deletes the \(cards) card\(cards == 1 ? "" : "s") scanned in this session."
+    }
+
     var framingInstruction: String {
         if viewModel.captureMode == .binder {
-            return "Fit the full binder page · Tap to scan"
+            // Framing is forgiving now: the page image auto-fits to the
+            // detected cards, so rough framing is enough.
+            return "Roughly fit the page · Tap to scan"
         }
         return viewModel.triggerMode == .automatic && viewModel.supportsLivePreview(viewModel.selectedMode)
             ? "Center one card · Hold steady"

@@ -28,6 +28,14 @@ const nextConfig = {
     };
     return config;
   },
+  // Turbopack (default bundler since Next 16) equivalent of the webpack
+  // aliases above.
+  turbopack: {
+    resolveAlias: {
+      sharp: './src/lib/empty-module.js',
+      'onnxruntime-node': './src/lib/empty-module.js',
+    },
+  },
   ...(isDemoExport
     ? {
         output: 'export',

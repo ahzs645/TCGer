@@ -28,6 +28,7 @@ struct BinderPageReviewView: View {
     @State private var isSavingPage = false
     @AppStorage("binderScanner.savePageImages") private var savesPageImages = true
     @AppStorage("binderScanner.replacePageImages") private var replacesPageImages = true
+    @AppStorage("binderScanner.hidesUnmatchedCards") private var hidesUnmatchedCards = false
 
     private let apiService = APIService()
 
@@ -51,7 +52,6 @@ struct BinderPageReviewView: View {
                         allPagesStrip
                         detectionSummary(record: record)
                         binderControls(record: record)
-                        actionControls(record: record)
                     } else {
                         ContentUnavailableView(
                             "No Pages to Review",
@@ -64,9 +64,14 @@ struct BinderPageReviewView: View {
             }
             .navigationTitle("Binder Page Review")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                if let record = currentRecord {
+                    stickyActionBar(record: record)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Next") { dismiss() }
+                    Button("Done") { dismiss() }
                         .disabled(isAdding || isCreatingBinder)
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -228,7 +233,10 @@ struct BinderPageReviewView: View {
                     }
                     .buttonStyle(.plain)
                     .modifier(
-                        BinderExclusionContextMenu(isEnabled: ScannerDevModeStore.isEnabled) { reason in
+                        BinderExclusionContextMenu(
+                            isEnabled: ScannerDevModeStore.isEnabled,
+                            previewCrop: detection.crop
+                        ) { reason in
                             excludeDetection(
                                 for: DetectionReference(pageID: record.id, detectionID: detection.id),
                                 reason: reason
@@ -246,6 +254,9 @@ struct BinderPageReviewView: View {
                                 : "Double tap to include this card in the binder."
                     )
 
+                    // Selection state on the page reads through the quad's
+                    // color, dash, and dimming; the ✕/✓ toggles live only in
+                    // the row list so small cards keep clean tap targets.
                     let points = detection.quad.points(in: fittedRect)
                     if let numberAnchor = points.first {
                         Text("\(index + 1)")
@@ -254,19 +265,6 @@ struct BinderPageReviewView: View {
                             .frame(width: 22, height: 22)
                             .background(statusColor(detection.status), in: Circle())
                             .position(x: numberAnchor.x + 11, y: numberAnchor.y + 11)
-                            .allowsHitTesting(false)
-                    }
-
-                    if points.count > 1 {
-                        Image(systemName: selectionSymbol(for: detection))
-                            .font(.title3.weight(.semibold))
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(
-                                .white,
-                                detection.isIncluded ? Color.accentColor : Color.secondary
-                            )
-                            .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
-                            .position(x: points[1].x - 12, y: points[1].y + 12)
                             .allowsHitTesting(false)
                     }
                 }
@@ -508,7 +506,10 @@ struct BinderPageReviewView: View {
                 }
                 .buttonStyle(.plain)
                 .modifier(
-                    BinderExclusionContextMenu(isEnabled: ScannerDevModeStore.isEnabled) { reason in
+                    BinderExclusionContextMenu(
+                        isEnabled: ScannerDevModeStore.isEnabled,
+                        previewCrop: detection.crop
+                    ) { reason in
                         excludeDetection(
                             for: DetectionReference(pageID: record.id, detectionID: detection.id),
                             reason: reason
@@ -531,6 +532,10 @@ struct BinderPageReviewView: View {
             statusFilterButton(title: "Matched", status: .matched)
             statusFilterButton(title: "Uncertain", status: .uncertain)
             statusFilterButton(title: "Unmatched", status: .unmatched)
+
+            Divider()
+
+            Toggle("Hide Unmatched Cards", isOn: $hidesUnmatchedCards)
         } label: {
             Label(statusFilterName, systemImage: "line.3.horizontal.decrease.circle")
                 .font(.subheadline)
@@ -645,25 +650,32 @@ struct BinderPageReviewView: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private func actionControls(record: BinderPageRecord) -> some View {
+    /// Pinned below the scroll view so Save/Add stay reachable while the
+    /// detection list scrolls. Save collapses to a short label; the full
+    /// intent stays on its accessibility label.
+    private func stickyActionBar(record: BinderPageRecord) -> some View {
         let records = destinationRecords(for: record)
         let binderID = destinationBinderID(for: record)
 
-        return VStack(spacing: 12) {
+        return HStack(spacing: 10) {
             Button {
                 guard let binderID else { return }
                 Task { await persistRecords(records, to: binderID) }
             } label: {
-                HStack {
-                    if isSavingPage { ProgressView() }
-                    Label(saveButtonTitle(for: record), systemImage: "square.and.arrow.down")
+                HStack(spacing: 6) {
+                    if isSavingPage {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+                    Text(compactSaveButtonTitle(for: record))
                         .fontWeight(.semibold)
                 }
-                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
             .disabled(isSavingPage || isAdding || binderID == nil)
+            .accessibilityLabel(saveButtonTitle(for: record))
 
             Button {
                 guard let binderID else { return }
@@ -675,6 +687,8 @@ struct BinderPageReviewView: View {
                     }
                     Text(addButtonTitle(for: record))
                         .fontWeight(.semibold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -687,6 +701,15 @@ struct BinderPageReviewView: View {
                     remainingIncludedDetectionCount(in: records) == 0
             )
         }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private func compactSaveButtonTitle(for record: BinderPageRecord) -> String {
+        let records = destinationRecords(for: record)
+        if records.count > 1 { return "Save \(records.count)" }
+        return storedPage(for: record.pageNumber) == nil ? "Save" : "Update"
     }
 
     private var currentRecord: BinderPageRecord? {
@@ -744,6 +767,11 @@ struct BinderPageReviewView: View {
     }
 
     private func matchesStatusFilter(_ detection: BinderCardDetection) -> Bool {
+        // Explicitly filtering to Unmatched overrides the hide preference —
+        // that filter exists to inspect exactly these detections.
+        if hidesUnmatchedCards, detection.status == .unmatched, statusFilter != .unmatched {
+            return false
+        }
         guard let statusFilter else { return true }
         return detection.status == statusFilter
     }
@@ -1208,20 +1236,38 @@ struct BinderPageReviewView: View {
 
 private struct BinderExclusionContextMenu: ViewModifier {
     let isEnabled: Bool
+    // Without an explicit preview, the system lifts the modified view itself.
+    // On the page overlay that view is a full-frame quad path, so the lift
+    // dragged the highlight box away from the card; previewing the crop keeps
+    // the overlay in place.
+    var previewCrop: CGImage?
     let onExclude: (BinderCardExclusionReason) -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if isEnabled {
-            content.contextMenu {
-                ForEach(BinderCardExclusionReason.allCases) { reason in
-                    Button("Exclude: \(reason.displayName)", systemImage: reason.systemImage) {
-                        onExclude(reason)
-                    }
+            if let previewCrop {
+                content.contextMenu {
+                    menuItems
+                } preview: {
+                    Image(uiImage: UIImage(cgImage: previewCrop))
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 240, maxHeight: 336)
                 }
+            } else {
+                content.contextMenu { menuItems }
             }
         } else {
             content
+        }
+    }
+
+    private var menuItems: some View {
+        ForEach(BinderCardExclusionReason.allCases) { reason in
+            Button("Exclude: \(reason.displayName)", systemImage: reason.systemImage) {
+                onExclude(reason)
+            }
         }
     }
 }

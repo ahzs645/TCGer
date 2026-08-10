@@ -76,16 +76,25 @@ Set fields — common: `code`, `name`, `count`; optional: `serie`, `releasedAt`,
 set-code badge when neither image is available.
 
 Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `artist?`, `type?`,
-`imageUrl?`, `imageUrlSmall?`.
+`imageUrl?`, `imageUrlSmall?`. Optional cross-game guide/search fields are
+`archetype?`, `classifications?`, `subtypes?`, `variants?`, `source?`,
+`character?`, `era?`, `specialTrait?`, and `treatments?`.
 `setName` is NOT stored per card; clients join via the `sets` array by `setCode`.
 Per game extras (all optional):
 
 - pokemon: `types` (string[]), `hp` (number). `artist` comes from TCGdex's
   illustrator credit and supports exact artist-based collection guides. `id` is
   the tcgdex id (`{setCode}-{localId}`).
-- magic: `manaCost`, `colors` (string[]). `id` is the Scryfall print UUID.
-- yugioh: `race`, `atk`, `def`, `level`, `konamiId` (number). `konamiId` is the
+- magic: `manaCost`, `colors` (string[]), `artist`, `variants` (finishes), and
+  `treatments` (frame effects, promo types, full-art, border style). `id` is the
+  Scryfall print UUID.
+- yugioh: `race`, `atk`, `def`, `level`, `archetype`, `konamiId` (number).
+  `konamiId` is the
   representative artwork/image id used to derive the YGOPRODeck image URL.
+- lorcana: `artist` contains the illustrator list and `classifications` retains
+  the provider's classifications.
+- dragonball: `character`, `era`, and `specialTrait` are retained from provider
+  attributes.
 - onepiece, lorcana, dragonball: provider image URLs are stored because their
   current CDNs do not expose a stable derivation rule from the compact card id.
 

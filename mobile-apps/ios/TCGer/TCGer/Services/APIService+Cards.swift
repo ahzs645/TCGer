@@ -271,7 +271,7 @@ private extension APIService {
     }
 }
 
-private extension JSONDecoder {
+extension JSONDecoder {
     static var tcgCardDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in

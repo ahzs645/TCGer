@@ -20,11 +20,11 @@ const PHASE_HINTS: Record<PackPhase, string> = {
 };
 
 const TIER_LABEL_CLASSES: Record<string, string> = {
-  common: "text-slate-300",
-  uncommon: "text-emerald-300",
-  rare: "text-sky-300",
-  ultra: "text-violet-300",
-  chase: "text-amber-300",
+  common: "text-slate-500 dark:text-slate-300",
+  uncommon: "text-emerald-600 dark:text-emerald-300",
+  rare: "text-sky-600 dark:text-sky-300",
+  ultra: "text-violet-600 dark:text-violet-300",
+  chase: "text-amber-600 dark:text-amber-300",
 };
 
 export function PackOpening() {
@@ -70,7 +70,7 @@ export function PackOpening() {
   const revealed = pack ? pack.slice(0, revealedCount) : [];
 
   return (
-    <div className="relative h-[72vh] min-h-[540px] w-full overflow-hidden rounded-xl border border-border bg-[radial-gradient(ellipse_at_center,#1c2340_0%,#0b0e1d_70%)]">
+    <div className="relative h-[72vh] min-h-[540px] w-full overflow-hidden">
       {pack && phase !== "summary" && (
         <Canvas
           key={packKey}
@@ -97,14 +97,18 @@ export function PackOpening() {
       {flashKey > 0 && (
         <div
           key={flashKey}
-          className="pointer-events-none absolute inset-0 animate-[pack-flash_0.6s_ease-out_forwards] bg-white"
+          className="pointer-events-none absolute inset-0 animate-[pack-flash_0.6s_ease-out_forwards]"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(255,255,255,1) 0%, rgba(147,197,253,0.7) 40%, rgba(147,197,253,0) 75%)",
+          }}
         />
       )}
       <style>{`@keyframes pack-flash { 0% { opacity: 0.9; } 100% { opacity: 0; } }`}</style>
 
       {/* phase hint */}
       {pack && PHASE_HINTS[phase] && (
-        <p className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-sm font-medium text-white/70">
+        <p className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-sm font-medium text-muted-foreground">
           {PHASE_HINTS[phase]}
         </p>
       )}
@@ -112,7 +116,7 @@ export function PackOpening() {
       {/* summary */}
       {pack && phase === "summary" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-6">
-          <h2 className="text-xl font-heading font-semibold text-white">
+          <h2 className="text-xl font-heading font-semibold text-foreground">
             Pack results
           </h2>
           <div className="flex flex-wrap items-start justify-center gap-4">
@@ -130,7 +134,7 @@ export function PackOpening() {
                       "ring-2 ring-amber-300/80 shadow-amber-400/30",
                   )}
                 />
-                <figcaption className="mt-1.5 text-xs text-white/85">
+                <figcaption className="mt-1.5 text-xs text-foreground/85">
                   {card.name}
                   <span
                     className={cn(
@@ -155,13 +159,13 @@ export function PackOpening() {
       )}
 
       {/* dev HUD */}
-      <div className="absolute right-3 top-3 w-52 space-y-2 rounded-lg border border-white/10 bg-black/60 p-3 font-mono text-[11px] text-white/80 backdrop-blur">
+      <div className="absolute right-3 top-3 w-52 space-y-2 rounded-lg border border-border bg-background/80 p-3 font-mono text-[11px] text-foreground/85 backdrop-blur">
         <p className="flex justify-between">
-          <span className="text-white/50">phase</span>
+          <span className="text-muted-foreground">phase</span>
           <span>{phase}</span>
         </p>
         <p className="flex justify-between">
-          <span className="text-white/50">revealed</span>
+          <span className="text-muted-foreground">revealed</span>
           <span>
             {revealedCount}/{pack?.length ?? 0}
           </span>
@@ -182,7 +186,7 @@ export function PackOpening() {
           </HudButton>
         </div>
         {revealed.length > 0 && phase !== "summary" && (
-          <ul className="space-y-0.5 border-t border-white/10 pt-1.5">
+          <ul className="space-y-0.5 border-t border-border pt-1.5">
             {revealed.map((card) => (
               <li key={card.id} className="flex justify-between gap-2">
                 <span className="truncate">{card.name}</span>
@@ -212,8 +216,9 @@ function HudButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded border border-white/15 px-2 py-1 transition hover:bg-white/10",
-        active && "border-amber-300/60 bg-amber-300/15 text-amber-200",
+        "rounded border border-border px-2 py-1 transition hover:bg-muted",
+        active &&
+          "border-amber-500/60 bg-amber-400/15 text-amber-600 dark:text-amber-200",
       )}
     >
       {children}

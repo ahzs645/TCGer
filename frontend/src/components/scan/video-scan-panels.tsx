@@ -240,7 +240,7 @@ export function VideoPlayerWithOverlay({
   overlayItems,
   onMetadataLoaded,
 }: {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   videoUrl: string | null;
   overlayItems: VideoOverlayItem[];
   onMetadataLoaded: (meta: {

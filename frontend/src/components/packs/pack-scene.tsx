@@ -371,6 +371,13 @@ export function PackExperience({
     const a = anim.current;
     const pointer = state.pointer;
 
+    // cards stay hidden inside the sealed pack — transparent-object depth
+    // sorting otherwise draws them over the wrapper as the pack tilts
+    if (stackRef.current) {
+      stackRef.current.visible =
+        phase === "reveal" || (phase === "opening" && a.openT > 0.3);
+    }
+
     // --- pack idle float + tilt toward pointer -------------------------------
     if (packRef.current) {
       const pack = packRef.current;
@@ -584,6 +591,7 @@ export function PackExperience({
           ref={stackRef}
           position={[0, -0.15, 0]}
           scale={0.92}
+          visible={false}
           onPointerDown={handleStackClick}
         >
           {cards.map((card, i) => (
@@ -622,7 +630,7 @@ export function PackExperience({
       {phase !== "summary" && (
         <group ref={packRef}>
           <group ref={bodyRef}>
-            <mesh geometry={bodyGeo} position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0]}>
+            <mesh geometry={bodyGeo} renderOrder={5} position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0]}>
               <meshStandardMaterial
                 ref={registerWrapperMaterial}
                 map={wrapperFrontTex}
@@ -632,6 +640,7 @@ export function PackExperience({
             </mesh>
             <mesh
               geometry={bodyGeo}
+              renderOrder={5}
               position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0]}
               rotation={[0, Math.PI, 0]}
             >
@@ -645,7 +654,7 @@ export function PackExperience({
           </group>
 
           <group ref={stripRef}>
-            <mesh geometry={stripGeo} position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0]}>
+            <mesh geometry={stripGeo} renderOrder={5} position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0]}>
               <meshStandardMaterial
                 map={wrapperFrontTex}
                 roughness={0.45}
@@ -654,6 +663,7 @@ export function PackExperience({
             </mesh>
             <mesh
               geometry={stripGeo}
+              renderOrder={5}
               position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0]}
               rotation={[0, Math.PI, 0]}
             >

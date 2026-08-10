@@ -54,6 +54,31 @@ nonisolated struct BinderNormalizedQuad: Sendable {
         bottomRight = observation.bottomRight
     }
 
+    init(topLeft: CGPoint, topRight: CGPoint, bottomLeft: CGPoint, bottomRight: CGPoint) {
+        self.topLeft = topLeft
+        self.topRight = topRight
+        self.bottomLeft = bottomLeft
+        self.bottomRight = bottomRight
+    }
+
+    /// Re-expresses the quad relative to a sub-rect of its coordinate space
+    /// (both in Vision-normalized coordinates), for when the page image is
+    /// re-cropped after detection.
+    func remapped(into rect: CGRect) -> BinderNormalizedQuad {
+        func map(_ point: CGPoint) -> CGPoint {
+            CGPoint(
+                x: (point.x - rect.minX) / rect.width,
+                y: (point.y - rect.minY) / rect.height
+            )
+        }
+        return BinderNormalizedQuad(
+            topLeft: map(topLeft),
+            topRight: map(topRight),
+            bottomLeft: map(bottomLeft),
+            bottomRight: map(bottomRight)
+        )
+    }
+
     func points(in rect: CGRect) -> [CGPoint] {
         func map(_ point: CGPoint) -> CGPoint {
             CGPoint(
@@ -203,6 +228,11 @@ actor BinderPageScanner {
         /// wrong candidates and kept ~75% of correct ones.
         static let reviewPreselectionMargin = 0.05
         static let targetSize = CGSize(width: 720, height: 1000)
+        /// Breathing room kept around the detected cards when the page image
+        /// is re-fitted to them, as a fraction of the frame per side.
+        static let pageFitMargin: CGFloat = 0.02
+        /// A fit that barely trims the frame isn't worth a recrop.
+        static let pageFitMinimumTrim: CGFloat = 0.97
         /// A top edge that strongly disagrees with the rest of the binder page
         /// is measured evidence that corner refinement latched onto interior
         /// artwork/text instead of the card border. Preserve the detector box
@@ -299,10 +329,24 @@ actor BinderPageScanner {
             }
         }
 
+        // Fit the page image to the detected cards: the capture often carries
+        // extra surroundings (and, on device, everything visible on screen),
+        // so the retained page tightens to the union of the card quads with a
+        // small margin instead of showing cards cut off at the frame edge.
+        var pageImage = image
+        var pageFitRect: CGRect?
+        if let candidate = Self.pageFitRect(for: workItems.map { BinderNormalizedQuad(observation: $0.observation) }),
+           let cropped = Self.crop(image, toNormalizedRect: candidate) {
+            pageImage = cropped
+            pageFitRect = candidate
+        }
+
         let detections = workItems.map { item -> BinderCardDetection in
+            let baseQuad = BinderNormalizedQuad(observation: item.observation)
+            let quad = pageFitRect.map { baseQuad.remapped(into: $0) } ?? baseQuad
             guard let result = identifications[item.index] else {
                 return BinderCardDetection(
-                    quad: BinderNormalizedQuad(observation: item.observation),
+                    quad: quad,
                     crop: item.crop,
                     rectangleConfidence: item.observation.confidence,
                     selectedCandidate: nil,
@@ -316,7 +360,7 @@ actor BinderPageScanner {
                 ? .matched
                 : .uncertain
             return BinderCardDetection(
-                quad: BinderNormalizedQuad(observation: item.observation),
+                quad: quad,
                 crop: item.crop,
                 rectangleConfidence: item.observation.confidence,
                 selectedCandidate: result.primary,
@@ -332,10 +376,46 @@ actor BinderPageScanner {
 
         return BinderPageScanResult(
             mode: context.mode,
-            capturedImage: image,
+            capturedImage: pageImage,
             detections: detections,
             elapsed: Date().timeIntervalSince(start)
         )
+    }
+
+    /// Union of every detected card corner, padded by `pageFitMargin` and
+    /// clamped to the frame — in Vision-normalized coordinates. Nil when there
+    /// is nothing to fit to, the fit is degenerate, or it would barely trim.
+    nonisolated static func pageFitRect(for quads: [BinderNormalizedQuad]) -> CGRect? {
+        let points = quads.flatMap { [$0.topLeft, $0.topRight, $0.bottomLeft, $0.bottomRight] }
+        guard !points.isEmpty else { return nil }
+
+        let minX = points.map(\.x).min()!
+        let maxX = points.map(\.x).max()!
+        let minY = points.map(\.y).min()!
+        let maxY = points.map(\.y).max()!
+
+        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            .insetBy(dx: -Configuration.pageFitMargin, dy: -Configuration.pageFitMargin)
+            .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+        guard !rect.isNull, rect.width > 0.05, rect.height > 0.05 else { return nil }
+        guard rect.width < Configuration.pageFitMinimumTrim
+            || rect.height < Configuration.pageFitMinimumTrim
+        else { return nil }
+        return rect
+    }
+
+    /// Crops using a Vision-normalized rect (origin bottom-left).
+    nonisolated static func crop(_ image: CGImage, toNormalizedRect rect: CGRect) -> CGImage? {
+        let width = CGFloat(image.width)
+        let height = CGFloat(image.height)
+        let pixelRect = CGRect(
+            x: rect.minX * width,
+            y: (1 - rect.maxY) * height,
+            width: rect.width * width,
+            height: rect.height * height
+        ).integral
+        guard pixelRect.width > 1, pixelRect.height > 1 else { return nil }
+        return image.cropping(to: pixelRect)
     }
 
     /// Detector-first multi-card localization. The generic rectangle detector

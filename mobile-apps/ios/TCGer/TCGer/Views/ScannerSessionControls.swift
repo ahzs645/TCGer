@@ -35,12 +35,8 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
         HStack(spacing: 10) {
             if let onDismiss {
                 Button(action: onDismiss) {
-                    Image(systemName: dismissIcon)
-                        .font(.headline)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
+                    dismissButtonLabel
                 }
-                .foregroundStyle(.white)
                 .accessibilityLabel("Close scanner")
             }
 
@@ -164,6 +160,24 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                 .accessibilityLabel(cameraController.isTorchEnabled ? "Turn off flashlight" : "Turn on flashlight")
                 .accessibilityValue(cameraController.isTorchEnabled ? "On" : "Off")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var dismissButtonLabel: some View {
+        if #available(iOS 26.0, *) {
+            Image(systemName: dismissIcon)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            Image(systemName: dismissIcon)
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
         }
     }
 

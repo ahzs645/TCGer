@@ -883,6 +883,38 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/CollectionGuide" }
 
+  /guides/cards:
+    get:
+      tags: [Guides]
+      summary: Search cards across all published collection guides
+      operationId: searchCollectionGuideCards
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: query, in: query, schema: { type: string } }
+        - { name: tcg, in: query, schema: { $ref: "#/components/schemas/TcgCode" } }
+        - { name: guide, in: query, schema: { type: string } }
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [art-style, artist, species, story, cameo, custom]
+        - name: ownership
+          in: query
+          schema: { type: string, enum: [all, owned, missing], default: all }
+        - { name: set, in: query, schema: { type: string } }
+        - { name: artist, in: query, schema: { type: string } }
+        - { name: rarity, in: query, schema: { type: string } }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
+      responses:
+        "200":
+          description: Deduplicated cards with every matching guide membership
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuideCardSearchResponse" }
+
   /guides/{slug}:
     get:
       tags: [Guides]
@@ -901,6 +933,28 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CollectionGuide" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /guides/{slug}/items:
+    get:
+      tags: [Guides]
+      summary: List exact ordered items for a published manual guide
+      operationId: listCollectionGuideItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Ordered exact-printing membership
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CollectionGuideItem" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /guides/{slug}/follow:
@@ -2874,12 +2928,75 @@ components:
           type: object
           required: [type, tcg, includeAllPrintings]
           properties:
-            type: { type: string, enum: [name, set, artist] }
+            type: { type: string, enum: [name, set, artist, manual] }
             tcg: { $ref: "#/components/schemas/TcgCode" }
             query: { type: string }
             setCode: { type: string }
             setName: { type: string }
             includeAllPrintings: { type: boolean }
+
+    CollectionGuideItem:
+      type: object
+      required: [id, guideId, tcg, externalId, name, position]
+      properties:
+        id: { type: string }
+        guideId: { type: string }
+        tcg: { $ref: "#/components/schemas/TcgCode" }
+        externalId: { type: string }
+        name: { type: string }
+        setCode: { type: string }
+        setName: { type: string }
+        collectorNumber: { type: string }
+        rarity: { type: string }
+        artist: { type: string }
+        variant: { type: string }
+        imageUrl: { type: string }
+        imageUrlSmall: { type: string }
+        groupKey: { type: string }
+        groupLabel: { type: string }
+        groupOrder: { type: integer }
+        position: { type: integer }
+        note: { type: string }
+        provenanceUrl: { type: string }
+
+    GuideCardMembership:
+      type: object
+      required: [guideId, slug, title, category, tags]
+      properties:
+        guideId: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        category:
+          type: string
+          enum: [art-style, artist, species, story, cameo, custom]
+        tags: { type: array, items: { type: string } }
+        groupKey: { type: string }
+        groupLabel: { type: string }
+        groupOrder: { type: integer }
+        position: { type: integer }
+
+    GuideCardSearchResult:
+      type: object
+      required: [card, owned, ownedQuantity, matchedGuides]
+      properties:
+        card: { $ref: "#/components/schemas/Card" }
+        owned: { type: boolean }
+        ownedQuantity: { type: integer }
+        matchedGuides:
+          type: array
+          items: { $ref: "#/components/schemas/GuideCardMembership" }
+
+    GuideCardSearchResponse:
+      type: object
+      required: [results, total, failedGuideSlugs]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/GuideCardSearchResult" }
+        total: { type: integer }
+        failedGuideSlugs:
+          type: array
+          items: { type: string }
 
     # ─── Users ───────────────────────────────────────────────────────
     UserProfile:

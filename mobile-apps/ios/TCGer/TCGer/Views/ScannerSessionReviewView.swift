@@ -227,6 +227,11 @@ struct ScannerSessionReviewView: View {
                         binders: collections,
                         selectedBinderId: $selectedBinderID
                     )
+                    .padding(.horizontal, 12)
+                    .background(
+                        Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
                 }
 
                 Button {

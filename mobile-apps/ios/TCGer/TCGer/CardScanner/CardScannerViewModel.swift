@@ -98,6 +98,24 @@ final class CardScannerViewModel: ObservableObject {
 
     var binderPagesScanned: Int { binderPages.count }
 
+    /// True when the current capture mode holds scan results that a mode
+    /// switch would discard — used to gate the switch behind a confirmation.
+    var hasPendingScanWork: Bool {
+        switch captureMode {
+        case .binder: return !binderPages.isEmpty
+        case .card: return !sessionResults.isEmpty
+        }
+    }
+
+    /// Switches capture mode, discarding the previous mode's session so the
+    /// scanner never carries hidden state across modes.
+    func switchCaptureMode(to mode: ScannerCaptureMode) {
+        guard mode != captureMode else { return }
+        clearSession()
+        clearBinderSession()
+        captureMode = mode
+    }
+
     var binderCardsScanned: Int {
         binderPages.reduce(0) { $0 + $1.detections.count }
     }
@@ -587,13 +605,16 @@ final class CardScannerViewModel: ObservableObject {
             return
         }
         if captureMode == .binder {
-            // The framing guide says "Fit the full binder page" — honor it.
-            // Processing the raw sensor frame made the scanner (and the
-            // review screen) see far more than the user framed: surroundings
-            // ate detector capacity and every card shrank relative to the
-            // frame. The uncropped photo is still preserved for dev mode.
+            // Crop to what the user could actually see, not just the guide:
+            // pocket cards routinely peek past the guide edges and a hard
+            // guide crop cut them off. BinderPageScanner re-fits the retained
+            // page image to the detected cards afterward, so the extra
+            // viewport context doesn't survive into review. Off-screen sensor
+            // pixels stay excluded — the raw frame previously fed the
+            // detector surroundings the user never framed. The uncropped
+            // photo is still preserved for dev mode.
             await scanBinderPage(
-                image: guideCroppedImage(from: cgImage),
+                image: viewportCroppedImage(from: cgImage),
                 source: .photoCapture,
                 originalImage: cgImage
             )
@@ -740,6 +761,14 @@ final class CardScannerViewModel: ObservableObject {
     private func guideCroppedImage(from image: CGImage) -> CGImage {
         guard let scannerGuideGeometry else { return image }
         return ScannerGuideCropper().crop(image, using: scannerGuideGeometry) ?? image
+    }
+
+    /// Crops the sensor image to the full visible preview instead of the
+    /// guide, by treating the viewport itself as the guide rect.
+    private func viewportCroppedImage(from image: CGImage) -> CGImage {
+        guard let previewFrame else { return image }
+        let geometry = ScannerGuideGeometry(previewFrame: previewFrame, guideFrame: previewFrame)
+        return ScannerGuideCropper().crop(image, using: geometry) ?? image
     }
 
     private func handleLiveSuccess(_ result: CardScanResult) {

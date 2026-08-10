@@ -40,19 +40,13 @@ test("validates demo source connectivity requests", async () => {
 });
 
 test("lists collection guides and follows one idempotently", async () => {
-  useDemoStore.persist.setOptions({
-    storage: {
-      getItem: () => null,
-      setItem: () => undefined,
-      removeItem: () => undefined,
-    },
-  });
+  useDemoStore.setState({ initialized: true, wishlists: [] });
   const list = await handleDemoRequest("GET", "/guides");
   const guides = (await list.json()) as Array<{
     slug: string;
     followed: boolean;
   }>;
-  assert.equal(guides.length, 2);
+  assert.equal(guides.length, 3);
 
   const first = await handleDemoRequest(
     "POST",
@@ -78,4 +72,25 @@ test("lists collection guides and follows one idempotently", async () => {
   assert.equal(second.status, 200);
   assert.equal(repeated.created, false);
   assert.equal(repeated.wishlistId, followed.wishlistId);
+});
+
+test("searches curated cards across every collection guide", async () => {
+  const response = await handleDemoRequest(
+    "GET",
+    "/guides/cards?query=Connected%20Art&category=story",
+  );
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as {
+    total: number;
+    results: Array<{
+      card: { id: string; name: string };
+      matchedGuides: Array<{ groupLabel?: string }>;
+    }>;
+  };
+  assert.equal(payload.total, 9);
+  assert.equal(payload.results[0]?.card.id, "swsh12.5gg-GG26");
+  assert.equal(
+    payload.results[0]?.matchedGuides[0]?.groupLabel,
+    "Crown Zenith nine-card scene",
+  );
 });

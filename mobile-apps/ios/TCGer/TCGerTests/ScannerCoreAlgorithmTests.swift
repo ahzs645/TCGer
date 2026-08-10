@@ -373,6 +373,69 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         )
     }
 
+    func testPageFitRectUnionsQuadsWithMarginAndClampsToFrame() throws {
+        let quads = [
+            makeQuad(x: 0.1, y: 0.55, width: 0.3, height: 0.4),
+            makeQuad(x: 0.5, y: 0.05, width: 0.3, height: 0.4)
+        ]
+
+        let rect = try XCTUnwrap(BinderPageScanner.pageFitRect(for: quads))
+
+        XCTAssertEqual(rect.minX, 0.08, accuracy: 0.0001)
+        XCTAssertEqual(rect.minY, 0.03, accuracy: 0.0001)
+        XCTAssertEqual(rect.maxX, 0.82, accuracy: 0.0001)
+        XCTAssertEqual(rect.maxY, 0.97, accuracy: 0.0001)
+    }
+
+    func testPageFitRectClampsMarginAtFrameEdge() throws {
+        let rect = try XCTUnwrap(BinderPageScanner.pageFitRect(for: [
+            makeQuad(x: 0, y: 0, width: 0.5, height: 0.5)
+        ]))
+
+        XCTAssertEqual(rect.minX, 0, accuracy: 0.0001)
+        XCTAssertEqual(rect.minY, 0, accuracy: 0.0001)
+    }
+
+    func testPageFitRectSkipsEmptyAndNearFullFits() {
+        XCTAssertNil(BinderPageScanner.pageFitRect(for: []))
+        // Cards already spanning the frame: recropping would trim nothing.
+        XCTAssertNil(BinderPageScanner.pageFitRect(for: [
+            makeQuad(x: 0.01, y: 0.01, width: 0.98, height: 0.98)
+        ]))
+    }
+
+    func testQuadRemappedIntoFitRectLandsAtProportionalPosition() {
+        let quad = makeQuad(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        let remapped = quad.remapped(into: CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5))
+
+        XCTAssertEqual(remapped.bottomLeft.x, 0, accuracy: 0.0001)
+        XCTAssertEqual(remapped.bottomLeft.y, 0, accuracy: 0.0001)
+        XCTAssertEqual(remapped.topRight.x, 1, accuracy: 0.0001)
+        XCTAssertEqual(remapped.topRight.y, 1, accuracy: 0.0001)
+    }
+
+    /// Bottom-left-origin normalized rects must flip vertically when cropping
+    /// the top-left-origin CGImage.
+    func testNormalizedCropFlipsVisionCoordinates() throws {
+        let image = ScannerTestImage.solid(width: 100, height: 200)
+        let cropped = try XCTUnwrap(BinderPageScanner.crop(
+            image,
+            toNormalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.5, height: 0.5)
+        ))
+
+        XCTAssertEqual(cropped.width, 50)
+        XCTAssertEqual(cropped.height, 100)
+    }
+
+    private func makeQuad(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> BinderNormalizedQuad {
+        BinderNormalizedQuad(
+            topLeft: CGPoint(x: x, y: y + height),
+            topRight: CGPoint(x: x + width, y: y + height),
+            bottomLeft: CGPoint(x: x, y: y),
+            bottomRight: CGPoint(x: x + width, y: y)
+        )
+    }
+
     private func entry(id: String, vector: [Float]) -> ArtworkFingerprintMatcher.Entry {
         let norm = sqrt(vector.reduce(0) { $0 + ($1 * $1) })
         return ArtworkFingerprintMatcher.Entry(
