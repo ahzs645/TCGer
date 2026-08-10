@@ -221,7 +221,12 @@ export default defineSchema({
     version: v.number(),
     featured: v.boolean(),
     status: v.union(v.literal("draft"), v.literal("published"), v.literal("archived")),
-    ruleType: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
+    ruleType: v.union(
+      v.literal("name"),
+      v.literal("set"),
+      v.literal("artist"),
+      v.literal("manual")
+    ),
     ruleQuery: v.optional(v.string()),
     ruleSetCode: v.optional(v.string()),
     ruleSetName: v.optional(v.string()),
@@ -250,6 +255,14 @@ export default defineSchema({
     groupOrder: v.optional(v.number()),
     position: v.number(),
     note: v.optional(v.string()),
+    source: v.optional(v.union(v.literal("rule"), v.literal("curated"))),
+    guideVersion: v.optional(v.number()),
+    rarity: v.optional(v.string()),
+    artist: v.optional(v.string()),
+    variant: v.optional(v.string()),
+    searchText: v.optional(v.string()),
+    provenanceUrl: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number()
   })
@@ -261,6 +274,7 @@ export default defineSchema({
     userId: v.id("users"),
     guideId: v.id("collectionGuides"),
     wishlistId: v.id("wishlists"),
+    guideVersion: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number()
   })

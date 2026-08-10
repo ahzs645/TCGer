@@ -210,6 +210,15 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let collectorNumber: String?
     let rarity: String?
     var artist: String? = nil
+    var archetype: String? = nil
+    var classifications: [String]? = nil
+    var subtypes: [String]? = nil
+    var variants: [String]? = nil
+    var source: String? = nil
+    var character: String? = nil
+    var era: String? = nil
+    var specialTrait: String? = nil
+    var treatments: [String]? = nil
     let type: String?
     let types: [String]?
     let colors: [String]?
@@ -357,6 +366,15 @@ final class CatalogStore: ObservableObject {
                 if let artist = card.artist {
                     searchableFields.append(Self.normalize(artist))
                 }
+                if let archetype = card.archetype { searchableFields.append(Self.normalize(archetype)) }
+                searchableFields.append(contentsOf: (card.classifications ?? []).map(Self.normalize))
+                searchableFields.append(contentsOf: (card.subtypes ?? []).map(Self.normalize))
+                searchableFields.append(contentsOf: (card.variants ?? []).map(Self.normalize))
+                if let source = card.source { searchableFields.append(Self.normalize(source)) }
+                if let character = card.character { searchableFields.append(Self.normalize(character)) }
+                if let era = card.era { searchableFields.append(Self.normalize(era)) }
+                if let specialTrait = card.specialTrait { searchableFields.append(Self.normalize(specialTrait)) }
+                searchableFields.append(contentsOf: (card.treatments ?? []).map(Self.normalize))
                 if let worlds {
                     searchableFields.append(String(worlds.year))
                     searchableFields.append(Self.normalize(worlds.playerName))

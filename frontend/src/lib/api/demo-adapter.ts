@@ -37,6 +37,7 @@ import type {
   AddCardInput,
   AddWishlistCardInput,
   Card,
+  CollectionGuideItemResponse,
   CollectionGuideResponse,
   CollectionCardCopy,
   CreateWishlistRuleInput,
@@ -134,19 +135,75 @@ function demoCollectionGuides(): CollectionGuideResponse[] {
       },
       cardCountHint: 30,
     },
+    {
+      id: "demo-guide-pokemon-crown-zenith-connected-art",
+      slug: "pokemon-crown-zenith-connected-art",
+      title: "Crown Zenith Connected Art",
+      description:
+        "Nine Galarian Gallery cards by Kouki Saitou that assemble into one continuous scene.",
+      tcg: "pokemon",
+      category: "story",
+      coverImageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG30_hires.png",
+      curatorName: "TCGer",
+      tags: ["Connected Art", "Panorama", "Crown Zenith", "Kouki Saitou"],
+      version: 1,
+      featured: true,
+      rule: {
+        type: "manual",
+        tcg: "pokemon",
+        includeAllPrintings: false,
+      },
+      cardCountHint: 9,
+    },
   ];
   return definitions.map((guide) => {
     const wishlist = store().wishlists.find((candidate) =>
-      (candidate.rules ?? []).some(
-        (rule) =>
-          rule.type === guide.rule.type &&
-          rule.tcg === guide.rule.tcg &&
-          rule.query === guide.rule.query &&
-          rule.setCode === guide.rule.setCode,
-      ),
+      guide.rule.type === "manual"
+        ? candidate.name === guide.title
+        : (candidate.rules ?? []).some(
+            (rule) =>
+              rule.type === guide.rule.type &&
+              rule.tcg === guide.rule.tcg &&
+              rule.query === guide.rule.query &&
+              rule.setCode === guide.rule.setCode,
+          ),
     );
     return { ...guide, followed: Boolean(wishlist), wishlistId: wishlist?.id };
   });
+}
+
+function demoConnectedArtItems(): CollectionGuideItemResponse[] {
+  const cards = [
+    ["GG26", "Riolu"],
+    ["GG27", "Swablu"],
+    ["GG28", "Duskull"],
+    ["GG29", "Bidoof"],
+    ["GG30", "Pikachu"],
+    ["GG31", "Turtwig"],
+    ["GG32", "Paras"],
+    ["GG33", "Poochyena"],
+    ["GG34", "Mareep"],
+  ] as const;
+  return cards.map(([collectorNumber, name], position) => ({
+    id: `demo-connected-${collectorNumber}`,
+    guideId: "demo-guide-pokemon-crown-zenith-connected-art",
+    tcg: "pokemon",
+    externalId: `swsh12.5gg-${collectorNumber}`,
+    name,
+    setCode: "swsh12.5gg",
+    setName: "Crown Zenith Galarian Gallery",
+    collectorNumber,
+    rarity: "Rare",
+    artist: "Kouki Saitou",
+    imageUrl: `https://images.pokemontcg.io/swsh12pt5gg/${collectorNumber}_hires.png`,
+    imageUrlSmall: `https://images.pokemontcg.io/swsh12pt5gg/${collectorNumber}.png`,
+    groupKey: "crown-zenith-nine-card-scene",
+    groupLabel: "Crown Zenith nine-card scene",
+    groupOrder: 0,
+    position,
+    provenanceUrl:
+      "https://bulbapedia.bulbagarden.net/wiki/Bidoof_(Crown_Zenith_111)",
+  }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -467,7 +524,7 @@ export function handleDemoRequest(
   }
 
   if (segments[0] === "guides") {
-    return handleGuides(method, segments.slice(1), body);
+    return handleGuides(method, segments.slice(1), body, queryString);
   }
 
   // ── Users ───────────────────────────────────────────────────────
@@ -500,19 +557,100 @@ export function handleDemoRequest(
   return notFound(`Demo: unknown route ${method} ${path}`);
 }
 
-function handleGuides(
+async function handleGuides(
   method: string,
   segments: string[],
   body?: unknown,
+  queryString?: string,
 ): Promise<Response> {
   store().init();
   const guides = demoCollectionGuides();
   if (segments.length === 0 && method === "GET") return json(guides);
 
+  if (segments[0] === "cards" && segments.length === 1 && method === "GET") {
+    const params = new URLSearchParams(queryString || "");
+    const query = normalizeCatalogText(params.get("query") || "");
+    const tcg = params.get("tcg");
+    const category = params.get("category");
+    const ownership = params.get("ownership") || "all";
+    const selectedGuides = guides.filter(
+      (guide) => (!tcg || guide.tcg === tcg) && (!category || guide.category === category),
+    );
+    const rows: Array<{
+      card: Card;
+      owned: boolean;
+      ownedQuantity: number;
+      matchedGuides: Array<{
+        guideId: string;
+        slug: string;
+        title: string;
+        category: CollectionGuideResponse["category"];
+        tags: string[];
+        groupKey?: string;
+        groupLabel?: string;
+        groupOrder?: number;
+        position?: number;
+      }>;
+    }> = [];
+    for (const guide of selectedGuides) {
+      const cards = guide.rule.type === "manual"
+        ? demoConnectedArtItems().map((item) => ({
+            card: {
+              id: item.externalId,
+              tcg: item.tcg,
+              name: item.name,
+              setCode: item.setCode,
+              setName: item.setName,
+              collectorNumber: item.collectorNumber,
+              rarity: item.rarity,
+              artist: item.artist,
+              imageUrl: item.imageUrl,
+              imageUrlSmall: item.imageUrlSmall,
+            } satisfies Card,
+            item,
+          }))
+        : guide.rule.type === "name" && guide.rule.query
+          ? (await demoSearchCards(guide.rule.query, guide.tcg)).map((card) => ({ card, item: undefined }))
+          : [];
+      for (const { card, item } of cards) {
+        const searchText = normalizeCatalogText(
+          [card.name, card.setName, card.artist, guide.title, ...guide.tags, item?.groupLabel]
+            .filter(Boolean)
+            .join(" "),
+        );
+        if (query && !searchText.includes(query)) continue;
+        const ownedQuantity = store().getOwnedQuantity(card.id);
+        const owned = ownedQuantity > 0;
+        if (ownership === "owned" && !owned) continue;
+        if (ownership === "missing" && owned) continue;
+        rows.push({
+          card,
+          owned,
+          ownedQuantity,
+          matchedGuides: [{
+            guideId: guide.id,
+            slug: guide.slug,
+            title: guide.title,
+            category: guide.category,
+            tags: guide.tags,
+            groupKey: item?.groupKey,
+            groupLabel: item?.groupLabel,
+            groupOrder: item?.groupOrder,
+            position: item?.position,
+          }],
+        });
+      }
+    }
+    return json({ results: rows, total: rows.length, failedGuideSlugs: [] });
+  }
+
   const slug = decodeURIComponent(segments[0] ?? "");
   const guide = guides.find((candidate) => candidate.slug === slug);
   if (!guide) return notFound("Collection guide not found");
   if (segments.length === 1 && method === "GET") return json(guide);
+  if (segments[1] === "items" && segments.length === 2 && method === "GET") {
+    return json(guide.rule.type === "manual" ? demoConnectedArtItems() : []);
+  }
 
   if (segments[1] === "follow" && segments.length === 2 && method === "POST") {
     if (guide.wishlistId) {
@@ -525,15 +663,44 @@ function handleGuides(
       name,
       `Following the “${guide.title}” collection guide.`,
     );
-    store().addWishlistRule(wishlistId, {
-      type: guide.rule.type,
-      tcg: guide.rule.tcg,
-      query: guide.rule.query,
-      setCode: guide.rule.setCode,
-      setName: guide.rule.setName,
-      includeAllPrintings: guide.rule.includeAllPrintings,
-      autoSync: true,
-    });
+    if (guide.rule.type === "manual") {
+      for (const item of demoConnectedArtItems()) {
+        store().addCardToWishlist(
+          wishlistId,
+          {
+            id: item.externalId,
+            tcg: item.tcg,
+            name: item.name,
+            setCode: `${item.setCode}-${item.collectorNumber}`,
+            setName: item.setName ?? item.setCode ?? "Unknown set",
+            rarity: item.rarity ?? "Unknown",
+            price: 0,
+          },
+          {
+            externalId: item.externalId,
+            tcg: item.tcg,
+            name: item.name,
+            setCode: item.setCode,
+            setName: item.setName,
+            rarity: item.rarity,
+            artist: item.artist,
+            imageUrl: item.imageUrl,
+            imageUrlSmall: item.imageUrlSmall,
+            collectorNumber: item.collectorNumber,
+          },
+        );
+      }
+    } else {
+      store().addWishlistRule(wishlistId, {
+        type: guide.rule.type,
+        tcg: guide.rule.tcg,
+        query: guide.rule.query,
+        setCode: guide.rule.setCode,
+        setName: guide.rule.setName,
+        includeAllPrintings: guide.rule.includeAllPrintings,
+        autoSync: true,
+      });
+    }
     const followed = demoCollectionGuides().find(
       (candidate) => candidate.slug === slug,
     )!;

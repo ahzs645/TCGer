@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import type { Card as CardType, CollectionGuideResponse } from "@tcg/api-types";
@@ -33,12 +33,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCollectionGuides, followCollectionGuide } from "@/lib/api/guides";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  getCollectionGuides,
+  followCollectionGuide,
+  searchCollectionGuideCards,
+} from "@/lib/api/guides";
 import { expandWishlistRule } from "@/lib/wishlists/sync";
 import { useAuthStore } from "@/stores/auth";
 import { useWishlistsStore } from "@/stores/wishlists";
 
 type OwnershipFilter = "all" | "owned" | "missing";
+type SearchScope = "guides" | "cards";
 
 export function CollectionGuidesContent() {
   const { token, isAuthenticated } = useAuthStore();
@@ -46,6 +52,12 @@ export function CollectionGuidesContent() {
     useWishlistsStore();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [guideSearch, setGuideSearch] = useState("");
+  const deferredGuideSearch = useDeferredValue(guideSearch);
+  const [searchScope, setSearchScope] = useState<SearchScope>("guides");
+  const [globalGame, setGlobalGame] = useState("all");
+  const [globalCategory, setGlobalCategory] = useState("all");
+  const [globalOwnership, setGlobalOwnership] =
+    useState<OwnershipFilter>("all");
   const [cardSearch, setCardSearch] = useState("");
   const [setFilter, setSetFilter] = useState("all");
   const [ownershipFilter, setOwnershipFilter] =
@@ -91,9 +103,45 @@ export function CollectionGuidesContent() {
       selectedGuide?.slug,
       selectedGuide?.version,
     ],
-    queryFn: () => expandWishlistRule(token!, selectedGuide!.rule),
+    queryFn: async () => {
+      const rule = selectedGuide!.rule;
+      if (rule.type === "manual") {
+        const response = await searchCollectionGuideCards(token!, {
+          guide: selectedGuide!.slug,
+          limit: 2000,
+        });
+        return response.results.map((result) => result.card);
+      }
+      return expandWishlistRule(token!, { ...rule, type: rule.type });
+    },
     enabled: Boolean(token && selectedGuide),
     staleTime: 10 * 60_000,
+  });
+
+  const globalCardsQuery = useQuery({
+    queryKey: [
+      "collection-guide-card-search",
+      deferredGuideSearch,
+      globalGame,
+      globalCategory,
+      globalOwnership,
+    ],
+    queryFn: () =>
+      searchCollectionGuideCards(token!, {
+        query: deferredGuideSearch,
+        tcg:
+          globalGame === "all"
+            ? undefined
+            : (globalGame as CardType["tcg"]),
+        category:
+          globalCategory === "all"
+            ? undefined
+            : (globalCategory as CollectionGuideResponse["category"]),
+        ownership: globalOwnership,
+        limit: 1000,
+      }),
+    enabled: Boolean(token && searchScope === "cards"),
+    staleTime: 5 * 60_000,
   });
 
   const followedWishlist = selectedGuide?.wishlistId
@@ -158,6 +206,13 @@ export function CollectionGuidesContent() {
     try {
       const followed = await followCollectionGuide(token, selectedGuide.slug);
       await fetchWishlists(token);
+      if (selectedGuide.rule.type === "manual") {
+        await guidesQuery.refetch();
+        setFollowStatus(
+          `Guide followed with ${cardsQuery.data?.length ?? selectedGuide.cardCountHint ?? 0} curated cards added to your wishlist.`,
+        );
+        return;
+      }
       setFollowStatus("Finding every matching card…");
       const result = await syncWishlist(token, followed.wishlistId, {
         onProgress: setFollowStatus,
@@ -215,36 +270,137 @@ export function CollectionGuidesContent() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className={selectedGuide ? "hidden lg:block" : "block"}>
-        <div className="mb-4 flex items-center gap-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative min-w-0 flex-1 sm:max-w-xl">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            className="pl-9"
             value={guideSearch}
             onChange={(event) => setGuideSearch(event.target.value)}
-            placeholder="Search themes, artists, Pokémon…"
+            placeholder={
+              searchScope === "cards"
+                ? "Search every guide card: Clay, Ditto, Connected Art…"
+                : "Search themes, artists, Pokémon…"
+            }
           />
         </div>
-        <div className="space-y-3">
-          {guides.map((guide) => (
-            <GuideListCard
-              key={guide.id}
-              guide={guide}
-              selected={guide.slug === selectedSlug}
-              onSelect={() => {
-                setSelectedSlug(guide.slug);
-                setFollowStatus(null);
-                setCardSearch("");
-                setSetFilter("all");
-                setOwnershipFilter("all");
-              }}
-            />
-          ))}
-        </div>
-      </aside>
+        <Tabs
+          value={searchScope}
+          onValueChange={(value) => setSearchScope(value as SearchScope)}
+        >
+          <TabsList>
+            <TabsTrigger value="guides">Guides</TabsTrigger>
+            <TabsTrigger value="cards">All guide cards</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
-      {selectedGuide ? (
-        <section className="min-w-0 space-y-5">
+      {searchScope === "cards" ? (
+        <section className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Select value={globalGame} onValueChange={setGlobalGame}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All games</SelectItem>
+                <SelectItem value="pokemon">Pokémon</SelectItem>
+                <SelectItem value="magic">Magic</SelectItem>
+                <SelectItem value="yugioh">Yu-Gi-Oh!</SelectItem>
+                <SelectItem value="onepiece">One Piece</SelectItem>
+                <SelectItem value="lorcana">Lorcana</SelectItem>
+                <SelectItem value="dragonball">Dragon Ball</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={globalCategory} onValueChange={setGlobalCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All themes</SelectItem>
+                <SelectItem value="art-style">Art style</SelectItem>
+                <SelectItem value="artist">Artist</SelectItem>
+                <SelectItem value="species">Species</SelectItem>
+                <SelectItem value="story">Story / connected art</SelectItem>
+                <SelectItem value="cameo">Cameo</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={globalOwnership}
+              onValueChange={(value) => setGlobalOwnership(value as OwnershipFilter)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All cards</SelectItem>
+                <SelectItem value="owned">Owned</SelectItem>
+                <SelectItem value="missing">Missing</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {globalCardsQuery.isLoading ? (
+            <CardGridSkeleton />
+          ) : globalCardsQuery.isError ? (
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle>Couldn&apos;t search guide cards</CardTitle>
+                <CardDescription>
+                  {globalCardsQuery.error instanceof Error
+                    ? globalCardsQuery.error.message
+                    : "Guide card search failed."}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : globalCardsQuery.data?.results.length ? (
+            <>
+              <div className="text-sm text-muted-foreground">
+                {globalCardsQuery.data.total} matching guide cards
+                {globalCardsQuery.data.failedGuideSlugs.length
+                  ? ` · ${globalCardsQuery.data.failedGuideSlugs.length} guide source unavailable`
+                  : ""}
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                {globalCardsQuery.data.results.map((result) => (
+                  <GuideCard
+                    key={`${result.card.tcg}:${result.card.id}`}
+                    card={result.card}
+                    owned={result.owned}
+                    guideLabels={result.matchedGuides.map((guide) =>
+                      guide.groupLabel
+                        ? `${guide.title} · ${guide.groupLabel}`
+                        : guide.title,
+                    )}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+              No guide cards match these filters.
+            </div>
+          )}
+        </section>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className={selectedGuide ? "hidden lg:block" : "block"}>
+            <div className="space-y-3">
+              {guides.map((guide) => (
+                <GuideListCard
+                  key={guide.id}
+                  guide={guide}
+                  selected={guide.slug === selectedSlug}
+                  onSelect={() => {
+                    setSelectedSlug(guide.slug);
+                    setFollowStatus(null);
+                    setCardSearch("");
+                    setSetFilter("all");
+                    setOwnershipFilter("all");
+                  }}
+                />
+              ))}
+            </div>
+          </aside>
+
+          {selectedGuide ? (
+            <section className="min-w-0 space-y-5">
           <Button
             variant="ghost"
             className="lg:hidden"
@@ -330,10 +486,12 @@ export function CollectionGuidesContent() {
               ))}
             </div>
           )}
-        </section>
-      ) : (
-        <div className="hidden items-center justify-center rounded-xl border border-dashed p-12 text-muted-foreground lg:flex">
-          Select a guide to see its cards.
+            </section>
+          ) : (
+            <div className="hidden items-center justify-center rounded-xl border border-dashed p-12 text-muted-foreground lg:flex">
+              Select a guide to see its cards.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -457,7 +615,15 @@ function GuideHero({
   );
 }
 
-function GuideCard({ card, owned }: { card: CardType; owned: boolean }) {
+function GuideCard({
+  card,
+  owned,
+  guideLabels = [],
+}: {
+  card: CardType;
+  owned: boolean;
+  guideLabels?: string[];
+}) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[2.5/3.5] bg-muted">
@@ -477,6 +643,15 @@ function GuideCard({ card, owned }: { card: CardType; owned: boolean }) {
         )}
       </div>
       <CardContent className="p-3">
+        {guideLabels.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {guideLabels.slice(0, 2).map((label) => (
+              <Badge key={label} variant="secondary" className="max-w-full truncate text-[10px]">
+                {label}
+              </Badge>
+            ))}
+          </div>
+        )}
         <div className="truncate text-sm font-medium" title={card.name}>
           {card.name}
         </div>

@@ -1,6 +1,12 @@
 import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
-import { CardDTO, CardNameSearchOptions, CardPrintsResult, TcgAdapter } from './types';
+import {
+  CardArtistSearchOptions,
+  CardDTO,
+  CardNameSearchOptions,
+  CardPrintsResult,
+  TcgAdapter
+} from './types';
 
 const API_ROOT = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
 const BASE_URL = `${API_ROOT}/cards`;
@@ -143,6 +149,39 @@ export class MagicAdapter implements TcgAdapter {
       }
     } catch (error) {
       console.error('MagicAdapter.fetchCardsByName error', error);
+    }
+
+    return collected.slice(0, options.limit).map((card) => this.mapCard(card));
+  }
+
+  async fetchCardsByArtist(
+    artist: string,
+    options: CardArtistSearchOptions
+  ): Promise<CardDTO[]> {
+    const trimmed = artist.trim();
+    if (!trimmed) return [];
+
+    const url = new URL(`${BASE_URL}/search`);
+    url.searchParams.set('q', `artist:"${trimmed.replace(/"/g, '')}"`);
+    url.searchParams.set('order', 'released');
+    url.searchParams.set('unique', options.includeAllPrintings ? 'prints' : 'art');
+    url.searchParams.set('dir', 'desc');
+    const collected: ScryfallCard[] = [];
+    let nextPageUrl: string | undefined = url.toString();
+
+    try {
+      while (nextPageUrl && collected.length < options.limit) {
+        const response = await rateLimitedFetch(nextPageUrl);
+        if (response.status === 404) break;
+        if (!response.ok) {
+          throw new Error(`Scryfall artist search failed: ${response.status}`);
+        }
+        const payload = (await response.json()) as ScryfallSearchResponse;
+        collected.push(...(payload.data ?? []));
+        nextPageUrl = payload.has_more && payload.next_page ? payload.next_page : undefined;
+      }
+    } catch (error) {
+      console.error('MagicAdapter.fetchCardsByArtist error', error);
     }
 
     return collected.slice(0, options.limit).map((card) => this.mapCard(card));

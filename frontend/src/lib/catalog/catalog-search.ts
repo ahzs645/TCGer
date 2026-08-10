@@ -184,6 +184,15 @@ function catalogCardAttributes(card: CatalogCard): Record<string, unknown> {
   if (card.level !== undefined) attributes.level = card.level;
   if (card.konamiId !== undefined) attributes.konamiId = card.konamiId;
   if (card.artist !== undefined) attributes.artist = card.artist;
+  if (card.archetype !== undefined) attributes.archetype = card.archetype;
+  if (card.classifications !== undefined) attributes.classifications = card.classifications;
+  if (card.subtypes !== undefined) attributes.subtypes = card.subtypes;
+  if (card.variants !== undefined) attributes.variants = card.variants;
+  if (card.source !== undefined) attributes.source = card.source;
+  if (card.character !== undefined) attributes.character = card.character;
+  if (card.era !== undefined) attributes.era = card.era;
+  if (card.specialTrait !== undefined) attributes.specialTrait = card.specialTrait;
+  if (card.treatments !== undefined) attributes.treatments = card.treatments;
   return attributes;
 }
 
@@ -254,6 +263,15 @@ async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null
           card.collectorNumber,
           card.rarity,
           card.artist,
+          catalogCard.archetype,
+          ...(catalogCard.classifications ?? []),
+          ...(catalogCard.subtypes ?? []),
+          ...(catalogCard.variants ?? []),
+          catalogCard.source,
+          catalogCard.character,
+          catalogCard.era,
+          catalogCard.specialTrait,
+          ...(catalogCard.treatments ?? []),
           card.supertype,
           card.printingKind,
           card.pokemonPrint?.worldChampionship?.year?.toString(),

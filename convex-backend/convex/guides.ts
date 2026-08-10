@@ -21,6 +21,7 @@ const guideRuleTypeValidator = v.union(
   v.literal("name"),
   v.literal("set"),
   v.literal("artist"),
+  v.literal("manual"),
 );
 
 const guideRuleValidator = v.object({
@@ -54,6 +55,28 @@ const followResponseValidator = v.object({
   guide: guideResponseValidator,
   wishlistId: v.id("wishlists"),
   created: v.boolean(),
+});
+
+const guideItemResponseValidator = v.object({
+  id: v.id("collectionGuideItems"),
+  guideId: v.id("collectionGuides"),
+  tcg: tcgCodeValidator,
+  externalId: v.string(),
+  name: v.string(),
+  setCode: v.optional(v.string()),
+  setName: v.optional(v.string()),
+  collectorNumber: v.optional(v.string()),
+  rarity: v.optional(v.string()),
+  artist: v.optional(v.string()),
+  variant: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  imageUrlSmall: v.optional(v.string()),
+  groupKey: v.optional(v.string()),
+  groupLabel: v.optional(v.string()),
+  groupOrder: v.optional(v.number()),
+  position: v.number(),
+  note: v.optional(v.string()),
+  provenanceUrl: v.optional(v.string()),
 });
 
 type ReaderCtx = QueryCtx | MutationCtx;
@@ -177,6 +200,75 @@ export const getPublishedBySlug = internalQuery({
   },
 });
 
+export const listPublishedItems = internalQuery({
+  args: { subject: v.string(), slug: v.string() },
+  returns: v.array(guideItemResponseValidator),
+  handler: async (ctx, args) => {
+    await requireViewerBySubject(ctx, args.subject);
+    const guide = await ctx.db
+      .query("collectionGuides")
+      .withIndex("by_slug", (query) => query.eq("slug", args.slug))
+      .unique();
+    if (!guide || guide.status !== "published") {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Collection guide not found",
+      });
+    }
+    const items = await ctx.db
+      .query("collectionGuideItems")
+      .withIndex("by_guide", (query) => query.eq("guideId", guide._id))
+      .take(2000);
+    return items
+      .sort(
+        (left, right) =>
+          (left.groupOrder ?? 0) - (right.groupOrder ?? 0) ||
+          left.position - right.position,
+      )
+      .map((item) => ({
+        id: item._id,
+        guideId: item.guideId,
+        tcg: item.tcg,
+        externalId: item.externalId,
+        name: item.name,
+        setCode: item.setCode,
+        setName: item.setName,
+        collectorNumber: item.collectorNumber,
+        rarity: item.rarity,
+        artist: item.artist,
+        variant: item.variant,
+        imageUrl: item.imageUrl,
+        imageUrlSmall: item.imageUrlSmall,
+        groupKey: item.groupKey,
+        groupLabel: item.groupLabel,
+        groupOrder: item.groupOrder,
+        position: item.position,
+        note: item.note,
+        provenanceUrl: item.provenanceUrl,
+      }));
+  },
+});
+
+export const listOwnedCardKeys = internalQuery({
+  args: { subject: v.string() },
+  returns: v.array(v.object({ key: v.string(), quantity: v.number() })),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const entries = await ctx.db
+      .query("collectionEntries")
+      .withIndex("by_user", (query) => query.eq("userId", viewer._id))
+      .take(5000);
+    const cards = await Promise.all(entries.map((entry) => ctx.db.get(entry.cardId)));
+    const quantities = new Map<string, number>();
+    for (const [index, card] of cards.entries()) {
+      if (!card) continue;
+      const key = `${card.tcg}:${card.externalId}`;
+      quantities.set(key, (quantities.get(key) ?? 0) + entries[index]!.quantity);
+    }
+    return [...quantities.entries()].map(([key, quantity]) => ({ key, quantity }));
+  },
+});
+
 export const follow = internalMutation({
   args: {
     subject: v.string(),
@@ -218,22 +310,52 @@ export const follow = internalMutation({
       createdAt: timestamp,
       updatedAt: timestamp,
     });
-    await ctx.db.insert("wishlistRules", {
-      wishlistId,
-      type: guide.ruleType,
-      tcg: guide.tcg,
-      query: guide.ruleQuery,
-      setCode: guide.ruleSetCode,
-      setName: guide.ruleSetName,
-      includeAllPrintings: guide.includeAllPrintings,
-      autoSync: true,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
+    if (guide.ruleType === "manual") {
+      const items = await ctx.db
+        .query("collectionGuideItems")
+        .withIndex("by_guide", (query) => query.eq("guideId", guide._id))
+        .take(2000);
+      const inserted = new Set<string>();
+      for (const item of items) {
+        const key = `${item.tcg}:${item.externalId}`;
+        if (inserted.has(key)) continue;
+        inserted.add(key);
+        await ctx.db.insert("wishlistCards", {
+          wishlistId,
+          externalId: item.externalId,
+          tcg: item.tcg,
+          name: item.name,
+          setCode: item.setCode,
+          setName: item.setName,
+          rarity: item.rarity,
+          artist: item.artist,
+          imageUrl: item.imageUrl,
+          imageUrlSmall: item.imageUrlSmall,
+          collectorNumber: item.collectorNumber,
+          notes: item.note,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+      }
+    } else {
+      await ctx.db.insert("wishlistRules", {
+        wishlistId,
+        type: guide.ruleType,
+        tcg: guide.tcg,
+        query: guide.ruleQuery,
+        setCode: guide.ruleSetCode,
+        setName: guide.ruleSetName,
+        includeAllPrintings: guide.includeAllPrintings,
+        autoSync: true,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+    }
     const followId = await ctx.db.insert("userGuideFollows", {
       userId: viewer._id,
       guideId: guide._id,
       wishlistId,
+      guideVersion: guide.version,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -299,6 +421,25 @@ export const seedSystemGuides = internalMutation({
         cardCountHint: 30,
         updatedAt: timestamp,
       },
+      {
+        slug: "pokemon-crown-zenith-connected-art",
+        title: "Crown Zenith Connected Art",
+        description:
+          "Nine Galarian Gallery cards by Kouki Saitou that assemble into one continuous scene.",
+        tcg: "pokemon" as const,
+        category: "story" as const,
+        coverImageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG30_hires.png",
+        curatorName: "TCGer",
+        tags: ["Connected Art", "Panorama", "Crown Zenith", "Kouki Saitou"],
+        version: 1,
+        featured: true,
+        status: "published" as const,
+        ruleType: "manual" as const,
+        includeAllPrintings: false,
+        matchAnyPrinting: false,
+        cardCountHint: 9,
+        updatedAt: timestamp,
+      },
     ];
 
     for (const guide of systemGuides) {
@@ -311,6 +452,74 @@ export const seedSystemGuides = internalMutation({
       } else {
         await ctx.db.insert("collectionGuides", {
           ...guide,
+          createdAt: timestamp,
+        });
+      }
+    }
+
+    const connectedGuide = await ctx.db
+      .query("collectionGuides")
+      .withIndex("by_slug", (query) =>
+        query.eq("slug", "pokemon-crown-zenith-connected-art"),
+      )
+      .unique();
+    if (!connectedGuide) {
+      throw new ConvexError({
+        code: "INVARIANT",
+        message: "Connected-art guide could not be seeded",
+      });
+    }
+
+    const connectedCards = [
+      ["GG26", "Riolu"],
+      ["GG27", "Swablu"],
+      ["GG28", "Duskull"],
+      ["GG29", "Bidoof"],
+      ["GG30", "Pikachu"],
+      ["GG31", "Turtwig"],
+      ["GG32", "Paras"],
+      ["GG33", "Poochyena"],
+      ["GG34", "Mareep"],
+    ] as const;
+    for (const [position, [collectorNumber, name]] of connectedCards.entries()) {
+      const externalId = `swsh12.5gg-${collectorNumber}`;
+      const imageRoot = `https://images.pokemontcg.io/swsh12pt5gg/${collectorNumber}`;
+      const item = {
+        guideId: connectedGuide._id,
+        tcg: "pokemon" as const,
+        externalId,
+        name,
+        setCode: "swsh12.5gg",
+        setName: "Crown Zenith Galarian Gallery",
+        collectorNumber,
+        rarity: "Rare",
+        artist: "Kouki Saitou",
+        imageUrl: `${imageRoot}_hires.png`,
+        imageUrlSmall: `${imageRoot}.png`,
+        groupKey: "crown-zenith-nine-card-scene",
+        groupLabel: "Crown Zenith nine-card scene",
+        groupOrder: 0,
+        position,
+        source: "curated" as const,
+        guideVersion: connectedGuide.version,
+        searchText:
+          `${name} Crown Zenith Galarian Gallery Connected Art Panorama Kouki Saitou`.toLowerCase(),
+        provenanceUrl:
+          "https://bulbapedia.bulbagarden.net/wiki/Bidoof_(Crown_Zenith_111)",
+        reviewedAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const existing = await ctx.db
+        .query("collectionGuideItems")
+        .withIndex("by_guide_and_external_id", (query) =>
+          query.eq("guideId", connectedGuide._id).eq("externalId", externalId),
+        )
+        .unique();
+      if (existing) {
+        await ctx.db.patch(existing._id, item);
+      } else {
+        await ctx.db.insert("collectionGuideItems", {
+          ...item,
           createdAt: timestamp,
         });
       }

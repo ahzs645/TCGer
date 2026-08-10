@@ -1380,6 +1380,22 @@ http.route({
 });
 
 http.route({
+  path: "/guides/owned-card-keys",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const keys = await ctx.runQuery(internal.guides.listOwnedCardKeys, {
+        subject: identity.subject
+      });
+      return json(keys);
+    } catch (error) {
+      return handleConvexError(error, "Failed to resolve guide ownership");
+    }
+  })
+});
+
+http.route({
   pathPrefix: "/guides/",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
@@ -1389,6 +1405,13 @@ http.route({
         .replace(/^\/guides\//, "")
         .split("/")
         .filter(Boolean);
+      if (segments.length === 2 && segments[1] === "items") {
+        const items = await ctx.runQuery(internal.guides.listPublishedItems, {
+          subject: identity.subject,
+          slug: decodeURIComponent(segments[0]!)
+        });
+        return json(items);
+      }
       if (segments.length !== 1) {
         return errorJson(404, "NOT_FOUND", "Route not found");
       }

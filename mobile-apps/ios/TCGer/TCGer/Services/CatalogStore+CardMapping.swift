@@ -14,6 +14,25 @@ extension CatalogStore {
         if let artist = entry.card.artist {
             attributes["artist"] = .string(artist)
         }
+        if let archetype = entry.card.archetype { attributes["archetype"] = .string(archetype) }
+        if let classifications = entry.card.classifications {
+            attributes["classifications"] = .array(classifications.map(JSONValue.string))
+        }
+        if let subtypes = entry.card.subtypes {
+            attributes["subtypes"] = .array(subtypes.map(JSONValue.string))
+        }
+        if let variants = entry.card.variants {
+            attributes["variants"] = .array(variants.map(JSONValue.string))
+        }
+        if let source = entry.card.source { attributes["source"] = .string(source) }
+        if let character = entry.card.character { attributes["character"] = .string(character) }
+        if let era = entry.card.era { attributes["era"] = .string(era) }
+        if let specialTrait = entry.card.specialTrait {
+            attributes["special_trait"] = .string(specialTrait)
+        }
+        if let treatments = entry.card.treatments {
+            attributes["treatments"] = .array(treatments.map(JSONValue.string))
+        }
 
         switch entry.tcg {
         case .magic:

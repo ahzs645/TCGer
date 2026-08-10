@@ -1,5 +1,17 @@
 import SwiftUI
 
+private enum GuideSearchScope: String, CaseIterable {
+    case guides = "Guides"
+    case cards = "All Cards"
+}
+
+private enum GuideOwnershipFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case missing = "Missing"
+    case owned = "Owned"
+    var id: String { rawValue }
+}
+
 struct CollectionGuidesView: View {
     let parentProvidesNavigation: Bool
 
@@ -8,6 +20,13 @@ struct CollectionGuidesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var searchText = ""
+    @State private var searchScope = GuideSearchScope.guides
+    @State private var guideCardResults: [GuideCardSearchResult] = []
+    @State private var guideCardTotal = 0
+    @State private var isSearchingCards = false
+    @State private var selectedGame = TCGGame.all
+    @State private var selectedCategory: CollectionGuideCategory?
+    @State private var globalOwnership = GuideOwnershipFilter.all
 
     private let apiService = APIService()
 
@@ -43,6 +62,8 @@ struct CollectionGuidesView: View {
                 ErrorView(title: "Couldn’t Load Guides", message: errorMessage) {
                     Task { await loadGuides() }
                 }
+            } else if searchScope == .cards {
+                guideCardSearchContent
             } else if filteredGuides.isEmpty {
                 ContentUnavailableView.search(text: searchText)
             } else {
@@ -61,11 +82,84 @@ struct CollectionGuidesView: View {
             }
         }
         .navigationTitle("Collection Guides")
-        .searchable(text: $searchText, prompt: "Clay, artist, Pokémon…")
+        .searchable(
+            text: $searchText,
+            prompt: searchScope == .cards
+                ? "Clay, Ditto, Connected Art…"
+                : "Clay, artist, Pokémon…"
+        )
+        .searchScopes($searchScope) {
+            ForEach(GuideSearchScope.allCases, id: \.self) { scope in
+                Text(scope.rawValue).tag(scope)
+            }
+        }
         .navigationDestination(for: CollectionGuide.self) { guide in
             CollectionGuideDetailView(guide: guide)
         }
         .task { await loadGuides() }
+        .task(id: "\(searchScope.rawValue)|\(searchText)|\(selectedGame.rawValue)|\(selectedCategory?.rawValue ?? "all")|\(globalOwnership.rawValue)") {
+            guard searchScope == .cards else { return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            await searchGuideCards()
+        }
+    }
+
+    private var guideCardSearchContent: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Menu {
+                    Picker("Game", selection: $selectedGame) {
+                        ForEach(TCGGame.allCases) { game in
+                            Text(game.displayName).tag(game)
+                        }
+                    }
+                    Picker("Theme", selection: $selectedCategory) {
+                        Text("All Themes").tag(CollectionGuideCategory?.none)
+                        Text("Art Style").tag(CollectionGuideCategory?.some(.artStyle))
+                        Text("Artist").tag(CollectionGuideCategory?.some(.artist))
+                        Text("Species").tag(CollectionGuideCategory?.some(.species))
+                        Text("Story / Connected Art").tag(CollectionGuideCategory?.some(.story))
+                        Text("Cameo").tag(CollectionGuideCategory?.some(.cameo))
+                    }
+                } label: {
+                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                Picker("Ownership", selection: $globalOwnership) {
+                    ForEach(GuideOwnershipFilter.allCases) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal)
+
+            if isSearchingCards && guideCardResults.isEmpty {
+                ProgressView("Searching every guide…")
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            } else if guideCardResults.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("\(guideCardTotal) matching guide cards")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 112, maximum: 170), spacing: 12)],
+                            spacing: 18
+                        ) {
+                            ForEach(guideCardResults) { result in
+                                GlobalGuideCardCell(result: result)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+                .refreshable { await searchGuideCards() }
+            }
+        }
     }
 
     @MainActor
@@ -81,6 +175,69 @@ struct CollectionGuidesView: View {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func searchGuideCards() async {
+        guard let token = environmentStore.authToken else { return }
+        isSearchingCards = true
+        defer { isSearchingCards = false }
+        do {
+            let response = try await apiService.searchCollectionGuideCards(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                query: searchText,
+                game: selectedGame,
+                category: selectedCategory,
+                ownership: globalOwnership.rawValue.lowercased()
+            )
+            guard !Task.isCancelled else { return }
+            guideCardResults = response.results
+            guideCardTotal = response.total
+            errorMessage = response.failedGuideSlugs.isEmpty
+                ? nil
+                : "Some guide sources are temporarily unavailable."
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct GlobalGuideCardCell: View {
+    let result: GuideCardSearchResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CachedAsyncImage(card: result.card) { phase in
+                if case let .success(image) = phase {
+                    image.resizable().scaledToFill()
+                } else {
+                    Rectangle().fill(.quaternary)
+                }
+            }
+            .aspectRatio(63 / 88, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .topTrailing) {
+                if result.owned {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.white, .green)
+                        .padding(5)
+                }
+            }
+            if let guide = result.matchedGuides.first {
+                Text(guide.groupLabel.map { "\(guide.title) · \($0)" } ?? guide.title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .lineLimit(2)
+            }
+            Text(result.card.name).font(.caption.weight(.semibold)).lineLimit(1)
+            Text([result.card.setCode, result.card.collectorNumber].compactMap { $0 }.joined(separator: " · "))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 }
@@ -343,6 +500,12 @@ private struct CollectionGuideDetailView: View {
                 tcg: guide.rule.tcg,
                 setCode: guide.rule.setCode ?? ""
             )
+        case .manual:
+            return try await apiService.getCollectionGuideItems(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                slug: guide.slug
+            ).map(\.card)
         }
     }
 
@@ -364,6 +527,12 @@ private struct CollectionGuideDetailView: View {
                 token: token,
                 id: response.wishlistId
             )
+            if guide.rule.type == .manual {
+                wishlist = followedWishlist
+                wishlistStore.insert(followedWishlist)
+                statusMessage = "Added \(followedWishlist.totalCards) curated cards to your wishlist."
+                return
+            }
             let syncService = WishlistSyncService(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -409,4 +578,3 @@ private struct CollectionGuideDetailView: View {
     ))
     .padding()
 }
-

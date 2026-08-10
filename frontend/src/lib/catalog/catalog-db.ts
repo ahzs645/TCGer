@@ -28,6 +28,15 @@ export interface CatalogCard {
   collectorNumber?: string;
   rarity?: string;
   artist?: string;
+  archetype?: string;
+  classifications?: string[];
+  subtypes?: string[];
+  variants?: string[];
+  source?: string;
+  character?: string;
+  era?: string;
+  specialTrait?: string;
+  treatments?: string[];
   type?: string;
   types?: string[];
   hp?: number;

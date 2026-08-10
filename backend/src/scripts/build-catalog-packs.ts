@@ -44,6 +44,15 @@ interface CatalogCard {
   collectorNumber?: string;
   rarity?: string;
   artist?: string;
+  archetype?: string;
+  classifications?: string[];
+  subtypes?: string[];
+  variants?: string[];
+  source?: string;
+  character?: string;
+  era?: string;
+  specialTrait?: string;
+  treatments?: string[];
   type?: string;
   types?: string[];
   hp?: number;
@@ -146,10 +155,17 @@ interface ScryfallBulkCard {
   type_line?: string;
   mana_cost?: string;
   colors?: string[];
+  artist?: string;
+  finishes?: string[];
+  frame_effects?: string[];
+  promo_types?: string[];
+  full_art?: boolean;
+  border_color?: string;
   games?: string[];
   card_faces?: Array<{
     type_line?: string;
     mana_cost?: string;
+    artist?: string;
   }>;
 }
 
@@ -165,6 +181,7 @@ interface YgoCard {
   atk?: number;
   def?: number;
   level?: number;
+  archetype?: string;
   card_images?: Array<{
     id?: number | string;
   }>;
@@ -210,6 +227,8 @@ interface LorcastCard {
   collector_number?: string;
   rarity?: string;
   type?: string[];
+  classifications?: string[];
+  illustrators?: string[];
   set?: { id?: string; code?: string; name?: string };
   image_uris?: {
     digital?: { small?: string; normal?: string; large?: string };
@@ -662,6 +681,14 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
       type: card.type_line ?? face?.type_line,
       manaCost: card.mana_cost ?? face?.mana_cost,
       colors: card.colors,
+      artist: card.artist ?? face?.artist,
+      variants: card.finishes,
+      treatments: [
+        ...(card.frame_effects ?? []),
+        ...(card.promo_types ?? []),
+        ...(card.full_art ? ['full-art'] : []),
+        ...(card.border_color ? [`${card.border_color}-border`] : []),
+      ],
     });
 
     const existingSet = sets.get(card.set);
@@ -725,6 +752,7 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
       atk: card.atk,
       def: card.def,
       level: card.level,
+      archetype: card.archetype,
       konamiId: Number.isFinite(imageId) ? imageId : card.id,
     });
 
@@ -860,6 +888,8 @@ async function buildLorcanaPack(updatedAt: string, limit?: number): Promise<Cata
           collectorNumber,
           rarity: card.rarity,
           type: card.type?.join(' · '),
+          artist: card.illustrators?.join(' / '),
+          classifications: card.classifications,
           ...lorcastImages(card),
         };
       }),
@@ -942,6 +972,11 @@ async function buildDragonBallPack(updatedAt: string, limit?: number): Promise<C
         collectorNumber: product.cardNumber ?? product.code,
         rarity: String(dragonBallAttribute(attributes, 'rarity') ?? '') || undefined,
         type: String(dragonBallAttribute(attributes, 'type', 'card type') ?? '') || undefined,
+        character: String(dragonBallAttribute(attributes, 'character') ?? '') || undefined,
+        era: String(dragonBallAttribute(attributes, 'era') ?? '') || undefined,
+        specialTrait:
+          String(dragonBallAttribute(attributes, 'special trait', 'specialTrait') ?? '') ||
+          undefined,
         imageUrl: image?.large ?? image?.medium ?? image?.small,
         imageUrlSmall: image?.small ?? image?.medium ?? image?.large,
       });
