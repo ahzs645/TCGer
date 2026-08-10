@@ -195,6 +195,13 @@ actor BinderPageScanner {
         static let maximumBoundingBoxArea: CGFloat = 0.45
         static let duplicateIntersectionThreshold: CGFloat = 0.55
         static let matchedScore = 0.82
+        /// ANN top-2 separation below which an uncertain suggestion is not
+        /// trustworthy enough to import on a blanket page confirm. Measured on
+        /// 67 strongly-accepted binder attempts (2026-08-10): every wrong
+        /// review candidate at >=0.72 had a top-2 margin <= 0.047 (median
+        /// 0.009), correct ones median 0.095. Gating at 0.05 suppressed all 15
+        /// wrong candidates and kept ~75% of correct ones.
+        static let reviewPreselectionMargin = 0.05
         static let targetSize = CGSize(width: 720, height: 1000)
         /// A top edge that strongly disagrees with the rest of the binder page
         /// is measured evidence that corner refinement latched onto interior
@@ -315,7 +322,11 @@ actor BinderPageScanner {
                 selectedCandidate: result.primary,
                 candidateOptions: [result.primary] + result.alternatives,
                 status: status,
-                isIncluded: true
+                isIncluded: Self.isReliableSuggestion(
+                    primary: result.primary,
+                    alternatives: result.alternatives,
+                    status: status
+                )
             )
         }
 
@@ -370,6 +381,26 @@ actor BinderPageScanner {
             }
         }
         return try detectRectangles(in: image)
+    }
+
+    /// An uncertain suggestion whose runner-up is nearly tied is wrong more
+    /// often than right (see `reviewPreselectionMargin`). Such a detection
+    /// keeps its suggestion visible in review, but is excluded from a blanket
+    /// page confirm until the user includes it explicitly. OCR-verified
+    /// primaries are exempt: a read collector number is stronger evidence
+    /// than ANN separation (and OCR promotion can invert the margin).
+    nonisolated static func isReliableSuggestion(
+        primary: CardScanCandidate,
+        alternatives: [CardScanCandidate],
+        status: BinderCardDetectionStatus
+    ) -> Bool {
+        if status == .matched { return true }
+        if primary.debugInfo["ocrVerified"] == "true" { return true }
+        let bestRivalScore = alternatives
+            .first { $0.details.identity.id != primary.details.identity.id }?
+            .confidence.score ?? 0
+        return primary.confidence.score - bestRivalScore
+            >= Configuration.reviewPreselectionMargin
     }
 
     nonisolated static func shouldUseDetectorBox(

@@ -22,6 +22,24 @@ final class BinderSessionReplayTests: XCTestCase {
     private static let simulatorCandidateFloors: [String: Int] = [
         "scan-session-20260809-211223/frame-0008.jpg": 4,
         "scan-session-20260809-211223/frame-0018.jpg": 6,
+        // 2026-08-10, pixel-space isCardShaped fix: these pages were already
+        // below their device baselines pre-fix (verified with a stashed
+        // control run on identical frames — e.g. frame-0009 reproduces 0
+        // candidates under BOTH codebases against a device baseline of 2).
+        // The fix improves every one of them or ties, and two shortfalls are
+        // junk candidates (ecard3-146, lc-92) no longer retrieving. Floors
+        // are the post-fix Simulator values, identical across two runs.
+        "scan-session-20260809-184048/frame-0001.jpg": 8,
+        "scan-session-20260809-190752/frame-0030.jpg": 6,
+        "scan-session-20260809-223944/frame-0007.jpg": 5,
+        "scan-session-20260809-223944/frame-0008.jpg": 4,
+        "scan-session-20260809-223944/frame-0009.jpg": 0,
+        "scan-session-20260809-223944/frame-0013.jpg": 3,
+        "scan-session-20260809-223944/frame-0019.jpg": 6,
+        "scan-session-20260809-223944/frame-0024.jpg": 3,
+        "scan-session-20260809-223944/frame-0025.jpg": 5,
+        "scan-session-20260809-223944/frame-0037.jpg": 7,
+        "scan-session-20260809-223944/frame-0039.jpg": 5,
     ]
 
     private struct EvidenceRecord: Decodable {

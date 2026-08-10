@@ -309,6 +309,51 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         ))
     }
 
+    func testCardShapedMeasuresNormalizedQuadsInPixelSpace() {
+        // A real card occupying most of an 830×1162 binder-page cell: pixel
+        // aspect 594/830 ÷ 830/1162 ≈ 0.71/0.95. In normalized units the same
+        // quad measures 0.716/0.716 = square-ish 0.95+ and used to be rejected.
+        let pageSize = CGSize(width: 830, height: 1162)
+        let cardOnPage = (
+            topLeft: CGPoint(x: 0.1, y: 0.85),
+            topRight: CGPoint(x: 0.1 + 594.0 / 830.0, y: 0.85),
+            bottomLeft: CGPoint(x: 0.1, y: 0.85 - 830.0 / 1162.0),
+            bottomRight: CGPoint(x: 0.1 + 594.0 / 830.0, y: 0.85 - 830.0 / 1162.0)
+        )
+        XCTAssertTrue(CardCropper.isCardShaped(
+            topLeft: cardOnPage.topLeft,
+            topRight: cardOnPage.topRight,
+            bottomLeft: cardOnPage.bottomLeft,
+            bottomRight: cardOnPage.bottomRight,
+            imageSize: pageSize
+        ))
+        // Unit-space measurement of the same quad reads nearly square — the
+        // pre-fix behavior that discarded 58/67 correct refinements.
+        XCTAssertFalse(CardCropper.isCardShaped(
+            topLeft: cardOnPage.topLeft,
+            topRight: cardOnPage.topRight,
+            bottomLeft: cardOnPage.bottomLeft,
+            bottomRight: cardOnPage.bottomRight
+        ))
+
+        // The Rhyperior failure: a too-narrow quad (pixel aspect ~0.55, below
+        // the 0.58 floor) whose normalized ratio 0.77 sat inside the band and
+        // was wrongly admitted before the fix.
+        let narrow = (
+            topLeft: CGPoint(x: 0.2, y: 0.8),
+            topRight: CGPoint(x: 0.2 + 380.0 / 830.0, y: 0.8),
+            bottomLeft: CGPoint(x: 0.2, y: 0.8 - 690.0 / 1162.0),
+            bottomRight: CGPoint(x: 0.2 + 380.0 / 830.0, y: 0.8 - 690.0 / 1162.0)
+        )
+        XCTAssertFalse(CardCropper.isCardShaped(
+            topLeft: narrow.topLeft,
+            topRight: narrow.topRight,
+            bottomLeft: narrow.bottomLeft,
+            bottomRight: narrow.bottomRight,
+            imageSize: pageSize
+        ))
+    }
+
     func testIntersectionOverUnion() {
         XCTAssertEqual(
             CardCropper.intersectionOverUnion(

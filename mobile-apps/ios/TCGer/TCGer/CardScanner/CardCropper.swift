@@ -221,7 +221,8 @@ nonisolated struct CardCropper {
                 topLeft: topLeft,
                 topRight: topRight,
                 bottomLeft: bottomLeft,
-                bottomRight: bottomRight
+                bottomRight: bottomRight,
+                imageSize: CGSize(width: width, height: height)
             ) else { return nil }
             // The quad must be the card, not a panel printed on it (>= half
             // the detector box) and not a failed whole-sub-image segmentation
@@ -262,6 +263,16 @@ nonisolated struct CardCropper {
     /// Document segmentation is intentionally broad and can return the full
     /// camera frame (or a tiny patch of background) with zero confidence. Do
     /// not let those observations suppress the card-shaped rectangle fallback.
+    ///
+    /// The shape band here is measured in NORMALIZED space on purpose, unlike
+    /// `refinedObservations`. On a portrait frame the normalized band maps to
+    /// pixel ratios narrower than any real card, which effectively disables
+    /// the doc-seg primary path on already-cropped card images — and that is
+    /// load-bearing: switching this check to pixel space admitted doc-seg
+    /// interior panels on borderless 720×1000 binder crops and dropped 11
+    /// replay pages below their candidate floors (one page 2 → 0) in the
+    /// 2026-08-10 binder session replay, while contributing nothing measured
+    /// anywhere else. Do not "fix" this without re-running that replay.
     static func isPlausibleDocumentDetection(_ observation: VNRectangleObservation) -> Bool {
         isPlausibleDocumentDetection(
             confidence: observation.confidence,
@@ -284,9 +295,35 @@ nonisolated struct CardCropper {
             && area <= 0.72
     }
 
+    /// `isCardShaped` for corners in Vision-normalized coordinates. Normalized
+    /// units are anisotropic on any non-square image — the same physical quad
+    /// reports a different edge ratio depending on the frame it came from (a
+    /// real card on an 830×1162 binder page measures 0.95, not 0.71) — so the
+    /// points must be scaled to pixel space before the [0.58, 0.9] band, which
+    /// was written for physical card proportions, means anything.
+    static func isCardShaped(
+        topLeft: CGPoint,
+        topRight: CGPoint,
+        bottomLeft: CGPoint,
+        bottomRight: CGPoint,
+        imageSize: CGSize
+    ) -> Bool {
+        func scaled(_ point: CGPoint) -> CGPoint {
+            CGPoint(x: point.x * imageSize.width, y: point.y * imageSize.height)
+        }
+        return isCardShaped(
+            topLeft: scaled(topLeft),
+            topRight: scaled(topRight),
+            bottomLeft: scaled(bottomLeft),
+            bottomRight: scaled(bottomRight)
+        )
+    }
+
     /// Measures the four quad edges instead of `boundingBox.width / height`.
     /// A rotated card can have a nearly-square axis-aligned bounding box, while
     /// its actual opposite edges still preserve the card's portrait ratio.
+    /// Corners must be in a space with square units (pixels); use the
+    /// `imageSize:` overload for Vision-normalized points.
     static func isCardShaped(
         topLeft: CGPoint,
         topRight: CGPoint,

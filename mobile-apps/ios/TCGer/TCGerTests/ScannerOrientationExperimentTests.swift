@@ -790,6 +790,16 @@ final class ScannerOrientationExperimentTests: XCTestCase {
                 ) {
                     variants.append(("detectorBox", detectorCrop))
                 }
+                // The production sub-image refinement as shipped (pixel-space
+                // isCardShaped). Distinct from "refined", which replays the
+                // quad the device recorded before the coordinate-space fix.
+                if let productionQuad = cropper.refinedQuad(in: original, around: box.boundingBox),
+                   let productionCrop = cropper.makeNormalizedCrop(
+                       from: original,
+                       observation: productionQuad
+                   ) {
+                    variants.append(("productionRefined", productionCrop))
+                }
                 for (offset, proposal) in outerBorderObservations(
                     in: original,
                     around: box.boundingBox

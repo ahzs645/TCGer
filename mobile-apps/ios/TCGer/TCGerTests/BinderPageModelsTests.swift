@@ -3,6 +3,62 @@ import XCTest
 
 @MainActor
 final class BinderPageModelsTests: XCTestCase {
+    private func candidate(id: String, score: Double, ocrVerified: Bool = false) -> CardScanCandidate {
+        CardScanCandidate(
+            details: CardDetails(
+                identity: CardIdentity(id: id, name: id, game: .pokemon, setCode: nil, setName: nil),
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            ),
+            confidence: CardScanConfidence(score: score, reason: "test"),
+            originatingStrategy: .mlDetector,
+            debugInfo: ocrVerified ? ["ocrVerified": "true"] : [:]
+        )
+    }
+
+    func testUncertainSuggestionsNeedAnnMarginOrOCRToAutoInclude() {
+        // Matched detections are always included, regardless of margin.
+        XCTAssertTrue(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.85),
+            alternatives: [candidate(id: "sv1-2", score: 0.84)],
+            status: .matched
+        ))
+        // Uncertain with a clear margin (0.79 vs 0.70) stays auto-included.
+        XCTAssertTrue(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.79),
+            alternatives: [candidate(id: "sv1-2", score: 0.70)],
+            status: .uncertain
+        ))
+        // A near-tied rival (margin 0.01 < 0.05) makes the suggestion
+        // review-only: measured wrong review candidates all had margin <=
+        // 0.047 on the 67-attempt binder evidence set.
+        XCTAssertFalse(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.79),
+            alternatives: [candidate(id: "sv1-2", score: 0.78)],
+            status: .uncertain
+        ))
+        // Same-card duplicates never count as rivals; only a different
+        // identity competes.
+        XCTAssertTrue(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.79),
+            alternatives: [candidate(id: "sv1-1", score: 0.78), candidate(id: "sv1-2", score: 0.60)],
+            status: .uncertain
+        ))
+        // OCR-verified primaries are exempt even when the ANN margin is tiny.
+        XCTAssertTrue(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.75, ocrVerified: true),
+            alternatives: [candidate(id: "sv1-2", score: 0.749)],
+            status: .uncertain
+        ))
+        // No alternatives at all means no rival — the suggestion stands.
+        XCTAssertTrue(BinderPageScanner.isReliableSuggestion(
+            primary: candidate(id: "sv1-1", score: 0.73),
+            alternatives: [],
+            status: .uncertain
+        ))
+    }
+
     func testSampleBinderPageUsesACompleteThreeByThreePocketLayout() {
         let page = LocalStore.makeSampleBinderPage(timestamp: "2026-08-10T12:00:00Z")
 
