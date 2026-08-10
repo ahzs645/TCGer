@@ -16,6 +16,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// same-name printings too: a correct name with the wrong set number is
         /// not an exact card match.
         static let ambiguityMargin: Double = 0.02
+        /// Non-baseline crop attempts (alternate box, whole frame) must clear
+        /// a slightly higher score. Extra hypotheses are recall-positive, but
+        /// each one is another draw near the threshold for out-of-index cards;
+        /// a wrong accept at 0.707 was measured on exactly this path. Applies
+        /// only to plain-embedding accepts — OCR-verified results are exempt.
+        static let retryAttemptMargin: Double = 0.02
     }
 
     let kind: ScanStrategyKind = .mlDetector
@@ -99,6 +105,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let gateScore: Double?
         let kind: ScanDiagnostics.AttemptKind
         let quad: [[Double]]?
+        /// True for the crop the pre-retry pipeline would have used (the best
+        /// detected crop, or the raw frame when nothing was detected).
+        var isBaseline: Bool = false
     }
 
     private func makeAttempt(
@@ -122,31 +131,43 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         source: ScanInvocationKind
     ) async throws -> [CropAttempt] {
         var attempts: [CropAttempt] = []
-        if let detected = try cropper.preferredCrop(from: image) {
+        let detailed = try cropper.detectRectanglesDetailed(in: image)
+        var candidateObservations: [VNRectangleObservation] = []
+        if let best = CardCropper.preferredObservation(from: detailed.observations) {
+            candidateObservations.append(best)
+        }
+        // The alternate (plain detector box) and whole-frame hypotheses cost
+        // an embedding each, so they are reserved for intentional captures;
+        // live frames stay single-attempt and recover on a later frame.
+        if source != .livePreview, let alternate = detailed.alternateBox {
+            candidateObservations.append(alternate)
+        }
+        for (offset, observation) in candidateObservations.enumerated() {
+            guard let crop = cropper.makeNormalizedCrop(from: image, observation: observation)
+            else { continue }
             let quad = [
-                detected.observation.topLeft, detected.observation.topRight,
-                detected.observation.bottomRight, detected.observation.bottomLeft,
+                observation.topLeft, observation.topRight,
+                observation.bottomRight, observation.bottomLeft,
             ].map { [Double($0.x), Double($0.y)] }
-            if let attempt = try await makeAttempt(
-                for: detected.image,
-                kind: .detectedCrop,
-                quad: quad
-            ) {
+            if var attempt = try await makeAttempt(for: crop, kind: .detectedCrop, quad: quad) {
+                attempt.isBaseline = offset == 0
                 attempts.append(attempt)
             }
         }
 
-        // An imported image never passed through the camera guide, so the
-        // frame itself may already be the card: on a borderless card crop the
-        // scene-trained detector fires on an interior panel, and no geometric
-        // test can separate that from a real card lying in a scene. Add the
-        // whole frame as a second candidate for this source only, ordered by
-        // card-face score so the more card-like candidate is tried first.
-        // Camera captures never take this path.
-        if source == .importedPhoto,
+        // Any intentional still image can benefit from a whole-frame second
+        // candidate: an import may already BE the card with no background,
+        // and a shutter capture is guide-cropped so the frame is card-plus-
+        // thin-border — in both cases a bad localization (interior panel,
+        // unrectified diagonal) abstains and the whole frame recovers it.
+        // Only the live path skips this: retries add latency per frame and a
+        // later clear frame recovers naturally.
+        if source != .livePreview,
            let wholeFrame = cropper.normalizedWholeImage(from: image),
            let attempt = try await makeAttempt(for: wholeFrame, kind: .wholeFrame) {
             attempts.append(attempt)
+        }
+        if attempts.count > 1 {
             attempts.sort {
                 ($0.gateScore ?? -.greatestFiniteMagnitude) >
                     ($1.gateScore ?? -.greatestFiniteMagnitude)
@@ -155,7 +176,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         // No detection and no usable whole-frame candidate: embed the raw
         // frame, preserving the historical `bestCrop ?? image` behavior.
-        if attempts.isEmpty, let fallback = try await makeAttempt(for: image, kind: .rawImage) {
+        if attempts.isEmpty, var fallback = try await makeAttempt(for: image, kind: .rawImage) {
+            fallback.isBaseline = true
             attempts.append(fallback)
         }
         return attempts
@@ -271,6 +293,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         )
         var titlePrintingCount = 0
         var titleRunnerScore: Double?
+        var titleConstrained = false
         if needsTitleEvidence {
             let titleCandidates = titleOCR.read(from: cropped)
             if let titleMatch = await metadataStore.exactNameMatch(
@@ -293,6 +316,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     ranked = titleRanked
                     primary = titlePrimary
                     titlePrintingCount = titleMatch.indices.count
+                    titleConstrained = true
                     titleRunnerScore = titleMatches.dropFirst().first.map {
                         scoreForDistance($0.distance)
                     }
@@ -332,6 +356,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 else { return false }
                 return pairNumbers.contains(cn)
             }
+            // Letter-prefixed promo numbers ("SWSH204") never print as
+            // NNN/NNN, so without this branch the entire promo class was
+            // structurally impossible to OCR-confirm.
+            if matched == nil, !reading.promoCodes.isEmpty {
+                let promoCodes = Set(reading.promoCodes)
+                matched = ocrEligibleCandidates.first { candidate in
+                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id),
+                          cn.contains(where: \.isLetter)
+                    else { return false }
+                    return promoCodes.contains(cn)
+                }
+            }
             // Fallback: slash-less digit runs ("079202" = 079/202). Accepted
             // only when every confirmed candidate agrees on ONE collector
             // number — ambiguity means abstain, never guess.
@@ -356,15 +392,29 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             }
         }
 
-        // A rejected card face may proceed only when its exact collector number
-        // confirms a shortlist printing. Title/name evidence alone is not
-        // enough to let a back, pack, or unrelated object through.
+        // A rejected card face may proceed when its exact collector number
+        // confirms a shortlist printing, or when BOTH an exact catalog title
+        // AND a strong (>= acceptance-threshold) visual match agree — the
+        // gate has measured false negatives on hand-held sleeved captures
+        // (0.29–0.47 on legitimate cards in device dev-mode sessions), and a
+        // back, pack, or carpet produces neither a title match nor a 0.70+
+        // similarity. Title evidence alone (without the strong score) is
+        // still not enough. The same-name printing guards below still apply.
         if gateRejected && !ocrVerified {
-            recordOutcome(.rejectedInput)
-            throw CardScannerError.rejectedInput
+            let titleBacked = titleConstrained
+                && primary.confidence.score >= (attempt.isBaseline
+                    ? Configuration.strongAcceptanceScore
+                    : Configuration.strongAcceptanceScore + Configuration.retryAttemptMargin)
+            if !titleBacked {
+                recordOutcome(.rejectedInput)
+                throw CardScannerError.rejectedInput
+            }
         }
 
-        guard primary.confidence.score >= Configuration.strongAcceptanceScore || ocrVerified else {
+        let requiredScore = attempt.isBaseline
+            ? Configuration.strongAcceptanceScore
+            : Configuration.strongAcceptanceScore + Configuration.retryAttemptMargin
+        guard primary.confidence.score >= requiredScore || ocrVerified else {
             recordOutcome(.belowAcceptanceThreshold)
             return nil
         }

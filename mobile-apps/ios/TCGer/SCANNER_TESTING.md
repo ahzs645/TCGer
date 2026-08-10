@@ -193,6 +193,32 @@ Sessions**, which bundles the whole `ScannerDevMode` folder into a single
 zip for AirDrop/Messages/Files — the hand-over path for testers sending
 collected data back for labeling and retraining.
 
+Replay an exported archive against the current pipeline with
+`DevModeSessionReplayTests` (env-gated):
+
+```bash
+env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  TEST_RUNNER_DEVMODE_SESSIONS_DIR=/path/to/unzipped/ScannerDevMode \
+  xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/DevModeSessionReplayTests
+```
+
+The recorded device decisions are the baseline; the test prints each frame's
+old → new outcome and fails on any new false accept or newly-lost accept.
+Caveat: Simulator Vision (doc-seg/rectangles) diverges from device Vision on
+some frames, so device-confirmed conclusions need a device build — the test
+keeps a documented allowlist of known Simulator divergences.
+
+The 2026-08-09 device sessions produced the angled-card diagnosis: the
+detector localizes angled cards fine, but full-frame Vision corner detection
+returns nothing at steep angles, and the axis-aligned fallback crop embeds
+~0.1 below the acceptance bar. Fixes shipped from that analysis: sub-image
+corner refinement (with the plain box kept as an alternate crop attempt),
+whole-frame retry for shutter captures, letter-prefixed promo collector OCR
+("SWSH204"), and a title+strong-similarity override for gate false negatives
+on intentional captures.
+
 ### Recording replay
 
 For replay, extract the exported recording zip in Files, then choose the

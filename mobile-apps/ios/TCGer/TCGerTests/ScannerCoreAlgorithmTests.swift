@@ -205,6 +205,44 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(CGSize(width: landscape.width, height: landscape.height), CGSize(width: 720, height: 1000))
     }
 
+    func testExtractPromoCodesNormalizesLetterPrefixedCollectorNumbers() {
+        XCTAssertEqual(CollectorNumberOCR.extractPromoCodes("SWSH204"), ["swsh204"])
+        XCTAssertEqual(CollectorNumberOCR.extractPromoCodes("Promo DP 11 foil"), ["dp11"])
+        XCTAssertEqual(CollectorNumberOCR.extractPromoCodes("XY-208"), ["xy208"])
+        XCTAssertEqual(CollectorNumberOCR.extractPromoCodes("swsh 042"), ["swsh42"])
+        XCTAssertEqual(CollectorNumberOCR.extractPromoCodes("123/456"), [])
+        // Matches the id convention used by collectorNumber(fromCardId:).
+        XCTAssertEqual(
+            CollectorNumberOCR.collectorNumber(fromCardId: "swshp-SWSH204"),
+            "swsh204"
+        )
+    }
+
+    func testMapSubImagePointRoundTripsCropCoordinates() {
+        // A 1000x800 image cropped at pixel rect (200, 100, 400, 300)
+        // (top-left origin). The sub-image's Vision origin (0,0) is the crop's
+        // bottom-left corner: pixel x=200, y=400 from the top → 400 from the
+        // bottom of the 800-tall image → normalized (0.2, 0.5).
+        let mapped = CardCropper.mapSubImagePoint(
+            CGPoint(x: 0, y: 0),
+            pixelRect: CGRect(x: 200, y: 100, width: 400, height: 300),
+            imageWidth: 1000,
+            imageHeight: 800
+        )
+        XCTAssertEqual(mapped.x, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(mapped.y, 0.5, accuracy: 1e-9)
+        // The crop's top-right corner: pixel x=600, y=100 from top → 700 from
+        // bottom → normalized (0.6, 0.875).
+        let topRight = CardCropper.mapSubImagePoint(
+            CGPoint(x: 1, y: 1),
+            pixelRect: CGRect(x: 200, y: 100, width: 400, height: 300),
+            imageWidth: 1000,
+            imageHeight: 800
+        )
+        XCTAssertEqual(topRight.x, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(topRight.y, 0.875, accuracy: 1e-9)
+    }
+
     func testQuadrilateralAreaIgnoresBoundingBoxInflationFromRotation() {
         // A card rotated 45 degrees fills half of its axis-aligned bounds.
         let area = CardCropper.quadrilateralArea(

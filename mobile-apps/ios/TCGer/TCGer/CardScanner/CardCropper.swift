@@ -93,6 +93,17 @@ nonisolated struct CardCropper {
     }
 
     func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {
+        try detectRectanglesDetailed(in: image).observations
+    }
+
+    /// Like `detectRectangles`, but when the quad came from the sub-image
+    /// corner refinement, also surfaces the detector's plain axis-aligned box
+    /// as an alternate hypothesis. A wrong refinement is indistinguishable
+    /// from a right one geometrically — the strategy's gate-ordered retry
+    /// arbitrates between the two crops instead.
+    func detectRectanglesDetailed(
+        in image: CGImage
+    ) throws -> (observations: [VNRectangleObservation], alternateBox: VNRectangleObservation?) {
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
 
         // A detector trained specifically on trading cards provides the coarse
@@ -113,9 +124,9 @@ nonisolated struct CardCropper {
                 let agreeing = documents.filter {
                     Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.45
                 }
-                if !agreeing.isEmpty { return agreeing }
+                if !agreeing.isEmpty { return (agreeing, nil) }
             } else {
-                return documents
+                return (documents, nil)
             }
         }
 
@@ -129,12 +140,112 @@ nonisolated struct CardCropper {
 
         try handler.perform([request])
         let rectangles = request.results ?? []
-        guard let detectedCard else { return rectangles }
+        guard let detectedCard else { return (rectangles, nil) }
         let agreeing = rectangles.filter {
             Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.35
         }
-        if !agreeing.isEmpty { return agreeing }
-        return [Self.rectangleObservation(for: detectedCard.boundingBox)]
+        if !agreeing.isEmpty { return (agreeing, nil) }
+
+        // Vision's full-frame detectors stop returning quads for steeply
+        // angled cards; falling straight back to the detector's axis-aligned
+        // box crops an unrectified diagonal card whose embedding similarity
+        // lands ~0.1 below the acceptance bar (measured on device dev-mode
+        // sessions, 2026-08-09). Second chance: re-run corner detection on
+        // the padded detector-box sub-image, where the card dominates the
+        // frame and corners are far easier to find. The plain box is kept as
+        // the alternate so a wrong refinement can never lose a card the box
+        // crop would have matched.
+        let fallbackBox = Self.rectangleObservation(for: detectedCard.boundingBox)
+        if let refined = refinedObservations(in: image, around: detectedCard.boundingBox),
+           !refined.isEmpty {
+            return (refined, fallbackBox)
+        }
+        return ([fallbackBox], nil)
+    }
+
+    /// Corner detection retried inside the padded detector box, with results
+    /// mapped back to full-image normalized coordinates. Returns nil when
+    /// nothing card-shaped covering most of the box is found.
+    private func refinedObservations(
+        in image: CGImage,
+        around normalizedBox: CGRect
+    ) -> [VNRectangleObservation]? {
+        let width = CGFloat(image.width)
+        let height = CGFloat(image.height)
+        let box = normalizedBox.standardized
+        let padded = box.insetBy(dx: -box.width * 0.12, dy: -box.height * 0.12)
+            .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+        let pixelRect = CGRect(
+            x: padded.minX * width,
+            y: (1 - padded.maxY) * height,
+            width: padded.width * width,
+            height: padded.height * height
+        ).integral
+        guard pixelRect.width >= 64, pixelRect.height >= 64,
+              let subImage = image.cropping(to: pixelRect)
+        else { return nil }
+
+        let handler = VNImageRequestHandler(cgImage: subImage, orientation: .up, options: [:])
+        let documentRequest = VNDetectDocumentSegmentationRequest()
+        let rectangleRequest = VNDetectRectanglesRequest()
+        rectangleRequest.maximumObservations = Configuration.maximumObservations
+        rectangleRequest.minimumConfidence = Configuration.minimumConfidence
+        rectangleRequest.minimumAspectRatio = Configuration.minimumAspectRatio
+        rectangleRequest.maximumAspectRatio = Configuration.maximumAspectRatio
+        // The card should dominate the sub-image; a small minimum would
+        // resurface the interior-panel problem this retry exists to avoid.
+        rectangleRequest.minimumSize = 0.3
+        try? handler.perform([documentRequest, rectangleRequest])
+
+        let candidates = (documentRequest.results ?? []).filter {
+            $0.confidence >= Configuration.minimumConfidence
+        } + (rectangleRequest.results ?? [])
+        let boxArea = box.width * box.height
+        let mapped = candidates.compactMap { observation -> VNRectangleObservation? in
+            let topLeft = Self.mapSubImagePoint(observation.topLeft, pixelRect: pixelRect, imageWidth: width, imageHeight: height)
+            let topRight = Self.mapSubImagePoint(observation.topRight, pixelRect: pixelRect, imageWidth: width, imageHeight: height)
+            let bottomRight = Self.mapSubImagePoint(observation.bottomRight, pixelRect: pixelRect, imageWidth: width, imageHeight: height)
+            let bottomLeft = Self.mapSubImagePoint(observation.bottomLeft, pixelRect: pixelRect, imageWidth: width, imageHeight: height)
+            guard Self.isCardShaped(
+                topLeft: topLeft,
+                topRight: topRight,
+                bottomLeft: bottomLeft,
+                bottomRight: bottomRight
+            ) else { return nil }
+            // The quad must be the card, not a panel printed on it (>= half
+            // the detector box) and not a failed whole-sub-image segmentation
+            // (not meaningfully larger than the box).
+            let area = Self.quadrilateralArea(
+                topLeft: topLeft,
+                topRight: topRight,
+                bottomRight: bottomRight,
+                bottomLeft: bottomLeft
+            )
+            guard area >= boxArea * 0.5, area <= boxArea * 1.15 else { return nil }
+            return VNRectangleObservation(
+                requestRevision: VNDetectRectanglesRequestRevision1,
+                topLeft: topLeft,
+                bottomLeft: bottomLeft,
+                bottomRight: bottomRight,
+                topRight: topRight
+            )
+        }
+        return mapped.isEmpty ? nil : mapped
+    }
+
+    /// Maps a Vision-normalized point in a sub-image (cropped at `pixelRect`,
+    /// which is in top-left-origin pixel coordinates) back to Vision-normalized
+    /// coordinates of the full image.
+    static func mapSubImagePoint(
+        _ point: CGPoint,
+        pixelRect: CGRect,
+        imageWidth: CGFloat,
+        imageHeight: CGFloat
+    ) -> CGPoint {
+        CGPoint(
+            x: (point.x * pixelRect.width + pixelRect.minX) / imageWidth,
+            y: (point.y * pixelRect.height + (imageHeight - pixelRect.maxY)) / imageHeight
+        )
     }
 
     /// Document segmentation is intentionally broad and can return the full

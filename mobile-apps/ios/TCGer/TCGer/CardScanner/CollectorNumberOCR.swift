@@ -14,11 +14,14 @@ struct CollectorNumberOCR {
     private let footerHeight: CGFloat = 0.11
     private let upscale: CGFloat = 4
 
-    /// Footer OCR output: clean "NNN/NNN" pair numbers plus long digit runs
-    /// ("079/202" read with the slash dropped arrives as "079202").
+    /// Footer OCR output: clean "NNN/NNN" pair numbers, long digit runs
+    /// ("079/202" read with the slash dropped arrives as "079202"), and
+    /// letter-prefixed promo codes ("SWSH204", "DP11") which never print as
+    /// NNN/NNN pairs and were previously unconfirmable.
     struct FooterReading {
         let pairNumbers: [String]
         let digitRuns: [String]
+        let promoCodes: [String]
     }
 
     /// Returns normalised "NNN/NNN" collector numbers found in the footer.
@@ -29,7 +32,7 @@ struct CollectorNumberOCR {
     /// Reads the footer once and extracts both pair numbers and digit runs.
     func readFooter(from image: CGImage) -> FooterReading {
         guard let footer = cropFooter(image) else {
-            return FooterReading(pairNumbers: [], digitRuns: [])
+            return FooterReading(pairNumbers: [], digitRuns: [], promoCodes: [])
         }
 
         let request = VNRecognizeTextRequest()
@@ -47,7 +50,8 @@ struct CollectorNumberOCR {
             .joined(separator: " ")
         return FooterReading(
             pairNumbers: Self.extractPairNumbers(text),
-            digitRuns: Self.extractDigitRuns(text)
+            digitRuns: Self.extractDigitRuns(text),
+            promoCodes: Self.extractPromoCodes(text)
         )
     }
 
@@ -89,6 +93,22 @@ struct CollectorNumberOCR {
             }
         }
         return results
+    }
+
+    /// Extract letter-prefixed promo collector codes ("SWSH204", "DP 11",
+    /// "XY-208") → normalised lowercase letters+digits ("swsh204", "dp11",
+    /// "xy208"), matching `collectorNumber(fromCardId:)` for promo ids like
+    /// "swshp-SWSH204". A stray extraction is harmless — it only matters when
+    /// it exactly equals a shortlist candidate's own collector code.
+    static func extractPromoCodes(_ text: String) -> [String] {
+        let pattern = #"\b([A-Za-z]{2,5})\s*[-–]?\s*0*(\d{1,4})\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { match in
+            let letters = ns.substring(with: match.range(at: 1)).lowercased()
+            let digits = normalize(ns.substring(with: match.range(at: 2)))
+            return letters + digits
+        }
     }
 
     /// Extract long digit runs (5-8 digits): slash-less footer reads.
