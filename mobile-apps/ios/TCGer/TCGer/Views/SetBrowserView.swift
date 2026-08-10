@@ -181,8 +181,9 @@ struct SetBrowserView: View {
                     Button {
                         addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [])
                     } label: {
-                        Image(systemName: "heart.badge.plus")
+                        Image(systemName: "plus")
                     }
+                    .tint(.accentColor)
                     .accessibilityLabel("Add sets to wishlist")
                 }
             }
@@ -238,8 +239,9 @@ struct SetBrowserView: View {
                 }
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+            Image(systemName: "line.3.horizontal.decrease")
         }
+        .tint(.accentColor)
         .accessibilityLabel("Filter and sort sets, \(progressFilter.filterTitle)")
     }
 

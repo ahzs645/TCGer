@@ -634,13 +634,13 @@ function FoilMaterial({ map, normalMap, materialRef, dim = false }: FoilMaterial
       map={map}
       normalMap={normalMap}
       normalScale={new THREE.Vector2(0.06, 0.06)}
-      metalness={dim ? 0.3 : 0.45}
-      roughness={dim ? 0.45 : 0.24}
-      clearcoat={dim ? 0.3 : 0.9}
+      metalness={dim ? 0.4 : 0.45}
+      roughness={dim ? 0.3 : 0.24}
+      clearcoat={dim ? 0.5 : 0.9}
       clearcoatRoughness={0.2}
       iridescence={dim ? 0 : 0.25}
       iridescenceIOR={1.3}
-      envMapIntensity={dim ? 0.35 : 0.9}
+      envMapIntensity={dim ? 0.6 : 0.9}
       transparent
       alphaTest={0.02}
     />
@@ -1118,9 +1118,7 @@ export function PackExperience({
         const s = easeInCubic(
           THREE.MathUtils.clamp((T - 0.3 - i * 0.05) / 0.5, 0, 1),
         );
-        // pitched slats mostly dissolve in place — a full slide in their
-        // tilted local frame would launch them at the camera
-        g.position.y = -s * (i === 0 ? 4.2 : 1.4);
+        g.position.y = -s * 4.2;
         g.visible = s < 1;
       });
       for (const mat of wrapperMaterials.current) {
@@ -1292,16 +1290,15 @@ export function PackExperience({
       {cardsVisible && (
         <group ref={packRef} position={[0, packBaseY, 0]}>
           {Array.from({ length: stackCount }).map((_, i) => (
-            // pivot at the pack's BOTTOM edge: slats lean back away from the
-            // camera, so they can never swing through the front pack
+            // all packs upright and parallel, each directly behind the one in
+            // front, peeking above it — reference-app stack
             <group
               key={i}
-              position={
-                i === 0
-                  ? [0, -PACK_H / 2, 0]
-                  : [0, 0.85 + (i - 1) * 0.17, -0.3 - (i - 1) * 0.15]
-              }
-              rotation={i === 0 ? [0, 0, 0] : [-1.05, 0, 0]}
+              position={[
+                0,
+                i * (stackCount > 6 ? 0.14 : 0.22) - PACK_H / 2,
+                -i * 0.16,
+              ]}
             >
               <group position={[0, PACK_H / 2, 0]}>
               <group

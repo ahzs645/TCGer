@@ -928,41 +928,6 @@
       "includeAllPrintings": true,
       "matchAnyPrinting": false,
       "cardCountHint": 287
-    },
-    {
-      "slug": "dragonball-secret-rares",
-      "title": "Dragon Ball Secret Rares",
-      "description": "Every Secret Rare printing in the installed Dragon Ball catalog.",
-      "tcg": "dragonball",
-      "category": "custom",
-      "curatorName": "TCGer",
-      "tags": [
-        "Secret Rare"
-      ],
-      "version": 1,
-      "featured": true,
-      "ruleType": "tag",
-      "ruleQuery": "dragonball.rarity.secret-rare",
-      "includeAllPrintings": true,
-      "matchAnyPrinting": false
-    },
-    {
-      "slug": "dragonball-saiyans",
-      "title": "Dragon Ball Saiyans",
-      "description": "Every card carrying the Saiyan special trait.",
-      "tcg": "dragonball",
-      "category": "custom",
-      "curatorName": "TCGer",
-      "tags": [
-        "Saiyan",
-        "Special Trait"
-      ],
-      "version": 1,
-      "featured": false,
-      "ruleType": "tag",
-      "ruleQuery": "dragonball.trait.saiyan",
-      "includeAllPrintings": true,
-      "matchAnyPrinting": false
     }
   ]
 }

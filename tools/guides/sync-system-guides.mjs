@@ -18,15 +18,17 @@ async function withCatalogCounts(catalog) {
     }
     return {
       ...catalog,
-      guides: catalog.guides.map((guide) => {
-        const pack = packs.get(guide.tcg);
-        if (!pack || !['tag', 'name'].includes(guide.ruleType)) return guide;
-        const query = guide.ruleQuery?.toLowerCase();
-        const cardCountHint = pack.cards.filter((card) => guide.ruleType === 'tag'
-          ? (card.collectionTags ?? []).some((tag) => tag.toLowerCase() === query)
-          : card.name.toLowerCase() === query).length;
-        return { ...guide, cardCountHint };
-      }),
+      guides: catalog.guides
+        .filter((guide) => packs.has(guide.tcg) || guide.ruleType === 'manual')
+        .map((guide) => {
+          const pack = packs.get(guide.tcg);
+          if (!pack || !['tag', 'name'].includes(guide.ruleType)) return guide;
+          const query = guide.ruleQuery?.toLowerCase();
+          const cardCountHint = pack.cards.filter((card) => guide.ruleType === 'tag'
+            ? (card.collectionTags ?? []).some((tag) => tag.toLowerCase() === query)
+            : card.name.toLowerCase() === query).length;
+          return { ...guide, cardCountHint };
+        }),
     };
   } catch {
     return catalog;
