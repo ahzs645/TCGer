@@ -293,6 +293,7 @@ final class LocalStore {
 
         if sampleDataLoaded {
             seedSampleCatalog()
+            seedSampleBinderPages()
         }
     }
 
@@ -1544,6 +1545,7 @@ final class LocalStore {
         guard !sampleDataLoaded else { return }
         seedSampleCatalog()
         seedSampleCollections()
+        seedSampleBinderPages()
         seedSampleWishlistsAndFinance()
         sampleDataLoaded = true
         persist()
@@ -1552,6 +1554,13 @@ final class LocalStore {
     /// Take the sample content back out, leaving anything the user added in
     /// place — including their own cards inside a sample binder.
     func removeSampleData() {
+        for page in binderPages where LocalStore.isSampleId(page.id) || LocalStore.isSampleId(page.binderId) {
+            removeLocalBinderPageImage(at: page.imageUrl)
+        }
+        binderPages.removeAll {
+            LocalStore.isSampleId($0.id) || LocalStore.isSampleId($0.binderId)
+        }
+
         collections = collections.compactMap { collection -> Collection? in
             let remaining = collection.cards.filter { !LocalStore.isSampleId($0.id) }
             if remaining.isEmpty, LocalStore.isSampleId(collection.id) {
@@ -1740,6 +1749,67 @@ final class LocalStore {
         )
     }
 
+    static func makeSampleBinderPage(timestamp: String) -> SavedBinderPage {
+        let cards = makeSampleCards()
+        let pocketCards = [
+            cards.charizard,
+            cards.pikaBase,
+            cards.pikaSurging,
+            cards.boltM10,
+            cards.blackLotus,
+            cards.bolt2xm,
+            cards.blueEyes,
+            cards.charizard,
+            cards.pikaBase
+        ]
+
+        let placements = pocketCards.enumerated().map { slotIndex, card in
+            let column = slotIndex % 3
+            let row = slotIndex / 3
+            let left = 0.045 + (Double(column) * 0.311)
+            let right = left + 0.288
+            let top = 0.973 - (Double(row) * 0.320)
+            let bottom = top - 0.306
+
+            return BinderPagePlacement(
+                slotIndex: slotIndex,
+                cardId: card.id,
+                name: card.name,
+                tcg: card.tcg,
+                setCode: card.setCode,
+                confidence: 0.99,
+                status: "matched",
+                quad: BinderPageQuad(
+                    topLeft: BinderPagePoint(x: left, y: top),
+                    topRight: BinderPagePoint(x: right, y: top),
+                    bottomRight: BinderPagePoint(x: right, y: bottom),
+                    bottomLeft: BinderPagePoint(x: left, y: bottom)
+                )
+            )
+        }
+
+        return SavedBinderPage(
+            id: "sample-binder-page-1",
+            binderId: "sample-binder-1",
+            pageNumber: 1,
+            revision: 1,
+            capturedAt: timestamp,
+            imageUrl: nil,
+            placements: placements,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
+    }
+
+    private func seedSampleBinderPages() {
+        guard !binderPages.contains(where: {
+            $0.binderId == "sample-binder-1" && $0.pageNumber == 1
+        }) else { return }
+
+        let timestamp = LocalStore.isoFormatter.string(from: Date())
+        binderPages.append(LocalStore.makeSampleBinderPage(timestamp: timestamp))
+    }
+
     /// Make the sample cards searchable without touching stored collections.
     private func seedSampleCatalog() {
         let cards = LocalStore.makeSampleCards()
@@ -1754,61 +1824,67 @@ final class LocalStore {
         let blueEyes = cards.blueEyes
         let pikaBase = cards.pikaBase
         let now = LocalStore.isoFormatter.string(from: Date())
-        let starterCards: [CollectionCard] = [
+
+        func sampleCollectionCard(
+            id: String,
+            card: Card,
+            quantity: Int,
+            condition: String = CardCondition.nearMint.rawValue,
+            notes: String? = nil,
+            acquisitionPrice: Double? = nil,
+            tagLabels: [String] = []
+        ) -> CollectionCard {
             CollectionCard(
-                id: "sample-cc-1",
-                cardId: charizard.id,
-                externalId: charizard.id,
-                name: charizard.name,
-                tcg: charizard.tcg,
-                setCode: charizard.setCode,
-                setName: charizard.setName,
-                rarity: charizard.rarity,
-                imageUrl: LocalStore.cardBack(for: charizard.tcg),
-                imageUrlSmall: LocalStore.cardBack(for: charizard.tcg),
-                quantity: 1,
-                price: charizard.price,
-                condition: CardCondition.nearMint.rawValue,
+                id: id,
+                cardId: card.id,
+                externalId: card.id,
+                name: card.name,
+                tcg: card.tcg,
+                setCode: card.setCode,
+                setName: card.setName,
+                rarity: card.rarity,
+                imageUrl: LocalStore.cardBack(for: card.tcg),
+                imageUrlSmall: LocalStore.cardBack(for: card.tcg),
+                quantity: quantity,
+                price: card.price,
+                condition: condition,
                 language: "English",
-                notes: "Pulled from pack",
-                collectorNumber: charizard.collectorNumber,
+                notes: notes,
+                collectorNumber: card.collectorNumber,
                 copies: makeCopies(
-                    quantity: 1,
-                    condition: CardCondition.nearMint.rawValue,
+                    quantity: quantity,
+                    condition: condition,
                     language: "English",
-                    notes: "Pulled from pack",
-                    price: charizard.price,
-                    acquisitionPrice: 8.99,
-                    tags: existingTags(labeled: ["PC"])
-                )
-            ),
-            CollectionCard(
-                id: "sample-cc-2",
-                cardId: boltM10.id,
-                externalId: boltM10.id,
-                name: boltM10.name,
-                tcg: boltM10.tcg,
-                setCode: boltM10.setCode,
-                setName: boltM10.setName,
-                rarity: boltM10.rarity,
-                imageUrl: LocalStore.cardBack(for: boltM10.tcg),
-                imageUrlSmall: LocalStore.cardBack(for: boltM10.tcg),
-                quantity: 3,
-                price: boltM10.price,
-                condition: "Excellent",
-                language: "English",
-                notes: nil,
-                collectorNumber: boltM10.collectorNumber,
-                copies: makeCopies(
-                    quantity: 3,
-                    condition: "Excellent",
-                    language: "English",
-                    notes: nil,
-                    price: boltM10.price,
-                    acquisitionPrice: 1.25,
-                    tags: existingTags(labeled: ["For Trade"])
+                    notes: notes,
+                    price: card.price,
+                    acquisitionPrice: acquisitionPrice,
+                    tags: existingTags(labeled: tagLabels)
                 )
             )
+        }
+
+        let starterCards: [CollectionCard] = [
+            sampleCollectionCard(
+                id: "sample-cc-1",
+                card: charizard,
+                quantity: 2,
+                notes: "Pulled from pack",
+                acquisitionPrice: 8.99,
+                tagLabels: ["PC"]
+            ),
+            sampleCollectionCard(
+                id: "sample-cc-2",
+                card: boltM10,
+                quantity: 1,
+                condition: "Excellent",
+                acquisitionPrice: 1.25,
+                tagLabels: ["For Trade"]
+            ),
+            sampleCollectionCard(id: "sample-cc-5", card: pikaBase, quantity: 2),
+            sampleCollectionCard(id: "sample-cc-6", card: cards.pikaSurging, quantity: 1),
+            sampleCollectionCard(id: "sample-cc-7", card: cards.blackLotus, quantity: 1),
+            sampleCollectionCard(id: "sample-cc-8", card: cards.bolt2xm, quantity: 1),
+            sampleCollectionCard(id: "sample-cc-9", card: blueEyes, quantity: 1)
         ]
 
         collections.append(contentsOf: [

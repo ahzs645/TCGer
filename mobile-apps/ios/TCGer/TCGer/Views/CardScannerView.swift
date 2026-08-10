@@ -28,6 +28,71 @@ private struct ScannerPhotoImportProgress {
     let total: Int
 }
 
+@MainActor
+private enum ScannerDemoFixture {
+    private static let binderCardNames = [
+        "BossOrders",
+        "Peonia",
+        "PokeStop",
+        "ProfessorsResearch",
+        "Rayquaza",
+        "PokemonCardBack",
+        "PokeStop",
+        "BossOrders",
+        "Peonia"
+    ]
+
+    static func image(for captureMode: ScannerCaptureMode) -> CGImage? {
+        switch captureMode {
+        case .card:
+            return UIImage(named: "BossOrders")?.cgImage
+        case .binder:
+            return binderPageImage()
+        }
+    }
+
+    private static func binderPageImage() -> CGImage? {
+        let cards = binderCardNames.compactMap(UIImage.init(named:))
+        guard cards.count == binderCardNames.count else { return nil }
+
+        let pageSize = CGSize(width: 1_400, height: 1_980)
+        let pageInset: CGFloat = 48
+        let gutter: CGFloat = 20
+        let cardWidth = (pageSize.width - pageInset * 2 - gutter * 2) / 3
+        let cardHeight = cardWidth * 1.395
+        let rendererFormat = UIGraphicsImageRendererFormat()
+        rendererFormat.scale = 1
+        rendererFormat.opaque = true
+
+        return UIGraphicsImageRenderer(size: pageSize, format: rendererFormat).image { context in
+            let bounds = CGRect(origin: .zero, size: pageSize)
+            UIColor(red: 0.035, green: 0.055, blue: 0.08, alpha: 1).setFill()
+            context.fill(bounds)
+
+            for (index, card) in cards.enumerated() {
+                let column = index % 3
+                let row = index / 3
+                let cardRect = CGRect(
+                    x: pageInset + CGFloat(column) * (cardWidth + gutter),
+                    y: pageInset + CGFloat(row) * (cardHeight + gutter),
+                    width: cardWidth,
+                    height: cardHeight
+                )
+                let pocketRect = cardRect.insetBy(dx: -6, dy: -6)
+
+                UIColor.white.withAlphaComponent(0.16).setFill()
+                UIBezierPath(roundedRect: pocketRect, cornerRadius: 14).fill()
+                card.draw(in: cardRect)
+
+                UIColor.white.withAlphaComponent(0.32).setStroke()
+                let pocketOutline = UIBezierPath(roundedRect: pocketRect, cornerRadius: 14)
+                pocketOutline.lineWidth = 3
+                pocketOutline.stroke()
+            }
+        }.cgImage
+    }
+}
+
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
@@ -203,6 +268,7 @@ struct CardScannerView: View {
                 isProcessing: isProcessingPhoto,
                 onLoadPhoto: { presentPhotoPicker(.single) },
                 onLoadPhotos: { presentPhotoPicker(.bulk) },
+                demoTitle: viewModel.captureMode == .binder ? "Demo Binder Page" : "Demo Card",
                 onRunDemo: scanDemoImage
             ) {
                 gameControl
@@ -701,8 +767,8 @@ struct CardScannerView: View {
 
     private func scanDemoImage() {
         guard !isProcessingPhoto else { return }
-        guard let image = UIImage(named: "BossOrders")?.cgImage else {
-            viewModel.errorMessage = "The bundled Boss's Orders scanner fixture is unavailable."
+        guard let image = ScannerDemoFixture.image(for: viewModel.captureMode) else {
+            viewModel.errorMessage = "The bundled scanner demo fixtures are unavailable."
             return
         }
         Task { await viewModel.scanCurrentCaptureMode(image: image) }

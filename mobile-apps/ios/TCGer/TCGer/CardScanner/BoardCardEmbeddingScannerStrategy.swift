@@ -8,7 +8,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// Candidates below the normal acceptance threshold remain available
         /// only for exact OCR confirmation (for example, a readable 170/198).
         static let minimumEvidenceScore: Double = 0.55
-        static let strongAcceptanceScore: Double = 0.70
+        static let strongAcceptanceScore: Double = 0.72
         /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
         static let ocrMargin: Double = 0.1
         /// Abstain when another printing trails the winner by less than this

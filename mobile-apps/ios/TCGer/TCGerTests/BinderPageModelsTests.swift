@@ -3,6 +3,53 @@ import XCTest
 
 @MainActor
 final class BinderPageModelsTests: XCTestCase {
+    func testSampleBinderPageUsesACompleteThreeByThreePocketLayout() {
+        let page = LocalStore.makeSampleBinderPage(timestamp: "2026-08-10T12:00:00Z")
+
+        XCTAssertEqual(page.binderId, "sample-binder-1")
+        XCTAssertEqual(page.pageNumber, 1)
+        XCTAssertNil(page.imageUrl)
+        XCTAssertEqual(page.placements.count, 9)
+        XCTAssertEqual(page.placements.map(\.slotIndex), Array(0..<9))
+
+        for placement in page.placements {
+            let points = [
+                placement.quad.topLeft,
+                placement.quad.topRight,
+                placement.quad.bottomRight,
+                placement.quad.bottomLeft
+            ]
+            XCTAssertTrue(points.allSatisfy { (0...1).contains($0.x) && (0...1).contains($0.y) })
+        }
+
+        let leftEdges = Set(page.placements.map { $0.quad.topLeft.x })
+        let topEdges = Set(page.placements.map { $0.quad.topLeft.y })
+        XCTAssertEqual(leftEdges.count, 3)
+        XCTAssertEqual(topEdges.count, 3)
+    }
+
+    func testLoadingSampleDataSeedsTheNinePocketFavoritesBinder() throws {
+        let store = LocalStore()
+        let wasLoaded = store.isSampleDataLoaded
+        if wasLoaded {
+            store.removeSampleData()
+        }
+        defer {
+            store.removeSampleData()
+            if wasLoaded {
+                store.loadSampleData()
+            }
+        }
+
+        store.loadSampleData()
+
+        let binder = try store.getCollection(id: "sample-binder-1")
+        let page = try XCTUnwrap(store.getBinderPages(binderId: binder.id).first)
+        XCTAssertEqual(binder.totalCopies, 9)
+        XCTAssertEqual(page.placements.count, 9)
+        XCTAssertEqual(Set(page.placements.map(\.slotIndex)), Set(0..<9))
+    }
+
     func testSavedPageRoundTripsWithoutAnImage() throws {
         let page = SavedBinderPage(
             id: "page-7",

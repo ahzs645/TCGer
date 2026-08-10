@@ -185,7 +185,7 @@ private struct BinderPageSnapshot: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                snapshotImage
+                snapshotImage(size: geometry.size)
                 ForEach(placements) { placement in
                     let rect = placementRect(placement, size: geometry.size)
                     RoundedRectangle(cornerRadius: 4)
@@ -208,24 +208,108 @@ private struct BinderPageSnapshot: View {
     }
 
     @ViewBuilder
-    private var snapshotImage: some View {
+    private func snapshotImage(size: CGSize) -> some View {
         if let imageURL, imageURL.isFileURL,
            let image = UIImage(contentsOfFile: imageURL.path) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let imageURL {
             AsyncImage(url: imageURL) { phase in
                 if let image = phase.image {
-                    image.resizable().scaledToFit()
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if phase.error != nil {
                     placeholder
                 } else {
                     ProgressView().tint(.white)
                 }
             }
+        } else if !placements.isEmpty {
+            digitalBinderPage(size: size)
         } else {
             placeholder
+        }
+    }
+
+    private func digitalBinderPage(size: CGSize) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(white: 0.13), Color(white: 0.045)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            ForEach(placements) { placement in
+                let rect = placementRect(placement, size: size).insetBy(dx: 3, dy: 3)
+                binderPocket(for: placement)
+                    .frame(width: rect.width, height: rect.height)
+                    .position(x: rect.midX, y: rect.midY)
+            }
+
+            LinearGradient(
+                colors: [.white.opacity(0.16), .clear, .white.opacity(0.04)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .blendMode(.screen)
+            .allowsHitTesting(false)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.white.opacity(0.13), lineWidth: 1)
+        }
+    }
+
+    private func binderPocket(for placement: BinderPagePlacement) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color.black.opacity(0.72))
+
+            if let assetName = cardBackAsset(for: placement.tcg) {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(3)
+            } else {
+                VStack(spacing: 3) {
+                    Image(systemName: "rectangle.portrait.fill")
+                    Text(placement.name)
+                        .font(.system(size: 7, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(.white.opacity(0.8))
+                .padding(4)
+            }
+
+            LinearGradient(
+                colors: [.white.opacity(0.22), .clear, .white.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(.white.opacity(0.24), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pocket \(placement.slotIndex + 1), \(placement.name)")
+    }
+
+    private func cardBackAsset(for tcg: String) -> String? {
+        switch tcg.lowercased() {
+        case "pokemon": "PokemonCardBack"
+        case "magic": "MagicCardBack"
+        case "yugioh": "YugiohCardBack"
+        case "onepiece": "OnePieceCardBack"
+        case "lorcana": "LorcanaCardBack"
+        case "dragonball": "DragonBallCardBack"
+        default: nil
         }
     }
 

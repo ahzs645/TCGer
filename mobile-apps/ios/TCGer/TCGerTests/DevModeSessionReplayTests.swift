@@ -14,6 +14,11 @@ import XCTest
 /// `TEST_RUNNER_DEVMODE_SESSIONS_DIR=... xcodebuild test`. Skips when unset.
 @MainActor
 final class DevModeSessionReplayTests: XCTestCase {
+    private struct EvidenceRecord: Decodable {
+        let imageFile: String
+        let outcome: String
+    }
+
     /// Ground truth for frames whose card was verified by a flat-on scan of
     /// the same physical card in the same archive (2026-08-09 sessions).
     private static let expectedCards: [String: String] = [
@@ -24,6 +29,38 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-160556/frame-0011.jpg": "swshp-SWSH204",
         "scan-session-20260809-160556/frame-0012.jpg": "swshp-SWSH204",
         "scan-session-20260809-160556/frame-0014.jpg": "me05-016",
+        // The 19:07 lighting/foil session deliberately repeats each physical
+        // card across blur, glare, angle, and framing changes. Clear frames
+        // and visible collector numbers identify every single-card shot.
+        "scan-session-20260809-190752/frame-0000.jpg": "me05-043",
+        "scan-session-20260809-190752/frame-0001.jpg": "me05-043",
+        "scan-session-20260809-190752/frame-0002.jpg": "me05-043",
+        "scan-session-20260809-190752/frame-0003.jpg": "me05-043",
+        "scan-session-20260809-190752/frame-0004.jpg": "me05-043",
+        "scan-session-20260809-190752/frame-0005.jpg": "me04-051",
+        "scan-session-20260809-190752/frame-0006.jpg": "me04-051",
+        "scan-session-20260809-190752/frame-0007.jpg": "me05-040",
+        "scan-session-20260809-190752/frame-0008.jpg": "me05-040",
+        "scan-session-20260809-190752/frame-0009.jpg": "me05-040",
+        "scan-session-20260809-190752/frame-0010.jpg": "swshp-SWSH204",
+        "scan-session-20260809-190752/frame-0011.jpg": "dp4-104",
+        "scan-session-20260809-190752/frame-0012.jpg": "pl4-AR3",
+        "scan-session-20260809-190752/frame-0013.jpg": "pl4-AR3",
+        "scan-session-20260809-190752/frame-0014.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0015.jpg": "dpp-DP38",
+        "scan-session-20260809-190752/frame-0016.jpg": "dpp-DP38",
+        "scan-session-20260809-190752/frame-0017.jpg": "dpp-DP38",
+        "scan-session-20260809-190752/frame-0018.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0019.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0020.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0021.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0022.jpg": "dpp-DP30",
+        "scan-session-20260809-190752/frame-0023.jpg": "dp4-103",
+        "scan-session-20260809-190752/frame-0024.jpg": "dp4-103",
+        "scan-session-20260809-190752/frame-0025.jpg": "dp4-103",
+        "scan-session-20260809-190752/frame-0026.jpg": "dp4-103",
+        "scan-session-20260809-190752/frame-0027.jpg": "dp4-103",
+        "scan-session-20260809-190752/frame-0028.jpg": "dp4-103",
     ]
     /// Frames that must NOT match anything (accidental shutter presses).
     private static let expectedNoMatch: Set<String> = [
@@ -55,7 +92,7 @@ final class DevModeSessionReplayTests: XCTestCase {
         let coordinator = CardScannerCoordinator.makeDefault()
         var recoveredCount = 0
         var lostCount = 0
-        var newFalseAccepts: [String] = []
+        var wrongAccepts: [String] = []
         var expectedHits = 0
         var expectedTotal = 0
 
@@ -64,7 +101,17 @@ final class DevModeSessionReplayTests: XCTestCase {
                 RecordedScanBundle.self,
                 from: Data(contentsOf: session.appendingPathComponent("results.json"))
             )
+            let evidence = (try? JSONDecoder().decode(
+                [EvidenceRecord].self,
+                from: Data(contentsOf: session.appendingPathComponent("evidence.json"))
+            )) ?? []
+            let binderImages = Set(evidence.lazy.filter {
+                $0.outcome.hasPrefix("binderPage")
+            }.map(\.imageFile))
             for frame in bundle.frames.sorted(by: { $0.index < $1.index }) {
+                // Binder pages have their own replay harness. Treating a full
+                // 3x3 page as one card creates meaningless single-card hits.
+                guard !binderImages.contains(frame.imageFile) else { continue }
                 let imageURL = session.appendingPathComponent(frame.imageFile)
                 guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
@@ -95,13 +142,16 @@ final class DevModeSessionReplayTests: XCTestCase {
                     if newCardID == expected {
                         expectedHits += 1
                         verdict = " ✓ RECOVERED (expected \(expected))"
+                    } else if let newCardID {
+                        wrongAccepts.append("\(key) expected \(expected), got \(newCardID)")
+                        verdict = " ✗ WRONG ACCEPT (expected \(expected))"
                     } else {
-                        verdict = " ✗ still wrong (expected \(expected))"
+                        verdict = " • abstained (expected \(expected))"
                     }
                 }
                 if Self.expectedNoMatch.contains(key) {
                     if newCardID != nil {
-                        newFalseAccepts.append("\(key) → \(current)")
+                        wrongAccepts.append("\(key) expected noMatch, got \(current)")
                         verdict = " ✗ FALSE ACCEPT"
                     } else {
                         verdict = " ✓ still declined"
@@ -131,10 +181,10 @@ final class DevModeSessionReplayTests: XCTestCase {
         }
 
         print("DEVREPLAY summary: labeled \(expectedHits)/\(expectedTotal) correct, "
-            + "\(lostCount) previously-accepted lost, \(newFalseAccepts.count) new false accepts")
+            + "\(lostCount) previously-accepted lost, \(wrongAccepts.count) wrong accepts")
         XCTAssertTrue(
-            newFalseAccepts.isEmpty,
-            "accidental captures must stay declined: \(newFalseAccepts)"
+            wrongAccepts.isEmpty,
+            "ground-truth labels must never change to a wrong card: \(wrongAccepts)"
         )
         XCTAssertEqual(lostCount, 0, "previously accepted frames must not be lost")
     }

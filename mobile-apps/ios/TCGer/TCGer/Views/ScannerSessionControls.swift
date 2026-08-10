@@ -12,6 +12,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     let isProcessing: Bool
     let onLoadPhoto: () -> Void
     let onLoadPhotos: () -> Void
+    let demoTitle: String
     let onRunDemo: () -> Void
     @ViewBuilder let leadingContent: () -> LeadingContent
 
@@ -83,7 +84,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                 if showsTestInputs {
                     Section("Testing") {
                         Button(action: onRunDemo) {
-                            Label("Demo", systemImage: "testtube.2")
+                            Label(demoTitle, systemImage: "testtube.2")
                         }
                         .disabled(isProcessing)
                     }
