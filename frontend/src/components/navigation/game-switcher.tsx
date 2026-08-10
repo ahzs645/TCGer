@@ -5,6 +5,7 @@ import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 
+import { useShallow } from "zustand/react/shallow";
 const iconPaths: Record<Exclude<SupportedGame, "all">, string> = {
   yugioh: "/icons/Yugioh.svg",
   magic: "/icons/MTG.svg",
@@ -15,10 +16,10 @@ const iconPaths: Record<Exclude<SupportedGame, "all">, string> = {
 };
 
 export function GameSwitcher() {
-  const { selectedGame, setGame } = useGameFilterStore((state) => ({
+  const { selectedGame, setGame } = useGameFilterStore(useShallow((state) => ({
     selectedGame: state.selectedGame,
     setGame: state.setGame,
-  }));
+  })));
   const enabledGames = useModuleStore((state) => state.enabledGames);
 
   // Count how many games are enabled

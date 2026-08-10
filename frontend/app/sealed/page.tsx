@@ -71,6 +71,7 @@ import {
   useModuleStore,
 } from "@/stores/preferences";
 
+import { useShallow } from "zustand/react/shallow";
 const TCG_COLORS: Record<string, string> = {
   yugioh: "#ef4444",
   magic: "#8b5cf6",
@@ -134,10 +135,10 @@ export default function SealedPage() {
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore((state) => ({
+  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
     enabledGames: state.enabledGames,
     showPricing: state.showPricing,
-  }));
+  })));
   const queryClient = useQueryClient();
   const demo = mounted && isDemoMode();
   const ready = mounted && isAuthenticated && !!token && !demo;

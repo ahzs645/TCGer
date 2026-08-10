@@ -335,7 +335,8 @@ final class CardScannerViewModel: ObservableObject {
         image: CGImage,
         presentsReview: Bool = true,
         source: ScanInvocationKind = .importedPhoto,
-        originalImage: CGImage? = nil
+        originalImage: CGImage? = nil,
+        protectedRect: CGRect? = nil
     ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
@@ -351,7 +352,11 @@ final class CardScannerViewModel: ObservableObject {
         defer { isProcessingPhoto = false }
 
         do {
-            let result = try await binderPageScanner.scan(image: image, context: context)
+            let result = try await binderPageScanner.scan(
+                image: image,
+                context: context,
+                protectedRect: protectedRect
+            )
             recordBinderPageForDevMode(
                 page: image,
                 original: originalImage,
@@ -616,7 +621,8 @@ final class CardScannerViewModel: ObservableObject {
             await scanBinderPage(
                 image: viewportCroppedImage(from: cgImage),
                 source: .photoCapture,
-                originalImage: cgImage
+                originalImage: cgImage,
+                protectedRect: guideRectInViewportNormalized
             )
         } else {
             await scan(
@@ -769,6 +775,23 @@ final class CardScannerViewModel: ObservableObject {
         guard let previewFrame else { return image }
         let geometry = ScannerGuideGeometry(previewFrame: previewFrame, guideFrame: previewFrame)
         return ScannerGuideCropper().crop(image, using: geometry) ?? image
+    }
+
+    /// The framing guide expressed in the viewport-cropped image's
+    /// Vision-normalized space (bottom-left origin). The viewport crop is
+    /// exactly the preview's visible content, so view-space fractions map
+    /// linearly onto it. Nil when either frame is unknown.
+    private var guideRectInViewportNormalized: CGRect? {
+        guard let previewFrame, let guideFrame,
+              previewFrame.width > 0, previewFrame.height > 0
+        else { return nil }
+        let visible = guideFrame.intersection(previewFrame)
+        guard !visible.isNull, visible.width > 1, visible.height > 1 else { return nil }
+        let x = (visible.minX - previewFrame.minX) / previewFrame.width
+        let topY = (visible.minY - previewFrame.minY) / previewFrame.height
+        let width = visible.width / previewFrame.width
+        let height = visible.height / previewFrame.height
+        return CGRect(x: x, y: 1 - topY - height, width: width, height: height)
     }
 
     private func handleLiveSuccess(_ result: CardScanResult) {

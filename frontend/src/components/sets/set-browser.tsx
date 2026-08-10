@@ -41,6 +41,7 @@ import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import type { CollectionCard, TcgCode, TcgSet } from "@tcg/api-types";
 
+import { useShallow } from "zustand/react/shallow";
 type ProgressFilter = "all" | "started" | "complete" | "not-started";
 type SetSort = "release" | "name" | "card-count";
 
@@ -86,17 +87,17 @@ export function SetBrowser() {
   const [mounted, setMounted] = useState(false);
   const { token, isAuthenticated } = useAuthStore();
   const enabledGames = useModuleStore((state) => state.enabledGames);
-  const { selectedGame: game, setGame } = useGameFilterStore((state) => ({
+  const { selectedGame: game, setGame } = useGameFilterStore(useShallow((state) => ({
     selectedGame: state.selectedGame,
     setGame: state.setGame,
-  }));
+  })));
   const { collections, fetchCollections, hasFetched, collectionsLoading } =
-    useCollectionsStore((state) => ({
+    useCollectionsStore(useShallow((state) => ({
       collections: state.collections,
       fetchCollections: state.fetchCollections,
       hasFetched: state.hasFetched,
       collectionsLoading: state.isLoading,
-    }));
+    })));
   const [query, setQuery] = useState("");
   const [progress, setProgress] = useState<ProgressFilter>("all");
   const [sort, setSort] = useState<SetSort>("release");

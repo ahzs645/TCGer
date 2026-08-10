@@ -36,14 +36,15 @@ import type {
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 
+import { useShallow } from "zustand/react/shallow";
 const NO_DEFAULT_BINDER = "__none__";
 
 export function CollectionImportDialog() {
   const { token, user } = useAuthStore();
-  const { collections, fetchCollections } = useCollectionsStore((state) => ({
+  const { collections, fetchCollections } = useCollectionsStore(useShallow((state) => ({
     collections: state.collections,
     fetchCollections: state.fetchCollections,
-  }));
+  })));
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");

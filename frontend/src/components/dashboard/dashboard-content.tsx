@@ -28,6 +28,7 @@ import {
   summarizeSetProgress,
 } from "@/lib/sets/progress";
 
+import { useShallow } from "zustand/react/shallow";
 type DashboardCard = CollectionCard & {
   updatedAt?: string;
   binderName?: string;
@@ -121,18 +122,18 @@ function buildDashboardStats(
 export function DashboardContent() {
   const pathname = usePathname();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore((state) => ({
+  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
     enabledGames: state.enabledGames,
     showPricing: state.showPricing,
-  }));
+  })));
   const { collections, fetchCollections, isLoading, hasFetched, error } =
-    useCollectionsStore((state) => ({
+    useCollectionsStore(useShallow((state) => ({
       collections: state.collections,
       fetchCollections: state.fetchCollections,
       isLoading: state.isLoading,
       hasFetched: state.hasFetched,
       error: state.error,
-    }));
+    })));
   const { token, isAuthenticated } = useAuthStore();
 
   // Defer auth-dependent rendering to avoid SSR/client hydration mismatch.

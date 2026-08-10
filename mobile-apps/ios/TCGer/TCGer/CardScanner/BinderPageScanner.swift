@@ -259,7 +259,15 @@ actor BinderPageScanner {
         self.coordinator = coordinator
     }
 
-    func scan(image: CGImage, context: CardScannerContext) async throws -> BinderPageScanResult {
+    /// `protectedRect` is the framing guide in the scanned image's
+    /// Vision-normalized space; the retained page image never trims inside
+    /// it (see `pageFitRect(for:protecting:)`). Nil for imports and replays,
+    /// which have no guide.
+    func scan(
+        image: CGImage,
+        context: CardScannerContext,
+        protectedRect: CGRect? = nil
+    ) async throws -> BinderPageScanResult {
         let start = Date()
         let observations = try detectCardQuads(in: image)
         let croppedObservations = observations.compactMap { observation -> (VNRectangleObservation, CGImage)? in
@@ -335,8 +343,10 @@ actor BinderPageScanner {
         // small margin instead of showing cards cut off at the frame edge.
         var pageImage = image
         var pageFitRect: CGRect?
-        if let candidate = Self.pageFitRect(for: workItems.map { BinderNormalizedQuad(observation: $0.observation) }),
-           let cropped = Self.crop(image, toNormalizedRect: candidate) {
+        if let candidate = Self.pageFitRect(
+            for: workItems.map { BinderNormalizedQuad(observation: $0.observation) },
+            protecting: protectedRect
+        ), let cropped = Self.crop(image, toNormalizedRect: candidate) {
             pageImage = cropped
             pageFitRect = candidate
         }
@@ -385,7 +395,19 @@ actor BinderPageScanner {
     /// Union of every detected card corner, padded by `pageFitMargin` and
     /// clamped to the frame — in Vision-normalized coordinates. Nil when there
     /// is nothing to fit to, the fit is degenerate, or it would barely trim.
-    nonisolated static func pageFitRect(for quads: [BinderNormalizedQuad]) -> CGRect? {
+    ///
+    /// `protecting` is the framing guide expressed in the scanned image's
+    /// normalized space: the area the user deliberately declared as the page.
+    /// The fit never trims inside it, because the union of DETECTED quads
+    /// under-covers the physical page — the card detector does not fire on
+    /// card backs (measured: 7 detections for 7 face-up cards and 0 for the
+    /// two backs on the 223944 binder session's frame-0009), and any face
+    /// card the detector misses would otherwise vanish from the retained
+    /// page image with no visual trace.
+    nonisolated static func pageFitRect(
+        for quads: [BinderNormalizedQuad],
+        protecting protectedRect: CGRect? = nil
+    ) -> CGRect? {
         let points = quads.flatMap { [$0.topLeft, $0.topRight, $0.bottomLeft, $0.bottomRight] }
         guard !points.isEmpty else { return nil }
 
@@ -394,7 +416,11 @@ actor BinderPageScanner {
         let minY = points.map(\.y).min()!
         let maxY = points.map(\.y).max()!
 
-        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        var union = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        if let protectedRect, !protectedRect.isNull, !protectedRect.isEmpty {
+            union = union.union(protectedRect.standardized)
+        }
+        let rect = union
             .insetBy(dx: -Configuration.pageFitMargin, dy: -Configuration.pageFitMargin)
             .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
         guard !rect.isNull, rect.width > 0.05, rect.height > 0.05 else { return nil }
@@ -425,7 +451,9 @@ actor BinderPageScanner {
     /// card detector finds the actual cards, and per-box corner refinement
     /// rectifies each one. The rectangle path remains as fallback when the
     /// detector asset is unavailable or fires on nothing.
-    private func detectCardQuads(in image: CGImage) throws -> [VNRectangleObservation] {
+    // Internal (not private) so the replay/fit experiment harnesses can score
+    // localization and page-fit geometry without running recognition.
+    func detectCardQuads(in image: CGImage) throws -> [VNRectangleObservation] {
         if let detector = CardObjectDetector.shared {
             let boxes = ((try? detector.detections(in: image)) ?? [])
                 .map { $0.boundingBox.standardized }

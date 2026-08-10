@@ -61,6 +61,7 @@ import type {
   TcgCode,
 } from "@tcg/api-types";
 
+import { useShallow } from "zustand/react/shallow";
 type OwnershipFilter = "all" | "owned" | "missing";
 type CardSort = "collector" | "name" | "rarity";
 type ViewMode = "grid" | "list";
@@ -112,12 +113,12 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const [mounted, setMounted] = useState(false);
   const { token, isAuthenticated, user } = useAuthStore();
   const { collections, fetchCollections, hasFetched, collectionsLoading } =
-    useCollectionsStore((state) => ({
+    useCollectionsStore(useShallow((state) => ({
       collections: state.collections,
       fetchCollections: state.fetchCollections,
       hasFetched: state.hasFetched,
       collectionsLoading: state.isLoading,
-    }));
+    })));
   const [collectionId, setCollectionId] = useState(ALL_COLLECTION_ID);
   const [query, setQuery] = useState("");
   const [rarity, setRarity] = useState("all");
@@ -135,12 +136,12 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
     fetchWishlists,
     hasFetchedWishlists,
     addRule: addWishlistRule,
-  } = useWishlistsStore((state) => ({
+  } = useWishlistsStore(useShallow((state) => ({
     wishlists: state.wishlists,
     fetchWishlists: state.fetchWishlists,
     hasFetchedWishlists: state.hasFetched,
     addRule: state.addRule,
-  }));
+  })));
   const [wishlistId, setWishlistId] = useState("");
   const [wishlistBusy, setWishlistBusy] = useState(false);
 

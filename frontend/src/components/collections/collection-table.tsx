@@ -91,6 +91,7 @@ import {
   POKEMON_FINISH_CATALOG,
 } from "@/lib/pokemon-variants";
 
+import { useShallow } from "zustand/react/shallow";
 type CardUpdateArgs = {
   cardId: string;
   binderId: string;
@@ -107,19 +108,19 @@ export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const token = useAuthStore((state) => state.token);
   const { collections, addCollection, removeCollection, updateCollectionCard } =
-    useCollectionsStore((state) => ({
+    useCollectionsStore(useShallow((state) => ({
       collections: state.collections,
       addCollection: state.addCollection,
       removeCollection: state.removeCollection,
       updateCollectionCard: state.updateCollectionCard,
-    }));
-  const { enabledGames, showPricing, showCardNumbers } = useModuleStore(
+    })));
+  const { enabledGames, showPricing, showCardNumbers } = useModuleStore(useShallow(
     (state) => ({
       enabledGames: state.enabledGames,
       showPricing: state.showPricing,
       showCardNumbers: state.showCardNumbers,
     }),
-  );
+  ));
   const [activeCollectionId, setActiveCollectionId] = useState<string>(
     collections.length ? ALL_COLLECTION_ID : "",
   );

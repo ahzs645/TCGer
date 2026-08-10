@@ -80,6 +80,7 @@ import {
   isFoilFinish,
 } from "@/lib/pokemon-variants";
 
+import { useShallow } from "zustand/react/shallow";
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
 const DEFAULT_BINDER_COLORS = [
   "#4B5563",
@@ -180,7 +181,7 @@ export function CollectionView() {
     isLoading,
     error,
     clearError,
-  } = useCollectionsStore((state) => ({
+  } = useCollectionsStore(useShallow((state) => ({
     collections: state.collections,
     fetchCollections: state.fetchCollections,
     updateCollectionCard: state.updateCollectionCard,
@@ -191,7 +192,7 @@ export function CollectionView() {
     isLoading: state.isLoading,
     error: state.error,
     clearError: state.clearError,
-  }));
+  })));
   const { tags, fetchTags, addTag } = useTagsStore();
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
   const showPricing = useModuleStore((state) => state.showPricing);

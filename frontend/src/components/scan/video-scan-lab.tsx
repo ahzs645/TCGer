@@ -37,15 +37,16 @@ import {
   VideoPlayerWithOverlay,
 } from "./video-scan-panels";
 
+import { useShallow } from "zustand/react/shallow";
 export function VideoScanLab() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const { token, isAuthenticated } = useAuthStore((s) => ({
+  const { token, isAuthenticated } = useAuthStore(useShallow((s) => ({
     token: s.token,
     isAuthenticated: s.isAuthenticated,
-  }));
+  })));
   const selectedGame = useGameFilterStore((s) => s.selectedGame);
 
   const [mounted, setMounted] = useState(false);

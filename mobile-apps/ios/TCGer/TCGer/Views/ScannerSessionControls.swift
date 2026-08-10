@@ -210,6 +210,23 @@ struct ScannerSessionTray: View {
     let onClear: () -> Void
 
     var body: some View {
+        adaptiveTray
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Scan session with \(results.count) cards")
+    }
+
+    @ViewBuilder
+    private var adaptiveTray: some View {
+        if #available(iOS 26.0, *) {
+            trayContent
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            trayContent
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    private var trayContent: some View {
         HStack(spacing: 10) {
             Button(action: onReview) {
                 HStack(spacing: 6) {
@@ -275,9 +292,6 @@ struct ScannerSessionTray: View {
         }
         .frame(height: 58)
         .padding(.horizontal, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Scan session with \(results.count) cards")
     }
 }
 

@@ -49,6 +49,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 import { CatalogManagementPanel } from "./catalog-management-panel";
 
+import { useShallow } from "zustand/react/shallow";
 const iconPaths = {
   yugioh: "/icons/Yugioh.svg",
   magic: "/icons/MTG.svg",
@@ -74,14 +75,14 @@ export function AccountSettingsDialog({
     setShowCardNumbers,
     showPricing,
     setShowPricing,
-  } = useModuleStore((state) => ({
+  } = useModuleStore(useShallow((state) => ({
     enabledGames: state.enabledGames,
     toggleGame: state.toggleGame,
     showCardNumbers: state.showCardNumbers,
     setShowCardNumbers: state.setShowCardNumbers,
     showPricing: state.showPricing,
     setShowPricing: state.setShowPricing,
-  }));
+  })));
 
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);

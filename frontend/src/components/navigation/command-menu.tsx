@@ -27,6 +27,7 @@ import { getAppRoute } from "@/lib/app-routes";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { supportedGameOptions, useGameFilterStore } from "@/stores/game-filter";
 
+import { useShallow } from "zustand/react/shallow";
 interface CommandMenuProps {
   secondaryNavigation: Array<{
     href: string;
@@ -39,10 +40,10 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { selectedGame, setGame } = useGameFilterStore((state) => ({
+  const { selectedGame, setGame } = useGameFilterStore(useShallow((state) => ({
     selectedGame: state.selectedGame,
     setGame: state.setGame,
-  }));
+  })));
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {

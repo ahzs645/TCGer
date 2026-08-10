@@ -48,6 +48,7 @@ import { GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import { CardImage } from "./card-image";
 import { SetSymbol } from "./set-symbol";
 
+import { useShallow } from "zustand/react/shallow";
 const PRINT_SUPPORTED_GAMES: Card["tcg"][] = ["magic", "pokemon"];
 interface CardPreviewProps {
   card: Card;
@@ -69,14 +70,14 @@ export function CardPreview({ card }: CardPreviewProps) {
     removeCollectionCard,
     isLoading: collectionsLoading,
     hasFetched,
-  } = useCollectionsStore((state) => ({
+  } = useCollectionsStore(useShallow((state) => ({
     collections: state.collections,
     addCardToBinder: state.addCardToBinder,
     updateCollectionCard: state.updateCollectionCard,
     removeCollectionCard: state.removeCollectionCard,
     isLoading: state.isLoading,
     hasFetched: state.hasFetched,
-  }));
+  })));
   const isSignedIn = isAuthenticated && Boolean(token);
   const [selectedBinderId, setSelectedBinderId] = useState<string>(
     collections[0]?.id ?? "",

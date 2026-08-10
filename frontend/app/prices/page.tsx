@@ -22,6 +22,7 @@ import { useCollectionsStore } from "@/stores/collections";
 import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 
+import { useShallow } from "zustand/react/shallow";
 const TCG_COLORS: Record<string, string> = {
   pokemon: "#f59e0b",
   magic: "#8b5cf6",
@@ -55,19 +56,19 @@ export default function PricesPage() {
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore((state) => ({
+  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
     enabledGames: state.enabledGames,
     showPricing: state.showPricing,
-  }));
+  })));
 
   const { collections, fetchCollections, isLoading, hasFetched, error } =
-    useCollectionsStore((state) => ({
+    useCollectionsStore(useShallow((state) => ({
       collections: state.collections,
       fetchCollections: state.fetchCollections,
       isLoading: state.isLoading,
       hasFetched: state.hasFetched,
       error: state.error,
-    }));
+    })));
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;

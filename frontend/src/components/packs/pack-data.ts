@@ -81,6 +81,78 @@ export const PACK_POOL: Record<PackRarityTier, PackCard[]> = {
   ],
 };
 
+export interface PackVariantPalette {
+  top: string;
+  mid: string;
+  bottom: string;
+  accent: string;
+  glow: string;
+}
+
+export type PackMotif = "aurora" | "flame" | "wave" | "leaf";
+
+export interface PackVariant {
+  id: string;
+  name: string;
+  motif: PackMotif;
+  palette: PackVariantPalette;
+}
+
+export const PACK_VARIANTS: PackVariant[] = [
+  {
+    id: "aurora",
+    name: "Aurora",
+    motif: "aurora",
+    palette: {
+      top: "#101b3f",
+      mid: "#2c2a6e",
+      bottom: "#1b1034",
+      accent: "#7de3ff",
+      glow: "#9fd8ff",
+    },
+  },
+  {
+    id: "ember",
+    name: "Ember",
+    motif: "flame",
+    palette: {
+      top: "#2a0b0b",
+      mid: "#8a2412",
+      bottom: "#1c0505",
+      accent: "#ffb547",
+      glow: "#ff9d45",
+    },
+  },
+  {
+    id: "tide",
+    name: "Tide",
+    motif: "wave",
+    palette: {
+      top: "#031b33",
+      mid: "#0b4d7a",
+      bottom: "#02101f",
+      accent: "#6fe3ff",
+      glow: "#59c8ff",
+    },
+  },
+  {
+    id: "verdant",
+    name: "Verdant",
+    motif: "leaf",
+    palette: {
+      top: "#0b2312",
+      mid: "#1e6b34",
+      bottom: "#06150a",
+      accent: "#a8ff8f",
+      glow: "#7dff9b",
+    },
+  },
+];
+
+export function packVariantById(id: string): PackVariant {
+  return PACK_VARIANTS.find((v) => v.id === id) ?? PACK_VARIANTS[0];
+}
+
 const TIER_ORDER: PackRarityTier[] = [
   "common",
   "uncommon",

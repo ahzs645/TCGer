@@ -30,17 +30,18 @@ import type { Card as CardType } from "@/types/card";
 
 import { CardPreview } from "./card-preview";
 
+import { useShallow } from "zustand/react/shallow";
 export function CardSearchPanel() {
-  const { selectedGame, setGame } = useGameFilterStore((state) => ({
+  const { selectedGame, setGame } = useGameFilterStore(useShallow((state) => ({
     selectedGame: state.selectedGame,
     setGame: state.setGame,
-  }));
+  })));
   const enabledGames = useModuleStore((state) => state.enabledGames);
   const { token, isAuthenticated } = useAuthStore();
-  const { fetchCollections, hasFetched } = useCollectionsStore((state) => ({
+  const { fetchCollections, hasFetched } = useCollectionsStore(useShallow((state) => ({
     fetchCollections: state.fetchCollections,
     hasFetched: state.hasFetched,
-  }));
+  })));
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 

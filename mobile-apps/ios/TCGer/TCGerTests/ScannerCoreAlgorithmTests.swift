@@ -404,6 +404,50 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         ]))
     }
 
+    func testPageFitRectNeverTrimsInsideTheProtectedGuide() throws {
+        // The backs-column case (223944/frame-0009): the detector fires only
+        // on the seven face-up cards in the right two columns; the two card
+        // backs in the left column produce no quads. Without protection the
+        // fit trims the left third of the page away.
+        let faceQuads = [
+            makeQuad(x: 0.38, y: 0.55, width: 0.26, height: 0.38),
+            makeQuad(x: 0.70, y: 0.55, width: 0.26, height: 0.38),
+            makeQuad(x: 0.38, y: 0.08, width: 0.26, height: 0.38)
+        ]
+        let unprotected = try XCTUnwrap(BinderPageScanner.pageFitRect(for: faceQuads))
+        XCTAssertGreaterThan(unprotected.minX, 0.3, "sanity: unprotected fit trims the left column")
+
+        // The guide is the user's declared page area; the fit may expand past
+        // it for peeking cards but must never cut inside it.
+        let guide = CGRect(x: 0.05, y: 0.15, width: 0.9, height: 0.7)
+        let protected0 = try XCTUnwrap(
+            BinderPageScanner.pageFitRect(for: faceQuads, protecting: guide)
+        )
+        XCTAssertLessThanOrEqual(protected0.minX, guide.minX)
+        XCTAssertLessThanOrEqual(protected0.minY, guide.minY)
+        XCTAssertGreaterThanOrEqual(protected0.maxX, guide.maxX)
+        XCTAssertGreaterThanOrEqual(protected0.maxY, guide.maxY)
+        // The face quads extend above and below the guide; the fit keeps them.
+        XCTAssertGreaterThanOrEqual(protected0.maxY, 0.93 + 0.019)
+
+        // A guide spanning nearly the whole viewport means nothing worth
+        // trimming remains — the fit becomes a no-op instead of a sliver cut.
+        XCTAssertNil(BinderPageScanner.pageFitRect(
+            for: faceQuads,
+            protecting: CGRect(x: 0.01, y: 0.01, width: 0.98, height: 0.98)
+        ))
+
+        // Nil / empty protection preserves the original behavior exactly.
+        XCTAssertEqual(
+            BinderPageScanner.pageFitRect(for: faceQuads, protecting: nil),
+            unprotected
+        )
+        XCTAssertEqual(
+            BinderPageScanner.pageFitRect(for: faceQuads, protecting: .zero),
+            unprotected
+        )
+    }
+
     func testQuadRemappedIntoFitRectLandsAtProportionalPosition() {
         let quad = makeQuad(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         let remapped = quad.remapped(into: CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5))

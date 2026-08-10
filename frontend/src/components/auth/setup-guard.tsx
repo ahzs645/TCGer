@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { LoginDialog } from "@/components/auth/login-dialog";
 import { SignupDialog } from "@/components/auth/signup-dialog";
 
+import { useShallow } from "zustand/react/shallow";
 interface SetupGuardProps {
   children: React.ReactNode;
   singleUserMode?: boolean;
@@ -28,10 +29,10 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
   const pathname = usePathname();
   const { isPending: sessionPending } = useSession();
   const singleUserMode = singleUserModeProp ?? isSingleUserModeEnabled();
-  const { isAuthenticated, token } = useAuthStore((state) => ({
+  const { isAuthenticated, token } = useAuthStore(useShallow((state) => ({
     isAuthenticated: state.isAuthenticated,
     token: state.token,
-  }));
+  })));
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(!singleUserMode);
   const [initialCheckDone, setInitialCheckDone] = useState(singleUserMode);

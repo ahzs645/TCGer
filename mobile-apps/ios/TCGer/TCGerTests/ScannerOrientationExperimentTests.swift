@@ -993,6 +993,110 @@ final class ScannerOrientationExperimentTests: XCTestCase {
         }
     }
 
+    /// Page-fit geometry on real binder frames across simulated guide sizes
+    /// ("zooms"). For every selected frame it runs production localization
+    /// (`BinderPageScanner.detectCardQuads`), then evaluates
+    /// `pageFitRect(for:protecting:)` under several centered guide presets —
+    /// from no guide at all to a tight guide with cards spilling past it —
+    /// and writes the fitted image with remapped quad overlays for visual
+    /// review. Asserts the invariants that matter: no detected corner is
+    /// ever cropped out, and the fit never trims inside the guide.
+    ///
+    /// PAGEFIT_SESSION_DIR selects the session; PAGEFIT_FRAME_FILES
+    /// (comma-separated) selects frames; PAGEFIT_OUT_DIR receives images.
+    func testBinderPageFitVariants() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["PAGEFIT_SESSION_DIR"] else {
+            throw XCTSkip("Set PAGEFIT_SESSION_DIR to a binder dev-mode session.")
+        }
+        let root = URL(fileURLWithPath: path, isDirectory: true)
+        let frames = (environment["PAGEFIT_FRAME_FILES"] ?? "frame-0009.jpg")
+            .split(separator: ",").map(String.init)
+        let outDir = environment["PAGEFIT_OUT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        if let outDir {
+            try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        }
+
+        func centeredGuide(_ fraction: CGFloat) -> CGRect {
+            CGRect(
+                x: (1 - fraction) / 2, y: (1 - fraction) / 2,
+                width: fraction, height: fraction
+            )
+        }
+        let presets: [(name: String, guide: CGRect?)] = [
+            ("noGuide", nil),
+            ("guide94", centeredGuide(0.94)),
+            ("guide85", centeredGuide(0.85)),
+            ("guide70", centeredGuide(0.70)),
+            ("guide50", centeredGuide(0.50)),
+        ]
+
+        let scanner = BinderPageScanner(coordinator: .makeDefault())
+        for frame in frames {
+            let image = try loadImage(root.appendingPathComponent(frame))
+            let observations = try await scanner.detectCardQuads(in: image)
+            let quads = observations.map(BinderNormalizedQuad.init(observation:))
+            print("PAGEFIT \(frame): \(quads.count) detected quads")
+            XCTAssertFalse(quads.isEmpty, "no detections on \(frame)")
+
+            for preset in presets {
+                let fit = BinderPageScanner.pageFitRect(for: quads, protecting: preset.guide)
+                let retained = fit.map { $0.width * $0.height } ?? 1
+                if let fit {
+                    // Invariant: every detected corner stays inside the fit
+                    // (the fit's margin makes this strict containment).
+                    let outside = quads.flatMap { [$0.topLeft, $0.topRight, $0.bottomLeft, $0.bottomRight] }
+                        .filter { !fit.insetBy(dx: -0.0001, dy: -0.0001).contains($0) }
+                    XCTAssertTrue(outside.isEmpty, "\(frame)/\(preset.name): corners cropped out \(outside)")
+                    // Invariant: the guide area is never trimmed.
+                    if let guide = preset.guide {
+                        XCTAssertTrue(
+                            fit.insetBy(dx: -0.0001, dy: -0.0001).contains(guide),
+                            "\(frame)/\(preset.name): fit \(fit) cuts inside guide \(guide)"
+                        )
+                    }
+                }
+                print(String(
+                    format: "PAGEFIT %@ %@: fit=%@ retainedArea=%.2f",
+                    frame, preset.name,
+                    fit.map { String(format: "(%.2f,%.2f %.2fx%.2f)", $0.minX, $0.minY, $0.width, $0.height) } ?? "none",
+                    retained
+                ))
+
+                guard let outDir else { continue }
+                let fitted = fit.flatMap { BinderPageScanner.crop(image, toNormalizedRect: $0) } ?? image
+                let mapped = fit.map { rect in quads.map { $0.remapped(into: rect) } } ?? quads
+                let name = "\(frame.replacingOccurrences(of: ".jpg", with: ""))-\(preset.name).png"
+                savePNG(
+                    drawQuads(mapped, on: fitted),
+                    to: outDir.appendingPathComponent(name)
+                )
+            }
+        }
+    }
+
+    private func drawQuads(_ quads: [BinderNormalizedQuad], on image: CGImage) -> CGImage {
+        let width = CGFloat(image.width)
+        let height = CGFloat(image.height)
+        guard let context = CGContext(
+            data: nil, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        context.setLineWidth(max(3, width / 400))
+        context.setStrokeColor(CGColor(red: 0, green: 1, blue: 0.2, alpha: 0.95))
+        for quad in quads {
+            let points = [quad.topLeft, quad.topRight, quad.bottomRight, quad.bottomLeft]
+                .map { CGPoint(x: $0.x * width, y: $0.y * height) }
+            context.beginPath()
+            context.addLines(between: points + [points[0]])
+            context.strokePath()
+        }
+        return context.makeImage() ?? image
+    }
+
     /// One-off detector/Vision dump for a single image outside the bundled
     /// fixtures (SINGLE_IMAGE_DIAGNOSTIC_PATH). Prints every detector box so
     /// multi-card policy guards can be designed from measured geometry.

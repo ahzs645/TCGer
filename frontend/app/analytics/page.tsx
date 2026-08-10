@@ -34,6 +34,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useModuleStore } from "@/stores/preferences";
 import { useGameFilterStore } from "@/stores/game-filter";
 
+import { useShallow } from "zustand/react/shallow";
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
@@ -69,10 +70,10 @@ export default function AnalyticsPage() {
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore((state) => ({
+  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
     enabledGames: state.enabledGames,
     showPricing: state.showPricing,
-  }));
+  })));
 
   const noGamesEnabled = Object.values(enabledGames).every(
     (enabled) => !enabled,
