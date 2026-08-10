@@ -220,9 +220,9 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         let steep = VNRectangleObservation(
             requestRevision: VNDetectRectanglesRequestRevision1,
             topLeft: CGPoint(x: 0.10, y: 0.70),
-            bottomLeft: CGPoint(x: 0.20, y: 0.20),
+            topRight: CGPoint(x: 0.40, y: 0.80),
             bottomRight: CGPoint(x: 0.50, y: 0.30),
-            topRight: CGPoint(x: 0.40, y: 0.80)
+            bottomLeft: CGPoint(x: 0.20, y: 0.20)
         )
         XCTAssertTrue(BinderPageScanner.shouldUseDetectorBox(
             insteadOf: steep,

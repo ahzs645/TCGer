@@ -1129,7 +1129,7 @@ extension APIService {
 /// Everything a screen collects about the copy being added to a binder.
 /// Bundled so sheet callbacks and the service helper share one shape instead
 /// of every view repeating the endpoint's full argument list.
-struct BinderCardAddDetails: Sendable {
+nonisolated struct BinderCardAddDetails: Sendable {
     var quantity: Int = 1
     var condition: String? = nil
     var language: String? = nil

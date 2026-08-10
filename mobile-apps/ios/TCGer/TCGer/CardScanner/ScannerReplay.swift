@@ -4,7 +4,7 @@ import ImageIO
 
 /// One analyzed frame from a device scanner recording. The original decision
 /// is retained as a baseline so future model/index builds can be compared.
-struct RecordedScanFrame: Codable {
+nonisolated struct RecordedScanFrame: Codable {
     let index: Int
     let timestampSeconds: Double
     let mode: String
@@ -31,7 +31,7 @@ struct RecordedScanFrame: Codable {
     let imageFile: String
 }
 
-struct RecordedScanBundle: Codable {
+nonisolated struct RecordedScanBundle: Codable {
     struct Summary: Codable {
         let capturedAt: String
         let frameCount: Int

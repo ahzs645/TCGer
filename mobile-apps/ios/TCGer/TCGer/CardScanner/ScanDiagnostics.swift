@@ -14,7 +14,7 @@ import Foundation
 /// Reference-type on purpose: the context is a `Sendable` value passed down
 /// through the strategy chain, and the collector must accumulate across it.
 /// Access is serialized with a lock.
-final class ScanDiagnostics: @unchecked Sendable {
+nonisolated final class ScanDiagnostics: @unchecked Sendable {
     struct Candidate: Codable {
         let cardID: String
         let name: String
@@ -94,7 +94,7 @@ final class ScanDiagnostics: @unchecked Sendable {
 /// The per-frame evidence document persisted next to `results.json`. Keyed by
 /// the frame's image file name so entries stay joined to the schema the
 /// replay/browser tools already read, without touching that schema.
-struct ScanEvidenceRecord: Codable {
+nonisolated struct ScanEvidenceRecord: Codable {
     let imageFile: String
     /// The unprocessed sensor photo for camera captures, saved alongside the
     /// guide-cropped pipeline input so the guide-cropping stage itself stays
@@ -113,7 +113,7 @@ struct ScanEvidenceRecord: Codable {
     let binderExclusion: BinderDetectionExclusionEvidence?
 }
 
-struct BinderDetectionExclusionEvidence: Codable, Equatable {
+nonisolated struct BinderDetectionExclusionEvidence: Codable, Equatable {
     let reason: BinderCardExclusionReason
     let pageNumber: Int
     let detectionIndex: Int

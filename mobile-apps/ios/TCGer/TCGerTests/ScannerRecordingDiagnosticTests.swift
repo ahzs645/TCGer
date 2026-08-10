@@ -28,17 +28,6 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
             strategies: [strategy],
             apiService: APIService()
         )
-        let context = CardScannerContext(
-            mode: .pokemon,
-            enginePreference: .automatic,
-            serverConfiguration: .onDevice,
-            authToken: nil,
-            showPricing: false,
-            saveDebugCapture: false,
-            captureNotes: nil,
-            setCode: nil
-        )
-
         _ = coordinator
 
         let cropper = CardCropper()
@@ -100,9 +89,9 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
                 let recordedObservation = VNRectangleObservation(
                     requestRevision: VNDetectRectanglesRequestRevision1,
                     topLeft: CGPoint(x: q[0][0], y: q[0][1]),
-                    bottomLeft: CGPoint(x: q[3][0], y: q[3][1]),
+                    topRight: CGPoint(x: q[1][0], y: q[1][1]),
                     bottomRight: CGPoint(x: q[2][0], y: q[2][1]),
-                    topRight: CGPoint(x: q[1][0], y: q[1][1])
+                    bottomLeft: CGPoint(x: q[3][0], y: q[3][1])
                 )
                 if let crop = cropper.makeNormalizedCrop(from: image, observation: recordedObservation) {
                     notes.append(try await analyze(crop, label: "recorded", index: frame.index))

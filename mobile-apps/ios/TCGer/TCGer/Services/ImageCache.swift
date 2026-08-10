@@ -98,7 +98,9 @@ final class ImageCache {
                     ) else {
                         continue
                     }
-                    self.store(decoded.image, data: decoded.cacheData, for: url)
+                    await MainActor.run {
+                        self.store(decoded.image, data: decoded.cacheData, for: url)
+                    }
                 } catch {
                     continue
                 }

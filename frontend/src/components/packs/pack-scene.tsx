@@ -53,21 +53,135 @@ const GOLD = new THREE.Color("#ffd76a");
 
 /* ---------------------------------- helpers --------------------------------- */
 
-function makeWrapperGeometry(yFrom: number, yTo: number): THREE.PlaneGeometry {
-  const height = PACK_H * (yTo - yFrom);
-  const geo = new THREE.PlaneGeometry(PACK_W, height, 24, 18);
+type CutFn = (x: number) => number;
+
+const PACK_T = 0.13; // half-thickness of the slab
+
+/**
+ * Pocket-style slab profile: flat across the face, rounded at the left/right
+ * edges (clamped so the slab keeps visible thickness), pinched at the crimps.
+ */
+function faceZ(x: number, packFrac: number): number {
+  const crimp = Math.min(1, Math.min(packFrac, 1 - packFrac) / 0.07);
+  const plateau = Math.max(
+    0.5,
+    1 - Math.pow(Math.abs((2 * x) / PACK_W), 7) * 0.9,
+  );
+  return PACK_T * plateau * crimp + 0.01;
+}
+
+/** Straight factory perforation — used until the user actually tears. */
+const STRAIGHT_CUT: CutFn = () => TEAR_Y;
+
+/** The whole front face, for pack-select thumbnails. */
+const FULL_FACE_CUT: CutFn = () => PACK_H / 2;
+
+/**
+ * Wrapper face split along an arbitrary cut line. Vertex positions are baked
+ * in pack-local coordinates (mesh sits at the group origin). `mirrored`
+ * builds the back face's copy of an asymmetric cut (back meshes are rotated
+ * 180°, so their local x is the world's -x).
+ */
+function makeWrapperGeometry(
+  cutFn: CutFn,
+  part: "body" | "strip",
+  mirrored = false,
+): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(PACK_W, 1, 24, 18);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const uv = geo.attributes.uv as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
-    const vFrac = yFrom + (pos.getY(i) / height + 0.5) * (yTo - yFrom);
-    // pillow bulge across the width, pinched flat at the crimped ends
-    const crimp = Math.min(1, Math.min(vFrac, 1 - vFrac) / 0.09);
-    pos.setZ(i, Math.cos((x / PACK_W) * Math.PI) * 0.2 * crimp + 0.01);
-    uv.setY(i, vFrac);
+    const cutFrac = cutFn(mirrored ? -x : x) / PACK_H + 0.5;
+    const rowFrac = pos.getY(i) + 0.5;
+    const packFrac =
+      part === "body" ? rowFrac * cutFrac : cutFrac + rowFrac * (1 - cutFrac);
+    pos.setY(i, PACK_H * (packFrac - 0.5));
+    pos.setZ(i, faceZ(x, packFrac));
+    uv.setY(i, packFrac);
   }
   geo.computeVertexNormals();
   return geo;
+}
+
+// how far the cut may wander from the perforation: generous downward into the
+// art, bounded above by the crimp
+const CUT_MIN = TEAR_Y - 0.55;
+const CUT_MAX = TEAR_Y + 0.34;
+
+/**
+ * Piecewise-linear cut line through the user's actual drag path — lightly
+ * smoothed so pointer noise doesn't spike, but the drawn shape is kept.
+ */
+function buildCutFnFromPath(path: { x: number; y: number }[]): CutFn {
+  const sorted = path
+    .filter((p, i, arr) => i === 0 || Math.abs(p.x - arr[i - 1].x) > 0.015)
+    .sort((a, b) => a.x - b.x);
+  // 3-tap moving average preserves the drawn line while killing jitter
+  const pts = sorted.map((p, i, arr) => {
+    const prev = arr[Math.max(0, i - 1)];
+    const next = arr[Math.min(arr.length - 1, i + 1)];
+    return { x: p.x, y: (prev.y + p.y + next.y) / 3 };
+  });
+  return (x: number) => {
+    let base = TEAR_Y;
+    if (pts.length >= 2) {
+      if (x <= pts[0].x) base = pts[0].y;
+      else if (x >= pts[pts.length - 1].x) base = pts[pts.length - 1].y;
+      else {
+        for (let i = 1; i < pts.length; i++) {
+          if (x <= pts[i].x) {
+            const t = (x - pts[i - 1].x) / (pts[i].x - pts[i - 1].x || 1);
+            base = THREE.MathUtils.lerp(pts[i - 1].y, pts[i].y, t);
+            break;
+          }
+        }
+      }
+    }
+    const jag = Math.sin(x * 23.7) * 0.007 + Math.sin(x * 57.3 + 2) * 0.005;
+    return THREE.MathUtils.clamp(base, CUT_MIN, CUT_MAX) + jag;
+  };
+}
+
+/** Jagged-but-centered cut for skip-tear / fallback opens. */
+const DEFAULT_TORN_CUT: CutFn = (x) =>
+  TEAR_Y + Math.sin(x * 23.7) * 0.012 + Math.sin(x * 57.3 + 2) * 0.009;
+
+/** Thin glowing ribbon that hugs the cut edge (Pocket's cyan tear glow). */
+function makeEdgeGeometry(cutFn: CutFn, side: "body" | "strip"): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(PACK_W, 1, 48, 1);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const cy = cutFn(x);
+    const isOuterRow = pos.getY(i) > 0;
+    const off =
+      side === "body" ? (isOuterRow ? 0 : -0.06) : isOuterRow ? 0.06 : 0;
+    const packFrac = (cy + off) / PACK_H + 0.5;
+    pos.setY(i, cy + off);
+    pos.setZ(i, faceZ(x, packFrac) + 0.025);
+  }
+  return geo;
+}
+
+interface CutGeometrySet {
+  bodyF: THREE.PlaneGeometry;
+  bodyB: THREE.PlaneGeometry;
+  stripF: THREE.PlaneGeometry;
+  stripB: THREE.PlaneGeometry;
+  edgeBody: THREE.PlaneGeometry;
+  edgeStrip: THREE.PlaneGeometry;
+}
+
+function buildCutSet(cutFn: CutFn): CutGeometrySet {
+  return {
+    bodyF: makeWrapperGeometry(cutFn, "body"),
+    bodyB: makeWrapperGeometry(cutFn, "body", true),
+    stripF: makeWrapperGeometry(cutFn, "strip"),
+    stripB: makeWrapperGeometry(cutFn, "strip", true),
+    edgeBody: makeEdgeGeometry(cutFn, "body"),
+    edgeStrip: makeEdgeGeometry(cutFn, "strip"),
+  };
 }
 
 function drawMotif(
@@ -258,8 +372,28 @@ function paintWrapper(variant: PackVariant, front: boolean): THREE.CanvasTexture
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // serrated crimp edges: notch triangles out of the very top/bottom
+  // rounded face corners, like the reference pack
   ctx.globalCompositeOperation = "destination-out";
+  const cr = 26;
+  for (const [cx2, cy2, sx, sy] of [
+    [0, 0, 1, 1],
+    [w, 0, -1, 1],
+    [0, h, 1, -1],
+    [w, h, -1, -1],
+  ] as const) {
+    const ccx = cx2 + sx * cr;
+    const ccy = cy2 + sy * cr;
+    const a1 = Math.atan2(-sy * cr, 0); // angle of the horizontal-edge point
+    const a2 = Math.atan2(0, -sx * cr); // angle of the vertical-edge point
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy2);
+    ctx.lineTo(ccx, cy2);
+    ctx.arc(ccx, ccy, cr, a1, a2, sx * sy > 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // serrated crimp edges: notch triangles out of the very top/bottom
   const tooth = 12;
   const toothDepth = 5;
   ctx.beginPath();
@@ -519,7 +653,7 @@ interface PackSelectRowProps {
 export function PackSelectRow({ onSelect }: PackSelectRowProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const groupRefs = useRef<Map<string, THREE.Group>>(new Map());
-  const fullGeo = useMemo(() => makeWrapperGeometry(0, 1), []);
+  const fullGeo = useMemo(() => makeWrapperGeometry(FULL_FACE_CUT, "body"), []);
   const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
   const textures = useMemo(
     () =>
@@ -550,9 +684,13 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
       if (!group) return;
       const isHover = hovered === variant.id;
       group.position.y = Math.sin(t * 1.2 + i * 1.1) * 0.05 + (isHover ? 0.12 : 0);
+      // carousel: side packs angle inward toward the center, reference-style
+      const carouselAngle = -(i - (PACK_VARIANTS.length - 1) / 2) * 0.24;
       group.rotation.y = THREE.MathUtils.damp(
         group.rotation.y,
-        isHover ? state.pointer.x * 0.4 : Math.sin(t * 0.6 + i) * 0.06,
+        isHover
+          ? state.pointer.x * 0.3
+          : carouselAngle + Math.sin(t * 0.6 + i) * 0.04,
         4,
         dt,
       );
@@ -572,7 +710,11 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
           ref={(g) => {
             if (g) groupRefs.current.set(variant.id, g);
           }}
-          position={[(i - (PACK_VARIANTS.length - 1) / 2) * 1.85, 0, 0]}
+          position={[
+            (i - (PACK_VARIANTS.length - 1) / 2) * 1.85,
+            0,
+            -Math.abs(i - (PACK_VARIANTS.length - 1) / 2) * 0.35,
+          ]}
           scale={0.6}
           onPointerOver={(e) => {
             e.stopPropagation();
@@ -591,6 +733,34 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
           <mesh geometry={fullGeo} rotation={[0, Math.PI, 0]}>
             <FoilMaterial map={back} normalMap={normalTex} />
           </mesh>
+          {[-1, 1].map((side) => (
+            <mesh
+              key={side}
+              position={[side * (PACK_W / 2 - 0.005), 0, 0.005]}
+              rotation={[0, (side * Math.PI) / 2, 0]}
+            >
+              <planeGeometry args={[PACK_T * 1.15, PACK_H * 0.85]} />
+              <meshPhysicalMaterial
+                color={variant.palette.bottom}
+                roughness={0.5}
+                metalness={0.3}
+              />
+            </mesh>
+          ))}
+          {/* floor reflection */}
+          <mesh
+            geometry={fullGeo}
+            scale={[1, -1, 1]}
+            position={[0, -PACK_H * 1.02, 0]}
+          >
+            <meshBasicMaterial
+              map={front}
+              transparent
+              opacity={0.13}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
         </group>
       ))}
     </group>
@@ -598,14 +768,6 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
 }
 
 /* ---------------------------------- scene ----------------------------------- */
-
-// deterministic per-pack jitter so a stack looks hand-piled, not machine-aligned
-function stackJitterX(i: number): number {
-  return i === 0 ? 0 : Math.sin(i * 12.9898) * 0.06;
-}
-function stackJitterRot(i: number): number {
-  return i === 0 ? 0 : Math.sin(i * 78.233) * 0.03;
-}
 
 export function PackExperience({
   cards,
@@ -620,6 +782,10 @@ export function PackExperience({
   onFlash,
 }: PackExperienceProps) {
   const stackCount = Math.min(packCount, 10);
+  // bulk stacks sit lower so the upward cascade stays in frame
+  const packBaseY = stackCount > 1 ? -0.55 : 0;
+  const [cutGeos, setCutGeos] = useState<CutGeometrySet | null>(null);
+  const cutBuiltRef = useRef(false);
   const frontTextures = useLoader(
     THREE.TextureLoader,
     cards.map((c) => c.imageUrl),
@@ -650,8 +816,8 @@ export function PackExperience({
     [variant],
   );
 
-  const bodyGeo = useMemo(() => makeWrapperGeometry(0, TEAR_FRAC), []);
-  const stripGeo = useMemo(() => makeWrapperGeometry(TEAR_FRAC, 1), []);
+  const bodyGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "body"), []);
+  const stripGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "strip"), []);
 
   const holoMaterials = useMemo(
     () => cards.map((card) => makeHoloMaterial(holoIntensityFor(card))),
@@ -663,9 +829,47 @@ export function PackExperience({
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const stackRef = useRef<THREE.Group>(null);
   const cardRefs = useRef<(THREE.Group | null)[]>([]);
-  const tearLineRef = useRef<THREE.Mesh>(null);
   const tearHeadRef = useRef<THREE.Sprite>(null);
+  // glowing polyline tracing the user's actual drag path
+  const tearTrail = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(80 * 3), 3),
+    );
+    geo.setDrawRange(0, 0);
+    const mat = new THREE.LineBasicMaterial({
+      color: new THREE.Color("#bffcff"),
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.frustumCulled = false;
+    line.renderOrder = 8;
+    return line;
+  }, []);
+  // WebGL lines are 1px — glow points along the same path give it body
+  const tearTrailPoints = useMemo(() => {
+    const pts = new THREE.Points(
+      tearTrail.geometry,
+      new THREE.PointsMaterial({
+        map: glowTex,
+        size: 0.16,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        color: new THREE.Color("#dffcff"),
+      }),
+    );
+    pts.frustumCulled = false;
+    pts.renderOrder = 8;
+    return pts;
+  }, [tearTrail, glowTex]);
   const chargeGlowRef = useRef<THREE.Sprite>(null);
+  const edgeBodyMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const edgeStripMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   const wrapperMaterials = useRef<THREE.MeshPhysicalMaterial[]>([]);
 
@@ -677,7 +881,13 @@ export function PackExperience({
     charge: { t: 0, done: false },
     dismiss: new Map<number, { t: number; dir: number }>(),
     allNotified: false,
-    tear: { active: false, startX: 0, dir: 1, progress: 0 },
+    tear: {
+      active: false,
+      startX: 0,
+      dir: 1,
+      progress: 0,
+      path: [] as { x: number; y: number }[],
+    },
   });
 
   // pointer-up anywhere ends the tear drag
@@ -696,11 +906,25 @@ export function PackExperience({
     }
   };
 
+  const recordTearPoint = (e: ThreeEvent<PointerEvent>) => {
+    // convert to pack-local space so the recorded path is exact even while
+    // the pack is tilted mid-float
+    const local = packRef.current
+      ? packRef.current.worldToLocal(e.point.clone())
+      : e.point;
+    return {
+      x: local.x,
+      // clamp at record time so the live trail shows exactly what the cut gets
+      y: THREE.MathUtils.clamp(local.y, CUT_MIN, CUT_MAX),
+    };
+  };
+
   const handleTearDown = (e: ThreeEvent<PointerEvent>) => {
     if (phase !== "tear") return;
     e.stopPropagation();
     anim.current.tear.active = true;
     anim.current.tear.startX = e.point.x;
+    anim.current.tear.path = [recordTearPoint(e)];
   };
 
   const handleTearMove = (e: ThreeEvent<PointerEvent>) => {
@@ -708,10 +932,14 @@ export function PackExperience({
     if (phase !== "tear" || !tear.active || anim.current.torn) return;
     const dx = e.point.x - tear.startX;
     if (Math.abs(dx) > 0.01) tear.dir = Math.sign(dx);
+    if (tear.path.length < 80) tear.path.push(recordTearPoint(e));
     tear.progress = THREE.MathUtils.clamp(Math.abs(dx) / (PACK_W * 0.72), 0, 1);
     if (tear.progress >= 1) {
       anim.current.torn = true;
       tear.active = false;
+      // the cut follows the drag path, so every tear is a little different
+      cutBuiltRef.current = true;
+      setCutGeos(buildCutSet(buildCutFnFromPath(tear.path)));
       onTorn();
     }
   };
@@ -748,47 +976,98 @@ export function PackExperience({
         phase === "reveal" || (phase === "opening" && a.openT > 0.3);
     }
 
+    // skip-tear / fallback opens still get a (jagged, centered) cut edge
+    if (phase === "opening" && !cutGeos && !cutBuiltRef.current) {
+      cutBuiltRef.current = true;
+      setCutGeos(buildCutSet(DEFAULT_TORN_CUT));
+    }
+
+    // glowing cut edge, pulsing like the reference
+    const glowPulse = 0.55 + Math.sin(t * 9) * 0.25;
+    if (edgeBodyMatRef.current) {
+      edgeBodyMatRef.current.opacity = cutGeos
+        ? glowPulse * (wrapperMaterials.current[0]?.opacity ?? 1)
+        : 0;
+    }
+    if (edgeStripMatRef.current) {
+      edgeStripMatRef.current.opacity = cutGeos ? glowPulse : 0;
+    }
+
     // --- pack idle float + tilt toward pointer -------------------------------
+    const tear = a.tear;
     if (packRef.current) {
       const pack = packRef.current;
       if (phase === "tear") {
-        pack.position.y = Math.sin(t * 1.3) * 0.06;
-        pack.rotation.y = THREE.MathUtils.damp(
-          pack.rotation.y,
-          pointer.x * 0.35,
-          4,
-          dt,
-        );
-        pack.rotation.x = THREE.MathUtils.damp(
-          pack.rotation.x,
-          -pointer.y * 0.2,
-          4,
-          dt,
-        );
+        // hold the pack steady while the user is cutting so the trail lands
+        // where they actually drag
+        if (tear.active) {
+          pack.position.y = THREE.MathUtils.damp(
+            pack.position.y,
+            packBaseY,
+            10,
+            dt,
+          );
+          pack.rotation.y = THREE.MathUtils.damp(pack.rotation.y, 0, 10, dt);
+          pack.rotation.x = THREE.MathUtils.damp(pack.rotation.x, 0, 10, dt);
+        } else {
+          pack.position.y = packBaseY + Math.sin(t * 1.3) * 0.06;
+          pack.rotation.y = THREE.MathUtils.damp(
+            pack.rotation.y,
+            pointer.x * 0.35,
+            4,
+            dt,
+          );
+          pack.rotation.x = THREE.MathUtils.damp(
+            pack.rotation.x,
+            -pointer.y * 0.2,
+            4,
+            dt,
+          );
+        }
       }
     }
 
-    // --- tear feedback -------------------------------------------------------
-    const tear = a.tear;
+    // --- tear feedback: glowing trail along the actual drag path -------------
     if (phase === "tear" && !tear.active && !a.torn && tear.progress > 0) {
       tear.progress = Math.max(0, tear.progress - dt * 1.6); // spring back
     }
-    const tearSpan = PACK_W * 0.72;
-    if (tearLineRef.current) {
-      tearLineRef.current.visible = phase === "tear" && tear.progress > 0.01;
-      tearLineRef.current.scale.x = Math.max(
-        (tear.progress * tearSpan) / PACK_W,
-        0.001,
-      );
-      tearLineRef.current.position.x =
-        tear.startX + (tear.dir * tear.progress * tearSpan) / 2;
-      const mat = tearLineRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.4 + tear.progress * 0.6;
+    const trailVisible =
+      phase === "tear" &&
+      !a.torn &&
+      tear.path.length > 1 &&
+      (tear.active || tear.progress > 0.01);
+    tearTrail.visible = trailVisible;
+    tearTrailPoints.visible = trailVisible;
+    if (trailVisible) {
+      (tearTrailPoints.material as THREE.PointsMaterial).opacity =
+        0.25 + tear.progress * 0.55;
+      const posAttr = tearTrail.geometry.getAttribute(
+        "position",
+      ) as THREE.BufferAttribute;
+      for (let i = 0; i < tear.path.length; i++) {
+        const p = tear.path[i];
+        posAttr.setXYZ(
+          i,
+          p.x,
+          p.y,
+          faceZ(p.x, p.y / PACK_H + 0.5) + 0.05,
+        );
+      }
+      posAttr.needsUpdate = true;
+      tearTrail.geometry.setDrawRange(0, tear.path.length);
+      (tearTrail.material as THREE.LineBasicMaterial).opacity =
+        0.35 + tear.progress * 0.65;
     }
     if (tearHeadRef.current) {
-      tearHeadRef.current.visible = phase === "tear" && tear.progress > 0.01;
-      tearHeadRef.current.position.x =
-        tear.startX + tear.dir * tear.progress * tearSpan;
+      const last = tear.path[tear.path.length - 1];
+      tearHeadRef.current.visible = trailVisible && !!last;
+      if (last) {
+        tearHeadRef.current.position.set(
+          last.x,
+          last.y,
+          faceZ(last.x, last.y / PACK_H + 0.5) + 0.06,
+        );
+      }
       const s = 0.3 + tear.progress * 0.5 + Math.sin(t * 20) * 0.05;
       tearHeadRef.current.scale.setScalar(s);
     }
@@ -957,8 +1236,9 @@ export function PackExperience({
         />
       </sprite>
 
-      {/* card stack (lives "inside" the pack until opened) */}
-      {cardsVisible && (
+      {/* card stack — mounted only once the pack is actually opening, so
+          cards can never poke through the sealed wrapper */}
+      {(phase === "opening" || phase === "reveal") && (
         <group
           ref={stackRef}
           position={[0, -0.15, 0]}
@@ -976,13 +1256,12 @@ export function PackExperience({
             >
               <mesh>
                 <planeGeometry args={[CARD_W, CARD_H]} />
-                <meshStandardMaterial
+                {/* unlit + untonemapped: card scans render exactly as-is */}
+                <meshBasicMaterial
                   map={frontTextures[i]}
                   transparent
                   alphaTest={0.05}
-                  roughness={0.85}
-                  metalness={0}
-                  envMapIntensity={0}
+                  toneMapped={false}
                 />
               </mesh>
               {holoIntensityFor(card) > 0 && (
@@ -992,26 +1271,28 @@ export function PackExperience({
               )}
               <mesh rotation={[0, Math.PI, 0]} position={[0, 0, -0.003]}>
                 <planeGeometry args={[CARD_W, CARD_H]} />
-                <meshStandardMaterial
-                  map={backTexture}
-                  roughness={0.85}
-                  envMapIntensity={0}
-                />
+                <meshBasicMaterial map={backTexture} toneMapped={false} />
               </mesh>
             </group>
           ))}
         </group>
       )}
 
-      {/* booster pack stack — bulk opens pile all packs behind the front one */}
+      {/* booster pack stack — bulk opens cascade upward so every pack peeks
+          out above the one in front, like the reference app */}
       {cardsVisible && (
-        <group ref={packRef}>
+        <group ref={packRef} position={[0, packBaseY, 0]}>
           {Array.from({ length: stackCount }).map((_, i) => (
             <group
               key={i}
-              position={[stackJitterX(i), 0, -i * 0.5]}
-              rotation={[0, 0, stackJitterRot(i)]}
-              scale={1 - i * 0.012}
+              // behind-packs pitch forward like slats and peek well above the
+              // upright front pack, reference-app style
+              position={
+                i === 0
+                  ? [0, 0, 0]
+                  : [0, 0.5 + (i - 1) * 0.2, -0.32 - (i - 1) * 0.12]
+              }
+              rotation={i === 0 ? [0, 0, 0] : [0.6, 0, 0]}
             >
               <group
                 ref={(g) => {
@@ -1019,9 +1300,8 @@ export function PackExperience({
                 }}
               >
                 <mesh
-                  geometry={bodyGeo}
+                  geometry={cutGeos ? cutGeos.bodyF : bodyGeo}
                   renderOrder={5}
-                  position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0]}
                 >
                   <FoilMaterial
                     map={wrapperFrontTex}
@@ -1030,9 +1310,8 @@ export function PackExperience({
                   />
                 </mesh>
                 <mesh
-                  geometry={bodyGeo}
+                  geometry={cutGeos ? cutGeos.bodyB : bodyGeo}
                   renderOrder={5}
-                  position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0]}
                   rotation={[0, Math.PI, 0]}
                 >
                   <FoilMaterial
@@ -1041,13 +1320,49 @@ export function PackExperience({
                     materialRef={registerWrapperMaterial}
                   />
                 </mesh>
+                {[-1, 1].map((side) => (
+                  <mesh
+                    key={side}
+                    position={[
+                      side * (PACK_W / 2 - 0.005),
+                      PACK_H * (TEAR_FRAC / 2 - 0.5),
+                      0.005,
+                    ]}
+                    rotation={[0, (side * Math.PI) / 2, 0]}
+                    renderOrder={4}
+                  >
+                    <planeGeometry
+                      args={[PACK_T * 1.15, PACK_H * TEAR_FRAC * 0.92]}
+                    />
+                    <meshPhysicalMaterial
+                      ref={registerWrapperMaterial}
+                      color={variant.palette.bottom}
+                      roughness={0.5}
+                      metalness={0.3}
+                      transparent
+                    />
+                  </mesh>
+                ))}
                 {i === 0 && (
                   <mesh
-                    geometry={bodyGeo}
+                    geometry={cutGeos ? cutGeos.bodyF : bodyGeo}
                     renderOrder={6}
-                    position={[0, PACK_H * (TEAR_FRAC / 2 - 0.5), 0.004]}
+                    position={[0, 0, 0.004]}
                     material={sheenMat}
                   />
+                )}
+                {i === 0 && cutGeos && (
+                  <mesh geometry={cutGeos.edgeBody} renderOrder={7}>
+                    <meshBasicMaterial
+                      ref={edgeBodyMatRef}
+                      color="#bffcff"
+                      transparent
+                      opacity={0}
+                      blending={THREE.AdditiveBlending}
+                      depthWrite={false}
+                      side={THREE.DoubleSide}
+                    />
+                  </mesh>
                 )}
               </group>
 
@@ -1057,9 +1372,8 @@ export function PackExperience({
                 }}
               >
                 <mesh
-                  geometry={stripGeo}
+                  geometry={cutGeos ? cutGeos.stripF : stripGeo}
                   renderOrder={5}
-                  position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0]}
                 >
                   <FoilMaterial
                     map={wrapperFrontTex}
@@ -1068,9 +1382,8 @@ export function PackExperience({
                   />
                 </mesh>
                 <mesh
-                  geometry={stripGeo}
+                  geometry={cutGeos ? cutGeos.stripB : stripGeo}
                   renderOrder={5}
-                  position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0]}
                   rotation={[0, Math.PI, 0]}
                 >
                   <FoilMaterial
@@ -1081,11 +1394,24 @@ export function PackExperience({
                 </mesh>
                 {i === 0 && (
                   <mesh
-                    geometry={stripGeo}
+                    geometry={cutGeos ? cutGeos.stripF : stripGeo}
                     renderOrder={6}
-                    position={[0, PACK_H * ((TEAR_FRAC + 1) / 2 - 0.5), 0.004]}
+                    position={[0, 0, 0.004]}
                     material={sheenMat}
                   />
+                )}
+                {i === 0 && cutGeos && (
+                  <mesh geometry={cutGeos.edgeStrip} renderOrder={7}>
+                    <meshBasicMaterial
+                      ref={edgeStripMatRef}
+                      color="#bffcff"
+                      transparent
+                      opacity={0}
+                      blending={THREE.AdditiveBlending}
+                      depthWrite={false}
+                      side={THREE.DoubleSide}
+                    />
+                  </mesh>
                 )}
               </group>
             </group>
@@ -1095,22 +1421,15 @@ export function PackExperience({
           {phase === "tear" && (
             <>
               <mesh
-                position={[0, TEAR_Y, 0.3]}
+                position={[0, (CUT_MIN + CUT_MAX) / 2, 0.3]}
                 onPointerDown={handleTearDown}
                 onPointerMove={handleTearMove}
               >
-                <planeGeometry args={[PACK_W * 1.5, 0.9]} />
+                <planeGeometry args={[PACK_W * 1.5, CUT_MAX - CUT_MIN + 0.5]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
-              <mesh ref={tearLineRef} position={[0, TEAR_Y, 0.26]} visible={false}>
-                <planeGeometry args={[PACK_W, 0.05]} />
-                <meshBasicMaterial
-                  color={accentColor}
-                  transparent
-                  blending={THREE.AdditiveBlending}
-                  depthWrite={false}
-                />
-              </mesh>
+              <primitive object={tearTrail} />
+              <primitive object={tearTrailPoints} />
               <sprite ref={tearHeadRef} position={[0, TEAR_Y, 0.32]} visible={false}>
                 <spriteMaterial
                   map={glowTex}

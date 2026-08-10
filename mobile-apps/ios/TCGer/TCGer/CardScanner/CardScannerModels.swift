@@ -279,7 +279,7 @@ struct CardScanResult: Identifiable {
     }
 }
 
-enum ScanStrategyKind: String, Sendable {
+nonisolated enum ScanStrategyKind: String, Sendable {
     case manual
     case textOCR
     case perceptualHash

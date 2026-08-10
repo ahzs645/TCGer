@@ -17,7 +17,7 @@ import ImageIO
 /// frame as a card back, a multi-card scene, or a printing outside the bundled
 /// index keeps those out of the recall denominator instead of counting every
 /// abstention as the same failure.
-struct ScannerReferenceSet: Identifiable {
+nonisolated struct ScannerReferenceSet: Identifiable {
     enum Kind: String {
         case recording = "Device recording"
         case replayCorpus = "Replay corpus"
@@ -35,7 +35,7 @@ struct ScannerReferenceSet: Identifiable {
 
 /// What a frame should produce. Everything except `.card` is a case the
 /// single-card recognizer is expected to decline.
-enum ScannerReferenceExpectation: Equatable {
+nonisolated enum ScannerReferenceExpectation: Equatable {
     case card(id: String, name: String?)
     case cardBack
     case multipleCards
@@ -67,7 +67,7 @@ enum ScannerReferenceExpectation: Equatable {
     }
 }
 
-struct ScannerReferenceItem: Identifiable {
+nonisolated struct ScannerReferenceItem: Identifiable {
     let id: Int
     let name: String
     let imageURL: URL
@@ -86,7 +86,7 @@ struct ScannerReferenceItem: Identifiable {
 }
 
 /// The outcome of scanning one reference item, judged against its expectation.
-enum ScannerReferenceVerdict: String {
+nonisolated enum ScannerReferenceVerdict: String {
     case correct = "Correct"
     case wrongPrinting = "Wrong printing"
     case wrongCard = "Wrong card"
@@ -138,7 +138,7 @@ enum ScannerReferenceVerdict: String {
 
 // MARK: - Discovery
 
-enum ScannerReferenceLibrary {
+nonisolated enum ScannerReferenceLibrary {
     static let labelsFilename = "scanner-labels.json"
     private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "heic"]
 
@@ -368,12 +368,12 @@ enum ScannerReferenceLibrary {
 
 // MARK: - Label file
 
-struct ScannerReferenceLabelFile: Codable {
+nonisolated struct ScannerReferenceLabelFile: Codable {
     let schemaVersion: Int
     let labels: [String: ScannerReferenceLabel]
 }
 
-struct ScannerReferenceLabel: Codable {
+nonisolated struct ScannerReferenceLabel: Codable {
     /// `singleCard`, `cardBack`, `multiCard`, `foreignLanguage`, `outsideIndex`.
     let category: String
     let cardId: String?
@@ -396,7 +396,7 @@ struct ScannerReferenceLabel: Codable {
 
 // MARK: - Replay manifest
 
-private struct ReplayCorpusManifest: Decodable {
+private nonisolated struct ReplayCorpusManifest: Decodable {
     struct Record: Decodable {
         let dataset: String
         let imagePath: String
@@ -413,7 +413,7 @@ private struct ReplayCorpusManifest: Decodable {
 }
 
 private extension Array {
-    func uniqued<Value: Hashable>(by keyPath: KeyPath<Element, Value>) -> [Element] {
+    nonisolated func uniqued<Value: Hashable>(by keyPath: KeyPath<Element, Value>) -> [Element] {
         var seen: Set<Value> = []
         return filter { seen.insert($0[keyPath: keyPath]).inserted }
     }

@@ -235,10 +235,10 @@ struct ScannerSessionTray: View {
                         .font(.caption2.weight(.bold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 10)
                 .frame(height: 42)
-                .background(color.opacity(0.24), in: Capsule())
+                .background(color, in: Capsule())
             }
             .buttonStyle(.plain)
             .disabled(results.isEmpty)

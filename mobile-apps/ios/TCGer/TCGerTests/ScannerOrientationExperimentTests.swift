@@ -1278,9 +1278,9 @@ final class ScannerOrientationExperimentTests: XCTestCase {
             return VNRectangleObservation(
                 requestRevision: VNDetectRectanglesRequestRevision1,
                 topLeft: topLeft,
-                bottomLeft: bottomLeft,
+                topRight: topRight,
                 bottomRight: bottomRight,
-                topRight: topRight
+                bottomLeft: bottomLeft
             )
         }
         counters.kept += mapped.count
@@ -1424,9 +1424,9 @@ final class ScannerOrientationExperimentTests: XCTestCase {
                 let candidate = VNRectangleObservation(
                     requestRevision: VNDetectRectanglesRequestRevision1,
                     topLeft: tl,
-                    bottomLeft: bl,
+                    topRight: tr,
                     bottomRight: br,
-                    topRight: tr
+                    bottomLeft: bl
                 )
                 let isDuplicate = observations.contains { existing in
                     hypot(existing.topLeft.x - tl.x, existing.topLeft.y - tl.y) < 0.015
@@ -1611,9 +1611,9 @@ final class ScannerOrientationExperimentTests: XCTestCase {
         return VNRectangleObservation(
             requestRevision: VNDetectRectanglesRequestRevision1,
             topLeft: points[0],
-            bottomLeft: points[3],
+            topRight: points[1],
             bottomRight: points[2],
-            topRight: points[1]
+            bottomLeft: points[3]
         )
     }
 
@@ -1653,9 +1653,9 @@ final class ScannerOrientationExperimentTests: XCTestCase {
         return VNRectangleObservation(
             requestRevision: VNDetectRectanglesRequestRevision1,
             topLeft: top[0],
-            bottomLeft: bottom[0],
+            topRight: top[1],
             bottomRight: bottom[1],
-            topRight: top[1]
+            bottomLeft: bottom[0]
         )
     }
 

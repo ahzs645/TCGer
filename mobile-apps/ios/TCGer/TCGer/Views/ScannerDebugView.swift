@@ -42,7 +42,7 @@ struct DebugLogEntry: Identifiable {
 
 // MARK: - Detected quad (normalized Vision corners, origin bottom-left)
 
-struct DetectedQuad {
+nonisolated struct DetectedQuad {
     let topLeft: CGPoint
     let topRight: CGPoint
     let bottomLeft: CGPoint
@@ -560,8 +560,9 @@ final class ScannerDebugViewModel: ObservableObject {
         let pipelineName = embeddingOnly ? "embedding-only (DINOv2 + OCR)" : "full local-first"
 
         Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
             guard let cgImage = ScannerDebugViewModel.makeCGImage(from: sampleBuffer) else {
-                await MainActor.run { self?.isAnalyzing = false }
+                await MainActor.run { self.isAnalyzing = false }
                 return
             }
 
@@ -580,7 +581,6 @@ final class ScannerDebugViewModel: ObservableObject {
             let jpegData = recording ? ScannerDebugViewModel.makeJPEG(from: cgImage) : nil
 
             await MainActor.run {
-                guard let self else { return }
                 self.quad = quad
                 self.frameCount += 1
                 self.lastFrameMs = elapsed * 1000

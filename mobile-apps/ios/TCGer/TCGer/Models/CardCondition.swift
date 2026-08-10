@@ -3,7 +3,7 @@ import Foundation
 /// Canonical card conditions used everywhere a condition is written or picked.
 /// The raw value is the canonical stored spelling — always use these instead of
 /// hand-rolled string lists so every screen stores the same casing.
-enum CardCondition: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum CardCondition: String, CaseIterable, Identifiable, Sendable {
     case mint = "Mint"
     case nearMint = "Near Mint"
     case excellent = "Excellent"

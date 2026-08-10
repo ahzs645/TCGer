@@ -70,7 +70,9 @@ struct CollectionGuidesView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(filteredGuides) { guide in
-                            NavigationLink(value: guide) {
+                            NavigationLink {
+                                CollectionGuideDetailView(guide: guide)
+                            } label: {
                                 CollectionGuideRow(guide: guide)
                             }
                             .buttonStyle(.plain)
@@ -92,9 +94,6 @@ struct CollectionGuidesView: View {
             ForEach(GuideSearchScope.allCases, id: \.self) { scope in
                 Text(scope.rawValue).tag(scope)
             }
-        }
-        .navigationDestination(for: CollectionGuide.self) { guide in
-            CollectionGuideDetailView(guide: guide)
         }
         .task { await loadGuides() }
         .task(id: "\(searchScope.rawValue)|\(searchText)|\(selectedGame.rawValue)|\(selectedCategory?.rawValue ?? "all")|\(globalOwnership.rawValue)") {
@@ -294,6 +293,7 @@ private struct CollectionGuideDetailView: View {
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @EnvironmentObject private var wishlistStore: WishlistStore
+    @StateObject private var catalogStore = CatalogStore.shared
     @State private var guide: CollectionGuide
     @State private var cards: [Card] = []
     @State private var wishlist: Wishlist?
@@ -304,6 +304,7 @@ private struct CollectionGuideDetailView: View {
     @State private var searchText = ""
     @State private var selectedSet = "All sets"
     @State private var ownershipFilter = OwnershipFilter.all
+    @State private var catalogInstallGame: TCGGame?
 
     private let apiService = APIService()
     private let columns = [GridItem(.adaptive(minimum: 112, maximum: 170), spacing: 12)]
@@ -352,12 +353,16 @@ private struct CollectionGuideDetailView: View {
                     Text(errorMessage).font(.subheadline).foregroundStyle(.red)
                 }
 
-                filters
+                if let catalogInstallGame {
+                    catalogInstallPrompt(for: catalogInstallGame)
+                } else {
+                    filters
+                }
 
-                if isLoading {
+                if isLoading && catalogInstallGame == nil {
                     ProgressView("Loading matching cards…")
                         .frame(maxWidth: .infinity, minHeight: 180)
-                } else if filteredCards.isEmpty {
+                } else if catalogInstallGame == nil && filteredCards.isEmpty {
                     ContentUnavailableView(
                         "No Matching Cards",
                         systemImage: "rectangle.stack.badge.minus",
@@ -407,7 +412,7 @@ private struct CollectionGuideDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isFollowing || guide.followed)
+                .disabled(isFollowing || guide.followed || catalogInstallGame != nil)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -428,6 +433,35 @@ private struct CollectionGuideDetailView: View {
                 Label(selectedSet, systemImage: "line.3.horizontal.decrease.circle")
             }
         }
+    }
+
+    private func catalogInstallPrompt(for game: TCGGame) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "square.and.arrow.down")
+                .font(.system(size: 42))
+                .foregroundStyle(.secondary)
+            Text("Install the \(game.displayName) Catalog")
+                .font(.headline)
+            Text("This guide searches the bundled card catalog. Install it once to browse and filter every matching card offline.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await installCatalog(for: game) }
+            } label: {
+                if catalogStore.installingGames.contains(game) {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Install Catalog", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(catalogStore.installingGames.contains(game))
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding()
     }
 
     private func guideCard(_ card: Card) -> some View {
@@ -462,7 +496,22 @@ private struct CollectionGuideDetailView: View {
         isLoading = true
         defer { isLoading = false }
         do {
+            if let game = requiredLocalCatalogGame,
+               case .notInstalled = catalogStore.installState(for: game) {
+                catalogInstallGame = game
+                cards = []
+                errorMessage = nil
+                return
+            }
             cards = try await expandGuide(token: token)
+            if let game = requiredLocalCatalogGame,
+               cards.isEmpty,
+               !catalogStore.isLoaded(game) {
+                catalogInstallGame = game
+                errorMessage = nil
+                return
+            }
+            catalogInstallGame = nil
             if let wishlistId = guide.wishlistId {
                 wishlist = try? await apiService.getWishlist(
                     config: environmentStore.serverConfiguration,
@@ -471,6 +520,39 @@ private struct CollectionGuideDetailView: View {
                 )
             }
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private var requiredLocalCatalogGame: TCGGame? {
+        guard environmentStore.serverConfiguration.isOnDevice,
+              guide.rule.type != .manual,
+              let game = TCGGame(rawValue: guide.rule.tcg),
+              TCGGame.catalogGames.contains(game) else {
+            return nil
+        }
+        return game
+    }
+
+    @MainActor
+    private func installCatalog(for game: TCGGame) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            await catalogStore.refreshManifest()
+            try await catalogStore.install(game)
+            await catalogStore.loadIfNeeded(game)
+            guard let token = environmentStore.authToken else { return }
+            cards = try await expandGuide(token: token)
+            guard !cards.isEmpty else {
+                throw APIService.APIError.serverError(
+                    status: 503,
+                    message: "The \(game.displayName) catalog installed but could not be loaded. Make sure the game is enabled in Settings."
+                )
+            }
+            catalogInstallGame = nil
         } catch {
             errorMessage = error.localizedDescription
         }

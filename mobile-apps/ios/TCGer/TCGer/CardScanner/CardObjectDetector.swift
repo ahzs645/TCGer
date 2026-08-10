@@ -5,7 +5,7 @@ import Foundation
 
 /// Single-class Core ML detector used to localize a trading card before the
 /// generic Vision document/rectangle requests refine its four corners.
-final class CardObjectDetector: @unchecked Sendable {
+nonisolated final class CardObjectDetector: @unchecked Sendable {
     static let shared = CardObjectDetector.loadBundled()
 
     private static let minimumConfidence: VNConfidence = 0.50

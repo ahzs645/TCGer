@@ -465,7 +465,7 @@ enum CollectionCSVImporter {
         return Double(normalized)
     }
 
-    private static func splitTags(_ raw: String) -> [String] {
+    private nonisolated static func splitTags(_ raw: String) -> [String] {
         raw
             .split(whereSeparator: { $0 == ";" || $0 == "|" })
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

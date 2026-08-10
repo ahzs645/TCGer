@@ -237,9 +237,9 @@ nonisolated struct CardCropper {
             return VNRectangleObservation(
                 requestRevision: VNDetectRectanglesRequestRevision1,
                 topLeft: topLeft,
-                bottomLeft: bottomLeft,
+                topRight: topRight,
                 bottomRight: bottomRight,
-                topRight: topRight
+                bottomLeft: bottomLeft
             )
         }
         return mapped.isEmpty ? nil : mapped
@@ -357,9 +357,9 @@ nonisolated struct CardCropper {
         VNRectangleObservation(
             requestRevision: VNDetectRectanglesRequestRevision1,
             topLeft: CGPoint(x: bounds.minX, y: bounds.maxY),
-            bottomLeft: CGPoint(x: bounds.minX, y: bounds.minY),
+            topRight: CGPoint(x: bounds.maxX, y: bounds.maxY),
             bottomRight: CGPoint(x: bounds.maxX, y: bounds.minY),
-            topRight: CGPoint(x: bounds.maxX, y: bounds.maxY)
+            bottomLeft: CGPoint(x: bounds.minX, y: bounds.minY)
         )
     }
 

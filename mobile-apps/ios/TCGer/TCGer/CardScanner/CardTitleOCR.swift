@@ -4,7 +4,7 @@ import Foundation
 
 /// Reads the title band of a normalized card crop. The embedding strategy uses
 /// exact catalog-name matches only; arbitrary OCR text never becomes a result.
-struct CardTitleOCR {
+nonisolated struct CardTitleOCR {
     struct Candidate: Sendable {
         let text: String
         let confidence: Double
