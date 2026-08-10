@@ -164,6 +164,53 @@ function makeEdgeGeometry(cutFn: CutFn, side: "body" | "strip"): THREE.PlaneGeom
   return geo;
 }
 
+/**
+ * Side wall that follows the slab's edge profile — pinched at the crimps,
+ * full thickness in the middle — so the pack silhouette is closed and
+ * nothing pokes through or gapes at side viewing angles.
+ */
+// the face corners are rounded in texture alpha with a 26px radius — the wall
+// must follow that same (elliptical in world space) arc to close the corners
+const CORNER_RX = (26 / 512) * PACK_W;
+const CORNER_RY = (26 / 768) * PACK_H;
+
+function makeSideWallGeometry(
+  side: 1 | -1,
+  fromY: number,
+  toY: number,
+): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(1, 1, 1, 36);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const normal = geo.attributes.normal as THREE.BufferAttribute;
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  const effFrom = Math.max(fromY, -PACK_H / 2);
+  const effTo = Math.min(toY, PACK_H / 2);
+  const yTopC = PACK_H / 2 - CORNER_RY;
+  const yBotC = -PACK_H / 2 + CORNER_RY;
+  for (let i = 0; i < pos.count; i++) {
+    const rowFrac = pos.getY(i) + 0.5;
+    const y = effFrom + rowFrac * (effTo - effFrom);
+    const packFrac = y / PACK_H + 0.5;
+    // trace the visible face edge: straight along the sides, curving inward
+    // around the rounded corners
+    let xE = PACK_W / 2;
+    if (y > yTopC) {
+      const t = (y - yTopC) / CORNER_RY;
+      xE = PACK_W / 2 - CORNER_RX + CORNER_RX * Math.sqrt(Math.max(0, 1 - t * t));
+    } else if (y < yBotC) {
+      const t = (yBotC - y) / CORNER_RY;
+      xE = PACK_W / 2 - CORNER_RX + CORNER_RX * Math.sqrt(Math.max(0, 1 - t * t));
+    }
+    const zExtent = faceZ(xE * 0.99, packFrac);
+    const zSign = (pos.getX(i) > 0 ? 1 : -1) * side;
+    pos.setXYZ(i, side * xE * 0.998, y, zSign * zExtent);
+    normal.setXYZ(i, side, 0, 0);
+    // sample the art's edge column so the wrapper wraps around the rim
+    uv.setXY(i, side > 0 ? 0.99 : 0.01, packFrac);
+  }
+  return geo;
+}
+
 interface CutGeometrySet {
   bodyF: THREE.PlaneGeometry;
   bodyB: THREE.PlaneGeometry;
@@ -171,6 +218,8 @@ interface CutGeometrySet {
   stripB: THREE.PlaneGeometry;
   edgeBody: THREE.PlaneGeometry;
   edgeStrip: THREE.PlaneGeometry;
+  walls: THREE.PlaneGeometry[];
+  stripWalls: THREE.PlaneGeometry[];
 }
 
 function buildCutSet(cutFn: CutFn): CutGeometrySet {
@@ -181,6 +230,12 @@ function buildCutSet(cutFn: CutFn): CutGeometrySet {
     stripB: makeWrapperGeometry(cutFn, "strip", true),
     edgeBody: makeEdgeGeometry(cutFn, "body"),
     edgeStrip: makeEdgeGeometry(cutFn, "strip"),
+    walls: ([-1, 1] as const).map((s) =>
+      makeSideWallGeometry(s, -PACK_H / 2, cutFn(s * PACK_W * 0.4975)),
+    ),
+    stripWalls: ([-1, 1] as const).map((s) =>
+      makeSideWallGeometry(s, cutFn(s * PACK_W * 0.4975), PACK_H / 2),
+    ),
   };
 }
 
@@ -608,7 +663,7 @@ export function FoilEnvironment() {
   const scene = useThree((s) => s.scene);
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
-    const env = pmrem.fromScene(new RoomEnvironment(), 0.05).texture;
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
     return () => {
       scene.environment = null;
@@ -625,12 +680,21 @@ interface FoilMaterialProps {
   materialRef?: (mat: THREE.MeshPhysicalMaterial | null) => void;
   /** pitched slats face the bright env "ceiling" — dim them or they blow out */
   dim?: boolean;
+  /** side walls render double-sided so winding never culls them */
+  doubleSide?: boolean;
 }
 
-function FoilMaterial({ map, normalMap, materialRef, dim = false }: FoilMaterialProps) {
+function FoilMaterial({
+  map,
+  normalMap,
+  materialRef,
+  dim = false,
+  doubleSide = false,
+}: FoilMaterialProps) {
   return (
     <meshPhysicalMaterial
       ref={materialRef}
+      side={doubleSide ? THREE.DoubleSide : THREE.FrontSide}
       map={map}
       normalMap={normalMap}
       normalScale={new THREE.Vector2(0.06, 0.06)}
@@ -649,28 +713,105 @@ function FoilMaterial({ map, normalMap, materialRef, dim = false }: FoilMaterial
 
 /* ------------------------------- pack select -------------------------------- */
 
-interface PackSelectRowProps {
-  onSelect: (variantId: string) => void;
+interface PackCarouselProps {
+  /** the ring shows identical copies of this pack — you pick "your" pack */
+  variant: PackVariant;
+  onSelect: () => void;
 }
 
-export function PackSelectRow({ onSelect }: PackSelectRowProps) {
-  const [hovered, setHovered] = useState<string | null>(null);
-  const groupRefs = useRef<Map<string, THREE.Group>>(new Map());
+const CAROUSEL_COPIES = 8;
+const CAROUSEL_STEP = (Math.PI * 2) / CAROUSEL_COPIES;
+const CAROUSEL_R = 3.4;
+const TWO_PI = Math.PI * 2;
+
+/**
+ * Pocket-style select carousel: a ring of identical packs of the chosen
+ * variant. Swipe anywhere to rotate the ring, drag on a pack to spin it fully
+ * around (the rotation you leave it at is kept), tap a side pack to focus it,
+ * tap the focused pack to open that one.
+ */
+export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
+  const [hovered, setHovered] = useState(false);
+  const groupRefs = useRef<(THREE.Group | null)[]>([]);
   const fullGeo = useMemo(() => makeWrapperGeometry(FULL_FACE_CUT, "body"), []);
-  const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
-  const textures = useMemo(
+  const wallGeos = useMemo(
     () =>
-      PACK_VARIANTS.map((v) => {
-        const front = paintWrapper(v, true);
-        return {
-          variant: v,
-          front,
-          back: paintWrapper(v, false),
-          sheen: makeSheenMaterial(front),
-        };
-      }),
+      ([-1, 1] as const).map((s) =>
+        makeSideWallGeometry(s, -PACK_H / 2, PACK_H / 2),
+      ),
     [],
   );
+  const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
+  const textures = useMemo(() => {
+    const front = paintWrapper(variant, true);
+    return {
+      front,
+      back: paintWrapper(variant, false),
+      sheen: makeSheenMaterial(front),
+    };
+  }, [variant]);
+
+  const ring = useRef({
+    angle: 0,
+    vel: 0,
+    goto: null as number | null,
+    spin: Array.from({ length: CAROUSEL_COPIES }, () => 0),
+    spinVel: Array.from({ length: CAROUSEL_COPIES }, () => 0),
+    drag: null as null | {
+      mode: "ring" | "pack";
+      idx: number;
+      lastX: number;
+      moved: number;
+    },
+  });
+
+  const focusedIndex = () => {
+    const st = ring.current;
+    const n = CAROUSEL_COPIES;
+    return ((Math.round(-st.angle / CAROUSEL_STEP) % n) + n) % n;
+  };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const st = ring.current;
+      if (!st.drag) return;
+      const dx = e.clientX - st.drag.lastX;
+      st.drag.lastX = e.clientX;
+      st.drag.moved += Math.abs(dx);
+      if (st.drag.mode === "ring") {
+        st.angle += dx * 0.006;
+        st.vel = dx * 0.006 * 30;
+        st.goto = null;
+      } else {
+        st.spin[st.drag.idx] += dx * 0.012;
+        st.spinVel[st.drag.idx] = dx * 0.012 * 30;
+      }
+    };
+    const onUp = () => {
+      const st = ring.current;
+      if (!st.drag) return;
+      const { mode, idx, moved } = st.drag;
+      st.drag = null;
+      if (mode === "pack" && moved < 6) {
+        // a tap, not a drag
+        if (idx === focusedIndex()) {
+          onSelect();
+        } else {
+          // bring the tapped pack to the front (closest turn direction)
+          const target = -idx * CAROUSEL_STEP;
+          const k = Math.round((st.angle - target) / TWO_PI);
+          st.goto = target + k * TWO_PI;
+          st.vel = 0;
+        }
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [onSelect]);
 
   useEffect(() => {
     document.body.style.cursor = hovered ? "pointer" : "";
@@ -681,25 +822,44 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
 
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
-    textures.forEach(({ variant, sheen }, i) => {
-      sheen.uniforms.uTime.value = t + i * 2.3;
-      const group = groupRefs.current.get(variant.id);
-      if (!group) return;
-      const isHover = hovered === variant.id;
-      group.position.y = Math.sin(t * 1.2 + i * 1.1) * 0.05 + (isHover ? 0.12 : 0);
-      // carousel: side packs angle inward toward the center, reference-style
-      const carouselAngle = -(i - (PACK_VARIANTS.length - 1) / 2) * 0.24;
-      group.rotation.y = THREE.MathUtils.damp(
-        group.rotation.y,
-        isHover
-          ? state.pointer.x * 0.3
-          : carouselAngle + Math.sin(t * 0.6 + i) * 0.04,
-        4,
-        dt,
+    const st = ring.current;
+
+    // ring physics: momentum → snap to the nearest slot (or an explicit goto)
+    if (!st.drag || st.drag.mode !== "ring") {
+      st.angle += st.vel * dt;
+      st.vel = THREE.MathUtils.damp(st.vel, 0, 3, dt);
+      if (st.goto !== null) {
+        st.angle = THREE.MathUtils.damp(st.angle, st.goto, 6, dt);
+        if (Math.abs(st.angle - st.goto) < 0.005) st.goto = null;
+      } else if (Math.abs(st.vel) < 0.4) {
+        const nearest = Math.round(st.angle / CAROUSEL_STEP) * CAROUSEL_STEP;
+        st.angle = THREE.MathUtils.damp(st.angle, nearest, 4, dt);
+      }
+    }
+
+    textures.sheen.uniforms.uTime.value = t;
+
+    for (let i = 0; i < CAROUSEL_COPIES; i++) {
+      // per-pack free spin with inertia — the rotation you leave it at is
+      // kept, no snap-back
+      const draggingThis = st.drag?.mode === "pack" && st.drag.idx === i;
+      if (!draggingThis) {
+        st.spin[i] += st.spinVel[i] * dt;
+        st.spinVel[i] = THREE.MathUtils.damp(st.spinVel[i], 0, 1.6, dt);
+      }
+
+      const group = groupRefs.current[i];
+      if (!group) continue;
+      const a = st.angle + i * CAROUSEL_STEP;
+      group.position.set(
+        Math.sin(a) * CAROUSEL_R,
+        Math.sin(t * 1.2 + i * 1.1) * 0.05,
+        -CAROUSEL_R + Math.cos(a) * CAROUSEL_R,
       );
-      const target = isHover ? 0.72 : 0.6;
-      group.scale.setScalar(THREE.MathUtils.damp(group.scale.x, target, 6, dt));
-    });
+      group.rotation.y = a * 0.55 + st.spin[i];
+      const focus = (Math.cos(a) + 1) / 2;
+      group.scale.setScalar(0.62 + focus * 0.28);
+    }
   });
 
   return (
@@ -707,46 +867,57 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
       <FoilEnvironment />
       <ambientLight intensity={0.5} />
       <directionalLight position={[3, 5, 6]} intensity={0.9} />
-      {textures.map(({ variant, front, back, sheen }, i) => (
+      {/* backdrop drag-catcher: swiping empty space rotates the ring */}
+      <mesh
+        position={[0, 0, -6]}
+        onPointerDown={(e) => {
+          ring.current.drag = {
+            mode: "ring",
+            idx: -1,
+            lastX: e.nativeEvent.clientX,
+            moved: 0,
+          };
+        }}
+      >
+        <planeGeometry args={[60, 30]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {Array.from({ length: CAROUSEL_COPIES }).map((_, i) => (
         <group
-          key={variant.id}
+          key={i}
           ref={(g) => {
-            if (g) groupRefs.current.set(variant.id, g);
+            groupRefs.current[i] = g;
           }}
-          position={[
-            (i - (PACK_VARIANTS.length - 1) / 2) * 1.85,
-            0,
-            -Math.abs(i - (PACK_VARIANTS.length - 1) / 2) * 0.35,
-          ]}
-          scale={0.6}
+          scale={0.62}
           onPointerOver={(e) => {
             e.stopPropagation();
-            setHovered(variant.id);
+            setHovered(true);
           }}
-          onPointerOut={() => setHovered(null)}
+          onPointerOut={() => setHovered(false)}
           onPointerDown={(e) => {
             e.stopPropagation();
-            onSelect(variant.id);
+            ring.current.drag = {
+              mode: "pack",
+              idx: i,
+              lastX: e.nativeEvent.clientX,
+              moved: 0,
+            };
           }}
         >
           <mesh geometry={fullGeo}>
-            <FoilMaterial map={front} normalMap={normalTex} />
+            <FoilMaterial map={textures.front} normalMap={normalTex} />
           </mesh>
-          <mesh geometry={fullGeo} position={[0, 0, 0.004]} material={sheen} />
+          <mesh geometry={fullGeo} position={[0, 0, 0.004]} material={textures.sheen} />
           <mesh geometry={fullGeo} rotation={[0, Math.PI, 0]}>
-            <FoilMaterial map={back} normalMap={normalTex} />
+            <FoilMaterial map={textures.back} normalMap={normalTex} />
           </mesh>
-          {[-1, 1].map((side) => (
-            <mesh
-              key={side}
-              position={[side * (PACK_W / 2 - 0.005), 0, 0.005]}
-              rotation={[0, (side * Math.PI) / 2, 0]}
-            >
-              <planeGeometry args={[PACK_T * 1.15, PACK_H * 0.85]} />
-              <meshPhysicalMaterial
-                color={variant.palette.bottom}
-                roughness={0.5}
-                metalness={0.3}
+          {wallGeos.map((g, wi) => (
+            <mesh key={wi} geometry={g}>
+              <FoilMaterial
+                map={textures.front}
+                normalMap={normalTex}
+                dim
+                doubleSide
               />
             </mesh>
           ))}
@@ -757,7 +928,7 @@ export function PackSelectRow({ onSelect }: PackSelectRowProps) {
             position={[0, -PACK_H * 1.02, 0]}
           >
             <meshBasicMaterial
-              map={front}
+              map={textures.front}
               transparent
               opacity={0.13}
               depthWrite={false}
@@ -821,6 +992,16 @@ export function PackExperience({
 
   const bodyGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "body"), []);
   const stripGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "strip"), []);
+  const bodyWallGeos = useMemo(
+    () =>
+      ([-1, 1] as const).map((s) => makeSideWallGeometry(s, -PACK_H / 2, TEAR_Y)),
+    [],
+  );
+  const stripWallGeos = useMemo(
+    () =>
+      ([-1, 1] as const).map((s) => makeSideWallGeometry(s, TEAR_Y, PACK_H / 2)),
+    [],
+  );
 
   const holoMaterials = useMemo(
     () => cards.map((card) => makeHoloMaterial(holoIntensityFor(card))),
@@ -1329,26 +1510,18 @@ export function PackExperience({
                     dim={i !== 0}
                   />
                 </mesh>
-                {[-1, 1].map((side) => (
+                {bodyWallGeos.map((g, wi) => (
                   <mesh
-                    key={side}
-                    position={[
-                      side * (PACK_W / 2 - 0.005),
-                      PACK_H * (TEAR_FRAC / 2 - 0.5),
-                      0.005,
-                    ]}
-                    rotation={[0, (side * Math.PI) / 2, 0]}
+                    key={wi}
+                    geometry={cutGeos ? cutGeos.walls[wi] : g}
                     renderOrder={4}
                   >
-                    <planeGeometry
-                      args={[PACK_T * 1.15, PACK_H * TEAR_FRAC * 0.92]}
-                    />
-                    <meshPhysicalMaterial
-                      ref={registerWrapperMaterial}
-                      color={variant.palette.bottom}
-                      roughness={0.5}
-                      metalness={0.3}
-                      transparent
+                    <FoilMaterial
+                      map={wrapperFrontTex}
+                      normalMap={normalTex}
+                      materialRef={registerWrapperMaterial}
+                      dim
+                      doubleSide
                     />
                   </mesh>
                 ))}
@@ -1403,6 +1576,21 @@ export function PackExperience({
                     dim={i !== 0}
                   />
                 </mesh>
+                {stripWallGeos.map((g, wi) => (
+                  <mesh
+                    key={`w${wi}`}
+                    geometry={cutGeos ? cutGeos.stripWalls[wi] : g}
+                    renderOrder={4}
+                  >
+                    <FoilMaterial
+                      map={wrapperFrontTex}
+                      normalMap={normalTex}
+                      materialRef={registerWrapperMaterial}
+                      dim
+                      doubleSide
+                    />
+                  </mesh>
+                ))}
                 {i === 0 && (
                   <mesh
                     geometry={cutGeos ? cutGeos.stripF : stripGeo}

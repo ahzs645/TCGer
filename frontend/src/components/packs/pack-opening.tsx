@@ -8,18 +8,19 @@ import { cn } from "@/lib/utils";
 import {
   generatePack,
   packVariantById,
+  PACK_VARIANTS,
   tierRank,
   type PulledCard,
 } from "./pack-data";
 import {
   PackExperience,
-  PackSelectRow,
+  PackCarousel,
   type PackPhase,
   type PackSceneControls,
 } from "./pack-scene";
 
 const PHASE_HINTS: Partial<Record<PackPhase, string>> = {
-  select: "Pick a booster — choose how many packs below",
+  select: "Swipe to browse · drag a pack to spin it · tap to open",
   tear: "Swipe across the dotted line to tear the pack open",
   reveal: "Tap the stack to reveal the next card",
 };
@@ -37,6 +38,7 @@ const TIER_LABEL_CLASSES: Record<string, string> = {
 export function PackOpening() {
   const [phase, setPhase] = useState<PackPhase>("select");
   const [packCount, setPackCount] = useState<number>(1);
+  const [browseVariantId, setBrowseVariantId] = useState(PACK_VARIANTS[0].id);
   const [variantId, setVariantId] = useState<string | null>(null);
   const [packs, setPacks] = useState<PulledCard[][]>([]);
   const [packIndex, setPackIndex] = useState(0);
@@ -119,7 +121,10 @@ export function PackOpening() {
         >
           <Suspense fallback={null}>
             {phase === "select" ? (
-              <PackSelectRow onSelect={startPacks} />
+              <PackCarousel
+                variant={packVariantById(browseVariantId)}
+                onSelect={() => startPacks(browseVariantId)}
+              />
             ) : currentPack && variant ? (
               <PackExperience
                 key={`${packIndex}-${remountKey}`}
@@ -167,23 +172,45 @@ export function PackOpening() {
         </p>
       )}
 
-      {/* pack count picker on select screen */}
+      {/* variant + pack count pickers on select screen */}
       {phase === "select" && (
-        <div className="absolute inset-x-0 bottom-12 flex justify-center gap-2">
-          {PACK_COUNTS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPackCount(n)}
-              className={cn(
-                "rounded-full border border-border px-4 py-1.5 text-sm font-semibold transition hover:bg-muted",
-                packCount === n &&
-                  "border-primary bg-primary text-primary-foreground hover:bg-primary",
-              )}
-            >
-              ×{n}
-            </button>
-          ))}
+        <div className="absolute inset-x-0 bottom-12 flex flex-col items-center gap-2">
+          <div className="flex justify-center gap-2">
+            {PACK_VARIANTS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setBrowseVariantId(v.id)}
+                className={cn(
+                  "rounded-full border border-border px-3 py-1 text-xs font-semibold transition hover:bg-muted",
+                  browseVariantId === v.id && "text-background",
+                )}
+                style={
+                  browseVariantId === v.id
+                    ? { background: v.palette.mid, borderColor: v.palette.mid }
+                    : undefined
+                }
+              >
+                {v.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-center gap-2">
+            {PACK_COUNTS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPackCount(n)}
+                className={cn(
+                  "rounded-full border border-border px-4 py-1.5 text-sm font-semibold transition hover:bg-muted",
+                  packCount === n &&
+                    "border-primary bg-primary text-primary-foreground hover:bg-primary",
+                )}
+              >
+                ×{n}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
