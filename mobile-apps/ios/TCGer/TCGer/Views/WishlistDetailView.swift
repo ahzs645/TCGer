@@ -47,10 +47,10 @@ struct WishlistDetailView: View {
         var result = cards
 
         if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let query = searchText.lowercased()
+            let query = SearchTextNormalizer.key(searchText)
             result = result.filter {
-                $0.name.lowercased().contains(query) ||
-                ($0.setName?.lowercased().contains(query) ?? false)
+                SearchTextNormalizer.contains($0.name, queryKey: query) ||
+                SearchTextNormalizer.contains($0.setName, queryKey: query)
             }
         }
 

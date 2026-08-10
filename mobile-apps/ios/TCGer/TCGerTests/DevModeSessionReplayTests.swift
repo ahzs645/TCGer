@@ -61,12 +61,33 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-190752/frame-0026.jpg": "dp4-103",
         "scan-session-20260809-190752/frame-0027.jpg": "dp4-103",
         "scan-session-20260809-190752/frame-0028.jpg": "dp4-103",
+        // The 21:09 follow-up repeats known cards under glare, blur, overlap,
+        // and clear framing. Visible titles/collector numbers plus the clear
+        // shots establish the exact printing for every single-card frame.
+        "scan-session-20260809-210958/frame-0000.jpg": "swshp-SWSH204",
+        "scan-session-20260809-210958/frame-0001.jpg": "swshp-SWSH204",
+        "scan-session-20260809-210958/frame-0002.jpg": "swshp-SWSH204",
+        "scan-session-20260809-210958/frame-0003.jpg": "swshp-SWSH204",
+        "scan-session-20260809-210958/frame-0004.jpg": "swshp-SWSH204",
+        "scan-session-20260809-210958/frame-0005.jpg": "dp4-103",
+        "scan-session-20260809-210958/frame-0006.jpg": "dp4-103",
+        "scan-session-20260809-210958/frame-0007.jpg": "dp4-104",
+        "scan-session-20260809-210958/frame-0008.jpg": "pl4-AR3",
+        "scan-session-20260809-210958/frame-0009.jpg": "pl4-AR3",
+        "scan-session-20260809-210958/frame-0010.jpg": "pl4-AR3",
+        "scan-session-20260809-210958/frame-0012.jpg": "dpp-DP38",
+        "scan-session-20260809-210958/frame-0013.jpg": "dpp-DP30",
+        "scan-session-20260809-210958/frame-0014.jpg": "dpp-DP30",
+        "scan-session-20260809-210958/frame-0015.jpg": "dpp-DP30",
     ]
     /// Frames that must NOT match anything (accidental shutter presses).
     private static let expectedNoMatch: Set<String> = [
         "scan-session-20260809-145850/frame-0000.jpg",
         "scan-session-20260809-145850/frame-0001.jpg",
         "scan-session-20260809-145947/frame-0000.jpg",
+        // Two overlapping card faces; accepting either as a clean single-card
+        // result would make the outcome depend on an arbitrary crop.
+        "scan-session-20260809-210958/frame-0011.jpg",
     ]
     /// Frames whose device decision does not reproduce in the Simulator even
     /// on unmodified code (Simulator Vision doc-seg/rectangles diverge from
@@ -81,6 +102,9 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-190752/frame-0017.jpg",
         "scan-session-20260809-190752/frame-0022.jpg",
         "scan-session-20260809-190752/frame-0026.jpg",
+        // Device accepted the correct Darkrai from its recorded crop; the
+        // Simulator chooses lower-scoring whole-frame/detected quads.
+        "scan-session-20260809-210958/frame-0007.jpg",
     ]
 
     func testReplayDevModeSessions() async throws {

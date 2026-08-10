@@ -203,6 +203,38 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(viewModel.nextBinderPageNumber, 8)
     }
 
+    func testBinderDestinationCanBeSharedOrChosenPerPageForTheSession() {
+        let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        viewModel.selectedBinderID = "session-binder"
+
+        XCTAssertEqual(viewModel.binderDestinationMode, .oneBinder)
+        XCTAssertEqual(viewModel.binderDestinationID(forPageNumber: 1), "session-binder")
+        XCTAssertEqual(viewModel.binderDestinationID(forPageNumber: 2), "session-binder")
+
+        viewModel.binderDestinationMode = .pageByPage
+        viewModel.setBinderDestinationID("first-page-binder", forPageNumber: 1)
+        viewModel.setBinderDestinationID("second-page-binder", forPageNumber: 2)
+
+        XCTAssertEqual(viewModel.binderDestinationID(forPageNumber: 1), "first-page-binder")
+        XCTAssertEqual(viewModel.binderDestinationID(forPageNumber: 2), "second-page-binder")
+        XCTAssertEqual(viewModel.binderDestinationID(forPageNumber: 3), "session-binder")
+    }
+
+    func testClearingBinderSessionResetsDestinationChoices() {
+        let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        viewModel.selectedBinderID = "session-binder"
+        viewModel.binderDestinationMode = .pageByPage
+        viewModel.setBinderDestinationID("page-binder", forPageNumber: 1)
+
+        viewModel.clearBinderSession()
+
+        XCTAssertEqual(viewModel.binderDestinationMode, .oneBinder)
+        XCTAssertNil(viewModel.selectedBinderID)
+        XCTAssertTrue(viewModel.binderPageDestinationIDs.isEmpty)
+    }
+
     func testStrategiesRunInModePriorityOrderAndContinueAfterFailures() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

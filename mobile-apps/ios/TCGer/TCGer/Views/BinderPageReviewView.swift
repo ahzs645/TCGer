@@ -26,7 +26,7 @@ struct BinderPageReviewView: View {
     @State private var statusFilter: BinderCardDetectionStatus?
     @State private var storedPages: [SavedBinderPage] = []
     @State private var isSavingPage = false
-    @AppStorage("binderScanner.savePageImages") private var savesPageImages = false
+    @AppStorage("binderScanner.savePageImages") private var savesPageImages = true
     @AppStorage("binderScanner.replacePageImages") private var replacesPageImages = true
 
     private let apiService = APIService()
@@ -49,7 +49,7 @@ struct BinderPageReviewView: View {
                         pagePreview(record: record)
                         allPagesStrip
                         detectionSummary(record: record)
-                        binderControls
+                        binderControls(record: record)
                         actionControls(record: record)
                     } else {
                         ContentUnavailableView(
@@ -65,25 +65,18 @@ struct BinderPageReviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Next") { dismiss() }
                         .disabled(isAdding || isCreatingBinder)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Scan Page \(viewModel.nextBinderPageNumber)") {
+                    if let currentRecord {
+                        Button("Retake") {
+                            viewModel.prepareToRescanBinderPage(currentRecord.pageNumber)
                             dismiss()
                         }
-                        if let currentRecord {
-                            Button("Rescan Page \(currentRecord.pageNumber)") {
-                                viewModel.prepareToRescanBinderPage(currentRecord.pageNumber)
-                                dismiss()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "camera.fill")
+                        .disabled(isAdding || isCreatingBinder || isSavingPage)
+                        .accessibilityHint("Retakes binder page \(currentRecord.pageNumber)")
                     }
-                    .disabled(isAdding || isCreatingBinder || isSavingPage)
-                    .accessibilityLabel("Scan another binder page")
                 }
             }
         }
@@ -96,7 +89,14 @@ struct BinderPageReviewView: View {
             currentPageIndex = min(currentPageIndex, count - 1)
         }
         .onChange(of: viewModel.selectedBinderID, initial: false) { _, _ in
+            guard viewModel.binderDestinationMode == .oneBinder else { return }
             Task { await loadStoredPages() }
+        }
+        .onChange(of: currentPageIndex, initial: false) { _, _ in
+            Task { await loadStoredPages(for: currentRecord.flatMap(destinationBinderID)) }
+        }
+        .onChange(of: viewModel.binderDestinationMode, initial: false) { _, _ in
+            Task { await loadStoredPages(for: currentRecord.flatMap(destinationBinderID)) }
         }
         .sheet(item: $selectedDetection) { selection in
             if let detection = detectionBinding(for: selection),
@@ -449,10 +449,33 @@ struct BinderPageReviewView: View {
         }
     }
 
-    private var binderControls: some View {
+    private func binderControls(record: BinderPageRecord) -> some View {
         VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Save Destination")
+                    .font(.headline)
+
+                Picker("Save Destination", selection: $viewModel.binderDestinationMode) {
+                    ForEach(CardScannerViewModel.BinderDestinationMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(viewModel.binderDestinationMode == .oneBinder
+                    ? "All pages and cards in this scan session are saved to one binder."
+                    : "Choose a binder for each page, then save that page before moving to the next one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+
             HStack(spacing: 8) {
-                Text("Target Binder")
+                Text(viewModel.binderDestinationMode == .oneBinder
+                    ? "Session Binder"
+                    : "Page \(record.pageNumber) Binder")
                     .font(.headline)
                     .fixedSize()
 
@@ -468,9 +491,9 @@ struct BinderPageReviewView: View {
                     Menu {
                         ForEach(collections) { collection in
                             Button {
-                                viewModel.selectedBinderID = collection.id
+                                selectBinder(collection.id, for: record)
                             } label: {
-                                if collection.id == viewModel.selectedBinderID {
+                                if collection.id == destinationBinderID(for: record) {
                                     Label(collection.name, systemImage: "checkmark")
                                 } else {
                                     Text(collection.name)
@@ -479,7 +502,7 @@ struct BinderPageReviewView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(selectedBinderName)
+                            Text(selectedBinderName(for: record))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                             Image(systemName: "chevron.down")
@@ -508,21 +531,6 @@ struct BinderPageReviewView: View {
                 .disabled(isLoadingCollections || isCreatingBinder)
                 .accessibilityLabel("New Binder")
             }
-
-            Divider()
-
-            Toggle("Save page photos", isOn: $savesPageImages)
-                .font(.subheadline.weight(.medium))
-            if savesPageImages {
-                Toggle("Replace photo when rescanning", isOn: $replacesPageImages)
-                    .font(.subheadline)
-            }
-            Text(savesPageImages
-                ? "Page photos are stored with the binder. Turn replacement off to keep an existing reference photo when rescanning."
-                : "Only page numbers and card positions are stored; the captured photo stays in this scan session.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -530,9 +538,13 @@ struct BinderPageReviewView: View {
     }
 
     private func actionControls(record: BinderPageRecord) -> some View {
-        VStack(spacing: 12) {
+        let records = destinationRecords(for: record)
+        let binderID = destinationBinderID(for: record)
+
+        return VStack(spacing: 12) {
             Button {
-                Task { await persistRecords(scopedRecords(for: record)) }
+                guard let binderID else { return }
+                Task { await persistRecords(records, to: binderID) }
             } label: {
                 HStack {
                     if isSavingPage { ProgressView() }
@@ -543,10 +555,11 @@ struct BinderPageReviewView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isSavingPage || isAdding || viewModel.selectedBinderID == nil)
+            .disabled(isSavingPage || isAdding || binderID == nil)
 
             Button {
-                Task { await addIncludedCards(from: scopedRecords(for: record)) }
+                guard let binderID else { return }
+                Task { await addIncludedCards(from: records, to: binderID) }
             } label: {
                 HStack {
                     if isAdding {
@@ -562,8 +575,8 @@ struct BinderPageReviewView: View {
             .disabled(
                 isAdding ||
                     isCreatingBinder || isSavingPage ||
-                    viewModel.selectedBinderID == nil ||
-                    remainingIncludedDetectionCount(for: record) == 0
+                    binderID == nil ||
+                    remainingIncludedDetectionCount(in: records) == 0
             )
         }
     }
@@ -585,6 +598,10 @@ struct BinderPageReviewView: View {
         showsAllCards ? viewModel.binderPages : [record]
     }
 
+    private func destinationRecords(for record: BinderPageRecord) -> [BinderPageRecord] {
+        viewModel.binderDestinationMode == .oneBinder ? viewModel.binderPages : [record]
+    }
+
     private func scopedDetectionCount(for record: BinderPageRecord) -> Int {
         scopedRecords(for: record).reduce(0) { $0 + $1.detections.count }
     }
@@ -599,8 +616,8 @@ struct BinderPageReviewView: View {
         scopedRecords(for: record).reduce(0) { $0 + includedDetections(in: $1).count }
     }
 
-    private func remainingIncludedDetectionCount(for record: BinderPageRecord) -> Int {
-        scopedRecords(for: record).reduce(0) { $0 + remainingIncludedDetections(in: $1).count }
+    private func remainingIncludedDetectionCount(in records: [BinderPageRecord]) -> Int {
+        records.reduce(0) { $0 + remainingIncludedDetections(in: $1).count }
     }
 
     private func detectionCountSummary(for record: BinderPageRecord) -> String {
@@ -619,7 +636,7 @@ struct BinderPageReviewView: View {
     }
 
     private func addButtonTitle(for record: BinderPageRecord) -> String {
-        let records = scopedRecords(for: record)
+        let records = destinationRecords(for: record)
         let remainingCount = records.reduce(0) { $0 + remainingIncludedDetections(in: $1).count }
         if remainingCount == 0, records.contains(where: { !$0.addedDetectionIDs.isEmpty }) {
             return "Cards Added"
@@ -628,7 +645,7 @@ struct BinderPageReviewView: View {
     }
 
     private func saveButtonTitle(for record: BinderPageRecord) -> String {
-        let records = scopedRecords(for: record)
+        let records = destinationRecords(for: record)
         if records.count > 1 { return "Save \(records.count) Page Layouts" }
         return storedPage(for: record.pageNumber) == nil
             ? "Save Binder Page \(record.pageNumber)"
@@ -681,9 +698,23 @@ struct BinderPageReviewView: View {
         return "\(page)Card \(cardIndex + 1) · \(set) · \(status)"
     }
 
-    private var selectedBinderName: String {
-        guard let selectedBinderID = viewModel.selectedBinderID else { return "Select Binder" }
+    private func selectedBinderName(for record: BinderPageRecord) -> String {
+        guard let selectedBinderID = destinationBinderID(for: record) else { return "Select Binder" }
         return collections.first(where: { $0.id == selectedBinderID })?.name ?? "Select Binder"
+    }
+
+    private func destinationBinderID(for record: BinderPageRecord) -> String? {
+        viewModel.binderDestinationID(forPageNumber: record.pageNumber)
+    }
+
+    private func selectBinder(_ binderID: String, for record: BinderPageRecord) {
+        switch viewModel.binderDestinationMode {
+        case .oneBinder:
+            viewModel.selectedBinderID = binderID
+        case .pageByPage:
+            viewModel.setBinderDestinationID(binderID, forPageNumber: record.pageNumber)
+            Task { await loadStoredPages(for: binderID) }
+        }
     }
 
     private func statusColor(_ status: BinderCardDetectionStatus) -> Color {
@@ -738,7 +769,7 @@ struct BinderPageReviewView: View {
             } else {
                 viewModel.selectedBinderID = collections.first?.id
             }
-            await loadStoredPages()
+            await loadStoredPages(for: currentRecord.flatMap(destinationBinderID))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -774,7 +805,11 @@ struct BinderPageReviewView: View {
             collections.removeAll { $0.id == collection.id }
             collections.append(collection)
             sortCollections()
-            viewModel.selectedBinderID = collection.id
+            if viewModel.binderDestinationMode == .pageByPage, let currentRecord {
+                viewModel.setBinderDestinationID(collection.id, forPageNumber: currentRecord.pageNumber)
+            } else {
+                viewModel.selectedBinderID = collection.id
+            }
             storedPages = []
             NotificationCenter.default.post(name: .collectionDidChange, object: collection)
         } catch {
@@ -783,8 +818,7 @@ struct BinderPageReviewView: View {
     }
 
     @MainActor
-    private func addIncludedCards(from records: [BinderPageRecord]) async {
-        guard let binderID = viewModel.selectedBinderID else { return }
+    private func addIncludedCards(from records: [BinderPageRecord], to binderID: String) async {
         guard let token = requestToken else {
             errorMessage = "Not authenticated"
             return
@@ -826,14 +860,14 @@ struct BinderPageReviewView: View {
         }
 
         if addedThisAttempt > 0 {
-            await persistRecords(records, reportsSuccess: false)
+            await persistRecords(records, to: binderID, reportsSuccess: false)
             HapticManager.notification(.success)
         }
     }
 
     @MainActor
-    private func loadStoredPages() async {
-        guard let binderID = viewModel.selectedBinderID else {
+    private func loadStoredPages(for requestedBinderID: String? = nil) async {
+        guard let binderID = requestedBinderID ?? viewModel.selectedBinderID else {
             storedPages = []
             return
         }
@@ -855,9 +889,10 @@ struct BinderPageReviewView: View {
     @MainActor
     private func persistRecords(
         _ records: [BinderPageRecord],
+        to binderID: String,
         reportsSuccess: Bool = true
     ) async {
-        guard let binderID = viewModel.selectedBinderID, !isSavingPage else { return }
+        guard !isSavingPage else { return }
         isSavingPage = true
         defer { isSavingPage = false }
 

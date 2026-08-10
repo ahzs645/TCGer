@@ -277,9 +277,11 @@ final class CatalogStore: ObservableObject {
     nonisolated private struct LoadedCatalogPack: Sendable {
         let pack: CatalogPack
         let setSearchMetadata: [String: SetSearchMetadata]
+        let cardSearchKeys: [String]
 
         init(pack: CatalogPack) {
             self.pack = pack
+            cardSearchKeys = pack.cards.map { SearchTextNormalizer.key($0.name) }
             setSearchMetadata = Dictionary(
                 pack.sets.map { set in
                     (
@@ -299,10 +301,7 @@ final class CatalogStore: ObservableObject {
         var cards: [CatalogCardEntry] { pack.cards }
 
         private static func normalize(_ value: String) -> String {
-            value.folding(
-                options: [.caseInsensitive, .diacriticInsensitive],
-                locale: nil
-            )
+            SearchTextNormalizer.key(value)
         }
     }
 
@@ -470,10 +469,8 @@ final class CatalogStore: ObservableObject {
     func search(query: String, tcg: TCGGame, limit: Int) -> [CatalogEntry] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty, limit > 0 else { return [] }
-        let normalizedNeedle = needle.folding(
-            options: [.caseInsensitive, .diacriticInsensitive],
-            locale: nil
-        )
+        let normalizedNeedle = SearchTextNormalizer.key(needle)
+        guard !normalizedNeedle.isEmpty else { return [] }
 
         let packs = searchablePacks(for: tcg)
         var results: [CatalogEntry] = []
@@ -481,19 +478,17 @@ final class CatalogStore: ObservableObject {
 
         // Ordered passes rank name prefixes, then name substrings, then set metadata.
         for (game, pack) in packs {
-            for card in pack.cards where name(card.name, hasPrefix: needle) {
+            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys)
+                where searchKey.hasPrefix(normalizedNeedle) {
                 results.append(CatalogEntry(tcg: game, card: card))
                 if results.count == limit { return results }
             }
         }
 
         for (game, pack) in packs {
-            for card in pack.cards {
-                guard !name(card.name, hasPrefix: needle),
-                      card.name.range(
-                        of: needle,
-                        options: [.caseInsensitive, .diacriticInsensitive]
-                      ) != nil else {
+            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys) {
+                guard !searchKey.hasPrefix(normalizedNeedle),
+                      searchKey.contains(normalizedNeedle) else {
                     continue
                 }
                 results.append(CatalogEntry(tcg: game, card: card))
@@ -502,11 +497,8 @@ final class CatalogStore: ObservableObject {
         }
 
         for (game, pack) in packs {
-            for card in pack.cards {
-                guard card.name.range(
-                    of: needle,
-                    options: [.caseInsensitive, .diacriticInsensitive]
-                ) == nil,
+            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys) {
+                guard !searchKey.contains(normalizedNeedle),
                       let setCode = card.setCode,
                       pack.setSearchMetadata[setCode]?.contains(normalizedNeedle) == true else {
                     continue
@@ -654,13 +646,6 @@ final class CatalogStore: ObservableObject {
         await Task.detached(priority: .utility) {
             SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         }.value
-    }
-
-    private func name(_ name: String, hasPrefix query: String) -> Bool {
-        name.range(
-            of: query,
-            options: [.anchored, .caseInsensitive, .diacriticInsensitive]
-        ) != nil
     }
 
     private func path(_ component: String) -> String {

@@ -615,10 +615,11 @@ final class LocalStore {
     }
 
     private func cardMatchesSearch(_ card: Card, query: String) -> Bool {
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        return card.name.range(of: query, options: options) != nil
-            || card.setName?.range(of: query, options: options) != nil
-            || card.setCode?.range(of: query, options: options) != nil
+        let queryKey = SearchTextNormalizer.key(query)
+        return SearchTextNormalizer.contains(card.name, queryKey: queryKey)
+            || SearchTextNormalizer.contains(card.setName, queryKey: queryKey)
+            || SearchTextNormalizer.contains(card.setCode, queryKey: queryKey)
+            || SearchTextNormalizer.contains(card.collectorNumber, queryKey: queryKey)
     }
 
     /// Merge a catalog slice with local collection cards. Catalog order is the

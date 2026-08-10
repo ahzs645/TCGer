@@ -63,11 +63,11 @@ struct CollectionDetailView: View {
     private var filteredCards: [CollectionCard] {
         let filtered = cards.filter { card in
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let query = searchText.lowercased()
+                let query = SearchTextNormalizer.key(searchText)
                 let matchesSearch =
-                    card.name.lowercased().contains(query) ||
-                    (card.setName?.lowercased().contains(query) ?? false) ||
-                    (card.setCode?.lowercased().contains(query) ?? false)
+                    SearchTextNormalizer.contains(card.name, queryKey: query) ||
+                    SearchTextNormalizer.contains(card.setName, queryKey: query) ||
+                    SearchTextNormalizer.contains(card.setCode, queryKey: query)
                 if !matchesSearch {
                     return false
                 }

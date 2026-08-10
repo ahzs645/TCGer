@@ -78,11 +78,12 @@ struct ScannerDevModeSessionsView: View {
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
-    @State private var sessionPendingDeletion: ScannerDevModeStore.SessionInfo?
-    @State private var isConfirmingDeleteAll = false
+    @State private var selectedSessionIDs: Set<String> = []
+    @State private var isSelecting = false
+    @State private var deletionRequest: DeletionRequest?
 
     var body: some View {
-        List {
+        List(selection: $selectedSessionIDs) {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)
@@ -99,34 +100,32 @@ struct ScannerDevModeSessionsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    HStack(spacing: 4) {
-                        Button {
-                            do {
-                                shareArchive = try DevModeExporter.zip(session: session)
-                                errorMessage = nil
-                            } catch {
-                                errorMessage = "Share failed: \(error.localizedDescription)"
+                    if !isSelecting {
+                        HStack(spacing: 4) {
+                            Button {
+                                share(session)
+                            } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .frame(width: 44, height: 44)
                             }
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Share \(Self.displayName(for: session))")
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Share \(Self.displayName(for: session))")
 
-                        Button(role: .destructive) {
-                            sessionPendingDeletion = session
-                        } label: {
-                            Image(systemName: "trash")
-                                .frame(width: 44, height: 44)
+                            Button(role: .destructive) {
+                                deletionRequest = .session(session)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Delete \(Self.displayName(for: session))")
                         }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Delete \(Self.displayName(for: session))")
                     }
                 }
+                .tag(session.id)
                 .swipeActions {
                     Button(role: .destructive) {
-                        sessionPendingDeletion = session
+                        deletionRequest = .session(session)
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
@@ -139,60 +138,112 @@ struct ScannerDevModeSessionsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
         .navigationTitle("Recorded Sessions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Delete All", role: .destructive) {
-                    isConfirmingDeleteAll = true
+                Button(isSelecting ? "Done" : "Select") {
+                    if isSelecting {
+                        endSelection()
+                    } else {
+                        isSelecting = true
+                    }
                 }
-                .disabled(sessions.isEmpty)
+                .disabled(sessions.isEmpty && !isSelecting)
+            }
+
+            if isSelecting {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button(allSessionsAreSelected ? "Deselect All" : "Select All") {
+                        toggleSelectAll()
+                    }
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        deletionRequest = .sessions(selectedSessionIDs)
+                    } label: {
+                        Label(deleteSelectionTitle, systemImage: "trash")
+                    }
+                    .disabled(selectedSessionIDs.isEmpty)
+                }
             }
         }
         .onAppear(perform: refresh)
         .sheet(item: $shareArchive) { archive in
             DevModeActivityView(items: [archive.url])
         }
-        .confirmationDialog(
-            "Delete Recorded Session?",
-            isPresented: isConfirmingSessionDeletion,
-            titleVisibility: .visible,
-            presenting: sessionPendingDeletion
-        ) { session in
-            Button("Delete", role: .destructive) {
-                delete(session)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { session in
-            Text("This permanently deletes \(Self.displayName(for: session)) and all of its recorded frames.")
-        }
-        .confirmationDialog(
-            "Delete All Recorded Sessions?",
-            isPresented: $isConfirmingDeleteAll,
-            titleVisibility: .visible
+        .alert(
+            deletionRequest?.title ?? "Delete Recorded Session?",
+            isPresented: isConfirmingDeletion
         ) {
-            Button("Delete All", role: .destructive) {
-                deleteAll()
+            Button("Cancel", role: .cancel) {
+                deletionRequest = nil
             }
-            Button("Cancel", role: .cancel) {}
+            Button(deletionRequest?.actionTitle ?? "Delete", role: .destructive) {
+                confirmDeletion()
+            }
         } message: {
-            Text("This permanently deletes all \(sessions.count) recorded sessions and their frames.")
+            Text(deletionRequest?.message ?? "")
         }
     }
 
-    private var isConfirmingSessionDeletion: Binding<Bool> {
+    private var isConfirmingDeletion: Binding<Bool> {
         Binding(
-            get: { sessionPendingDeletion != nil },
+            get: { deletionRequest != nil },
             set: { isPresented in
                 if !isPresented {
-                    sessionPendingDeletion = nil
+                    deletionRequest = nil
                 }
             }
         )
     }
 
+    private var allSessionsAreSelected: Bool {
+        !sessions.isEmpty && selectedSessionIDs.count == sessions.count
+    }
+
+    private var deleteSelectionTitle: String {
+        selectedSessionIDs.isEmpty ? "Delete" : "Delete (\(selectedSessionIDs.count))"
+    }
+
     private func refresh() {
         sessions = ScannerDevModeStore.listSessions()
+        selectedSessionIDs.formIntersection(sessions.map(\.id))
+    }
+
+    private func share(_ session: ScannerDevModeStore.SessionInfo) {
+        do {
+            shareArchive = try DevModeExporter.zip(session: session)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Share failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func toggleSelectAll() {
+        if allSessionsAreSelected {
+            selectedSessionIDs.removeAll()
+        } else {
+            selectedSessionIDs = Set(sessions.map(\.id))
+        }
+    }
+
+    private func endSelection() {
+        isSelecting = false
+        selectedSessionIDs.removeAll()
+    }
+
+    private func confirmDeletion() {
+        guard let deletionRequest else { return }
+
+        switch deletionRequest {
+        case .session(let session):
+            delete(session)
+        case .sessions(let ids):
+            deleteSessions(withIDs: ids)
+        }
     }
 
     private func delete(_ session: ScannerDevModeStore.SessionInfo) {
@@ -202,18 +253,65 @@ struct ScannerDevModeSessionsView: View {
         } catch {
             errorMessage = "Delete failed: \(error.localizedDescription)"
         }
-        sessionPendingDeletion = nil
+        deletionRequest = nil
         refresh()
     }
 
-    private func deleteAll() {
-        do {
-            try ScannerDevModeStore.deleteAllSessions()
+    private func deleteSessions(withIDs ids: Set<String>) {
+        let targets = sessions.filter { ids.contains($0.id) }
+        var failedIDs: Set<String> = []
+
+        for session in targets {
+            do {
+                try ScannerDevModeStore.deleteSession(at: session.url)
+            } catch {
+                failedIDs.insert(session.id)
+            }
+        }
+
+        deletionRequest = nil
+        if failedIDs.isEmpty {
             errorMessage = nil
-        } catch {
-            errorMessage = "Delete all failed: \(error.localizedDescription)"
+            endSelection()
+        } else {
+            selectedSessionIDs = failedIDs
+            let noun = failedIDs.count == 1 ? "session" : "sessions"
+            errorMessage = "Couldn’t delete \(failedIDs.count) selected \(noun)."
         }
         refresh()
+    }
+
+    private enum DeletionRequest {
+        case session(ScannerDevModeStore.SessionInfo)
+        case sessions(Set<String>)
+
+        var title: String {
+            switch self {
+            case .session:
+                return "Delete Recorded Session?"
+            case .sessions(let ids):
+                return ids.count == 1 ? "Delete 1 Recorded Session?" : "Delete \(ids.count) Recorded Sessions?"
+            }
+        }
+
+        var actionTitle: String {
+            switch self {
+            case .session:
+                return "Delete"
+            case .sessions(let ids):
+                return ids.count == 1 ? "Delete Session" : "Delete \(ids.count) Sessions"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .session(let session):
+                return "This permanently deletes \(ScannerDevModeSessionsView.displayName(for: session)) and all of its recorded frames."
+            case .sessions(let ids):
+                let noun = ids.count == 1 ? "session" : "sessions"
+                return "This permanently deletes the \(ids.count) selected \(noun) and all of their recorded frames."
+            }
+        }
     }
 
     /// "scan-session-20260809-145717" → "Aug 9, 2:57 PM"; falls back to the

@@ -7,6 +7,20 @@ import VideoToolbox
 
 @MainActor
 final class CardScannerViewModel: ObservableObject {
+    enum BinderDestinationMode: String, CaseIterable, Identifiable {
+        case oneBinder
+        case pageByPage
+
+        var id: Self { self }
+
+        var displayName: String {
+            switch self {
+            case .oneBinder: return "One Binder"
+            case .pageByPage: return "Page by Page"
+            }
+        }
+    }
+
     enum ViewState {
         case idle
         case ready
@@ -47,6 +61,8 @@ final class CardScannerViewModel: ObservableObject {
     @Published var binderPages: [BinderPageRecord] = []
     @Published var binderReviewPresentation: BinderReviewPresentation?
     @Published var selectedBinderID: String?
+    @Published var binderDestinationMode: BinderDestinationMode = .oneBinder
+    @Published private(set) var binderPageDestinationIDs: [Int: String] = [:]
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
@@ -471,10 +487,25 @@ final class CardScannerViewModel: ObservableObject {
         nextBinderPageNumber = max(1, min(10_000, pageNumber))
     }
 
+    func binderDestinationID(forPageNumber pageNumber: Int) -> String? {
+        switch binderDestinationMode {
+        case .oneBinder:
+            return selectedBinderID
+        case .pageByPage:
+            return binderPageDestinationIDs[pageNumber] ?? selectedBinderID
+        }
+    }
+
+    func setBinderDestinationID(_ binderID: String, forPageNumber pageNumber: Int) {
+        binderPageDestinationIDs[pageNumber] = binderID
+    }
+
     func clearBinderSession() {
         binderReviewPresentation = nil
         binderPages.removeAll()
         selectedBinderID = nil
+        binderDestinationMode = .oneBinder
+        binderPageDestinationIDs.removeAll()
         nextBinderPageNumber = 1
     }
 

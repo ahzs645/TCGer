@@ -468,10 +468,11 @@ struct CardSearchView: View {
 
 private extension Card {
     func matchesSearchText(_ query: String) -> Bool {
-        name.localizedCaseInsensitiveContains(query) ||
-            collectorNumber?.localizedCaseInsensitiveContains(query) == true ||
-            rarity?.localizedCaseInsensitiveContains(query) == true ||
-            setCode?.localizedCaseInsensitiveContains(query) == true
+        let queryKey = SearchTextNormalizer.key(query)
+        return SearchTextNormalizer.contains(name, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(collectorNumber, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(rarity, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(setCode, queryKey: queryKey)
     }
 }
 

@@ -217,6 +217,34 @@ Caveat: Simulator Vision (doc-seg/rectangles) diverges from device Vision on
 some frames, so device-confirmed conclusions need a device build — the test
 keeps a documented allowlist of known Simulator divergences.
 
+Explicit corrections recorded in `results.json` are stronger evidence than
+the original device decision. `ScannerCorrectionReplayTests` finds those
+labels, collapses repeated edits of byte-identical crops so the final edit
+wins, and fails if a corrected crop becomes a wrong accepted card:
+
+```bash
+env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  TEST_RUNNER_DEVMODE_SESSIONS_DIR=/path/to/unzipped/ScannerDevMode \
+  xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/ScannerCorrectionReplayTests
+```
+
+Use `TEST_RUNNER_DEVMODE_CORRECTION_FRAME=frame-NNNN.jpg` to isolate one
+correction and print its gate, top candidates, title OCR, footer OCR, and
+attempt outcomes. `ScannerOrientationExperimentTests` is a diagnostic ANN
+comparison of upright versus 180-degree input on the same final labels:
+
+```bash
+env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  TEST_RUNNER_ORIENTATION_EXPERIMENT_SESSION_DIR=/path/to/scan-session \
+  xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/ScannerOrientationExperimentTests
+```
+
+Both are environment-gated and skip in the ordinary test suite.
+
 The 2026-08-09 device sessions produced the angled-card diagnosis: the
 detector localizes angled cards fine, but full-frame Vision corner detection
 returns nothing at steep angles, and the axis-aligned fallback crop embeds

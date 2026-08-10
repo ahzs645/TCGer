@@ -13,6 +13,7 @@ import type {
   TcgAdapter
 } from '../adapters/types';
 import { logger } from '../../utils/logger';
+import { normalizeSearchText, searchTerms } from '../../utils/search-text';
 
 const searchSchema = z.object({
   query: z.string().min(1),
@@ -50,13 +51,13 @@ export async function searchCards(input: CardSearchInput) {
 
   if (tcg && tcg !== 'all') {
     const adapter = adapterRegistry.get(tcg);
-    return adapter.searchCards(query);
+    return searchAdapterWithFallback(adapter, query);
   }
 
   const adapters = adapterRegistry.list();
   const results = await Promise.allSettled(
     adapters.map((adapter) =>
-      withProviderTimeout(adapter.game, 'search', adapter.searchCards(query))
+      withProviderTimeout(adapter.game, 'search', searchAdapterWithFallback(adapter, query))
     )
   );
   return results.flatMap((result, index) => {
@@ -71,6 +72,37 @@ export async function searchCards(input: CardSearchInput) {
     );
     return [];
   });
+}
+
+async function searchAdapterWithFallback(adapter: TcgAdapter, query: string): Promise<CardDTO[]> {
+  const exactResults = await adapter.searchCards(query);
+  if (exactResults.length) {
+    return exactResults;
+  }
+
+  return punctuationInsensitiveFallback(query, (term) => adapter.searchCards(term));
+}
+
+async function punctuationInsensitiveFallback(
+  query: string,
+  search: (term: string) => Promise<CardDTO[]>
+): Promise<CardDTO[]> {
+  const queryKey = normalizeSearchText(query);
+  const terms = [...new Set(searchTerms(query))]
+    .filter((term) => normalizeSearchText(term) !== queryKey)
+    .sort((left, right) => right.length - left.length);
+
+  // A broad provider retry is only useful for a multi-token name. The final
+  // normalized filter prevents a token such as "mime" from returning Mime Jr.
+  for (const term of terms) {
+    const candidates = await search(term);
+    const matches = candidates.filter((card) => normalizeSearchText(card.name).includes(queryKey));
+    if (matches.length) {
+      return matches;
+    }
+  }
+
+  return [];
 }
 
 /**
@@ -128,10 +160,18 @@ async function runExhaustiveSearch(
       { provider: adapter.game },
       'Adapter has no exhaustive name search; falling back to preview search'
     );
-    const preview = await adapter.searchCards(query);
+    const preview = await searchAdapterWithFallback(adapter, query);
     return preview.slice(0, options.limit);
   }
-  return (await adapter.fetchCardsByName(query, options)).slice(0, options.limit);
+  const exactResults = await adapter.fetchCardsByName(query, options);
+  if (exactResults.length) {
+    return exactResults.slice(0, options.limit);
+  }
+
+  const fallbackResults = await punctuationInsensitiveFallback(query, (term) =>
+    adapter.fetchCardsByName!(term, options)
+  );
+  return fallbackResults.slice(0, options.limit);
 }
 
 export async function getCardPrints(params: { tcg: string; cardId: string }): Promise<CardPrintsResult> {

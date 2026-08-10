@@ -1,6 +1,105 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-09 (19:12 lighting/foil export analysis and precision tightening)
+Last updated: 2026-08-09 (21:29 correction labels, rotation audit, and scanner-repo survey)
+
+## Session Results 2026-08-09 (21:29 correction/rotation export)
+
+Archive: `TCGer-DevMode-All-20260809-212942.zip`. It adds two sessions:
+16 single-card lighting/overlap captures at 21:09 and seven binder-page
+captures plus manual correction events at 21:12.
+
+### Single-card results
+
+- The 21:09 session produced eight exact accepts and eight safe abstentions,
+  with zero wrong accepts. Exact accepted IDs were `swshp-SWSH204` (2),
+  `dp4-103`, `dp4-104`, `pl4-AR3`, `dpp-DP38`, and `dpp-DP30` (2).
+- The abstentions are explainable from the pixels: severe glare/blur on
+  Arceus V and Cresselia, two-card overlap on Giratina/Regigigas, and weak
+  Arceus/Regigigas shots. This is the intended precision-first behavior.
+- The known `ecard3-146` Charizard attractor appeared at 0.65 on an alternate
+  Arceus-V attempt and 0.69 on the overlapping Giratina frame. Neither was
+  accepted. This is fresh device evidence that the 0.72 plain-visual bar is
+  blocking the earlier false-positive mode while clear attempts still pass.
+- Current Simulator replay with all 15 single-card frames labeled produces
+  10/15 exact, five abstentions, and zero wrong accepts. It recovers Arceus V
+  frame 2, Arceus frame 9, and Regigigas frame 14, while the device-accepted
+  Darkrai frame 7 is a documented Simulator Vision divergence. Net measured
+  recall improves without a false accept.
+
+### Binder corrections are now ground truth
+
+Manual correction images are byte-identical to their originating
+`frame-NNNN-attempt-N.jpg` crops. Hash matching recovered ten unique final
+labels, and every corrected slot was originally `noCandidates`:
+
+`dp4-41`, `xy3-56`, `pl3-83`, `ex13-18`, `pl2-49`, `pl1-28`, `pl2-28`,
+`dp3-131`, `base4-45`, and `ecard1-33`.
+
+Two crops contain correction history rather than separate cards. The final
+event must win: Gardevoir ends at `dp3-131`; Alakazam was first labeled
+`ecard1-1`, briefly marked no-match, then finalized as `ecard1-33`.
+
+`ScannerCorrectionReplayTests` collapses identical crop bytes in event order
+and replays the final labels through the full production coordinator. Current
+Simulator result: 2/10 exact (`pl3-83` Skarmory FB and `ecard1-33` Alakazam),
+8 safe abstentions, 0 wrong accepts. The Sharpedo crop is especially useful:
+raw ANN top-1 is the correct `pl2-49` at 0.74, but the card-face gate is only
+0.39-0.41 and footer OCR cannot read `49/111`, so production safely abstains.
+Do not lower the gate; improve small/dark collector-number OCR.
+
+The seven recorded binder pages contain 61 detections: 44 had a candidate,
+14 were accepted, 30 were printing-ambiguous, and 17 were `noCandidates`.
+Localization remains good; exact-print evidence and weak
+vintage-card embeddings remain the limiting stages.
+
+Unmodified current code replays those pages in Simulator at 43 candidates
+and 17 matches. Pages `frame-0008.jpg` and `frame-0018.jpg` reproduce one
+candidate below their device recordings, while `frame-0004.jpg` gains one;
+this is another device/Simulator evidence divergence, not a production-code
+regression. `BinderSessionReplayTests` now uses per-page Simulator floors for
+those two pages and the recorded device count everywhere else.
+
+### Rotation audit
+
+- `CardCropper` perspective-corrects cards and rotates a landscape crop to
+  portrait, but it does not distinguish upright from 180-degree upside-down.
+- `BinderPageScanner` currently uses a separate crop path that perspective-
+  corrects and resizes to portrait dimensions without rotating a landscape
+  result. A proposed unification with `CardCropper` was not kept because this
+  archive contains no sideways binder cards. It produced the same 43/17
+  Simulator replay as the reverted path, so the archive cannot distinguish
+  the implementations. Add real sideways binder fixtures before changing it.
+- `ScannerOrientationExperimentTests` compared upright and 180-degree ANN
+  retrieval on the ten final correction crops. Upright: 3/10 top-1, one
+  strong exact, one strong wrong. Rotated 180: 1/10 top-1, zero strong exact,
+  one strong wrong. Best-of-two did not improve this already-upright set.
+  Do not pay the extra embedding cost until an upside-down device corpus shows
+  an abstention-only 180-degree retry improves recall without new accepts.
+
+### `/Volumes/Main/Scanner` ideas worth carrying forward
+
+The local `METHODS_ANALYSIS.md` already catalogs 29 scanner repositories.
+The most relevant patterns for this app are:
+
+- OpenSorts compares upright and 180-degree embeddings; Spell Coven generates
+  all four orientations. Use these as experiment designs, not automatic
+  production changes.
+- Spell Coven and the MTG sorter use Laplacian sharpness/motion stability.
+  A calibrated quality signal could ask the user to hold steady or retake a
+  frame without altering embedding pixels.
+- RiftBound uses YOLO OBB, full-resolution crops, and synthetic rotation,
+  glare, shadow, JPEG, vignette, and distractor augmentation. TCGer already
+  has the stronger detector path; the transferable idea is augmentation for
+  reference/model training and always cropping from the highest-resolution
+  source.
+- The MTG sorter combines pHash, HSV, and geometric feature verification.
+  For TCGer, a second visual verifier should rerank an ANN shortlist only;
+  it must not bypass the gate/printing safeguards.
+
+Next measured work: collector-number OCR crops/preprocessing on the ten new
+labels, blur-quality calibration on device frames, sideways/upside-down
+fixtures, then perspective/foil reference augmentation. Keep the 0.72
+acceptance bar and 0.82 binder auto-match bar unchanged.
 
 ## Session Results 2026-08-09 (19:12 lighting/foil export)
 

@@ -48,6 +48,31 @@ describe('cross-game card search', () => {
 
     await expect(searchCards({ query: 'Goku', tcg: 'dragonball' })).rejects.toBe(error);
   });
+
+  test.each(['Mr Mime', 'Mr.mime'])(
+    'falls back to normalized name tokens for %s without aliases',
+    async (query) => {
+      const searchCardsMock = jest.fn(async (providerQuery: string) => {
+        if (providerQuery.toLowerCase() === 'mime') {
+          return [
+            { id: 'mr-mime', tcg: 'pokemon', name: 'Mr. Mime' },
+            { id: 'mime-jr', tcg: 'pokemon', name: 'Mime Jr.' }
+          ];
+        }
+        return [];
+      });
+      jest.spyOn(adapterRegistry, 'get').mockReturnValue({
+        game: 'pokemon',
+        searchCards: searchCardsMock
+      } as unknown as TcgAdapter);
+
+      await expect(searchCards({ query, tcg: 'pokemon' })).resolves.toEqual([
+        { id: 'mr-mime', tcg: 'pokemon', name: 'Mr. Mime' }
+      ]);
+      expect(searchCardsMock).toHaveBeenCalledWith(query);
+      expect(searchCardsMock).toHaveBeenCalledWith('mime');
+    }
+  );
 });
 
 describe('exhaustive name search', () => {

@@ -100,6 +100,8 @@ struct CardScannerView: View {
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeRecordingEnabled = false
     @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
+    @AppStorage("binderScanner.savePageImages") private var savesBinderPageImages = true
+    @AppStorage("binderScanner.replacePageImages") private var replacesBinderPageImages = true
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
     @State private var photoPickerMode: ScannerPhotoPickerMode?
@@ -264,6 +266,9 @@ struct CardScannerView: View {
                 dismissIcon: scope == nil ? "chevron.left" : "xmark",
                 triggerMode: $viewModel.triggerMode,
                 automaticallyShowResults: $automaticallyShowResults,
+                savesBinderPageImages: $savesBinderPageImages,
+                replacesBinderPageImages: $replacesBinderPageImages,
+                showsBinderOptions: viewModel.captureMode == .binder,
                 showsTestInputs: showTestingTools || isSimulator,
                 isProcessing: isProcessingPhoto,
                 onLoadPhoto: { presentPhotoPicker(.single) },

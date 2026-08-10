@@ -8,6 +8,9 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     var dismissIcon: String = "xmark"
     @Binding var triggerMode: ScannerTriggerMode
     @Binding var automaticallyShowResults: Bool
+    @Binding var savesBinderPageImages: Bool
+    @Binding var replacesBinderPageImages: Bool
+    let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
     let onLoadPhoto: () -> Void
@@ -96,6 +99,22 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     }
                     .disabled(isProcessing)
                 }
+
+                if showsBinderOptions {
+                    Section("Binder scans") {
+                        Toggle(isOn: $savesBinderPageImages) {
+                            Label("Save Page Photos", systemImage: "photo.on.rectangle.angled")
+                        }
+                        .disabled(isProcessing)
+
+                        if savesBinderPageImages {
+                            Toggle(isOn: $replacesBinderPageImages) {
+                                Label("Replace Photos on Retake", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .disabled(isProcessing)
+                        }
+                    }
+                }
             } label: {
                 scannerOptionsLabel
             }
@@ -104,6 +123,9 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
             .accessibilityValue(
                 "\(triggerMode.displayName) scan, automatic results "
                     + (automaticallyShowResults ? "on" : "off")
+                    + (showsBinderOptions
+                        ? ", save binder page photos \(savesBinderPageImages ? "on" : "off")"
+                        : "")
             )
 
             if cameraController.isTorchAvailable {
