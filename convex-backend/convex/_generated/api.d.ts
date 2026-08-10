@@ -18,6 +18,7 @@ import type * as decks from "../decks.js";
 import type * as decksHttp from "../decksHttp.js";
 import type * as finance from "../finance.js";
 import type * as financeHttp from "../financeHttp.js";
+import type * as guides from "../guides.js";
 import type * as http from "../http.js";
 import type * as lib_auditValidators from "../lib/auditValidators.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   decksHttp: typeof decksHttp;
   finance: typeof finance;
   financeHttp: typeof financeHttp;
+  guides: typeof guides;
   http: typeof http;
   "lib/auditValidators": typeof lib_auditValidators;
   "lib/auth": typeof lib_auth;

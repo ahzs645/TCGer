@@ -183,6 +183,7 @@ function catalogCardAttributes(card: CatalogCard): Record<string, unknown> {
   if (card.def !== undefined) attributes.def = card.def;
   if (card.level !== undefined) attributes.level = card.level;
   if (card.konamiId !== undefined) attributes.konamiId = card.konamiId;
+  if (card.artist !== undefined) attributes.artist = card.artist;
   return attributes;
 }
 
@@ -195,15 +196,27 @@ export function catalogCardToCard(
   return {
     id: card.id,
     tcg,
+    printingKey: card.printingKey,
+    printingKind: card.printingKind,
+    sanctionedPlayLegal: card.sanctionedPlayLegal,
+    originalPrintingKey: card.originalPrintingKey,
     name: card.name,
     setCode: card.setCode,
     setName: set?.name,
     rarity: card.rarity,
+    artist: card.artist,
     collectorNumber: card.collectorNumber,
     releasedAt: set?.releasedAt,
     setSymbolUrl: set?.iconUrl,
     setLogoUrl: set?.logoUrl,
     supertype: card.type,
+    pokemonPrint: card.pokemonWorldChampionship
+      ? {
+          finishes: ["normal"],
+          category: card.type,
+          worldChampionship: card.pokemonWorldChampionship,
+        }
+      : undefined,
     ...(Object.keys(attributes).length > 0 ? { attributes } : {}),
     ...deriveCatalogImageUrls(tcg, card, set),
   };
@@ -240,7 +253,16 @@ async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null
           card.setCode,
           card.collectorNumber,
           card.rarity,
+          card.artist,
           card.supertype,
+          card.printingKind,
+          card.pokemonPrint?.worldChampionship?.year?.toString(),
+          card.pokemonPrint?.worldChampionship?.playerName,
+          card.pokemonPrint?.worldChampionship?.deckName,
+          card.pokemonPrint?.worldChampionship?.stamp,
+          card.pokemonPrint?.worldChampionship
+            ? "world worlds world championship wcd replica memorabilia"
+            : undefined,
         ]
           .filter((value): value is string => Boolean(value))
           .join(" "),
@@ -308,6 +330,24 @@ export async function searchCatalog(
   return ranked.flat().slice(0, limit);
 }
 
+export async function searchCatalogByArtist(
+  artist: string,
+  tcg: CatalogTcgCode,
+  limit = 1000,
+): Promise<Card[]> {
+  const normalizedArtist = normalizeCatalogText(artist);
+  if (!normalizedArtist || limit <= 0) return [];
+
+  const index = await buildSearchIndex(tcg);
+  if (!index) return [];
+  return index.entries
+    .filter(
+      (entry) => normalizeCatalogText(entry.card.artist ?? "") === normalizedArtist,
+    )
+    .slice(0, limit)
+    .map((entry) => entry.card);
+}
+
 export async function matchCatalogCards(
   tcg: CatalogTcgCode,
   lookups: CatalogCardLookup[],
@@ -342,6 +382,9 @@ export async function getSets(tcg: CatalogTcgCode): Promise<TcgSet[]> {
     tcg,
     releaseDate: set.releasedAt,
     totalCards: set.count,
+    standardCards: set.standardCount,
+    setType: set.setType,
+    releaseYear: set.releaseYear,
     iconUrl: set.iconUrl,
     iconFallbackUrl: set.iconFallbackUrl,
     logoUrl: set.logoUrl,

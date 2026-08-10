@@ -29,7 +29,7 @@ struct CollectionsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingCreateSheet = false
-   @State private var selectedCollection: Collection?
+    @State private var selectedCollection: Collection?
     @State private var selectedSmartFolder: SmartFolder?
     @State private var showingSmartFolderEditor = false
     @State private var showingImportSheet = false
@@ -113,100 +113,98 @@ struct CollectionsView: View {
     }
 
     private var collectionsContent: some View {
-        VStack(spacing: 0) {
-            binderControlBar
-
-            Group {
-                if isLoading {
-                    ProgressView("Loading binders...")
-                } else if let error = errorMessage {
-                    ErrorView(title: "Error Loading Binders", message: error) {
-                        Task { await loadCollections() }
-                    }
-                } else if sortedCollections.isEmpty && environmentStore.smartFolders.isEmpty {
-                    if environmentStore.isAuthenticated {
-                        EmptyCollectionsView(onCreate: {
-                            showingCreateSheet = true
-                        })
-                    } else {
-                        VStack(spacing: 12) {
-                            Image(systemName: "lock")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
-                            Text("Sign in to manage collections")
-                                .font(.headline)
-                            Text("Public access is currently limited for collections on this server.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+        Group {
+            if isLoading {
+                ProgressView("Loading binders...")
+            } else if let error = errorMessage {
+                ErrorView(title: "Error Loading Binders", message: error) {
+                    Task { await loadCollections() }
+                }
+            } else if sortedCollections.isEmpty && environmentStore.smartFolders.isEmpty {
+                if environmentStore.isAuthenticated {
+                    EmptyCollectionsView(onCreate: {
+                        showingCreateSheet = true
+                    })
                 } else {
-                    ScrollView {
-                        if displayCollections.isEmpty && displaySmartFolders.isEmpty {
-                            ContentUnavailableView.search(text: searchText)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 80)
-                        }
+                    VStack(spacing: 12) {
+                        Image(systemName: "lock")
+                            .font(.system(size: 40))
+                            .foregroundColor(.secondary)
+                        Text("Sign in to manage collections")
+                            .font(.headline)
+                        Text("Public access is currently limited for collections on this server.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                ScrollView {
+                    binderControlBar
 
-                        if !displaySmartFolders.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Smart Folders")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
+                    if displayCollections.isEmpty && displaySmartFolders.isEmpty {
+                        ContentUnavailableView.search(text: searchText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                    }
 
-                                ForEach(displaySmartFolders) { folder in
-                                    Button {
-                                        selectedSmartFolder = folder
-                                    } label: {
-                                        HStack(spacing: 10) {
-                                            Image(systemName: "wand.and.stars")
-                                                .foregroundColor(Color.fromHex(folder.colorHex))
-                                                .frame(width: 24)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(folder.name)
-                                                    .font(.subheadline)
-                                                    .fontWeight(.medium)
-                                                Text("\(folder.rules.count) rules (\(folder.matchMode.rawValue.lowercased()))")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
+                    if !displaySmartFolders.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Smart Folders")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+
+                            ForEach(displaySmartFolders) { folder in
+                                Button {
+                                    selectedSmartFolder = folder
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "wand.and.stars")
+                                            .foregroundColor(Color.fromHex(folder.colorHex))
+                                            .frame(width: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(folder.name)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Text("\(folder.rules.count) rules (\(folder.matchMode.rawValue.lowercased()))")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
-                                        .padding(12)
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(10)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        }
-
-                        LazyVStack(spacing: 16) {
-                            ForEach(displayCollections) { collection in
-                                Button {
-                                    selectedCollection = collection
-                                } label: {
-                                    CollectionCardView(
-                                        collection: collection,
-                                        showPricing: environmentStore.showPricing,
-                                        showUpdatedDate: sortOption == .lastEdited
-                                    )
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding()
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                     }
+
+                    LazyVStack(spacing: 16) {
+                        ForEach(displayCollections) { collection in
+                            Button {
+                                selectedCollection = collection
+                            } label: {
+                                CollectionCardView(
+                                    collection: collection,
+                                    showPricing: environmentStore.showPricing,
+                                    showUpdatedDate: sortOption == .lastEdited
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding()
                 }
             }
         }
@@ -216,6 +214,7 @@ struct CollectionsView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search binders"
             )
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     if environmentStore.isAuthenticated {

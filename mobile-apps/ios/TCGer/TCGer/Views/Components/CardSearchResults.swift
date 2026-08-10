@@ -168,6 +168,23 @@ struct CardSearchResultCell: View {
 
             // Card Info
             VStack(alignment: .leading, spacing: 4) {
+                if let worlds = card.pokemonPrint?.worldChampionship {
+                    HStack(spacing: 4) {
+                        Text("Worlds \(worlds.year)")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.14))
+                            .clipShape(Capsule())
+
+                        Text(worlds.playerName)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
                 if let rarity = card.rarity {
                     PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
                 }
@@ -209,7 +226,15 @@ struct CardSearchResultCell: View {
                                 .background(Color(.systemGray4))
                                 .cornerRadius(3)
                         }
-                        if card.formatLegality?.standard == true {
+                        if card.sanctionedPlayLegal == false {
+                            Text("Not tournament legal")
+                                .font(.system(size: 9))
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.orange.opacity(0.15))
+                                .cornerRadius(3)
+                        } else if card.formatLegality?.standard == true {
                             Text("Standard")
                                 .font(.system(size: 9))
                                 .foregroundColor(.green)
@@ -319,6 +344,15 @@ struct CardSearchResultCell: View {
 
         if let rarity = nonEmpty(card.rarity) {
             parts.append(rarity)
+        }
+        if let worlds = card.pokemonPrint?.worldChampionship {
+            parts.append("World Championship \(worlds.year) replica for \(worlds.playerName)")
+            if let deckName = nonEmpty(worlds.deckName) {
+                parts.append("Deck \(deckName)")
+            }
+        }
+        if card.sanctionedPlayLegal == false {
+            parts.append("Not tournament legal")
         }
         if showPricing, let price = card.price {
             parts.append("Price \(price.priceText)")

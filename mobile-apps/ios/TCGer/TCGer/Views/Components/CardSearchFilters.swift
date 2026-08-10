@@ -169,8 +169,10 @@ struct CardSearchFilterSheet: View {
                 (draftGame == .all || set.tcg.caseInsensitiveCompare(draftGame.rawValue) == .orderedSame)
             }
             .sorted {
-                if ($0.releaseDate ?? "") != ($1.releaseDate ?? "") {
-                    return ($0.releaseDate ?? "") > ($1.releaseDate ?? "")
+                let leftDate = $0.releaseDate ?? $0.releaseYear.map { "\($0)-12-31" } ?? ""
+                let rightDate = $1.releaseDate ?? $1.releaseYear.map { "\($0)-12-31" } ?? ""
+                if leftDate != rightDate {
+                    return leftDate > rightDate
                 }
                 return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
@@ -429,7 +431,10 @@ private struct CardSearchSetPicker: View {
                         } label: {
                             selectionRow(
                                 title: set.name,
-                                subtitle: set.code.uppercased(),
+                                subtitle: [
+                                    set.code.uppercased(),
+                                    set.setType == "memorabilia" ? "Memorabilia" : nil
+                                ].compactMap { $0 }.joined(separator: " · "),
                                 isSelected: selection?.id == set.id
                             )
                         }

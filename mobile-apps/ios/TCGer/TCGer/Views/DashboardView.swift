@@ -36,7 +36,7 @@ struct DashboardView: View {
 
     private var dashboardContent: some View {
         ScrollView {
-                VStack(spacing: 20) {
+            VStack(spacing: 20) {
                     if isLoading {
                         ProgressView("Loading your collection...")
                             .padding()
@@ -80,7 +80,8 @@ struct DashboardView: View {
                     }
                 }
                 .padding()
-            }
+        }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .navigationTitle("Dashboard")
             .toolbar {
                 if environmentStore.isAuthenticated {

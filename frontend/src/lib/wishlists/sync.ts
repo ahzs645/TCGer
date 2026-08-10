@@ -6,7 +6,11 @@ import {
   type WishlistRuleResponse,
 } from "@tcg/api-types";
 
-import { getSetCards, searchAllCards } from "@/lib/api/cards";
+import {
+  getSetCards,
+  searchAllCards,
+  searchCardsByArtist,
+} from "@/lib/api/cards";
 import { addCardsToWishlist, updateWishlistRule } from "@/lib/api/wishlists";
 
 /**
@@ -22,6 +26,10 @@ export function toWishlistCardInput(card: Card): AddWishlistCardInput {
     baseExternalId: card.baseExternalId,
     printingKey: card.printingKey,
     artworkId: card.artworkId,
+    printingKind: card.printingKind,
+    sanctionedPlayLegal: card.sanctionedPlayLegal,
+    originalPrintingKey: card.originalPrintingKey,
+    artist: card.artist,
     tcg: card.tcg,
     name: card.name,
     setCode: card.setCode,
@@ -49,7 +57,7 @@ export function toWishlistCardInput(card: Card): AddWishlistCardInput {
 }
 
 export interface WishlistRuleQuery {
-  type: "name" | "set";
+  type: "name" | "set" | "artist";
   tcg?: TcgCode;
   query?: string;
   setCode?: string;
@@ -66,6 +74,13 @@ export async function expandWishlistRule(
     return getSetCards(token, rule.tcg, rule.setCode);
   }
   if (!rule.query) return [];
+  if (rule.type === "artist") {
+    return searchCardsByArtist(token, {
+      artist: rule.query,
+      tcg: rule.tcg,
+      unique: rule.includeAllPrintings === false ? "cards" : "prints",
+    });
+  }
   return searchAllCards(token, {
     query: rule.query,
     tcg: rule.tcg,

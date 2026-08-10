@@ -44,6 +44,10 @@ export const addWishlistCardSchema = z.object({
   baseExternalId: z.string().trim().min(1).optional(),
   printingKey: z.string().trim().min(1).optional(),
   artworkId: z.string().trim().min(1).optional(),
+  artist: z.string().trim().min(1).optional(),
+  printingKind: z.string().trim().min(1).optional(),
+  sanctionedPlayLegal: z.boolean().optional(),
+  originalPrintingKey: z.string().trim().min(1).optional(),
   tcg: tcgCodeSchema,
   name: z.string().min(1, 'Card name is required'),
   setCode: z.string().optional(),
@@ -95,7 +99,7 @@ export type AddWishlistCardsInput = z.infer<typeof addWishlistCardsSchema>;
  * in Pokemon", "all of Prismatic Evolutions" — so the list can be re-expanded
  * later and pick up printings that did not exist when it was created.
  */
-export const wishlistRuleTypeSchema = z.enum(['name', 'set']);
+export const wishlistRuleTypeSchema = z.enum(['name', 'set', 'artist']);
 export type WishlistRuleType = z.infer<typeof wishlistRuleTypeSchema>;
 
 export const createWishlistRuleSchema = z
@@ -103,7 +107,7 @@ export const createWishlistRuleSchema = z
     type: wishlistRuleTypeSchema,
     /** Omitted on a name rule means "search every game". Required for set rules. */
     tcg: tcgCodeSchema.optional(),
-    /** Name fragment to match. Required for name rules. */
+    /** Name or artist to match. Required for name and artist rules. */
     query: z.string().trim().min(1).optional(),
     /** Provider set code. Required for set rules. */
     setCode: z.string().trim().min(1).optional(),
@@ -114,7 +118,7 @@ export const createWishlistRuleSchema = z
     autoSync: z.boolean().default(true)
   })
   .superRefine((value, ctx) => {
-    if (value.type === 'name' && !value.query) {
+    if ((value.type === 'name' || value.type === 'artist') && !value.query) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['query'],
@@ -179,6 +183,9 @@ export function describeWishlistRule(rule: {
     const set = rule.setName ?? rule.setCode ?? 'set';
     return `Every card in ${set}`;
   }
+  if (rule.type === 'artist') {
+    return `Every card illustrated by ${rule.query ?? 'this artist'}`;
+  }
   const scope = rule.includeAllPrintings === false ? 'card' : 'printing';
   return `Every ${scope} named "${rule.query ?? ''}"`;
 }
@@ -193,6 +200,10 @@ export interface WishlistCardResponse {
   baseExternalId?: string;
   printingKey?: string;
   artworkId?: string;
+  artist?: string;
+  printingKind?: string;
+  sanctionedPlayLegal?: boolean;
+  originalPrintingKey?: string;
   tcg: TcgCode;
   name: string;
   setCode?: string;

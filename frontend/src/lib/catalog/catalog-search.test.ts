@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { Card } from "@tcg/api-types";
 
-import { selectBestCatalogCardMatch } from "./catalog-search";
+import { catalogCardToCard, selectBestCatalogCardMatch } from "./catalog-search";
 
 function card(overrides: Partial<Card> & Pick<Card, "id">): Card {
   const { id, ...rest } = overrides;
@@ -89,4 +89,36 @@ test("does not enrich from a partial-name match", () => {
   );
 
   assert.equal(match, undefined);
+});
+
+test("maps a World Championship catalog row as an exact replica printing", () => {
+  const mapped = catalogCardToCard(
+    "pokemon",
+    {
+      id: "wcd-901",
+      name: "Dragapult ex",
+      setCode: "wcd2025",
+      printingKey: "pokemon:wcd:2025:yuya-okita:901",
+      printingKind: "replica",
+      sanctionedPlayLegal: false,
+      pokemonWorldChampionship: {
+        year: 2025,
+        playerName: "Yuya Okita",
+        deckName: "Dragapult Dominion",
+        printedSignature: true,
+        cardBack: "world-championship",
+      },
+    },
+    {
+      code: "wcd2025",
+      name: "World Championship Decks 2025",
+      setType: "memorabilia",
+      releaseYear: 2025,
+    },
+  );
+
+  assert.equal(mapped.printingKind, "replica");
+  assert.equal(mapped.sanctionedPlayLegal, false);
+  assert.equal(mapped.pokemonPrint?.worldChampionship?.playerName, "Yuya Okita");
+  assert.deepEqual(mapped.pokemonPrint?.finishes, ["normal"]);
 });

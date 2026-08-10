@@ -94,6 +94,7 @@ struct WishlistsView: View {
                 .listStyle(.insetGrouped)
             }
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle("Wishlists")
         .searchable(
             text: $searchText,

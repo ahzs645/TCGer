@@ -264,7 +264,6 @@ struct CollectionCardRow: View {
                             .foregroundColor(.green)
                     }
                 }
-                Spacer()
             }
 
             if card.copies.count > 1, isCopiesExpanded {
@@ -330,7 +329,12 @@ struct CollectionCardRow: View {
             }
         }
         .contentShape(Rectangle())
-        .cardPreviewContextMenu(card: card.previewCard)
+        // Foil is suppressed only when the copies have explicit finish data
+        // and none of them are foil; unknown finishes keep the rarity default.
+        .cardPreviewContextMenu(
+            card: card.previewCard,
+            showsFoil: hasAnyFoil || finishLabels.isEmpty
+        )
     }
 
     private struct SummaryRow: View {

@@ -88,6 +88,45 @@ extension APIService {
         return searchResponse.cards
     }
 
+    /// Exact illustrator lookup used by curated collection guides such as the
+    /// Yuka Morii clay collection.
+    func searchCardsByArtist(
+        config: ServerConfiguration,
+        token: String,
+        artist: String,
+        game: TCGGame = .pokemon,
+        limit: Int = 1000
+    ) async throws -> [Card] {
+        if config.isOnDevice {
+            await prepareLocalCatalog(for: game)
+            return CatalogStore.shared.cards(byArtist: artist, tcg: game).prefix(limit).map {
+                CatalogStore.shared.card(from: $0)
+            }
+        }
+
+        let queryItems = [
+            URLQueryItem(name: "artist", value: artist),
+            URLQueryItem(name: "tcg", value: game.rawValue),
+            URLQueryItem(name: "unique", value: "prints"),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/search/artist",
+            queryItems: queryItems,
+            token: token
+        )
+
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let searchResponse = try? JSONDecoder.tcgCardDecoder.decode(CardSearchResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return searchResponse.cards
+    }
+
     func getCardPrints(
         config: ServerConfiguration,
         token: String,

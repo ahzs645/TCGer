@@ -2,6 +2,7 @@ import { env } from '../../config/env';
 import type { TcgSet } from '@tcg/api-types';
 import type {
   CardDTO,
+  CardArtistSearchOptions,
   CardNameSearchOptions,
   CardPrintsResult,
   PokemonFunctionalAbilityDTO,
@@ -19,6 +20,11 @@ import {
 } from './pokemon-normalization';
 import { resolvePokemonSetArtwork } from './pokemon-set-artwork';
 import { resolveTcgdexAssetUrl } from './tcgdex-assets';
+import {
+  cardsByWorldChampionshipName,
+  safePokemonWorldChampionshipCatalog,
+  searchPokemonWorldChampionshipCatalog
+} from './pokemon-world-championships';
 
 const POKEMON_TCG_IO_API_ROOT = 'https://api.pokemontcg.io/v2';
 const configuredPokemonApiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
@@ -31,6 +37,7 @@ const isScrydex = /scrydex\.com/i.test(API_ROOT);
 const CARDS_ENDPOINT = isScrydex ? `${API_ROOT}/pokemon/v1/cards` : `${API_ROOT}/cards`;
 const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
 const TCGDEX_CARDS_ENDPOINT = `${VARIANT_API_ROOT}/cards`;
+const PUBLIC_TCGDEX_CARDS_ENDPOINT = 'https://api.tcgdex.net/v2/en/cards';
 const isPublicTCGdexREST = new URL(VARIANT_API_ROOT).hostname.toLowerCase() === 'api.tcgdex.net';
 const isTCGdex = /tcgdex/i.test(API_ROOT);
 const isRemoteApi = isScrydex || /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
@@ -193,6 +200,7 @@ interface PokemonCard {
   flavorText?: string;
   rules?: string[];
   regulationMark?: string;
+  artist?: string;
   legalities?: {
     standard?: string;
     expanded?: string;
@@ -222,6 +230,20 @@ export class PokemonAdapter implements TcgAdapter {
   private static readonly MAX_PRINT_PAGES = 3;
 
   async searchCards(query: string): Promise<CardDTO[]> {
+    const [providerCards, catalog] = await Promise.all([
+      this.searchProviderCards(query),
+      safePokemonWorldChampionshipCatalog()
+    ]);
+    const championshipCards = searchPokemonWorldChampionshipCatalog(catalog, query, 20);
+    const championshipFirst = /\b(world|worlds|wcd|replica|memorabilia|20\d{2})\b/i.test(query);
+    return this.deduplicateCards(
+      championshipFirst
+        ? [...championshipCards, ...providerCards]
+        : [...providerCards, ...championshipCards]
+    ).slice(0, 20);
+  }
+
+  private async searchProviderCards(query: string): Promise<CardDTO[]> {
     const trimmedQuery = query.trim();
 
     if (isTCGdex) {
@@ -259,14 +281,63 @@ export class PokemonAdapter implements TcgAdapter {
       return [];
     }
 
-    const cards = isTCGdex
-      ? await this.fetchTCGdexCardsByName(trimmed, options.limit)
-      : await this.fetchPokemonCardsByName(trimmed, options.limit);
+    const [providerCards, catalog] = await Promise.all([
+      isTCGdex
+        ? this.fetchTCGdexCardsByName(trimmed, options.limit)
+        : this.fetchPokemonCardsByName(trimmed, options.limit),
+      safePokemonWorldChampionshipCatalog()
+    ]);
+    const championshipCards = cardsByWorldChampionshipName(catalog, trimmed);
+    const cards = this.deduplicateCards([...providerCards, ...championshipCards]);
 
     if (options.includeAllPrintings) {
       return cards.slice(0, options.limit);
     }
     return this.collapseToDistinctCards(cards).slice(0, options.limit);
+  }
+
+  async fetchCardsByArtist(
+    artist: string,
+    options: CardArtistSearchOptions
+  ): Promise<CardDTO[]> {
+    const trimmed = artist.trim();
+    if (!trimmed) return [];
+
+    const url = new URL(PUBLIC_TCGDEX_CARDS_ENDPOINT);
+    url.searchParams.set('illustrator', trimmed);
+    url.searchParams.set('pagination:page', '1');
+    url.searchParams.set('pagination:itemsPerPage', String(options.limit));
+    const response = await rateLimitedFetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`TCGdex artist search failed: ${response.status}`);
+    }
+    const payload = (await response.json()) as TCGdexCardSummary[];
+    const cards = payload.slice(0, options.limit).map((card): CardDTO => {
+      const imageBase = card.image?.replace(/\/$/, '');
+      const dashIndex = card.id.lastIndexOf('-');
+      const setCode = dashIndex > 0 ? card.id.slice(0, dashIndex) : undefined;
+      return {
+        id: card.id,
+        tcg: this.game,
+        printingKey: `${this.game}:${card.id}`,
+        name: card.name,
+        artist: trimmed,
+        setCode,
+        collectorNumber: card.localId,
+        imageUrl: imageBase ? `${imageBase}/high.webp` : undefined,
+        imageUrlSmall: imageBase ? `${imageBase}/low.webp` : undefined,
+        attributes: { artist: trimmed },
+        provenance: {
+          source: 'tcgdex',
+          sourceId: card.id,
+          fetchedAt: new Date().toISOString(),
+          schemaVersion: 'v2'
+        }
+      };
+    });
+    return options.includeAllPrintings
+      ? cards
+      : this.collapseToDistinctCards(cards);
   }
 
   /**
@@ -379,6 +450,11 @@ export class PokemonAdapter implements TcgAdapter {
       return null;
     }
 
+    if (trimmedId.startsWith('wcd-')) {
+      const catalog = await safePokemonWorldChampionshipCatalog();
+      return catalog.cards.find((card) => card.id === trimmedId) ?? null;
+    }
+
     try {
       const response = await rateLimitedFetch(`${CARDS_ENDPOINT}/${trimmedId}`, {
         headers: this.buildHeaders()
@@ -404,6 +480,26 @@ export class PokemonAdapter implements TcgAdapter {
     const trimmedId = externalId.trim();
     if (!trimmedId) {
       return { mode: 'simple', prints: [], total: 0 };
+    }
+
+    if (trimmedId.startsWith('wcd-')) {
+      const catalog = await safePokemonWorldChampionshipCatalog();
+      const selected = catalog.cards.find((card) => card.id === trimmedId);
+      if (!selected) {
+        return { mode: 'simple', prints: [], total: 0 };
+      }
+      const normalizedName = this.normalizeName(selected.name);
+      const championshipPrints = catalog.cards.filter(
+        (card) => this.normalizeName(card.name) === normalizedName
+      );
+      const providerPrints = isTCGdex
+        ? await this.fetchTCGdexPrintsByName(selected.name)
+        : [];
+      const prints = this.deduplicateCards([
+        ...providerPrints.filter((card) => this.normalizeName(card.name) === normalizedName),
+        ...championshipPrints
+      ]);
+      return { mode: 'simple', prints, total: prints.length };
     }
 
     try {
@@ -436,7 +532,14 @@ export class PokemonAdapter implements TcgAdapter {
     const normalizedName = this.normalizeName(detail.name);
     const narrowed = this.filterEntriesByName(prints, normalizedName);
     const dataset = narrowed.length ? narrowed : prints;
-    const ordered = this.deduplicateCards(this.sortByReleaseDate(dataset));
+    const catalog = await safePokemonWorldChampionshipCatalog();
+    const championshipPrints = catalog.cards.filter(
+      (card) => this.normalizeName(card.name) === normalizedName
+    );
+    const ordered = this.deduplicateCards([
+      ...this.sortByReleaseDate(dataset),
+      ...championshipPrints
+    ]);
     return { mode: 'simple', prints: ordered, total: ordered.length };
   }
 
@@ -481,6 +584,7 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   async fetchSets(): Promise<TcgSet[]> {
+    const catalogPromise = safePokemonWorldChampionshipCatalog();
     try {
       const response = await rateLimitedFetch(`${API_ROOT}/sets`);
       if (!response.ok) {
@@ -495,7 +599,7 @@ export class PokemonAdapter implements TcgAdapter {
         images?: { symbol?: string; logo?: string };
       }> };
 
-      return (payload.data ?? []).map((s) => ({
+      const providerSets: TcgSet[] = (payload.data ?? []).map((s) => ({
         code: s.id,
         name: s.name,
         tcg: this.game,
@@ -503,14 +607,25 @@ export class PokemonAdapter implements TcgAdapter {
         totalCards: s.total,
         standardCards: s.printedTotal ?? s.total,
         ...resolvePokemonSetArtwork(s.id, s.images?.symbol, s.images?.logo)
-      })).sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''));
+      }));
+      const catalog = await catalogPromise;
+      return [...catalog.sets, ...providerSets]
+        .sort((a, b) => {
+          const sortableDate = (set: TcgSet) =>
+            set.releaseDate ?? (set.releaseYear ? `${set.releaseYear}-12-31` : '');
+          return sortableDate(b).localeCompare(sortableDate(a));
+        });
     } catch (error) {
       console.error('PokemonAdapter.fetchSets error', error);
-      return [];
+      return (await catalogPromise).sets;
     }
   }
 
   async fetchSetCards(setCode: string): Promise<CardDTO[]> {
+    if (/^wcd20\d{2}$/i.test(setCode)) {
+      const catalog = await safePokemonWorldChampionshipCatalog();
+      return catalog.cards.filter((card) => card.setCode?.toLowerCase() === setCode.toLowerCase());
+    }
     try {
       const url = `${CARDS_ENDPOINT}?q=set.id:${setCode}&pageSize=250&orderBy=number`;
       const response = await rateLimitedFetch(url);
@@ -567,6 +682,7 @@ export class PokemonAdapter implements TcgAdapter {
     const functionalSource: PokemonCard = {
       id: card.id,
       name: card.name,
+      artist: card.illustrator,
       supertype: card.category,
       subtypes: card.stage ? [card.stage] : undefined,
       hp: card.hp?.toString(),
@@ -593,6 +709,7 @@ export class PokemonAdapter implements TcgAdapter {
       baseExternalId: functionalIdentity.key || undefined,
       printingKey: `${this.game}:${card.id}`,
       name: card.name,
+      artist: card.illustrator,
       setCode: card.set?.id,
       setName: card.set?.name,
       rarity,
@@ -632,6 +749,7 @@ export class PokemonAdapter implements TcgAdapter {
         schemaVersion: 'v2'
       },
       attributes: {
+        artist: card.illustrator,
         hp: card.hp,
         types: card.types,
         evolvesFrom: card.evolveFrom,
@@ -661,6 +779,7 @@ export class PokemonAdapter implements TcgAdapter {
       baseExternalId: functionalIdentity.key || undefined,
       printingKey: `${this.game}:${card.id}`,
       name: card.name,
+      artist: card.artist,
       setCode: card.set?.id,
       setName: card.set?.name,
       rarity: canonicalizePokemonRarity(card.rarity, card.name),
@@ -694,6 +813,7 @@ export class PokemonAdapter implements TcgAdapter {
         schemaVersion: 'v2'
       },
       attributes: {
+        artist: card.artist,
         subtypes: card.subtypes,
         hp: card.hp,
         types: card.types,

@@ -11,6 +11,19 @@ export const dexEntryValidator = v.object({
   name: v.string()
 });
 
+export const pokemonWorldChampionshipPrintValidator = v.object({
+  year: v.number(),
+  playerName: v.string(),
+  deckName: v.optional(v.string()),
+  originalCollectorNumber: v.optional(v.string()),
+  printedSignature: v.optional(v.boolean()),
+  cardBack: v.optional(v.string()),
+  borderStyle: v.optional(v.string()),
+  stamp: v.optional(v.string()),
+  sourceProductId: v.optional(v.string()),
+  sourceUrl: v.optional(v.string())
+});
+
 export const pokemonPrintValidator = v.object({
   tcgdexId: v.optional(v.string()),
   tcgdexImage: v.optional(v.string()),
@@ -28,7 +41,8 @@ export const pokemonPrintValidator = v.object({
   language: v.optional(v.string()),
   formatLegality: v.optional(formatLegalityValidator),
   dexEntries: v.optional(v.array(dexEntryValidator)),
-  region: v.optional(v.string())
+  region: v.optional(v.string()),
+  worldChampionship: v.optional(pokemonWorldChampionshipPrintValidator)
 });
 
 export const provenanceValidator = v.object({
@@ -57,6 +71,10 @@ export const functionalIdentityValidator = v.object({
 });
 
 export const richCardMetadataFields = {
+  artist: v.optional(v.string()),
+  printingKind: v.optional(v.string()),
+  sanctionedPlayLegal: v.optional(v.boolean()),
+  originalPrintingKey: v.optional(v.string()),
   setSymbolUrl: v.optional(v.string()),
   setLogoUrl: v.optional(v.string()),
   regulationMark: v.optional(v.string()),
@@ -74,6 +92,10 @@ export const richCardMetadataFields = {
 };
 
 export type RichCardMetadata = {
+  artist?: string;
+  printingKind?: string;
+  sanctionedPlayLegal?: boolean;
+  originalPrintingKey?: string;
   setSymbolUrl?: string;
   setLogoUrl?: string;
   regulationMark?: string;
@@ -110,6 +132,18 @@ export type RichCardMetadata = {
       name: string;
     }>;
     region?: string;
+    worldChampionship?: {
+      year: number;
+      playerName: string;
+      deckName?: string;
+      originalCollectorNumber?: string;
+      printedSignature?: boolean;
+      cardBack?: string;
+      borderStyle?: string;
+      stamp?: string;
+      sourceProductId?: string;
+      sourceUrl?: string;
+    };
   };
   attributes?: Record<string, unknown>;
   provenance?: {
@@ -183,6 +217,10 @@ function mergeLegalityPeriods(
 
 export function pickRichCardMetadata(source: RichCardMetadata): RichCardMetadata {
   return {
+    artist: source.artist,
+    printingKind: source.printingKind,
+    sanctionedPlayLegal: source.sanctionedPlayLegal,
+    originalPrintingKey: source.originalPrintingKey,
     setSymbolUrl: source.setSymbolUrl,
     setLogoUrl: source.setLogoUrl,
     regulationMark: source.regulationMark,
@@ -207,6 +245,10 @@ export function mergeRichCardMetadata(
   const next = pickRichCardMetadata(incoming);
   const previous = pickRichCardMetadata(existing);
   return {
+    artist: next.artist ?? previous.artist,
+    printingKind: next.printingKind ?? previous.printingKind,
+    sanctionedPlayLegal: next.sanctionedPlayLegal ?? previous.sanctionedPlayLegal,
+    originalPrintingKey: next.originalPrintingKey ?? previous.originalPrintingKey,
     setSymbolUrl: next.setSymbolUrl ?? previous.setSymbolUrl,
     setLogoUrl: next.setLogoUrl ?? previous.setLogoUrl,
     regulationMark: next.regulationMark ?? previous.regulationMark,

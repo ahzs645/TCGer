@@ -8,6 +8,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
     case collections
     case sets
     case wishlists
+    case guides
     case sealed
     case scan
     case settings
@@ -20,6 +21,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .collections: return "Collections"
         case .sets: return "Sets"
         case .wishlists: return "Wishlists"
+        case .guides: return "Guides"
         case .sealed: return "Sealed"
         case .scan: return "Scan"
         case .settings: return "Settings"
@@ -32,6 +34,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .collections: return "folder.fill"
         case .sets: return "square.stack.3d.up"
         case .wishlists: return "heart.fill"
+        case .guides: return "sparkles.rectangle.stack.fill"
         case .sealed: return "shippingbox.fill"
         case .scan: return "camera.viewfinder"
         case .settings: return "gearshape.fill"
@@ -44,6 +47,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .collections: return "Binders, smart folders, and CSV import"
         case .sets: return "Browse sets and track set completion"
         case .wishlists: return "Cards you're hunting for"
+        case .guides: return "Curated card collections to follow"
         case .sealed: return "Sealed boxes, packs, and openings"
         case .scan: return "Identify cards with the camera"
         case .settings: return "Preferences and app configuration"

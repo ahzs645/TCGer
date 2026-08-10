@@ -197,6 +197,8 @@ nonisolated struct CatalogSetEntry: Decodable, Hashable, Sendable {
     let iconUrl: String?
     let iconFallbackUrl: String?
     let logoUrl: String?
+    var setType: String? = nil
+    var releaseYear: Int? = nil
 }
 
 /// The in-memory pack row intentionally contains only fields needed by offline
@@ -207,6 +209,7 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let setCode: String?
     let collectorNumber: String?
     let rarity: String?
+    var artist: String? = nil
     let type: String?
     let types: [String]?
     let colors: [String]?
@@ -215,6 +218,11 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let konamiId: Int?
     let imageUrl: String?
     let imageUrlSmall: String?
+    var printingKey: String? = nil
+    var printingKind: String? = nil
+    var sanctionedPlayLegal: Bool? = nil
+    var originalPrintingKey: String? = nil
+    var pokemonWorldChampionship: PokemonWorldChampionshipPrint? = nil
 }
 
 nonisolated struct CatalogEntry: Hashable, Sendable {
@@ -281,13 +289,16 @@ final class CatalogStore: ObservableObject {
         let searchableFields: [String]
         let collectorNumber: String?
         let displayCollectorNumber: String?
+        let worldChampionshipYear: String?
 
         func matchesAll(_ queryTerms: [String]) -> Bool {
             queryTerms.allSatisfy { term in
                 if term.allSatisfy(\.isNumber) {
                     // A bare number is a collector-number query, not a loose
                     // substring of a name, set, or denominator.
-                    return collectorNumber == term || displayCollectorNumber == term
+                    return collectorNumber == term
+                        || displayCollectorNumber == term
+                        || worldChampionshipYear == term
                 }
                 return searchableFields.contains { $0.contains(term) }
             }
@@ -323,7 +334,10 @@ final class CatalogStore: ObservableObject {
                 uniquingKeysWith: { first, _ in first }
             )
             setSearchMetadata = setMetadata
-            cardSearchMetadata = pack.cards.map { card in
+            var metadata: [CardSearchMetadata] = []
+            metadata.reserveCapacity(pack.cards.count)
+
+            for card in pack.cards {
                 let set = card.setCode.flatMap { setMetadata[$0] }
                 let collectorNumber = card.collectorNumber.map(Self.normalize)
                 let displayCollectorNumber = CatalogStore.displayCollectorNumber(
@@ -331,20 +345,43 @@ final class CatalogStore: ObservableObject {
                     tcg: TCGGame(rawValue: pack.tcg) ?? .all,
                     officialCardCount: set?.officialCardCount
                 ).map(Self.normalize)
-                return CardSearchMetadata(
+                let worlds = card.pokemonWorldChampionship
+                var searchableFields = [Self.normalize(card.name)]
+                if let setName = set?.name { searchableFields.append(setName) }
+                if let setCode = set?.code { searchableFields.append(setCode) }
+                if let collectorNumber { searchableFields.append(collectorNumber) }
+                if let displayCollectorNumber { searchableFields.append(displayCollectorNumber) }
+                if let printingKind = card.printingKind {
+                    searchableFields.append(Self.normalize(printingKind))
+                }
+                if let artist = card.artist {
+                    searchableFields.append(Self.normalize(artist))
+                }
+                if let worlds {
+                    searchableFields.append(String(worlds.year))
+                    searchableFields.append(Self.normalize(worlds.playerName))
+                    if let deckName = worlds.deckName {
+                        searchableFields.append(Self.normalize(deckName))
+                    }
+                    if let stamp = worlds.stamp {
+                        searchableFields.append(Self.normalize(stamp))
+                    }
+                    searchableFields.append(contentsOf: [
+                        "world", "worlds", "world championship", "wcd", "replica", "memorabilia"
+                    ])
+                }
+                searchableFields.append(contentsOf: CatalogSearchAliases.normalizedAliases(forCardID: card.id))
+
+                metadata.append(CardSearchMetadata(
                     name: Self.normalize(card.name),
                     nameWords: SearchTextNormalizer.wordKeys(card.name),
-                    searchableFields: [
-                        Self.normalize(card.name),
-                        set?.name,
-                        set?.code,
-                        collectorNumber,
-                        displayCollectorNumber
-                    ].compactMap { $0 } + CatalogSearchAliases.normalizedAliases(forCardID: card.id),
+                    searchableFields: searchableFields,
                     collectorNumber: collectorNumber,
-                    displayCollectorNumber: displayCollectorNumber
-                )
+                    displayCollectorNumber: displayCollectorNumber,
+                    worldChampionshipYear: worlds.map { String($0.year) }
+                ))
             }
+            cardSearchMetadata = metadata
         }
 
         var version: Int { pack.version }
@@ -616,6 +653,21 @@ final class CatalogStore: ObservableObject {
         }
         return pack.cards.compactMap { card in
             card.setCode == setCode ? CatalogEntry(tcg: tcg, card: card) : nil
+        }
+    }
+
+    func cards(byArtist artist: String, tcg: TCGGame) -> [CatalogEntry] {
+        guard tcg != .all,
+              enabledGames.contains(tcg),
+              let pack = loadedPacks[tcg] else {
+            return []
+        }
+        let normalizedArtist = SearchTextNormalizer.key(artist)
+        return pack.cards.compactMap { card in
+            guard card.artist.map(SearchTextNormalizer.key) == normalizedArtist else {
+                return nil
+            }
+            return CatalogEntry(tcg: tcg, card: card)
         }
     }
 

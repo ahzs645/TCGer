@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   exhaustiveSearchQuerySchema,
+  artistSearchQuerySchema,
+  type ArtistSearchQueryInput,
   type ExhaustiveSearchQueryInput,
   type TcgSet
 } from '@tcg/api-types';
@@ -146,6 +148,22 @@ export async function searchAllCards(input: ExhaustiveSearchQueryInput): Promise
     );
     return [];
   });
+}
+
+export async function searchCardsByArtist(input: ArtistSearchQueryInput): Promise<CardDTO[]> {
+  const { artist, tcg, unique, limit } = artistSearchQuerySchema.parse(input);
+  const adapter = adapterRegistry.get(tcg);
+  if (!adapter.fetchCardsByArtist) {
+    return [];
+  }
+  return withProviderTimeout(
+    adapter.game,
+    'artist search',
+    adapter.fetchCardsByArtist(artist, {
+      includeAllPrintings: unique === 'prints',
+      limit
+    })
+  );
 }
 
 async function runExhaustiveSearch(

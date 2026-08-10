@@ -119,11 +119,6 @@ struct SetDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isLoading, errorMessage == nil, !cards.isEmpty {
-                cardControlBar
-                Divider()
-            }
-
             if isLoading {
                 ProgressView("Loading cards...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -213,16 +208,19 @@ struct SetDetailView: View {
                     }
 
                     if displayedCards.isEmpty {
-                        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            ContentUnavailableView(
-                                "No Cards in This Filter",
-                                systemImage: "rectangle.stack",
-                                description: Text("Choose another ownership filter to see cards.")
-                            )
-                        } else {
-                            ContentUnavailableView.search(text: searchText)
+                        Group {
+                            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                ContentUnavailableView(
+                                    "No Cards in This Filter",
+                                    systemImage: "rectangle.stack",
+                                    description: Text("Choose another ownership filter to see cards.")
+                                )
+                            } else {
+                                ContentUnavailableView.search(text: searchText)
+                            }
                         }
-                        
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 48)
                     } else {
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
@@ -275,6 +273,12 @@ struct SetDetailView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: "Search this set"
         )
+        .safeAreaBar(edge: .top, spacing: 0) {
+            if !isLoading, errorMessage == nil, !cards.isEmpty {
+                cardControlBar
+            }
+        }
+        .scrollEdgeEffectStyle(.soft, for: .all)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -314,7 +318,7 @@ struct SetDetailView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaBar(edge: .bottom) {
             if isSelecting && !selectedCardIds.isEmpty {
                 VStack(spacing: 8) {
                     Button {
@@ -348,14 +352,12 @@ struct SetDetailView: View {
                     .disabled(isBulkAdding)
                 }
                 .padding()
-                .background(.regularMaterial)
             } else if let wishlistStatus {
                 Text(wishlistStatus)
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(.regularMaterial)
             }
         }
         .task {

@@ -91,6 +91,9 @@ export const cardDataPayloadSchema = z.object({
   baseExternalId: z.string().trim().min(1).optional(),
   printingKey: z.string().trim().min(1).optional(),
   artworkId: z.string().trim().min(1).optional(),
+  printingKind: z.string().trim().min(1).optional(),
+  sanctionedPlayLegal: z.boolean().optional(),
+  originalPrintingKey: z.string().trim().min(1).optional(),
   setCode: z.string().optional(),
   setName: z.string().optional(),
   rarity: z.string().optional(),
@@ -629,6 +632,9 @@ export interface CollectionCard {
   baseExternalId?: string;
   printingKey?: string;
   artworkId?: string;
+  printingKind?: string;
+  sanctionedPlayLegal?: boolean;
+  originalPrintingKey?: string;
   name: string;
   tcg: TcgCode;
   setCode?: string;

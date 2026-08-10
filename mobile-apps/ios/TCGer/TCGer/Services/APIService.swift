@@ -2047,6 +2047,7 @@ final class LocalStore {
             setCode: card.setCode,
             setName: card.setName,
             rarity: card.rarity,
+            artist: card.artist,
             imageUrl: card.imageUrl,
             imageUrlSmall: card.imageUrlSmall,
             quantity: copies.count,

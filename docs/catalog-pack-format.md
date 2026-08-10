@@ -64,6 +64,7 @@ Games are independent — a pack may be absent (client treats that game as "no c
       "setCode": "swsh6",
       "collectorNumber": "82",
       "rarity": "Common",
+      "artist": "Yuka Morii",
       "type": "Pokémon"
     }
   ]
@@ -74,12 +75,14 @@ Set fields — common: `code`, `name`, `count`; optional: `serie`, `releasedAt`,
 `iconUrl`, `logoUrl`. Clients should render `iconUrl`, then `logoUrl`, then a
 set-code badge when neither image is available.
 
-Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `type?`,
+Card fields — common: `id`, `name`, `setCode?`, `collectorNumber?`, `rarity?`, `artist?`, `type?`,
 `imageUrl?`, `imageUrlSmall?`.
 `setName` is NOT stored per card; clients join via the `sets` array by `setCode`.
 Per game extras (all optional):
 
-- pokemon: `types` (string[]), `hp` (number). `id` is the tcgdex id (`{setCode}-{localId}`).
+- pokemon: `types` (string[]), `hp` (number). `artist` comes from TCGdex's
+  illustrator credit and supports exact artist-based collection guides. `id` is
+  the tcgdex id (`{setCode}-{localId}`).
 - magic: `manaCost`, `colors` (string[]). `id` is the Scryfall print UUID.
 - yugioh: `race`, `atk`, `def`, `level`, `konamiId` (number). `konamiId` is the
   representative artwork/image id used to derive the YGOPRODeck image URL.

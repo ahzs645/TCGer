@@ -1580,9 +1580,6 @@ private struct BinderCardMatchSearchView: View {
                     )
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                capturedCardReference
-            }
             .navigationTitle("Choose Match")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
@@ -1590,6 +1587,10 @@ private struct BinderCardMatchSearchView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search \(mode.displayName) cards"
             )
+            .safeAreaBar(edge: .top, spacing: 0) {
+                capturedCardReference
+            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .onSubmit(of: .search) {
                 Task { await search() }
             }

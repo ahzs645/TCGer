@@ -85,14 +85,6 @@ struct AddSetsToWishlistSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if environmentStore.enabledGames.count > 1 {
-                    GamePickerPills(
-                        selection: $selectedGame,
-                        games: environmentStore.gamePickerGames
-                    )
-                    Divider()
-                }
-
                 List {
                     if fixedWishlist == nil {
                         wishlistSection
@@ -117,6 +109,15 @@ struct AddSetsToWishlistSheet: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search sets"
             )
+            .safeAreaBar(edge: .top, spacing: 0) {
+                if environmentStore.enabledGames.count > 1 {
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
+                }
+            }
+            .scrollEdgeEffectStyle(.soft, for: .all)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -131,7 +132,7 @@ struct AddSetsToWishlistSheet: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .bottom) {
+            .safeAreaBar(edge: .bottom) {
                 actionBar
             }
             .task {
@@ -336,7 +337,6 @@ struct AddSetsToWishlistSheet: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
     }
 
     private var actionTitle: String {

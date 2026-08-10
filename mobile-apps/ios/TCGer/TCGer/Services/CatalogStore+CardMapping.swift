@@ -11,6 +11,9 @@ extension CatalogStore {
            displayCollectorNumber != entry.card.collectorNumber {
             attributes["collector_number_display"] = .string(displayCollectorNumber)
         }
+        if let artist = entry.card.artist {
+            attributes["artist"] = .string(artist)
+        }
 
         switch entry.tcg {
         case .magic:
@@ -33,6 +36,7 @@ extension CatalogStore {
             setCode: entry.card.setCode,
             setName: set?.name,
             rarity: entry.card.rarity,
+            artist: entry.card.artist,
             imageUrl: fullImageURL,
             imageUrlSmall: thumbnailURL,
             price: nil,
@@ -42,9 +46,27 @@ extension CatalogStore {
             types: entry.tcg == .pokemon ? entry.card.types : nil,
             setSymbolUrl: set?.iconUrl,
             setLogoUrl: set?.logoUrl,
+            pokemonPrint: entry.card.pokemonWorldChampionship.map { worlds in
+                PokemonPrintMetadata(
+                    tcgdexId: nil,
+                    tcgdexImage: nil,
+                    variants: nil,
+                    finishes: ["normal"],
+                    category: entry.card.type,
+                    regulationMark: nil,
+                    language: nil,
+                    formatLegality: nil,
+                    dexEntries: nil,
+                    region: nil,
+                    worldChampionship: worlds
+                )
+            },
             attributes: attributes.isEmpty ? nil : attributes,
-            printingKey: entry.tcg == .yugioh ? entry.card.id : nil,
-            artworkId: entry.card.konamiId.map(String.init)
+            printingKey: entry.card.printingKey ?? (entry.tcg == .yugioh ? entry.card.id : nil),
+            artworkId: entry.card.konamiId.map(String.init),
+            printingKind: entry.card.printingKind,
+            sanctionedPlayLegal: entry.card.sanctionedPlayLegal,
+            originalPrintingKey: entry.card.originalPrintingKey
         )
     }
 
@@ -58,7 +80,9 @@ extension CatalogStore {
             standardCards: set.standardCount,
             iconUrl: set.iconUrl,
             iconFallbackUrl: set.iconFallbackUrl,
-            logoUrl: set.logoUrl
+            logoUrl: set.logoUrl,
+            setType: set.setType,
+            releaseYear: set.releaseYear
         )
     }
 }

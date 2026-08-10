@@ -189,7 +189,7 @@ export default defineSchema({
 
   wishlistRules: defineTable({
     wishlistId: v.id("wishlists"),
-    type: v.union(v.literal("name"), v.literal("set")),
+    type: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
     tcg: v.optional(tcgCode),
     query: v.optional(v.string()),
     setCode: v.optional(v.string()),
@@ -201,6 +201,73 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number()
   }).index("by_wishlist", ["wishlistId"]),
+
+  collectionGuides: defineTable({
+    slug: v.string(),
+    title: v.string(),
+    description: v.string(),
+    tcg: tcgCode,
+    category: v.union(
+      v.literal("art-style"),
+      v.literal("artist"),
+      v.literal("species"),
+      v.literal("story"),
+      v.literal("cameo"),
+      v.literal("custom")
+    ),
+    coverImageUrl: v.optional(v.string()),
+    curatorName: v.string(),
+    tags: v.array(v.string()),
+    version: v.number(),
+    featured: v.boolean(),
+    status: v.union(v.literal("draft"), v.literal("published"), v.literal("archived")),
+    ruleType: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
+    ruleQuery: v.optional(v.string()),
+    ruleSetCode: v.optional(v.string()),
+    ruleSetName: v.optional(v.string()),
+    includeAllPrintings: v.boolean(),
+    matchAnyPrinting: v.boolean(),
+    cardCountHint: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_slug", ["slug"])
+    .index("by_status", ["status"])
+    .index("by_status_and_featured", ["status", "featured"]),
+
+  collectionGuideItems: defineTable({
+    guideId: v.id("collectionGuides"),
+    tcg: tcgCode,
+    externalId: v.string(),
+    name: v.string(),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    collectorNumber: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    imageUrlSmall: v.optional(v.string()),
+    groupKey: v.optional(v.string()),
+    groupLabel: v.optional(v.string()),
+    groupOrder: v.optional(v.number()),
+    position: v.number(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_guide", ["guideId"])
+    .index("by_guide_and_external_id", ["guideId", "externalId"])
+    .index("by_guide_and_group_key", ["guideId", "groupKey"]),
+
+  userGuideFollows: defineTable({
+    userId: v.id("users"),
+    guideId: v.id("collectionGuides"),
+    wishlistId: v.id("wishlists"),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_guide", ["guideId"])
+    .index("by_user_and_guide", ["userId", "guideId"])
+    .index("by_wishlist", ["wishlistId"]),
 
   collectionEntries: defineTable({
     userId: v.id("users"),

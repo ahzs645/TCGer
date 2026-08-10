@@ -146,7 +146,7 @@ type NativeWishlistCard = RichCardMetadata & {
 
 type NativeWishlistRule = {
   id: string;
-  type: "name" | "set";
+  type: "name" | "set" | "artist";
   tcg?: TcgCode;
   query?: string;
   setCode?: string;
@@ -1247,8 +1247,8 @@ http.route({
       }
 
       if (segments.length === 2 && segments[1] === "rules") {
-        if (body.type !== "name" && body.type !== "set") {
-          return errorJson(400, "BAD_REQUEST", "type must be 'name' or 'set'");
+        if (body.type !== "name" && body.type !== "set" && body.type !== "artist") {
+          return errorJson(400, "BAD_REQUEST", "type must be 'name', 'set', or 'artist'");
         }
         const rule = await ctx.runMutation(internal.bridge.addWishlistRule, {
           subject: identity.subject,
@@ -1359,6 +1359,72 @@ http.route({
       return errorJson(404, "NOT_FOUND", "Route not found");
     } catch (error) {
       return handleConvexError(error, "Failed to delete wishlist resource");
+    }
+  })
+});
+
+http.route({
+  path: "/guides",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const guides = await ctx.runQuery(internal.guides.listPublished, {
+        subject: identity.subject
+      });
+      return json(guides);
+    } catch (error) {
+      return handleConvexError(error, "Failed to fetch collection guides");
+    }
+  })
+});
+
+http.route({
+  pathPrefix: "/guides/",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const segments = new URL(request.url).pathname
+        .replace(/^\/guides\//, "")
+        .split("/")
+        .filter(Boolean);
+      if (segments.length !== 1) {
+        return errorJson(404, "NOT_FOUND", "Route not found");
+      }
+      const guide = await ctx.runQuery(internal.guides.getPublishedBySlug, {
+        subject: identity.subject,
+        slug: decodeURIComponent(segments[0]!)
+      });
+      return json(guide);
+    } catch (error) {
+      return handleConvexError(error, "Failed to fetch collection guide");
+    }
+  })
+});
+
+http.route({
+  pathPrefix: "/guides/",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const identity = await requireBridgeIdentity(ctx, request);
+      const segments = new URL(request.url).pathname
+        .replace(/^\/guides\//, "")
+        .split("/")
+        .filter(Boolean);
+      if (segments.length !== 2 || segments[1] !== "follow") {
+        return errorJson(404, "NOT_FOUND", "Route not found");
+      }
+      const body = await parseJsonBody(request);
+      const result = await ctx.runMutation(internal.guides.follow, {
+        subject: identity.subject,
+        slug: decodeURIComponent(segments[0]!),
+        wishlistName: typeof body.wishlistName === "string" ? body.wishlistName : undefined
+      });
+      return json(result, result.created ? 201 : 200);
+    } catch (error) {
+      return handleConvexError(error, "Failed to follow collection guide");
     }
   })
 });

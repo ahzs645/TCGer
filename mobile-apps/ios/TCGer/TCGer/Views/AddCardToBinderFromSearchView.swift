@@ -31,17 +31,6 @@ struct AddCardToBinderFromSearchView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Game Filter - Only show if more than one game is enabled
-                if environmentStore.enabledGames.count > 1 {
-                    GamePickerPills(
-                        selection: $selectedGame,
-                        games: environmentStore.gamePickerGames
-                    )
-                    .background(Color(.systemBackground))
-
-                    Divider()
-                }
-
                 // Search Results
                 if isSearching {
                     ProgressView("Searching...")
@@ -78,6 +67,15 @@ struct AddCardToBinderFromSearchView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search for cards..."
             )
+            .safeAreaBar(edge: .top, spacing: 0) {
+                if environmentStore.enabledGames.count > 1 {
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
+                }
+            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }

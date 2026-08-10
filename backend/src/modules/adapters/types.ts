@@ -29,6 +29,8 @@ export interface CardNameSearchOptions {
   limit: number;
 }
 
+export type CardArtistSearchOptions = CardNameSearchOptions;
+
 // Backend-only: adapter interface (not part of the API contract)
 export interface TcgAdapter {
   readonly game: TcgCode;
@@ -40,6 +42,8 @@ export interface TcgAdapter {
    * only returns a capped preview page.
    */
   fetchCardsByName?(name: string, options: CardNameSearchOptions): Promise<Card[]>;
+  /** Exhaustive illustrator/artist lookup for art-first collection guides. */
+  fetchCardsByArtist?(artist: string, options: CardArtistSearchOptions): Promise<Card[]>;
   fetchCardById(externalId: string): Promise<Card | null>;
   fetchCardPrints?(externalId: string): Promise<CardPrintsResponse>;
   fetchSets?(): Promise<TcgSet[]>;

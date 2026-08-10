@@ -68,6 +68,9 @@ type BinderSnapshot = {
 type AggregatedCollectionCard = CollectionCard;
 
 const CARD_SPECIFIC_FIELDS = [
+  'printingKind',
+  'sanctionedPlayLegal',
+  'originalPrintingKey',
   'releasedAt',
   'setSymbolUrl',
   'setLogoUrl',
@@ -441,6 +444,9 @@ function aggregateCollectionEntries(
         baseExternalId: card.baseExternalId ?? undefined,
         printingKey: card.printingKey ?? undefined,
         artworkId: card.artworkId ?? undefined,
+        printingKind: metadata.printingKind as string | undefined,
+        sanctionedPlayLegal: metadata.sanctionedPlayLegal as boolean | undefined,
+        originalPrintingKey: metadata.originalPrintingKey as string | undefined,
         tcg: card.tcgGame.code as TcgCode,
         name: card.name,
         setCode: card.setCode ?? undefined,

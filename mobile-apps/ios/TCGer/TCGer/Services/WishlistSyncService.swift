@@ -63,6 +63,15 @@ struct WishlistSyncService {
                 ))
             }
             return matches
+        case .artist:
+            guard let artist = rule.query, !artist.isEmpty else { return [] }
+            let game = rule.tcg.flatMap(TCGGame.init(rawValue:)) ?? .pokemon
+            return try await apiService.searchCardsByArtist(
+                config: config,
+                token: token,
+                artist: artist,
+                game: game
+            )
         }
     }
 

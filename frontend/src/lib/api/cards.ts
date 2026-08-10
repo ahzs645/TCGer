@@ -64,6 +64,30 @@ export async function searchAllCards(
   return payload.cards;
 }
 
+export async function searchCardsByArtist(
+  token: string,
+  options: {
+    artist: string;
+    tcg?: TcgCode;
+    unique?: "prints" | "cards";
+    limit?: number;
+  },
+): Promise<Card[]> {
+  const params = new URLSearchParams({ artist: options.artist });
+  if (options.tcg) params.set("tcg", options.tcg);
+  if (options.unique) params.set("unique", options.unique);
+  if (options.limit) params.set("limit", String(options.limit));
+  const response = await fetch(
+    `${API_BASE_URL}/cards/search/artist?${params.toString()}`,
+    { headers: authHeaders(token), credentials: "include" },
+  );
+  const payload = await readJson<SetCardsResponse>(
+    response,
+    "Failed to search cards by artist",
+  );
+  return payload.cards;
+}
+
 function authHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,

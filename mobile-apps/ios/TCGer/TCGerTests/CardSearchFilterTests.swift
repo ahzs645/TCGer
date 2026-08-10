@@ -82,6 +82,50 @@ final class CardSearchFilterTests: XCTestCase {
         XCTAssertEqual(CardSearchFacetKind.color.values(for: card), ["Blue"])
     }
 
+    func testCatalogMappingPreservesWorldChampionshipPrintingIdentity() {
+        let worlds = PokemonWorldChampionshipPrint(
+            year: 2025,
+            playerName: "Yuya Okita",
+            deckName: "Dragapult Dominion",
+            originalCollectorNumber: "130/167",
+            printedSignature: true,
+            cardBack: "world-championship",
+            borderStyle: nil,
+            stamp: nil,
+            sourceProductId: "901",
+            sourceUrl: nil
+        )
+        let entry = CatalogEntry(
+            tcg: .pokemon,
+            card: CatalogCardEntry(
+                id: "wcd-901",
+                name: "Dragapult ex",
+                setCode: "wcd2025",
+                collectorNumber: "130/167",
+                rarity: "Double Rare",
+                type: "Pokémon",
+                types: nil,
+                colors: nil,
+                race: nil,
+                level: nil,
+                konamiId: nil,
+                imageUrl: nil,
+                imageUrlSmall: nil,
+                printingKey: "pokemon:wcd:2025:yuya-okita:901",
+                printingKind: "replica",
+                sanctionedPlayLegal: false,
+                pokemonWorldChampionship: worlds
+            )
+        )
+
+        let card = CatalogStore.shared.card(from: entry)
+
+        XCTAssertEqual(card.printingKind, "replica")
+        XCTAssertEqual(card.sanctionedPlayLegal, false)
+        XCTAssertEqual(card.pokemonPrint?.worldChampionship?.playerName, "Yuya Okita")
+        XCTAssertEqual(card.pokemonPrint?.finishes, ["normal"])
+    }
+
     private func makeCard(
         tcg: String,
         setCode: String? = nil,

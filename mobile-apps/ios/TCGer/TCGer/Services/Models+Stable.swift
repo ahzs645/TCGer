@@ -34,6 +34,9 @@ struct StableCollectionCard: Identifiable, Codable {
     let baseExternalId: String?
     let printingKey: String?
     let artworkId: String?
+    let printingKind: String?
+    let sanctionedPlayLegal: Bool?
+    let originalPrintingKey: String?
 
     func asModel() -> CollectionCard {
         CollectionCard(
@@ -71,7 +74,10 @@ struct StableCollectionCard: Identifiable, Codable {
             functionalIdentity: functionalIdentity,
             baseExternalId: baseExternalId,
             printingKey: printingKey,
-            artworkId: artworkId
+            artworkId: artworkId,
+            printingKind: printingKind,
+            sanctionedPlayLegal: sanctionedPlayLegal,
+            originalPrintingKey: originalPrintingKey
         )
     }
 }

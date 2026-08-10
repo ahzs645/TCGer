@@ -57,6 +57,7 @@ struct CardArtworkImage: View {
 /// A reusable preview view shown when the system context menu presents card artwork.
 struct CardPreviewContextView: View {
     let card: Card
+    var showsFoil: Bool = true
 
     var body: some View {
         GeometryReader { proxy in
@@ -85,7 +86,8 @@ struct CardPreviewContextView: View {
                 maxTiltDegrees: 0,
                 enableMotion: false,
                 enableDrag: false,
-                showsShadow: true
+                showsShadow: true,
+                showsFoil: showsFoil
             )
                 .padding(.horizontal, horizontalPadding)
                 .padding(.vertical, verticalPadding)
@@ -194,6 +196,7 @@ struct CardDetailSheet: View {
 
 private struct CardPreviewContextMenuModifier: ViewModifier {
     let card: Card
+    let showsFoil: Bool
     let primaryActionTitle: String
     let onSelect: (() -> Void)?
     let onShowDetails: (() -> Void)?
@@ -223,7 +226,7 @@ private struct CardPreviewContextMenuModifier: ViewModifier {
             }
             Button("Close", role: .cancel) { }
         } preview: {
-            CardPreviewContextView(card: card)
+            CardPreviewContextView(card: card, showsFoil: showsFoil)
         }
     }
 }
@@ -232,6 +235,7 @@ extension View {
     /// Attaches a context menu preview for the given card, using an optional selection action.
     func cardPreviewContextMenu(
         card: Card,
+        showsFoil: Bool = true,
         primaryActionTitle: String = "Select this print",
         onSelect: (() -> Void)? = nil,
         onShowDetails: (() -> Void)? = nil,
@@ -240,6 +244,7 @@ extension View {
         modifier(
             CardPreviewContextMenuModifier(
                 card: card,
+                showsFoil: showsFoil,
                 primaryActionTitle: primaryActionTitle,
                 onSelect: onSelect,
                 onShowDetails: onShowDetails,
@@ -280,7 +285,10 @@ extension Card {
             functionalIdentity: collectionCard.functionalIdentity,
             baseExternalId: collectionCard.baseExternalId,
             printingKey: collectionCard.printingKey,
-            artworkId: collectionCard.artworkId
+            artworkId: collectionCard.artworkId,
+            printingKind: collectionCard.printingKind,
+            sanctionedPlayLegal: collectionCard.sanctionedPlayLegal,
+            originalPrintingKey: collectionCard.originalPrintingKey
         )
     }
 }
@@ -321,7 +329,10 @@ extension WishlistCard {
             functionalIdentity: functionalIdentity,
             baseExternalId: baseExternalId,
             printingKey: printingKey,
-            artworkId: artworkId
+            artworkId: artworkId,
+            printingKind: printingKind,
+            sanctionedPlayLegal: sanctionedPlayLegal,
+            originalPrintingKey: originalPrintingKey
         )
     }
 }

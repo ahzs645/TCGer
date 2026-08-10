@@ -177,6 +177,19 @@ struct PokemonVariantFlags: Codable, Hashable, Sendable {
     let firstEdition: Bool?
 }
 
+nonisolated struct PokemonWorldChampionshipPrint: Codable, Hashable, Sendable {
+    let year: Int
+    let playerName: String
+    let deckName: String?
+    let originalCollectorNumber: String?
+    let printedSignature: Bool?
+    let cardBack: String?
+    let borderStyle: String?
+    let stamp: String?
+    let sourceProductId: String?
+    let sourceUrl: String?
+}
+
 struct PokemonPrintMetadata: Codable, Hashable, Sendable {
     let tcgdexId: String?
     let tcgdexImage: String?
@@ -188,6 +201,7 @@ struct PokemonPrintMetadata: Codable, Hashable, Sendable {
     let formatLegality: PokemonFormatLegality?
     let dexEntries: [PokedexEntry]?
     let region: String?
+    var worldChampionship: PokemonWorldChampionshipPrint? = nil
 }
 
 struct PokemonFinishOption: Identifiable, Hashable, Sendable {
@@ -382,6 +396,7 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     let setCode: String?
     let setName: String?
     let rarity: String?
+    let artist: String?
     let imageUrl: String?
     let imageUrlSmall: String?
     let price: Double?
@@ -406,6 +421,9 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
     let baseExternalId: String?
     let printingKey: String?
     let artworkId: String?
+    let printingKind: String?
+    let sanctionedPlayLegal: Bool?
+    let originalPrintingKey: String?
 
     // Custom initializer with default values for Pokemon-specific fields
     init(
@@ -415,6 +433,7 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         setCode: String?,
         setName: String?,
         rarity: String?,
+        artist: String? = nil,
         imageUrl: String?,
         imageUrlSmall: String?,
         price: Double?,
@@ -438,7 +457,10 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         functionalIdentity: JSONValue? = nil,
         baseExternalId: String? = nil,
         printingKey: String? = nil,
-        artworkId: String? = nil
+        artworkId: String? = nil,
+        printingKind: String? = nil,
+        sanctionedPlayLegal: Bool? = nil,
+        originalPrintingKey: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -446,6 +468,7 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         self.setCode = setCode
         self.setName = setName
         self.rarity = rarity
+        self.artist = artist
         self.imageUrl = imageUrl
         self.imageUrlSmall = imageUrlSmall
         self.price = price
@@ -470,6 +493,9 @@ struct Card: Identifiable, Codable, Hashable, Sendable {
         self.baseExternalId = baseExternalId
         self.printingKey = printingKey
         self.artworkId = artworkId
+        self.printingKind = printingKind
+        self.sanctionedPlayLegal = sanctionedPlayLegal
+        self.originalPrintingKey = originalPrintingKey
     }
 
     var displayName: String {
@@ -608,6 +634,7 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     let setCode: String?
     let setName: String?
     let rarity: String?
+    var artist: String? = nil
     let imageUrl: String?
     let imageUrlSmall: String?
     let quantity: Int
@@ -635,6 +662,9 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     var baseExternalId: String? = nil
     var printingKey: String? = nil
     var artworkId: String? = nil
+    var printingKind: String? = nil
+    var sanctionedPlayLegal: Bool? = nil
+    var originalPrintingKey: String? = nil
 
     var supportsPrintSelection: Bool {
         switch tcg.lowercased() {
@@ -793,6 +823,8 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     let iconUrl: String?
     var iconFallbackUrl: String? = nil
     let logoUrl: String?
+    var setType: String? = nil
+    var releaseYear: Int? = nil
 
     var id: String { "\(tcg)-\(code)" }
 
@@ -804,7 +836,9 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     }
 
     var formattedReleaseDate: String? {
-        guard let releaseDate else { return nil }
+        guard let releaseDate else {
+            return releaseYear.map(String.init)
+        }
         let parser = Date.ISO8601FormatStyle(timeZone: .gmt)
             .year()
             .month()
@@ -907,6 +941,7 @@ struct WishlistRule: Identifiable, Codable, Hashable, Sendable {
     enum RuleType: String, Codable, Sendable {
         case name
         case set
+        case artist
     }
 
     let id: String
@@ -930,6 +965,8 @@ struct WishlistRule: Identifiable, Codable, Hashable, Sendable {
         case .name:
             let scope = includeAllPrintings ? "printing" : "card"
             return "Every \(scope) named \"\(query ?? "")\""
+        case .artist:
+            return "Every card illustrated by \(query ?? "this artist")"
         }
     }
 }
@@ -942,6 +979,7 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     let setCode: String?
     let setName: String?
     let rarity: String?
+    var artist: String? = nil
     let imageUrl: String?
     let imageUrlSmall: String?
     let setSymbolUrl: String?
@@ -969,6 +1007,9 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
     var baseExternalId: String? = nil
     var printingKey: String? = nil
     var artworkId: String? = nil
+    var printingKind: String? = nil
+    var sanctionedPlayLegal: Bool? = nil
+    var originalPrintingKey: String? = nil
 }
 
 // MARK: - Sealed Products

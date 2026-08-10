@@ -78,11 +78,12 @@ struct ScannerSessionReviewView: View {
                     .disabled(availableResultIDs.isEmpty || isAdding)
                 }
             }
-            .safeAreaInset(edge: .bottom) {
+            .safeAreaBar(edge: .bottom) {
                 if !viewModel.sessionResults.isEmpty {
                     binderActionBar
                 }
             }
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .interactiveDismissDisabled(isAdding || isCreatingBinder)
         .task { await loadCollections() }
@@ -260,7 +261,6 @@ struct ScannerSessionReviewView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(.bar)
     }
 
     private var availableResultIDs: Set<CardScanResult.ID> {

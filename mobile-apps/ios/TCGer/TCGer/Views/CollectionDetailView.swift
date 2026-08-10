@@ -139,24 +139,6 @@ struct CollectionDetailView: View {
                         .ignoresSafeArea()
 
                     VStack(spacing: 0) {
-                        if !isEditing {
-                            CollectionFilterBar(
-                                showFilters: $showFilters,
-                                sortOption: $sortOption,
-                                selectedTagFilters: $selectedTagFilters,
-                                selectedConditionFilters: $selectedConditionFilters,
-                                minPriceFilter: $minPriceFilter,
-                                maxPriceFilter: $maxPriceFilter,
-                                tagOptions: binderTagOptions,
-                                conditionOptions: binderConditionOptions,
-                                hasActiveFilters: hasActiveFilters,
-                                onClearAll: clearFilters
-                            )
-                            .padding(.horizontal)
-
-                            Divider()
-                        }
-
                         List {
                         if isEditing {
                             NameDescriptionColorSections(
@@ -333,6 +315,24 @@ struct CollectionDetailView: View {
                             placement: .navigationBarDrawer(displayMode: .always),
                             prompt: "Search cards, sets, or codes"
                         )
+                        .safeAreaBar(edge: .top, spacing: 0) {
+                            if !isEditing {
+                                CollectionFilterBar(
+                                    showFilters: $showFilters,
+                                    sortOption: $sortOption,
+                                    selectedTagFilters: $selectedTagFilters,
+                                    selectedConditionFilters: $selectedConditionFilters,
+                                    minPriceFilter: $minPriceFilter,
+                                    maxPriceFilter: $maxPriceFilter,
+                                    tagOptions: binderTagOptions,
+                                    conditionOptions: binderConditionOptions,
+                                    hasActiveFilters: hasActiveFilters,
+                                    onClearAll: clearFilters
+                                )
+                                .padding(.horizontal)
+                            }
+                        }
+                        .scrollEdgeEffectStyle(.soft, for: .top)
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)

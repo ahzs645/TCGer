@@ -2004,9 +2004,16 @@ export const deleteWishlist = internalMutation({
       .query("wishlistRules")
       .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
       .collect();
+    const guideFollow = await ctx.db
+      .query("userGuideFollows")
+      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+      .unique();
 
     await Promise.all(cards.map((card) => ctx.db.delete(card._id)));
     await Promise.all(rules.map((rule) => ctx.db.delete(rule._id)));
+    if (guideFollow) {
+      await ctx.db.delete(guideFollow._id);
+    }
     await ctx.db.delete(wishlist._id);
     return null;
   }
@@ -2203,7 +2210,7 @@ export const addWishlistRule = internalMutation({
   args: {
     subject: v.string(),
     wishlistId: v.id("wishlists"),
-    type: v.union(v.literal("name"), v.literal("set")),
+    type: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
     tcg: v.optional(tcgCodeValidator),
     query: v.optional(v.string()),
     setCode: v.optional(v.string()),
@@ -2219,10 +2226,10 @@ export const addWishlistRule = internalMutation({
     const query = args.query?.trim() || undefined;
     const setCode = args.setCode?.trim() || undefined;
 
-    if (args.type === "name" && !query) {
+    if ((args.type === "name" || args.type === "artist") && !query) {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "query is required for a name rule"
+        message: "query is required for name and artist rules"
       });
     }
     if (args.type === "set" && (!setCode || !args.tcg)) {

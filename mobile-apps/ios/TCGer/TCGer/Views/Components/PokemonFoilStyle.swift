@@ -23,7 +23,13 @@ enum PokemonFoilStyle: CaseIterable {
         }
     }
 
+    /// Kill switch for the foil/holo overlay system: rarity-based styling
+    /// misfires on copies whose real finish differs (e.g. non-holo prints of
+    /// holo-rarity cards), so it's disabled until finish-aware styling lands.
+    static let isEnabled = false
+
     static func style(for card: Card) -> PokemonFoilStyle? {
+        guard isEnabled else { return nil }
         guard card.tcg.lowercased() == "pokemon" else { return nil }
         guard let rarityValue = card.rarity?.lowercased() else { return nil }
         let rarity = rarityValue.trimmingCharacters(in: .whitespacesAndNewlines)

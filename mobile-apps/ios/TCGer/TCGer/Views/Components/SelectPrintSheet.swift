@@ -146,7 +146,9 @@ private struct PrintRow: View {
             parts.append("Reg \(regulationMark)")
         }
 
-        if let releasedAt = print.releasedAt {
+        if let year = print.pokemonPrint?.worldChampionship?.year {
+            parts.append(String(year))
+        } else if let releasedAt = print.releasedAt {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy"
             let year = formatter.string(from: releasedAt)
@@ -172,6 +174,23 @@ private struct PrintRow: View {
                     Text(printDetails)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+
+                if let worlds = print.pokemonPrint?.worldChampionship {
+                    Text([worlds.playerName, worlds.deckName].compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        printBadge("Replica", color: .orange)
+                        if print.sanctionedPlayLegal == false {
+                            printBadge("Not tournament legal", color: .red)
+                        }
+                        if let stamp = worlds.stamp {
+                            printBadge(PokemonFinishOption.label(for: stamp), color: .yellow)
+                        }
+                    }
                 }
 
                 let finishes = PokemonFinishOption.options(for: print)
@@ -214,6 +233,16 @@ private struct PrintRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to choose this print. Long press to preview the artwork.")
+    }
+
+    private func printBadge(_ label: String, color: Color) -> some View {
+        Text(label)
+            .font(.caption2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .foregroundStyle(color)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
     }
 }
 

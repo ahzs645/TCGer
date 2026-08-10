@@ -13,6 +13,9 @@ export interface CatalogSet {
   serie?: string;
   releasedAt?: string;
   count?: number;
+  standardCount?: number;
+  setType?: string;
+  releaseYear?: number;
   iconUrl?: string;
   iconFallbackUrl?: string;
   logoUrl?: string;
@@ -24,6 +27,7 @@ export interface CatalogCard {
   setCode?: string;
   collectorNumber?: string;
   rarity?: string;
+  artist?: string;
   type?: string;
   types?: string[];
   hp?: number;
@@ -36,6 +40,22 @@ export interface CatalogCard {
   konamiId?: number;
   imageUrl?: string;
   imageUrlSmall?: string;
+  printingKey?: string;
+  printingKind?: string;
+  sanctionedPlayLegal?: boolean;
+  originalPrintingKey?: string;
+  pokemonWorldChampionship?: {
+    year: number;
+    playerName: string;
+    deckName?: string;
+    originalCollectorNumber?: string;
+    printedSignature?: boolean;
+    cardBack?: string;
+    borderStyle?: string;
+    stamp?: string;
+    sourceProductId?: string;
+    sourceUrl?: string;
+  };
 }
 
 export interface CatalogPack {

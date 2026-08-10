@@ -586,6 +586,9 @@ extension APIService {
             let baseExternalId: String?
             let printingKey: String?
             let artworkId: String?
+            let printingKind: String?
+            let sanctionedPlayLegal: Bool?
+            let originalPrintingKey: String?
             let setCode: String?
             let setName: String?
             let rarity: String?
@@ -621,6 +624,9 @@ extension APIService {
             let baseExternalId: String?
             let printingKey: String?
             let artworkId: String?
+            let printingKind: String?
+            let sanctionedPlayLegal: Bool?
+            let originalPrintingKey: String?
             let setCode: String?
             let setName: String?
             let rarity: String?
@@ -760,6 +766,9 @@ extension APIService {
                 baseExternalId: card.baseExternalId,
                 printingKey: card.printingKey,
                 artworkId: card.artworkId,
+                printingKind: card.printingKind,
+                sanctionedPlayLegal: card.sanctionedPlayLegal,
+                originalPrintingKey: card.originalPrintingKey,
                 setCode: card.setCode,
                 setName: card.setName,
                 rarity: card.rarity,
@@ -887,6 +896,9 @@ extension APIService {
                     baseExternalId: print.baseExternalId,
                     printingKey: print.printingKey,
                     artworkId: print.artworkId,
+                    printingKind: print.printingKind,
+                    sanctionedPlayLegal: print.sanctionedPlayLegal,
+                    originalPrintingKey: print.originalPrintingKey,
                     setCode: print.setCode,
                     setName: print.setName,
                     rarity: print.rarity,

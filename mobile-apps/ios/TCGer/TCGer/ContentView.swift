@@ -96,6 +96,8 @@ struct ContentView: View {
             SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
         case .wishlists:
             WishlistsView(parentProvidesNavigation: parentProvidesNavigation)
+        case .guides:
+            CollectionGuidesView(parentProvidesNavigation: parentProvidesNavigation)
         case .sealed:
             SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
         case .scan:
@@ -115,7 +117,7 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
         case .sealed:
             return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
-        case .sets, .wishlists, .scan:
+        case .sets, .wishlists, .guides, .scan:
             return environmentStore.isAuthenticated
         }
     }

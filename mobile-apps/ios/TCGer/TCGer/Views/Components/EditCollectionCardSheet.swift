@@ -206,7 +206,10 @@ struct EditCollectionCardSheet: View {
                                 functionalIdentity: card.functionalIdentity,
                                 baseExternalId: card.baseExternalId,
                                 printingKey: card.printingKey,
-                                artworkId: card.artworkId
+                                artworkId: card.artworkId,
+                                printingKind: card.printingKind,
+                                sanctionedPlayLegal: card.sanctionedPlayLegal,
+                                originalPrintingKey: card.originalPrintingKey
                             )
                             showingPrintSelection = true
                         } label: {

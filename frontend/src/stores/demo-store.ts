@@ -91,7 +91,7 @@ interface DemoCardPersistence {
 
 export interface DemoWishlistRule {
   id: string;
-  type: "name" | "set";
+  type: "name" | "set" | "artist";
   tcg?: TcgCode;
   query?: string;
   setCode?: string;

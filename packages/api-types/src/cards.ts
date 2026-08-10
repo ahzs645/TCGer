@@ -24,6 +24,14 @@ export type TcgCode = z.infer<typeof tcgCodeSchema>;
 export const pokemonFinishTypeSchema = z.string().min(1);
 export type PokemonFinishType = z.infer<typeof pokemonFinishTypeSchema>;
 
+/**
+ * Physical printing classification, shared across games. This is intentionally
+ * open-ended: games use different names for replica, memorabilia, oversized,
+ * demo, and other non-standard printings.
+ */
+export const printingKindSchema = z.string().min(1);
+export type PrintingKind = z.infer<typeof printingKindSchema>;
+
 // ---------------------------------------------------------------------------
 // Pokemon-specific schemas
 // ---------------------------------------------------------------------------
@@ -36,6 +44,22 @@ export const pokemonVariantFlagsSchema = z.object({
 });
 export type PokemonVariantFlags = z.infer<typeof pokemonVariantFlagsSchema>;
 
+export const pokemonWorldChampionshipPrintSchema = z.object({
+  year: z.number().int().min(2004),
+  playerName: z.string().min(1),
+  deckName: z.string().optional(),
+  originalCollectorNumber: z.string().optional(),
+  printedSignature: z.boolean().optional(),
+  cardBack: z.string().optional(),
+  borderStyle: z.string().optional(),
+  stamp: z.string().optional(),
+  sourceProductId: z.string().optional(),
+  sourceUrl: z.string().optional()
+});
+export type PokemonWorldChampionshipPrint = z.infer<
+  typeof pokemonWorldChampionshipPrintSchema
+>;
+
 export const pokemonPrintMetadataSchema = z.object({
   tcgdexId: z.string().optional(),
   tcgdexImage: z.string().optional(),
@@ -46,7 +70,8 @@ export const pokemonPrintMetadataSchema = z.object({
   language: z.string().optional(),
   formatLegality: pokemonFormatLegalitySchema.optional(),
   dexEntries: z.array(pokedexEntrySchema).optional(),
-  region: z.string().optional()
+  region: z.string().optional(),
+  worldChampionship: pokemonWorldChampionshipPrintSchema.optional()
 });
 export type PokemonPrintMetadata = z.infer<typeof pokemonPrintMetadataSchema>;
 
@@ -123,6 +148,14 @@ export const cardSchema = z.object({
   printingKey: z.string().optional(),
   /** Provider artwork/image identifier when a printing has alternate art. */
   artworkId: z.string().optional(),
+  /** Illustrator/artist credit as printed by the card provider. */
+  artist: z.string().optional(),
+  /** Cross-game physical classification such as replica or oversized. */
+  printingKind: printingKindSchema.optional(),
+  /** Whether this physical printing may be used in sanctioned play. */
+  sanctionedPlayLegal: z.boolean().optional(),
+  /** Known exact printing that this special printing reproduces. */
+  originalPrintingKey: z.string().optional(),
   name: z.string(),
   setCode: z.string().optional(),
   setName: z.string().optional(),
@@ -192,6 +225,10 @@ export const tcgSetSchema = z.object({
   releaseDate: z.string().optional(),
   totalCards: z.number().optional(),
   standardCards: z.number().optional(),
+  /** Cross-game set classification such as expansion or memorabilia. */
+  setType: z.string().optional(),
+  /** Useful for annual products that do not have a reliable release date. */
+  releaseYear: z.number().int().optional(),
   iconUrl: z.string().optional(),
   iconFallbackUrl: z.string().optional(),
   logoUrl: z.string().optional()
@@ -238,3 +275,12 @@ export const exhaustiveSearchQuerySchema = z.object({
     .default(EXHAUSTIVE_SEARCH_DEFAULT_LIMIT)
 });
 export type ExhaustiveSearchQueryInput = z.infer<typeof exhaustiveSearchQuerySchema>;
+
+/** Exhaustive artist lookup used by art-first collection guides. */
+export const artistSearchQuerySchema = z.object({
+  artist: z.string().trim().min(1, 'artist parameter is required'),
+  tcg: tcgCodeSchema.default('pokemon'),
+  unique: z.enum(['prints', 'cards']).default('prints'),
+  limit: z.coerce.number().int().min(1).max(1000).default(500)
+});
+export type ArtistSearchQueryInput = z.infer<typeof artistSearchQuerySchema>;

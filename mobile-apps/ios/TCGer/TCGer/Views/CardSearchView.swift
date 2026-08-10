@@ -34,73 +34,6 @@ struct CardSearchView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Game Filter - Only show if more than one game is enabled
-                if environmentStore.enabledGames.count > 1 {
-                    GamePickerPills(
-                        selection: Binding(
-                            get: { selectedGame },
-                            set: { selectGame($0) }
-                        ),
-                        games: environmentStore.gamePickerGames
-                    )
-                    .background(Color(.systemBackground))
-
-                    Divider()
-                }
-
-                CardSearchFilterBar(
-                    filters: searchFilters,
-                    onOpen: { showingFilters = true },
-                    onClear: clearSearchFilters
-                )
-
-                Divider()
-
-                // Bulk add banner — only when this search is feeding a wishlist
-                if let wishlistId = addToWishlistId,
-                   hasSearched,
-                   !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Add every match")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("Not just the results shown below")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Button {
-                                Task { await addAllMatches(to: wishlistId) }
-                            } label: {
-                                if isAddingAllMatches {
-                                    ProgressView().scaleEffect(0.8)
-                                } else {
-                                    Text("Add all")
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                            .disabled(isAddingAllMatches)
-                        }
-
-                        Toggle("Keep this wishlist updated", isOn: $keepWishlistUpdated)
-                            .font(.caption)
-
-                        if let bulkWishlistStatus {
-                            Text(bulkWishlistStatus)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                    .background(Color(.secondarySystemBackground))
-
-                    Divider()
-                }
-
                 // Search Results
                 if isSearching {
                     ProgressView("Searching...")
@@ -141,11 +74,16 @@ struct CardSearchView: View {
                 }
             }
             .navigationTitle("Search Cards")
+            .navigationBarTitleDisplayMode(.inline)
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search for cards..."
             )
+            .safeAreaBar(edge: .top, spacing: 0) {
+                searchControlBar
+            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
@@ -238,6 +176,67 @@ struct CardSearchView: View {
                    !hasSearched {
                     selectedGame = game
                 }
+            }
+        }
+    }
+
+    private var searchControlBar: some View {
+        VStack(spacing: 0) {
+            if environmentStore.enabledGames.count > 1 {
+                GamePickerPills(
+                    selection: Binding(
+                        get: { selectedGame },
+                        set: { selectGame($0) }
+                    ),
+                    games: environmentStore.gamePickerGames
+                )
+            }
+
+            CardSearchFilterBar(
+                filters: searchFilters,
+                onOpen: { showingFilters = true },
+                onClear: clearSearchFilters
+            )
+
+            if let wishlistId = addToWishlistId,
+               hasSearched,
+               !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add every match")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Not just the results shown below")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            Task { await addAllMatches(to: wishlistId) }
+                        } label: {
+                            if isAddingAllMatches {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Text("Add all")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isAddingAllMatches)
+                    }
+
+                    Toggle("Keep this wishlist updated", isOn: $keepWishlistUpdated)
+                        .font(.caption)
+
+                    if let bulkWishlistStatus {
+                        Text(bulkWishlistStatus)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
             }
         }
     }
@@ -473,10 +472,31 @@ struct CardSearchView: View {
 private extension Card {
     func matchesSearchText(_ query: String) -> Bool {
         let queryKey = SearchTextNormalizer.key(query)
+        let worldsFields = pokemonPrint?.worldChampionship.map { worlds in
+            [
+                name,
+                setName,
+                setCode,
+                String(worlds.year),
+                worlds.playerName,
+                worlds.deckName,
+                worlds.stamp,
+                "world worlds world championship wcd replica memorabilia"
+            ].compactMap { $0 }
+        } ?? []
+        let worldsMatch = pokemonPrint?.worldChampionship != nil &&
+            SearchTextNormalizer.termKeys(query).allSatisfy { term in
+                worldsFields.contains { SearchTextNormalizer.contains($0, queryKey: term) }
+            }
         return SearchTextNormalizer.contains(name, queryKey: queryKey) ||
             SearchTextNormalizer.contains(collectorNumber, queryKey: queryKey) ||
             SearchTextNormalizer.contains(rarity, queryKey: queryKey) ||
-            SearchTextNormalizer.contains(setCode, queryKey: queryKey)
+            SearchTextNormalizer.contains(setCode, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(setName, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(pokemonPrint?.worldChampionship?.playerName, queryKey: queryKey) ||
+            SearchTextNormalizer.contains(pokemonPrint?.worldChampionship?.deckName, queryKey: queryKey) ||
+            pokemonPrint?.worldChampionship.map { String($0.year) == queryKey } == true ||
+            worldsMatch
     }
 }
 

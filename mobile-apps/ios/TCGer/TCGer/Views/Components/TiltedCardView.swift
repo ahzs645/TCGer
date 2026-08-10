@@ -11,6 +11,9 @@ struct TiltedCardView: View {
     var enableMotion: Bool = true
     var enableDrag: Bool = true
     var showsShadow: Bool = true
+    /// Rarity implies a foil style, but the owned copy may be a non-foil
+    /// print; pass false to suppress the overlay for those copies.
+    var showsFoil: Bool = true
 
     @StateObject private var motionManager = CardMotionManager()
     @State private var manualTilt: CardTilt?
@@ -37,7 +40,7 @@ struct TiltedCardView: View {
                 pow(Double(normalizedPointer.y) - 0.5, 2)
             ) * 2.0
             let foilIntensity = pointerDistance.clamped(to: 0...1)
-            let foilStyle = PokemonFoilStyle.style(for: card)
+            let foilStyle = showsFoil ? PokemonFoilStyle.style(for: card) : nil
 
             let dragGesture = DragGesture(minimumDistance: 0)
                 .onChanged { value in

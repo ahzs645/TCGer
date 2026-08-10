@@ -116,6 +116,7 @@ struct SealedInventoryView: View {
                     }
                 }
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle("Sealed Products")
             .searchable(
                 text: $searchText,

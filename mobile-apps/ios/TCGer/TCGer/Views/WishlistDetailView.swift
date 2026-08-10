@@ -89,19 +89,6 @@ struct WishlistDetailView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if totalCount > 0 && !isEditing {
-                    Picker("Filter", selection: $filterOwned) {
-                        ForEach(OwnershipFilter.allCases, id: \.self) { filter in
-                            Text(filter.rawValue).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-
-                    Divider()
-                }
-
                 List {
                 // Header — only rendered when it has content, otherwise the
                 // section shows up as an empty card under the navigation title.
@@ -248,12 +235,25 @@ struct WishlistDetailView: View {
                 }
                 }
                 .listStyle(.insetGrouped)
+                .searchable(
+                    text: $searchText,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search cards"
+                )
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    if totalCount > 0 && !isEditing {
+                        Picker("Filter", selection: $filterOwned) {
+                            ForEach(OwnershipFilter.allCases, id: \.self) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                    }
+                }
+                .scrollEdgeEffectStyle(.soft, for: .top)
             }
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search cards"
-            )
             .navigationTitle(wishlist.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

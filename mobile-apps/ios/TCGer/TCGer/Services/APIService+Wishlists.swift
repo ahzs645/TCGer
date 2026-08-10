@@ -23,11 +23,15 @@ extension APIService {
         let baseExternalId: String?
         let printingKey: String?
         let artworkId: String?
+        let printingKind: String?
+        let sanctionedPlayLegal: Bool?
+        let originalPrintingKey: String?
         let tcg: String
         let name: String
         let setCode: String?
         let setName: String?
         let rarity: String?
+        let artist: String?
         let imageUrl: String?
         let imageUrlSmall: String?
         let setSymbolUrl: String?
@@ -79,11 +83,15 @@ extension APIService {
             baseExternalId: card.baseExternalId,
             printingKey: card.printingKey,
             artworkId: card.artworkId,
+            printingKind: card.printingKind,
+            sanctionedPlayLegal: card.sanctionedPlayLegal,
+            originalPrintingKey: card.originalPrintingKey,
             tcg: card.tcg,
             name: card.name,
             setCode: card.setCode,
             setName: card.setName,
             rarity: card.rarity,
+            artist: card.artist,
             imageUrl: card.imageUrl,
             imageUrlSmall: card.imageUrlSmall,
             setSymbolUrl: card.setSymbolUrl,

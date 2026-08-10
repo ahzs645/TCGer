@@ -12,6 +12,7 @@ import {
 } from '../modules/adapters/yugioh-set-code';
 import { canonicalizePokemonRarity } from '../modules/adapters/pokemon-normalization';
 import { resolvePokemonSetArtwork } from '../modules/adapters/pokemon-set-artwork';
+import { getPokemonWorldChampionshipCatalog } from '../modules/adapters/pokemon-world-championships';
 
 type SupportedGame = 'pokemon' | 'magic' | 'yugioh' | 'onepiece' | 'lorcana' | 'dragonball';
 
@@ -29,6 +30,8 @@ interface CatalogSet {
   releasedAt?: string;
   count: number;
   standardCount?: number;
+  setType?: string;
+  releaseYear?: number;
   iconUrl?: string;
   iconFallbackUrl?: string;
   logoUrl?: string;
@@ -40,6 +43,7 @@ interface CatalogCard {
   setCode?: string;
   collectorNumber?: string;
   rarity?: string;
+  artist?: string;
   type?: string;
   types?: string[];
   hp?: number;
@@ -52,6 +56,22 @@ interface CatalogCard {
   konamiId?: number;
   imageUrl?: string;
   imageUrlSmall?: string;
+  printingKey?: string;
+  printingKind?: string;
+  sanctionedPlayLegal?: boolean;
+  originalPrintingKey?: string;
+  pokemonWorldChampionship?: {
+    year: number;
+    playerName: string;
+    deckName?: string;
+    originalCollectorNumber?: string;
+    printedSignature?: boolean;
+    cardBack?: string;
+    borderStyle?: string;
+    stamp?: string;
+    sourceProductId?: string;
+    sourceUrl?: string;
+  };
 }
 
 interface CatalogPack {
@@ -96,11 +116,12 @@ interface TcgdexSetDetail extends TcgdexSetSummary {
   }>;
 }
 
-interface TcgdexRarityIndexResponse {
+interface TcgdexCardIndexResponse {
   data?: {
     cards?: Array<{
       id: string;
       rarity?: string;
+      illustrator?: string;
     }>;
   };
   errors?: Array<{ message?: string }>;
@@ -369,35 +390,37 @@ async function fetchWithRetry(
   throw new Error(`${label} failed after ${maxAttempts} attempts`);
 }
 
-async function fetchPokemonRarityIndex(): Promise<Map<string, string>> {
+async function fetchPokemonCardIndex(): Promise<
+  Map<string, { rarity?: string; artist?: string }>
+> {
   const response = await fetchWithRetry(
     POKEMON_GRAPHQL_URL,
-    'TCGdex rarity index',
+    'TCGdex card metadata index',
     { 'Content-Type': 'application/json' },
     {
       method: 'POST',
       body: JSON.stringify({
-        query: 'query CatalogRarities { cards { id rarity } }',
+        query: 'query CatalogCardMetadata { cards { id rarity illustrator } }',
       }),
     },
   );
-  const payload = (await response.json()) as TcgdexRarityIndexResponse;
+  const payload = (await response.json()) as TcgdexCardIndexResponse;
   if (payload.errors?.length) {
     const message = payload.errors
       .map((error) => error.message)
       .filter(Boolean)
       .join('; ');
-    throw new Error(`TCGdex rarity index failed: ${message || 'unknown GraphQL error'}`);
+    throw new Error(`TCGdex card metadata index failed: ${message || 'unknown GraphQL error'}`);
   }
 
   const indexedCards = payload.data?.cards;
   if (!indexedCards?.length) {
-    throw new Error('TCGdex rarity index contained no cards');
+    throw new Error('TCGdex card metadata index contained no cards');
   }
   return new Map(
-    indexedCards.flatMap((card) =>
-      card.id && card.rarity ? [[card.id, card.rarity] as const] : [],
-    ),
+    indexedCards.flatMap((card) => card.id
+      ? [[card.id, { rarity: card.rarity, artist: card.illustrator }] as const]
+      : []),
   );
 }
 
@@ -411,9 +434,10 @@ async function fetchJson<T>(
 }
 
 async function buildPokemonPack(updatedAt: string, limit?: number): Promise<CatalogPack> {
-  const [summaries, rarityByCardId] = await Promise.all([
+  const [summaries, metadataByCardId, worldChampionshipCatalog] = await Promise.all([
     fetchJson<TcgdexSetSummary[]>(`${POKEMON_API_ROOT}/sets`, 'TCGdex set list'),
-    fetchPokemonRarityIndex(),
+    fetchPokemonCardIndex(),
+    getPokemonWorldChampionshipCatalog(),
   ]);
   const sets: CatalogSet[] = [];
   const cards: CatalogCard[] = [];
@@ -458,12 +482,48 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
           name: card.name,
           setCode: detail.id,
           collectorNumber: card.localId ?? card.id.slice(detail.id.length + 1),
-          rarity: canonicalizePokemonRarity(rarityByCardId.get(card.id), card.name, {
+          rarity: canonicalizePokemonRarity(metadataByCardId.get(card.id)?.rarity, card.name, {
             noneMeansPromo: true,
           }),
+          artist: metadataByCardId.get(card.id)?.artist,
         })),
       );
     }
+  }
+
+  const remaining = limit ? Math.max(0, limit - cards.length) : Number.POSITIVE_INFINITY;
+  const championshipCards = worldChampionshipCatalog.cards.slice(0, remaining);
+  if (championshipCards.length) {
+    const includedSetCodes = new Set(championshipCards.flatMap((card) => card.setCode ? [card.setCode] : []));
+    sets.push(
+      ...worldChampionshipCatalog.sets
+        .filter((set) => includedSetCodes.has(set.code))
+        .map((set) => ({
+          code: set.code,
+          name: set.name,
+          count: set.totalCards ?? 0,
+          standardCount: set.standardCards,
+          setType: set.setType,
+          releaseYear: set.releaseYear,
+        })),
+    );
+    cards.push(
+      ...championshipCards.map((card) => ({
+        id: card.id,
+        name: card.name,
+        setCode: card.setCode,
+        collectorNumber: card.collectorNumber,
+        rarity: card.rarity,
+        type: card.supertype,
+        imageUrl: card.imageUrl,
+        imageUrlSmall: card.imageUrlSmall,
+        printingKey: card.printingKey,
+        printingKind: card.printingKind,
+        sanctionedPlayLegal: card.sanctionedPlayLegal,
+        originalPrintingKey: card.originalPrintingKey,
+        pokemonWorldChampionship: card.pokemonPrint?.worldChampionship,
+      })),
+    );
   }
 
   return {
