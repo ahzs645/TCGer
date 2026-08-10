@@ -222,6 +222,8 @@ def export_bundle(recording_root: Path, output: Path, local_files_root: Path) ->
                     "segmentation_confidence": frame.get("segmentationConfidence"),
                     "alternatives": frame.get("alternatives", []),
                     "alternative_card_ids": frame.get("alternativeCardIds") or [],
+                    "expected_card_id": frame.get("expectedCardId"),
+                    "expected_no_match": frame.get("expectedNoMatch"),
                 },
                 "meta": {
                     "mode": frame["mode"],
@@ -258,6 +260,8 @@ def export_bundle(recording_root: Path, output: Path, local_files_root: Path) ->
                         "recorded_match_id": frame.get("bestMatchCardId"),
                         "recorded_match_name": frame.get("bestMatchName"),
                         "recorded_match_confidence": frame.get("confidence"),
+                        "expected_card_id": frame.get("expectedCardId"),
+                        "expected_no_match": frame.get("expectedNoMatch"),
                     },
                 }
             )
@@ -272,8 +276,10 @@ def export_bundle(recording_root: Path, output: Path, local_files_root: Path) ->
                 "recorded_match_name": frame.get("bestMatchName") or "",
                 "recorded_confidence": frame.get("confidence") or "",
                 "segmentation_confidence": frame.get("segmentationConfidence") or "",
-                "expected_card_id": "",
-                "expected_no_match": "",
+                "expected_card_id": frame.get("expectedCardId") or "",
+                "expected_no_match": (
+                    "true" if frame.get("expectedNoMatch") is True else ""
+                ),
                 "geometry_accepted": "",
                 "notes": "",
             }
@@ -306,18 +312,24 @@ def export_bundle(recording_root: Path, output: Path, local_files_root: Path) ->
         writer.writerows(review_rows)
 
     matched_count = sum(bool(frame["identified"]) for frame in frames)
+    correction_count = sum(
+        frame.get("expectedCardId") is not None or frame.get("expectedNoMatch") is True
+        for frame in frames
+    )
     readme = f"""# TCGer scanner recording annotation bundle
 
 Generated from {recording_root.name}.
 
 - Frames: {len(frames)}
 - Recorded identity matches: {matched_count}
+- Human-reviewed corrections: {correction_count}
 - Vision geometry predictions: {len(coco_annotations)}
 - Game: {manifest["summary"]["mode"]}
 - Pipeline: {manifest["summary"]["pipeline"]}
 
-The geometry and identity fields are model predictions, not reviewed labels.
-Use review_status, expected_card_id, and notes to create ground truth.
+The geometry and recorded identity fields are model predictions. Rows with an
+expected_card_id or expected_no_match value were reviewed in the app; use the
+remaining review fields and notes to finish any additional annotation.
 
 ## Label Studio
 

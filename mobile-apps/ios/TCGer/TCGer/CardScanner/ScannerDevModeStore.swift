@@ -3,6 +3,18 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
+/// Main-actor UI models are flattened before crossing into the recording
+/// actor so manual labels remain Swift-concurrency safe.
+nonisolated struct ScannerManualCorrection: Sendable {
+    let previousCardId: String?
+    let previousCardName: String?
+    let previousSetCode: String?
+    let previousSetName: String?
+    let previousConfidence: Double?
+    let previousStrategy: String?
+    let correctedCardId: String?
+}
+
 /// Dev-mode scan recorder: when enabled, every scan that goes through the
 /// production coordinator — live frames, shutter captures, photo imports —
 /// is persisted with its raw input image, every crop attempt, and the
@@ -74,6 +86,7 @@ actor ScannerDevModeStore {
 
     // MARK: Recording
 
+    @discardableResult
     func record(
         image: CGImage,
         source: ScanInvocationKind,
@@ -82,20 +95,23 @@ actor ScannerDevModeStore {
         result: Result<CardScanResult, CardScannerError>?,
         diagnostics: ScanDiagnostics?,
         originalImage: CGImage? = nil,
-        outcomeLabel: String? = nil
-    ) {
-        guard Self.isEnabled else { return }
+        outcomeLabel: String? = nil,
+        expectedCardId: String? = nil,
+        expectedNoMatch: Bool? = nil,
+        manualCorrection: ScannerManualCorrection? = nil
+    ) -> Bool {
+        guard Self.isEnabled else { return false }
         let directory: URL
         do {
             directory = try ensureSession(mode: mode)
         } catch {
-            return
+            return false
         }
 
         let index = frameIndex
         frameIndex += 1
         let imageFile = String(format: "frame-%04d.jpg", index)
-        guard write(image: image, to: directory.appendingPathComponent(imageFile)) else { return }
+        guard write(image: image, to: directory.appendingPathComponent(imageFile)) else { return false }
 
         var originalFile: String?
         if let originalImage {
@@ -142,6 +158,15 @@ actor ScannerDevModeStore {
         case nil:
             break
         }
+        if let manualCorrection {
+            identified = manualCorrection.previousCardId != nil
+            name = manualCorrection.previousCardName
+            cardID = manualCorrection.previousCardId
+            setCode = manualCorrection.previousSetCode
+            setName = manualCorrection.previousSetName
+            confidence = manualCorrection.previousConfidence
+            strategy = manualCorrection.previousStrategy
+        }
         if let outcomeLabel {
             outcome = outcomeLabel
         }
@@ -157,7 +182,7 @@ actor ScannerDevModeStore {
             mode: mode.rawValue,
             pipeline: "dev-mode \(sourceLabel(source))",
             elapsedMs: elapsedMs,
-            detectedCount: attempts.count,
+            detectedCount: manualCorrection == nil ? attempts.count : 1,
             segmentationConfidence: nil,
             quad: quad,
             identified: identified,
@@ -169,8 +194,8 @@ actor ScannerDevModeStore {
             strategy: strategy,
             alternatives: alternatives,
             alternativeCardIds: alternativeIDs,
-            expectedCardId: nil,
-            expectedNoMatch: nil,
+            expectedCardId: expectedCardId,
+            expectedNoMatch: expectedNoMatch,
             imageFile: imageFile
         ))
         evidence.append(ScanEvidenceRecord(
@@ -186,6 +211,35 @@ actor ScannerDevModeStore {
 
         trimSessionIfNeeded(directory: directory)
         persistManifests(to: directory)
+        return true
+    }
+
+    /// Persists a human-reviewed binder crop as labeled training data while
+    /// retaining the scanner's previous choice as the regression baseline.
+    /// A nil corrected card is an explicit human-reviewed no-match label.
+    @discardableResult
+    func recordManualCorrection(
+        image: CGImage,
+        mode: ScanMode,
+        correction: ScannerManualCorrection
+    ) -> Bool {
+        guard Self.isEnabled else { return false }
+        let outcomeLabel = correction.correctedCardId.map {
+            "manualCorrection: \($0)"
+        } ?? "manualCorrection: no match"
+
+        return record(
+            image: image,
+            source: .photoCapture,
+            mode: mode,
+            elapsedMs: 0,
+            result: nil,
+            diagnostics: nil,
+            outcomeLabel: outcomeLabel,
+            expectedCardId: correction.correctedCardId,
+            expectedNoMatch: correction.correctedCardId == nil,
+            manualCorrection: correction
+        )
     }
 
     // MARK: Sessions

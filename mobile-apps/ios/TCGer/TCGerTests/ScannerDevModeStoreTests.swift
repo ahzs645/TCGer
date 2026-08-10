@@ -103,6 +103,75 @@ final class ScannerDevModeStoreTests: XCTestCase {
         XCTAssertTrue(ScannerDevModeStore.listSessions().isEmpty)
     }
 
+    func testManualCorrectionWritesHumanGroundTruthAgainstOriginalPrediction() async throws {
+        let image = ScannerTestImage.solid(width: 90, height: 120)
+        let originalCandidate = CardScanCandidate(
+            details: CardDetails(
+                identity: CardIdentity(
+                    id: "original-card",
+                    name: "Original Match",
+                    game: .pokemon,
+                    setCode: "base",
+                    setName: "Base"
+                ),
+                rarity: nil,
+                imageURL: nil,
+                price: nil
+            ),
+            confidence: CardScanConfidence(score: 0.73, reason: nil),
+            originatingStrategy: .artworkFingerprint
+        )
+
+        let didSave = await ScannerDevModeStore.shared.recordManualCorrection(
+            image: image,
+            mode: .pokemon,
+            correction: ScannerManualCorrection(
+                previousCardId: originalCandidate.details.identity.id,
+                previousCardName: originalCandidate.details.identity.name,
+                previousSetCode: originalCandidate.details.identity.setCode,
+                previousSetName: originalCandidate.details.identity.setName,
+                previousConfidence: originalCandidate.confidence.score,
+                previousStrategy: originalCandidate.originatingStrategy.displayName,
+                correctedCardId: "corrected-card"
+            )
+        )
+
+        XCTAssertTrue(didSave)
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let bundleData = try Data(contentsOf: session.url.appendingPathComponent("results.json"))
+        let bundle = try JSONDecoder().decode(RecordedScanBundle.self, from: bundleData)
+        let frame = try XCTUnwrap(bundle.frames.last)
+        XCTAssertEqual(frame.bestMatchCardId, "original-card")
+        XCTAssertEqual(frame.expectedCardId, "corrected-card")
+        XCTAssertEqual(frame.expectedNoMatch, false)
+        XCTAssertEqual(frame.strategy, ScanStrategyKind.artworkFingerprint.displayName)
+    }
+
+    func testClearingMatchWritesExplicitNoMatchGroundTruth() async throws {
+        let didSave = await ScannerDevModeStore.shared.recordManualCorrection(
+            image: ScannerTestImage.solid(width: 90, height: 120),
+            mode: .pokemon,
+            correction: ScannerManualCorrection(
+                previousCardId: nil,
+                previousCardName: nil,
+                previousSetCode: nil,
+                previousSetName: nil,
+                previousConfidence: nil,
+                previousStrategy: nil,
+                correctedCardId: nil
+            )
+        )
+
+        XCTAssertTrue(didSave)
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let bundleData = try Data(contentsOf: session.url.appendingPathComponent("results.json"))
+        let bundle = try JSONDecoder().decode(RecordedScanBundle.self, from: bundleData)
+        let frame = try XCTUnwrap(bundle.frames.last)
+        XCTAssertNil(frame.expectedCardId)
+        XCTAssertEqual(frame.expectedNoMatch, true)
+        XCTAssertFalse(frame.identified)
+    }
+
     func testSessionDeletionRejectsLocationsOutsideRecordingsFolder() throws {
         let outsideURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("not-a-scanner-recording", isDirectory: true)

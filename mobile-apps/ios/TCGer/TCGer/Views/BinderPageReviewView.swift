@@ -24,6 +24,10 @@ struct BinderPageReviewView: View {
     @State private var errorMessage: String?
     @State private var showsAllCards = false
     @State private var statusFilter: BinderCardDetectionStatus?
+    @State private var storedPages: [SavedBinderPage] = []
+    @State private var isSavingPage = false
+    @AppStorage("binderScanner.savePageImages") private var savesPageImages = false
+    @AppStorage("binderScanner.replacePageImages") private var replacesPageImages = true
 
     private let apiService = APIService()
 
@@ -65,13 +69,21 @@ struct BinderPageReviewView: View {
                         .disabled(isAdding || isCreatingBinder)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        dismiss()
+                    Menu {
+                        Button("Scan Page \(viewModel.nextBinderPageNumber)") {
+                            dismiss()
+                        }
+                        if let currentRecord {
+                            Button("Rescan Page \(currentRecord.pageNumber)") {
+                                viewModel.prepareToRescanBinderPage(currentRecord.pageNumber)
+                                dismiss()
+                            }
+                        }
                     } label: {
                         Image(systemName: "camera.fill")
                     }
-                    .disabled(isAdding || isCreatingBinder)
-                    .accessibilityLabel("Scan next page")
+                    .disabled(isAdding || isCreatingBinder || isSavingPage)
+                    .accessibilityLabel("Scan another binder page")
                 }
             }
         }
@@ -83,14 +95,17 @@ struct BinderPageReviewView: View {
             }
             currentPageIndex = min(currentPageIndex, count - 1)
         }
+        .onChange(of: viewModel.selectedBinderID, initial: false) { _, _ in
+            Task { await loadStoredPages() }
+        }
         .sheet(item: $selectedDetection) { selection in
             if let detection = detectionBinding(for: selection),
                let record = viewModel.binderPages.first(where: { $0.id == selection.pageID }) {
                 BinderCardDetectionDetailView(
                     detection: detection,
-                    game: record.result.mode.tcgGame
+                    mode: record.result.mode
                 )
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large])
             }
         }
         .alert(
@@ -152,7 +167,7 @@ struct BinderPageReviewView: View {
             .accessibilityLabel("Previous page")
 
             Spacer()
-            Text("Page \(currentPageIndex + 1) of \(viewModel.binderPages.count)")
+            Text(currentRecord.map { "Binder page \($0.pageNumber)" } ?? "Binder page")
                 .font(.headline)
             Spacer()
 
@@ -271,7 +286,7 @@ struct BinderPageReviewView: View {
                             .stroke(index == currentPageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
                     }
 
-                Text(allAdded ? "All added" : "\(includedCount)/\(record.detections.count) included")
+                Text("Page \(record.pageNumber) · " + (allAdded ? "All added" : "\(includedCount)/\(record.detections.count) included"))
                     .font(.caption2.weight(index == currentPageIndex ? .semibold : .regular))
                     .foregroundStyle(index == currentPageIndex ? Color.accentColor : Color.secondary)
                     .lineLimit(1)
@@ -282,7 +297,7 @@ struct BinderPageReviewView: View {
         .buttonStyle(.plain)
         .disabled(isAdding)
         .accessibilityLabel(
-            "Page \(index + 1), \(includedCount) of \(record.detections.count) included" +
+            "Binder page \(record.pageNumber), \(includedCount) of \(record.detections.count) included" +
                 (allAdded ? ", all added" : "")
         )
     }
@@ -435,23 +450,20 @@ struct BinderPageReviewView: View {
     }
 
     private var binderControls: some View {
-        HStack(spacing: 8) {
-            Text("Target Binder")
-                .font(.headline)
-                .fixedSize()
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text("Target Binder")
+                    .font(.headline)
+                    .fixedSize()
 
-            Spacer(minLength: 4)
+                Spacer(minLength: 4)
 
-            if isLoadingCollections {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                if collections.isEmpty {
+                if isLoadingCollections {
+                    ProgressView().controlSize(.small)
+                } else if collections.isEmpty {
                     Text("No binders yet")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
                 } else {
                     Menu {
                         ForEach(collections) { collection in
@@ -477,27 +489,40 @@ struct BinderPageReviewView: View {
                     }
                     .layoutPriority(-1)
                 }
+
+                Button {
+                    showingCreateBinderSheet = true
+                } label: {
+                    ZStack {
+                        Circle().fill(Color.accentColor.opacity(0.14))
+                        if isCreatingBinder {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "plus")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .disabled(isLoadingCollections || isCreatingBinder)
+                .accessibilityLabel("New Binder")
             }
 
-            Button {
-                showingCreateBinderSheet = true
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.14))
-                    if isCreatingBinder {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "plus")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
-                .frame(width: 32, height: 32)
+            Divider()
+
+            Toggle("Save page photos", isOn: $savesPageImages)
+                .font(.subheadline.weight(.medium))
+            if savesPageImages {
+                Toggle("Replace photo when rescanning", isOn: $replacesPageImages)
+                    .font(.subheadline)
             }
-            .buttonStyle(.plain)
-            .disabled(isLoadingCollections || isCreatingBinder)
-            .accessibilityLabel("New Binder")
+            Text(savesPageImages
+                ? "Page photos are stored with the binder. Turn replacement off to keep an existing reference photo when rescanning."
+                : "Only page numbers and card positions are stored; the captured photo stays in this scan session.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -506,6 +531,20 @@ struct BinderPageReviewView: View {
 
     private func actionControls(record: BinderPageRecord) -> some View {
         VStack(spacing: 12) {
+            Button {
+                Task { await persistRecords(scopedRecords(for: record)) }
+            } label: {
+                HStack {
+                    if isSavingPage { ProgressView() }
+                    Label(saveButtonTitle(for: record), systemImage: "square.and.arrow.down")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isSavingPage || isAdding || viewModel.selectedBinderID == nil)
+
             Button {
                 Task { await addIncludedCards(from: scopedRecords(for: record)) }
             } label: {
@@ -522,7 +561,7 @@ struct BinderPageReviewView: View {
             .controlSize(.large)
             .disabled(
                 isAdding ||
-                    isCreatingBinder ||
+                    isCreatingBinder || isSavingPage ||
                     viewModel.selectedBinderID == nil ||
                     remainingIncludedDetectionCount(for: record) == 0
             )
@@ -586,6 +625,14 @@ struct BinderPageReviewView: View {
             return "Cards Added"
         }
         return "Add \(remainingCount) Cards to Binder"
+    }
+
+    private func saveButtonTitle(for record: BinderPageRecord) -> String {
+        let records = scopedRecords(for: record)
+        if records.count > 1 { return "Save \(records.count) Page Layouts" }
+        return storedPage(for: record.pageNumber) == nil
+            ? "Save Binder Page \(record.pageNumber)"
+            : "Update Binder Page \(record.pageNumber)"
     }
 
     private func showPage(at index: Int) {
@@ -691,6 +738,7 @@ struct BinderPageReviewView: View {
             } else {
                 viewModel.selectedBinderID = collections.first?.id
             }
+            await loadStoredPages()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -727,6 +775,7 @@ struct BinderPageReviewView: View {
             collections.append(collection)
             sortCollections()
             viewModel.selectedBinderID = collection.id
+            storedPages = []
             NotificationCenter.default.post(name: .collectionDidChange, object: collection)
         } catch {
             errorMessage = error.localizedDescription
@@ -777,7 +826,72 @@ struct BinderPageReviewView: View {
         }
 
         if addedThisAttempt > 0 {
+            await persistRecords(records, reportsSuccess: false)
             HapticManager.notification(.success)
+        }
+    }
+
+    @MainActor
+    private func loadStoredPages() async {
+        guard let binderID = viewModel.selectedBinderID else {
+            storedPages = []
+            return
+        }
+        do {
+            storedPages = try await apiService.getBinderPages(
+                config: environmentStore.serverConfiguration,
+                token: requestToken,
+                binderId: binderID
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func storedPage(for pageNumber: Int) -> SavedBinderPage? {
+        storedPages.first { $0.pageNumber == pageNumber }
+    }
+
+    @MainActor
+    private func persistRecords(
+        _ records: [BinderPageRecord],
+        reportsSuccess: Bool = true
+    ) async {
+        guard let binderID = viewModel.selectedBinderID, !isSavingPage else { return }
+        isSavingPage = true
+        defer { isSavingPage = false }
+
+        do {
+            for record in records {
+                let existing = storedPage(for: record.pageNumber)
+                var saved = try await apiService.upsertBinderPage(
+                    config: environmentStore.serverConfiguration,
+                    token: requestToken,
+                    binderId: binderID,
+                    pageNumber: record.pageNumber,
+                    capturedAt: record.scannedAt,
+                    placements: record.persistentPlacements
+                )
+                let shouldUploadImage = savesPageImages && (existing?.imageUrl == nil || replacesPageImages)
+                if shouldUploadImage,
+                   let imageData = UIImage(cgImage: record.result.capturedImage)
+                    .jpegData(compressionQuality: 0.82) {
+                    saved = try await apiService.replaceBinderPageImage(
+                        config: environmentStore.serverConfiguration,
+                        token: requestToken,
+                        binderId: binderID,
+                        pageNumber: record.pageNumber,
+                        imageData: imageData
+                    )
+                }
+                storedPages.removeAll { $0.pageNumber == saved.pageNumber }
+                storedPages.append(saved)
+            }
+            storedPages.sort { $0.pageNumber < $1.pageNumber }
+            if reportsSuccess { HapticManager.notification(.success) }
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.notification(.error)
         }
     }
 
@@ -818,8 +932,10 @@ struct BinderPageReviewView: View {
 private struct BinderCardDetectionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var detection: BinderCardDetection
-    let game: TCGGame
+    let mode: ScanMode
     @State private var showingCardSearch = false
+    @State private var correctionFeedback: String?
+    @State private var correctionFeedbackIsError = false
 
     var body: some View {
         NavigationStack {
@@ -829,34 +945,73 @@ private struct BinderCardDetectionDetailView: View {
 
                     if let candidate = detection.selectedCandidate {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(candidate.details.identity.name)
-                                .font(.title3.weight(.semibold))
+                            HStack(spacing: 7) {
+                                Text(candidate.details.identity.name)
+                                    .font(.title3.weight(.semibold))
+                                if candidate.originatingStrategy == .manual {
+                                    Label("Manual match", systemImage: "hand.tap.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.blue)
+                                }
+                            }
                             Text(candidate.details.identity.setName ?? candidate.details.identity.setCode ?? "Unknown set")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                            Text(String(format: "%.0f%% match", candidate.confidence.score * 100))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(statusColor)
+                            if candidate.originatingStrategy == .manual {
+                                Text("Selected by you")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(String(format: "%.0f%% match", candidate.confidence.score * 100))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(statusColor)
+                            }
                         }
                     } else {
                         ContentUnavailableView(
                             "No Match",
                             systemImage: "questionmark.app.dashed",
-                            description: Text("Exclude this detection and rescan the card individually if needed.")
+                            description: Text("Choose a card below, or leave this detection excluded from the bulk add.")
                         )
+                    }
+
+                    if let correctionFeedback {
+                        Label(
+                            correctionFeedback,
+                            systemImage: correctionFeedbackIsError
+                                ? "exclamationmark.triangle.fill"
+                                : "checkmark.circle.fill"
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(correctionFeedbackIsError ? Color.orange : Color.green)
                     }
 
                     if detection.candidateOptions.count > 1 {
                         alternatives
                     }
 
-                    Button {
-                        showingCardSearch = true
-                    } label: {
-                        Label("Find Another Match", systemImage: "magnifyingglass")
+                    HStack(spacing: 10) {
+                        Button {
+                            showingCardSearch = true
+                        } label: {
+                            Label(
+                                detection.selectedCandidate == nil ? "Find Match" : "Change Match",
+                                systemImage: "magnifyingglass"
+                            )
                             .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        if detection.selectedCandidate != nil {
+                            Button(role: .destructive) {
+                                clearMatch()
+                            } label: {
+                                Label("Clear", systemImage: "xmark.circle")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
-                    .buttonStyle(.bordered)
 
                     Toggle("Include in bulk add", isOn: $detection.isIncluded)
                         .disabled(detection.selectedCandidate == nil)
@@ -872,16 +1027,8 @@ private struct BinderCardDetectionDetailView: View {
             }
         }
         .sheet(isPresented: $showingCardSearch) {
-            BinderCardMatchSearchView(game: game) { card in
-                let candidate = CardScanCandidate(
-                    details: CardDetails(card: card),
-                    confidence: CardScanConfidence(score: 1, reason: "Selected manually"),
-                    originatingStrategy: .manual
-                )
-                detection.selectedCandidate = candidate
-                detection.candidateOptions.append(candidate)
-                detection.status = .matched
-                detection.isIncluded = true
+            BinderCardMatchSearchView(mode: mode, capturedCard: detection.crop) { card in
+                applyManualMatch(details: CardDetails(card: card))
                 showingCardSearch = false
             }
         }
@@ -937,9 +1084,7 @@ private struct BinderCardDetectionDetailView: View {
 
             ForEach(detection.candidateOptions) { candidate in
                 Button {
-                    detection.selectedCandidate = candidate
-                    detection.status = candidate.confidence.score >= 0.82 ? .matched : .uncertain
-                    detection.isIncluded = true
+                    applyManualMatch(details: candidate.details)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -953,10 +1098,14 @@ private struct BinderCardDetectionDetailView: View {
                         Text(String(format: "%.0f%%", candidate.confidence.score * 100))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Image(systemName: candidate.id == detection.selectedCandidate?.id
+                        Image(systemName: candidate.details.identity.id == detection.selectedCandidate?.details.identity.id
                             ? "checkmark.circle.fill"
                             : "circle")
-                            .foregroundStyle(candidate.id == detection.selectedCandidate?.id ? statusColor : Color.secondary)
+                            .foregroundStyle(
+                                candidate.details.identity.id == detection.selectedCandidate?.details.identity.id
+                                    ? statusColor
+                                    : Color.secondary
+                            )
                     }
                     .padding(10)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
@@ -973,21 +1122,84 @@ private struct BinderCardDetectionDetailView: View {
         case .unmatched: return .red
         }
     }
+
+    private func applyManualMatch(details: CardDetails) {
+        let previousCandidate = detection.selectedCandidate
+        let manualCandidate = CardScanCandidate(
+            details: details,
+            confidence: CardScanConfidence(score: 1, reason: "Selected manually"),
+            originatingStrategy: .manual
+        )
+        if let existingIndex = detection.candidateOptions.firstIndex(where: {
+            $0.details.identity.id == details.identity.id
+        }) {
+            detection.candidateOptions[existingIndex] = manualCandidate
+        } else {
+            detection.candidateOptions.append(manualCandidate)
+        }
+        detection.selectedCandidate = manualCandidate
+        detection.status = .matched
+        detection.isIncluded = true
+        saveCorrection(previousCandidate: previousCandidate, correctedCardId: details.identity.id)
+    }
+
+    private func clearMatch() {
+        let previousCandidate = detection.selectedCandidate
+        detection.selectedCandidate = nil
+        detection.status = .unmatched
+        detection.isIncluded = false
+        saveCorrection(previousCandidate: previousCandidate, correctedCardId: nil)
+    }
+
+    private func saveCorrection(
+        previousCandidate: CardScanCandidate?,
+        correctedCardId: String?
+    ) {
+        correctionFeedback = nil
+        guard ScannerDevModeStore.isEnabled else { return }
+        let crop = detection.crop
+        let correction = ScannerManualCorrection(
+            previousCardId: previousCandidate?.details.identity.id,
+            previousCardName: previousCandidate?.details.identity.name,
+            previousSetCode: previousCandidate?.details.identity.setCode,
+            previousSetName: previousCandidate?.details.identity.setName,
+            previousConfidence: previousCandidate?.confidence.score,
+            previousStrategy: previousCandidate?.originatingStrategy.displayName,
+            correctedCardId: correctedCardId
+        )
+        Task {
+            let didSave = await ScannerDevModeStore.shared.recordManualCorrection(
+                image: crop,
+                mode: mode,
+                correction: correction
+            )
+            correctionFeedbackIsError = !didSave
+            correctionFeedback = didSave
+                ? (correctedCardId == nil
+                    ? "Saved “No Match” to the dev-mode recording"
+                    : "Saved manual match to the dev-mode recording")
+                : "Couldn’t save this correction to the dev-mode recording"
+        }
+    }
 }
 
 private struct BinderCardMatchSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
-    let game: TCGGame
+    let mode: ScanMode
+    let capturedCard: CGImage
     let onSelect: (Card) -> Void
 
     @State private var searchText = ""
     @State private var results: [Card] = []
     @State private var isSearching = false
+    @State private var hasSearched = false
     @State private var errorMessage: String?
 
     private let apiService = APIService()
+
+    private var game: TCGGame { mode.tcgGame }
 
     var body: some View {
         NavigationStack {
@@ -996,9 +1208,13 @@ private struct BinderCardMatchSearchView: View {
                     ProgressView("Searching…")
                 } else if results.isEmpty {
                     ContentUnavailableView(
-                        "Find a Card",
-                        systemImage: "magnifyingglass",
-                        description: Text("Search by card name or collector number.")
+                        hasSearched ? "No Cards Found" : "Find a Card",
+                        systemImage: hasSearched ? "rectangle.stack.badge.questionmark" : "magnifyingglass",
+                        description: Text(
+                            hasSearched
+                                ? "Try another card name or collector number."
+                                : "Search by card name or collector number."
+                        )
                     )
                 } else {
                     CardSearchResultsList(
@@ -1007,16 +1223,31 @@ private struct BinderCardMatchSearchView: View {
                         enabledGames: environmentStore.enabledGames,
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
+                        showsGameSectionHeader: false,
                         primaryActionTitle: "Use This Card",
+                        accessibilityHint: "Selects this card as the manual match",
                         onCardTap: onSelect
                     )
                 }
             }
-            .navigationTitle("Correct Match")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                capturedCardReference
+            }
+            .navigationTitle("Choose Match")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Card name or number")
+            .searchable(
+                text: $searchText,
+                placement: .toolbar,
+                prompt: "Search \(mode.displayName) cards"
+            )
             .onSubmit(of: .search) {
                 Task { await search() }
+            }
+            .onChange(of: searchText) { _, newValue in
+                if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    results = []
+                    hasSearched = false
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1037,16 +1268,55 @@ private struct BinderCardMatchSearchView: View {
         }
     }
 
+    @ViewBuilder
+    private var capturedCardReference: some View {
+        let content = HStack(spacing: 12) {
+            Image(uiImage: UIImage(cgImage: capturedCard))
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 58, height: 78)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Captured card")
+                    .font(.subheadline.weight(.semibold))
+                Text("Compare this crop with the search results.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+        }
+    }
+
     @MainActor
     private func search() async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
-        guard let token = environmentStore.authToken else {
+        let token: String
+        if environmentStore.serverConfiguration.isOnDevice {
+            token = environmentStore.authToken ?? ""
+        } else if let authToken = environmentStore.authToken {
+            token = authToken
+        } else {
             errorMessage = "Not authenticated"
             return
         }
 
         isSearching = true
+        hasSearched = true
         defer { isSearching = false }
         do {
             results = try await apiService.searchCards(

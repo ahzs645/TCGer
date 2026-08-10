@@ -1,6 +1,141 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-08 (iOS scanner diagnosis: asset verification, crop-grade parity fix, strategy priority)
+Last updated: 2026-08-09 (import path + YOLO detector + dev mode + angled-card and binder fixes from device evidence)
+
+## Session Results 2026-08-09 (the evidence-loop sessions)
+
+One long working day, five pushed commits (`9dcfc8be`, `43017cbe`,
+`cba75988`, `48ef8509`, `993cadf4`) plus in-flight work. The theme: build the
+instrumentation to capture real device evidence, then let that evidence drive
+every fix. Full analyses live in
+`docs/scanner-import-path-and-detector-2026-08-09.md` (import path + detector
+migration) and `mobile-apps/ios/TCGer/SCANNER_TESTING.md` (how to run
+everything); this section is the map plus the decisions and their reasons.
+
+### Architecture changes a new model must know
+
+- **`ScanInvocationKind` has three cases.** `.photoCapture` = camera shutter
+  (guide-cropped), `.importedPhoto` = photo library / Test Photo / fixtures,
+  `.livePreview`. Only the shutter path is `.photoCapture`. The distinction
+  exists because a borderless card image defeats every geometric test (an
+  iPhone 3:4 photo is inside the card aspect band).
+- **The embedding strategy is multi-hypothesis with retry-on-abstain**
+  (`BoardCardEmbeddingScannerStrategy.makeCropAttempts`): best detected crop,
+  the detector's plain axis-aligned box when corner refinement supplied the
+  primary quad, and the normalized whole frame (non-live sources only) —
+  ordered by card-face gate score, tried until one accepts. Retries are
+  recall-only by construction: an accept returns immediately and every
+  attempt faces the full gate/OCR/threshold policy. Non-baseline attempts
+  need `strongAcceptanceScore + 0.02` (OCR-verified exempt) because a
+  measured 0.707 wrong accept of an out-of-index card arrived via a retry
+  attempt.
+- **The detector is YOLO11s** (`CardDetector.mlpackage`, 18 MB, ultralytics
+  8.4 → Core ML NMS export, trained on the tight-crop-augmented corpus on a
+  Colab L4). Consumed unchanged by `CardObjectDetector` (Vision, "card"
+  label, conf ≥ 0.50, scaleFit). Replay: 99.9% localized, 97.9% IoU≥0.50,
+  95.3% IoU≥0.75 (Create ML predecessor: 90.3%/72.7%). Borderless fixtures
+  get full-frame boxes at 0.97+; the two-card composite gets one box per
+  card. Vision-level scoring of any candidate model without an app build:
+  `mobile-apps/ios/scripts/evaluate-card-detector.swift MODEL split-dir...`.
+- **Corner refinement second chance** (`CardCropper.refinedObservations`):
+  full-frame Vision doc-seg/rectangles return nothing for steeply angled
+  cards, and the axis-box fallback crop embeds ~0.1 below the accept bar
+  (same physical cards measured 0.79–0.93 flat vs 0.55–0.64 angled). Corner
+  detection re-runs inside the padded detector box; the plain box is KEPT as
+  an alternate attempt because a wrong refinement once lost a card the box
+  crop caught. `CardCropper.refinedQuad(in:around:)` is the per-box public
+  entry used by the binder scanner.
+- **Binder pages are detector-first** (`BinderPageScanner.detectCardQuads`):
+  YOLO boxes + per-box corner refinement; the legacy rectangle harvest
+  (which returned attack text boxes, card backs behind pockets, sleeve
+  fabric — 52/77 dead detections on the first device binder session) remains
+  only as fallback. Duplicate suppression is overlap-over-SMALLER-area with
+  larger quads winning — pocketed cards cannot overlap, and a fragment
+  nested in a full-card quad has near-total containment but tiny IoU, which
+  the old IoU test never caught. Measured on recorded pages: candidates
+  19→48, auto-matched 3→9.
+- **Binder shutter captures are guide-cropped** (uncommitted at writing):
+  they previously processed the raw sensor frame while the guide said "Fit
+  the full binder page" — user-visible mismatch and ~half the pixel density
+  per card. The uncropped photo is preserved in dev-mode recordings.
+- **OCR upgrades**: letter-prefixed promo collector codes
+  (`CollectorNumberOCR.extractPromoCodes`, "SWSH204"/"DP38" → normalized
+  "swsh204"/"dp38") — the promo class was structurally unconfirmable before
+  and this is verified working on device. Gate false negatives on intentional
+  captures can also be overridden by exact-title match AND a
+  threshold-clearing visual score (gate measured 0.29–0.47 on legitimate
+  hand-held cards; do NOT lower the 0.45 gate threshold instead — carpet
+  measures 0.42).
+
+### Dev mode: the evidence loop
+
+`ScannerDevModeStore` + `ScanDiagnostics` record every scan (live, shutter,
+import, binder) while the Settings toggle is on: raw input, original sensor
+photo for shutter captures, every crop-attempt image with quad, gate score,
+top-5 ANN candidates, OCR readings, and a per-attempt outcome enum that makes
+abstentions attributable to a stage. Sessions are written in the
+device-recording schema (`results.json` + frames) with an `evidence.json`
+sidecar, so they browse in Reference Sets, replay, and export for labeling
+with zero new tooling. Tester flow: 7 taps on Settings→About→Version unlocks
+developer tools; Export All Sessions ships one zip.
+
+Replay harnesses (both env-gated via `TEST_RUNNER_DEVMODE_SESSIONS_DIR`
+pointing at an unzipped export):
+
+- `DevModeSessionReplayTests` — single-card frames vs recorded device
+  decisions; fails on new false accepts or newly-lost accepts.
+- `BinderSessionReplayTests` — binder pages vs recorded baseline; writes
+  per-page quad overlays to `/tmp/binder-replay-overlays/`.
+
+**Simulator Vision ≠ device Vision** for doc-seg/rectangles: some recorded
+device outcomes do not reproduce in the Simulator on identical code (known
+allowlist in the tests). Device-level conclusions need a device build; the
+harnesses measure change-vs-baseline, not absolute device truth.
+
+### Measured decisions (do not silently revert)
+
+- Crop candidate ties break by shoelace quad area, not Vision confidence
+  (everything ties at 1.00); measured neutral on the 2,336 scene corpus.
+- Fixture `minimumConfidence` floors = 0.70 (production bar), two-cards =
+  `top5Any` at 0.55 (OCR-verified route).
+- Aspect-ratio guards on the detector's axis-aligned box are harmful (a
+  rotated card is near-square in its box): one such guard cost 524
+  localizations before being reverted.
+- The 2,336-image replay is the precision gate: it caught both the harmful
+  shape guard and the retry-attempt wrong accept. Run it for any change
+  touching crops, thresholds, or the strategy
+  (`TEST_RUNNER_ROBOFLOW_REPLAY_DIR`, env vars must be ON xcodebuild, not
+  trailing args — trailing args become build settings and the test silently
+  skips).
+- Latest replay state: 18/50 accepted, 16/24 exact printings, 0 wrong,
+  including the long-abstaining same-art Dark Weezing base5-14.
+
+### Where everything lives
+
+- Datasets/replay: `~/Downloads/Reference/TCGer-Scanner-Datasets/` (docx
+  paths without `Reference/` are stale). Device dev-mode sessions staged at
+  `~/Downloads/Reference/TCGer-DevSessions/`. YOLO training pipeline:
+  `scripts/prepare_createml_card_detector.py --tight-crops` →
+  `scripts/createml_to_yolo.py` → ultralytics on GPU → Core ML NMS export
+  (Colab notebook `Untitled2.ipynb` + artifacts in Drive
+  `TCGer-detector/`). Legacy on-Mac Create ML trainer leaks ~30 MB per
+  iteration into `$TMPDIR/CreateMLModels` — clear it and keep ≥25 GB free.
+
+### Open items / monitoring
+
+1. `ecard3-146 Charizard` is a junk attractor: cluttered whole-frame crops
+   repeatedly retrieve it top-1 at 0.56–0.65. Never accepted so far; watch
+   it in future session exports.
+2. Binder vintage commons cluster at 0.71–0.82 against the 0.82 auto-match
+   bar (`BinderPageScanner.Configuration.matchedScore`); revisit with
+   post-guide-crop device data before touching the bar.
+3. Steep-angle residuals (0.55–0.69 on extreme foreshortening) are an
+   index-side problem — perspective augmentation of reference embeddings is
+   the lever, not thresholds.
+4. Cross-shot aggregation for repeated binder-page captures (same card
+   swings 0.73–0.85 across shots of the same page).
+5. Physical-device acceptance items from the scanner report remain (ANE
+   latency for YOLO11s measured healthy: 74–780 ms warm scans on iPhone).
 
 ## Session Results 2026-08-08 (iOS "scanning doesn't work" diagnosis)
 

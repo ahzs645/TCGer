@@ -36,6 +36,7 @@ struct CollectionDetailView: View {
     @State private var showingBulkConditionSheet = false
     @State private var isBulkProcessing = false
     @State private var cardToSell: CollectionCard?
+    @State private var showingBinderPages = false
 
     private let apiService = APIService()
     init(collection: Collection) {
@@ -361,6 +362,13 @@ struct CollectionDetailView: View {
                                     .foregroundColor(.green)
                                     .fontWeight(.semibold)
                                 } else {
+                                    if !collection.isUnsortedBinder {
+                                        Button(action: { showingBinderPages = true }) {
+                                            Image(systemName: "rectangle.stack")
+                                        }
+                                        .accessibilityLabel("Binder pages")
+                                    }
+
                                     Button("Select") {
                                         isSelectMode = true
                                         selectedCardIds.removeAll()
@@ -388,6 +396,10 @@ struct CollectionDetailView: View {
                 }
                 .sheet(isPresented: $showingAddCard) {
                     AddCardToBinderFromSearchView(binderId: collection.id)
+                }
+                .sheet(isPresented: $showingBinderPages) {
+                    BinderPagesView(collection: workingCollectionSnapshot)
+                        .environmentObject(environmentStore)
                 }
                 .sheet(item: $editContext) { context in
                     EditCollectionCardSheet(

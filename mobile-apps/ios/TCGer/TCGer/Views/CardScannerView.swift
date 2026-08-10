@@ -42,10 +42,19 @@ struct CardScannerView: View {
     @State private var photoImportProgress: ScannerPhotoImportProgress?
     @State private var bottomControlsHeight: CGFloat = 120
     @State private var showingSessionReview = false
+    @State private var didApplyBinderStart = false
     let scope: CardScanScope?
+    let startingBinderID: String?
+    let startingBinderPageNumber: Int?
 
-    init(scope: CardScanScope? = nil) {
+    init(
+        scope: CardScanScope? = nil,
+        startingBinderID: String? = nil,
+        startingBinderPageNumber: Int? = nil
+    ) {
         self.scope = scope
+        self.startingBinderID = startingBinderID
+        self.startingBinderPageNumber = startingBinderPageNumber
     }
 
     var body: some View {
@@ -79,6 +88,7 @@ struct CardScannerView: View {
                 syncSelectedModeWithModules()
                 consumePendingScanMode()
             }
+            applyBinderStartIfNeeded()
         }
         .onReceive(environmentStore.$pendingDeepLinkTab) { tab in
             guard tab == .scan, scope == nil else { return }
@@ -167,6 +177,16 @@ struct CardScannerView: View {
                 })
             )
         }
+    }
+
+    private func applyBinderStartIfNeeded() {
+        guard !didApplyBinderStart,
+              let startingBinderID,
+              let startingBinderPageNumber else { return }
+        didApplyBinderStart = true
+        viewModel.captureMode = .binder
+        viewModel.selectedBinderID = startingBinderID
+        viewModel.setNextBinderPageNumber(startingBinderPageNumber)
     }
 
     @ViewBuilder

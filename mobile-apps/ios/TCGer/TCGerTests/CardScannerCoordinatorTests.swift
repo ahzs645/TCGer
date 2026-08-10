@@ -181,6 +181,28 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertNotNil(viewModel.binderReviewPresentation)
     }
 
+    func testBinderRescanReplacesPhysicalPageAndContinuesPagination() async {
+        let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+        viewModel.captureMode = .binder
+
+        await viewModel.scanBinderPage(image: ScannerTestImage.solid(), presentsReview: false)
+        viewModel.prepareToRescanBinderPage(1)
+        await viewModel.scanBinderPage(image: ScannerTestImage.solid(), presentsReview: false)
+
+        XCTAssertEqual(viewModel.binderPages.map(\.pageNumber), [1])
+        XCTAssertEqual(viewModel.nextBinderPageNumber, 2)
+
+        viewModel.setNextBinderPageNumber(7)
+        await viewModel.scanBinderPage(image: ScannerTestImage.solid(), presentsReview: false)
+
+        XCTAssertEqual(viewModel.binderPages.map(\.pageNumber), [1, 7])
+        XCTAssertEqual(viewModel.nextBinderPageNumber, 8)
+    }
+
     func testStrategiesRunInModePriorityOrderAndContinueAfterFailures() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

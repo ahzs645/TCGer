@@ -10,7 +10,9 @@ struct CardSearchResultsList: View {
     let enabledGames: [TCGGame]
     let showPricing: Bool
     let showCardNumbers: Bool
+    var showsGameSectionHeader = true
     var primaryActionTitle: String = "Add Card"
+    var accessibilityHint = "Opens the add card form"
     let onCardTap: (Card) -> Void
     var onShowDetails: ((Card) -> Void)? = nil
     var onAddToWishlist: ((Card) -> Void)? = nil
@@ -37,49 +39,57 @@ struct CardSearchResultsList: View {
         ScrollView {
             LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
                 ForEach(groupedCards, id: \.0) { tcg, tcgCards in
-                    Section {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            ForEach(tcgCards) { card in
-                                Button {
-                                    onCardTap(card)
-                                } label: {
-                                    CardSearchResultCell(
-                                        card: card,
-                                        showPricing: showPricing,
-                                        showCardNumbers: showCardNumbers
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityHint("Opens the add card form")
-                                .cardPreviewContextMenu(
-                                    card: card,
-                                    primaryActionTitle: primaryActionTitle,
-                                    onSelect: { onCardTap(card) },
-                                    onShowDetails: onShowDetails.map { handler in { handler(card) } },
-                                    onAddToWishlist: onAddToWishlist.map { handler in { handler(card) } }
-                                )
+                    if showsGameSectionHeader {
+                        Section {
+                            cardsGrid(tcgCards)
+                        } header: {
+                            HStack {
+                                Text(tcgCards.first?.tcgDisplayName ?? tcg.uppercased())
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                Spacer()
+                                Text("\(tcgCards.count) cards")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
                             }
+                            .padding(.vertical, 8)
+                            .background(Color(.systemBackground))
                         }
-                    } header: {
-                        HStack {
-                            Text(tcgCards.first?.tcgDisplayName ?? tcg.uppercased())
-                                .font(.headline)
-                                .padding(.horizontal)
-                            Spacer()
-                            Text("\(tcgCards.count) cards")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                        }
-                        .padding(.vertical, 8)
-                        .background(Color(.systemBackground))
+                    } else {
+                        cardsGrid(tcgCards)
                     }
                 }
             }
             .padding()
+        }
+    }
+
+    private func cardsGrid(_ cards: [Card]) -> some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 16) {
+            ForEach(cards) { card in
+                Button {
+                    onCardTap(card)
+                } label: {
+                    CardSearchResultCell(
+                        card: card,
+                        showPricing: showPricing,
+                        showCardNumbers: showCardNumbers
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(accessibilityHint)
+                .cardPreviewContextMenu(
+                    card: card,
+                    primaryActionTitle: primaryActionTitle,
+                    onSelect: { onCardTap(card) },
+                    onShowDetails: onShowDetails.map { handler in { handler(card) } },
+                    onAddToWishlist: onAddToWishlist.map { handler in { handler(card) } }
+                )
+            }
         }
     }
 }
