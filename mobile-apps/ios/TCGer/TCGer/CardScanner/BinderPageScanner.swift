@@ -35,8 +35,8 @@ enum ScannerTriggerMode: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .automatic: return "Automatic"
-        case .manual: return "Manual"
+        case .automatic: return "Auto-scan"
+        case .manual: return "Tap Shutter"
         }
     }
 }
@@ -196,6 +196,11 @@ actor BinderPageScanner {
         static let duplicateIntersectionThreshold: CGFloat = 0.55
         static let matchedScore = 0.82
         static let targetSize = CGSize(width: 720, height: 1000)
+        /// A top edge that strongly disagrees with the rest of the binder page
+        /// is measured evidence that corner refinement latched onto interior
+        /// artwork/text instead of the card border. Preserve the detector box
+        /// and let the per-card coordinator localize it again.
+        static let maximumRefinedAngleDeviationDegrees: CGFloat = 15
     }
 
     private struct CropWorkItem: @unchecked Sendable {
@@ -339,14 +344,58 @@ actor BinderPageScanner {
                         && area <= Configuration.maximumBoundingBoxArea
                 }
             if !boxes.isEmpty {
-                let quads = boxes.map { box in
-                    cropper.refinedQuad(in: image, around: box)
-                        ?? CardCropper.rectangleObservation(for: box)
+                let imageSize = CGSize(width: image.width, height: image.height)
+                let refinements = boxes.map { box in
+                    (box, cropper.refinedQuad(in: image, around: box))
+                }
+                let refinedAngles = refinements.compactMap {
+                    $0.1.flatMap { Self.refinedTopEdgeAngleDegrees($0, imageSize: imageSize) }
+                }.sorted()
+                let pageAngle = refinedAngles.isEmpty
+                    ? nil
+                    : refinedAngles[refinedAngles.count / 2]
+                let quads = refinements.map { box, refined in
+                    guard let refined,
+                          !Self.shouldUseDetectorBox(
+                              insteadOf: refined,
+                              imageSize: imageSize,
+                              pageAngleDegrees: pageAngle
+                          )
+                    else {
+                        return CardCropper.rectangleObservation(for: box)
+                    }
+                    return refined
                 }
                 return Array(orderedAndDeduplicated(quads).prefix(Configuration.maximumObservations))
             }
         }
         return try detectRectangles(in: image)
+    }
+
+    nonisolated static func shouldUseDetectorBox(
+        insteadOf refined: VNRectangleObservation,
+        imageSize: CGSize,
+        pageAngleDegrees: CGFloat?
+    ) -> Bool {
+        guard let angle = refinedTopEdgeAngleDegrees(refined, imageSize: imageSize) else {
+            return true
+        }
+        guard let pageAngleDegrees else { return false }
+        var deviation = abs(angle - pageAngleDegrees)
+        if deviation > 90 { deviation = 180 - deviation }
+        return deviation > Configuration.maximumRefinedAngleDeviationDegrees
+    }
+
+    nonisolated static func refinedTopEdgeAngleDegrees(
+        _ refined: VNRectangleObservation,
+        imageSize: CGSize
+    ) -> CGFloat? {
+        let dx = (refined.topRight.x - refined.topLeft.x) * imageSize.width
+        let dy = (refined.topRight.y - refined.topLeft.y) * imageSize.height
+        guard dx != 0 || dy != 0 else { return nil }
+        var angle = abs(atan2(dy, dx) * 180 / .pi)
+        if angle > 90 { angle = 180 - angle }
+        return dy < 0 ? -angle : angle
     }
 
     private func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {

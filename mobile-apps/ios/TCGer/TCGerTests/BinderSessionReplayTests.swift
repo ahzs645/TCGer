@@ -77,6 +77,11 @@ final class BinderSessionReplayTests: XCTestCase {
             throw XCTSkip("Set DEVMODE_SESSIONS_DIR to an unzipped Export All archive to run.")
         }
         let root = URL(fileURLWithPath: dir, isDirectory: true)
+        let frameFilter = Set(
+            (ProcessInfo.processInfo.environment["DEVMODE_BINDER_FRAME_FILES"] ?? "")
+                .split(separator: ",")
+                .map(String.init)
+        )
         let sessions = ((try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: nil
@@ -96,7 +101,8 @@ final class BinderSessionReplayTests: XCTestCase {
             guard let data = try? Data(contentsOf: evidenceURL),
                   let records = try? JSONDecoder().decode([EvidenceRecord].self, from: data)
             else { continue }
-            for record in records where record.outcome.hasPrefix("binderPage") {
+            for record in records where record.outcome.hasPrefix("binderPage")
+                && (frameFilter.isEmpty || frameFilter.contains(record.imageFile)) {
                 let imageURL = session.appendingPathComponent(record.imageFile)
                 guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
@@ -140,9 +146,14 @@ final class BinderSessionReplayTests: XCTestCase {
         print("BINDERREPLAY summary: \(pages) pages | candidates \(baselineWithCandidate) -> \(newWithCandidate) | matched \(baselineMatched) -> \(newMatched)")
         print("BINDERREPLAY overlays: /tmp/binder-replay-overlays/")
         XCTAssertGreaterThan(pages, 0, "no binder pages found under \(dir)")
-        XCTAssertTrue(
-            candidateRegressions.isEmpty,
-            "binder pages fell below their device/current-Simulator candidate floors: \(candidateRegressions)"
-        )
+        if ProcessInfo.processInfo.environment["DEVMODE_BINDER_DIAGNOSTIC_ONLY"] != "1" {
+            XCTAssertTrue(
+                candidateRegressions.isEmpty,
+                "binder pages fell below their device/current-Simulator candidate floors: "
+                    + "\(candidateRegressions)"
+            )
+        } else if !candidateRegressions.isEmpty {
+            print("BINDERREPLAY diagnostic-only floor differences: \(candidateRegressions)")
+        }
     }
 }

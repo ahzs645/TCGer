@@ -7,6 +7,11 @@ extension CatalogStore {
         let thumbnailURL = imageURL(for: entry, thumbnail: true)?.absoluteString
         var attributes: [String: JSONValue] = [:]
 
+        if let displayCollectorNumber = displayCollectorNumber(for: entry),
+           displayCollectorNumber != entry.card.collectorNumber {
+            attributes["collector_number_display"] = .string(displayCollectorNumber)
+        }
+
         switch entry.tcg {
         case .magic:
             if let type = entry.card.type { attributes["type_line"] = .string(type) }

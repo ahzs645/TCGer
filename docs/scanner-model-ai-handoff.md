@@ -1,6 +1,226 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-09 (arbitrary-angle rotation experiments and binder regression)
+Last updated: 2026-08-10 (Lucario Trainer Kit search and image-less variant audit)
+
+## Manual Match Search: Lucario Trainer Kit 3/11
+
+The eBay listing resolved to English Lucario `3/11`, DP Trainer Kit
+(Lucario), printed identifier `DPBP#506`; the seller title misspelled the name
+as `Lucaio`. The canonical TCGdex/catalog ID is `tk-dp-l-3`.
+
+The exact printing was already present in the bundled Pokemon catalog but was
+hard to find: offline search indexed names and set metadata only, collapsed a
+compound query into one substring, had no typo fallback, and did not carry the
+printed DPBP alias. Its TCGdex record has no image, so the result also appeared
+as an indistinguishable placeholder and the printing is absent from the ANN
+scanner index.
+
+Retained fixes:
+
+- tokenized AND matching across name, set name/code, canonical collector
+  number, and Pokemon display fraction (`3/11`);
+- conservative one-edit correction only for an otherwise empty, single-word,
+  five-or-more-letter query (`Lucaio` -> `Lucario`);
+- a reviewable curated alias registry mapping `DPBP#506` to `tk-dp-l-3`;
+- canonical collector number remains `3`, while mapped UI metadata exposes
+  `3/11`; and
+- shared result cells show set name, set code, collector fraction, an explicit
+  unavailable-image state, and the same printing identity to VoiceOver.
+
+`CatalogSearchTests` covers `Lucario`, `Lucaio`, `3/11`, `Lucario 3/11`,
+`DPBP#506`, `DPBP506`, wrong denominators, exact-result precedence, and
+non-Pokemon number formatting. Focused catalog/normalizer/filter validation
+passes 11/11 on iPhone 17 Pro Simulator.
+
+Server fallback was also inconsistent: the adapter sent the local TCGdex
+cache's `q`/`pageSize` parameters and expected a wrapped `data` response even
+when configured for public `api.tcgdex.net`. Public TCGdex now uses `name` and
+colon-style pagination and accepts raw arrays/objects; non-public cache origins
+retain their existing contract. Focused adapter/card-service suites pass 11/11
+and the backend TypeScript build check passes.
+
+Do not insert metadata without an embedding or relabel `dp1-6` as this card.
+TCGdex has no exact reference image and its guessed asset URL returns 404;
+`dp1-6` uses different artwork/illustrator despite sharing attacks. Exact
+automatic visual matching requires a clean rights-cleared or user-owned front
+scan, followed by an atomic vector/metadata rebuild. The curated identifier
+can safely support high-confidence OCR verification in the meantime.
+
+## Session Results 2026-08-09 (22:39 binder export)
+
+Archive: `TCGer-DevMode-scan-session-20260809-223944.zip` (SHA-256
+`6d84f61e535e3daa12cfcc9ae671a6078088db0a1d7417cda25939c23cbf7b01`).
+It contains 41 Pokemon binder-page frames and 324 saved card attempts. There
+are no manual correction labels, so device outcomes are regression evidence,
+not exact-print ground truth.
+
+### Device evidence
+
+- 67 attempts were accepted, 120 were printing-ambiguous, and 137 had no
+  candidates. Nine pages had no accepted card. Accepted confidence ranged
+  from 0.820 to 0.910 (median 0.846); ambiguous confidence ranged from 0.620
+  to 0.819 (median 0.768).
+- Footer-pair OCR was empty for all 324 attempts, and no attempt used title or
+  OCR verification. Binder exact-print evidence remains the largest measured
+  recognition gap; do not compensate by lowering the 0.82 auto-match bar.
+- The pages are mostly upright with modest camera roll, perspective, glare,
+  partial pages, card backs, and Energy cards. This is useful binder stress
+  coverage but is not semantic 90/180-degree rotation ground truth.
+
+### Arbitrary-angle and crop findings
+
+Perspective correction handled ordinary camera roll well: 312/324 recorded
+crop quads had a pixel-corrected top edge within 2 degrees of horizontal,
+seven were 2-5 degrees, three were 5-10 degrees, and only two exceeded 15
+degrees. The two extreme outliers were isolated bad corner refinements, not
+coherently rotated pages.
+
+The clearest case is `frame-0027`, attempt 7. The archived, current
+perspective, short-edge-reordered, and 180-degree variants all missed the
+visible `pl3-10` Rhyperior in ANN top 10. Cropping the same source from the
+detector's axis-aligned box put `pl3-10` at ANN top 1 (0.722); the full
+per-card coordinator then returned the exact candidate at 0.777. The binder
+decision correctly remains ambiguous below its 0.82 auto-match bar. Rotation
+did not solve this failure; the refined corners had latched onto the wrong
+image structure.
+
+`BinderPageScanner` now computes the median refined top-edge angle for the
+page and retains coherent arbitrary page rotation. It uses the detector box
+only when one refinement differs from that page consensus by more than 15
+degrees, allowing the per-card coordinator to localize that crop again. This
+would affect only the two pathological recorded attempts, rather than every
+genuinely tilted card/page.
+
+### Replay and validation
+
+Replaying all 41 full-resolution pages in one Simulator test exceeded the
+test-process lifetime after eight pages. `BinderSessionReplayTests` therefore
+supports comma-separated `DEVMODE_BINDER_FRAME_FILES` chunks and an explicit
+`DEVMODE_BINDER_DIAGNOSTIC_ONLY=1` comparison mode. Six bounded chunks ran to
+completion. Recorded device versus current Simulator totals were 187 to 160
+attempts with candidates and 67 to 40 matched; this is a Vision
+device/Simulator divergence, so these pages must not receive new Simulator
+floors without labels.
+
+The two seven-page neighborhoods around the extreme quads were unchanged by
+the guarded fallback: frames 21-27 stayed at 16 candidates/2 matches and
+frames 28-34 stayed at 35/13. The focused algorithm suite passed 17/17. A
+test-only labeled perspective harness remains available for future manually
+verified binder slots.
+
+Next measured work: persist manual binder slot corrections as ground truth;
+improve high-resolution title/collector OCR for small and vintage crops; add
+real whole-page and per-card 90/180-degree captures; and retain card backs,
+glare, and partial-page negatives. Arbitrary roll itself is already handled
+by quad rectification—future rotation work should distinguish bad corners
+from semantic upside-down content.
+
+### Post-shutter warp experiment and repository cross-check (2026-08-10)
+
+The default scanner trigger is `Tap Shutter`, so a bounded correction pass
+after capture is acceptable; alternate warps still must not multiply work for
+every card on every binder page. The most transferable open-source patterns
+were:
+
+- [OSS DocumentScanner](https://github.com/ossappscollective/OSS-DocumentScanner)
+  searches multiple edge thresholds, validates convex document-like quads,
+  and exposes manual edge/corner correction.
+- [WeScan](https://github.com/WeTransferArchive/WeScan) keeps automatic
+  detection and an editable post-capture quadrilateral as separate stages.
+- [RiftBound Scanner](https://github.com/Nekoraru22/riftbound-scanner) uses
+  learned corner/angle localization, full-resolution warps, and synthetic
+  perspective, sleeve, glare, and shadow augmentation.
+- [Rarebox](https://github.com/novaoc/rarebox) compares multiple Sobel
+  thresholds plus strongest/outermost Hough borders. No usable repository
+  license was found, so only the independently implemented experiment design
+  was retained.
+- [UVDoc](https://github.com/tanguymagne/UVDoc) targets dense dewarping of bent
+  paper. It is unnecessary for a rigid card and can hallucinate geometry, so
+  it is not a production candidate here.
+- [yugioh-one-shot-learning](https://github.com/vanstorm9/yugioh-one-shot-learning)
+  uses a simple first four-point contour. It is a useful baseline but is too
+  brittle for sleeves, artwork rectangles, and binder seams.
+
+`ScannerOrientationExperimentTests` now contains a test-only outer-border
+proposal generator. It downsizes only the detector region, tries Sobel mean
+multipliers 2.2/1.5/1.0, votes for border lines, compares strongest versus
+outermost sufficiently strong lines, and rejects non-card-shaped or badly
+sized quads before perspective correction.
+
+On the manually verified `frame-0027` Rhyperior (`pl3-10`), the archived and
+current refined crops scored 0.562/0.568 and missed the expected card in the
+ANN top 10. The detector box scored 0.722; the outer-border warp raised the
+same exact candidate to 0.798 through both raw ANN and the full coordinator.
+That remains below the 0.82 binder auto-match threshold, so it improves the
+review candidate without justifying an automatic accept.
+
+The broader safety run used all 67 device-accepted attempts as pseudo-labels.
+These are regression evidence rather than human exact-print truth. Current
+refined crops produced 48/67 top-1, 38 strong-correct, four strong-wrong, and
+25 abstentions on Simulator. Detector boxes produced 50/67, 39, six, and 22.
+Selecting the maximum detector/Hough score produced 53/67, 47, six, and 14,
+but changed identity ten times: five corrections and five regressions. That
+unconstrained policy is rejected.
+
+An agreement-only interpretation is safer: accept a Hough score increase only
+when it returns the same card ID as the first crop. At the binder 0.82 bar,
+detector boxes had 13 matched-correct and zero matched-wrong pseudo-labels;
+agreement-only refinement had 16 and zero. The full run generated 62 Hough
+proposals, spent 52.487 seconds in the test-only Hough CPU stage, and took
+293.7 seconds including embeddings on Simulator. Production work should
+therefore remain an uncertain-result-only post-shutter retry, and it still
+needs human-labeled binder positives and negatives before promotion.
+
+Do not reintroduce the tempting global binder portrait-normalizer shortcut.
+The earlier 19-page replay reduced candidates from 107 to 99 despite gaining
+one match, and the archive contains no physical sideways binder card to prove
+the intended fix. The safe next sequence is: persist per-slot correction
+labels; capture sideways and upside-down cards plus negatives; evaluate the
+agreement-only retry; then add an editable four-corner review control for an
+uncertain manual-shutter card. Manual correction is the most reliable escape
+hatch for sleeve glare or a border detector locked onto interior artwork.
+
+### Offline policy evaluation on one evidence dump (2026-08-10, later)
+
+`ScannerOrientationExperimentTests.testAcceptedBinderPolicyEvidence` writes
+one JSON line per strongly accepted binder attempt: the full ANN top-10 for
+the refined crop, the detector box, and every Hough proposal, plus Laplacian
+sharpness, plus each crop as a PNG. Selection policies are then scored
+offline from a single Simulator run instead of re-embedding per policy. On
+the same 67 pseudo-labeled attempts:
+
+- Baselines reproduced exactly: refined 16 matched-correct/0 matched-wrong at
+  0.82, detector box 13/0, agreement-only 19/0 in this run.
+- Separation is highly diagnostic. Every wrong review candidate at >=0.72 had
+  a top-2 ANN margin of at most 0.047 (median 0.009); correct ones had median
+  0.095. An ANN margin >=0.05 gate would have suppressed all fifteen wrong
+  review candidates while keeping roughly three quarters of correct ones.
+- Laplacian sharpness did not separate correct from wrong refined crops
+  (medians 479 versus 490); binder identity errors here are crop-geometry
+  errors, not blur. A sharpness gate changed nothing.
+- Identity change with two agreeing alternates (challenger k=2) gained three
+  corrections with zero regressions; k=1 behaved like unsafe max-score.
+- Grayscale NCC against reference art (128x179, ensemble over crop variants,
+  pooled top-5 candidates) recovered 13 of 19 wrong refined top-1s; the six
+  misses all lacked the true card in any variant's top-5 (geometry failures,
+  unreachable by re-ranking). Restricted to attempts where the true card was
+  present, recovery was 13 of 14.
+- Combined production-shaped policy — accept refined at >=0.82; otherwise
+  NCC-arbitrate pooled candidates only when the refined ANN margin is <0.05,
+  requiring NCC >=0.25 and NCC top-2 margin >=0.05 for an identity change —
+  scored 59/67 top-1 (11 corrections, zero regressions), 18 matched-correct,
+  zero matched-wrong, zero strong-wrong at 0.72.
+- One instructive conflict: `frame-0002` attempt 5 was device-accepted as
+  Pocket ID `A2-105` at 0.79 ANN, but its reference art NCC was -0.02
+  (uncorrelated). A physical binder card with a digital-only Pocket ID plus
+  zero pixel correlation suggests art-reuse index aliasing; ANN-versus-NCC
+  disagreement is a useful review flag on its own.
+
+Caveats unchanged: pseudo-labels, Simulator Vision, and reference art pulled
+from pokemontcg.io/tcgdex CDNs at evaluation time (a production NCC stage
+would need bundled or cached reference thumbnails, and four IDs had no
+fetchable art). The evaluation scripts live outside the repository; the
+JSONL format is documented in the test.
 
 ## Session Results 2026-08-09 (21:29 correction/rotation export)
 

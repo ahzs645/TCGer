@@ -7,9 +7,11 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     let onDismiss: (() -> Void)?
     var dismissIcon: String = "xmark"
     @Binding var triggerMode: ScannerTriggerMode
+    @Binding var selectedEngine: ScanEnginePreference
     @Binding var automaticallyShowResults: Bool
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
+    let availableScanEngines: [ScanEnginePreference]
     let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
@@ -57,18 +59,20 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
             Spacer()
 
             Menu {
-                Section("Single-card scan") {
-                    ForEach(ScannerTriggerMode.allCases) { mode in
-                        Button {
-                            triggerMode = mode
-                        } label: {
-                            if triggerMode == mode {
-                                Label(mode.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(mode.displayName)
+                if !showsBinderOptions {
+                    Section("Single-card scan") {
+                        ForEach(ScannerTriggerMode.allCases) { mode in
+                            Button {
+                                triggerMode = mode
+                            } label: {
+                                if triggerMode == mode {
+                                    Label(mode.displayName, systemImage: "checkmark")
+                                } else {
+                                    Text(mode.displayName)
+                                }
                             }
+                            .disabled(isProcessing)
                         }
-                        .disabled(isProcessing)
                     }
                 }
 
@@ -90,14 +94,33 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                             Label(demoTitle, systemImage: "testtube.2")
                         }
                         .disabled(isProcessing)
+
+                        Menu {
+                            ForEach(availableScanEngines) { engine in
+                                Button {
+                                    selectedEngine = engine
+                                } label: {
+                                    if selectedEngine == engine {
+                                        Label(engine.displayName, systemImage: "checkmark")
+                                    } else {
+                                        Text(engine.displayName)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label("Recognition Engine", systemImage: "cpu")
+                        }
+                        .disabled(isProcessing || availableScanEngines.count < 2)
                     }
                 }
 
-                Section("Results") {
-                    Toggle(isOn: $automaticallyShowResults) {
-                        Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
+                if !showsBinderOptions {
+                    Section("Results") {
+                        Toggle(isOn: $automaticallyShowResults) {
+                            Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
+                        }
+                        .disabled(isProcessing)
                     }
-                    .disabled(isProcessing)
                 }
 
                 if showsBinderOptions {
@@ -121,7 +144,9 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
             .foregroundStyle(.primary)
             .accessibilityLabel("Scanner options")
             .accessibilityValue(
-                "\(triggerMode.displayName) scan, automatic results "
+                (showsBinderOptions
+                    ? "Binder scan, automatic results "
+                    : "\(triggerMode.displayName), automatic results ")
                     + (automaticallyShowResults ? "on" : "off")
                     + (showsBinderOptions
                         ? ", save binder page photos \(savesBinderPageImages ? "on" : "off")"

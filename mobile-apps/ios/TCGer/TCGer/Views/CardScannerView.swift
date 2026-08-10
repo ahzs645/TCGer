@@ -265,9 +265,11 @@ struct CardScannerView: View {
                 onDismiss: (scope != nil || isPresented) ? { dismiss() } : nil,
                 dismissIcon: scope == nil ? "chevron.left" : "xmark",
                 triggerMode: $viewModel.triggerMode,
+                selectedEngine: $viewModel.selectedEngine,
                 automaticallyShowResults: $automaticallyShowResults,
                 savesBinderPageImages: $savesBinderPageImages,
                 replacesBinderPageImages: $replacesBinderPageImages,
+                availableScanEngines: availableScanEngines,
                 showsBinderOptions: viewModel.captureMode == .binder,
                 showsTestInputs: showTestingTools || isSimulator,
                 isProcessing: isProcessingPhoto,
@@ -518,9 +520,6 @@ struct CardScannerView: View {
             .overlay(alignment: .leading) {
                 captureModeControl
             }
-            .overlay(alignment: .trailing) {
-                engineControl
-            }
     }
 
     @ViewBuilder
@@ -680,42 +679,6 @@ struct CardScannerView: View {
             )
             .accessibilityLabel("Card game")
             .accessibilityValue(hasEnabledScanModes ? viewModel.selectedMode.displayName : "No enabled games")
-        }
-    }
-
-    @ViewBuilder
-    private var engineControl: some View {
-        if availableScanEngines.count > 1 {
-            Menu {
-                ForEach(availableScanEngines) { engine in
-                    Button {
-                        viewModel.selectedEngine = engine
-                    } label: {
-                        if engine == viewModel.selectedEngine {
-                            Label(engine.displayName, systemImage: "checkmark")
-                        } else {
-                            Text(engine.displayName)
-                        }
-                    }
-                }
-            } label: {
-                ScannerOptionLabel(
-                    title: engineControlTitle,
-                    systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars"
-                )
-            }
-            .accessibilityLabel("Recognition engine")
-            .accessibilityValue(viewModel.selectedEngine.displayName)
-            .accessibilityHint("On-device recognition works privately without a server")
-        } else {
-            ScannerOptionLabel(
-                title: engineControlTitle,
-                systemImage: viewModel.selectedEngine.isLocalOnly ? "iphone" : "wand.and.stars",
-                isInteractive: false
-            )
-            .accessibilityLabel("Recognition engine")
-            .accessibilityValue(availableScanEngines.first?.displayName ?? "Unavailable")
-            .accessibilityHint("On-device recognition works privately without a server")
         }
     }
 
@@ -960,18 +923,6 @@ private extension CardScannerView {
             : "Center one card · Tap shutter"
     }
 
-    var engineControlTitle: String {
-        switch viewModel.selectedEngine {
-        case .localOnly:
-            return "Offline AI"
-        case .automatic:
-            return "Auto AI"
-        case .serverHash:
-            return "Server Hash"
-        case .serverEmbedding:
-            return "Server AI"
-        }
-    }
 }
 
 private struct ScannerOptionLabel: View {

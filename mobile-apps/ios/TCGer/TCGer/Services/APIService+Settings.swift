@@ -1,6 +1,124 @@
 import Foundation
 
 extension APIService {
+    struct PricingSourceConfiguration: Codable, Sendable {
+        let url: String
+        let label: String
+        let configured: Bool
+    }
+
+    struct TestSourceResult: Codable, Sendable {
+        let ok: Bool
+        let latencyMs: Int
+        let error: String?
+    }
+
+    private struct TestSourceRequest: Codable, Sendable {
+        let source: String
+    }
+
+    private struct SourceDefaultsResponse: Codable, Sendable {
+        let justtcg: PricingSourceConfiguration
+    }
+
+    func getPricingSourceConfiguration(
+        config: ServerConfiguration,
+        token: String?
+    ) async throws -> PricingSourceConfiguration {
+        if config.isOnDevice {
+            return PricingSourceConfiguration(
+                url: "https://api.justtcg.com/v1",
+                label: "JustTCG (Personal Key)",
+                configured: try JustTCGCredentialStore.loadAPIKey() != nil
+            )
+        }
+
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "settings/source-defaults",
+            token: token
+        )
+
+        guard response.statusCode == 200 else {
+            let serverMessage = parseServerMessage(from: data)
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
+        }
+
+        guard let sources = try? JSONDecoder().decode(SourceDefaultsResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return sources.justtcg
+    }
+
+    func testPricingSource(
+        config: ServerConfiguration,
+        token: String?
+    ) async throws -> TestSourceResult {
+        if config.isOnDevice {
+            return try await testOnDeviceJustTCGConnection()
+        }
+
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "settings/test-source",
+            method: "POST",
+            token: token,
+            body: TestSourceRequest(source: "justtcg")
+        )
+
+        guard response.statusCode == 200 else {
+            let serverMessage = parseServerMessage(from: data)
+            throw APIError.serverError(status: response.statusCode, message: serverMessage)
+        }
+
+        guard let result = try? JSONDecoder().decode(TestSourceResult.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        return result
+    }
+
+    func saveOnDevicePricingAPIKey(_ apiKey: String) throws {
+        try JustTCGCredentialStore.save(apiKey: apiKey)
+    }
+
+    func removeOnDevicePricingAPIKey() throws {
+        try JustTCGCredentialStore.deleteAPIKey()
+    }
+
+    private func testOnDeviceJustTCGConnection() async throws -> TestSourceResult {
+        guard let apiKey = try JustTCGCredentialStore.loadAPIKey() else {
+            return TestSourceResult(
+                ok: false,
+                latencyMs: 0,
+                error: "No personal JustTCG API key is stored on this iPhone."
+            )
+        }
+        guard let url = URL(string: "https://api.justtcg.com/v1/games") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+
+        let startedAt = ContinuousClock.now
+        let (data, response) = try await execute(request)
+        let elapsed = startedAt.duration(to: .now)
+        let latencyMs = Int(elapsed.components.seconds * 1_000)
+            + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+
+        return TestSourceResult(
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            latencyMs: latencyMs,
+            error: response.statusCode >= 200 && response.statusCode < 300
+                ? nil
+                : (parseServerMessage(from: data) ?? "JustTCG returned HTTP \(response.statusCode).")
+        )
+    }
+
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
         if config.isOnDevice {
             return LocalStore.shared.getSettings()

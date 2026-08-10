@@ -1,4 +1,5 @@
 import XCTest
+@preconcurrency import Vision
 @testable import TCGer
 
 final class ScannerCoreAlgorithmTests: XCTestCase {
@@ -203,6 +204,36 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
             cropper.normalizedWholeImage(from: ScannerTestImage.solid(width: 102, height: 73))
         )
         XCTAssertEqual(CGSize(width: landscape.width, height: landscape.height), CGSize(width: 720, height: 1000))
+    }
+
+    func testBinderUsesDetectorBoxOnlyForStronglySkewedRefinement() {
+        let imageSize = CGSize(width: 1_000, height: 1_000)
+        let axisAligned = CardCropper.rectangleObservation(
+            for: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.5)
+        )
+        XCTAssertFalse(BinderPageScanner.shouldUseDetectorBox(
+            insteadOf: axisAligned,
+            imageSize: imageSize,
+            pageAngleDegrees: 0
+        ))
+
+        let steep = VNRectangleObservation(
+            requestRevision: VNDetectRectanglesRequestRevision1,
+            topLeft: CGPoint(x: 0.10, y: 0.70),
+            bottomLeft: CGPoint(x: 0.20, y: 0.20),
+            bottomRight: CGPoint(x: 0.50, y: 0.30),
+            topRight: CGPoint(x: 0.40, y: 0.80)
+        )
+        XCTAssertTrue(BinderPageScanner.shouldUseDetectorBox(
+            insteadOf: steep,
+            imageSize: imageSize,
+            pageAngleDegrees: 0
+        ))
+        XCTAssertFalse(BinderPageScanner.shouldUseDetectorBox(
+            insteadOf: steep,
+            imageSize: imageSize,
+            pageAngleDegrees: 18
+        ))
     }
 
     func testExtractPromoCodesNormalizesLetterPrefixedCollectorNumbers() {

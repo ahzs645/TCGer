@@ -11,6 +11,12 @@ const booleanEnv = z
   .default('false')
   .transform((value) => value === 'true');
 
+const optionalSecretEnv = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim().length === 0 ? undefined : value,
+  z.string().trim().min(1).optional()
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -32,6 +38,8 @@ const envSchema = z.object({
   YGO_API_BASE_URL: z.string().url().default('https://db.ygoprodeck.com/api/v7'),
   POKEMON_API_BASE_URL: z.string().url().default('https://api.scrydex.com'),
   TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en'),
+  JUSTTCG_API_BASE_URL: z.string().url().default('https://api.justtcg.com/v1'),
+  JUSTTCG_API_KEY: optionalSecretEnv,
   ONEPIECE_API_BASE_URL: z.string().url().default('https://optcgapi.com/api'),
   LORCANA_API_BASE_URL: z.string().url().default('https://api.lorcast.com/v0'),
   APITCG_API_BASE_URL: z.string().url().default('https://api.apitcg.com'),

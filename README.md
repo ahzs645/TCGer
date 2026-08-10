@@ -115,6 +115,8 @@ Express backend (see `backend/src/config/env.ts`):
 - `YGO_API_BASE_URL` (default `https://db.ygoprodeck.com/api/v7`).
 - `POKEMON_API_BASE_URL` (default `https://api.scrydex.com`).
 - `TCGDEX_API_BASE_URL` (default `https://api.tcgdex.net/v2/en`).
+- `JUSTTCG_API_BASE_URL` (default `https://api.justtcg.com/v1`) and
+  `JUSTTCG_API_KEY` (paid commercial pricing; server-side only).
 
 Convex backend:
 - `BETTER_AUTH_SECRET` signs Better Auth sessions. Non-local Convex deployments require it; use a random value of at least 32 characters.

@@ -327,6 +327,34 @@ struct SettingsView: View {
                     Text("Display Preferences")
                 }
 
+                if isLocalMode || (environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin) {
+                    Section {
+                        NavigationLink {
+                            PricingSourceSettingsView()
+                                .environmentObject(environmentStore)
+                        } label: {
+                            HStack {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .foregroundColor(.green)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Pricing Source")
+                                    Text(isLocalMode
+                                        ? "Personal JustTCG key on this phone"
+                                        : "Configure and test JustTCG")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Pricing")
+                    } footer: {
+                        Text(isLocalMode
+                            ? "Phone-only mode can use a separate personal JustTCG key stored in this iPhone's Keychain. A server-held key remains safer."
+                            : "JustTCG is the primary commercial pricing provider. Its API key is configured on the server, never stored in the mobile app.")
+                    }
+                }
+
                 // Security Section
                 if BiometricAuthManager.isAvailable {
                     Section {

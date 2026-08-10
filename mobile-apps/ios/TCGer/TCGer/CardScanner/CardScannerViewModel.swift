@@ -154,13 +154,10 @@ final class CardScannerViewModel: ObservableObject {
 
     func updateEnvironment(_ environment: EnvironmentStore) {
         environmentStore = environment
-        // In phone-only mode there is no backend, so fall back to the fully
-        // on-device engine — both for the default and for a server matcher
-        // carried over from a previous server connection.
-        if environment.serverConfiguration.isOnDevice,
-           selectedEngine == .automatic || selectedEngine.requiresServerOnlyFlow {
-            selectedEngine = .localOnly
-        }
+        // Recognition routing is an implementation detail for regular scans:
+        // stay fully on-device in phone-only mode, otherwise use the local-first
+        // automatic chain. Developer tools can still override this afterward.
+        selectedEngine = environment.serverConfiguration.isOnDevice ? .localOnly : .automatic
         rebuildContext()
         prepareCameraIfPossible()
     }

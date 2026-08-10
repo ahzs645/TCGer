@@ -121,16 +121,14 @@ struct CardSearchResultCell: View {
                         .fill(Color(.systemGray5))
                         .aspectRatio(0.7, contentMode: .fit)
                         .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
+                            unavailableImagePlaceholder
                         )
                 @unknown default:
                     Rectangle()
                         .fill(Color(.systemGray5))
                         .aspectRatio(0.7, contentMode: .fit)
                         .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.secondary)
+                            unavailableImagePlaceholder
                         )
                 }
             }
@@ -147,11 +145,25 @@ struct CardSearchResultCell: View {
                     .fontWeight(.medium)
                     .lineLimit(2)
 
-                if showCardNumbers, let setName = card.setName {
-                    Text(setName)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                if showCardNumbers,
+                   setDisplayName != nil || collectorNumberDisplay != nil {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        if let setDisplayName {
+                            Text(setDisplayName)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        if let collectorNumberDisplay {
+                            Text(collectorNumberDisplay)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                                .fixedSize()
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 }
 
                 // Pokemon TCG format legality & dex number
@@ -207,6 +219,88 @@ struct CardSearchResultCell: View {
         .background(Color(.systemGray6))
         .cornerRadius(12)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var unavailableImagePlaceholder: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "photo")
+                .font(.title3)
+            Text("Image unavailable")
+                .font(.caption2)
+        }
+        .foregroundColor(.secondary)
+        .accessibilityHidden(true)
+    }
+
+    private var setDisplayName: String? {
+        switch (setName, setCode) {
+        case let (name?, code?) where name.caseInsensitiveCompare(code) != .orderedSame:
+            return "\(name) · \(code)"
+        case let (name?, _):
+            return name
+        case let (_, code?):
+            return code
+        default:
+            return nil
+        }
+    }
+
+    private var setName: String? {
+        nonEmpty(card.setName)
+    }
+
+    private var setCode: String? {
+        nonEmpty(card.setCode)
+    }
+
+    private var collectorNumber: String? {
+        if let displayValue = card.attributes?["collector_number_display"],
+           case .string(let displayNumber) = displayValue,
+           let displayNumber = nonEmpty(displayNumber) {
+            return displayNumber
+        }
+        return nonEmpty(card.collectorNumber)
+    }
+
+    private var collectorNumberDisplay: String? {
+        guard let collectorNumber else { return nil }
+        return collectorNumber.hasPrefix("#") ? collectorNumber : "#\(collectorNumber)"
+    }
+
+    private var accessibilityLabel: String {
+        var parts = [card.name, card.tcgDisplayName]
+
+        if showCardNumbers {
+            if let setName {
+                parts.append("Set \(setName)")
+            }
+            if let setCode,
+               setCode.caseInsensitiveCompare(setName ?? "") != .orderedSame {
+                parts.append("Set code \(setCode)")
+            }
+            if let collectorNumber {
+                parts.append("Card number \(collectorNumber)")
+            }
+        }
+
+        if let rarity = nonEmpty(card.rarity) {
+            parts.append(rarity)
+        }
+        if showPricing, let price = card.price {
+            parts.append("Price \(price.priceText)")
+        }
+
+        return parts.joined(separator: ", ")
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 }
 

@@ -218,6 +218,20 @@ Caveat: Simulator Vision (doc-seg/rectangles) diverges from device Vision on
 some frames, so device-confirmed conclusions need a device build — the test
 keeps a documented allowlist of known Simulator divergences.
 
+Large binder exports can exceed the Simulator test-process lifetime when run
+as one replay. Split them into deterministic chunks with a comma-separated
+frame list. Diagnostic-only mode prints device/floor differences without
+blessing them as new regression floors:
+
+```bash
+TEST_RUNNER_DEVMODE_SESSIONS_DIR=/path/to/unzipped/export \
+TEST_RUNNER_DEVMODE_BINDER_FRAME_FILES=frame-0000.jpg,frame-0001.jpg \
+TEST_RUNNER_DEVMODE_BINDER_DIAGNOSTIC_ONLY=1 \
+xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/BinderSessionReplayTests/testReplayBinderPages
+```
+
 Explicit corrections recorded in `results.json` are stronger evidence than
 the original device decision. `ScannerCorrectionReplayTests` finds those
 labels, collapses repeated edits of byte-identical crops so the final edit
@@ -247,6 +261,80 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 Both are environment-gated and skip in the ordinary test suite.
+
+For one manually verified binder slot, the perspective diagnostic compares
+the archived crop, current perspective crop, short-edge ordering, 180-degree
+variant, detector box, and full coordinator result:
+
+```bash
+TEST_RUNNER_BINDER_ORIENTATION_EXPERIMENT_SESSION_DIR=/path/to/scan-session \
+TEST_RUNNER_BINDER_ORIENTATION_EXPERIMENT_FRAME=frame-0027.jpg \
+TEST_RUNNER_BINDER_ORIENTATION_EXPERIMENT_ATTEMPT=7 \
+TEST_RUNNER_BINDER_ORIENTATION_EXPERIMENT_EXPECTED=pl3-10 \
+xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/ScannerOrientationExperimentTests/testLabeledBinderPerspectiveVariants
+```
+
+Treat this manual expected ID as an experiment label, not archive metadata;
+the current binder export format does not persist per-slot corrections.
+
+To regression-test an alternate warp against every strongly accepted binder
+attempt, use the accepted device candidate as a pseudo-label. This does not
+replace human per-slot labels; it rejects hypotheses that damage already-good
+manual-shutter captures and reports the Hough CPU cost separately:
+
+```bash
+TEST_RUNNER_BINDER_WARP_EXPERIMENT_SESSION_DIR=/path/to/scan-session \
+TEST_RUNNER_BINDER_WARP_EXPERIMENT_LIMIT=100 \
+xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/ScannerOrientationExperimentTests/testAcceptedBinderWarpVariants
+```
+
+The test compares the recorded/refined quad, the detector box, and a test-only
+multi-threshold outer-border Hough policy. Do not promote maximum-score
+selection: the 2026-08-10 67-attempt run changed identity ten times, split
+evenly between corrections and regressions. The only production candidate is
+an uncertain-result-only, same-card-ID agreement retry after manual shutter.
+
+For policy comparisons, prefer the evidence-dump variant, which records the
+full ANN top-10, Laplacian sharpness, and a PNG for every crop variant so
+that agreement, margin, hysteresis, sharpness, and reference-image policies
+can all be scored offline from one Simulator run:
+
+```bash
+TEST_RUNNER_BINDER_WARP_EXPERIMENT_SESSION_DIR=/path/to/scan-session \
+TEST_RUNNER_BINDER_WARP_EXPERIMENT_LIMIT=100 \
+TEST_RUNNER_BINDER_POLICY_EVIDENCE_OUT=/path/to/policy-evidence.jsonl \
+TEST_RUNNER_BINDER_POLICY_EVIDENCE_CROPS_DIR=/path/to/crops \
+xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:TCGerTests/ScannerOrientationExperimentTests/testAcceptedBinderPolicyEvidence
+```
+
+The 2026-08-10 offline evaluation of that dump found: top-2 ANN margin
+separates wrong review candidates (max 0.047) from correct ones (median
+0.095); Laplacian sharpness does not separate them at all; identity change
+requires at least two agreeing alternate crops to stay regression-free; and
+grayscale NCC against reference art recovered 13 of the 14 wrong top-1s whose
+true card appeared in any variant's top-5. Details and the combined
+zero-regression policy are in `docs/scanner-model-ai-handoff.md`.
+
+### Manual-match catalog search regressions
+
+Image-less catalog variants must remain selectable even though they cannot be
+part of the embedding index. `CatalogSearchTests` uses Lucario Trainer Kit
+`tk-dp-l-3` as the regression case and verifies all of these queries:
+`Lucario 3/11`, `3/11`, `DPBP#506`, `DPBP506`, and the seller typo `Lucaio`.
+It also verifies ordinary name-prefix order, wrong-denominator rejection,
+exact-result precedence over typo expansion, and unchanged Magic/Yu-Gi-Oh
+collector formatting.
+
+The result cell must expose set name, set code, and the display collector
+fraction even when artwork is unavailable. Keep the canonical catalog number
+unchanged for identity/image keys; the Pokemon-only display fraction belongs
+in `attributes["collector_number_display"]`.
 
 The arbitrary-angle test uses one positive label by default so it remains a
 focused diagnostic. Set

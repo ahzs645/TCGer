@@ -268,32 +268,83 @@ final class CatalogStore: ObservableObject {
     nonisolated private struct SetSearchMetadata: Sendable {
         let name: String
         let code: String
+        let officialCardCount: Int?
 
         func contains(_ query: String) -> Bool {
             name.contains(query) || code.contains(query)
         }
     }
 
+    nonisolated private struct CardSearchMetadata: Sendable {
+        let name: String
+        let nameWords: [String]
+        let searchableFields: [String]
+        let collectorNumber: String?
+        let displayCollectorNumber: String?
+
+        func matchesAll(_ queryTerms: [String]) -> Bool {
+            queryTerms.allSatisfy { term in
+                if term.allSatisfy(\.isNumber) {
+                    // A bare number is a collector-number query, not a loose
+                    // substring of a name, set, or denominator.
+                    return collectorNumber == term || displayCollectorNumber == term
+                }
+                return searchableFields.contains { $0.contains(term) }
+            }
+        }
+
+        func nameIsSingleEditAway(from query: String) -> Bool {
+            nameWords.contains { SearchTextNormalizer.isSingleEditAway($0, query) }
+        }
+
+        func namePrefixIsSingleEditAway(from query: String) -> Bool {
+            nameWords.first.map { SearchTextNormalizer.isSingleEditAway($0, query) } == true
+        }
+    }
+
     nonisolated private struct LoadedCatalogPack: Sendable {
         let pack: CatalogPack
         let setSearchMetadata: [String: SetSearchMetadata]
-        let cardSearchKeys: [String]
+        let cardSearchMetadata: [CardSearchMetadata]
 
         init(pack: CatalogPack) {
             self.pack = pack
-            cardSearchKeys = pack.cards.map { SearchTextNormalizer.key($0.name) }
-            setSearchMetadata = Dictionary(
+            let setMetadata = Dictionary(
                 pack.sets.map { set in
                     (
                         set.code,
                         SetSearchMetadata(
                             name: Self.normalize(set.name),
-                            code: Self.normalize(set.code)
+                            code: Self.normalize(set.code),
+                            officialCardCount: set.standardCount ?? (set.count > 0 ? set.count : nil)
                         )
                     )
                 },
                 uniquingKeysWith: { first, _ in first }
             )
+            setSearchMetadata = setMetadata
+            cardSearchMetadata = pack.cards.map { card in
+                let set = card.setCode.flatMap { setMetadata[$0] }
+                let collectorNumber = card.collectorNumber.map(Self.normalize)
+                let displayCollectorNumber = CatalogStore.displayCollectorNumber(
+                    card.collectorNumber,
+                    tcg: TCGGame(rawValue: pack.tcg) ?? .all,
+                    officialCardCount: set?.officialCardCount
+                ).map(Self.normalize)
+                return CardSearchMetadata(
+                    name: Self.normalize(card.name),
+                    nameWords: SearchTextNormalizer.wordKeys(card.name),
+                    searchableFields: [
+                        Self.normalize(card.name),
+                        set?.name,
+                        set?.code,
+                        collectorNumber,
+                        displayCollectorNumber
+                    ].compactMap { $0 } + CatalogSearchAliases.normalizedAliases(forCardID: card.id),
+                    collectorNumber: collectorNumber,
+                    displayCollectorNumber: displayCollectorNumber
+                )
+            }
         }
 
         var version: Int { pack.version }
@@ -471,6 +522,7 @@ final class CatalogStore: ObservableObject {
         guard !needle.isEmpty, limit > 0 else { return [] }
         let normalizedNeedle = SearchTextNormalizer.key(needle)
         guard !normalizedNeedle.isEmpty else { return [] }
+        let queryTerms = SearchTextNormalizer.termKeys(needle)
 
         let packs = searchablePacks(for: tcg)
         var results: [CatalogEntry] = []
@@ -478,17 +530,17 @@ final class CatalogStore: ObservableObject {
 
         // Ordered passes rank name prefixes, then name substrings, then set metadata.
         for (game, pack) in packs {
-            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys)
-                where searchKey.hasPrefix(normalizedNeedle) {
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
+                where metadata.name.hasPrefix(normalizedNeedle) {
                 results.append(CatalogEntry(tcg: game, card: card))
                 if results.count == limit { return results }
             }
         }
 
         for (game, pack) in packs {
-            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys) {
-                guard !searchKey.hasPrefix(normalizedNeedle),
-                      searchKey.contains(normalizedNeedle) else {
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata) {
+                guard !metadata.name.hasPrefix(normalizedNeedle),
+                      metadata.name.contains(normalizedNeedle) else {
                     continue
                 }
                 results.append(CatalogEntry(tcg: game, card: card))
@@ -497,14 +549,54 @@ final class CatalogStore: ObservableObject {
         }
 
         for (game, pack) in packs {
-            for (card, searchKey) in zip(pack.cards, pack.cardSearchKeys) {
-                guard !searchKey.contains(normalizedNeedle),
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata) {
+                guard !metadata.name.contains(normalizedNeedle),
                       let setCode = card.setCode,
                       pack.setSearchMetadata[setCode]?.contains(normalizedNeedle) == true else {
                     continue
                 }
                 results.append(CatalogEntry(tcg: game, card: card))
                 if results.count == limit { return results }
+            }
+        }
+
+        // Multi-term queries may span the card name, set, and collector number.
+        // Existing ordered passes stay first so established name-prefix ranking
+        // is unchanged for ordinary queries such as `Lucario`.
+        let existingIDs = Set(results.map(\.card.id))
+        for (game, pack) in packs {
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata) {
+                guard !existingIDs.contains(card.id), metadata.matchesAll(queryTerms) else {
+                    continue
+                }
+                results.append(CatalogEntry(tcg: game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        // Typo tolerance is deliberately an empty-result fallback. It handles
+        // one long misspelled card-name word (`Lucaio` -> `Lucario`) without
+        // adding near-neighbor noise to otherwise successful searches.
+        if results.isEmpty,
+           queryTerms.count == 1,
+           let queryTerm = queryTerms.first,
+           queryTerm.count >= 5,
+           queryTerm.allSatisfy(\.isLetter) {
+            for (game, pack) in packs {
+                for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
+                    where metadata.namePrefixIsSingleEditAway(from: queryTerm) {
+                    results.append(CatalogEntry(tcg: game, card: card))
+                    if results.count == limit { return results }
+                }
+            }
+            let prefixIDs = Set(results.map(\.card.id))
+            for (game, pack) in packs {
+                for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
+                    where !prefixIDs.contains(card.id)
+                        && metadata.nameIsSingleEditAway(from: queryTerm) {
+                    results.append(CatalogEntry(tcg: game, card: card))
+                    if results.count == limit { return results }
+                }
             }
         }
 
@@ -574,6 +666,35 @@ final class CatalogStore: ObservableObject {
     func set(for entry: CatalogEntry) -> CatalogSetEntry? {
         guard let setCode = entry.card.setCode else { return nil }
         return loadedPacks[entry.tcg]?.sets.first(where: { $0.code == setCode })
+    }
+
+    /// A display/search form such as `3/11`, derived without changing the
+    /// catalog's canonical collector number used for image and identity keys.
+    func displayCollectorNumber(for entry: CatalogEntry) -> String? {
+        let set = set(for: entry)
+        return Self.displayCollectorNumber(
+            entry.card.collectorNumber,
+            tcg: entry.tcg,
+            officialCardCount: set?.standardCount ?? set?.count
+        )
+    }
+
+    nonisolated static func displayCollectorNumber(
+        _ raw: String?,
+        tcg: TCGGame,
+        officialCardCount: Int?
+    ) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard tcg == .pokemon,
+              !trimmed.contains("/"),
+              trimmed.allSatisfy(\.isNumber),
+              let officialCardCount,
+              officialCardCount > 0 else {
+            return trimmed
+        }
+        return "\(trimmed)/\(officialCardCount)"
     }
 
     private func isInstalled(_ game: TCGGame) -> Bool {

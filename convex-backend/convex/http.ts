@@ -1030,7 +1030,12 @@ http.route({
         scryfall: { url: process.env.SCRYFALL_API_BASE_URL, label: "Scryfall (Magic)" },
         yugioh: { url: process.env.YGO_API_BASE_URL, label: "YGOPRODeck (Yu-Gi-Oh)" },
         pokemon: { url: process.env.POKEMON_API_BASE_URL, label: "Scrydex (Pokémon)" },
-        tcgdex: { url: process.env.TCGDEX_API_BASE_URL, label: "TCGdex (Pokémon Variants)" }
+        tcgdex: { url: process.env.TCGDEX_API_BASE_URL, label: "TCGdex (Pokémon Variants)" },
+        justtcg: {
+          url: process.env.JUSTTCG_API_BASE_URL ?? "https://api.justtcg.com/v1",
+          label: "JustTCG (Primary Pricing)",
+          configured: Boolean(process.env.JUSTTCG_API_KEY)
+        }
       });
     } catch (error) {
       return handleConvexError(error, "Failed to fetch source defaults");
@@ -1047,8 +1052,16 @@ http.route({
       await requireBridgeAdmin(ctx, identity);
       const body = await parseJsonBody(request);
       const source = typeof body.source === "string" ? body.source : "";
-      if (!["scryfall", "yugioh", "pokemon", "tcgdex"].includes(source)) {
+      if (!["scryfall", "yugioh", "pokemon", "tcgdex", "justtcg"].includes(source)) {
         return errorJson(400, "BAD_REQUEST", "Unsupported source");
+      }
+
+      if (source === "justtcg" && !process.env.JUSTTCG_API_KEY) {
+        return json({
+          ok: false,
+          latencyMs: 0,
+          error: "JUSTTCG_API_KEY is not configured on the server"
+        });
       }
 
       const settings = await ctx.runQuery(internal.bridge.getSettings, {
@@ -1072,7 +1085,8 @@ http.route({
         tcgdex:
           typeof adminSettings.tcgdexApiBaseUrl === "string"
             ? adminSettings.tcgdexApiBaseUrl
-            : (process.env.TCGDEX_API_BASE_URL ?? "https://api.tcgdex.net/v2/en")
+            : (process.env.TCGDEX_API_BASE_URL ?? "https://api.tcgdex.net/v2/en"),
+        justtcg: process.env.JUSTTCG_API_BASE_URL ?? "https://api.justtcg.com/v1"
       };
 
       const base = baseUrls[source].replace(/\/+$/, "");
@@ -1096,6 +1110,9 @@ http.route({
               ? `${base}/pokemon/v1/cards?q=name:pikachu&pageSize=1`
               : `${base}/cards?q=name:pikachu&pageSize=1`;
             break;
+          case "justtcg":
+            url = `${base}/games`;
+            break;
           default:
             url = `${base}/cards?q=pikachu&pageSize=1`;
             break;
@@ -1107,7 +1124,13 @@ http.route({
       const start = Date.now();
 
       try {
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers:
+            source === "justtcg"
+              ? { "x-api-key": process.env.JUSTTCG_API_KEY as string }
+              : undefined
+        });
         const latencyMs = Date.now() - start;
         return json(
           response.ok

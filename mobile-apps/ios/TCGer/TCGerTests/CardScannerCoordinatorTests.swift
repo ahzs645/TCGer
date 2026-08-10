@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class CardScannerCoordinatorTests: XCTestCase {
+    func testEnvironmentChoosesRecognitionEngineForRegularScans() {
+        let viewModel = CardScannerViewModel(
+            coordinator: CardScannerCoordinator(strategies: [], apiService: APIService())
+        )
+        let environment = EnvironmentStore()
+
+        environment.serverConfiguration = .onDevice
+        viewModel.selectedEngine = .serverEmbedding
+        viewModel.updateEnvironment(environment)
+
+        XCTAssertEqual(viewModel.selectedEngine, .localOnly)
+
+        environment.serverConfiguration = ServerConfiguration(baseURL: "https://example.com")
+        viewModel.updateEnvironment(environment)
+
+        XCTAssertEqual(viewModel.selectedEngine, .automatic)
+    }
+
     func testSuccessfulManualScanStaysInSessionByDefault() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

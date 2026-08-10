@@ -31,6 +31,7 @@ const isScrydex = /scrydex\.com/i.test(API_ROOT);
 const CARDS_ENDPOINT = isScrydex ? `${API_ROOT}/pokemon/v1/cards` : `${API_ROOT}/cards`;
 const VARIANT_API_ROOT = env.TCGDEX_API_BASE_URL.replace(/\/+$/, '');
 const TCGDEX_CARDS_ENDPOINT = `${VARIANT_API_ROOT}/cards`;
+const isPublicTCGdexREST = new URL(VARIANT_API_ROOT).hostname.toLowerCase() === 'api.tcgdex.net';
 const isTCGdex = /tcgdex/i.test(API_ROOT);
 const isRemoteApi = isScrydex || /pokemontcg\.io$/i.test(new URL(API_ROOT).hostname);
 const configuredDelay = Number.parseInt(process.env.POKEMON_MIN_DELAY_MS ?? '', 10);
@@ -335,29 +336,29 @@ export class PokemonAdapter implements TcgAdapter {
   }
 
   private async searchTCGdex(query: string): Promise<CardDTO[]> {
-    const url = new URL(TCGDEX_CARDS_ENDPOINT);
-    if (query) {
-      url.searchParams.set('q', query);
-    }
-    url.searchParams.set('pageSize', '20');
+    const url = this.buildTCGdexSearchURL(query, 20);
 
     try {
       const response = await rateLimitedFetch(url.toString());
       if (!response.ok) {
         throw new Error(`TCGdex search failed: ${response.status}`);
       }
-      const payload = (await response.json()) as TCGdexSearchResponse;
-      if (!payload?.data?.length) {
+      const payload = await response.json() as TCGdexSearchResponse | TCGdexCardSummary[];
+      const data = this.tcgdexSearchCards(payload);
+      if (!data.length) {
         return [];
       }
 
       // Fetch full details for each card to get set name and rarity
-      const detailPromises = payload.data.map(async (card) => {
+      const detailPromises = data.map(async (card) => {
         try {
           const detailResponse = await rateLimitedFetch(`${TCGDEX_CARDS_ENDPOINT}/${card.id}`);
           if (detailResponse.ok) {
-            const detailPayload = (await detailResponse.json()) as { data: TCGdexCardDetail };
-            return detailPayload.data ? this.mapTCGdexDetailCard(detailPayload.data) : this.mapTCGdexCard(card);
+            const detailPayload = await detailResponse.json() as
+              | { data: TCGdexCardDetail }
+              | TCGdexCardDetail;
+            const detail = this.tcgdexDetailCard(detailPayload);
+            return detail ? this.mapTCGdexDetailCard(detail) : this.mapTCGdexCard(card);
           }
         } catch (err) {
           console.error(`Failed to fetch details for card ${card.id}`, err);
@@ -861,17 +862,14 @@ export class PokemonAdapter implements TcgAdapter {
     const pageSize = 60;
 
     while (page <= PokemonAdapter.MAX_PRINT_PAGES) {
-      const url = new URL(CARDS_ENDPOINT);
-      url.searchParams.set('q', safeName);
-      url.searchParams.set('page', String(page));
-      url.searchParams.set('pageSize', String(pageSize));
+      const url = this.buildTCGdexSearchURL(safeName, pageSize, page);
 
       const response = await rateLimitedFetch(url.toString());
       if (!response.ok) {
         break;
       }
-      const payload = (await response.json()) as TCGdexSearchResponse;
-      const data = payload.data ?? [];
+      const payload = await response.json() as TCGdexSearchResponse | TCGdexCardSummary[];
+      const data = this.tcgdexSearchCards(payload);
       if (!data.length) {
         break;
       }
@@ -879,12 +877,15 @@ export class PokemonAdapter implements TcgAdapter {
       const detailed = await Promise.all(
         data.map(async (entry) => {
           try {
-            const detail = await rateLimitedFetch(`${CARDS_ENDPOINT}/${entry.id}`);
+            const detail = await rateLimitedFetch(`${TCGDEX_CARDS_ENDPOINT}/${entry.id}`);
             if (!detail.ok) {
               return this.mapTCGdexCard(entry);
             }
-            const detailPayload = (await detail.json()) as { data: TCGdexCardDetail };
-            return detailPayload?.data ? this.mapTCGdexDetailCard(detailPayload.data) : this.mapTCGdexCard(entry);
+            const detailPayload = await detail.json() as
+              | { data: TCGdexCardDetail }
+              | TCGdexCardDetail;
+            const detailCard = this.tcgdexDetailCard(detailPayload);
+            return detailCard ? this.mapTCGdexDetailCard(detailCard) : this.mapTCGdexCard(entry);
           } catch (error) {
             console.error(`Failed to fetch TCGdex print ${entry.id}`, error);
             return this.mapTCGdexCard(entry);
@@ -894,8 +895,9 @@ export class PokemonAdapter implements TcgAdapter {
 
       prints.push(...detailed);
 
-      const total = payload.totalCount ?? data.length;
-      if (prints.length >= total || data.length < pageSize) {
+      const reachedWrappedTotal = !Array.isArray(payload)
+        && prints.length >= (payload.totalCount ?? data.length);
+      if (reachedWrappedTotal || data.length < pageSize) {
         break;
       }
 
@@ -903,6 +905,47 @@ export class PokemonAdapter implements TcgAdapter {
     }
 
     return this.deduplicateCards(prints);
+  }
+
+  /**
+   * The public TCGdex REST API uses field filters and colon-named pagination
+   * parameters, while our cache service intentionally exposes a Pokemon-API-
+   * compatible q/page/pageSize wrapper. Keep that distinction at the provider
+   * boundary so switching the fallback origin does not silently return no cards.
+   */
+  private buildTCGdexSearchURL(query: string, pageSize: number, page?: number): URL {
+    const url = new URL(TCGDEX_CARDS_ENDPOINT);
+    if (isPublicTCGdexREST) {
+      if (query) {
+        url.searchParams.set('name', query);
+      }
+      url.searchParams.set('pagination:page', String(page ?? 1));
+      url.searchParams.set('pagination:itemsPerPage', String(pageSize));
+    } else {
+      if (query) {
+        url.searchParams.set('q', query);
+      }
+      if (page !== undefined) {
+        url.searchParams.set('page', String(page));
+      }
+      url.searchParams.set('pageSize', String(pageSize));
+    }
+    return url;
+  }
+
+  private tcgdexSearchCards(
+    payload: TCGdexSearchResponse | TCGdexCardSummary[]
+  ): TCGdexCardSummary[] {
+    return Array.isArray(payload) ? payload : payload.data ?? [];
+  }
+
+  private tcgdexDetailCard(
+    payload: { data: TCGdexCardDetail } | TCGdexCardDetail
+  ): TCGdexCardDetail | null {
+    if ('data' in payload) {
+      return payload.data ?? null;
+    }
+    return payload.id ? payload : null;
   }
 
   private deduplicateCards(cards: CardDTO[]): CardDTO[] {

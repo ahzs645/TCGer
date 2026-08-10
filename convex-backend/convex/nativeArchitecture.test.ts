@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import { createTestConvex, TEST_BRIDGE_SECRET } from "./test.setup";
 
@@ -1024,6 +1024,7 @@ describe("convex native architecture", () => {
   });
 
   test("mirrors setup, settings, and user REST routes over Convex HTTP actions", async () => {
+    vi.stubEnv("JUSTTCG_API_KEY", "");
     const t = createTestConvex();
     const headers = {
       Authorization: "Bearer local-test-token",
@@ -1167,6 +1168,26 @@ describe("convex native architecture", () => {
       headers: refreshedHeaders
     });
     expect(sourceDefaultsResponse.status).toBe(200);
-    expect(await sourceDefaultsResponse.json()).toHaveProperty("scryfall");
+    expect(await sourceDefaultsResponse.json()).toMatchObject({
+      scryfall: expect.any(Object),
+      justtcg: {
+        url: "https://api.justtcg.com/v1",
+        label: "JustTCG (Primary Pricing)",
+        configured: false
+      }
+    });
+
+    const justTcgTestResponse = await t.fetch("/settings/test-source", {
+      method: "POST",
+      headers: refreshedHeaders,
+      body: JSON.stringify({ source: "justtcg" })
+    });
+    expect(justTcgTestResponse.status).toBe(200);
+    expect(await justTcgTestResponse.json()).toEqual({
+      ok: false,
+      latencyMs: 0,
+      error: "JUSTTCG_API_KEY is not configured on the server"
+    });
+    vi.unstubAllEnvs();
   });
 });

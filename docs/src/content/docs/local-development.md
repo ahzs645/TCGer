@@ -65,11 +65,14 @@ Open `http://localhost:3003`. Browser-facing REST requests use Express. Never ca
 - `YGO_API_BASE_URL` (default `https://db.ygoprodeck.com/api/v7`)
 - `POKEMON_API_BASE_URL` (default `https://api.scrydex.com`)
 - `TCGDEX_API_BASE_URL` (default `https://api.tcgdex.net/v2/en`)
+- `JUSTTCG_API_BASE_URL` (default `https://api.justtcg.com/v1`)
+- `JUSTTCG_API_KEY` (paid commercial pricing; keep server-side and never bundle in a client)
 
 ### Convex
 
 - `BETTER_AUTH_SECRET`: signs Better Auth sessions and is required for non-local Convex deployments.
 - `TCGER_BRIDGE_SECRET`: must match the Express value.
+- `JUSTTCG_API_KEY`: paid JustTCG key reserved for server-side pricing and connection checks.
 
 Local fallback values live in `backend/src/config/env.ts` and `convex-backend/convex/betterAuth/auth.ts`. Compose supplies development defaults in `docker/docker-compose.yml`; `docker/docker-compose.prod.yml` requires both secrets.
 
