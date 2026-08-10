@@ -16,6 +16,7 @@ struct BinderPageReviewView: View {
 
     @State private var currentPageIndex: Int
     @State private var selectedDetection: DetectionReference?
+    @State private var pendingExclusion: DetectionReference?
     @State private var collections: [Collection] = []
     @State private var isLoadingCollections = true
     @State private var isAdding = false
@@ -47,6 +48,7 @@ struct BinderPageReviewView: View {
                     if let record = currentRecord {
                         pageNavigation
                         pagePreview(record: record)
+                        pageSelectionControls(record: record)
                         allPagesStrip
                         detectionSummary(record: record)
                         binderControls(record: record)
@@ -103,10 +105,33 @@ struct BinderPageReviewView: View {
                let record = viewModel.binderPages.first(where: { $0.id == selection.pageID }) {
                 BinderCardDetectionDetailView(
                     detection: detection,
-                    mode: record.result.mode
+                    mode: record.result.mode,
+                    onInclude: { includeDetection(for: selection) },
+                    onExclude: { reason in
+                        excludeDetection(for: selection, reason: reason)
+                    }
                 )
                     .presentationDetents([.large])
             }
+        }
+        .confirmationDialog(
+            "Why exclude this detection?",
+            isPresented: Binding(
+                get: { pendingExclusion != nil },
+                set: { if !$0 { pendingExclusion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(BinderCardExclusionReason.allCases) { reason in
+                Button(reason.displayName, systemImage: reason.systemImage) {
+                    guard let selection = pendingExclusion else { return }
+                    excludeDetection(for: selection, reason: reason)
+                    pendingExclusion = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingExclusion = nil }
+        } message: {
+            Text("The reason is saved with this crop when Scanner Dev Mode is enabled.")
         }
         .alert(
             "Binder Review Error",
@@ -135,7 +160,7 @@ struct BinderPageReviewView: View {
         HStack(spacing: 0) {
             summaryMetric(value: viewModel.binderPagesScanned, label: "Pages")
             Divider().frame(height: 34)
-            summaryMetric(value: viewModel.binderCardsScanned, label: "Detected")
+            summaryMetric(value: viewModel.binderCardsSelected, label: "Selected")
             Divider().frame(height: 34)
             summaryMetric(value: viewModel.binderCardsAdded, label: "Added")
         }
@@ -197,31 +222,62 @@ struct BinderPageReviewView: View {
 
                 ForEach(Array(record.detections.enumerated()), id: \.element.id) { index, detection in
                     let path = quadPath(for: detection.quad, in: fittedRect)
-                    path
-                        .fill(statusColor(detection.status).opacity(0.08))
-                        .overlay {
-                            path.stroke(
-                                statusColor(detection.status),
-                                style: StrokeStyle(lineWidth: 3, lineJoin: .round)
+                    Button {
+                        handleDetectionTap(
+                            DetectionReference(pageID: record.id, detectionID: detection.id)
+                        )
+                    } label: {
+                        path
+                            .fill(
+                                detection.isIncluded
+                                    ? statusColor(detection.status).opacity(0.08)
+                                    : Color.black.opacity(0.38)
                             )
-                        }
-                        .contentShape(path)
-                        .opacity(detection.isIncluded ? 1 : 0.42)
-                        .onTapGesture {
-                            selectedDetection = DetectionReference(
-                                pageID: record.id,
-                                detectionID: detection.id
-                            )
-                        }
+                            .overlay {
+                                path.stroke(
+                                    detection.isIncluded ? statusColor(detection.status) : Color.secondary,
+                                    style: StrokeStyle(
+                                        lineWidth: 3,
+                                        lineJoin: .round,
+                                        dash: detection.isIncluded ? [] : [7, 5]
+                                    )
+                                )
+                            }
+                            .contentShape(path)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isAdding)
+                    .accessibilityLabel(detectionAccessibilityLabel(index: index, detection: detection))
+                    .accessibilityValue(detectionAccessibilityValue(detection))
+                    .accessibilityHint(
+                        detection.isIncluded
+                            ? "Double tap to choose why this detection should be excluded."
+                            : detection.selectedCandidate == nil
+                                ? "Double tap to label this unmatched detection."
+                                : "Double tap to include this card in the binder."
+                    )
 
                     let points = detection.quad.points(in: fittedRect)
-                    if let anchor = points.first {
+                    if let numberAnchor = points.first {
                         Text("\(index + 1)")
                             .font(.caption2.bold())
                             .foregroundStyle(.white)
                             .frame(width: 22, height: 22)
                             .background(statusColor(detection.status), in: Circle())
-                            .position(x: anchor.x + 11, y: anchor.y + 11)
+                            .position(x: numberAnchor.x + 11, y: numberAnchor.y + 11)
+                            .allowsHitTesting(false)
+                    }
+
+                    if points.count > 1 {
+                        Image(systemName: selectionSymbol(for: detection))
+                            .font(.title3.weight(.semibold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(
+                                .white,
+                                detection.isIncluded ? Color.accentColor : Color.secondary
+                            )
+                            .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
+                            .position(x: points[1].x - 12, y: points[1].y + 12)
                             .allowsHitTesting(false)
                     }
                 }
@@ -238,6 +294,48 @@ struct BinderPageReviewView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    private func pageSelectionControls(record: BinderPageRecord) -> some View {
+        let selectableCount = selectableDetections(in: record).count
+        let selectedCount = includedDetections(in: record).count
+
+        return HStack(spacing: 12) {
+            Image(systemName: "hand.tap")
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(selectedCount) of \(record.detections.count) detections selected")
+                    .font(.subheadline.weight(.semibold))
+                Text("Tap a detection to include it or choose an exclusion reason.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 4)
+
+            Menu {
+                Button("Select All", systemImage: "checkmark.circle") {
+                    setInclusion(true, for: record.id)
+                }
+                .disabled(selectedCount == selectableCount)
+
+                Menu("Exclude All As", systemImage: "xmark.circle") {
+                    ForEach(BinderCardExclusionReason.allCases) { reason in
+                        Button(reason.displayName, systemImage: reason.systemImage) {
+                            excludeAllDetections(in: record.id, reason: reason)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .frame(width: 32, height: 32)
+            }
+            .disabled(record.detections.isEmpty || isAdding)
+            .accessibilityLabel("Card selection options")
+        }
+        .padding(.horizontal, 4)
     }
 
     private var allPagesStrip: some View {
@@ -286,7 +384,7 @@ struct BinderPageReviewView: View {
                             .stroke(index == currentPageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
                     }
 
-                Text("Page \(record.pageNumber) · " + (allAdded ? "All added" : "\(includedCount)/\(record.detections.count) included"))
+                Text("Page \(record.pageNumber) · " + (allAdded ? "All added" : "\(includedCount)/\(record.detections.count) selected"))
                     .font(.caption2.weight(index == currentPageIndex ? .semibold : .regular))
                     .foregroundStyle(index == currentPageIndex ? Color.accentColor : Color.secondary)
                     .lineLimit(1)
@@ -297,7 +395,7 @@ struct BinderPageReviewView: View {
         .buttonStyle(.plain)
         .disabled(isAdding)
         .accessibilityLabel(
-            "Binder page \(record.pageNumber), \(includedCount) of \(record.detections.count) included" +
+            "Binder page \(record.pageNumber), \(includedCount) of \(record.detections.count) selected" +
                 (allAdded ? ", all added" : "")
         )
     }
@@ -389,6 +487,7 @@ struct BinderPageReviewView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         }
+                        .opacity(detection.isIncluded ? 1 : 0.58)
 
                         Spacer(minLength: 0)
                     }
@@ -398,21 +497,22 @@ struct BinderPageReviewView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button {
-                    toggleInclusion(
-                        for: DetectionReference(
-                            pageID: record.id,
-                            detectionID: detection.id
-                        )
+                    handleDetectionTap(
+                        DetectionReference(pageID: record.id, detectionID: detection.id)
                     )
                 } label: {
-                    Image(systemName: detection.isIncluded ? "checkmark.circle.fill" : "minus.circle")
+                    Image(systemName: selectionSymbol(for: detection))
                         .font(.title3)
-                        .foregroundStyle(detection.isIncluded ? statusColor(detection.status) : Color.secondary)
+                        .foregroundStyle(detection.isIncluded ? Color.accentColor : Color.secondary)
                         .frame(width: 32, height: 44)
                 }
                 .buttonStyle(.plain)
-                .disabled(detection.selectedCandidate == nil || isAdding)
-                .accessibilityLabel(detection.isIncluded ? "Exclude card" : "Include card")
+                .disabled(isAdding)
+                .accessibilityLabel(
+                    detection.isIncluded
+                        ? "Exclude detection"
+                        : detection.selectedCandidate == nil ? "Label detection" : "Include card"
+                )
             }
         }
     }
@@ -590,6 +690,10 @@ struct BinderPageReviewView: View {
         record.detections.filter { $0.isIncluded && $0.selectedCandidate != nil }
     }
 
+    private func selectableDetections(in record: BinderPageRecord) -> [BinderCardDetection] {
+        record.detections.filter { $0.selectedCandidate != nil }
+    }
+
     private func remainingIncludedDetections(in record: BinderPageRecord) -> [BinderCardDetection] {
         includedDetections(in: record).filter { !record.addedDetectionIDs.contains($0.id) }
     }
@@ -622,8 +726,9 @@ struct BinderPageReviewView: View {
 
     private func detectionCountSummary(for record: BinderPageRecord) -> String {
         let included = scopedIncludedDetectionCount(for: record)
+        let detected = scopedDetectionCount(for: record)
         let isFiltered = visibleDetectionCount(for: record) < scopedDetectionCount(for: record)
-        return "\(included) included" + (isFiltered ? " · filtered" : "")
+        return "\(included) selected · \(detected) detected" + (isFiltered ? " · filtered" : "")
     }
 
     private var statusFilterName: String {
@@ -673,15 +778,131 @@ struct BinderPageReviewView: View {
         )
     }
 
-    private func toggleInclusion(for selection: DetectionReference) {
+    private func handleDetectionTap(_ selection: DetectionReference) {
         guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
               let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
-                where: { $0.id == selection.detectionID }
+                  where: { $0.id == selection.detectionID }
+              )
+        else { return }
+
+        let detection = viewModel.binderPages[pageIndex].detections[detectionIndex]
+        if detection.isIncluded {
+            pendingExclusion = selection
+        } else if detection.selectedCandidate != nil {
+            includeDetection(for: selection)
+        } else {
+            pendingExclusion = selection
+        }
+    }
+
+    private func includeDetection(for selection: DetectionReference) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
+              let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
+                  where: { $0.id == selection.detectionID }
               ),
               viewModel.binderPages[pageIndex].detections[detectionIndex].selectedCandidate != nil
         else { return }
 
-        viewModel.binderPages[pageIndex].detections[detectionIndex].isIncluded.toggle()
+        viewModel.binderPages[pageIndex].detections[detectionIndex].isIncluded = true
+        viewModel.binderPages[pageIndex].detections[detectionIndex].exclusionReason = nil
+        HapticManager.selection()
+    }
+
+    private func excludeDetection(
+        for selection: DetectionReference,
+        reason: BinderCardExclusionReason
+    ) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
+              let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
+                  where: { $0.id == selection.detectionID }
+              )
+        else { return }
+
+        viewModel.binderPages[pageIndex].detections[detectionIndex].isIncluded = false
+        viewModel.binderPages[pageIndex].detections[detectionIndex].exclusionReason = reason
+        recordExclusion(pageIndex: pageIndex, detectionIndex: detectionIndex, reason: reason)
+        HapticManager.selection()
+    }
+
+    private func setInclusion(_ isIncluded: Bool, for pageID: UUID) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == pageID }) else { return }
+
+        for detectionIndex in viewModel.binderPages[pageIndex].detections.indices
+        where viewModel.binderPages[pageIndex].detections[detectionIndex].selectedCandidate != nil {
+            viewModel.binderPages[pageIndex].detections[detectionIndex].isIncluded = isIncluded
+            if isIncluded {
+                viewModel.binderPages[pageIndex].detections[detectionIndex].exclusionReason = nil
+            }
+        }
+        HapticManager.selection()
+    }
+
+    private func excludeAllDetections(
+        in pageID: UUID,
+        reason: BinderCardExclusionReason
+    ) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == pageID }) else { return }
+
+        for detectionIndex in viewModel.binderPages[pageIndex].detections.indices {
+            viewModel.binderPages[pageIndex].detections[detectionIndex].isIncluded = false
+            viewModel.binderPages[pageIndex].detections[detectionIndex].exclusionReason = reason
+            recordExclusion(pageIndex: pageIndex, detectionIndex: detectionIndex, reason: reason)
+        }
+        HapticManager.selection()
+    }
+
+    private func recordExclusion(
+        pageIndex: Int,
+        detectionIndex: Int,
+        reason: BinderCardExclusionReason
+    ) {
+        guard ScannerDevModeStore.isEnabled,
+              viewModel.binderPages.indices.contains(pageIndex),
+              viewModel.binderPages[pageIndex].detections.indices.contains(detectionIndex)
+        else { return }
+
+        let record = viewModel.binderPages[pageIndex]
+        let detection = record.detections[detectionIndex]
+        let candidate = detection.selectedCandidate
+        let exclusion = ScannerBinderDetectionExclusion(
+            reason: reason,
+            pageNumber: record.pageNumber,
+            detectionIndex: detectionIndex,
+            predictedCardId: candidate?.details.identity.id,
+            predictedCardName: candidate?.details.identity.name,
+            predictedSetCode: candidate?.details.identity.setCode,
+            predictedSetName: candidate?.details.identity.setName,
+            predictedConfidence: candidate?.confidence.score,
+            predictedStrategy: candidate?.originatingStrategy.displayName
+        )
+        let crop = detection.crop
+        let mode = record.result.mode
+        Task {
+            await ScannerDevModeStore.shared.recordBinderDetectionExclusion(
+                image: crop,
+                mode: mode,
+                exclusion: exclusion
+            )
+        }
+    }
+
+    private func selectionSymbol(for detection: BinderCardDetection) -> String {
+        if detection.isIncluded { return "checkmark.circle.fill" }
+        return detection.exclusionReason?.systemImage ?? "questionmark.circle.fill"
+    }
+
+    private func detectionAccessibilityValue(_ detection: BinderCardDetection) -> String {
+        if detection.isIncluded { return "Selected" }
+        if let reason = detection.exclusionReason { return "Excluded: \(reason.displayName)" }
+        return "Excluded, reason not labeled"
+    }
+
+    private func detectionAccessibilityLabel(
+        index: Int,
+        detection: BinderCardDetection
+    ) -> String {
+        let name = detection.selectedCandidate?.details.identity.name ?? "Unmatched card"
+        return "Card \(index + 1), \(name)"
     }
 
     private func detectionSubtitle(
@@ -692,10 +913,14 @@ struct BinderPageReviewView: View {
         let status = detection.status.rawValue.capitalized
         let page = pageIndex.map { "Page \($0 + 1) · " } ?? ""
         guard let candidate = detection.selectedCandidate else {
-            return "\(page)Card \(cardIndex + 1) · \(status)"
+            let reason = detection.exclusionReason.map { " · \($0.displayName)" } ?? " · Needs label"
+            return "\(page)Detection \(cardIndex + 1) · \(status)\(reason)"
         }
         let set = candidate.details.identity.setName ?? candidate.details.identity.setCode ?? "Unknown set"
-        return "\(page)Card \(cardIndex + 1) · \(set) · \(status)"
+        let inclusion = detection.isIncluded
+            ? "Selected"
+            : "Excluded: \(detection.exclusionReason?.displayName ?? "Unspecified")"
+        return "\(page)Card \(cardIndex + 1) · \(set) · \(status) · \(inclusion)"
     }
 
     private func selectedBinderName(for record: BinderPageRecord) -> String {
@@ -968,6 +1193,8 @@ private struct BinderCardDetectionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var detection: BinderCardDetection
     let mode: ScanMode
+    let onInclude: () -> Void
+    let onExclude: (BinderCardExclusionReason) -> Void
     @State private var showingCardSearch = false
     @State private var correctionFeedback: String?
     @State private var correctionFeedbackIsError = false
@@ -1048,8 +1275,7 @@ private struct BinderCardDetectionDetailView: View {
                         }
                     }
 
-                    Toggle("Include in bulk add", isOn: $detection.isIncluded)
-                        .disabled(detection.selectedCandidate == nil)
+                    binderSelectionControl
                 }
                 .padding()
             }
@@ -1103,6 +1329,49 @@ private struct BinderCardDetectionDetailView: View {
             }
         }
         .frame(maxHeight: 250)
+    }
+
+    private var binderSelectionControl: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Binder Selection")
+                .font(.headline)
+
+            HStack(spacing: 10) {
+                Label(
+                    detection.isIncluded
+                        ? "Selected"
+                        : "Excluded: \(detection.exclusionReason?.displayName ?? "Needs reason")",
+                    systemImage: detection.isIncluded
+                        ? "checkmark.circle.fill"
+                        : detection.exclusionReason?.systemImage ?? "questionmark.circle.fill"
+                )
+                .foregroundStyle(detection.isIncluded ? Color.accentColor : Color.secondary)
+
+                Spacer()
+
+                if !detection.isIncluded, detection.selectedCandidate != nil {
+                    Button("Include") { onInclude() }
+                        .buttonStyle(.bordered)
+                }
+
+                Menu(detection.isIncluded ? "Exclude" : "Change Reason") {
+                    ForEach(BinderCardExclusionReason.allCases) { reason in
+                        Button(reason.displayName, systemImage: reason.systemImage) {
+                            onExclude(reason)
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if ScannerDevModeStore.isEnabled {
+                Text("Exclusion reasons are saved with this crop in the dev-mode recording.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var candidatePlaceholder: some View {
@@ -1175,6 +1444,7 @@ private struct BinderCardDetectionDetailView: View {
         detection.selectedCandidate = manualCandidate
         detection.status = .matched
         detection.isIncluded = true
+        detection.exclusionReason = nil
         saveCorrection(previousCandidate: previousCandidate, correctedCardId: details.identity.id)
     }
 
@@ -1183,6 +1453,7 @@ private struct BinderCardDetectionDetailView: View {
         detection.selectedCandidate = nil
         detection.status = .unmatched
         detection.isIncluded = false
+        detection.exclusionReason = nil
         saveCorrection(previousCandidate: previousCandidate, correctedCardId: nil)
     }
 

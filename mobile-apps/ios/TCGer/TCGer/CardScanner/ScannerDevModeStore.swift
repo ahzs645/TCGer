@@ -15,6 +15,18 @@ nonisolated struct ScannerManualCorrection: Sendable {
     let correctedCardId: String?
 }
 
+nonisolated struct ScannerBinderDetectionExclusion: Sendable {
+    let reason: BinderCardExclusionReason
+    let pageNumber: Int
+    let detectionIndex: Int
+    let predictedCardId: String?
+    let predictedCardName: String?
+    let predictedSetCode: String?
+    let predictedSetName: String?
+    let predictedConfidence: Double?
+    let predictedStrategy: String?
+}
+
 /// Dev-mode scan recorder: when enabled, every scan that goes through the
 /// production coordinator — live frames, shutter captures, photo imports —
 /// is persisted with its raw input image, every crop attempt, and the
@@ -98,7 +110,8 @@ actor ScannerDevModeStore {
         outcomeLabel: String? = nil,
         expectedCardId: String? = nil,
         expectedNoMatch: Bool? = nil,
-        manualCorrection: ScannerManualCorrection? = nil
+        manualCorrection: ScannerManualCorrection? = nil,
+        binderExclusion: ScannerBinderDetectionExclusion? = nil
     ) -> Bool {
         guard Self.isEnabled else { return false }
         let directory: URL
@@ -167,6 +180,15 @@ actor ScannerDevModeStore {
             confidence = manualCorrection.previousConfidence
             strategy = manualCorrection.previousStrategy
         }
+        if let binderExclusion {
+            identified = binderExclusion.predictedCardId != nil
+            name = binderExclusion.predictedCardName
+            cardID = binderExclusion.predictedCardId
+            setCode = binderExclusion.predictedSetCode
+            setName = binderExclusion.predictedSetName
+            confidence = binderExclusion.predictedConfidence
+            strategy = binderExclusion.predictedStrategy
+        }
         if let outcomeLabel {
             outcome = outcomeLabel
         }
@@ -182,7 +204,7 @@ actor ScannerDevModeStore {
             mode: mode.rawValue,
             pipeline: "dev-mode \(sourceLabel(source))",
             elapsedMs: elapsedMs,
-            detectedCount: manualCorrection == nil ? attempts.count : 1,
+            detectedCount: manualCorrection == nil && binderExclusion == nil ? attempts.count : 1,
             segmentationConfidence: nil,
             quad: quad,
             identified: identified,
@@ -206,7 +228,16 @@ actor ScannerDevModeStore {
             elapsedMs: elapsedMs,
             outcome: outcome,
             attempts: attempts,
-            attemptImageFiles: attemptFiles
+            attemptImageFiles: attemptFiles,
+            binderExclusion: binderExclusion.map {
+                BinderDetectionExclusionEvidence(
+                    reason: $0.reason,
+                    pageNumber: $0.pageNumber,
+                    detectionIndex: $0.detectionIndex,
+                    predictedCardID: $0.predictedCardId,
+                    predictedCardName: $0.predictedCardName
+                )
+            }
         ))
 
         trimSessionIfNeeded(directory: directory)
@@ -239,6 +270,29 @@ actor ScannerDevModeStore {
             expectedCardId: correction.correctedCardId,
             expectedNoMatch: correction.correctedCardId == nil,
             manualCorrection: correction
+        )
+    }
+
+    /// Records why a human excluded one localized region from a binder page.
+    /// Only `notACard` is emitted as open-set no-match ground truth; a visible
+    /// card from the page behind is still valid card imagery.
+    @discardableResult
+    func recordBinderDetectionExclusion(
+        image: CGImage,
+        mode: ScanMode,
+        exclusion: ScannerBinderDetectionExclusion
+    ) -> Bool {
+        guard Self.isEnabled else { return false }
+        return record(
+            image: image,
+            source: .photoCapture,
+            mode: mode,
+            elapsedMs: 0,
+            result: nil,
+            diagnostics: nil,
+            outcomeLabel: "binderExclusion: \(exclusion.reason.rawValue)",
+            expectedNoMatch: exclusion.reason == .notACard ? true : nil,
+            binderExclusion: exclusion
         )
     }
 

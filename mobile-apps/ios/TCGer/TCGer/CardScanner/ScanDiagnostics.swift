@@ -107,4 +107,16 @@ struct ScanEvidenceRecord: Codable {
     let outcome: String
     let attempts: [ScanDiagnostics.Attempt]
     let attemptImageFiles: [String]
+    /// Human review applied to one binder detection after the page scan.
+    /// Kept separate from `expectedNoMatch`: a back card is valid card input,
+    /// but it does not belong to the currently reviewed binder page.
+    let binderExclusion: BinderDetectionExclusionEvidence?
+}
+
+struct BinderDetectionExclusionEvidence: Codable, Equatable {
+    let reason: BinderCardExclusionReason
+    let pageNumber: Int
+    let detectionIndex: Int
+    let predictedCardID: String?
+    let predictedCardName: String?
 }

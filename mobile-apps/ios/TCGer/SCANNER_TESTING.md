@@ -233,8 +233,10 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 Use `TEST_RUNNER_DEVMODE_CORRECTION_FRAME=frame-NNNN.jpg` to isolate one
 correction and print its gate, top candidates, title OCR, footer OCR, and
-attempt outcomes. `ScannerOrientationExperimentTests` is a diagnostic ANN
-comparison of upright versus 180-degree input on the same final labels:
+attempt outcomes. `ScannerOrientationExperimentTests` is a test-only rotation
+lab. It measures raw and portrait-normalized 0/90/180/270 input, an
+abstention-only 180 retry, and arbitrary-angle camera scenes at +/-15, 30, 45,
+60, and 75 degrees (with mild perspective at +/-30 and 60):
 
 ```bash
 env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -246,14 +248,38 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 Both are environment-gated and skip in the ordinary test suite.
 
-The 2026-08-09 device sessions produced the angled-card diagnosis: the
-detector localizes angled cards fine, but full-frame Vision corner detection
-returns nothing at steep angles, and the axis-aligned fallback crop embeds
-~0.1 below the acceptance bar. Fixes shipped from that analysis: sub-image
-corner refinement (with the plain box kept as an alternate crop attempt),
-whole-frame retry for shutter captures, letter-prefixed promo collector OCR
-("SWSH204"), and a title+strong-similarity override for gate false negatives
-on intentional captures.
+The arbitrary-angle test uses one positive label by default so it remains a
+focused diagnostic. Set
+`TEST_RUNNER_ORIENTATION_EXPERIMENT_FRAME=frame-NNNN.jpg` to select it, or set
+`TEST_RUNNER_ORIENTATION_EXPERIMENT_GEOMETRY_ALL_LABELS=1` for the much slower
+all-label matrix. Read detector/crop/fallback totals separately from ANN
+accuracy: successful quad rectification proves the geometry worked, while an
+inverted title/footer after rectification is a semantic 0/180 failure.
+
+Do not reduce this to a single "rotation" fixture. Device capture coverage
+must include arbitrary angles on both sides of upright, both sideways
+directions, upside-down, perspective, and combined glare/blur. Include card
+backs and non-card scenes at the same rotations so a recall improvement cannot
+hide new strong wrong accepts.
+
+A binder experiment that replaced its cropper with the single-card normalizer
+was deliberately reverted. On the full 19-page archive replay it changed
+candidates from 107 to 99 and matches from 30 to 31, with seven upright pages
+below their established candidate floors. Do not bless new floors for that
+experiment. A future binder rotation change needs real sideways pages and must
+also preserve every current upright-page floor.
+
+The 2026-08-09 device sessions produced the difficult-scene angled-card
+diagnosis: the detector localized the card, but full-frame Vision corner
+detection sometimes returned nothing at steep angles, and the axis-aligned
+fallback crop embedded ~0.1 below the acceptance bar. Clean synthetic scenes
+now localize and crop successfully through +/-75 degrees, so angle alone is
+not the failure; background, glare, blur, and partial edges need to be varied
+with it. Fixes shipped from the device analysis: sub-image corner refinement
+(with the plain box kept as an alternate crop attempt), whole-frame retry for
+shutter captures, letter-prefixed promo collector OCR ("SWSH204"), and a
+title+strong-similarity override for gate false negatives on intentional
+captures.
 
 ### Recording replay
 

@@ -72,6 +72,30 @@ enum BinderCardDetectionStatus: String, Sendable {
     case unmatched
 }
 
+nonisolated enum BinderCardExclusionReason: String, CaseIterable, Codable, Identifiable, Sendable {
+    case backCard
+    case notACard
+    case other
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .backCard: return "Back card"
+        case .notACard: return "Not a card"
+        case .other: return "Other"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .backCard: return "rectangle.on.rectangle.slash"
+        case .notACard: return "nosign"
+        case .other: return "xmark.circle"
+        }
+    }
+}
+
 nonisolated struct BinderCardDetection: Identifiable, @unchecked Sendable {
     let id: UUID
     let quad: BinderNormalizedQuad
@@ -81,6 +105,7 @@ nonisolated struct BinderCardDetection: Identifiable, @unchecked Sendable {
     var candidateOptions: [CardScanCandidate]
     var status: BinderCardDetectionStatus
     var isIncluded: Bool
+    var exclusionReason: BinderCardExclusionReason?
 
     init(
         id: UUID = UUID(),
@@ -90,7 +115,8 @@ nonisolated struct BinderCardDetection: Identifiable, @unchecked Sendable {
         selectedCandidate: CardScanCandidate?,
         candidateOptions: [CardScanCandidate],
         status: BinderCardDetectionStatus,
-        isIncluded: Bool
+        isIncluded: Bool,
+        exclusionReason: BinderCardExclusionReason? = nil
     ) {
         self.id = id
         self.quad = quad
@@ -100,6 +126,7 @@ nonisolated struct BinderCardDetection: Identifiable, @unchecked Sendable {
         self.candidateOptions = candidateOptions
         self.status = status
         self.isIncluded = isIncluded
+        self.exclusionReason = exclusionReason
     }
 }
 

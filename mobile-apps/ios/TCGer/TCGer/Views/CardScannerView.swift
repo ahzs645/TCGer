@@ -620,26 +620,33 @@ struct CardScannerView: View {
                     Label("Review", systemImage: "chevron.right")
                         .fontWeight(.semibold)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.black.opacity(0.48), in: Capsule())
             }
             .buttonStyle(.plain)
+            .foregroundStyle(.white)
             .accessibilityLabel(
                 "Review \(viewModel.binderPagesScanned) binder pages, " +
                     "\(viewModel.binderCardsScanned) detected cards, " +
                     "\(viewModel.binderCardsAdded) added"
             )
 
-            Spacer(minLength: 0)
-            Button("Clear") {
+            Button(role: .destructive) {
                 viewModel.clearBinderSession()
+            } label: {
+                Text("Clear")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(Color.black.opacity(0.48), in: Capsule())
             }
-            .font(.caption.weight(.semibold))
+            .buttonStyle(.plain)
             .accessibilityHint("Clears all scanned binder pages and their review changes")
         }
         .font(.caption)
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Color.black.opacity(0.48), in: Capsule())
     }
 
     @ViewBuilder

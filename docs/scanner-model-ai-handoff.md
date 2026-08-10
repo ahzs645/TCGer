@@ -1,6 +1,6 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-09 (21:29 correction labels, rotation audit, and scanner-repo survey)
+Last updated: 2026-08-09 (arbitrary-angle rotation experiments and binder regression)
 
 ## Session Results 2026-08-09 (21:29 correction/rotation export)
 
@@ -62,28 +62,79 @@ those two pages and the recorded device count everywhere else.
 ### Rotation audit
 
 - `CardCropper` perspective-corrects cards and rotates a landscape crop to
-  portrait, but it does not distinguish upright from 180-degree upside-down.
-- `BinderPageScanner` currently uses a separate crop path that perspective-
-  corrects and resizes to portrait dimensions without rotating a landscape
-  result. A proposed unification with `CardCropper` was not kept because this
-  archive contains no sideways binder cards. It produced the same 43/17
-  Simulator replay as the reverted path, so the archive cannot distinguish
-  the implementations. Add real sideways binder fixtures before changing it.
-- `ScannerOrientationExperimentTests` compared upright and 180-degree ANN
-  retrieval on the ten final correction crops. Upright: 3/10 top-1, one
-  strong exact, one strong wrong. Rotated 180: 1/10 top-1, zero strong exact,
-  one strong wrong. Best-of-two did not improve this already-upright set.
-  Do not pay the extra embedding cost until an upside-down device corpus shows
-  an abstention-only 180-degree retry improves recall without new accepts.
+  portrait. Its quad/perspective path handles arbitrary in-plane angles, not
+  only 90-degree turns, but geometry cannot determine whether printed content
+  is upright or upside-down.
+- `BinderPageScanner` still has a separate normalizer that can non-uniformly
+  scale a landscape perspective result directly into 720x1000. Reusing
+  `CardCropper` would remove that sideways-stretch mechanism at no extra
+  embedding cost, but the full 19-page Simulator replay regressed from 107 to
+  99 candidates across seven upright pages (matches changed 30 to 31). The
+  production change was reverted. Existing archives contain no sideways binder
+  cards, so first add physical sideways fixtures, then design a binder-specific
+  normalizer that preserves the current upright crop pixels.
+- Camera orientation remains a separate coordinate-space risk. Live video is
+  fixed to 90 degrees, while preview and photo-output connections are not kept
+  in an explicitly synchronized interface-orientation mapping. The guide crop
+  assumes their pixel and preview spaces agree. Validate portrait, both
+  landscapes, and iPad upside-down on a device before changing this path.
+- Photos and shutter JPEGs apply EXIF through Image I/O thumbnail transforms.
+  Replay/reference loaders use raw `CGImageSourceCreateImageAtIndex`; an image
+  whose rotation exists only in EXIF can therefore diverge from Photos. Add a
+  shared decoder and EXIF 1-8 asymmetric-corner fixtures.
+
+### Rotation experiments: cardinal and arbitrary angles
+
+`ScannerOrientationExperimentTests` now separates three questions: raw input
+rotation, production portrait-geometry normalization, and a test-only
+abstention-gated semantic 180-degree retry.
+
+- On ten deduplicated final correction labels, upright raw and normalized
+  results were both 3/10 exact top-1, 6/10 top-5, one strong exact, one strong
+  wrong, and eight below the 0.72 strong threshold.
+- Production normalization maps one sideways direction back to the upright
+  baseline. The opposite direction and a 180-degree input remain semantically
+  inverted: 1/10 exact, 2/10 top-5, zero strong exact, one strong wrong.
+- The test-only 180-degree retry recovered the simulated inverted variants but
+  did not improve the real upright baseline and retained its strong wrong.
+  It required 34 extra embeddings and 76.7 seconds of Simulator embedding time
+  in this diagnostic. Do not ship this retry from the current evidence.
+- A representative strongly recognized real crop was placed in synthetic
+  1200x1600 camera scenes at +/-15, 30, 45, 60, and 75 degrees, with mild
+  perspective at +/-30 and 60. Card detection and normalized cropping both
+  succeeded in all 28/28 scenes, all through direct quadrilaterals with no
+  axis-aligned fallback. This confirms that the main path handles weird angles.
+- Upright flat scenes were strong/exact at 8/10 angles and perspective scenes
+  at 3/4, with zero strong wrongs. The failures were +60 and +75 (and +60 with
+  perspective). Semantic-180 inputs showed the inverse success at those steep
+  positive angles. The crop geometry succeeds, but Vision corner ordering plus
+  the unconditional landscape `.right` turn can select the opposite portrait
+  direction. This is the next focused geometry experiment; it is not evidence
+  for accepting the maximum score across rotations.
+
+The experimental harness supports one labeled frame by default,
+`ORIENTATION_EXPERIMENT_FRAME` for a chosen crop, and
+`ORIENTATION_EXPERIMENT_GEOMETRY_ALL_LABELS=1` for the slower all-label
+arbitrary-angle matrix.
 
 ### `/Volumes/Main/Scanner` ideas worth carrying forward
 
 The local `METHODS_ANALYSIS.md` already catalogs 29 scanner repositories.
 The most relevant patterns for this app are:
 
-- OpenSorts compares upright and 180-degree embeddings; Spell Coven generates
-  all four orientations. Use these as experiment designs, not automatic
-  production changes.
+- OpenSorts compares upright and 180-degree embeddings. Spell Coven generates
+  all four orientations, but that is four sequential encoder calls and no
+  orientation tests were found. Once a quad is normalized to portrait, only
+  0/180 remain distinct; keep four-way evaluation offline.
+- CardReaderLibrary tries three OCR thresholds at both 0 and 180 degrees and
+  chooses the OCR-confidence winner. TCGer can trial title/collector evidence
+  as an orientation verifier after abstention, without letting it bypass the
+  gate, ambiguity policy, or exact-print safeguards.
+- Pokemon-Card-Scanner precomputes transformed reference hashes. Its supposed
+  "four orientations" are actually identity, horizontal mirror, vertical
+  flip, and mirror+vertical flip; only the last is a 180-degree rotation. The
+  useful idea is an offline 180-degree reference index if on-device retry
+  latency proves too high, not copying those transforms literally.
 - Spell Coven and the MTG sorter use Laplacian sharpness/motion stability.
   A calibrated quality signal could ask the user to hold steady or retake a
   frame without altering embedding pixels.
@@ -96,9 +147,20 @@ The most relevant patterns for this app are:
   For TCGer, a second visual verifier should rerank an ANN shortlist only;
   it must not bypass the gate/printing safeguards.
 
-Next measured work: collector-number OCR crops/preprocessing on the ten new
-labels, blur-quality calibration on device frames, sideways/upside-down
-fixtures, then perspective/foil reference augmentation. Keep the 0.72
+Primary-source cross-checks point to the same separation of concerns. Apple's
+[Vision still-image guidance](https://developer.apple.com/documentation/vision/detecting-objects-in-still-images)
+states that Vision assumes upright input and that `CGImage`, `CIImage`, and
+`CVPixelBuffer` do not carry orientation, so callers must supply or bake it.
+PaddleOCR ships a dedicated
+[0/90/180/270 document-orientation classifier](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/module_usage/doc_img_orientation_classification.en.md)
+rather than expecting OCR to infer orientation implicitly. TCGer should not
+add that model yet; it is evidence that semantic orientation is its own stage,
+after arbitrary-angle localization and perspective correction.
+
+Next measured work: test a short-edge/corner-ordering rule at steep positive
+angles, then capture real arbitrary-angle, 90-degree, and upside-down single
+cards and binder pages with glare. After that, calibrate collector OCR and blur
+guidance and consider perspective/foil reference augmentation. Keep the 0.72
 acceptance bar and 0.82 binder auto-match bar unchanged.
 
 ## Session Results 2026-08-09 (19:12 lighting/foil export)

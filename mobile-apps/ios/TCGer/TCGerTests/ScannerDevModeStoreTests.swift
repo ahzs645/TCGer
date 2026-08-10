@@ -172,6 +172,76 @@ final class ScannerDevModeStoreTests: XCTestCase {
         XCTAssertFalse(frame.identified)
     }
 
+    func testBinderExclusionReasonDistinguishesBackCardFromNonCardInput() async throws {
+        let image = ScannerTestImage.solid(width: 90, height: 120)
+        let prediction = ScannerBinderDetectionExclusion(
+            reason: .backCard,
+            pageNumber: 29,
+            detectionIndex: 0,
+            predictedCardId: "back-page-card",
+            predictedCardName: "Back Page Card",
+            predictedSetCode: "base",
+            predictedSetName: "Base",
+            predictedConfidence: 0.91,
+            predictedStrategy: ScanStrategyKind.artworkFingerprint.displayName
+        )
+
+        let savedBackCard = await ScannerDevModeStore.shared.recordBinderDetectionExclusion(
+            image: image,
+            mode: .pokemon,
+            exclusion: prediction
+        )
+
+        XCTAssertTrue(savedBackCard)
+        var session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        var bundle = try JSONDecoder().decode(
+            RecordedScanBundle.self,
+            from: Data(contentsOf: session.url.appendingPathComponent("results.json"))
+        )
+        var frame = try XCTUnwrap(bundle.frames.last)
+        XCTAssertEqual(frame.bestMatchCardId, "back-page-card")
+        XCTAssertNil(frame.expectedNoMatch, "a back card is card imagery, not open-set negative input")
+
+        var evidence = try JSONDecoder().decode(
+            [ScanEvidenceRecord].self,
+            from: Data(contentsOf: session.url.appendingPathComponent("evidence.json"))
+        )
+        XCTAssertEqual(evidence.last?.binderExclusion?.reason, .backCard)
+        XCTAssertEqual(evidence.last?.binderExclusion?.pageNumber, 29)
+        XCTAssertEqual(evidence.last?.binderExclusion?.detectionIndex, 0)
+
+        let savedNotACard = await ScannerDevModeStore.shared.recordBinderDetectionExclusion(
+            image: image,
+            mode: .pokemon,
+            exclusion: ScannerBinderDetectionExclusion(
+                reason: .notACard,
+                pageNumber: 29,
+                detectionIndex: 0,
+                predictedCardId: nil,
+                predictedCardName: nil,
+                predictedSetCode: nil,
+                predictedSetName: nil,
+                predictedConfidence: nil,
+                predictedStrategy: nil
+            )
+        )
+
+        XCTAssertTrue(savedNotACard)
+        session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        bundle = try JSONDecoder().decode(
+            RecordedScanBundle.self,
+            from: Data(contentsOf: session.url.appendingPathComponent("results.json"))
+        )
+        frame = try XCTUnwrap(bundle.frames.last)
+        XCTAssertEqual(frame.expectedNoMatch, true)
+
+        evidence = try JSONDecoder().decode(
+            [ScanEvidenceRecord].self,
+            from: Data(contentsOf: session.url.appendingPathComponent("evidence.json"))
+        )
+        XCTAssertEqual(evidence.last?.binderExclusion?.reason, .notACard)
+    }
+
     func testSessionDeletionRejectsLocationsOutsideRecordingsFolder() throws {
         let outsideURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("not-a-scanner-recording", isDirectory: true)

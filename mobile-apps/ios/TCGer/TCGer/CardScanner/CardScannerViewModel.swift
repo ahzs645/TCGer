@@ -102,6 +102,12 @@ final class CardScannerViewModel: ObservableObject {
         binderPages.reduce(0) { $0 + $1.detections.count }
     }
 
+    var binderCardsSelected: Int {
+        binderPages.reduce(0) { count, page in
+            count + page.detections.filter { $0.isIncluded && $0.selectedCandidate != nil }.count
+        }
+    }
+
     var binderCardsAdded: Int {
         binderPages.reduce(0) { $0 + $1.addedDetectionIDs.count }
     }
