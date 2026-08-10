@@ -66,10 +66,6 @@ struct CollectionStatsCard: View {
                 .padding(.horizontal, 4)
             }
         }
-        .padding(10)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }
 

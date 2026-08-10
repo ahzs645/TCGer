@@ -8,24 +8,21 @@ struct ColorPickerGrid: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Binder Color")
-                .font(.headline)
-
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(Color.binderColors.indices, id: \.self) { index in
-                    ColorCircle(
-                        color: Color.binderColors[index],
-                        isSelected: selectedColor.toHex() == Color.binderColors[index].toHex()
-                    )
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3)) {
-                            selectedColor = Color.binderColors[index]
-                        }
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(Color.binderColors.indices, id: \.self) { index in
+                ColorCircle(
+                    color: Color.binderColors[index],
+                    isSelected: selectedColor.toHex() == Color.binderColors[index].toHex()
+                )
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedColor = Color.binderColors[index]
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Color")
     }
 }
 
@@ -74,6 +71,8 @@ struct ColorCircle: View {
 
         var body: some View {
             VStack {
+                Text("Color")
+                    .font(.headline)
                 ColorPickerGrid(selectedColor: $selectedColor)
 
                 Text("Selected: \(selectedColor.toHex())")

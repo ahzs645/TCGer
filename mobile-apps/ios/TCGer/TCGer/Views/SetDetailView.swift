@@ -15,6 +15,7 @@ struct SetDetailView: View {
     @State private var ownedCardIds: Set<String> = []
     @State private var ownershipLoaded = false
     @State private var collections: [Collection] = []
+    @State private var searchText = ""
     @State private var cardFilter: SetCardFilter = .all
     @State private var cardSort: SetCardSort = .collectorNumber
     @State private var isSelecting = false
@@ -71,16 +72,25 @@ struct SetDetailView: View {
     }
 
     private var displayedCards: [Card] {
-        cards
+        let query = SearchTextNormalizer.key(searchText)
+
+        return cards
             .filter { card in
+                let matchesOwnership: Bool
                 switch cardFilter {
                 case .all:
-                    return true
+                    matchesOwnership = true
                 case .missing:
-                    return !ownedCardIds.contains(card.id)
+                    matchesOwnership = !ownedCardIds.contains(card.id)
                 case .owned:
-                    return ownedCardIds.contains(card.id)
+                    matchesOwnership = ownedCardIds.contains(card.id)
                 }
+
+                guard matchesOwnership else { return false }
+                guard !query.isEmpty else { return true }
+
+                return SearchTextNormalizer.contains(card.name, queryKey: query) ||
+                    SearchTextNormalizer.contains(card.collectorNumber, queryKey: query)
             }
             .sorted { left, right in
                 switch cardSort {
@@ -109,6 +119,11 @@ struct SetDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !isLoading, errorMessage == nil, !cards.isEmpty {
+                cardControlBar
+                Divider()
+            }
+
             if isLoading {
                 ProgressView("Loading cards...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -197,73 +212,69 @@ struct SetDetailView: View {
                         .padding(.bottom, 4)
                     }
 
-                    HStack(spacing: 12) {
-                        Picker("Cards", selection: $cardFilter) {
-                            ForEach(SetCardFilter.allCases) { filter in
-                                Text(filter.title).tag(filter)
+                    if displayedCards.isEmpty {
+                        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            ContentUnavailableView(
+                                "No Cards in This Filter",
+                                systemImage: "rectangle.stack",
+                                description: Text("Choose another ownership filter to see cards.")
+                            )
+                        } else {
+                            ContentUnavailableView.search(text: searchText)
+                        }
+                        
+                    } else {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 16) {
+                            ForEach(displayedCards) { card in
+                                SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
+                                    .overlay(alignment: .topLeading) {
+                                        if isSelecting {
+                                            Image(
+                                                systemName: selectedCardIds.contains(card.id)
+                                                    ? "checkmark.circle.fill"
+                                                    : "circle"
+                                            )
+                                            .font(.title2)
+                                            .foregroundStyle(
+                                                selectedCardIds.contains(card.id)
+                                                    ? Color.accentColor
+                                                    : Color.secondary
+                                            )
+                                            .background(Circle().fill(.background))
+                                            .padding(6)
+                                        }
+                                    }
+                                    .onTapGesture {
+                                        if isSelecting {
+                                            toggleSelection(card.id)
+                                        } else {
+                                            Task { await handleCardSelection(card) }
+                                        }
+                                    }
+                                    .cardPreviewContextMenu(card: card, onSelect: {
+                                        if isSelecting {
+                                            toggleSelection(card.id)
+                                        } else {
+                                            Task { await handleCardSelection(card) }
+                                        }
+                                    }, onAddToWishlist: {
+                                        wishlistSheetCard = card
+                                    })
                             }
                         }
-                        .pickerStyle(.segmented)
-
-                        Menu {
-                            Picker("Sort", selection: $cardSort) {
-                                ForEach(SetCardSort.allCases) { sort in
-                                    Text(sort.title).tag(sort)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                                .frame(width: 36, height: 32)
-                        }
+                        .padding()
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 16) {
-                        ForEach(displayedCards) { card in
-                            SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
-                                .overlay(alignment: .topLeading) {
-                                    if isSelecting {
-                                        Image(
-                                            systemName: selectedCardIds.contains(card.id)
-                                                ? "checkmark.circle.fill"
-                                                : "circle"
-                                        )
-                                        .font(.title2)
-                                        .foregroundStyle(
-                                            selectedCardIds.contains(card.id)
-                                                ? Color.accentColor
-                                                : Color.secondary
-                                        )
-                                        .background(Circle().fill(.background))
-                                        .padding(6)
-                                    }
-                                }
-                                .onTapGesture {
-                                    if isSelecting {
-                                        toggleSelection(card.id)
-                                    } else {
-                                        Task { await handleCardSelection(card) }
-                                    }
-                                }
-                                .cardPreviewContextMenu(card: card, onSelect: {
-                                    if isSelecting {
-                                        toggleSelection(card.id)
-                                    } else {
-                                        Task { await handleCardSelection(card) }
-                                    }
-                                }, onAddToWishlist: {
-                                    wishlistSheetCard = card
-                                })
-                        }
-                    }
-                    .padding()
                 }
             }
         }
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search this set"
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -426,6 +437,33 @@ struct SetDetailView: View {
                     .environmentObject(environmentStore)
             }
         }
+    }
+
+    private var cardControlBar: some View {
+        HStack(spacing: 12) {
+            Picker("Cards", selection: $cardFilter) {
+                ForEach(SetCardFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Menu {
+                Picker("Sort", selection: $cardSort) {
+                    ForEach(SetCardSort.allCases) { sort in
+                        Text(sort.title).tag(sort)
+                    }
+                }
+            } label: {
+                Label("Sort cards", systemImage: "arrow.up.arrow.down")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 36, height: 32)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Sort cards")
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
 
     /// Sends either the whole set (saving a rule so it stays current) or just

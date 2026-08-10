@@ -6,8 +6,17 @@
 import SwiftUI
 
 struct ProfileView: View {
+    private enum FocusedField: Hashable {
+        case username
+        case email
+        case currentPassword
+        case newPassword
+        case confirmPassword
+    }
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: FocusedField?
 
     @State private var profile: APIService.UserProfile?
     @State private var isLoading = true
@@ -30,7 +39,7 @@ struct ProfileView: View {
     @State private var passwordSuccess = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if isLoading {
                     ProgressView("Loading profile...")
@@ -79,69 +88,51 @@ struct ProfileView: View {
     private func profileSection(_ profile: APIService.UserProfile) -> some View {
         Section {
             if isEditingProfile {
-                // Edit mode
-                VStack(alignment: .leading, spacing: 16) {
-                    if let error = profileSaveError {
+                if let error = profileSaveError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Profile error: \(error)")
+                }
+
+                TextField("Username", text: $editUsername)
+                    .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($focusedField, equals: .username)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        focusedField = .email
+                    }
+
+                TextField("Email", text: $editEmail)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.emailAddress)
+                    .focused($focusedField, equals: .email)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        guard !isSavingProfile else { return }
+                        Task { await saveProfile() }
+                    }
+
+                Button {
+                    Task { await saveProfile() }
+                } label: {
+                    if isSavingProfile {
                         HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
+                            ProgressView()
+                            Text("Saving…")
                         }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Username")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("Username", text: $editUsername)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Email")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("Email", text: $editEmail)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                            .keyboardType(.emailAddress)
-                    }
-
-                    HStack(spacing: 12) {
-                        Button(action: { Task { await saveProfile() } }) {
-                            HStack {
-                                if isSavingProfile {
-                                    ProgressView()
-                                        .progressViewStyle(.circular)
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "checkmark")
-                                }
-                                Text(isSavingProfile ? "Saving..." : "Save")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isSavingProfile)
-
-                        Button(action: cancelEditProfile) {
-                            HStack {
-                                Image(systemName: "xmark")
-                                Text("Cancel")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isSavingProfile)
+                    } else {
+                        Label("Save Profile", systemImage: "checkmark")
                     }
                 }
-                .padding(.vertical, 8)
+                .disabled(isSavingProfile)
+
+                Button("Cancel", role: .cancel, action: cancelEditProfile)
+                    .disabled(isSavingProfile)
             } else {
                 // Display mode
                 HStack {
@@ -216,13 +207,8 @@ struct ProfileView: View {
                 }
 
                 Button(action: startEditProfile) {
-                    HStack {
-                        Image(systemName: "pencil")
-                        Text("Edit Profile")
-                    }
-                    .frame(maxWidth: .infinity)
+                    Label("Edit Profile", systemImage: "pencil")
                 }
-                .buttonStyle(.bordered)
             }
         } header: {
             Text("Account Information")
@@ -233,105 +219,72 @@ struct ProfileView: View {
     private var passwordSection: some View {
         Section {
             if isChangingPassword {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let error = passwordError {
+                if let error = passwordError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Password error: \(error)")
+                }
+
+                if passwordSuccess {
+                    Label("Password changed successfully", systemImage: "checkmark.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.green)
+                        .accessibilityAddTraits(.isStaticText)
+                }
+
+                SecureField("Current Password", text: $currentPassword)
+                    .textContentType(.password)
+                    .focused($focusedField, equals: .currentPassword)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        focusedField = .newPassword
+                    }
+
+                SecureField("New Password (minimum 8 characters)", text: $newPassword)
+                    .textContentType(.newPassword)
+                    .focused($focusedField, equals: .newPassword)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        focusedField = .confirmPassword
+                    }
+
+                SecureField("Confirm New Password", text: $confirmPassword)
+                    .textContentType(.newPassword)
+                    .focused($focusedField, equals: .confirmPassword)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        guard !isSavingPassword,
+                              !currentPassword.isEmpty,
+                              !newPassword.isEmpty,
+                              !confirmPassword.isEmpty else { return }
+                        Task { await changePassword() }
+                    }
+
+                Button {
+                    Task { await changePassword() }
+                } label: {
+                    if isSavingPassword {
                         HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
+                            ProgressView()
+                            Text("Changing Password…")
                         }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-
-                    if passwordSuccess {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Password changed successfully!")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                        }
-                        .padding()
-                        .background(Color.green.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Current Password")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        SecureField("Enter current password", text: $currentPassword)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("New Password")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        SecureField("Enter new password (min 8 characters)", text: $newPassword)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Confirm New Password")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        SecureField("Confirm new password", text: $confirmPassword)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                    }
-
-                    HStack(spacing: 12) {
-                        Button(action: { Task { await changePassword() } }) {
-                            HStack {
-                                if isSavingPassword {
-                                    ProgressView()
-                                        .progressViewStyle(.circular)
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "key.fill")
-                                }
-                                Text(isSavingPassword ? "Changing..." : "Change Password")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isSavingPassword || currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty)
-
-                        Button(action: cancelPasswordChange) {
-                            HStack {
-                                Image(systemName: "xmark")
-                                Text("Cancel")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isSavingPassword)
+                    } else {
+                        Label("Change Password", systemImage: "key.fill")
                     }
                 }
-                .padding(.vertical, 8)
+                .disabled(isSavingPassword || currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty)
+
+                Button("Cancel", role: .cancel, action: cancelPasswordChange)
+                    .disabled(isSavingPassword)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Change your password to keep your account secure")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                Text("Change your password to keep your account secure")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
 
-                    Button(action: startPasswordChange) {
-                        HStack {
-                            Image(systemName: "key.fill")
-                            Text("Change Password")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
+                Button(action: startPasswordChange) {
+                    Label("Change Password", systemImage: "key.fill")
                 }
-                .padding(.vertical, 4)
             }
         } header: {
             Text("Security")
@@ -391,9 +344,11 @@ struct ProfileView: View {
         editEmail = profile.email
         profileSaveError = nil
         isEditingProfile = true
+        focusedField = .username
     }
 
     private func cancelEditProfile() {
+        focusedField = nil
         isEditingProfile = false
         profileSaveError = nil
     }
@@ -424,6 +379,7 @@ struct ProfileView: View {
         // If nothing changed, just exit edit mode
         if usernameUpdate == nil && emailUpdate == nil {
             await MainActor.run {
+                focusedField = nil
                 isEditingProfile = false
                 isSavingProfile = false
             }
@@ -460,6 +416,7 @@ struct ProfileView: View {
                     environmentStore.applyUserProfile(profile)
                 }
 
+                focusedField = nil
                 isEditingProfile = false
                 isSavingProfile = false
             }
@@ -478,9 +435,11 @@ struct ProfileView: View {
         passwordError = nil
         passwordSuccess = false
         isChangingPassword = true
+        focusedField = .currentPassword
     }
 
     private func cancelPasswordChange() {
+        focusedField = nil
         isChangingPassword = false
         currentPassword = ""
         newPassword = ""
@@ -521,6 +480,7 @@ struct ProfileView: View {
             )
 
             await MainActor.run {
+                focusedField = nil
                 passwordSuccess = true
                 isSavingPassword = false
                 currentPassword = ""

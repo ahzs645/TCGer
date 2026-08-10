@@ -87,22 +87,32 @@ struct WishlistDetailView: View {
     }
 
     var body: some View {
-        NavigationView {
-            List {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if totalCount > 0 && !isEditing {
+                    Picker("Filter", selection: $filterOwned) {
+                        ForEach(OwnershipFilter.allCases, id: \.self) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+
+                    Divider()
+                }
+
+                List {
                 // Header — only rendered when it has content, otherwise the
                 // section shows up as an empty card under the navigation title.
                 if isEditing {
-                    Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            InlineNameDescriptionColorEditor(
-                                namePlaceholder: "Wishlist Name",
-                                name: $editedName,
-                                description: $editedDescription,
-                                selectedColor: $selectedColor
-                            )
-                        }
-                        .listRowSeparator(.hidden)
-                    }
+                    NameDescriptionColorSections(
+                        namePlaceholder: "Wishlist Name",
+                        name: $editedName,
+                        description: $editedDescription,
+                        selectedColor: $selectedColor
+                    )
+
                     Section {
                         Toggle("Any printing counts as owned", isOn: $editedMatchAnyPrinting)
                     } footer: {
@@ -177,18 +187,6 @@ struct WishlistDetailView: View {
                     }
                 }
 
-                // Filter
-                if totalCount > 0 {
-                    Section {
-                        Picker("Filter", selection: $filterOwned) {
-                            ForEach(OwnershipFilter.allCases, id: \.self) { filter in
-                                Text(filter.rawValue).tag(filter)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                }
-
                 // Cards List
                 Section {
                     if cards.isEmpty {
@@ -248,9 +246,14 @@ struct WishlistDetailView: View {
                         }
                     }
                 }
+                }
+                .listStyle(.insetGrouped)
             }
-            .listStyle(.insetGrouped)
-            .searchable(text: $searchText, prompt: "Search cards")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search cards"
+            )
             .navigationTitle(wishlist.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

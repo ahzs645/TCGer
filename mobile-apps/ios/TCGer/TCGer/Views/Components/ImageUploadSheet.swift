@@ -19,7 +19,7 @@ struct ImageUploadSheet: View {
     private let apiService = APIService()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 // Existing Images
                 if !existingImageUrls.isEmpty {

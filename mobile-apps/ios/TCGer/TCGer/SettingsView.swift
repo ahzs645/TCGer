@@ -93,7 +93,7 @@ struct SettingsView: View {
             if parentProvidesNavigation {
                 settingsContent
             } else {
-                NavigationView {
+                NavigationStack {
                     settingsContent
                 }
             }
@@ -665,7 +665,7 @@ struct SettingsView: View {
                         // retraining. Same section as the debug screen's copy,
                         // surfaced here so a tester never has to enter Live
                         // Scanner Debug to enable, review, or export.
-                        ScannerDevModeSection()
+                        ScannerDevModeSection(presentation: .settingsRows)
 
                         if developerToolsUnlocked {
                             Button(role: .destructive) {

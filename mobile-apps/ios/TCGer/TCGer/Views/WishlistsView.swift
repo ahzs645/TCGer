@@ -12,8 +12,18 @@ struct WishlistsView: View {
     @State private var newWishlistColor: Color = .blue
     @State private var newWishlistMatchAnyPrinting = false
     @State private var actionErrorMessage: String?
+    @State private var searchText = ""
 
     private let apiService = APIService()
+
+    private var filteredWishlists: [Wishlist] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return wishlistStore.wishlists }
+        return wishlistStore.wishlists.filter {
+            $0.name.localizedCaseInsensitiveContains(query) ||
+            ($0.description?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
 
     init(parentProvidesNavigation: Bool = false) {
         self.parentProvidesNavigation = parentProvidesNavigation
@@ -24,7 +34,7 @@ struct WishlistsView: View {
             if parentProvidesNavigation {
                 wishlistContent
             } else {
-                NavigationView {
+                NavigationStack {
                     wishlistContent
                 }
             }
@@ -59,9 +69,11 @@ struct WishlistsView: View {
                     .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredWishlists.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             } else {
                 List {
-                    ForEach(wishlistStore.wishlists) { wishlist in
+                    ForEach(filteredWishlists) { wishlist in
                         Button {
                             selectedWishlist = wishlist
                         } label: {
@@ -79,10 +91,15 @@ struct WishlistsView: View {
                         }
                     }
                 }
-                .listStyle(.plain)
+                .listStyle(.insetGrouped)
             }
         }
         .navigationTitle("Wishlists")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search wishlists"
+        )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -120,7 +137,7 @@ struct WishlistsView: View {
     }
 
     private var createWishlistSheet: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 NameDescriptionColorSections(
                     namePlaceholder: "Wishlist Name",

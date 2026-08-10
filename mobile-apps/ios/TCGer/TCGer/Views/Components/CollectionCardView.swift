@@ -3,6 +3,7 @@ import SwiftUI
 struct CollectionCardView: View {
     let collection: Collection
     let showPricing: Bool
+    var showUpdatedDate: Bool = false
     @Namespace private var namespace
 
     var body: some View {
@@ -29,21 +30,15 @@ struct CollectionCardView: View {
             // Card Preview Strip
             CardPreviewStrip(cards: collection.cards)
 
-            // Stats Row
-            HStack(spacing: 16) {
-                Label(
-                    "\(collection.uniqueGames.count) games",
-                    systemImage: "gamecontroller.fill"
-                )
-                .font(.caption)
-                .foregroundColor(.secondary)
+            // Stats Row: game badges, card count, value
+            HStack(spacing: 8) {
+                ForEach(Array(collection.uniqueGames).sorted(), id: \.self) { game in
+                    GameBadge(tcg: game)
+                }
 
-                Label(
-                    "\(collection.uniqueCards) cards",
-                    systemImage: "square.stack.3d.up.fill"
-                )
-                .font(.caption)
-                .foregroundColor(.secondary)
+                Text("\(collection.uniqueCards) cards")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 Spacer()
 
@@ -55,20 +50,10 @@ struct CollectionCardView: View {
                 }
             }
 
-            // Updated timestamp and game badges
-            HStack {
-                Text("Updated \(formatRelativeDate(collection.updatedAt))")
+            if showUpdatedDate {
+                Text("Edited \(formatRelativeDate(collection.updatedAt))")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-
-                Spacer()
-
-                // Game badges
-                HStack(spacing: 4) {
-                    ForEach(Array(collection.uniqueGames).sorted(), id: \.self) { game in
-                        GameBadge(tcg: game)
-                    }
-                }
             }
         }
         .padding()

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddCardToBinderFromSearchView: View {
     let binderId: String
+    let onCardAdded: (String) async -> Void
+
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
@@ -18,8 +20,16 @@ struct AddCardToBinderFromSearchView: View {
 
     private let apiService = APIService()
 
+    init(
+        binderId: String,
+        onCardAdded: @escaping (String) async -> Void = { _ in }
+    ) {
+        self.binderId = binderId
+        self.onCardAdded = onCardAdded
+    }
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Game Filter - Only show if more than one game is enabled
                 if environmentStore.enabledGames.count > 1 {
@@ -63,7 +73,11 @@ struct AddCardToBinderFromSearchView: View {
             }
             .navigationTitle("Add Card to Binder")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Search for cards...")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search for cards..."
+            )
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }
@@ -112,6 +126,7 @@ struct AddCardToBinderFromSearchView: View {
                         card: card,
                         details: details
                     )
+                    await onCardAdded(binderId)
                     dismiss()
                 }
             }

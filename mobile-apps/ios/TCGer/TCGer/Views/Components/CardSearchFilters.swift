@@ -439,7 +439,11 @@ private struct CardSearchSetPicker: View {
         }
         .navigationTitle("Set")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Search sets or codes")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search sets or codes"
+        )
         .overlay {
             if filteredSets.isEmpty {
                 ContentUnavailableView.search(text: searchText)

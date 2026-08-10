@@ -11,7 +11,7 @@ struct CreateBinderSheet: View {
     let onCreate: (String, String?, String?, String?) async -> Void
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 NameDescriptionColorSections(
                     namePlaceholder: "Binder Name",

@@ -24,7 +24,7 @@ struct DashboardView: View {
             if parentProvidesNavigation {
                 dashboardContent
             } else {
-                NavigationView {
+                NavigationStack {
                     dashboardContent
                 }
             }

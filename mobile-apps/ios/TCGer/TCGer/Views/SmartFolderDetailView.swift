@@ -11,7 +11,7 @@ struct SmartFolderDetailView: View {
     private let apiService = APIService()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if isLoading {
                     ProgressView("Finding matching cards...")

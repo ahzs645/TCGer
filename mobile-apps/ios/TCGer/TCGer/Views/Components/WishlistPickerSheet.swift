@@ -15,7 +15,7 @@ struct WishlistPickerSheet: View {
     private let apiService = APIService()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if wishlistStore.isLoading && !wishlistStore.hasLoaded {
                     ProgressView("Loading wishlists…")

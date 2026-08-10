@@ -76,7 +76,7 @@ struct SetBrowserView: View {
             if parentProvidesNavigation {
                 setBrowserContent
             } else {
-                NavigationView {
+                NavigationStack {
                     setBrowserContent
                 }
             }
@@ -214,7 +214,11 @@ struct SetBrowserView: View {
                 }
         }
         .navigationTitle("Sets")
-            .searchable(text: $searchText, prompt: "Search sets...")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search sets..."
+            )
             .task {
                 await loadSets()
             }

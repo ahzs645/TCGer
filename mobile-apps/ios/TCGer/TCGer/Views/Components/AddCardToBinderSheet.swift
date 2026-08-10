@@ -50,7 +50,7 @@ struct AddCardToBinderSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 // Card Preview Section
                 Section {

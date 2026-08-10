@@ -15,52 +15,12 @@ struct RootView: View {
     private let apiService = APIService()
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if !environmentStore.serverConfiguration.isValid {
-                    ServerSetupView()
-                } else if !environmentStore.isServerVerified {
-                    ServerVerificationView(
-                        isChecking: isVerifyingServer,
-                        currentURL: environmentStore.serverConfiguration.baseURL,
-                        retryAction: { Task { await verifyServerConnection() } },
-                        changeServerAction: resetServerSelection
-                    )
-                    .task(id: environmentStore.serverConfiguration.baseURL) {
-                        await verifyServerConnection()
-                    }
-                } else if setupRequired == nil || environmentStore.appSettings == nil || isBootstrapping {
-                    ProgressView("Loading app configuration…")
-                        .progressViewStyle(.circular)
-                } else if setupRequired == true {
-                    InitialSetupView(
-                        isSubmitting: $isAuthenticating,
-                        onCreateAdmin: { email, password, username in
-                            Task { await createInitialAdmin(email: email, password: password, username: username) }
-                        },
-                        onRefreshStatus: { Task { await refreshBootstrapState(force: true) } },
-                        onChangeServer: resetServerSelection
-                    )
-                } else if !environmentStore.isAuthenticated && shouldRequireAuthentication {
-                    if showingSignup {
-                        SignupView(
-                            isSubmitting: $isAuthenticating,
-                            onSignup: { email, password, username in
-                                Task { await signup(email: email, password: password, username: username) }
-                            },
-                            onCancel: {
-                                showingSignup = false
-                            }
-                        )
-                    } else {
-                        LoginView(isAuthenticating: $isAuthenticating) {
-                            Task { await authenticate() }
-                        } onShowSignup: {
-                            showingSignup = true
-                        }
-                    }
-                } else {
-                    MainContentView()
+        Group {
+            if shouldPresentMainContent {
+                MainContentView()
+            } else {
+                NavigationStack {
+                    launchContent
                 }
             }
         }
@@ -102,6 +62,62 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             if environmentStore.biometricLockEnabled {
                 isAppLocked = true
+            }
+        }
+    }
+
+    private var shouldPresentMainContent: Bool {
+        environmentStore.serverConfiguration.isValid &&
+        environmentStore.isServerVerified &&
+        setupRequired == false &&
+        environmentStore.appSettings != nil &&
+        !isBootstrapping &&
+        (environmentStore.isAuthenticated || !shouldRequireAuthentication)
+    }
+
+    @ViewBuilder
+    private var launchContent: some View {
+        if !environmentStore.serverConfiguration.isValid {
+            ServerSetupView()
+        } else if !environmentStore.isServerVerified {
+            ServerVerificationView(
+                isChecking: isVerifyingServer,
+                currentURL: environmentStore.serverConfiguration.baseURL,
+                retryAction: { Task { await verifyServerConnection() } },
+                changeServerAction: resetServerSelection
+            )
+            .task(id: environmentStore.serverConfiguration.baseURL) {
+                await verifyServerConnection()
+            }
+        } else if setupRequired == nil || environmentStore.appSettings == nil || isBootstrapping {
+            ProgressView("Loading app configuration…")
+                .progressViewStyle(.circular)
+        } else if setupRequired == true {
+            InitialSetupView(
+                isSubmitting: $isAuthenticating,
+                onCreateAdmin: { email, password, username in
+                    Task { await createInitialAdmin(email: email, password: password, username: username) }
+                },
+                onRefreshStatus: { Task { await refreshBootstrapState(force: true) } },
+                onChangeServer: resetServerSelection
+            )
+        } else if !environmentStore.isAuthenticated && shouldRequireAuthentication {
+            if showingSignup {
+                SignupView(
+                    isSubmitting: $isAuthenticating,
+                    onSignup: { email, password, username in
+                        Task { await signup(email: email, password: password, username: username) }
+                    },
+                    onCancel: {
+                        showingSignup = false
+                    }
+                )
+            } else {
+                LoginView(isAuthenticating: $isAuthenticating) {
+                    Task { await authenticate() }
+                } onShowSignup: {
+                    showingSignup = true
+                }
             }
         }
     }

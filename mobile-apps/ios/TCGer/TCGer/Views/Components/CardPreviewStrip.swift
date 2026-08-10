@@ -69,27 +69,34 @@ struct CardPreviewImage: View {
 }
 
 struct EmptyPreviewPlaceholder: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "rectangle.stack.badge.plus")
-                .font(.title3)
-                .foregroundColor(.accentColor)
+    private let slotCount = 4
+    private let slotWidth: CGFloat = 80 * (2.5 / 3.5)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("No cards in this binder yet")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text("Add cards to see quick previews here.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<slotCount, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(
+                        Color.secondary.opacity(0.25),
+                        style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.05))
+                    )
+                    .frame(width: slotWidth, height: 80)
+                    .overlay {
+                        if index == 0 {
+                            Image(systemName: "plus")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
+                    }
             }
 
             Spacer()
         }
-        .padding(12)
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
+        .frame(height: 80)
     }
 }
 

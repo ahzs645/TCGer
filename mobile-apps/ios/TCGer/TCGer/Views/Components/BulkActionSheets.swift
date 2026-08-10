@@ -8,7 +8,7 @@ struct BulkConditionSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section {
                     ForEach(CardCondition.allCases) { condition in
@@ -51,7 +51,7 @@ struct BulkMoveSheet: View {
     private let apiService = APIService()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if isLoading {
                     ProgressView("Loading binders...")

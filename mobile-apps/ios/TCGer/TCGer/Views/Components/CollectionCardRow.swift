@@ -272,6 +272,9 @@ struct CollectionCardRow: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(card.copies.enumerated()), id: \.element.id) { index, copy in
                         CopyDetailRow(copy: copy, index: index)
+                        if index < card.copies.count - 1 {
+                            Divider()
+                        }
                     }
                 }
             }
@@ -489,9 +492,7 @@ struct CollectionCardRow: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(8)
-            .background(colorScheme == .dark ? Color(.tertiarySystemBackground) : Color(.secondarySystemBackground))
-            .cornerRadius(8)
+            .padding(.vertical, 4)
         }
     }
 }

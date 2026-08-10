@@ -21,7 +21,7 @@ struct SmartFolderEditorSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     TextField("Folder Name", text: $name)

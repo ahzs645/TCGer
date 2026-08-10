@@ -222,7 +222,7 @@ struct ScannerSessionReviewView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    BinderPickerMenu(
+                    BinderPickerSheetButton(
                         binders: collections,
                         selectedBinderId: $selectedBinderID
                     )

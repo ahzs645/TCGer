@@ -1034,7 +1034,7 @@ private struct ScanResultSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerSection
@@ -1334,7 +1334,7 @@ private struct ScanResultSheet: View {
 
                 if let attempts = capture.diagnostics?.attempts, !attempts.isEmpty {
                     DisclosureGroup("Variant Attempts") {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 0) {
                             ForEach(Array(attempts.prefix(4).enumerated()), id: \.offset) { entry in
                                 let attempt = entry.element
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1352,9 +1352,11 @@ private struct ScanResultSheet: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 }
-                                .padding(10)
-                                .background(Color(.tertiarySystemBackground))
-                                .cornerRadius(10)
+                                .padding(.vertical, 8)
+
+                                if entry.offset < min(attempts.count, 4) - 1 {
+                                    Divider()
+                                }
                             }
                         }
                         .padding(.top, 8)
@@ -1391,7 +1393,8 @@ private struct ScanResultSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Alternatives")
                 .font(.headline)
-            ForEach(result.alternatives, id: \.id) { candidate in
+            ForEach(Array(result.alternatives.enumerated()), id: \.element.id) { index, candidate in
+                let isSelected = candidate.id == selectedCandidate.id
                 Button {
                     selectedCandidate = candidate
                     onSelectCandidate(candidate)
@@ -1411,18 +1414,20 @@ private struct ScanResultSheet: View {
                         Text(String(format: "%.0f%%", candidate.confidence.score * 100))
                             .font(.footnote)
                             .foregroundColor(.secondary)
-                        if candidate.id == selectedCandidate.id {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(color)
-                        }
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(isSelected ? color : .secondary)
                     }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(candidate.id == selectedCandidate.id ? color : Color.gray.opacity(0.3), lineWidth: candidate.id == selectedCandidate.id ? 2 : 1)
-                    )
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(candidate.details.identity.name)
+                .accessibilityValue(String(format: "%.0f percent match", candidate.confidence.score * 100))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+                if index < result.alternatives.count - 1 {
+                    Divider()
+                }
             }
         }
         .padding()
@@ -1535,10 +1540,11 @@ private struct ScanResultSheet: View {
         title: String?,
         rows: [DiagnosticRow]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             if let title {
                 Text(title)
                     .font(.subheadline.weight(.medium))
+                    .padding(.bottom, 4)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { entry in
                 let row = entry.element
@@ -1557,9 +1563,11 @@ private struct ScanResultSheet: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                .padding(10)
-                .background(Color(.tertiarySystemBackground))
-                .cornerRadius(10)
+                .padding(.vertical, 8)
+
+                if entry.offset < rows.count - 1 {
+                    Divider()
+                }
             }
         }
     }

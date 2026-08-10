@@ -12,7 +12,7 @@ struct TiltTesterView: View {
     private var activeCard: Card { Self.demoCards[selectedCardIndex] }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 Spacer(minLength: 12)
 

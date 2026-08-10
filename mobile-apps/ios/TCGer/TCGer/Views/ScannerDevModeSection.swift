@@ -6,57 +6,127 @@ import SwiftUI
 /// and use the device-recording schema, so they also appear in Browse
 /// Reference Sets and can be replayed directly.
 struct ScannerDevModeSection: View {
+    enum Presentation: Equatable {
+        case compact
+        case settingsRows
+    }
+
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeEnabled = false
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle(isOn: $devModeEnabled) {
-                Label("Dev Mode Recording", systemImage: "record.circle")
-            }
+    var presentation: Presentation = .compact
 
-            Text("Saves every scan with its crop attempts and decision evidence as reusable training data.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    @ViewBuilder
+    var body: some View {
+        switch presentation {
+        case .compact:
+            compactContent
+        case .settingsRows:
+            settingsRows
+        }
+    }
+
+    private var compactContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            recordingToggle
+
+            recordingDescription
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
+                errorLabel(errorMessage)
             }
 
+            sessionsLink
+
+            exportButton
+                .buttonStyle(.bordered)
+        }
+        .onAppear(perform: refresh)
+    }
+
+    @ViewBuilder
+    private var settingsRows: some View {
+        recordingToggle
+            .onAppear(perform: refresh)
+
+        recordingDescription
+
+        if let errorMessage {
+            errorLabel(errorMessage)
+        }
+
+        sessionsLink
+
+        exportButton
+    }
+
+    private var recordingToggle: some View {
+        Toggle(isOn: $devModeEnabled) {
+            Label("Dev Mode Recording", systemImage: "record.circle")
+        }
+        .onChange(of: devModeEnabled) { refresh() }
+    }
+
+    private var recordingDescription: some View {
+        Text("Saves every scan with its crop attempts and decision evidence as reusable training data.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func errorLabel(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundStyle(.red)
+    }
+
+    @ViewBuilder
+    private var sessionsLink: some View {
+        if presentation == .compact {
             NavigationLink {
                 ScannerDevModeSessionsView()
             } label: {
-                HStack {
-                    Label("Recorded Sessions", systemImage: "film.stack")
-                    Spacer()
-                    Text(sessionSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
+                sessionsLinkLabel
             }
             .buttonStyle(.plain)
-
-            Button {
-                do {
-                    shareArchive = try DevModeExporter.zipAllSessions()
-                    errorMessage = nil
-                } catch {
-                    errorMessage = "Export failed: \(error.localizedDescription)"
-                }
+        } else {
+            NavigationLink {
+                ScannerDevModeSessionsView()
             } label: {
+                sessionsLinkLabel
+            }
+        }
+    }
+
+    private var sessionsLinkLabel: some View {
+        HStack {
+            Label("Recorded Sessions", systemImage: "film.stack")
+            Spacer()
+            Text(sessionSummary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var exportButton: some View {
+        Button {
+            do {
+                shareArchive = try DevModeExporter.zipAllSessions()
+                errorMessage = nil
+            } catch {
+                errorMessage = "Export failed: \(error.localizedDescription)"
+            }
+        } label: {
+            if presentation == .compact {
                 Label("Export All Sessions", systemImage: "square.and.arrow.up.on.square")
                     .frame(maxWidth: .infinity)
+            } else {
+                Label("Export All Sessions", systemImage: "square.and.arrow.up.on.square")
             }
-            .buttonStyle(.bordered)
-            .disabled(sessions.isEmpty)
         }
-        .onAppear(perform: refresh)
-        .onChange(of: devModeEnabled) { refresh() }
+        .disabled(sessions.isEmpty)
         .sheet(item: $shareArchive) { archive in
             DevModeActivityView(items: [archive.url])
         }

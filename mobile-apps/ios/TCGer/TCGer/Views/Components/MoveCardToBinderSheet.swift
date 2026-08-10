@@ -39,7 +39,7 @@ struct MoveCardToBinderSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     CardSummaryRow(card: card)
@@ -64,7 +64,7 @@ struct MoveCardToBinderSheet: View {
                         }
                         .padding(.vertical, 8)
                     } else {
-                        BinderPickerMenu(
+                        BinderPickerSheetButton(
                             binders: availableBinders,
                             selectedBinderId: $selectedBinderId
                         )

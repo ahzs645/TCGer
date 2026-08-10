@@ -21,6 +21,8 @@ enum CardSortOption: String, CaseIterable {
 /// clear-all action (which may also reset state the bar doesn't own, e.g.
 /// search text).
 struct CollectionFilterBar: View {
+    private let filterChipHeight: CGFloat = 30
+
     @Binding var showFilters: Bool
     @Binding var sortOption: CardSortOption
     @Binding var selectedTagFilters: Set<String>
@@ -180,16 +182,19 @@ struct CollectionFilterBar: View {
                 .font(.caption)
             TextField("Min", text: $minPriceFilter)
                 .keyboardType(.decimalPad)
+                .textFieldStyle(.plain)
                 .frame(width: 44)
             Text("–")
                 .foregroundColor(.secondary)
             TextField("Max", text: $maxPriceFilter)
                 .keyboardType(.decimalPad)
+                .textFieldStyle(.plain)
                 .frame(width: 44)
         }
         .font(.caption)
+        .fontWeight(.medium)
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .frame(height: filterChipHeight)
         .background(hasPriceFilter ? Color.accentColor.opacity(0.15) : Color(.secondarySystemBackground))
         .clipShape(Capsule())
     }
@@ -218,7 +223,7 @@ struct CollectionFilterBar: View {
         .fontWeight(.medium)
         .foregroundColor(activeCount > 0 ? .accentColor : .primary)
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .frame(height: filterChipHeight)
         .background(activeCount > 0 ? Color.accentColor.opacity(0.15) : Color(.secondarySystemBackground))
         .clipShape(Capsule())
     }

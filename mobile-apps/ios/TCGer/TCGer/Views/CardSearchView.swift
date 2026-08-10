@@ -32,7 +32,7 @@ struct CardSearchView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Game Filter - Only show if more than one game is enabled
                 if environmentStore.enabledGames.count > 1 {
@@ -141,7 +141,11 @@ struct CardSearchView: View {
                 }
             }
             .navigationTitle("Search Cards")
-            .searchable(text: $searchText, prompt: "Search for cards...")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search for cards..."
+            )
             .onSubmit(of: .search) {
                 Task { await performSearch() }
             }

@@ -11,7 +11,7 @@ struct RecentDebugCapturesSheet: View {
     let color: Color
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if let token = environmentStore.authToken {
                     content(token: token)
@@ -276,7 +276,7 @@ private struct DebugCaptureDetailSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     heroSection

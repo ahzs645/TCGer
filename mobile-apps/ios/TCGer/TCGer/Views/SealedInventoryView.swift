@@ -12,8 +12,26 @@ struct SealedInventoryView: View {
     @State private var showingBarcodeScanner = false
     @State private var scannedProduct: SealedProduct?
     @State private var barcodeError: String?
+    @State private var searchText = ""
 
     private let apiService = APIService()
+
+    private var filteredInventory: [SealedInventoryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return inventory }
+        return inventory.filter {
+            $0.product.name.localizedCaseInsensitiveContains(query) ||
+            $0.product.tcg.localizedCaseInsensitiveContains(query) ||
+            ($0.product.setCode?.localizedCaseInsensitiveContains(query) ?? false) ||
+            ($0.product.upc?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private var filteredLedgers: [SealedOpeningLedger] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return ledgers }
+        return ledgers.filter { $0.productName.localizedCaseInsensitiveContains(query) }
+    }
 
     init(parentProvidesNavigation: Bool = false) {
         self.parentProvidesNavigation = parentProvidesNavigation
@@ -24,7 +42,7 @@ struct SealedInventoryView: View {
             if parentProvidesNavigation {
                 sealedInventoryContent
             } else {
-                NavigationView {
+                NavigationStack {
                     sealedInventoryContent
                 }
             }
@@ -68,17 +86,20 @@ struct SealedInventoryView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        if !ledgers.isEmpty {
+                    if filteredInventory.isEmpty && filteredLedgers.isEmpty {
+                        ContentUnavailableView.search(text: searchText)
+                    } else {
+                        List {
+                        if !filteredLedgers.isEmpty {
                             Section("Opened Product P&L") {
-                                ForEach(ledgers) { ledger in
+                                ForEach(filteredLedgers) { ledger in
                                     SealedLedgerRow(ledger: ledger)
                                 }
                             }
                         }
-                        if !inventory.isEmpty {
+                        if !filteredInventory.isEmpty {
                             Section("Sealed Inventory") {
-                                ForEach(inventory) { item in
+                                ForEach(filteredInventory) { item in
                                     SealedInventoryRow(item: item)
                                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                             Button(role: .destructive) {
@@ -91,10 +112,16 @@ struct SealedInventoryView: View {
                             }
                         }
                     }
-                    .listStyle(.plain)
+                        .listStyle(.insetGrouped)
+                    }
                 }
         }
         .navigationTitle("Sealed Products")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search inventory"
+            )
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
@@ -348,7 +375,7 @@ private struct SealedProductCatalogSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if isLoading {
                     ProgressView("Loading products...")
@@ -409,7 +436,11 @@ private struct SealedProductCatalogSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .searchable(text: $searchText, prompt: "Search products")
+                    .searchable(
+                        text: $searchText,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Search products"
+                    )
                 }
             }
             .navigationTitle("Product Catalog")

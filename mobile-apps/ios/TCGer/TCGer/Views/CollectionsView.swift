@@ -1,5 +1,25 @@
 import SwiftUI
 
+enum BinderSortOption: String, CaseIterable, Identifiable {
+    case lastOpened = "Last Opened"
+    case lastEdited = "Last Edited"
+    case name = "Name"
+    case value = "Value"
+    case cardCount = "Card Count"
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .lastOpened: return "clock"
+        case .lastEdited: return "pencil"
+        case .name: return "textformat"
+        case .value: return "dollarsign.circle"
+        case .cardCount: return "square.stack.3d.up"
+        }
+    }
+}
+
 struct CollectionsView: View {
     let parentProvidesNavigation: Bool
 
@@ -13,10 +33,55 @@ struct CollectionsView: View {
     @State private var selectedSmartFolder: SmartFolder?
     @State private var showingSmartFolderEditor = false
     @State private var showingImportSheet = false
+    @State private var searchText = ""
+    @AppStorage("binderSortOption") private var sortOptionRaw = BinderSortOption.lastOpened.rawValue
 
     private let apiService = APIService()
+
+    private var sortOption: BinderSortOption {
+        BinderSortOption(rawValue: sortOptionRaw) ?? .lastOpened
+    }
+
+    private var sortedCollections: [Collection] {
+        let base = collections.sortedForDisplay(hidingEmptyUnsortedLibrary: true)
+        switch sortOption {
+        case .lastOpened:
+            // Never-opened binders have no local timestamp; base order
+            // (most recently updated) breaks those ties.
+            return base.sortedKeepingUnsortedFirst {
+                let lhs = BinderAccessLog.lastOpened($0.id) ?? .distantPast
+                let rhs = BinderAccessLog.lastOpened($1.id) ?? .distantPast
+                if lhs != rhs { return lhs > rhs }
+                return $0.updatedAt > $1.updatedAt
+            }
+        case .lastEdited:
+            return base
+        case .name:
+            return base.sortedKeepingUnsortedFirst {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .value:
+            return base.sortedKeepingUnsortedFirst { $0.totalValue > $1.totalValue }
+        case .cardCount:
+            return base.sortedKeepingUnsortedFirst { $0.uniqueCards > $1.uniqueCards }
+        }
+    }
+
     private var displayCollections: [Collection] {
-        collections.sortedForDisplay(hidingEmptyUnsortedLibrary: true)
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return sortedCollections }
+        return sortedCollections.filter {
+            $0.name.localizedCaseInsensitiveContains(query) ||
+            ($0.description?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private var displaySmartFolders: [SmartFolder] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return environmentStore.smartFolders }
+        return environmentStore.smartFolders.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+        }
     }
 
     init(parentProvidesNavigation: Bool = false) {
@@ -28,7 +93,7 @@ struct CollectionsView: View {
             if parentProvidesNavigation {
                 collectionsContent
             } else {
-                NavigationView {
+                NavigationStack {
                     collectionsContent
                 }
             }
@@ -48,14 +113,17 @@ struct CollectionsView: View {
     }
 
     private var collectionsContent: some View {
-        Group {
+        VStack(spacing: 0) {
+            binderControlBar
+
+            Group {
                 if isLoading {
                     ProgressView("Loading binders...")
                 } else if let error = errorMessage {
                     ErrorView(title: "Error Loading Binders", message: error) {
                         Task { await loadCollections() }
                     }
-                } else if displayCollections.isEmpty {
+                } else if sortedCollections.isEmpty && environmentStore.smartFolders.isEmpty {
                     if environmentStore.isAuthenticated {
                         EmptyCollectionsView(onCreate: {
                             showingCreateSheet = true
@@ -77,7 +145,13 @@ struct CollectionsView: View {
                     }
                 } else {
                     ScrollView {
-                        if !environmentStore.smartFolders.isEmpty {
+                        if displayCollections.isEmpty && displaySmartFolders.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                        }
+
+                        if !displaySmartFolders.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Smart Folders")
                                     .font(.caption)
@@ -85,7 +159,7 @@ struct CollectionsView: View {
                                     .foregroundColor(.secondary)
                                     .textCase(.uppercase)
 
-                                ForEach(environmentStore.smartFolders) { folder in
+                                ForEach(displaySmartFolders) { folder in
                                     Button {
                                         selectedSmartFolder = folder
                                     } label: {
@@ -119,48 +193,38 @@ struct CollectionsView: View {
 
                         LazyVStack(spacing: 16) {
                             ForEach(displayCollections) { collection in
-                                CollectionCardView(collection: collection, showPricing: environmentStore.showPricing)
-                                    .onTapGesture {
-                                        selectedCollection = collection
-                                    }
+                                Button {
+                                    selectedCollection = collection
+                                } label: {
+                                    CollectionCardView(
+                                        collection: collection,
+                                        showPricing: environmentStore.showPricing,
+                                        showUpdatedDate: sortOption == .lastEdited
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
                     }
                 }
             }
+        }
             .navigationTitle("Binders")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search binders"
+            )
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 16) {
-                        if environmentStore.isAuthenticated {
-                            Button {
-                                showingSearch.wrappedValue = true
-                            } label: {
-                                Image(systemName: "magnifyingglass")
-                            }
-                        }
-
-                        Menu {
-                            Button {
-                                showingCreateSheet = true
-                            } label: {
-                                Label("New Binder", systemImage: "folder.badge.plus")
-                            }
-                            Button {
-                                showingSmartFolderEditor = true
-                            } label: {
-                                Label("New Smart Folder", systemImage: "wand.and.stars")
-                            }
-                            Button {
-                                showingImportSheet = true
-                            } label: {
-                                Label("Import CSV", systemImage: "square.and.arrow.down")
-                            }
+                    if environmentStore.isAuthenticated {
+                        Button {
+                            showingSearch.wrappedValue = true
                         } label: {
-                            Image(systemName: "plus")
+                            Image(systemName: "rectangle.and.text.magnifyingglass")
                         }
-                        .disabled(!environmentStore.isAuthenticated)
+                        .accessibilityLabel("Search card catalog")
                     }
                 }
             }
@@ -197,6 +261,48 @@ struct CollectionsView: View {
                     }
                 }
             )
+    }
+
+    private var binderControlBar: some View {
+        HStack(spacing: 12) {
+            Menu {
+                Picker("Sort by", selection: $sortOptionRaw) {
+                    ForEach(BinderSortOption.allCases) { option in
+                        Label(option.rawValue, systemImage: option.systemImage)
+                            .tag(option.rawValue)
+                    }
+                }
+            } label: {
+                Label(sortOption.rawValue, systemImage: "arrow.up.arrow.down")
+            }
+            .buttonStyle(.bordered)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    showingCreateSheet = true
+                } label: {
+                    Label("New Binder", systemImage: "folder.badge.plus")
+                }
+                Button {
+                    showingSmartFolderEditor = true
+                } label: {
+                    Label("New Smart Folder", systemImage: "wand.and.stars")
+                }
+                Button {
+                    showingImportSheet = true
+                } label: {
+                    Label("Import CSV", systemImage: "square.and.arrow.down")
+                }
+            } label: {
+                Label("Add", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!environmentStore.isAuthenticated)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
 
     @MainActor

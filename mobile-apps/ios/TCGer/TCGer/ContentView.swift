@@ -73,7 +73,7 @@ struct ContentView: View {
     }
 
     private var moreTabsView: some View {
-        NavigationView {
+        NavigationStack {
             List(overflowTabs) { tab in
                 NavigationLink {
                     destination(for: tab, parentProvidesNavigation: true)

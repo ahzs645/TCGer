@@ -30,29 +30,3 @@ struct NameDescriptionColorSections: View {
         }
     }
 }
-
-/// Inline name/description/color editor used in the edit headers of the
-/// binder and wishlist detail views.
-struct InlineNameDescriptionColorEditor: View {
-    let namePlaceholder: String
-    @Binding var name: String
-    @Binding var description: String
-    @Binding var selectedColor: Color
-    var nameFont: Font = .title2
-
-    var body: some View {
-        TextField(namePlaceholder, text: $name)
-            .font(nameFont)
-            .fontWeight(.bold)
-            .textFieldStyle(.roundedBorder)
-
-        TextField("Description (optional)", text: $description, axis: .vertical)
-            .font(.body)
-            .foregroundColor(.secondary)
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(3...6)
-
-        ColorPickerGrid(selectedColor: $selectedColor)
-            .padding(.top, 8)
-    }
-}

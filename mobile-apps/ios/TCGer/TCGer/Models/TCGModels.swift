@@ -569,6 +569,34 @@ extension Array where Element == Collection {
         guard hidingEmptyUnsortedLibrary else { return ordered }
         return ordered.filter { !$0.isUnsortedBinder || !$0.cards.isEmpty }
     }
+
+    /// Re-sorts binders by the given comparator while keeping the Unsorted
+    /// Library pinned to the top, matching sortedForDisplay's convention.
+    func sortedKeepingUnsortedFirst(by areInIncreasingOrder: (Collection, Collection) -> Bool) -> [Collection] {
+        sorted { lhs, rhs in
+            if lhs.isUnsortedBinder != rhs.isUnsortedBinder {
+                return lhs.isUnsortedBinder
+            }
+            return areInIncreasingOrder(lhs, rhs)
+        }
+    }
+}
+
+/// Device-local record of when each binder was last opened; the server has no
+/// notion of "opened", so this only reflects activity on this device.
+enum BinderAccessLog {
+    private static let key = "binderLastOpenedDates"
+
+    static func recordOpen(_ collectionId: String) {
+        var dates = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        dates[collectionId] = Date().timeIntervalSince1970
+        UserDefaults.standard.set(dates, forKey: key)
+    }
+
+    static func lastOpened(_ collectionId: String) -> Date? {
+        let dates = UserDefaults.standard.dictionary(forKey: key) as? [String: Double]
+        return (dates?[collectionId]).map { Date(timeIntervalSince1970: $0) }
+    }
 }
 
 struct CollectionCard: Identifiable, Codable, Hashable, Sendable {

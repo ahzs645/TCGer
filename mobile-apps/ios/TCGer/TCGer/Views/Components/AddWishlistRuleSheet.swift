@@ -61,7 +61,7 @@ struct AddWishlistRuleSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     Picker("Mode", selection: $mode) {

@@ -1587,7 +1587,7 @@ private struct BinderCardMatchSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
                 text: $searchText,
-                placement: .toolbar,
+                placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search \(mode.displayName) cards"
             )
             .onSubmit(of: .search) {

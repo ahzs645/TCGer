@@ -43,18 +43,11 @@ struct CardSearchResultsList: View {
                         Section {
                             cardsGrid(tcgCards)
                         } header: {
-                            HStack {
-                                Text(tcgCards.first?.tcgDisplayName ?? tcg.uppercased())
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                Spacer()
-                                Text("\(tcgCards.count) cards")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
-                            }
-                            .padding(.vertical, 8)
-                            .background(Color(.systemBackground))
+                            CardSearchGameSectionHeader(
+                                tcg: tcg,
+                                displayName: tcgCards.first?.tcgDisplayName ?? tcg.uppercased(),
+                                cardCount: tcgCards.count
+                            )
                         }
                     } else {
                         cardsGrid(tcgCards)
@@ -91,6 +84,45 @@ struct CardSearchResultsList: View {
                 )
             }
         }
+    }
+}
+
+private struct CardSearchGameSectionHeader: View {
+    let tcg: String
+    let displayName: String
+    let cardCount: Int
+
+    private var game: TCGGame? {
+        TCGGame(rawValue: tcg.lowercased())
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let game {
+                TCGGameIcon(game: game, size: 13)
+                    .foregroundStyle(game.brandColor)
+            }
+
+            Text(displayName)
+                .font(.subheadline.weight(.semibold))
+
+            Divider()
+                .frame(height: 14)
+
+            Text("\(cardCount) cards")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .glassEffect(
+            .regular.tint((game?.brandColor ?? .accentColor).opacity(0.08)),
+            in: .capsule
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(displayName), \(cardCount) cards")
     }
 }
 

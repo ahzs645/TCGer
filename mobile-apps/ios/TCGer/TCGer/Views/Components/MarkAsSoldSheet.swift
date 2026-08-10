@@ -11,7 +11,7 @@ struct MarkAsSoldSheet: View {
     private let platforms = ["", "TCGPlayer", "CardMarket", "eBay", "Local", "Other"]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     HStack(spacing: 12) {

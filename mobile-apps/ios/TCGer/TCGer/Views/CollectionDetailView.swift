@@ -133,33 +133,50 @@ struct CollectionDetailView: View {
 
     var body: some View {
         ZStack {
-            NavigationView {
+            NavigationStack {
                 ZStack {
                     Color(.systemBackground)
                         .ignoresSafeArea()
 
-                    List {
-                        Section {
-                            VStack(alignment: .leading, spacing: 8) {
-                                if isEditing {
-                                    InlineNameDescriptionColorEditor(
-                                        namePlaceholder: "Binder Name",
-                                        name: $editedName,
-                                        description: $editedDescription,
-                                        selectedColor: $selectedColor,
-                                        nameFont: .title
-                                    )
-                                    HStack {
-                                        Text("Default Condition")
-                                            .font(.subheadline)
-                                        Spacer()
-                                        ConditionPicker(
-                                            selection: $editedDefaultCondition,
-                                            includeUnspecified: true
-                                        )
-                                        .labelsHidden()
-                                    }
-                                } else {
+                    VStack(spacing: 0) {
+                        if !isEditing {
+                            CollectionFilterBar(
+                                showFilters: $showFilters,
+                                sortOption: $sortOption,
+                                selectedTagFilters: $selectedTagFilters,
+                                selectedConditionFilters: $selectedConditionFilters,
+                                minPriceFilter: $minPriceFilter,
+                                maxPriceFilter: $maxPriceFilter,
+                                tagOptions: binderTagOptions,
+                                conditionOptions: binderConditionOptions,
+                                hasActiveFilters: hasActiveFilters,
+                                onClearAll: clearFilters
+                            )
+                            .padding(.horizontal)
+
+                            Divider()
+                        }
+
+                        List {
+                        if isEditing {
+                            NameDescriptionColorSections(
+                                namePlaceholder: "Binder Name",
+                                name: $editedName,
+                                description: $editedDescription,
+                                selectedColor: $selectedColor
+                            )
+
+                            Section {
+                                ConditionPicker(
+                                    selection: $editedDefaultCondition,
+                                    includeUnspecified: true
+                                )
+                            } header: {
+                                Text("Default Condition")
+                            }
+                        } else {
+                            Section {
+                                VStack(alignment: .leading, spacing: 8) {
                                     Text(collection.name)
                                         .font(.title)
                                         .fontWeight(.bold)
@@ -182,11 +199,11 @@ struct CollectionDetailView: View {
                                         .foregroundColor(.secondary)
                                     }
                                 }
+                                .padding()
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color(.systemBackground))
                             }
-                            .padding()
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color(.systemBackground))
                         }
 
                         Section {
@@ -197,24 +214,6 @@ struct CollectionDetailView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                             .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color(.systemBackground))
-                        }
-
-                        Section {
-                            CollectionFilterBar(
-                                showFilters: $showFilters,
-                                sortOption: $sortOption,
-                                selectedTagFilters: $selectedTagFilters,
-                                selectedConditionFilters: $selectedConditionFilters,
-                                minPriceFilter: $minPriceFilter,
-                                maxPriceFilter: $maxPriceFilter,
-                                tagOptions: binderTagOptions,
-                                conditionOptions: binderConditionOptions,
-                                hasActiveFilters: hasActiveFilters,
-                                onClearAll: clearFilters
-                            )
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color(.systemBackground))
                         }
@@ -327,9 +326,14 @@ struct CollectionDetailView: View {
                             .listRowBackground(Color(.systemBackground))
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .searchable(text: $searchText, prompt: "Search cards, sets, or codes")
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .searchable(
+                            text: $searchText,
+                            placement: .navigationBarDrawer(displayMode: .always),
+                            prompt: "Search cards, sets, or codes"
+                        )
+                    }
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -392,10 +396,14 @@ struct CollectionDetailView: View {
                     }
                 }
                 .task {
+                    BinderAccessLog.recordOpen(collection.id)
                     await loadAvailableTags()
                 }
                 .sheet(isPresented: $showingAddCard) {
-                    AddCardToBinderFromSearchView(binderId: collection.id)
+                    AddCardToBinderFromSearchView(binderId: collection.id) { destinationBinderId in
+                        guard destinationBinderId == collection.id else { return }
+                        await reloadBinderCards()
+                    }
                 }
                 .sheet(isPresented: $showingBinderPages) {
                     BinderPagesView(collection: workingCollectionSnapshot)
@@ -1111,7 +1119,7 @@ private struct CopySelectionSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 if copies.isEmpty {
                     Text("No individual copies available for editing.")
