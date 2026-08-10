@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { handleDemoRequest } from "./demo-adapter";
 import { useDemoStore } from "@/stores/demo-store";
+import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
 
 test("returns only supported data sources for the demo settings screen", async () => {
   const response = await handleDemoRequest("GET", "/settings/source-defaults");
@@ -46,7 +47,10 @@ test("lists collection guides and follows one idempotently", async () => {
     slug: string;
     followed: boolean;
   }>;
-  assert.equal(guides.length, 3);
+  assert.equal(guides.length, systemGuideDefinitions.length);
+  assert.ok(guides.some((guide) => guide.slug === "pokemon-delta-species"));
+  assert.ok(guides.some((guide) => guide.slug === "magic-showcase"));
+  assert.ok(guides.some((guide) => guide.slug === "yugioh-ghost-rares"));
 
   const first = await handleDemoRequest(
     "POST",

@@ -593,11 +593,12 @@ function easeInCubic(t: number): number {
   return t * t * t;
 }
 
+// kept subtle: the additive holo shine must never wash out the card art
 function holoIntensityFor(card: PulledCard): number {
   const rank = tierRank(card.tier);
-  if (rank >= 4) return 0.85; // chase
-  if (rank >= 3) return 0.6; // ultra
-  if (rank >= 2) return 0.35; // rare / holo
+  if (rank >= 4) return 0.45; // chase
+  if (rank >= 3) return 0.3; // ultra
+  if (rank >= 2) return 0.18; // rare / holo
   return 0;
 }
 
@@ -622,22 +623,24 @@ interface FoilMaterialProps {
   map: THREE.Texture;
   normalMap: THREE.Texture;
   materialRef?: (mat: THREE.MeshPhysicalMaterial | null) => void;
+  /** pitched slats face the bright env "ceiling" — dim them or they blow out */
+  dim?: boolean;
 }
 
-function FoilMaterial({ map, normalMap, materialRef }: FoilMaterialProps) {
+function FoilMaterial({ map, normalMap, materialRef, dim = false }: FoilMaterialProps) {
   return (
     <meshPhysicalMaterial
       ref={materialRef}
       map={map}
       normalMap={normalMap}
       normalScale={new THREE.Vector2(0.06, 0.06)}
-      metalness={0.45}
-      roughness={0.24}
-      clearcoat={0.9}
+      metalness={dim ? 0.3 : 0.45}
+      roughness={dim ? 0.45 : 0.24}
+      clearcoat={dim ? 0.3 : 0.9}
       clearcoatRoughness={0.2}
-      iridescence={0.25}
+      iridescence={dim ? 0 : 0.25}
       iridescenceIOR={1.3}
-      envMapIntensity={0.9}
+      envMapIntensity={dim ? 0.35 : 0.9}
       transparent
       alphaTest={0.02}
     />
@@ -1314,6 +1317,7 @@ export function PackExperience({
                     map={wrapperFrontTex}
                     normalMap={normalTex}
                     materialRef={registerWrapperMaterial}
+                    dim={i !== 0}
                   />
                 </mesh>
                 <mesh
@@ -1325,6 +1329,7 @@ export function PackExperience({
                     map={wrapperBackTex}
                     normalMap={normalTex}
                     materialRef={registerWrapperMaterial}
+                    dim={i !== 0}
                   />
                 </mesh>
                 {[-1, 1].map((side) => (
@@ -1386,6 +1391,7 @@ export function PackExperience({
                     map={wrapperFrontTex}
                     normalMap={normalTex}
                     materialRef={registerWrapperMaterial}
+                    dim={i !== 0}
                   />
                 </mesh>
                 <mesh
@@ -1397,6 +1403,7 @@ export function PackExperience({
                     map={wrapperBackTex}
                     normalMap={normalTex}
                     materialRef={registerWrapperMaterial}
+                    dim={i !== 0}
                   />
                 </mesh>
                 {i === 0 && (

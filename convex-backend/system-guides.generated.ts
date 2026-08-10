@@ -37,7 +37,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.art.crochet",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 42
   },
   {
     "slug": "every-ditto",
@@ -55,7 +56,8 @@ export const systemGuideDefinitions = [
     "ruleType": "name",
     "ruleQuery": "Ditto",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 30
   },
   {
     "slug": "pokemon-delta-species",
@@ -75,7 +77,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.delta-species",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
-    "cardCountHint": 190
+    "cardCountHint": 194
   },
   {
     "slug": "pokemon-dark",
@@ -93,7 +95,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.dark",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 131
   },
   {
     "slug": "pokemon-light",
@@ -111,7 +114,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.light",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 22
   },
   {
     "slug": "pokemon-shining",
@@ -129,7 +133,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.shining",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 20
   },
   {
     "slug": "pokemon-gold-star",
@@ -147,7 +152,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.gold-star",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 32
   },
   {
     "slug": "pokemon-prism-star",
@@ -164,7 +170,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.prism-star",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 35
   },
   {
     "slug": "pokemon-amazing",
@@ -181,7 +188,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.amazing",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 9
   },
   {
     "slug": "pokemon-radiant",
@@ -199,7 +207,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.radiant",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 22
   },
   {
     "slug": "pokemon-prime",
@@ -217,7 +226,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.prime",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 27
   },
   {
     "slug": "pokemon-legend",
@@ -235,7 +245,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.legend",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 18
   },
   {
     "slug": "pokemon-lv-x",
@@ -253,7 +264,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.lv-x",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 92
   },
   {
     "slug": "pokemon-break",
@@ -270,7 +282,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.break",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 38
   },
   {
     "slug": "pokemon-restored",
@@ -288,7 +301,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.restored",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 13
   },
   {
     "slug": "pokemon-mega",
@@ -305,7 +319,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.mega",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 94
   },
   {
     "slug": "pokemon-ex-lowercase",
@@ -322,7 +337,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.ex",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 1437
   },
   {
     "slug": "pokemon-ex-uppercase",
@@ -339,7 +355,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.ex-uppercase",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 954
   },
   {
     "slug": "pokemon-gx",
@@ -356,7 +373,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.gx",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 629
   },
   {
     "slug": "pokemon-tag-team",
@@ -374,7 +392,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.tag-team",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 107
   },
   {
     "slug": "pokemon-v-family",
@@ -391,7 +410,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.v",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 745
   },
   {
     "slug": "pokemon-vmax",
@@ -408,7 +428,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.vmax",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 214
   },
   {
     "slug": "pokemon-vstar",
@@ -425,7 +446,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.vstar",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 102
   },
   {
     "slug": "pokemon-v-union",
@@ -443,7 +465,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.v-union",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 20
   },
   {
     "slug": "pokemon-ace-spec",
@@ -460,7 +483,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.ace-spec",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 38
   },
   {
     "slug": "pokemon-illustration-rares",
@@ -478,7 +502,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.illustration-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 493
   },
   {
     "slug": "pokemon-special-illustration-rares",
@@ -496,7 +521,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.special-illustration-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 222
   },
   {
     "slug": "pokemon-trainer-gallery",
@@ -513,7 +539,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.trainer-gallery",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 120
   },
   {
     "slug": "pokemon-galarian-gallery",
@@ -531,7 +558,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "pokemon.galarian-gallery",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 70
   },
   {
     "slug": "pokemon-crown-zenith-connected-art",
@@ -569,7 +597,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "magic.showcase",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 3099
   },
   {
     "slug": "magic-borderless",
@@ -586,7 +615,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "magic.borderless",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 8775
   },
   {
     "slug": "magic-full-art",
@@ -603,7 +633,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "magic.full-art",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 6308
   },
   {
     "slug": "magic-extended-art",
@@ -620,7 +651,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "magic.extended-art",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 4210
   },
   {
     "slug": "magic-serialized",
@@ -637,7 +669,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "magic.serialized",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 299
   },
   {
     "slug": "yugioh-ghost-rares",
@@ -654,7 +687,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "yugioh.ghost-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 54
   },
   {
     "slug": "yugioh-ultimate-rares",
@@ -671,7 +705,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "yugioh.ultimate-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 1173
   },
   {
     "slug": "yugioh-starlight-rares",
@@ -688,7 +723,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "yugioh.starlight-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 559
   },
   {
     "slug": "yugioh-quarter-century",
@@ -705,7 +741,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "yugioh.quarter-century-secret-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 1045
   },
   {
     "slug": "yugioh-lost-art",
@@ -723,7 +760,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "yugioh.lost-art",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 138
   },
   {
     "slug": "lorcana-enchanted",
@@ -741,7 +779,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.enchanted",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 224
   },
   {
     "slug": "lorcana-epic",
@@ -758,7 +797,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.epic",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 90
   },
   {
     "slug": "lorcana-iconic",
@@ -775,7 +815,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.iconic",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 10
   },
   {
     "slug": "lorcana-floodborn",
@@ -792,7 +833,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.classification.floodborn",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 296
   },
   {
     "slug": "lorcana-princesses",
@@ -809,7 +851,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.classification.princess",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 234
   },
   {
     "slug": "lorcana-villains",
@@ -826,7 +869,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "lorcana.classification.villain",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 387
   },
   {
     "slug": "onepiece-treasure-rares",
@@ -844,7 +888,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "onepiece.treasure-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 8
   },
   {
     "slug": "onepiece-special-rares",
@@ -862,7 +907,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "onepiece.special-rare",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 102
   },
   {
     "slug": "onepiece-leaders",
@@ -879,7 +925,8 @@ export const systemGuideDefinitions = [
     "ruleType": "tag",
     "ruleQuery": "onepiece.leader",
     "includeAllPrintings": true,
-    "matchAnyPrinting": false
+    "matchAnyPrinting": false,
+    "cardCountHint": 287
   },
   {
     "slug": "dragonball-secret-rares",

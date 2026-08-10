@@ -104,6 +104,19 @@ final class CatalogSearchTests: XCTestCase {
         )
     }
 
+    func testCanonicalCollectionTagsSupportExactOfflineGuideSearch() async throws {
+        let fixture = try await makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+
+        let entries = fixture.store.cards(tagged: "pokemon.art.clay", tcg: .pokemon)
+        XCTAssertEqual(entries.map(\.card.id), ["lucario-v"])
+        XCTAssertEqual(
+            fixture.store.card(from: try XCTUnwrap(entries.first))
+                .attributes?["collection_tags"],
+            .array([.string("pokemon.art.clay")])
+        )
+    }
+
     private func makeFixture() async throws -> Fixture {
         let pack = Data(
             #"""
@@ -123,7 +136,7 @@ final class CatalogSearchTests: XCTestCase {
               ],
               "cards": [
                 {"id":"mega-lucario","name":"Mega Lucario","setCode":"tk-dp-l","collectorNumber":"13"},
-                {"id":"lucario-v","name":"Lucario V","setCode":"tk-dp-l","collectorNumber":"4"},
+                {"id":"lucario-v","name":"Lucario V","setCode":"tk-dp-l","collectorNumber":"4","collectionTags":["pokemon.art.clay"]},
                 {"id":"tk-dp-l-3","name":"Lucario","setCode":"tk-dp-l","collectorNumber":"3","rarity":"Promo"},
                 {"id":"lukario-trick","name":"Lukario's Trick","setCode":"tk-dp-l","collectorNumber":"7"}
               ]

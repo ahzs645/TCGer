@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Card, TcgCode } from '@tcg/api-types';
@@ -19,6 +20,7 @@ interface CatalogCard {
   id: string;
   name: string;
   setCode?: string;
+  setName?: string;
   collectorNumber?: string;
   rarity?: string;
   artist?: string;
@@ -42,7 +44,10 @@ interface CatalogPack {
 const loadedPacks = new Map<TcgCode, Promise<CatalogPack | undefined>>();
 
 function catalogDirectory(): string {
-  return resolve(process.env.CATALOG_DATA_DIR ?? resolve(process.cwd(), '../data/catalog'));
+  if (process.env.CATALOG_DATA_DIR) return resolve(process.env.CATALOG_DATA_DIR);
+  const fromRepositoryRoot = resolve(process.cwd(), 'data/catalog');
+  if (existsSync(resolve(fromRepositoryRoot, 'manifest.json'))) return fromRepositoryRoot;
+  return resolve(process.cwd(), '../data/catalog');
 }
 
 async function loadPack(tcg: TcgCode): Promise<CatalogPack | undefined> {
@@ -93,7 +98,7 @@ function mapCard(tcg: TcgCode, card: CatalogCard, set?: CatalogSet): Card {
     tcg,
     name: card.name,
     setCode: card.setCode,
-    setName: set?.name,
+    setName: set?.name ?? card.setName,
     rarity: card.rarity,
     artist: card.artist,
     collectorNumber: card.collectorNumber,

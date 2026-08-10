@@ -42,6 +42,7 @@ interface CatalogCard {
   id: string;
   name: string;
   setCode?: string;
+  setName?: string;
   collectorNumber?: string;
   rarity?: string;
   artist?: string;
@@ -764,47 +765,72 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
   const sets = new Map<string, CatalogSet>();
 
   for (const card of sourceCards) {
-    const printingSet = card.card_sets?.[0];
-    const image = card.card_images?.[0];
-    const artworkId = image?.id !== undefined ? String(image.id) : undefined;
-    const setCode = printingSet
-      ? (extractYugiohSetPrefix(printingSet.set_code) ??
-        canonicalizeYugiohSetCode(printingSet.set_code))
+    const primaryArtworkId = card.card_images?.[0]?.id !== undefined
+      ? String(card.card_images[0]!.id)
       : undefined;
-    const imageId = Number(artworkId ?? card.id);
-    const id = buildYugiohPrintingKey({
-      baseExternalId: String(card.id),
-      setCode: printingSet?.set_code,
-      rarity: printingSet?.set_rarity,
-      artworkId,
-    });
+    const printings = card.card_sets?.length ? card.card_sets : [undefined];
+    for (const printingSet of printings) {
+      const setCode = printingSet
+        ? (extractYugiohSetPrefix(printingSet.set_code) ??
+          canonicalizeYugiohSetCode(printingSet.set_code))
+        : undefined;
+      const imageId = Number(primaryArtworkId ?? card.id);
+      const id = buildYugiohPrintingKey({
+        baseExternalId: String(card.id),
+        setCode: printingSet?.set_code,
+        rarity: printingSet?.set_rarity,
+        artworkId: primaryArtworkId,
+      });
 
-    cards.push(taggedCard('yugioh', {
-      id,
-      name: card.name,
-      setCode,
-      collectorNumber: printingSet ? extractYugiohCollectorNumber(printingSet.set_code) : undefined,
-      rarity: printingSet?.set_rarity,
-      type: card.type,
-      race: card.race,
-      atk: card.atk,
-      def: card.def,
-      level: card.level,
-      archetype: card.archetype,
-      konamiId: Number.isFinite(imageId) ? imageId : card.id,
-    }));
+      cards.push(taggedCard('yugioh', {
+        id,
+        name: card.name,
+        setCode,
+        setName: printingSet?.set_name,
+        collectorNumber: printingSet ? extractYugiohCollectorNumber(printingSet.set_code) : undefined,
+        rarity: printingSet?.set_rarity,
+        type: card.type,
+        race: card.race,
+        atk: card.atk,
+        def: card.def,
+        level: card.level,
+        archetype: card.archetype,
+        konamiId: Number.isFinite(imageId) ? imageId : card.id,
+      }));
 
-    if (setCode && printingSet) {
-      const existingSet = sets.get(setCode);
-      if (existingSet) {
-        existingSet.count += 1;
-      } else {
-        sets.set(setCode, {
-          code: setCode,
-          name: printingSet.set_name,
-          count: 1,
-        });
+      if (setCode && printingSet) {
+        const existingSet = sets.get(setCode);
+        if (existingSet) {
+          existingSet.count += 1;
+        } else {
+          sets.set(setCode, {
+            code: setCode,
+            name: printingSet.set_name,
+            count: 1,
+          });
+        }
       }
+    }
+
+    for (const alternateImage of card.card_images?.slice(1) ?? []) {
+      const artworkId = alternateImage.id !== undefined ? String(alternateImage.id) : undefined;
+      if (!artworkId) continue;
+      const imageId = Number(artworkId);
+      cards.push(taggedCard('yugioh', {
+        id: buildYugiohPrintingKey({
+          baseExternalId: String(card.id),
+          artworkId,
+        }),
+        name: card.name,
+        type: card.type,
+        race: card.race,
+        atk: card.atk,
+        def: card.def,
+        level: card.level,
+        archetype: card.archetype,
+        variants: ['alternate-art'],
+        konamiId: Number.isFinite(imageId) ? imageId : card.id,
+      }));
     }
   }
 
@@ -844,11 +870,19 @@ async function buildOnePiecePack(updatedAt: string, limit?: number): Promise<Cat
   const sets = new Map<string, CatalogSet>();
 
   for (const card of selectedCards) {
-    const id = card.card_image_id ?? card.card_set_id;
+    const baseId = card.card_image_id ?? card.card_set_id;
     const name = card.card_name?.trim();
-    if (!id || !name) continue;
+    if (!baseId || !name) continue;
     const setCode = onePieceSetCode(card.set_id);
     const imageUrl = card.card_image?.trim() || undefined;
+    const imageToken = imageUrl
+      ?.split('/')
+      .at(-1)
+      ?.split('?', 1)[0]
+      ?.replace(/\.[^.]+$/, '');
+    const id = ['onepiece', setCode ?? 'unknown', imageToken ?? baseId]
+      .map((part) => encodeURIComponent(part))
+      .join(':');
     cards.push(taggedCard('onepiece', {
       id,
       name,

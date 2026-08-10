@@ -62,11 +62,21 @@ function addPokemonTags(tags: Set<string>, card: CollectionTagInput) {
   if (/^Light\s/.test(name)) tags.add('pokemon.light');
   if (/^Shining\s/.test(name)) tags.add('pokemon.shining');
   if (/^Radiant\s/.test(name) || rarity === 'radiant-rare') tags.add('pokemon.radiant');
-  if (/[★☆]/.test(name)) tags.add('pokemon.gold-star');
-  if (/◇\s*$/.test(name)) tags.add('pokemon.prism-star');
+  if (/[★☆]/.test(name) || (/ Star(?: δ)?$/.test(name) && !/Prism Star$/.test(name))) {
+    tags.add('pokemon.gold-star');
+  }
+  if (/◇\s*$/.test(name) || /Prism Star$/.test(name)) tags.add('pokemon.prism-star');
 
   if (rawSuffix === 'EX') tags.add('pokemon.ex-uppercase');
   if (rawSuffix === 'ex') tags.add('pokemon.ex');
+  if (/(?:-| )EX$/.test(name)) tags.add('pokemon.ex-uppercase');
+  if (/(?:-| )ex$/.test(name)) tags.add('pokemon.ex');
+  if (/(?:-| )GX$/.test(name)) tags.add('pokemon.gx');
+  if (/ V$/.test(name)) tags.add('pokemon.v');
+  if (/ VMAX$/.test(name)) tags.add('pokemon.vmax');
+  if (/ VSTAR$/.test(name)) tags.add('pokemon.vstar');
+  if (/ BREAK$/.test(name)) tags.add('pokemon.break');
+  if (/ LV\.X$/.test(name)) tags.add('pokemon.lv-x');
 
   const suffixTags: Record<string, string> = {
     gx: 'pokemon.gx',
@@ -194,6 +204,7 @@ function addOnePieceTags(tags: Set<string>, card: CollectionTagInput) {
     pr: 'onepiece.promo',
   };
   if (rarityAliases[rarity]) tags.add(rarityAliases[rarity]!);
+  if (/\(SP\)\s*$/.test(card.name)) tags.add('onepiece.special-rare');
   const type = collectionTagSlug(card.type ?? '');
   if (type.includes('don')) tags.add('onepiece.don');
 }

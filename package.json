@@ -31,6 +31,8 @@
     "build": "turbo build",
     "build:marketing": "npm --prefix marketing-site run build",
     "catalogs:build": "tsx backend/src/scripts/build-catalog-packs.ts --sync",
+    "guides:sync": "node tools/guides/sync-system-guides.mjs",
+    "guides:validate": "node tools/guides/validate-system-guides.mjs",
     "pokemon:import-rarity-vectors": "node tools/pokemon/import-rarity-vectors.mjs",
     "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
     "lint": "turbo lint",

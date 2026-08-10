@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import { createTestConvex } from "./test.setup";
+import { systemGuideDefinitions } from "../system-guides.generated";
 
 describe("collection guides", () => {
   test("seeds connected art and follows it as exact curated cards", async () => {
@@ -10,7 +11,9 @@ describe("collection guides", () => {
     await t.mutation(internal.guides.seedSystemGuides, {});
 
     const guides = await t.query(internal.guides.listPublished, { subject });
-    expect(guides).toHaveLength(3);
+    expect(guides).toHaveLength(systemGuideDefinitions.length);
+    expect(guides.find((guide) => guide.slug === "pokemon-delta-species")?.rule)
+      .toMatchObject({ type: "tag", query: "pokemon.delta-species" });
     const connected = guides.find(
       (guide) => guide.slug === "pokemon-crown-zenith-connected-art",
     );

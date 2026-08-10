@@ -7,7 +7,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { tcgCodeValidator } from "./lib/validators";
-import { systemGuideDefinitions } from "./data/systemGuides";
+import { systemGuideDefinitions } from "../system-guides.generated";
 
 const guideCategoryValidator = v.union(
   v.literal("art-style"),
