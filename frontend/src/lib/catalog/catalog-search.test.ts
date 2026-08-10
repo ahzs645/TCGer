@@ -122,3 +122,15 @@ test("maps a World Championship catalog row as an exact replica printing", () =>
   assert.equal(mapped.pokemonPrint?.worldChampionship?.playerName, "Yuya Okita");
   assert.deepEqual(mapped.pokemonPrint?.finishes, ["normal"]);
 });
+
+test("preserves illustrator credit for offline artist guides", () => {
+  const mapped = catalogCardToCard("pokemon", {
+    id: "sm6-1",
+    name: "Exeggcute",
+    setCode: "sm6",
+    artist: "Yuka Morii",
+  });
+
+  assert.equal(mapped.artist, "Yuka Morii");
+  assert.equal(mapped.attributes?.artist, "Yuka Morii");
+});

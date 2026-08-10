@@ -1,14 +1,14 @@
-import { z } from 'zod';
-import { tcgCodeSchema, type TcgCode } from './cards';
-import { wishlistRuleTypeSchema, type WishlistRuleType } from './wishlists';
+import { z } from "zod";
+import { tcgCodeSchema, type TcgCode } from "./cards";
+import { wishlistRuleTypeSchema, type WishlistRuleType } from "./wishlists";
 
 export const guideCategorySchema = z.enum([
-  'art-style',
-  'artist',
-  'species',
-  'story',
-  'cameo',
-  'custom'
+  "art-style",
+  "artist",
+  "species",
+  "story",
+  "cameo",
+  "custom",
 ]);
 export type GuideCategory = z.infer<typeof guideCategorySchema>;
 
@@ -46,7 +46,8 @@ export interface FollowCollectionGuideResponse {
 }
 
 export const followCollectionGuideSchema = z.object({
-  wishlistName: z.string().trim().min(1).optional()
+  wishlistName: z.string().trim().min(1).optional(),
 });
-export type FollowCollectionGuideInput = z.infer<typeof followCollectionGuideSchema>;
-
+export type FollowCollectionGuideInput = z.infer<
+  typeof followCollectionGuideSchema
+>;

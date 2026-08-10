@@ -129,14 +129,14 @@ iOS asset names `PokemonCardBack` / `MagicCardBack` / `YugiohCardBack`
 
 ## Sources & expected sizes
 
-| game    | source                                                               | cards             | pack raw |
-| ------- | -------------------------------------------------------------------- | ----------------- | -------- |
-| pokemon | tcgdex (`https://api.tcgdex.net/v2/en`)                              | ~23.4k            | ~5 MB    |
-| magic   | Scryfall bulk `default_cards` (~558 MB download, streamed + trimmed) | ~96k paper prints | ~15 MB   |
-| yugioh  | YGOPRODeck `cardinfo.php`                                            | ~14.5k            | ~4–8 MB  |
-| onepiece | OPTCG API set and starter-deck dumps                                | ~4k               | ~1.1 MB  |
-| lorcana | Lorcast per-set card endpoints                                       | ~3.2k             | ~1.1 MB  |
-| dragonball | API TCG Fusion World products (requires `APITCG_API_KEY`)          | provider-dependent | provider-dependent |
+| game       | source                                                               | cards              | pack raw           |
+| ---------- | -------------------------------------------------------------------- | ------------------ | ------------------ |
+| pokemon    | tcgdex (`https://api.tcgdex.net/v2/en`)                              | ~23.4k             | ~5 MB              |
+| magic      | Scryfall bulk `default_cards` (~558 MB download, streamed + trimmed) | ~96k paper prints  | ~15 MB             |
+| yugioh     | YGOPRODeck `cardinfo.php`                                            | ~14.5k             | ~4–8 MB            |
+| onepiece   | OPTCG API set and starter-deck dumps                                 | ~4k                | ~1.1 MB            |
+| lorcana    | Lorcast per-set card endpoints                                       | ~3.2k              | ~1.1 MB            |
+| dragonball | API TCG Fusion World products (requires `APITCG_API_KEY`)            | provider-dependent | provider-dependent |
 
 Magic includes every `default_cards` record whose `games` contains `paper`.
 Pure-digital records are excluded. Paper tokens, emblems, and art-series cards

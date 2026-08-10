@@ -8,13 +8,13 @@ jest.mock('../../config/env', () => ({
     LORCANA_API_BASE_URL: 'https://lorcana.example.test/api',
     APITCG_API_BASE_URL: 'https://apitcg.example.test',
     APITCG_API_KEY: undefined,
-    SCRYDEX_API_KEY: undefined
-  }
+    SCRYDEX_API_KEY: undefined,
+  },
 }));
 
 import type { TcgAdapter } from '../adapters/types';
 import { adapterRegistry } from '../adapters/adapter-registry';
-import { searchAllCards, searchCards } from './cards.service';
+import { searchAllCards, searchCards, searchCardsByArtist } from './cards.service';
 
 describe('cross-game card search', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -22,28 +22,28 @@ describe('cross-game card search', () => {
   test('returns successful provider results when another adapter fails', async () => {
     const successAdapter = {
       game: 'onepiece',
-      searchCards: jest.fn().mockResolvedValue([
-        { id: 'OP01-001', tcg: 'onepiece', name: 'Roronoa Zoro' }
-      ])
+      searchCards: jest
+        .fn()
+        .mockResolvedValue([{ id: 'OP01-001', tcg: 'onepiece', name: 'Roronoa Zoro' }]),
     } as unknown as TcgAdapter;
     const failedAdapter = {
       game: 'dragonball',
-      searchCards: jest.fn().mockRejectedValue(new Error('APITCG unavailable'))
+      searchCards: jest.fn().mockRejectedValue(new Error('APITCG unavailable')),
     } as unknown as TcgAdapter;
     jest.spyOn(adapterRegistry, 'list').mockReturnValue([successAdapter, failedAdapter]);
 
     await expect(searchCards({ query: 'hero', tcg: 'all' })).resolves.toEqual([
-      { id: 'OP01-001', tcg: 'onepiece', name: 'Roronoa Zoro' }
+      { id: 'OP01-001', tcg: 'onepiece', name: 'Roronoa Zoro' },
     ]);
   });
 
   test('preserves useful errors for a specific game search', async () => {
     const error = Object.assign(new Error('APITCG_API_KEY is required'), {
-      status: 503
+      status: 503,
     });
     jest.spyOn(adapterRegistry, 'get').mockReturnValue({
       game: 'dragonball',
-      searchCards: jest.fn().mockRejectedValue(error)
+      searchCards: jest.fn().mockRejectedValue(error),
     } as unknown as TcgAdapter);
 
     await expect(searchCards({ query: 'Goku', tcg: 'dragonball' })).rejects.toBe(error);
@@ -56,22 +56,22 @@ describe('cross-game card search', () => {
         if (providerQuery.toLowerCase() === 'mime') {
           return [
             { id: 'mr-mime', tcg: 'pokemon', name: 'Mr. Mime' },
-            { id: 'mime-jr', tcg: 'pokemon', name: 'Mime Jr.' }
+            { id: 'mime-jr', tcg: 'pokemon', name: 'Mime Jr.' },
           ];
         }
         return [];
       });
       jest.spyOn(adapterRegistry, 'get').mockReturnValue({
         game: 'pokemon',
-        searchCards: searchCardsMock
+        searchCards: searchCardsMock,
       } as unknown as TcgAdapter);
 
       await expect(searchCards({ query, tcg: 'pokemon' })).resolves.toEqual([
-        { id: 'mr-mime', tcg: 'pokemon', name: 'Mr. Mime' }
+        { id: 'mr-mime', tcg: 'pokemon', name: 'Mr. Mime' },
       ]);
       expect(searchCardsMock).toHaveBeenCalledWith(query);
       expect(searchCardsMock).toHaveBeenCalledWith('mime');
-    }
+    },
   );
 });
 
@@ -85,19 +85,19 @@ describe('exhaustive name search', () => {
     jest.spyOn(adapterRegistry, 'get').mockReturnValue({
       game: 'pokemon',
       searchCards: jest.fn(),
-      fetchCardsByName
+      fetchCardsByName,
     } as unknown as TcgAdapter);
 
     const results = await searchAllCards({
       query: 'darkrai',
       tcg: 'pokemon',
       unique: 'prints',
-      limit: 2
+      limit: 2,
     });
 
     expect(fetchCardsByName).toHaveBeenCalledWith('darkrai', {
       includeAllPrintings: true,
-      limit: 2
+      limit: 2,
     });
     expect(results).toHaveLength(2);
   });
@@ -107,14 +107,14 @@ describe('exhaustive name search', () => {
     jest.spyOn(adapterRegistry, 'get').mockReturnValue({
       game: 'pokemon',
       searchCards: jest.fn(),
-      fetchCardsByName
+      fetchCardsByName,
     } as unknown as TcgAdapter);
 
     await searchAllCards({ query: 'darkrai', tcg: 'pokemon', unique: 'cards', limit: 10 });
 
     expect(fetchCardsByName).toHaveBeenCalledWith('darkrai', {
       includeAllPrintings: false,
-      limit: 10
+      limit: 10,
     });
   });
 
@@ -122,14 +122,14 @@ describe('exhaustive name search', () => {
     const searchCardsMock = jest.fn().mockResolvedValue([card('a'), card('b')]);
     jest.spyOn(adapterRegistry, 'get').mockReturnValue({
       game: 'onepiece',
-      searchCards: searchCardsMock
+      searchCards: searchCardsMock,
     } as unknown as TcgAdapter);
 
     const results = await searchAllCards({
       query: 'zoro',
       tcg: 'onepiece',
       unique: 'prints',
-      limit: 50
+      limit: 50,
     });
 
     expect(searchCardsMock).toHaveBeenCalledWith('zoro');
@@ -140,17 +140,44 @@ describe('exhaustive name search', () => {
     const workingAdapter = {
       game: 'pokemon',
       searchCards: jest.fn(),
-      fetchCardsByName: jest.fn().mockResolvedValue([card('a')])
+      fetchCardsByName: jest.fn().mockResolvedValue([card('a')]),
     } as unknown as TcgAdapter;
     const brokenAdapter = {
       game: 'dragonball',
       searchCards: jest.fn(),
-      fetchCardsByName: jest.fn().mockRejectedValue(new Error('APITCG unavailable'))
+      fetchCardsByName: jest.fn().mockRejectedValue(new Error('APITCG unavailable')),
     } as unknown as TcgAdapter;
     jest.spyOn(adapterRegistry, 'list').mockReturnValue([workingAdapter, brokenAdapter]);
 
     await expect(
-      searchAllCards({ query: 'darkrai', unique: 'prints', limit: 100 })
+      searchAllCards({ query: 'darkrai', unique: 'prints', limit: 100 }),
     ).resolves.toEqual([card('a')]);
+  });
+});
+
+describe('artist search', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('uses exact adapter artist lookup with printing options', async () => {
+    const clayCards = [{ id: 'sm6-1', tcg: 'pokemon', name: 'Exeggcute', artist: 'Yuka Morii' }];
+    const fetchCardsByArtist = jest.fn().mockResolvedValue(clayCards);
+    jest.spyOn(adapterRegistry, 'get').mockReturnValue({
+      game: 'pokemon',
+      searchCards: jest.fn(),
+      fetchCardsByArtist,
+    } as unknown as TcgAdapter);
+
+    await expect(
+      searchCardsByArtist({
+        artist: 'Yuka Morii',
+        tcg: 'pokemon',
+        unique: 'prints',
+        limit: 500,
+      }),
+    ).resolves.toEqual(clayCards);
+    expect(fetchCardsByArtist).toHaveBeenCalledWith('Yuka Morii', {
+      includeAllPrintings: true,
+      limit: 500,
+    });
   });
 });

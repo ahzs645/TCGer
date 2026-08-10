@@ -36,7 +36,15 @@ private struct PokemonRarityArtworkView: View {
         guard let artwork = PokemonRarityArtworkCatalog.artwork(for: rarity) else {
             return []
         }
-        return [artwork.vectorFilename].compactMap(Self.resourceURL)
+
+        var urls: [URL] = []
+        if let localURL = Self.resourceURL(for: artwork.vectorFilename) {
+            urls.append(localURL)
+        }
+        if let remoteURL = Self.remoteURL(for: artwork.vectorFilename) {
+            urls.append(remoteURL)
+        }
+        return urls
     }
 
     private var artworkURL: URL? {
@@ -87,5 +95,14 @@ private struct PokemonRarityArtworkView: View {
             }
         }
         return Bundle.main.url(forResource: filename, withExtension: nil)
+    }
+
+    /// Content-addressed CDN fallback for a known rarity whose bundled SVG is
+    /// missing or cannot be decoded. Unknown rarity labels remain text-only so
+    /// the app never guesses at the wrong official symbol.
+    private static func remoteURL(for filename: String) -> URL? {
+        URL(
+            string: "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/\(filename)"
+        )
     }
 }

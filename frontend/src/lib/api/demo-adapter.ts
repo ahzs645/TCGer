@@ -30,12 +30,14 @@ import {
   getSets as getCatalogSets,
   normalizeCatalogText,
   searchCatalog,
+  searchCatalogByArtist,
 } from "@/lib/catalog/catalog-search";
 import type { TcgCode } from "@/types/card";
 import type {
   AddCardInput,
   AddWishlistCardInput,
   Card,
+  CollectionGuideResponse,
   CollectionCardCopy,
   CreateWishlistRuleInput,
   TcgSet,
@@ -84,6 +86,67 @@ function demoAuthUser() {
     isAdmin: true,
     ...getPreferences(),
   };
+}
+
+function demoCollectionGuides(): CollectionGuideResponse[] {
+  const definitions: Array<
+    Omit<CollectionGuideResponse, "followed" | "wishlistId">
+  > = [
+    {
+      id: "demo-guide-pokemon-clay-art",
+      slug: "pokemon-clay-art",
+      title: "The Clay Collection",
+      description:
+        "A living guide to English Pokémon cards illustrated by Yuka Morii, best known for hand-sculpted clay scenes.",
+      tcg: "pokemon",
+      category: "art-style",
+      coverImageUrl: "https://assets.tcgdex.net/en/sm/sm6/1/high.webp",
+      curatorName: "TCGer",
+      tags: ["Clay", "Sculpture", "Photography", "Yuka Morii"],
+      version: 1,
+      featured: true,
+      rule: {
+        type: "artist",
+        tcg: "pokemon",
+        query: "Yuka Morii",
+        includeAllPrintings: true,
+      },
+      cardCountHint: 224,
+    },
+    {
+      id: "demo-guide-every-ditto",
+      slug: "every-ditto",
+      title: "Every Ditto",
+      description:
+        "Every English Pokémon TCG printing named Ditto, kept current as new sets are released.",
+      tcg: "pokemon",
+      category: "species",
+      coverImageUrl: "https://assets.tcgdex.net/en/base/base3/3/high.webp",
+      curatorName: "TCGer",
+      tags: ["Ditto", "Pokémon", "Species Collection"],
+      version: 1,
+      featured: true,
+      rule: {
+        type: "name",
+        tcg: "pokemon",
+        query: "Ditto",
+        includeAllPrintings: true,
+      },
+      cardCountHint: 30,
+    },
+  ];
+  return definitions.map((guide) => {
+    const wishlist = store().wishlists.find((candidate) =>
+      (candidate.rules ?? []).some(
+        (rule) =>
+          rule.type === guide.rule.type &&
+          rule.tcg === guide.rule.tcg &&
+          rule.query === guide.rule.query &&
+          rule.setCode === guide.rule.setCode,
+      ),
+    );
+    return { ...guide, followed: Boolean(wishlist), wishlistId: wishlist?.id };
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -343,7 +406,9 @@ async function demoCatalogSets(tcg?: TcgCode): Promise<TcgSet[]> {
   const merged = new Map(
     results
       .flat()
-      .map((set) => [`${set.tcg}:${normalizeCatalogText(set.code)}`, set] as const),
+      .map(
+        (set) => [`${set.tcg}:${normalizeCatalogText(set.code)}`, set] as const,
+      ),
   );
   for (const set of demoOwnedSets(tcg)) {
     merged.set(`${set.tcg}:${normalizeCatalogText(set.code)}`, set);
@@ -401,6 +466,10 @@ export function handleDemoRequest(
     return handleWishlists(method, segments.slice(1), body);
   }
 
+  if (segments[0] === "guides") {
+    return handleGuides(method, segments.slice(1), body);
+  }
+
   // ── Users ───────────────────────────────────────────────────────
   if (segments[0] === "users") {
     return handleUsers(method, segments.slice(1), body);
@@ -429,6 +498,48 @@ export function handleDemoRequest(
   }
 
   return notFound(`Demo: unknown route ${method} ${path}`);
+}
+
+function handleGuides(
+  method: string,
+  segments: string[],
+  body?: unknown,
+): Promise<Response> {
+  store().init();
+  const guides = demoCollectionGuides();
+  if (segments.length === 0 && method === "GET") return json(guides);
+
+  const slug = decodeURIComponent(segments[0] ?? "");
+  const guide = guides.find((candidate) => candidate.slug === slug);
+  if (!guide) return notFound("Collection guide not found");
+  if (segments.length === 1 && method === "GET") return json(guide);
+
+  if (segments[1] === "follow" && segments.length === 2 && method === "POST") {
+    if (guide.wishlistId) {
+      return json({ guide, wishlistId: guide.wishlistId, created: false });
+    }
+    const name =
+      (body as { wishlistName?: string } | undefined)?.wishlistName?.trim() ||
+      guide.title;
+    const wishlistId = store().addWishlist(
+      name,
+      `Following the “${guide.title}” collection guide.`,
+    );
+    store().addWishlistRule(wishlistId, {
+      type: guide.rule.type,
+      tcg: guide.rule.tcg,
+      query: guide.rule.query,
+      setCode: guide.rule.setCode,
+      setName: guide.rule.setName,
+      includeAllPrintings: guide.rule.includeAllPrintings,
+      autoSync: true,
+    });
+    const followed = demoCollectionGuides().find(
+      (candidate) => candidate.slug === slug,
+    )!;
+    return json({ guide: followed, wishlistId, created: true }, 201);
+  }
+  return notFound();
 }
 
 /* ------------------------------------------------------------------ */
@@ -905,6 +1016,22 @@ async function handleCards(
   segments: string[],
   queryString?: string,
 ): Promise<Response> {
+  if (
+    segments[0] === "search" &&
+    segments[1] === "artist" &&
+    method === "GET"
+  ) {
+    const params = new URLSearchParams(queryString || "");
+    const artist = params.get("artist") || "";
+    const tcg = (params.get("tcg") || "pokemon") as CatalogTcgCode;
+    const limit = Number.parseInt(params.get("limit") || "1000", 10);
+    const cards =
+      isCatalogGame(tcg) && (await isCatalogInstalled(tcg))
+        ? await searchCatalogByArtist(artist, tcg, limit)
+        : [];
+    return json({ cards, total: cards.length });
+  }
+
   // GET /cards/sets?tcg=...
   if (segments[0] === "sets" && segments.length === 1 && method === "GET") {
     const params = new URLSearchParams(queryString || "");

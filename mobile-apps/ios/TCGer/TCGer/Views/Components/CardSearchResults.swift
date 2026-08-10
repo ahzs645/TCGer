@@ -189,30 +189,30 @@ struct CardSearchResultCell: View {
                     PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
                 }
 
-                Text(card.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(2)
+                HStack(alignment: .top, spacing: 4) {
+                    Text(card.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(2, reservesSpace: true)
 
-                if showCardNumbers,
-                   setDisplayName != nil || collectorNumberDisplay != nil {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        if let setDisplayName {
-                            Text(setDisplayName)
-                                .lineLimit(2)
-                        }
+                    Spacer(minLength: 0)
 
-                        Spacer(minLength: 0)
-
+                    if showCardNumbers {
                         if let collectorNumberDisplay {
                             Text(collectorNumberDisplay)
+                                .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.primary)
                                 .fixedSize()
                         }
                     }
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                }
+
+                if showCardNumbers {
+                    Text(setDisplayName ?? " ")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
 
                 // Pokemon TCG format legality & dex number

@@ -86,7 +86,11 @@ export function CollectionGuidesContent() {
     guidesQuery.data?.find((guide) => guide.slug === selectedSlug) ?? null;
 
   const cardsQuery = useQuery({
-    queryKey: ["collection-guide-cards", selectedGuide?.slug, selectedGuide?.version],
+    queryKey: [
+      "collection-guide-cards",
+      selectedGuide?.slug,
+      selectedGuide?.version,
+    ],
     queryFn: () => expandWishlistRule(token!, selectedGuide!.rule),
     enabled: Boolean(token && selectedGuide),
     staleTime: 10 * 60_000,
@@ -108,8 +112,11 @@ export function CollectionGuidesContent() {
 
   const setCodes = useMemo(
     () =>
-      [...new Set((cardsQuery.data ?? []).map((card) => card.setCode).filter(Boolean))]
-        .sort() as string[],
+      [
+        ...new Set(
+          (cardsQuery.data ?? []).map((card) => card.setCode).filter(Boolean),
+        ),
+      ].sort() as string[],
     [cardsQuery.data],
   );
 
@@ -135,7 +142,14 @@ export function CollectionGuidesContent() {
       }
       return true;
     });
-  }, [cardSearch, cardsQuery.data, followedWishlist, ownershipFilter, setFilter, wishlistCards]);
+  }, [
+    cardSearch,
+    cardsQuery.data,
+    followedWishlist,
+    ownershipFilter,
+    setFilter,
+    wishlistCards,
+  ]);
 
   async function handleFollow() {
     if (!token || !selectedGuide) return;
@@ -170,7 +184,8 @@ export function CollectionGuidesContent() {
         <CardHeader>
           <CardTitle>Sign in to explore collection guides</CardTitle>
           <CardDescription>
-            Guides compare against your collection and create synchronized wishlists.
+            Guides compare against your collection and create synchronized
+            wishlists.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -259,20 +274,28 @@ export function CollectionGuidesContent() {
               placeholder="Filter cards…"
             />
             <Select value={setFilter} onValueChange={setSetFilter}>
-              <SelectTrigger><SelectValue placeholder="All sets" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="All sets" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sets</SelectItem>
                 {setCodes.map((code) => (
-                  <SelectItem key={code} value={code}>{code}</SelectItem>
+                  <SelectItem key={code} value={code}>
+                    {code}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
               value={ownershipFilter}
-              onValueChange={(value) => setOwnershipFilter(value as OwnershipFilter)}
+              onValueChange={(value) =>
+                setOwnershipFilter(value as OwnershipFilter)
+              }
               disabled={!followedWishlist}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All cards</SelectItem>
                 <SelectItem value="owned">Owned</SelectItem>
@@ -300,7 +323,9 @@ export function CollectionGuidesContent() {
                 <GuideCard
                   key={`${card.tcg}:${card.id}`}
                   card={card}
-                  owned={wishlistCards.get(`${card.tcg}:${card.id}`)?.owned === true}
+                  owned={
+                    wishlistCards.get(`${card.tcg}:${card.id}`)?.owned === true
+                  }
                 />
               ))}
             </div>
@@ -329,7 +354,9 @@ function GuideListCard({
       type="button"
       onClick={onSelect}
       className={`w-full rounded-xl border p-4 text-left transition-colors ${
-        selected ? "border-primary bg-primary/10" : "bg-card hover:border-primary/50"
+        selected
+          ? "border-primary bg-primary/10"
+          : "bg-card hover:border-primary/50"
       }`}
     >
       <div className="mb-2 flex items-start justify-between gap-3">
@@ -341,7 +368,9 @@ function GuideListCard({
         {guide.description}
       </div>
       <div className="mt-3 text-xs text-muted-foreground">
-        {guide.cardCountHint ? `About ${guide.cardCountHint} cards` : guide.category}
+        {guide.cardCountHint
+          ? `About ${guide.cardCountHint} cards`
+          : guide.category}
       </div>
     </button>
   );
@@ -356,7 +385,11 @@ function GuideHero({
 }: {
   guide: CollectionGuideResponse;
   cardCount?: number;
-  wishlist?: { completionPercent: number; ownedCards: number; totalCards: number };
+  wishlist?: {
+    completionPercent: number;
+    ownedCards: number;
+    totalCards: number;
+  };
   isFollowing: boolean;
   onFollow: () => void;
 }) {
@@ -375,22 +408,37 @@ function GuideHero({
         </div>
         <div className="p-6">
           <div className="mb-3 flex flex-wrap gap-2">
-            {guide.tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+            {guide.tags.map((tag) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
+              </Badge>
+            ))}
           </div>
           <h2 className="text-3xl font-heading font-semibold">{guide.title}</h2>
-          <p className="mt-3 max-w-3xl text-muted-foreground">{guide.description}</p>
+          <p className="mt-3 max-w-3xl text-muted-foreground">
+            {guide.description}
+          </p>
           <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
-            <span>{cardCount ?? guide.cardCountHint ?? "—"} matching cards</span>
-            <span className="text-muted-foreground">Curated by {guide.curatorName}</span>
+            <span>
+              {cardCount ?? guide.cardCountHint ?? "—"} matching cards
+            </span>
+            <span className="text-muted-foreground">
+              Curated by {guide.curatorName}
+            </span>
           </div>
           {wishlist ? (
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Badge className="gap-1"><Check className="h-3.5 w-3.5" /> Following</Badge>
+              <Badge className="gap-1">
+                <Check className="h-3.5 w-3.5" /> Following
+              </Badge>
               <span className="text-sm">
-                {wishlist.ownedCards}/{wishlist.totalCards} owned · {wishlist.completionPercent}%
+                {wishlist.ownedCards}/{wishlist.totalCards} owned ·{" "}
+                {wishlist.completionPercent}%
               </span>
               <Button asChild variant="outline" size="sm">
-                <Link href="/wishlists"><Heart className="mr-2 h-4 w-4" /> Open wishlist</Link>
+                <Link href="/wishlists">
+                  <Heart className="mr-2 h-4 w-4" /> Open wishlist
+                </Link>
               </Button>
             </div>
           ) : (
@@ -429,9 +477,12 @@ function GuideCard({ card, owned }: { card: CardType; owned: boolean }) {
         )}
       </div>
       <CardContent className="p-3">
-        <div className="truncate text-sm font-medium" title={card.name}>{card.name}</div>
+        <div className="truncate text-sm font-medium" title={card.name}>
+          {card.name}
+        </div>
         <div className="mt-1 truncate text-xs text-muted-foreground">
-          {[card.setCode, card.collectorNumber].filter(Boolean).join(" · ") || card.artist}
+          {[card.setCode, card.collectorNumber].filter(Boolean).join(" · ") ||
+            card.artist}
         </div>
       </CardContent>
     </Card>
@@ -441,7 +492,11 @@ function GuideCard({ card, owned }: { card: CardType; owned: boolean }) {
 function GuideSkeleton() {
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <div className="space-y-3">{[0, 1, 2].map((id) => <Skeleton key={id} className="h-32" />)}</div>
+      <div className="space-y-3">
+        {[0, 1, 2].map((id) => (
+          <Skeleton key={id} className="h-32" />
+        ))}
+      </div>
       <Skeleton className="h-[520px]" />
     </div>
   );

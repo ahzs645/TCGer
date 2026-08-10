@@ -53,4 +53,3 @@ when a guide's definition or curation changes. For a query-driven guide, add the
 metadata and rule to the seed. For connected art, add ordered
 `collectionGuideItems` and expose a manual-item rule in the guide resolver before
 publishing it.
-

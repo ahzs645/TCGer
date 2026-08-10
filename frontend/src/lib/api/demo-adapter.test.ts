@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleDemoRequest } from "./demo-adapter";
+import { useDemoStore } from "@/stores/demo-store";
 
 test("returns only supported data sources for the demo settings screen", async () => {
   const response = await handleDemoRequest("GET", "/settings/source-defaults");
@@ -36,4 +37,45 @@ test("validates demo source connectivity requests", async () => {
   assert.equal(valid.status, 200);
   assert.deepEqual(await valid.json(), { ok: true, latencyMs: 0 });
   assert.equal(invalid.status, 400);
+});
+
+test("lists collection guides and follows one idempotently", async () => {
+  useDemoStore.persist.setOptions({
+    storage: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    },
+  });
+  const list = await handleDemoRequest("GET", "/guides");
+  const guides = (await list.json()) as Array<{
+    slug: string;
+    followed: boolean;
+  }>;
+  assert.equal(guides.length, 2);
+
+  const first = await handleDemoRequest(
+    "POST",
+    "/guides/pokemon-clay-art/follow",
+    {},
+  );
+  assert.equal(first.status, 201);
+  const followed = (await first.json()) as {
+    wishlistId: string;
+    guide: { followed: boolean };
+  };
+  assert.equal(followed.guide.followed, true);
+
+  const second = await handleDemoRequest(
+    "POST",
+    "/guides/pokemon-clay-art/follow",
+    {},
+  );
+  const repeated = (await second.json()) as {
+    wishlistId: string;
+    created: boolean;
+  };
+  assert.equal(second.status, 200);
+  assert.equal(repeated.created, false);
+  assert.equal(repeated.wishlistId, followed.wishlistId);
 });

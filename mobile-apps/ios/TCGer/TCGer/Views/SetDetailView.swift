@@ -780,7 +780,7 @@ private struct SetCardCell: View {
                 Text(card.name)
                     .font(.caption)
                     .fontWeight(.medium)
-                    .lineLimit(2)
+                    .lineLimit(2, reservesSpace: true)
 
                 if let collectorNumber = card.collectorNumber {
                     Text("#\(collectorNumber)")

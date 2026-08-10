@@ -9,4 +9,3 @@ convexGuidesRouter.use(requireAuth);
 convexGuidesRouter.use((req, res, next) => {
   proxyToConvexHttp(req as AuthRequest, res).catch(next);
 });
-

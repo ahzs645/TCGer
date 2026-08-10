@@ -7,7 +7,10 @@ import type {
 import { API_BASE_URL } from "./base-url";
 
 function headers(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
 }
 
 async function readJson<T>(response: Response, fallback: string): Promise<T> {
@@ -44,4 +47,3 @@ export async function followCollectionGuide(
   );
   return readJson(response, "Failed to follow collection guide");
 }
-
