@@ -163,6 +163,17 @@ nonisolated struct CardCropper {
         return ([fallbackBox], nil)
     }
 
+    /// The best refined quad for a single detector box, for callers that
+    /// localize many cards per frame (binder pages): corner detection re-runs
+    /// inside the padded box and the largest card-shaped result wins.
+    func refinedQuad(
+        in image: CGImage,
+        around normalizedBox: CGRect
+    ) -> VNRectangleObservation? {
+        refinedObservations(in: image, around: normalizedBox)
+            .flatMap(Self.preferredObservation(from:))
+    }
+
     /// Corner detection retried inside the padded detector box, with results
     /// mapped back to full-image normalized coordinates. Returns nil when
     /// nothing card-shaped covering most of the box is found.

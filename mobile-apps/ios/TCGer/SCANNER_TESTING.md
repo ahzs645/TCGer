@@ -206,6 +206,9 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 The recorded device decisions are the baseline; the test prints each frame's
 old → new outcome and fails on any new false accept or newly-lost accept.
+`BinderSessionReplayTests` does the same for recorded binder pages (frames
+whose evidence outcome starts with `binderPage`), asserting the new
+localization never identifies fewer cards than the recorded baseline.
 Caveat: Simulator Vision (doc-seg/rectangles) diverges from device Vision on
 some frames, so device-confirmed conclusions need a device build — the test
 keeps a documented allowlist of known Simulator divergences.

@@ -184,6 +184,7 @@ actor BinderPageScanner {
 
     private let coordinator: CardScannerCoordinator
     private let ciContext = CIContext()
+    private let cropper = CardCropper()
 
     init(coordinator: CardScannerCoordinator) {
         self.coordinator = coordinator
@@ -191,7 +192,7 @@ actor BinderPageScanner {
 
     func scan(image: CGImage, context: CardScannerContext) async throws -> BinderPageScanResult {
         let start = Date()
-        let observations = try detectRectangles(in: image)
+        let observations = try detectCardQuads(in: image)
         let croppedObservations = observations.compactMap { observation -> (VNRectangleObservation, CGImage)? in
             guard let crop = makeNormalizedCrop(from: image, observation: observation) else {
                 return nil
@@ -294,6 +295,33 @@ actor BinderPageScanner {
         )
     }
 
+    /// Detector-first multi-card localization. The generic rectangle detector
+    /// harvests attack text boxes, card backs behind pockets, and sleeve
+    /// fabric on real binder photos (measured 52/77 detections retrieving
+    /// nothing on the first device dev-mode binder session); the trained
+    /// card detector finds the actual cards, and per-box corner refinement
+    /// rectifies each one. The rectangle path remains as fallback when the
+    /// detector asset is unavailable or fires on nothing.
+    private func detectCardQuads(in image: CGImage) throws -> [VNRectangleObservation] {
+        if let detector = CardObjectDetector.shared {
+            let boxes = ((try? detector.detections(in: image)) ?? [])
+                .map { $0.boundingBox.standardized }
+                .filter { box in
+                    let area = box.width * box.height
+                    return area >= CGFloat(Configuration.minimumSize * Configuration.minimumSize)
+                        && area <= Configuration.maximumBoundingBoxArea
+                }
+            if !boxes.isEmpty {
+                let quads = boxes.map { box in
+                    cropper.refinedQuad(in: image, around: box)
+                        ?? CardCropper.rectangleObservation(for: box)
+                }
+                return Array(orderedAndDeduplicated(quads).prefix(Configuration.maximumObservations))
+            }
+        }
+        return try detectRectangles(in: image)
+    }
+
     private func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {
         let request = VNDetectRectanglesRequest()
         request.maximumObservations = Configuration.maximumObservations
@@ -306,29 +334,53 @@ actor BinderPageScanner {
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
         try handler.perform([request])
 
-        let ranked = (request.results ?? [])
+        let filtered = (request.results ?? [])
             .filter { observation in
                 observation.boundingBox.width * observation.boundingBox.height <=
                     Configuration.maximumBoundingBoxArea
             }
-            .sorted { lhs, rhs in
-            if abs(lhs.boundingBox.midY - rhs.boundingBox.midY) > 0.08 {
-                return lhs.boundingBox.midY > rhs.boundingBox.midY
-            }
-            return lhs.boundingBox.midX < rhs.boundingBox.midX
-            }
+        return orderedAndDeduplicated(filtered)
+    }
 
+    /// Reading order (rows top-to-bottom, then left-to-right) with duplicate
+    /// suppression. Cards in binder pockets physically cannot overlap, so any
+    /// heavily-overlapping pair is the same card localized twice. Overlap is
+    /// measured against the SMALLER box, not IoU: the classic duplicate is a
+    /// text-box or art-panel fragment nested inside the full-card quad, and a
+    /// contained small box has near-total overlap but tiny IoU. Larger quads
+    /// win, so the full card survives and its fragments are dropped.
+    private func orderedAndDeduplicated(
+        _ observations: [VNRectangleObservation]
+    ) -> [VNRectangleObservation] {
+        let byArea = observations.sorted {
+            CardCropper.normalizedArea(of: $0) > CardCropper.normalizedArea(of: $1)
+        }
         var accepted: [VNRectangleObservation] = []
-        for observation in ranked {
+        for observation in byArea {
             let isDuplicate = accepted.contains { existing in
-                intersectionOverUnion(observation.boundingBox, existing.boundingBox) >=
+                overlapOverSmallerArea(observation.boundingBox, existing.boundingBox) >=
                     Configuration.duplicateIntersectionThreshold
             }
             if !isDuplicate {
                 accepted.append(observation)
             }
         }
-        return accepted
+        return accepted.sorted { lhs, rhs in
+            if abs(lhs.boundingBox.midY - rhs.boundingBox.midY) > 0.08 {
+                return lhs.boundingBox.midY > rhs.boundingBox.midY
+            }
+            return lhs.boundingBox.midX < rhs.boundingBox.midX
+        }
+    }
+
+    private func overlapOverSmallerArea(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
+        let intersection = lhs.intersection(rhs)
+        guard !intersection.isNull, intersection.width > 0, intersection.height > 0 else {
+            return 0
+        }
+        let smallerArea = min(lhs.width * lhs.height, rhs.width * rhs.height)
+        guard smallerArea > 0 else { return 0 }
+        return (intersection.width * intersection.height) / smallerArea
     }
 
     private func intersectionOverUnion(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
