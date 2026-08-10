@@ -3,7 +3,8 @@ import {
   searchQuerySchema,
   cardParamsSchema,
   exhaustiveSearchQuerySchema,
-  artistSearchQuerySchema
+  artistSearchQuerySchema,
+  collectionTagSearchQuerySchema
 } from '@tcg/api-types';
 
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
@@ -12,6 +13,7 @@ import {
   searchCards,
   searchAllCards,
   searchCardsByArtist,
+  searchCardsByCollectionTag,
   getSetsWithStatus,
   getSetCards
 } from '../../modules/cards/cards.service';
@@ -45,6 +47,15 @@ cardsRouter.get(
   asyncHandler(async (req, res) => {
     const params = artistSearchQuerySchema.parse(req.query);
     const cards = await searchCardsByArtist(params);
+    res.json({ cards, total: cards.length });
+  })
+);
+
+cardsRouter.get(
+  '/search/tag',
+  asyncHandler(async (req, res) => {
+    const params = collectionTagSearchQuerySchema.parse(req.query);
+    const cards = await searchCardsByCollectionTag(params);
     res.json({ cards, total: cards.length });
   })
 );

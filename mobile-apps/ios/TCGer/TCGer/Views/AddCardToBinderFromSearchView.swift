@@ -68,7 +68,7 @@ struct AddCardToBinderFromSearchView: View {
                 prompt: "Search for cards..."
             )
             .safeAreaBar(edge: .top, spacing: 0) {
-                if environmentStore.enabledGames.count > 1 {
+                if environmentStore.shouldShowGamePicker {
                     GamePickerPills(
                         selection: $selectedGame,
                         games: environmentStore.gamePickerGames
@@ -146,6 +146,7 @@ struct AddCardToBinderFromSearchView: View {
                    !hasSearched {
                     selectedGame = game
                 }
+                validateSelectedGame()
             }
         }
     }
@@ -218,9 +219,7 @@ struct AddCardToBinderFromSearchView: View {
     }
 
     private func validateSelectedGame() {
-        if !environmentStore.isGameEnabled(selectedGame) {
-            selectedGame = .all
-        }
+        selectedGame = environmentStore.resolvedGameSelection(selectedGame)
     }
 
     @MainActor

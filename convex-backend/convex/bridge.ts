@@ -2210,7 +2210,12 @@ export const addWishlistRule = internalMutation({
   args: {
     subject: v.string(),
     wishlistId: v.id("wishlists"),
-    type: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
+    type: v.union(
+      v.literal("name"),
+      v.literal("set"),
+      v.literal("artist"),
+      v.literal("tag")
+    ),
     tcg: v.optional(tcgCodeValidator),
     query: v.optional(v.string()),
     setCode: v.optional(v.string()),
@@ -2226,10 +2231,10 @@ export const addWishlistRule = internalMutation({
     const query = args.query?.trim() || undefined;
     const setCode = args.setCode?.trim() || undefined;
 
-    if ((args.type === "name" || args.type === "artist") && !query) {
+    if ((args.type === "name" || args.type === "artist" || args.type === "tag") && !query) {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "query is required for name and artist rules"
+        message: "query is required for name, artist, and tag rules"
       });
     }
     if (args.type === "set" && (!setCode || !args.tcg)) {

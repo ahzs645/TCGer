@@ -2,7 +2,9 @@ import { z } from 'zod';
 import {
   exhaustiveSearchQuerySchema,
   artistSearchQuerySchema,
+  collectionTagSearchQuerySchema,
   type ArtistSearchQueryInput,
+  type CollectionTagSearchQueryInput,
   type ExhaustiveSearchQueryInput,
   type TcgSet
 } from '@tcg/api-types';
@@ -16,6 +18,7 @@ import type {
 } from '../adapters/types';
 import { logger } from '../../utils/logger';
 import { normalizeSearchText, searchTerms } from '../../utils/search-text';
+import { searchCatalogCardsByTag } from './catalog-tag-search';
 
 const searchSchema = z.object({
   query: z.string().min(1),
@@ -164,6 +167,13 @@ export async function searchCardsByArtist(input: ArtistSearchQueryInput): Promis
       limit
     })
   );
+}
+
+export async function searchCardsByCollectionTag(
+  input: CollectionTagSearchQueryInput
+): Promise<CardDTO[]> {
+  const { tcg, tag, limit } = collectionTagSearchQuerySchema.parse(input);
+  return searchCatalogCardsByTag(tcg, tag, limit);
 }
 
 async function runExhaustiveSearch(

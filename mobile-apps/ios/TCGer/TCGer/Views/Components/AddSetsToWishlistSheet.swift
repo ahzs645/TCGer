@@ -110,7 +110,7 @@ struct AddSetsToWishlistSheet: View {
                 prompt: "Search sets"
             )
             .safeAreaBar(edge: .top, spacing: 0) {
-                if environmentStore.enabledGames.count > 1 {
+                if environmentStore.shouldShowGamePicker {
                     GamePickerPills(
                         selection: $selectedGame,
                         games: environmentStore.gamePickerGames
@@ -136,6 +136,7 @@ struct AddSetsToWishlistSheet: View {
                 actionBar
             }
             .task {
+                selectedGame = environmentStore.resolvedGameSelection(selectedGame)
                 await loadInitialData()
             }
         }

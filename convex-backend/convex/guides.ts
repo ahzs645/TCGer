@@ -7,6 +7,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { tcgCodeValidator } from "./lib/validators";
+import { systemGuideDefinitions } from "./data/systemGuides";
 
 const guideCategoryValidator = v.union(
   v.literal("art-style"),
@@ -21,6 +22,7 @@ const guideRuleTypeValidator = v.union(
   v.literal("name"),
   v.literal("set"),
   v.literal("artist"),
+  v.literal("tag"),
   v.literal("manual"),
 );
 
@@ -380,67 +382,12 @@ export const seedSystemGuides = internalMutation({
   returns: v.object({ upserted: v.number() }),
   handler: async (ctx) => {
     const timestamp = Date.now();
-    const systemGuides = [
-      {
-        slug: "pokemon-clay-art",
-        title: "The Clay Collection",
-        description:
-          "A living guide to English Pokémon cards illustrated by Yuka Morii, best known for hand-sculpted clay scenes.",
-        tcg: "pokemon" as const,
-        category: "art-style" as const,
-        coverImageUrl: "https://assets.tcgdex.net/en/sm/sm6/1/high.webp",
-        curatorName: "TCGer",
-        tags: ["Clay", "Sculpture", "Photography", "Yuka Morii"],
-        version: 1,
-        featured: true,
-        status: "published" as const,
-        ruleType: "artist" as const,
-        ruleQuery: "Yuka Morii",
-        includeAllPrintings: true,
-        matchAnyPrinting: false,
-        cardCountHint: 224,
-        updatedAt: timestamp,
-      },
-      {
-        slug: "every-ditto",
-        title: "Every Ditto",
-        description:
-          "Every English Pokémon TCG printing named Ditto, kept current as new sets are released.",
-        tcg: "pokemon" as const,
-        category: "species" as const,
-        coverImageUrl: "https://assets.tcgdex.net/en/base/base3/3/high.webp",
-        curatorName: "TCGer",
-        tags: ["Ditto", "Pokémon", "Species Collection"],
-        version: 1,
-        featured: true,
-        status: "published" as const,
-        ruleType: "name" as const,
-        ruleQuery: "Ditto",
-        includeAllPrintings: true,
-        matchAnyPrinting: false,
-        cardCountHint: 30,
-        updatedAt: timestamp,
-      },
-      {
-        slug: "pokemon-crown-zenith-connected-art",
-        title: "Crown Zenith Connected Art",
-        description:
-          "Nine Galarian Gallery cards by Kouki Saitou that assemble into one continuous scene.",
-        tcg: "pokemon" as const,
-        category: "story" as const,
-        coverImageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG30_hires.png",
-        curatorName: "TCGer",
-        tags: ["Connected Art", "Panorama", "Crown Zenith", "Kouki Saitou"],
-        version: 1,
-        featured: true,
-        status: "published" as const,
-        ruleType: "manual" as const,
-        includeAllPrintings: false,
-        matchAnyPrinting: false,
-        cardCountHint: 9,
-        updatedAt: timestamp,
-      },
-    ];
+    const systemGuides = systemGuideDefinitions.map((guide) => ({
+      ...guide,
+      tags: [...guide.tags],
+      status: "published" as const,
+      updatedAt: timestamp,
+    }));
 
     for (const guide of systemGuides) {
       const existing = await ctx.db

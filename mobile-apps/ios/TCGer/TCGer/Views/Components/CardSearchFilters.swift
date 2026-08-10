@@ -221,11 +221,13 @@ struct CardSearchFilterSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Game") {
-                    Picker("Game", selection: $draftGame) {
-                        ForEach(environmentStore.gamePickerGames) { game in
-                            Label(game.shortName, systemImage: game.systemIconName)
-                                .tag(game)
+                if environmentStore.shouldShowGamePicker {
+                    Section("Game") {
+                        Picker("Game", selection: $draftGame) {
+                            ForEach(environmentStore.gamePickerGames) { game in
+                                Label(game.shortName, systemImage: game.systemIconName)
+                                    .tag(game)
+                            }
                         }
                     }
                 }
@@ -327,7 +329,11 @@ struct CardSearchFilterSheet: View {
                 }
             }
             .task {
+                resolveDraftGame()
                 await loadSets()
+            }
+            .onChange(of: environmentStore.enabledGames) {
+                resolveDraftGame()
             }
             .onChange(of: draftGame) {
                 draftFilters.clearIncompatibleValues(for: draftGame)
@@ -345,6 +351,13 @@ struct CardSearchFilterSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func resolveDraftGame() {
+        let resolvedGame = environmentStore.resolvedGameSelection(draftGame)
+        guard resolvedGame != draftGame else { return }
+        draftGame = resolvedGame
+        draftFilters.clearIncompatibleValues(for: resolvedGame)
     }
 
     @ViewBuilder

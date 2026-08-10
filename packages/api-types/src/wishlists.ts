@@ -99,7 +99,7 @@ export type AddWishlistCardsInput = z.infer<typeof addWishlistCardsSchema>;
  * in Pokemon", "all of Prismatic Evolutions" — so the list can be re-expanded
  * later and pick up printings that did not exist when it was created.
  */
-export const wishlistRuleTypeSchema = z.enum(['name', 'set', 'artist']);
+export const wishlistRuleTypeSchema = z.enum(['name', 'set', 'artist', 'tag']);
 export type WishlistRuleType = z.infer<typeof wishlistRuleTypeSchema>;
 
 export const createWishlistRuleSchema = z
@@ -118,7 +118,7 @@ export const createWishlistRuleSchema = z
     autoSync: z.boolean().default(true)
   })
   .superRefine((value, ctx) => {
-    if ((value.type === 'name' || value.type === 'artist') && !value.query) {
+    if ((value.type === 'name' || value.type === 'artist' || value.type === 'tag') && !value.query) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['query'],
@@ -185,6 +185,9 @@ export function describeWishlistRule(rule: {
   }
   if (rule.type === 'artist') {
     return `Every card illustrated by ${rule.query ?? 'this artist'}`;
+  }
+  if (rule.type === 'tag') {
+    return `Every card in ${rule.query ?? 'this collection'}`;
   }
   const scope = rule.includeAllPrintings === false ? 'card' : 'printing';
   return `Every ${scope} named "${rule.query ?? ''}"`;

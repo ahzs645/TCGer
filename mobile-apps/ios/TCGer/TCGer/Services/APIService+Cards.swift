@@ -127,6 +127,41 @@ extension APIService {
         return searchResponse.cards
     }
 
+    func searchCardsByCollectionTag(
+        config: ServerConfiguration,
+        token: String,
+        tag: String,
+        game: TCGGame,
+        limit: Int = 5000
+    ) async throws -> [Card] {
+        if config.isOnDevice {
+            await prepareLocalCatalog(for: game)
+            return CatalogStore.shared.cards(tagged: tag, tcg: game).prefix(limit).map {
+                CatalogStore.shared.card(from: $0)
+            }
+        }
+
+        let queryItems = [
+            URLQueryItem(name: "tag", value: tag),
+            URLQueryItem(name: "tcg", value: game.rawValue),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/search/tag",
+            queryItems: queryItems,
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let searchResponse = try? JSONDecoder.tcgCardDecoder.decode(CardSearchResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return searchResponse.cards
+    }
+
     func getCardPrints(
         config: ServerConfiguration,
         token: String,

@@ -31,6 +31,7 @@ import {
   normalizeCatalogText,
   searchCatalog,
   searchCatalogByArtist,
+  searchCatalogByCollectionTag,
 } from "@/lib/catalog/catalog-search";
 import type { TcgCode } from "@/types/card";
 import type {
@@ -46,6 +47,7 @@ import type {
   UpdateWishlistRuleInput,
   UserPreferences,
 } from "@tcg/api-types";
+import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -92,70 +94,25 @@ function demoAuthUser() {
 function demoCollectionGuides(): CollectionGuideResponse[] {
   const definitions: Array<
     Omit<CollectionGuideResponse, "followed" | "wishlistId">
-  > = [
-    {
-      id: "demo-guide-pokemon-clay-art",
-      slug: "pokemon-clay-art",
-      title: "The Clay Collection",
-      description:
-        "A living guide to English Pokémon cards illustrated by Yuka Morii, best known for hand-sculpted clay scenes.",
-      tcg: "pokemon",
-      category: "art-style",
-      coverImageUrl: "https://assets.tcgdex.net/en/sm/sm6/1/high.webp",
-      curatorName: "TCGer",
-      tags: ["Clay", "Sculpture", "Photography", "Yuka Morii"],
-      version: 1,
-      featured: true,
-      rule: {
-        type: "artist",
-        tcg: "pokemon",
-        query: "Yuka Morii",
-        includeAllPrintings: true,
-      },
-      cardCountHint: 224,
+  > = systemGuideDefinitions.map((guide) => ({
+    id: `demo-guide-${guide.slug}`,
+    slug: guide.slug,
+    title: guide.title,
+    description: guide.description,
+    tcg: guide.tcg,
+    category: guide.category,
+    curatorName: guide.curatorName,
+    tags: [...guide.tags],
+    version: guide.version,
+    featured: guide.featured,
+    rule: {
+      type: guide.ruleType,
+      tcg: guide.tcg,
+      query: "ruleQuery" in guide ? guide.ruleQuery : undefined,
+      includeAllPrintings: guide.includeAllPrintings,
     },
-    {
-      id: "demo-guide-every-ditto",
-      slug: "every-ditto",
-      title: "Every Ditto",
-      description:
-        "Every English Pokémon TCG printing named Ditto, kept current as new sets are released.",
-      tcg: "pokemon",
-      category: "species",
-      coverImageUrl: "https://assets.tcgdex.net/en/base/base3/3/high.webp",
-      curatorName: "TCGer",
-      tags: ["Ditto", "Pokémon", "Species Collection"],
-      version: 1,
-      featured: true,
-      rule: {
-        type: "name",
-        tcg: "pokemon",
-        query: "Ditto",
-        includeAllPrintings: true,
-      },
-      cardCountHint: 30,
-    },
-    {
-      id: "demo-guide-pokemon-crown-zenith-connected-art",
-      slug: "pokemon-crown-zenith-connected-art",
-      title: "Crown Zenith Connected Art",
-      description:
-        "Nine Galarian Gallery cards by Kouki Saitou that assemble into one continuous scene.",
-      tcg: "pokemon",
-      category: "story",
-      coverImageUrl: "https://images.pokemontcg.io/swsh12pt5gg/GG30_hires.png",
-      curatorName: "TCGer",
-      tags: ["Connected Art", "Panorama", "Crown Zenith", "Kouki Saitou"],
-      version: 1,
-      featured: true,
-      rule: {
-        type: "manual",
-        tcg: "pokemon",
-        includeAllPrintings: false,
-      },
-      cardCountHint: 9,
-    },
-  ];
+    cardCountHint: "cardCountHint" in guide ? guide.cardCountHint : undefined,
+  }));
   return definitions.map((guide) => {
     const wishlist = store().wishlists.find((candidate) =>
       guide.rule.type === "manual"
@@ -572,9 +529,13 @@ async function handleGuides(
     const query = normalizeCatalogText(params.get("query") || "");
     const tcg = params.get("tcg");
     const category = params.get("category");
+    const guideSlug = params.get("guide");
     const ownership = params.get("ownership") || "all";
     const selectedGuides = guides.filter(
-      (guide) => (!tcg || guide.tcg === tcg) && (!category || guide.category === category),
+      (guide) =>
+        (!tcg || guide.tcg === tcg)
+        && (!category || guide.category === category)
+        && (!guideSlug || guide.slug === guideSlug),
     );
     const rows: Array<{
       card: Card;
@@ -611,6 +572,9 @@ async function handleGuides(
           }))
         : guide.rule.type === "name" && guide.rule.query
           ? (await demoSearchCards(guide.rule.query, guide.tcg)).map((card) => ({ card, item: undefined }))
+          : guide.rule.type === "tag" && guide.rule.query && isCatalogGame(guide.tcg)
+            ? (await searchCatalogByCollectionTag(guide.rule.query, guide.tcg, 5000))
+                .map((card) => ({ card, item: undefined }))
           : [];
       for (const { card, item } of cards) {
         const searchText = normalizeCatalogText(

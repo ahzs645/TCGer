@@ -95,7 +95,13 @@ struct CollectionGuidesView: View {
                 Text(scope.rawValue).tag(scope)
             }
         }
-        .task { await loadGuides() }
+        .task {
+            resolveSelectedGame()
+            await loadGuides()
+        }
+        .onChange(of: environmentStore.enabledGames) {
+            resolveSelectedGame()
+        }
         .task(id: "\(searchScope.rawValue)|\(searchText)|\(selectedGame.rawValue)|\(selectedCategory?.rawValue ?? "all")|\(globalOwnership.rawValue)") {
             guard searchScope == .cards else { return }
             try? await Task.sleep(for: .milliseconds(250))
@@ -108,9 +114,12 @@ struct CollectionGuidesView: View {
         VStack(spacing: 12) {
             HStack {
                 Menu {
-                    Picker("Game", selection: $selectedGame) {
-                        ForEach(TCGGame.allCases) { game in
-                            Text(game.displayName).tag(game)
+                    if environmentStore.shouldShowGamePicker {
+                        Picker("Game", selection: $selectedGame) {
+                            ForEach(environmentStore.gamePickerGames) { game in
+                                GameLabel(game: game)
+                                    .tag(game)
+                            }
                         }
                     }
                     Picker("Theme", selection: $selectedCategory) {
@@ -159,6 +168,10 @@ struct CollectionGuidesView: View {
                 .refreshable { await searchGuideCards() }
             }
         }
+    }
+
+    private func resolveSelectedGame() {
+        selectedGame = environmentStore.resolvedGameSelection(selectedGame)
     }
 
     @MainActor
@@ -565,6 +578,13 @@ private struct CollectionGuideDetailView: View {
                 config: environmentStore.serverConfiguration,
                 token: token,
                 artist: guide.rule.query ?? "",
+                game: TCGGame(rawValue: guide.rule.tcg) ?? .pokemon
+            )
+        case .tag:
+            return try await apiService.searchCardsByCollectionTag(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                tag: guide.rule.query ?? "",
                 game: TCGGame(rawValue: guide.rule.tcg) ?? .pokemon
             )
         case .name:

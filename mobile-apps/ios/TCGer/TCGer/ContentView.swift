@@ -83,6 +83,7 @@ struct ContentView: View {
             }
             .navigationTitle("More")
         }
+        .tint(environmentStore.accentColorChoice.color)
     }
 
     @ViewBuilder

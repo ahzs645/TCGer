@@ -88,6 +88,23 @@ export async function searchCardsByArtist(
   return payload.cards;
 }
 
+export async function searchCardsByCollectionTag(
+  token: string,
+  options: { tag: string; tcg: TcgCode; limit?: number },
+): Promise<Card[]> {
+  const params = new URLSearchParams({ tag: options.tag, tcg: options.tcg });
+  if (options.limit) params.set("limit", String(options.limit));
+  const response = await fetch(
+    `${API_BASE_URL}/cards/search/tag?${params.toString()}`,
+    { headers: authHeaders(token), credentials: "include" },
+  );
+  const payload = await readJson<SetCardsResponse>(
+    response,
+    "Failed to search collection cards",
+  );
+  return payload.cards;
+}
+
 function authHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,

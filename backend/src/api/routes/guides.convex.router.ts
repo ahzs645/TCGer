@@ -12,7 +12,8 @@ import { env } from '../../config/env';
 import {
   getSetCards,
   searchAllCards,
-  searchCardsByArtist
+  searchCardsByArtist,
+  searchCardsByCollectionTag
 } from '../../modules/cards/cards.service';
 import { normalizeSearchText } from '../../utils/search-text';
 import { asyncHandler } from '../../utils/async-handler';
@@ -124,6 +125,12 @@ async function expandGuide(
         limit: 2000
       });
     }
+  } else if (guide.rule.type === 'tag' && guide.rule.query) {
+    cards = await searchCardsByCollectionTag({
+      tag: guide.rule.query,
+      tcg: guide.tcg,
+      limit: 5000
+    });
   } else if (guide.rule.query) {
     cards = await searchAllCards({
       query: guide.rule.query,

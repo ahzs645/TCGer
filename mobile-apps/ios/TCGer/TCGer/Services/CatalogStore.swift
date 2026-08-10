@@ -219,6 +219,7 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     var era: String? = nil
     var specialTrait: String? = nil
     var treatments: [String]? = nil
+    var collectionTags: [String]? = nil
     let type: String?
     let types: [String]?
     let colors: [String]?
@@ -375,6 +376,7 @@ final class CatalogStore: ObservableObject {
                 if let era = card.era { searchableFields.append(Self.normalize(era)) }
                 if let specialTrait = card.specialTrait { searchableFields.append(Self.normalize(specialTrait)) }
                 searchableFields.append(contentsOf: (card.treatments ?? []).map(Self.normalize))
+                searchableFields.append(contentsOf: (card.collectionTags ?? []).map(Self.normalize))
                 if let worlds {
                     searchableFields.append(String(worlds.year))
                     searchableFields.append(Self.normalize(worlds.playerName))
@@ -685,6 +687,21 @@ final class CatalogStore: ObservableObject {
             guard card.artist.map(SearchTextNormalizer.key) == normalizedArtist else {
                 return nil
             }
+            return CatalogEntry(tcg: tcg, card: card)
+        }
+    }
+
+    func cards(tagged tag: String, tcg: TCGGame) -> [CatalogEntry] {
+        guard tcg != .all,
+              enabledGames.contains(tcg),
+              let pack = loadedPacks[tcg] else {
+            return []
+        }
+        let normalizedTag = SearchTextNormalizer.key(tag)
+        return pack.cards.compactMap { card in
+            guard card.collectionTags?.contains(where: {
+                SearchTextNormalizer.key($0) == normalizedTag
+            }) == true else { return nil }
             return CatalogEntry(tcg: tcg, card: card)
         }
     }

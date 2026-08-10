@@ -227,11 +227,8 @@ struct ScannerSessionReviewView: View {
                         binders: collections,
                         selectedBinderId: $selectedBinderID
                     )
-                    .padding(.horizontal, 12)
-                    .background(
-                        Color(.secondarySystemBackground),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
+                    .padding(.horizontal, 14)
+                    .modifier(ReviewBinderPickerSurface())
                 }
 
                 Button {
@@ -428,6 +425,29 @@ struct ScannerSessionReviewView: View {
             collectorNumber: nil,
             releasedAt: nil
         )
+    }
+}
+
+private struct ReviewBinderPickerSurface: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(
+                    .regular.tint(Color.accentColor.opacity(0.18)).interactive(),
+                    in: .rect(cornerRadius: 14)
+                )
+        } else {
+            content
+                .background(
+                    Color.accentColor.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.16), lineWidth: 1)
+                }
+        }
     }
 }
 

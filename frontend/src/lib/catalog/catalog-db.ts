@@ -37,6 +37,7 @@ export interface CatalogCard {
   era?: string;
   specialTrait?: string;
   treatments?: string[];
+  collectionTags?: string[];
   type?: string;
   types?: string[];
   hp?: number;

@@ -10,6 +10,19 @@ GATE_FIXTURE="${REPO_ROOT}/backend/fixtures/models/card-face-rejection-gate-dino
 GATE_DESTINATION="${SCAN_INDEX_DIR}/CardFaceGate.json"
 TSX="${REPO_ROOT}/node_modules/.bin/tsx"
 
+# Xcode launched from Finder does not inherit the user's shell PATH. Make the
+# validator able to find common Homebrew Node installations before reporting
+# that the assets are invalid.
+if ! command -v node >/dev/null 2>&1; then
+  for node_directory in /opt/homebrew/bin /usr/local/bin; do
+    if [[ -x "${node_directory}/node" ]]; then
+      PATH="${node_directory}:${PATH}"
+      export PATH
+      break
+    fi
+  done
+fi
+
 usage() {
   cat <<'EOF'
 Usage: scripts/ios-assets.sh build|check

@@ -72,6 +72,15 @@ struct WishlistSyncService {
                 artist: artist,
                 game: game
             )
+        case .tag:
+            guard let tag = rule.query,
+                  let game = rule.tcg.flatMap(TCGGame.init(rawValue:)) else { return [] }
+            return try await apiService.searchCardsByCollectionTag(
+                config: config,
+                token: token,
+                tag: tag,
+                game: game
+            )
         }
     }
 

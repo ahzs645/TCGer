@@ -146,7 +146,7 @@ type NativeWishlistCard = RichCardMetadata & {
 
 type NativeWishlistRule = {
   id: string;
-  type: "name" | "set" | "artist";
+  type: "name" | "set" | "artist" | "tag";
   tcg?: TcgCode;
   query?: string;
   setCode?: string;

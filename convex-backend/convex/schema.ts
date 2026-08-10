@@ -189,7 +189,12 @@ export default defineSchema({
 
   wishlistRules: defineTable({
     wishlistId: v.id("wishlists"),
-    type: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
+    type: v.union(
+      v.literal("name"),
+      v.literal("set"),
+      v.literal("artist"),
+      v.literal("tag")
+    ),
     tcg: v.optional(tcgCode),
     query: v.optional(v.string()),
     setCode: v.optional(v.string()),
@@ -225,6 +230,7 @@ export default defineSchema({
       v.literal("name"),
       v.literal("set"),
       v.literal("artist"),
+      v.literal("tag"),
       v.literal("manual")
     ),
     ruleQuery: v.optional(v.string()),

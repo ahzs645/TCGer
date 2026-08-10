@@ -14,6 +14,7 @@ struct CollectionGuideRule: Codable, Hashable, Sendable {
         case name
         case set
         case artist
+        case tag
         case manual
     }
 

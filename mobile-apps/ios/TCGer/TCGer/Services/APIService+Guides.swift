@@ -1,6 +1,29 @@
 import Foundation
 
 extension APIService {
+    private struct BundledGuideCatalog: Decodable {
+        let guides: [BundledGuideDefinition]
+    }
+
+    private struct BundledGuideDefinition: Decodable {
+        let slug: String
+        let title: String
+        let description: String
+        let tcg: String
+        let category: String
+        let coverImageUrl: String?
+        let curatorName: String
+        let tags: [String]
+        let version: Int
+        let featured: Bool
+        let ruleType: String
+        let ruleQuery: String?
+        let ruleSetCode: String?
+        let ruleSetName: String?
+        let includeAllPrintings: Bool
+        let cardCountHint: Int?
+    }
+
     private struct FollowGuideRequest: Encodable {
         let wishlistName: String?
     }
@@ -54,7 +77,7 @@ extension APIService {
     }
 
     private static func localGuides() -> [CollectionGuide] {
-        let definitions = [CollectionGuide(
+        let fallbackDefinitions = [CollectionGuide(
             id: "local-guide-pokemon-clay-art",
             slug: "pokemon-clay-art",
             title: "The Clay Collection",
@@ -124,6 +147,7 @@ extension APIService {
             followed: false,
             wishlistId: nil
         )]
+        let definitions = bundledGuideDefinitions() ?? fallbackDefinitions
         let wishlists = LocalStore.shared.getWishlists()
         return definitions.map { definition in
             let existing = wishlists.first { wishlist in
@@ -156,6 +180,51 @@ extension APIService {
                 wishlistId: existing?.id
             )
         }
+    }
+
+    private static func bundledGuideDefinitions() -> [CollectionGuide]? {
+        let url = Bundle.main.url(
+            forResource: "system-guides",
+            withExtension: "json",
+            subdirectory: "Guides"
+        ) ?? Bundle.main.url(forResource: "system-guides", withExtension: "json")
+        guard
+            let url,
+            let data = try? Data(contentsOf: url),
+            let catalog = try? JSONDecoder().decode(BundledGuideCatalog.self, from: data)
+        else { return nil }
+
+        let guides = catalog.guides.compactMap { definition -> CollectionGuide? in
+            guard
+                let category = CollectionGuideCategory(rawValue: definition.category),
+                let ruleType = CollectionGuideRule.RuleType(rawValue: definition.ruleType)
+            else { return nil }
+            return CollectionGuide(
+                id: "local-guide-\(definition.slug)",
+                slug: definition.slug,
+                title: definition.title,
+                description: definition.description,
+                tcg: definition.tcg,
+                category: category,
+                coverImageUrl: definition.coverImageUrl,
+                curatorName: definition.curatorName,
+                tags: definition.tags,
+                version: definition.version,
+                featured: definition.featured,
+                rule: CollectionGuideRule(
+                    type: ruleType,
+                    tcg: definition.tcg,
+                    query: definition.ruleQuery,
+                    setCode: definition.ruleSetCode,
+                    setName: definition.ruleSetName,
+                    includeAllPrintings: definition.includeAllPrintings
+                ),
+                cardCountHint: definition.cardCountHint,
+                followed: false,
+                wishlistId: nil
+            )
+        }
+        return guides.isEmpty ? nil : guides
     }
 
     private static func followLocalGuide(
@@ -303,6 +372,14 @@ extension APIService {
                     token: token,
                     artist: guide.rule.query ?? "",
                     game: TCGGame(rawValue: guide.tcg) ?? .pokemon
+                ).map { ($0, nil) }
+            case .tag:
+                cards = try await searchCardsByCollectionTag(
+                    config: config,
+                    token: token,
+                    tag: guide.rule.query ?? "",
+                    game: TCGGame(rawValue: guide.tcg) ?? .pokemon,
+                    limit: limit
                 ).map { ($0, nil) }
             case .name:
                 cards = try await searchAllCards(

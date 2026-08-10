@@ -393,7 +393,7 @@ private struct SealedProductCatalogSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 0) {
-                        if environmentStore.enabledGames.count > 1 {
+                        if environmentStore.shouldShowGamePicker {
                             GamePickerPills(
                                 selection: $selectedGame,
                                 games: environmentStore.gamePickerGames

@@ -18,6 +18,7 @@ RUN npm install
 COPY packages/api-types ./packages/api-types
 COPY backend ./backend
 COPY docs ./docs
+COPY data/catalog ./data/catalog
 COPY tsconfig.base.json ./
 
 # --- Development target ---
@@ -55,6 +56,7 @@ COPY --from=build /app/backend/package*.json ./backend/
 COPY --from=build /app/backend/prisma ./backend/prisma
 COPY --from=build /app/node_modules ./node_modules
 COPY docs ./docs
+COPY --from=build /app/data/catalog ./data/catalog
 
 WORKDIR /app/backend
 EXPOSE 3000

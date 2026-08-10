@@ -10,6 +10,7 @@ import {
   getSetCards,
   searchAllCards,
   searchCardsByArtist,
+  searchCardsByCollectionTag,
 } from "@/lib/api/cards";
 import { addCardsToWishlist, updateWishlistRule } from "@/lib/api/wishlists";
 
@@ -57,7 +58,7 @@ export function toWishlistCardInput(card: Card): AddWishlistCardInput {
 }
 
 export interface WishlistRuleQuery {
-  type: "name" | "set" | "artist";
+  type: "name" | "set" | "artist" | "tag";
   tcg?: TcgCode;
   query?: string;
   setCode?: string;
@@ -74,6 +75,14 @@ export async function expandWishlistRule(
     return getSetCards(token, rule.tcg, rule.setCode);
   }
   if (!rule.query) return [];
+  if (rule.type === "tag") {
+    if (!rule.tcg) return [];
+    return searchCardsByCollectionTag(token, {
+      tag: rule.query,
+      tcg: rule.tcg,
+      limit: 5000,
+    });
+  }
   if (rule.type === "artist") {
     return searchCardsByArtist(token, {
       artist: rule.query,

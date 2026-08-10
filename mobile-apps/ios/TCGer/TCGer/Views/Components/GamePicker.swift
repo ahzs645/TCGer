@@ -1,8 +1,28 @@
 import SwiftUI
 
 extension EnvironmentStore {
+    var shouldShowGamePicker: Bool {
+        enabledGames.count > 1
+    }
+
+    var singleEnabledGame: TCGGame? {
+        enabledGames.count == 1 ? enabledGames.first : nil
+    }
+
     var gamePickerGames: [TCGGame] {
         [.all] + enabledGames
+    }
+
+    /// Keeps a stored game filter valid as modules are enabled or disabled.
+    /// With one enabled game, "All" is redundant and resolves to that game.
+    func resolvedGameSelection(_ selection: TCGGame) -> TCGGame {
+        if let singleEnabledGame {
+            return singleEnabledGame
+        }
+        if selection == .all || enabledGames.contains(selection) {
+            return selection
+        }
+        return .all
     }
 }
 

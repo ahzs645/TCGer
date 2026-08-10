@@ -13,6 +13,7 @@ import {
 import { canonicalizePokemonRarity } from '../modules/adapters/pokemon-normalization';
 import { resolvePokemonSetArtwork } from '../modules/adapters/pokemon-set-artwork';
 import { getPokemonWorldChampionshipCatalog } from '../modules/adapters/pokemon-world-championships';
+import { deriveCollectionTags } from '@tcg/api-types';
 
 type SupportedGame = 'pokemon' | 'magic' | 'yugioh' | 'onepiece' | 'lorcana' | 'dragonball';
 
@@ -44,6 +45,9 @@ interface CatalogCard {
   collectorNumber?: string;
   rarity?: string;
   artist?: string;
+  category?: string;
+  stage?: string;
+  suffix?: string;
   archetype?: string;
   classifications?: string[];
   subtypes?: string[];
@@ -53,6 +57,7 @@ interface CatalogCard {
   era?: string;
   specialTrait?: string;
   treatments?: string[];
+  collectionTags?: string[];
   type?: string;
   types?: string[];
   hp?: number;
@@ -131,6 +136,10 @@ interface TcgdexCardIndexResponse {
       id: string;
       rarity?: string;
       illustrator?: string;
+      category?: string;
+      stage?: string;
+      suffix?: string;
+      types?: string[];
     }>;
   };
   errors?: Array<{ message?: string }>;
@@ -410,7 +419,14 @@ async function fetchWithRetry(
 }
 
 async function fetchPokemonCardIndex(): Promise<
-  Map<string, { rarity?: string; artist?: string }>
+  Map<string, {
+    rarity?: string;
+    artist?: string;
+    category?: string;
+    stage?: string;
+    suffix?: string;
+    types?: string[];
+  }>
 > {
   const response = await fetchWithRetry(
     POKEMON_GRAPHQL_URL,
@@ -419,7 +435,7 @@ async function fetchPokemonCardIndex(): Promise<
     {
       method: 'POST',
       body: JSON.stringify({
-        query: 'query CatalogCardMetadata { cards { id rarity illustrator } }',
+        query: 'query CatalogCardMetadata { cards { id rarity illustrator category stage suffix types } }',
       }),
     },
   );
@@ -438,9 +454,23 @@ async function fetchPokemonCardIndex(): Promise<
   }
   return new Map(
     indexedCards.flatMap((card) => card.id
-      ? [[card.id, { rarity: card.rarity, artist: card.illustrator }] as const]
+      ? [[card.id, {
+          rarity: card.rarity,
+          artist: card.illustrator,
+          category: card.category,
+          stage: card.stage,
+          suffix: card.suffix,
+          types: card.types,
+        }] as const]
       : []),
   );
+}
+
+function taggedCard(tcg: SupportedGame, card: CatalogCard): CatalogCard {
+  return {
+    ...card,
+    collectionTags: deriveCollectionTags({ tcg, ...card }),
+  };
 }
 
 async function fetchJson<T>(
@@ -496,16 +526,24 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         ...artwork,
       });
       cards.push(
-        ...setCards.map((card) => ({
-          id: card.id,
-          name: card.name,
-          setCode: detail.id,
-          collectorNumber: card.localId ?? card.id.slice(detail.id.length + 1),
-          rarity: canonicalizePokemonRarity(metadataByCardId.get(card.id)?.rarity, card.name, {
-            noneMeansPromo: true,
-          }),
-          artist: metadataByCardId.get(card.id)?.artist,
-        })),
+        ...setCards.map((card) => {
+          const metadata = metadataByCardId.get(card.id);
+          return taggedCard('pokemon', {
+            id: card.id,
+            name: card.name,
+            setCode: detail.id,
+            collectorNumber: card.localId ?? card.id.slice(detail.id.length + 1),
+            rarity: canonicalizePokemonRarity(metadata?.rarity, card.name, {
+              noneMeansPromo: true,
+            }),
+            artist: metadata?.artist,
+            category: metadata?.category,
+            stage: metadata?.stage,
+            suffix: metadata?.suffix,
+            types: metadata?.types,
+            subtypes: [metadata?.stage, metadata?.suffix].filter((value): value is string => Boolean(value)),
+          });
+        }),
       );
     }
   }
@@ -527,7 +565,7 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         })),
     );
     cards.push(
-      ...championshipCards.map((card) => ({
+      ...championshipCards.map((card) => taggedCard('pokemon', {
         id: card.id,
         name: card.name,
         setCode: card.setCode,
@@ -672,7 +710,7 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
     }
 
     const face = card.card_faces?.[0];
-    cards.push({
+    cards.push(taggedCard('magic', {
       id: card.id,
       name: card.name,
       setCode: card.set,
@@ -689,7 +727,7 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
         ...(card.full_art ? ['full-art'] : []),
         ...(card.border_color ? [`${card.border_color}-border`] : []),
       ],
-    });
+    }));
 
     const existingSet = sets.get(card.set);
     if (existingSet) {
@@ -741,7 +779,7 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
       artworkId,
     });
 
-    cards.push({
+    cards.push(taggedCard('yugioh', {
       id,
       name: card.name,
       setCode,
@@ -754,7 +792,7 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
       level: card.level,
       archetype: card.archetype,
       konamiId: Number.isFinite(imageId) ? imageId : card.id,
-    });
+    }));
 
     if (setCode && printingSet) {
       const existingSet = sets.get(setCode);
@@ -811,7 +849,7 @@ async function buildOnePiecePack(updatedAt: string, limit?: number): Promise<Cat
     if (!id || !name) continue;
     const setCode = onePieceSetCode(card.set_id);
     const imageUrl = card.card_image?.trim() || undefined;
-    cards.push({
+    cards.push(taggedCard('onepiece', {
       id,
       name,
       setCode,
@@ -820,7 +858,7 @@ async function buildOnePiecePack(updatedAt: string, limit?: number): Promise<Cat
       type: card.card_type,
       imageUrl,
       imageUrlSmall: imageUrl,
-    });
+    }));
 
     if (setCode) {
       const existing = sets.get(setCode);
@@ -881,7 +919,7 @@ async function buildLorcanaPack(updatedAt: string, limit?: number): Promise<Cata
       ...selectedCards.map((card) => {
         const collectorNumber = card.collector_number?.trim();
         const cardSetCode = card.set?.code ?? code;
-        return {
+        return taggedCard('lorcana', {
           id: collectorNumber ? `${cardSetCode}:${collectorNumber}` : card.id,
           name: card.version ? `${card.name} - ${card.version}` : card.name,
           setCode: cardSetCode,
@@ -891,7 +929,7 @@ async function buildLorcanaPack(updatedAt: string, limit?: number): Promise<Cata
           artist: card.illustrators?.join(' / '),
           classifications: card.classifications,
           ...lorcastImages(card),
-        };
+        });
       }),
     );
     // Lorcast asks clients to leave 50–100 ms between requests.
@@ -964,7 +1002,7 @@ async function buildDragonBallPack(updatedAt: string, limit?: number): Promise<C
             ? (setById.get(product.set) ?? setByCode.get(product.set))
             : undefined;
       const image = product.images?.[0];
-      cards.push({
+      cards.push(taggedCard('dragonball', {
         id: String(product._id),
         name: product.name,
         setCode:
@@ -979,7 +1017,7 @@ async function buildDragonBallPack(updatedAt: string, limit?: number): Promise<C
           undefined,
         imageUrl: image?.large ?? image?.medium ?? image?.small,
         imageUrlSmall: image?.small ?? image?.medium ?? image?.large,
-      });
+      }));
     }
     page += 1;
   }

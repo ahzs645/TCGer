@@ -33,6 +33,9 @@ extension CatalogStore {
         if let treatments = entry.card.treatments {
             attributes["treatments"] = .array(treatments.map(JSONValue.string))
         }
+        if let collectionTags = entry.card.collectionTags {
+            attributes["collection_tags"] = .array(collectionTags.map(JSONValue.string))
+        }
 
         switch entry.tcg {
         case .magic:

@@ -176,13 +176,14 @@ struct CardSearchView: View {
                    !hasSearched {
                     selectedGame = game
                 }
+                validateSelectedGame()
             }
         }
     }
 
     private var searchControlBar: some View {
         VStack(spacing: 0) {
-            if environmentStore.enabledGames.count > 1 {
+            if environmentStore.shouldShowGamePicker {
                 GamePickerPills(
                     selection: Binding(
                         get: { selectedGame },
@@ -309,9 +310,10 @@ struct CardSearchView: View {
     }
 
     private func validateSelectedGame() {
-        if !environmentStore.isGameEnabled(selectedGame) {
-            selectedGame = .all
-            searchFilters.clearIncompatibleValues(for: .all)
+        let resolvedGame = environmentStore.resolvedGameSelection(selectedGame)
+        if resolvedGame != selectedGame {
+            selectedGame = resolvedGame
+            searchFilters.clearIncompatibleValues(for: resolvedGame)
             if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Task { await performSearch() }
             }

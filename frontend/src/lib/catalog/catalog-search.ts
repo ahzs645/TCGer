@@ -193,6 +193,7 @@ function catalogCardAttributes(card: CatalogCard): Record<string, unknown> {
   if (card.era !== undefined) attributes.era = card.era;
   if (card.specialTrait !== undefined) attributes.specialTrait = card.specialTrait;
   if (card.treatments !== undefined) attributes.treatments = card.treatments;
+  if (card.collectionTags !== undefined) attributes.collection_tags = card.collectionTags;
   return attributes;
 }
 
@@ -272,6 +273,7 @@ async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null
           catalogCard.era,
           catalogCard.specialTrait,
           ...(catalogCard.treatments ?? []),
+          ...(catalogCard.collectionTags ?? []),
           card.supertype,
           card.printingKind,
           card.pokemonPrint?.worldChampionship?.year?.toString(),
@@ -362,6 +364,26 @@ export async function searchCatalogByArtist(
     .filter(
       (entry) => normalizeCatalogText(entry.card.artist ?? "") === normalizedArtist,
     )
+    .slice(0, limit)
+    .map((entry) => entry.card);
+}
+
+export async function searchCatalogByCollectionTag(
+  tag: string,
+  tcg: CatalogTcgCode,
+  limit = 5000,
+): Promise<Card[]> {
+  const normalizedTag = normalizeCatalogText(tag);
+  if (!normalizedTag || limit <= 0) return [];
+  const index = await buildSearchIndex(tcg);
+  if (!index) return [];
+  return index.entries
+    .filter((entry) => {
+      const values = entry.card.attributes?.collection_tags;
+      return Array.isArray(values) && values.some(
+        (value) => typeof value === "string" && normalizeCatalogText(value) === normalizedTag,
+      );
+    })
     .slice(0, limit)
     .map((entry) => entry.card);
 }

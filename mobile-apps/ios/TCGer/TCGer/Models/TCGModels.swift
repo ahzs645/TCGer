@@ -942,6 +942,7 @@ struct WishlistRule: Identifiable, Codable, Hashable, Sendable {
         case name
         case set
         case artist
+        case tag
     }
 
     let id: String
@@ -967,6 +968,8 @@ struct WishlistRule: Identifiable, Codable, Hashable, Sendable {
             return "Every \(scope) named \"\(query ?? "")\""
         case .artist:
             return "Every card illustrated by \(query ?? "this artist")"
+        case .tag:
+            return "Every card in \(query ?? "this collection")"
         }
     }
 }

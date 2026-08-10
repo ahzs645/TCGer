@@ -188,6 +188,7 @@ services:
     volumes:
       - ../backend:/app/backend
       - ../packages:/app/packages
+      - ../data/catalog:/app/data/catalog:ro
       - /app/node_modules
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     ports:

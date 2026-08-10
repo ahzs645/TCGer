@@ -234,7 +234,12 @@ export const wishlistCardValidator = v.object({
 
 export const wishlistRuleValidator = v.object({
   id: v.id("wishlistRules"),
-  type: v.union(v.literal("name"), v.literal("set"), v.literal("artist")),
+  type: v.union(
+    v.literal("name"),
+    v.literal("set"),
+    v.literal("artist"),
+    v.literal("tag")
+  ),
   tcg: v.optional(tcgCodeValidator),
   query: v.optional(v.string()),
   setCode: v.optional(v.string()),

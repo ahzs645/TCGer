@@ -51,6 +51,10 @@ struct AddWishlistRuleSheet: View {
         preferredDefaultGame ?? availableGames.first
     }
 
+    private var preferredSearchGame: TCGGame {
+        environmentStore.singleEnabledGame ?? preferredDefaultGame ?? .all
+    }
+
     private var canSubmit: Bool {
         switch mode {
         case .name:
@@ -78,10 +82,12 @@ struct AddWishlistRuleSheet: View {
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.words)
 
-                        Picker("Game", selection: $selectedGame) {
-                            ForEach(environmentStore.gamePickerGames) { game in
-                                GameLabel(game: game)
-                                    .tag(game)
+                        if environmentStore.shouldShowGamePicker {
+                            Picker("Game", selection: $selectedGame) {
+                                ForEach(environmentStore.gamePickerGames) { game in
+                                    GameLabel(game: game)
+                                        .tag(game)
+                                }
                             }
                         }
 
@@ -95,16 +101,18 @@ struct AddWishlistRuleSheet: View {
                     }
                 } else {
                     Section {
-                        Picker("Game", selection: $setGame) {
-                            ForEach(availableGames) { game in
-                                GameLabel(game: game)
-                                    .tag(game)
+                        if environmentStore.shouldShowGamePicker {
+                            Picker("Game", selection: $setGame) {
+                                ForEach(availableGames) { game in
+                                    GameLabel(game: game)
+                                        .tag(game)
+                                }
                             }
-                        }
-                        .onChange(of: setGame) {
-                            selectedSetCode = ""
-                            if mode == .set {
-                                Task { await loadSets() }
+                            .onChange(of: setGame) {
+                                selectedSetCode = ""
+                                if mode == .set {
+                                    Task { await loadSets() }
+                                }
                             }
                         }
 
@@ -168,7 +176,7 @@ struct AddWishlistRuleSheet: View {
                 }
             }
             .task {
-                selectedGame = preferredDefaultGame ?? .all
+                selectedGame = preferredSearchGame
                 setGame = preferredSetGame ?? .all
                 if mode == .set { await loadSets() }
             }

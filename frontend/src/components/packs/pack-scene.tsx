@@ -138,8 +138,8 @@ function buildCutFnFromPath(path: { x: number; y: number }[]): CutFn {
         }
       }
     }
-    const jag = Math.sin(x * 23.7) * 0.007 + Math.sin(x * 57.3 + 2) * 0.005;
-    return THREE.MathUtils.clamp(base, CUT_MIN, CUT_MAX) + jag;
+    // no artificial jag: the cut is exactly the user's (smoothed) drag path
+    return THREE.MathUtils.clamp(base, CUT_MIN, CUT_MAX);
   };
 }
 
@@ -1010,16 +1010,20 @@ export function PackExperience({
           pack.rotation.y = THREE.MathUtils.damp(pack.rotation.y, 0, 10, dt);
           pack.rotation.x = THREE.MathUtils.damp(pack.rotation.x, 0, 10, dt);
         } else {
+          // bulk stacks barely tilt — seen edge-on, the pitched slats splay
+          // into a fanned mess (reference app locks its stack down too)
+          const tiltY = stackCount > 1 ? 0.06 : 0.35;
+          const tiltX = stackCount > 1 ? 0.04 : 0.2;
           pack.position.y = packBaseY + Math.sin(t * 1.3) * 0.06;
           pack.rotation.y = THREE.MathUtils.damp(
             pack.rotation.y,
-            pointer.x * 0.35,
+            pointer.x * tiltY,
             4,
             dt,
           );
           pack.rotation.x = THREE.MathUtils.damp(
             pack.rotation.x,
-            -pointer.y * 0.2,
+            -pointer.y * tiltX,
             4,
             dt,
           );
@@ -1111,7 +1115,9 @@ export function PackExperience({
         const s = easeInCubic(
           THREE.MathUtils.clamp((T - 0.3 - i * 0.05) / 0.5, 0, 1),
         );
-        g.position.y = -s * 4.2;
+        // pitched slats mostly dissolve in place — a full slide in their
+        // tilted local frame would launch them at the camera
+        g.position.y = -s * (i === 0 ? 4.2 : 1.4);
         g.visible = s < 1;
       });
       for (const mat of wrapperMaterials.current) {
@@ -1283,17 +1289,18 @@ export function PackExperience({
       {cardsVisible && (
         <group ref={packRef} position={[0, packBaseY, 0]}>
           {Array.from({ length: stackCount }).map((_, i) => (
+            // pivot at the pack's BOTTOM edge: slats lean back away from the
+            // camera, so they can never swing through the front pack
             <group
               key={i}
-              // behind-packs pitch forward like slats and peek well above the
-              // upright front pack, reference-app style
               position={
                 i === 0
-                  ? [0, 0, 0]
-                  : [0, 0.5 + (i - 1) * 0.2, -0.32 - (i - 1) * 0.12]
+                  ? [0, -PACK_H / 2, 0]
+                  : [0, 0.85 + (i - 1) * 0.17, -0.3 - (i - 1) * 0.15]
               }
-              rotation={i === 0 ? [0, 0, 0] : [0.6, 0, 0]}
+              rotation={i === 0 ? [0, 0, 0] : [-1.05, 0, 0]}
             >
+              <group position={[0, PACK_H / 2, 0]}>
               <group
                 ref={(g) => {
                   bodyRefs.current[i] = g;
@@ -1413,6 +1420,7 @@ export function PackExperience({
                     />
                   </mesh>
                 )}
+                </group>
               </group>
             </group>
           ))}

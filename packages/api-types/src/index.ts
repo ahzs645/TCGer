@@ -15,3 +15,4 @@ export * from './automations';
 export * from './shipping';
 export * from './health';
 export * from './guides';
+export * from './collection-tags';

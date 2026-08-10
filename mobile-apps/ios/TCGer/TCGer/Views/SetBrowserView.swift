@@ -85,6 +85,19 @@ struct SetBrowserView: View {
 
     private var setBrowserContent: some View {
         VStack(spacing: 0) {
+                if environmentStore.shouldShowGamePicker {
+                    GamePickerPills(
+                        selection: $selectedGame,
+                        games: environmentStore.gamePickerGames
+                    )
+                    .background(Color(.systemBackground))
+                    Divider()
+                }
+
+                if !failedProviders.isEmpty {
+                    failedProvidersBanner
+                }
+
                 if isLoading {
                     ProgressView("Loading sets...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -121,11 +134,6 @@ struct SetBrowserView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        setBrowserControlBar
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-
                         ForEach(groupedSets, id: \.0) { tcg, tcgSets in
                             Section {
                                 ForEach(tcgSets) { set in
@@ -152,8 +160,11 @@ struct SetBrowserView: View {
                         }
                     }
                     .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(.systemBackground))
                 }
         }
+        .background(Color(.systemBackground).ignoresSafeArea())
         .navigationTitle("Sets")
             .searchable(
                 text: $searchText,
@@ -161,7 +172,22 @@ struct SetBrowserView: View {
                 prompt: "Search sets..."
             )
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    setFilterMenu
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [])
+                    } label: {
+                        Image(systemName: "heart.badge.plus")
+                    }
+                    .accessibilityLabel("Add sets to wishlist")
+                }
+            }
             .task {
+                validateSelectedGame()
                 await loadSets()
             }
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
@@ -190,70 +216,48 @@ struct SetBrowserView: View {
         }
     }
 
-    private var setBrowserControlBar: some View {
-        VStack(spacing: 0) {
-            if environmentStore.enabledGames.count > 1 {
-                GamePickerPills(
-                    selection: $selectedGame,
-                    games: environmentStore.gamePickerGames
-                )
+    private var setFilterMenu: some View {
+        Menu {
+            Picker("Progress", selection: $progressFilter) {
+                ForEach(SetProgressFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
             }
 
-            HStack(spacing: 12) {
-                Menu {
-                    Picker("Progress", selection: $progressFilter) {
-                        ForEach(SetProgressFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
-                        }
-                    }
+            Divider()
 
-                    Divider()
-
-                    Picker("Completion goal", selection: completionModeBinding) {
-                        ForEach(SetCompletionMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-
-                    Picker("Sort", selection: $environmentStore.setBrowserSort) {
-                        ForEach(SetBrowserSort.allCases) { sort in
-                            Text(sort.title).tag(sort)
-                        }
-                    }
-                } label: {
-                    Label(progressFilter.filterTitle, systemImage: "line.3.horizontal.decrease.circle")
+            Picker("Completion goal", selection: completionModeBinding) {
+                ForEach(SetCompletionMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
                 }
-                .buttonStyle(.bordered)
-
-                Spacer()
-
-                Button {
-                    addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [])
-                } label: {
-                    Label("Add Sets", systemImage: "heart.badge.plus")
-                }
-                .buttonStyle(.borderedProminent)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
 
-            if !failedProviders.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text("Some set catalogs are unavailable: \(failedProviderNames)")
-                        .font(.footnote)
-                    Spacer()
-                    Button("Retry") {
-                        Task { await loadSets(useCache: false) }
-                    }
-                    .font(.footnote.weight(.semibold))
+            Picker("Sort", selection: $environmentStore.setBrowserSort) {
+                ForEach(SetBrowserSort.allCases) { sort in
+                    Text(sort.title).tag(sort)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color.orange.opacity(0.12))
             }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
         }
+        .accessibilityLabel("Filter and sort sets, \(progressFilter.filterTitle)")
+    }
+
+    private var failedProvidersBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text("Some set catalogs are unavailable: \(failedProviderNames)")
+                .font(.footnote)
+            Spacer()
+            Button("Retry") {
+                Task { await loadSets(useCache: false) }
+            }
+            .font(.footnote.weight(.semibold))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.12))
     }
 
     @ViewBuilder
@@ -267,9 +271,7 @@ struct SetBrowserView: View {
     }
 
     private func validateSelectedGame() {
-        if selectedGame != .all && !environmentStore.enabledGames.contains(selectedGame) {
-            selectedGame = .all
-        }
+        selectedGame = environmentStore.resolvedGameSelection(selectedGame)
     }
 
     private var completionModeBinding: Binding<SetCompletionMode> {

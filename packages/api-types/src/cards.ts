@@ -284,3 +284,11 @@ export const artistSearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(500)
 });
 export type ArtistSearchQueryInput = z.infer<typeof artistSearchQuerySchema>;
+
+/** Exact canonical collection-tag lookup used by system collection guides. */
+export const collectionTagSearchQuerySchema = z.object({
+  tag: z.string().trim().min(1, 'tag parameter is required'),
+  tcg: tcgCodeSchema,
+  limit: z.coerce.number().int().min(1).max(5000).default(2000)
+});
+export type CollectionTagSearchQueryInput = z.infer<typeof collectionTagSearchQuerySchema>;
