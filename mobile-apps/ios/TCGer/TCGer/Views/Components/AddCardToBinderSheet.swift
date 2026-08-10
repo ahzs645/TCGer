@@ -5,6 +5,7 @@ struct AddCardToBinderSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let card: Card
+    let initialBinderId: String?
     let onAdd: (String, BinderCardAddDetails) async throws -> Void
 
     @State private var collections: [Collection] = []
@@ -38,6 +39,16 @@ struct AddCardToBinderSheet: View {
         PokemonFinishOption.options(for: card, includeCatalog: true)
     }
 
+    init(
+        card: Card,
+        initialBinderId: String? = nil,
+        onAdd: @escaping (String, BinderCardAddDetails) async throws -> Void
+    ) {
+        self.card = card
+        self.initialBinderId = initialBinderId
+        self.onAdd = onAdd
+    }
+
     var body: some View {
         NavigationView {
             Form {
@@ -67,20 +78,10 @@ struct AddCardToBinderSheet: View {
                         }
                         .padding(.vertical, 8)
                     } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            BinderPickerMenu(
-                                binders: collections,
-                                selectedBinderId: $selectedBinderId
-                            )
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(Color.fromHex(collection(for: selectedBinderId)?.colorHex))
-                                    .frame(width: 10, height: 10)
-                                Text(collection(for: selectedBinderId)?.name ?? "No binder selected")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+                        BinderPickerSheetButton(
+                            binders: collections,
+                            selectedBinderId: $selectedBinderId
+                        )
                     }
                 } header: {
                     Text("Binder")
@@ -221,8 +222,13 @@ struct AddCardToBinderSheet: View {
                 config: environmentStore.serverConfiguration,
                 token: token
             ).sortedForDisplay()
-            // Auto-select first binder if only one exists
-            if selectedBinderId == nil {
+            if let selectedBinderId,
+               collections.contains(where: { $0.id == selectedBinderId }) {
+                // Preserve a selection the user already made if collections reload.
+            } else if let initialBinderId,
+                      collections.contains(where: { $0.id == initialBinderId }) {
+                selectedBinderId = initialBinderId
+            } else {
                 selectedBinderId = collections.first?.id
             }
             applyBinderDefaultCondition()

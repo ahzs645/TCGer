@@ -104,7 +104,7 @@ struct AddCardToBinderFromSearchView: View {
                 currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card) { binderId, details in
+                AddCardToBinderSheet(card: card, initialBinderId: binderId) { binderId, details in
                     try await apiService.addCardToBinder(
                         config: environmentStore.serverConfiguration,
                         token: environmentStore.authToken,
@@ -242,4 +242,3 @@ struct AddCardToBinderFromSearchView: View {
         }
     }
 }
-
