@@ -5,19 +5,26 @@ import Image from "next/image";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { generatePack, tierRank, type PulledCard } from "./pack-data";
+import {
+  generatePack,
+  packVariantById,
+  tierRank,
+  type PulledCard,
+} from "./pack-data";
 import {
   PackExperience,
+  PackSelectRow,
   type PackPhase,
   type PackSceneControls,
 } from "./pack-scene";
 
-const PHASE_HINTS: Record<PackPhase, string> = {
+const PHASE_HINTS: Partial<Record<PackPhase, string>> = {
+  select: "Pick a booster — choose how many packs below",
   tear: "Swipe across the dotted line to tear the pack open",
-  opening: "",
   reveal: "Tap the stack to reveal the next card",
-  summary: "",
 };
+
+const PACK_COUNTS = [1, 5, 10] as const;
 
 const TIER_LABEL_CLASSES: Record<string, string> = {
   common: "text-slate-500 dark:text-slate-300",
@@ -28,9 +35,12 @@ const TIER_LABEL_CLASSES: Record<string, string> = {
 };
 
 export function PackOpening() {
-  const [pack, setPack] = useState<PulledCard[] | null>(null);
-  const [packKey, setPackKey] = useState(0);
-  const [phase, setPhase] = useState<PackPhase>("tear");
+  const [phase, setPhase] = useState<PackPhase>("select");
+  const [packCount, setPackCount] = useState<number>(1);
+  const [variantId, setVariantId] = useState<string | null>(null);
+  const [packs, setPacks] = useState<PulledCard[][]>([]);
+  const [packIndex, setPackIndex] = useState(0);
+  const [remountKey, setRemountKey] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
   const [flashKey, setFlashKey] = useState(0);
   const [forceChase, setForceChase] = useState(false);
@@ -38,28 +48,51 @@ export function PackOpening() {
   const controls = useRef<PackSceneControls>({ timeScale: 1 });
 
   useEffect(() => {
-    setPack(generatePack());
-  }, []);
-
-  useEffect(() => {
     controls.current.timeScale = slowMo ? 0.25 : 1;
   }, [slowMo]);
 
-  const reroll = useCallback(
-    (chase: boolean) => {
-      setPack(generatePack(chase));
-      setPackKey((k) => k + 1);
-      setPhase("tear");
+  const startPacks = useCallback(
+    (id: string) => {
+      setVariantId(id);
+      setPacks(
+        Array.from({ length: packCount }, () => generatePack(forceChase)),
+      );
+      setPackIndex(0);
       setRevealedCount(0);
+      setRemountKey((k) => k + 1);
+      setPhase("tear");
     },
-    [],
+    [packCount, forceChase],
   );
 
-  const handleTorn = useCallback(() => setPhase("opening"), []);
-  const handleOpened = useCallback(() => {
-    setPhase("reveal");
-    setRevealedCount(1);
+  const rerollCurrent = useCallback(() => {
+    setPacks((prev) =>
+      prev.map((p, i) => (i === packIndex ? generatePack(forceChase) : p)),
+    );
+    setRevealedCount(0);
+    setRemountKey((k) => k + 1);
+    setPhase("tear");
+  }, [packIndex, forceChase]);
+
+  const backToSelect = useCallback(() => {
+    setPhase("select");
+    setPacks([]);
+    setVariantId(null);
+    setPackIndex(0);
+    setRevealedCount(0);
   }, []);
+
+  const handleTorn = useCallback(() => setPhase("opening"), []);
+  // Bulk opens skip the card-by-card ritual: one tear, all results at once,
+  // matching the reference app's multi-pack flow.
+  const handleOpened = useCallback(() => {
+    if (packs.length > 1) {
+      setPhase("final");
+    } else {
+      setPhase("reveal");
+      setRevealedCount(1);
+    }
+  }, [packs.length]);
   const handleReveal = useCallback(
     (count: number) => setRevealedCount(count),
     [],
@@ -67,28 +100,41 @@ export function PackOpening() {
   const handleAllRevealed = useCallback(() => setPhase("summary"), []);
   const handleFlash = useCallback(() => setFlashKey((k) => k + 1), []);
 
-  const revealed = pack ? pack.slice(0, revealedCount) : [];
+  const variant = variantId ? packVariantById(variantId) : null;
+  const currentPack = packs[packIndex] ?? null;
+  const revealed = currentPack ? currentPack.slice(0, revealedCount) : [];
+  const canvasVisible =
+    phase === "select" ||
+    phase === "tear" ||
+    phase === "opening" ||
+    phase === "reveal";
 
   return (
     <div className="relative h-[72vh] min-h-[540px] w-full overflow-hidden">
-      {pack && phase !== "summary" && (
+      {canvasVisible && (
         <Canvas
-          key={packKey}
           camera={{ position: [0, 0, 7], fov: 40 }}
           dpr={[1, 2]}
           gl={{ antialias: true, alpha: true }}
         >
           <Suspense fallback={null}>
-            <PackExperience
-              cards={pack}
-              phase={phase}
-              controls={controls}
-              onTorn={handleTorn}
-              onOpened={handleOpened}
-              onReveal={handleReveal}
-              onAllRevealed={handleAllRevealed}
-              onFlash={handleFlash}
-            />
+            {phase === "select" ? (
+              <PackSelectRow onSelect={startPacks} />
+            ) : currentPack && variant ? (
+              <PackExperience
+                key={`${packIndex}-${remountKey}`}
+                cards={currentPack}
+                variant={variant}
+                packCount={packs.length}
+                phase={phase}
+                controls={controls}
+                onTorn={handleTorn}
+                onOpened={handleOpened}
+                onReveal={handleReveal}
+                onAllRevealed={handleAllRevealed}
+                onFlash={handleFlash}
+              />
+            ) : null}
           </Suspense>
         </Canvas>
       )}
@@ -104,56 +150,116 @@ export function PackOpening() {
           }}
         />
       )}
-      <style>{`@keyframes pack-flash { 0% { opacity: 0.9; } 100% { opacity: 0; } }`}</style>
+      <style>{`
+        @keyframes pack-flash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+        @keyframes pack-card-in {
+          0% { opacity: 0; transform: translateY(14px) scale(0.94); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       {/* phase hint */}
-      {pack && PHASE_HINTS[phase] && (
+      {PHASE_HINTS[phase] && (
         <p className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-sm font-medium text-muted-foreground">
-          {PHASE_HINTS[phase]}
+          {phase === "tear" && packs.length > 1
+            ? `Tear once to open all ${packs.length} packs`
+            : PHASE_HINTS[phase]}
         </p>
       )}
 
-      {/* summary */}
-      {pack && phase === "summary" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-6">
+      {/* pack count picker on select screen */}
+      {phase === "select" && (
+        <div className="absolute inset-x-0 bottom-12 flex justify-center gap-2">
+          {PACK_COUNTS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setPackCount(n)}
+              className={cn(
+                "rounded-full border border-border px-4 py-1.5 text-sm font-semibold transition hover:bg-muted",
+                packCount === n &&
+                  "border-primary bg-primary text-primary-foreground hover:bg-primary",
+              )}
+            >
+              ×{n}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* single-pack summary */}
+      {phase === "summary" && currentPack && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6">
           <h2 className="text-xl font-heading font-semibold text-foreground">
             Pack results
           </h2>
           <div className="flex flex-wrap items-start justify-center gap-4">
-            {pack.map((card) => (
-              <figure key={card.id} className="w-32 text-center sm:w-36">
-                <Image
-                  src={card.imageUrlSmall}
-                  alt={card.name}
-                  width={245}
-                  height={342}
-                  unoptimized
-                  className={cn(
-                    "w-full rounded-lg shadow-lg",
-                    tierRank(card.tier) >= 3 &&
-                      "ring-2 ring-amber-300/80 shadow-amber-400/30",
-                  )}
-                />
-                <figcaption className="mt-1.5 text-xs text-foreground/85">
-                  {card.name}
-                  <span
-                    className={cn(
-                      "block text-[10px] uppercase tracking-wide",
-                      TIER_LABEL_CLASSES[card.tier],
-                    )}
-                  >
-                    {card.rarity}
-                  </span>
-                </figcaption>
-              </figure>
+            {currentPack.map((card, i) => (
+              <PackResultCard key={card.id} card={card} index={i} />
             ))}
           </div>
           <button
             type="button"
-            onClick={() => reroll(forceChase)}
+            onClick={backToSelect}
             className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
           >
-            Open another pack
+            Open more packs
+          </button>
+        </div>
+      )}
+
+      {/* combined results across all packs */}
+      {phase === "final" && (
+        <div className="absolute inset-0 flex flex-col items-center gap-6 overflow-y-auto p-6">
+          <h2 className="text-xl font-heading font-semibold text-foreground">
+            All results · {packs.length} packs · {variant?.name}
+          </h2>
+          {(() => {
+            const best = packs
+              .flatMap((pack, i) =>
+                pack.map((card, j) => ({ card, key: `${i}-${j}` })),
+              )
+              .filter(({ card }) => tierRank(card.tier) >= 3)
+              .sort(
+                (a, b) => tierRank(b.card.tier) - tierRank(a.card.tier),
+              );
+            if (best.length === 0) return null;
+            return (
+              <section className="w-full max-w-4xl space-y-2">
+                <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-300">
+                  Best pulls
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  {best.map(({ card, key }, i) => (
+                    <PackResultCard key={key} card={card} index={i} />
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+          {packs.map((pack, i) => (
+            <section key={i} className="w-full max-w-4xl space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                Pack {i + 1}
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {pack.map((card, j) => (
+                  <PackResultCard
+                    key={`${i}-${card.id}`}
+                    card={card}
+                    small
+                    index={i * 5 + j}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+          <button
+            type="button"
+            onClick={backToSelect}
+            className="mb-4 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+          >
+            Open more packs
           </button>
         </div>
       )}
@@ -164,28 +270,38 @@ export function PackOpening() {
           <span className="text-muted-foreground">phase</span>
           <span>{phase}</span>
         </p>
+        {packs.length > 0 && (
+          <p className="flex justify-between">
+            <span className="text-muted-foreground">packs</span>
+            <span>
+              ×{packs.length} · {variant?.name}
+            </span>
+          </p>
+        )}
         <p className="flex justify-between">
           <span className="text-muted-foreground">revealed</span>
           <span>
-            {revealedCount}/{pack?.length ?? 0}
+            {revealedCount}/{currentPack?.length ?? 0}
           </span>
         </p>
         <div className="flex flex-wrap gap-1.5 pt-1">
-          <HudButton onClick={() => reroll(forceChase)}>Reroll</HudButton>
+          {phase !== "select" && (
+            <>
+              <HudButton onClick={rerollCurrent}>Reroll</HudButton>
+              <HudButton onClick={backToSelect}>Packs</HudButton>
+            </>
+          )}
           {phase === "tear" && (
             <HudButton onClick={handleTorn}>Skip tear</HudButton>
           )}
-          <HudButton
-            active={forceChase}
-            onClick={() => setForceChase((v) => !v)}
-          >
+          <HudButton active={forceChase} onClick={() => setForceChase((v) => !v)}>
             Force chase
           </HudButton>
           <HudButton active={slowMo} onClick={() => setSlowMo((v) => !v)}>
             Slow-mo
           </HudButton>
         </div>
-        {revealed.length > 0 && phase !== "summary" && (
+        {revealed.length > 0 && phase === "reveal" && (
           <ul className="space-y-0.5 border-t border-border pt-1.5">
             {revealed.map((card) => (
               <li key={card.id} className="flex justify-between gap-2">
@@ -199,6 +315,56 @@ export function PackOpening() {
         )}
       </div>
     </div>
+  );
+}
+
+function PackResultCard({
+  card,
+  small = false,
+  index = 0,
+}: {
+  card: PulledCard;
+  small?: boolean;
+  index?: number;
+}) {
+  return (
+    <figure
+      className={cn(
+        "animate-[pack-card-in_0.45s_both] text-center",
+        small ? "w-24" : "w-32 sm:w-36",
+      )}
+      style={{ animationDelay: `${index * 55}ms` }}
+    >
+      <Image
+        src={card.imageUrlSmall}
+        alt={card.name}
+        width={245}
+        height={342}
+        unoptimized
+        className={cn(
+          "w-full rounded-lg shadow-lg",
+          tierRank(card.tier) >= 3 &&
+            "ring-2 ring-amber-300/80 shadow-amber-400/30",
+        )}
+      />
+      <figcaption
+        className={cn(
+          "mt-1.5 text-foreground/85",
+          small ? "text-[10px]" : "text-xs",
+        )}
+      >
+        {card.name}
+        <span
+          className={cn(
+            "block uppercase tracking-wide",
+            small ? "text-[9px]" : "text-[10px]",
+            TIER_LABEL_CLASSES[card.tier],
+          )}
+        >
+          {card.rarity}
+        </span>
+      </figcaption>
+    </figure>
   );
 }
 
