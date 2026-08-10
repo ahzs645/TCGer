@@ -8,6 +8,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// Candidates below the normal acceptance threshold remain available
         /// only for exact OCR confirmation (for example, a readable 170/198).
         static let minimumEvidenceScore: Double = 0.55
+        /// Device foil/blur evidence found two plain-visual wrong accepts at
+        /// 0.70 while the canonical replay's weakest plain correct accept was
+        /// 0.742. OCR-confirmed results remain eligible from 0.55.
         static let strongAcceptanceScore: Double = 0.72
         /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
         static let ocrMargin: Double = 0.1
@@ -397,7 +400,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // AND a strong (>= acceptance-threshold) visual match agree — the
         // gate has measured false negatives on hand-held sleeved captures
         // (0.29–0.47 on legitimate cards in device dev-mode sessions), and a
-        // back, pack, or carpet produces neither a title match nor a 0.70+
+        // back, pack, or carpet produces neither a title match nor a 0.72+
         // similarity. Title evidence alone (without the strong score) is
         // still not enough. The same-name printing guards below still apply.
         if gateRejected && !ocrVerified {

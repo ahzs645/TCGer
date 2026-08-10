@@ -29,7 +29,7 @@ of {detected crop, whole frame} scores higher as a card face is used. Camera
 captures never take that fallback, so live behavior is unchanged.
 
 Fixture `minimumConfidence` floors assert the production strong-acceptance
-threshold (0.70), not a stricter test-only bar: correct top-1 results at
+threshold (0.72), not a stricter test-only bar: correct top-1 results at
 0.80–0.88 were failing a legacy 0.90 floor that production would happily
 accept, which hid real crop failures behind threshold noise.
 
@@ -41,7 +41,7 @@ pre-2026-08-09 detector, the mixed-region crop retrieved a wrong card at
 outcome was abstention. If this fixture flips back to no-match after a
 detector change, diagnose which card region the box covers before blessing
 either answer. Its confidence floor is 0.55 (the OCR-verified evidence
-floor), not 0.70: the partially occluded crop is accepted via collector
+floor), not 0.72: the partially occluded crop is accepted via collector
 number confirmation, which production admits from `minimumEvidenceScore` up.
 
 ## Command-line setup

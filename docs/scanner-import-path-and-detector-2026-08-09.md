@@ -67,7 +67,7 @@ and footer OCR confirms the printing past the gate rejection.
 ### 3. Honest fixture baselines
 
 - `minimumConfidence` floors dropped from a legacy test-only 0.90 to the
-  production strong-accept 0.70. Correct top-1 results at 0.80–0.88 were
+  then-production strong-accept 0.70. Correct top-1 results at 0.80–0.88 were
   failing a bar production doesn't use, which hid the real crop failures
   behind threshold noise.
 - `two-cards` briefly became a `noMatch` fixture (with the old detector no
@@ -75,7 +75,8 @@ and footer OCR confirms the printing past the gate rejection.
   at 0.704 — one ambiguity-margin check from a confident mislabel, so
   abstention was correct). With the new detector it isolates one card and
   identifies it via collector-number OCR, so it is `top5Any` again with a
-  0.55 floor (the OCR-verified evidence floor, not the 0.70 embedding floor).
+  0.55 floor (the OCR-verified evidence floor, not the plain embedding floor,
+  which later moved to 0.72 after device lighting/foil evidence).
 - The perf suite's first-scan test scans the bundled fixture as
   `.importedPhoto` — it is a borderless crop, i.e. an import — which also
   puts the most expensive path (whole-frame retry) inside the latency budget.

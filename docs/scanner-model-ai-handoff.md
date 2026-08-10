@@ -1,6 +1,39 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-09 (import path + YOLO detector + dev mode + angled-card and binder fixes from device evidence)
+Last updated: 2026-08-09 (19:12 lighting/foil export analysis and precision tightening)
+
+## Session Results 2026-08-09 (19:12 lighting/foil export)
+
+The newest export contributed 29 labelable single-card shots and five binder
+pages. Repeated shots plus visible titles/collector numbers establish exact
+ground truth for every single-card frame; the replay harness now carries those
+labels and excludes binder pages, which belong in `BinderSessionReplayTests`.
+
+- At the old 0.70 plain-visual bar, current Simulator replay produced 13/29
+  correct, 14 safe abstentions, and two wrong accepts: Primeape became
+  `sm3-23` Simisear and Cresselia became the known junk attractor
+  `ecard3-146` Charizard. At 0.72 it kept the same 13 correct and changed both
+  wrong accepts to abstentions. Exact collector OCR remains eligible from the
+  0.55 evidence floor.
+- The completed canonical 50-image run at 0.70 was 18 accepted, 16/16 labeled
+  accepts exact, and zero wrong printings. Its weakest plain correct accept was
+  0.742; the only lower correct result (0.691) was OCR-confirmed. This supports
+  0.72 without sacrificing any measured plain correct accept. A second full
+  corpus run at 0.72 hit a Simulator/Xcode lifecycle hang and produced no
+  report, so do not describe that run as passing.
+- Crop-level lighting experiments rejected global preprocessing. Baseline was
+  16/29 top-1 and 9 strong correct; exposure reduction fell to 13/29,
+  highlight compression fell to 13/29 and introduced a strong wrong result,
+  sharpening reached 17/29 but added no strong correct result, and the combined
+  filter was 15/29 with a strong wrong result. Keep embedding pixels ungraded.
+- New binder pages replay at 7-9 detections per page. Current Simulator replay
+  moved candidates 24 -> 22 and matches 4 -> 5; the quads are visually sound.
+  The dominant bottleneck is exact-printing evidence (20 recorded
+  `printingAmbiguous` attempts), not localization or a global lighting filter.
+
+Next levers: perspective/foil augmentation of reference embeddings, exact
+collector OCR for binder crops, and cross-shot aggregation. Do not lower the
+gate or acceptance bar to recover glare/blur frames.
 
 ## Session Results 2026-08-09 (the evidence-loop sessions)
 
@@ -96,7 +129,7 @@ harnesses measure change-vs-baseline, not absolute device truth.
 
 - Crop candidate ties break by shoelace quad area, not Vision confidence
   (everything ties at 1.00); measured neutral on the 2,336 scene corpus.
-- Fixture `minimumConfidence` floors = 0.70 (production bar), two-cards =
+- Fixture `minimumConfidence` floors = 0.72 (production bar), two-cards =
   `top5Any` at 0.55 (OCR-verified route).
 - Aspect-ratio guards on the detector's axis-aligned box are harmful (a
   rotated card is near-square in its box): one such guard cost 524

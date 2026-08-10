@@ -10,6 +10,8 @@ import XCTest
 /// wrong top-1 results on this set and the full scanner replay corpus.
 @MainActor
 final class ScannerLightingExperimentTests: XCTestCase {
+    private static let plainAcceptanceScore = 0.72
+
     private struct EvidenceRecord: Decodable {
         let imageFile: String
         let attemptImageFiles: [String]
@@ -160,10 +162,10 @@ final class ScannerLightingExperimentTests: XCTestCase {
                 value.gateScoreSum += gateScore
                 value.correctScoreSum += correct?.score ?? 0
                 if top?.id == expected { value.top1Correct += 1 }
-                if top?.id == expected, (top?.score ?? 0) >= 0.70 {
+                if top?.id == expected, (top?.score ?? 0) >= Self.plainAcceptanceScore {
                     value.correctAtStrongThreshold += 1
                 }
-                if top?.id != expected, (top?.score ?? 0) >= 0.70 {
+                if top?.id != expected, (top?.score ?? 0) >= Self.plainAcceptanceScore {
                     value.wrongAtStrongThreshold += 1
                 }
                 totals[variant] = value
