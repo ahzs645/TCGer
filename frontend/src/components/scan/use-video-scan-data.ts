@@ -13,16 +13,17 @@ import {
   parseEmbeddingIndex,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
+import {
+  SCAN_CACHE_ARTWORK_STORE as ARTWORK_STORE,
+  SCAN_CACHE_EMBEDDING_STORE as EMBEDDING_STORE,
+  SCAN_CACHE_HASH_STORE as HASH_STORE,
+  SCAN_CACHE_DB_NAME as IDB_NAME,
+  SCAN_CACHE_DB_VERSION as IDB_VERSION,
+} from "@/lib/storage/keys";
 
 import { HASH_PAGE_SIZE, type ScanFilter } from "./video-scan-types";
 
 // ---------- IndexedDB helpers ----------
-
-const IDB_NAME = "tcger-scan-cache";
-const IDB_VERSION = 2;
-const HASH_STORE = "hashEntries";
-const ARTWORK_STORE = "artworkDb";
-const EMBEDDING_STORE = "embeddingIndex";
 
 function openCache(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

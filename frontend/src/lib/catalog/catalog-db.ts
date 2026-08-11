@@ -1,11 +1,13 @@
-import type { CatalogTcgCode } from "./catalog-types";
+import {
+  CATALOG_CARDS_SET_INDEX as CARDS_SET_INDEX,
+  CATALOG_CARDS_STORE as CARDS_STORE,
+  CATALOG_CARDS_TCG_INDEX as CARDS_TCG_INDEX,
+  CATALOG_DB_NAME as DB_NAME,
+  CATALOG_DB_VERSION as DB_VERSION,
+  CATALOG_PACKS_STORE as PACKS_STORE,
+} from "@/lib/storage/keys";
 
-const DB_NAME = "tcger-catalog";
-const DB_VERSION = 1;
-const PACKS_STORE = "packs";
-const CARDS_STORE = "cards";
-const CARDS_TCG_INDEX = "by-tcg";
-const CARDS_SET_INDEX = "by-tcg-set";
+import type { CatalogTcgCode } from "./catalog-types";
 
 export interface CatalogSet {
   code: string;

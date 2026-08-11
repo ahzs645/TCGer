@@ -20,6 +20,7 @@ import {
   isCatalogGame,
   useCatalog,
 } from "@/lib/catalog/use-catalog";
+import { catalogPromptDismissedKey as dismissalKey } from "@/lib/storage/keys";
 import { GAME_LABELS } from "@/lib/utils";
 import { useGameFilterStore } from "@/stores/game-filter";
 
@@ -27,10 +28,6 @@ function formatApproximateSize(bytes?: number): string {
   if (!bytes) return "";
   const megabytes = bytes / (1024 * 1024);
   return ` (~${megabytes >= 10 ? megabytes.toFixed(0) : megabytes.toFixed(1)} MB)`;
-}
-
-function dismissalKey(tcg: TcgCode, version?: number): string {
-  return `tcger:catalog-prompt-dismissed:${tcg}:v${version ?? "unknown"}`;
 }
 
 function isDemoExperience(): boolean {
