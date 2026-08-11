@@ -121,29 +121,48 @@ export default function AnalyticsPage() {
         >
           <StatCard
             title="Total Value"
-            value={`$${totalValue.toFixed(2)}`}
+            value={mounted ? `$${totalValue.toFixed(2)}` : "—"}
             icon={<DollarSign className="h-5 w-5" data-oid="mt89jh7" />}
             sub="Across all games"
             data-oid="mun8pi5"
           />
           <StatCard
             title="Total Cards"
-            value={totalCards}
+            value={mounted ? totalCards.toLocaleString() : "—"}
             icon={<Layers className="h-5 w-5" data-oid="brh-qc." />}
-            sub="135 unique cards"
+            sub={
+              mounted
+                ? `${uniqueCards.toLocaleString()} unique cards`
+                : "Across your binders"
+            }
             data-oid="yip_-tb"
           />
           <StatCard
             title="30-Day Change"
-            value="+$215.00"
-            icon={<TrendingUp className="h-5 w-5" data-oid="ywyuj8w" />}
-            sub="+11.7% this month"
-            positive
+            value={
+              mounted
+                ? `${monthChange >= 0 ? "+" : "-"}$${Math.abs(monthChange).toFixed(2)}`
+                : "—"
+            }
+            icon={
+              mounted && monthChange < 0 ? (
+                <TrendingDown className="h-5 w-5" />
+              ) : (
+                <TrendingUp className="h-5 w-5" data-oid="ywyuj8w" />
+              )
+            }
+            sub={
+              mounted
+                ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(1)}% since ${previousMonth.month}`
+                : "Versus last month"
+            }
+            positive={mounted && monthChange >= 0}
+            negative={mounted && monthChange < 0}
             data-oid="m4lulu9"
           />
           <StatCard
             title="Avg Card Value"
-            value={`$${(totalValue / totalCards).toFixed(2)}`}
+            value={mounted ? `$${avgCardValue.toFixed(2)}` : "—"}
             icon={<BarChart3 className="h-5 w-5" data-oid="4mjb6dx" />}
             sub="Per card average"
             data-oid="_cm1w::"
@@ -162,24 +181,34 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent data-oid="pu8f.fm">
-            <div className="flex items-end gap-3 h-48" data-oid="rtts-rv">
-              {MONTHLY_VALUES.map((m) => (
+            <div
+              className="flex items-end gap-3 h-48"
+              role="img"
+              aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${totalValue.toFixed(2)}`}
+              data-oid="rtts-rv"
+            >
+              {monthlyValues.map((m) => (
                 <div
                   key={m.month}
-                  className="flex flex-1 flex-col items-center gap-1"
+                  className="flex h-full flex-1 flex-col items-center gap-1"
+                  title={`${m.month}: $${m.value.toFixed(2)}`}
                   data-oid="4f:xh5c"
                 >
                   <span
                     className="text-xs text-muted-foreground font-medium"
                     data-oid="geq.yah"
                   >
-                    ${m.value}
+                    ${Math.round(m.value)}
                   </span>
-                  <div
-                    className="w-full rounded-t bg-primary/80 transition-all"
-                    style={{ height: `${(m.value / maxBarValue) * 100}%` }}
-                    data-oid="yypyl_v"
-                  />
+                  <div className="flex w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-t bg-primary/80 transition-all"
+                      style={{
+                        height: `${Math.max(2, (m.value / maxBarValue) * 100)}%`,
+                      }}
+                      data-oid="yypyl_v"
+                    />
+                  </div>
 
                   <span
                     className="text-xs text-muted-foreground"
