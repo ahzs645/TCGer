@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { requireAuth, type AuthRequest } from '../middleware/auth';
+import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
-import * as pricingService from '../../modules/pricing/pricing.service';
+import { fetchLiveCardPrices } from '../../modules/pricing/live-pricing.service';
+import { env } from '../../config/env';
 
 export const pricesRouter = Router();
 
@@ -9,9 +10,16 @@ pricesRouter.use(requireAuth);
 
 // Get price movers
 pricesRouter.get('/analytics/movers', asyncHandler(async (req, res) => {
+  if (env.BACKEND_MODE === 'convex') {
+    return res.status(501).json({
+      error: 'NOT_IMPLEMENTED',
+      message: 'Price-history analytics are not available in Convex mode yet',
+    });
+  }
   const tcg = req.query.tcg as string | undefined;
   const period = Math.min(365, Math.max(1, parseInt(req.query.period as string) || 7));
-  const movers = await pricingService.getPriceAnalyticsMovers(tcg, period);
+  const { getPriceAnalyticsMovers } = await import('../../modules/pricing/pricing.service');
+  const movers = await getPriceAnalyticsMovers(tcg, period);
   res.json(movers);
 }));
 
@@ -19,6 +27,13 @@ pricesRouter.get('/analytics/movers', asyncHandler(async (req, res) => {
 pricesRouter.get('/:tcg/:cardId', asyncHandler(async (req, res) => {
   const { tcg, cardId } = req.params;
   const finishCode = typeof req.query.finish === 'string' ? req.query.finish : undefined;
-  const prices = await pricingService.fetchCardPrices(tcg, cardId, finishCode);
+  const prices =
+    env.BACKEND_MODE === 'convex'
+      ? await fetchLiveCardPrices(tcg, cardId, finishCode)
+      : await (await import('../../modules/pricing/pricing.service')).fetchCardPrices(
+          tcg,
+          cardId,
+          finishCode,
+        );
   res.json(prices);
 }));

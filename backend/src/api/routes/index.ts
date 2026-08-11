@@ -10,6 +10,7 @@ import { docsRouter } from './docs.router';
 import { healthRouter } from './health.router';
 import { newsRouter } from './news.router';
 import { createNotImplementedRouter } from './not-implemented.router';
+import { pricesRouter } from './prices.router';
 import { convexPublicRouter } from './public.convex.router';
 import { settingsRouter } from './settings.router';
 import { convexSealedRouter } from './sealed.convex.router';
@@ -43,7 +44,6 @@ async function registerLegacyRoutes(app: Express) {
     { decksRouter },
     { alertsRouter },
     { financeRouter },
-    { pricesRouter },
     { shopsRouter },
     { sealedRouter },
     { tradingRouter },
@@ -56,7 +56,6 @@ async function registerLegacyRoutes(app: Express) {
     import('./decks.router'),
     import('./alerts.router'),
     import('./finance.router'),
-    import('./prices.router'),
     import('./shops.router'),
     import('./sealed.router'),
     import('./trading.router'),
@@ -70,7 +69,6 @@ async function registerLegacyRoutes(app: Express) {
   app.use('/decks', decksRouter);
   app.use('/alerts', alertsRouter);
   app.use('/finance', financeRouter);
-  app.use('/prices', pricesRouter);
   app.use('/shops', shopsRouter);
   app.use('/sealed', sealedRouter);
   app.use('/trades', tradingRouter);
@@ -99,6 +97,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/wishlists', wishlistsRouter);
   app.use('/guides', convexGuidesRouter);
   app.use('/news', newsRouter);
+  app.use('/prices', pricesRouter);
 
   // Convex-native feature routers and explicit legacy-feature availability
   // signals, mounted only in full Convex mode.
@@ -108,7 +107,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     app.use('/sealed', convexSealedRouter);
     app.use('/analytics', convexAnalyticsRouter);
     app.use('/trades', convexTradesRouter);
-    app.use('/prices', createNotImplementedRouter('prices'));
     app.use('/notifications', createNotImplementedRouter('notifications'));
     app.use('/alerts', createNotImplementedRouter('alerts'));
     app.use('/shops', createNotImplementedRouter('shops'));

@@ -54,6 +54,7 @@ import {
   replaceBinderPageImage,
   upsertBinderPage
 } from '../../modules/collections/binder-pages.service';
+import { enrichCollectionCardPrice } from '../../modules/pricing/collection-price-enrichment';
 
 export const collectionsRouter = Router();
 
@@ -375,7 +376,7 @@ collectionsRouter.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const userId = (req as AuthRequest).user!.id;
-    const data = addLibraryCardSchema.parse(req.body);
+    const data = await enrichCollectionCardPrice(addLibraryCardSchema.parse(req.body));
 
     const collection = await addCardToLibrary(userId, data);
     res.status(201).json(collection);
@@ -389,7 +390,7 @@ collectionsRouter.post(
   asyncHandler(async (req, res) => {
     const userId = (req as AuthRequest).user!.id;
     const { binderId } = req.params;
-    const data = addCardSchema.parse(req.body);
+    const data = await enrichCollectionCardPrice(addCardSchema.parse(req.body));
 
     try {
       const collection = await addCardToBinder(userId, binderId, data);

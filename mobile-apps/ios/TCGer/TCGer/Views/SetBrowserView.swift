@@ -147,6 +147,17 @@ struct SetBrowserView: View {
                                             progressTotal: progressTotal(for: set)
                                         )
                                     }
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        Color(.secondarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    )
+                                    .listRowInsets(
+                                        EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16)
+                                    )
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                         addToWishlistAction(for: set)
                                     }
@@ -159,12 +170,12 @@ struct SetBrowserView: View {
                             }
                         }
                     }
-                    .listStyle(.insetGrouped)
+                    .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .background(Color(.systemBackground))
+                    .background(Color(.systemGroupedBackground))
                 }
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Sets")
             .searchable(
                 text: $searchText,

@@ -136,8 +136,15 @@ export async function getCardPrices(
   token: string,
   tcg: string,
   cardId: string,
+  finishCode?: string,
 ): Promise<PriceResult[]> {
-  return authFetch(`${API_BASE_URL}/prices/${tcg}/${cardId}`, token);
+  const params = new URLSearchParams();
+  if (finishCode) params.set("finish", finishCode);
+  const query = params.size ? `?${params.toString()}` : "";
+  return authFetch(
+    `${API_BASE_URL}/prices/${encodeURIComponent(tcg)}/${encodeURIComponent(cardId)}${query}`,
+    token,
+  );
 }
 export async function getPriceMovers(
   token: string,

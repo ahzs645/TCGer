@@ -228,6 +228,7 @@ struct ScannerSessionReviewView: View {
                         selectedBinderId: $selectedBinderID
                     )
                     .padding(.horizontal, 14)
+                    .frame(height: ReviewBinderControlMetrics.height)
                     .modifier(ReviewBinderPickerSurface())
                 }
 
@@ -236,9 +237,27 @@ struct ScannerSessionReviewView: View {
                 } label: {
                     Image(systemName: "folder.badge.plus")
                         .font(.headline)
-                        .frame(width: 44, height: 44)
+                        .foregroundStyle(.tint)
+                        .frame(
+                            width: ReviewBinderControlMetrics.height,
+                            height: ReviewBinderControlMetrics.height
+                        )
+                        .background(
+                            Color.accentColor.opacity(0.12),
+                            in: RoundedRectangle(
+                                cornerRadius: ReviewBinderControlMetrics.cornerRadius,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: ReviewBinderControlMetrics.cornerRadius,
+                                style: .continuous
+                            )
+                            .stroke(Color.accentColor.opacity(0.22), lineWidth: 1)
+                        }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .disabled(isLoadingCollections || isAdding || isCreatingBinder)
                 .accessibilityLabel("Create binder")
             }
@@ -428,26 +447,28 @@ struct ScannerSessionReviewView: View {
     }
 }
 
+private enum ReviewBinderControlMetrics {
+    static let height: CGFloat = 52
+    static let cornerRadius: CGFloat = 14
+}
+
 private struct ReviewBinderPickerSurface: ViewModifier {
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(Color.accentColor.opacity(0.18)).interactive(),
-                    in: .rect(cornerRadius: 14)
+        content
+            .background(
+                Color(.secondarySystemBackground),
+                in: RoundedRectangle(
+                    cornerRadius: ReviewBinderControlMetrics.cornerRadius,
+                    style: .continuous
                 )
-        } else {
-            content
-                .background(
-                    Color.accentColor.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: ReviewBinderControlMetrics.cornerRadius,
+                    style: .continuous
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.16), lineWidth: 1)
-                }
-        }
+                .stroke(Color(.separator).opacity(0.28), lineWidth: 1)
+            }
     }
 }
 

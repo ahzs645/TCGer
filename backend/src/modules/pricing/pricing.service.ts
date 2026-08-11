@@ -1,100 +1,8 @@
 import { prisma } from '../../lib/prisma';
-import { adapterRegistry } from '../adapters/adapter-registry';
+import { fetchLiveCardPrices } from './live-pricing.service';
+import { isUsablePrice } from './pricing.types';
 
-export interface PriceProviderQuote {
-  price?: number;
-  foilPrice?: number;
-  reverseHoloPrice?: number;
-  currency: string;
-}
-
-export interface PriceProvider {
-  readonly name: string;
-  fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null>;
-}
-
-export function isUsablePrice(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-export function normalizePriceQuote(quote: PriceProviderQuote | null): PriceProviderQuote | null {
-  if (!quote) return null;
-  const normalized = {
-    currency: quote.currency.trim().toUpperCase() || 'USD',
-    price: isUsablePrice(quote.price) ? quote.price : undefined,
-    foilPrice: isUsablePrice(quote.foilPrice) ? quote.foilPrice : undefined,
-    reverseHoloPrice: isUsablePrice(quote.reverseHoloPrice) ? quote.reverseHoloPrice : undefined,
-  };
-  return normalized.price || normalized.foilPrice || normalized.reverseHoloPrice
-    ? normalized
-    : null;
-}
-
-export function selectPriceForFinish(
-  quote: PriceProviderQuote,
-  finishCode?: string,
-): number | undefined {
-  const finish = finishCode?.trim().toLocaleLowerCase() ?? '';
-  if (finish.includes('reverse')) {
-    return quote.reverseHoloPrice ?? quote.foilPrice ?? quote.price;
-  }
-  if (finish.includes('foil') || finish.includes('holo') || finish.includes('etched')) {
-    return quote.foilPrice ?? quote.price;
-  }
-  return quote.price ?? quote.foilPrice ?? quote.reverseHoloPrice;
-}
-
-function readPrice(
-  attributes: Record<string, unknown> | undefined,
-  keys: string[],
-): number | undefined {
-  if (!attributes) return undefined;
-  for (const key of keys) {
-    const raw = attributes[key];
-    const value =
-      typeof raw === 'number' ? raw : typeof raw === 'string' ? Number.parseFloat(raw) : undefined;
-    if (isUsablePrice(value)) return value;
-  }
-  return undefined;
-}
-
-class AdapterPriceProvider implements PriceProvider {
-  readonly name = 'card-source';
-
-  async fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null> {
-    const card = await adapterRegistry.get(tcg).fetchCardById(externalId);
-    if (!card) return null;
-    return normalizePriceQuote({
-      currency: 'USD',
-      price: readPrice(card.attributes, [
-        'market_price',
-        'marketPrice',
-        'price_usd',
-        'set_price',
-        'price',
-      ]),
-      foilPrice: readPrice(card.attributes, [
-        'foil_market_price',
-        'foilMarketPrice',
-        'price_usd_foil',
-        'price_usd_etched',
-        'holofoil_market_price',
-      ]),
-      reverseHoloPrice: readPrice(card.attributes, [
-        'reverse_holo_market_price',
-        'reverseHoloMarketPrice',
-      ]),
-    });
-  }
-}
-
-const providers: PriceProvider[] = [new AdapterPriceProvider()];
-
-export function registerPriceProvider(provider: PriceProvider): void {
-  if (!providers.some((candidate) => candidate.name === provider.name)) {
-    providers.push(provider);
-  }
-}
+export * from './live-pricing.service';
 
 async function recordPriceIfFresh(
   cardId: string,
@@ -133,27 +41,11 @@ export async function fetchCardPrices(tcg: string, externalId: string, finishCod
     isFallback?: boolean;
   }> = [];
 
-  for (const provider of providers) {
-    try {
-      const quote = normalizePriceQuote(await provider.fetchPrice(tcg, externalId));
-      if (!quote) continue;
-      const selected = selectPriceForFinish(quote, finishCode);
-      if (!isUsablePrice(selected)) continue;
-      results.push({
-        source: provider.name,
-        price: selected,
-        currency: quote.currency,
-        basePrice: quote.price,
-        foilPrice: quote.foilPrice,
-        reverseHoloPrice: quote.reverseHoloPrice,
-        finishCode,
-        updatedAt: new Date().toISOString(),
-      });
-      if (card) {
-        await recordPriceIfFresh(card.id, selected, provider.name, quote.currency, finishCode);
-      }
-    } catch (error) {
-      console.error(`[pricing] Provider ${provider.name} failed for ${tcg}/${externalId}:`, error);
+  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode);
+  for (const result of liveResults) {
+    results.push(result);
+    if (card) {
+      await recordPriceIfFresh(card.id, result.price, result.source, result.currency, finishCode);
     }
   }
 
