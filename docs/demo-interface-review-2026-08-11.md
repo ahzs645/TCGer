@@ -21,10 +21,10 @@ as findings.
 ## Outcome (updated after the fix pass)
 
 All 25 findings were worked. **All 25 are now resolved** — 24 fixed and
-verified in a browser, and finding 24 closed as a wrong premise (see below). Verification re-ran the exact measurement
-behind each finding against the demo's real shipped artifact (the
-`DEMO_EXPORT=true` static export), not against a dev server: 32 of 33
-automated checks pass, and the 33rd was a probe defect, not a product one.
+verified in a browser, and finding 24 closed as a wrong premise (see below).
+Verification re-ran the exact measurement behind each finding against the
+demo's real shipped artifact (the `DEMO_EXPORT=true` static export), not
+against a dev server: **33 of 33 automated checks pass**.
 
 | # | Finding | Status |
 | --- | --- | --- |
@@ -47,15 +47,15 @@ automated checks pass, and the 33rd was a probe defect, not a product one.
 | 17 | Sub-44px tap targets | Fixed — 44×44 `::before`, visual glyph unchanged |
 | 18 | Wishlist detail cramped | Fixed — title no longer truncates |
 | 19 | Unexplained disabled actions | Fixed on all three |
-| 20 | Scan is a dead end | Investigated, not implemented — see below |
+| 20 | Scan is a dead end | Fixed — dropped from demo primary nav, still reachable from More |
 | 21 | Packs ships its dev HUD | Fixed — hidden in a production build, `?debug=1` opts in |
 | 22 | Every tab titled "TCGer Demo" | Fixed — 12/12 distinct titles |
 | 23 | Dashboard has no `<h1>` | Fixed |
 | 24 | Placeholder card art | Not a defect — real art arrives via catalog enrichment; backs are the correct fallback |
 | 25 | Guides opens on an empty guide | Fixed — opens on the index |
 
-`tsc --noEmit` clean, 14/14 tests pass, lint 0 errors. The swarm added exactly
-2 lint warnings (75 → 77), both instances of the `mounted`-flag
+`tsc --noEmit` clean, 14/14 tests pass, lint 0 errors. Warnings went 75 → 80
+across all three passes, every one of them an instance of the `mounted`-flag
 `set-state-in-effect` pattern that `dashboard-content.tsx` already uses and
 already warns on.
 
