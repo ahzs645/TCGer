@@ -178,12 +178,14 @@ test("a query through an index that cannot serve it is rejected", async () => {
   );
 });
 
-test("only ids this store minted are recognised", async () => {
+test("normalizeId answers for the table it is asked about", async () => {
   const db = new LocalPortableDb();
   const id = await makeBinder(db, "Ids");
   assert.equal(db.normalizeId("binders", id), id);
+  // A real binder id is not a valid entry id.
   assert.equal(db.normalizeId("collectionEntries", id), null);
   assert.equal(db.normalizeId("binders", "jd7abc123"), null);
+  assert.equal(db.normalizeId("binders", ""), null);
 });
 
 test("row writes touch one table, not the whole collection", async () => {

@@ -355,7 +355,11 @@ class DexieDemoPersistence implements DemoPersistence {
     // read path alone meant an imported legacy payload skipped it entirely
     // while already carrying a version marker — unmigrated data labelled
     // migrated, with the localStorage original already deleted.
-    if (loaded && loadedVersion !== null && loadedVersion < DEMO_SCHEMA_VERSION) {
+    if (
+      loaded &&
+      loadedVersion !== null &&
+      loadedVersion < DEMO_SCHEMA_VERSION
+    ) {
       loaded = await this.migrateStoredState(db, loaded, loadedVersion);
       if (generation !== this.generation || this.db !== db) return;
     }

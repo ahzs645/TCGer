@@ -252,8 +252,19 @@ export class LocalPortableDb implements PortableDb {
     }
   }
 
+  /**
+   * Existence, not format.
+   *
+   * Convex validates its own id encoding without touching the database. This
+   * store has no encoding to check — ids minted here sit alongside ids carried
+   * over verbatim from the shipped nested shape, which must keep working
+   * because they appear in URLs and in the REST contract. The working set is in
+   * memory, so answering "is this a real id for this table" outright is both
+   * cheap and strictly more useful than a prefix test.
+   */
   normalizeId(table: PortableTableName, id: string): string | null {
-    return id.startsWith(`local_${table}_`) ? id : null;
+    if (!id) return null;
+    return this.read(table).some((row) => row._id === id) ? id : null;
   }
 }
 
