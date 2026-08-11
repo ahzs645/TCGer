@@ -20,8 +20,8 @@ as findings.
 
 ## Outcome (updated after the fix pass)
 
-All 25 findings were worked. **24 are fixed and verified in a browser; 1 is
-deferred as a product decision.** Verification re-ran the exact measurement
+All 25 findings were worked. **All 25 are now resolved** — 24 fixed and
+verified in a browser, and finding 24 closed as a wrong premise (see below). Verification re-ran the exact measurement
 behind each finding against the demo's real shipped artifact (the
 `DEMO_EXPORT=true` static export), not against a dev server: 32 of 33
 automated checks pass, and the 33rd was a probe defect, not a product one.
@@ -51,7 +51,7 @@ automated checks pass, and the 33rd was a probe defect, not a product one.
 | 21 | Packs ships its dev HUD | Fixed — hidden in a production build, `?debug=1` opts in |
 | 22 | Every tab titled "TCGer Demo" | Fixed — 12/12 distinct titles |
 | 23 | Dashboard has no `<h1>` | Fixed |
-| 24 | Placeholder card art | **Deferred — product decision, see below** |
+| 24 | Placeholder card art | Not a defect — real art arrives via catalog enrichment; backs are the correct fallback |
 | 25 | Guides opens on an empty guide | Fixed — opens on the index |
 
 `tsc --noEmit` clean, 14/14 tests pass, lint 0 errors. The swarm added exactly
@@ -76,14 +76,30 @@ already warns on.
   mobile; the detail renders full-width below all six deck cards. Only the
   empty placeholder is hidden, so a selected deck still renders at every width.
 
-### Deferred
+### Resolved — finding 24 was wrong about its own cause
 
-**24 — placeholder card art.** `DemoCard` in `src/lib/data/demo-cards.ts`
-carries `id/tcg/name/setCode/setName/rarity/price` and no image field; there
-are zero image URLs in the file. Fixing this means either licensing and
-shipping ~60 card images in the static export, or wiring the demo to a live
-card API — which defeats the point of an offline demo. That is a product
-call, not a bug fix.
+**24 — placeholder card art.** The claim that this needed licensed images or a
+live API was incorrect, and so was the reasoning behind it. It is true that
+`DemoCard` carries no image field, but that is not where demo card art comes
+from. The offline catalog packs carry `imageUrl` / `imageUrlSmall` per card
+(`docs/catalog-pack-format.md`), and the demo store already has
+`enrichCardsFromCatalog`, which matches seeded demo cards against an installed
+catalog and writes the real image URLs onto them. It is wired to run
+automatically — from `use-catalog.ts` after an install, and from three points
+in `demo-adapter.ts`. The deployed demo sets `NEXT_PUBLIC_CATALOG_BASE_URL`
+(`.github/workflows/pages.yml:85`) and surfaces `CatalogDownloadPrompt`, so a
+visitor can install a catalog and the art appears.
+
+The card backs are the correct pre-catalog fallback, and they are already
+implemented properly: `src/components/cards/card-image.tsx` takes the real
+`src` when present, falls back to the per-game back
+(`public/card-backs/{game}.png`), paints the same back as a CSS background so
+there is no flash of empty box, and re-falls-back on `onError`. Alt text comes
+from the caller and names the card.
+
+The only reason the review saw nothing but backs is that local testing had no
+catalog origin configured — which is the same root cause as finding 12's
+`/catalog/manifest.json` 404. No code change was needed.
 
 ### New findings from the fix pass
 
@@ -164,21 +180,25 @@ buttons have now superseded.
 
 ### Follow-ups not taken
 
-- **Scan (20)** was investigated but not implemented, because the nav config
-  needed changes in a file another agent owned mid-run. The minimal change is
-  about six lines in `app-shell.tsx`: derive `primaryNavigation` from
-  `demoMode`, filter `/scan` out of it, append Scan to `mobileNavSecondary`,
-  and thread `primaryNavigation.slice(0, 3)` into `MobileBottomNav`. Note
-  `command-menu.tsx:114-121` hardcodes its own "Card Scan" entry and would
-  want the same treatment.
-- **The header fix cost the game switcher on tablets.** Because the container
-  caps content at 1312px at every width, nav labels and game labels cannot
-  coexist; the switcher moved from `sm:flex` to `lg:flex`, so there is no
-  visible game filter between 640px and 1023px (⌘K still has "Switch TCG").
-  Raising the "Quick Actions" text and ⌘K `<kbd>` in `command-menu.tsx:77-88`
-  to `lg:` frees ~134px and would let the switcher return to `sm:flex`.
-- **Decks has no scroll-into-view on mobile.** Tapping a deck renders its
-  detail below all six cards, so it can look like nothing happened.
+All three of the follow-ups previously listed here are now done.
+
+- **Scan (20) — done.** `/scan` needs the server-side hash store and upload
+  API, so in the demo it can only say "disabled" while occupying one of five
+  desktop nav slots and one of three mobile tabs. `primaryNavigation` is now
+  derived from `demoMode` with `/scan` filtered out, and Scan moved into the
+  More sheet where it still explains why it is off. Live mode is unchanged.
+- **Tablet game filter — done.** Measured headroom with the switcher hidden:
+  222px free at 640, **110px at 768**, 242px at 900, 365px at 1023, against a
+  212px switcher. So the dead zone was never the whole 640–1023 band, only
+  roughly 768–830, where the five-item nav appears while the container is
+  still narrow. Moving the "Quick Actions" label and ⌘K badge to `lg:` frees
+  ~134px there, which is enough; the switcher is back at `sm:flex` and visible
+  at every width from 640 up. The trigger is icon-only below `lg`, so it
+  gained an `aria-label` and `title`.
+- **Deck scroll-into-view — done.** Selecting a deck below `lg` now scrolls
+  the detail into view, guarded to the stacked layout and honouring
+  `prefers-reduced-motion`, with `scroll-mt-20` keeping it clear of the fixed
+  header.
 
 ---
 
