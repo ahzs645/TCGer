@@ -6,12 +6,25 @@ import XCTest
 @MainActor
 final class ScannerPerformanceTests: XCTestCase {
     private enum Budget {
+        /// Debug Simulator has more variance than a Release device build, but
+        /// scanner construction must remain well below the seconds-long asset
+        /// loads that would visibly block the presentation transition.
+        static let scannerConstructionSeconds = 0.25
         static let artworkDatabaseLoadSeconds = 8.0
         static let annColdRankSeconds = 10.0
         static let firstScanSeconds = 10.0
         static let sustainedMeanSeconds = 2.0
         static let scannerPayloadBytes: Int64 = 150 * 1_024 * 1_024
         static let artworkLoadMemoryGrowthBytes: UInt64 = 240 * 1_024 * 1_024
+    }
+
+    func testScannerViewModelConstructionStaysWithinPresentationBudget() {
+        let started = Date()
+        let viewModel = CardScannerViewModel()
+        let elapsed = Date().timeIntervalSince(started)
+
+        withExtendedLifetime(viewModel) {}
+        XCTAssertLessThan(elapsed, Budget.scannerConstructionSeconds)
     }
 
     func testBundledScannerPayloadStaysWithinBudget() throws {

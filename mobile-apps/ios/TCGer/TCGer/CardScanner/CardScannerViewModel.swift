@@ -95,6 +95,7 @@ final class CardScannerViewModel: ObservableObject {
     private var liveConsensus = LiveScanConsensus()
     private var automaticallyPresentsResults = false
     private var isPhotoImportActive = false
+    private var detectorPreparationStarted = false
 
     var binderPagesScanned: Int { binderPages.count }
 
@@ -198,6 +199,7 @@ final class CardScannerViewModel: ObservableObject {
         case .authorized:
             cameraController.configureIfNeeded()
             cameraController.startRunning()
+            prepareDetectorAfterPresentation()
             state = .ready
         case .notDetermined:
             requestCameraPermission()
@@ -220,11 +222,26 @@ final class CardScannerViewModel: ObservableObject {
                 if granted {
                     self.cameraController.configureIfNeeded()
                     self.cameraController.startRunning()
+                    self.prepareDetectorAfterPresentation()
                     self.state = .ready
                 } else {
                     self.state = .unauthorized
                 }
             }
+        }
+    }
+
+    /// The detector is needed by every local scanner, but loading its compiled
+    /// Core ML model during view-model construction stalls the scanner's opening
+    /// transition. Give the camera UI time to present, then warm the process-wide
+    /// model on a utility executor so the first capture does not pay that cost.
+    private func prepareDetectorAfterPresentation() {
+        guard !detectorPreparationStarted else { return }
+        detectorPreparationStarted = true
+        Task.detached(priority: .utility) {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            _ = CardObjectDetector.shared
         }
     }
 

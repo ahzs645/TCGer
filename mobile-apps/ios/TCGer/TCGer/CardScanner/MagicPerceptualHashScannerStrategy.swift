@@ -15,7 +15,7 @@ final class MagicPerceptualHashScannerStrategy: ScanStrategy {
     let supportsLiveScanning: Bool = true
 
     private let hashLibrary: MagicCardHashLibrary
-    private let ciContext = CIContext()
+    private static let ciContext = CIContext()
 
     init(hashLibrary: MagicCardHashLibrary = .shared) {
         self.hashLibrary = hashLibrary
@@ -135,7 +135,7 @@ final class MagicPerceptualHashScannerStrategy: ScanStrategy {
                 "inputBrightness": -0.02
             ])
 
-        return ciContext.createCGImage(corrected, from: corrected.extent)
+        return Self.ciContext.createCGImage(corrected, from: corrected.extent)
     }
 
     private func convert(_ point: CGPoint, in imageSize: CGSize) -> CGPoint {

@@ -252,7 +252,7 @@ actor BinderPageScanner {
     }
 
     private let coordinator: CardScannerCoordinator
-    private let ciContext = CIContext()
+    private static let ciContext = CIContext()
     private let cropper = CardCropper()
 
     init(coordinator: CardScannerCoordinator) {
@@ -635,7 +635,7 @@ actor BinderPageScanner {
         // CardCropper output, and the reference indexes are built from
         // unmodified catalog images (parity — see docs/scanner-model-ai-handoff.md).
 
-        return ciContext.createCGImage(corrected, from: corrected.extent)
+        return Self.ciContext.createCGImage(corrected, from: corrected.extent)
     }
 
     private func convert(_ point: CGPoint, in imageSize: CGSize) -> CGPoint {

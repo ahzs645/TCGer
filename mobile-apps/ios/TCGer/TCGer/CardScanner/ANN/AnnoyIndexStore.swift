@@ -117,9 +117,13 @@ actor AnnoyIndexStore: ANNIndexProviding {
         fileExtension: String
     ) -> Bool {
         guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension),
-              let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-              data.count >= 8
+              let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              let handle = try? FileHandle(forReadingFrom: url)
         else {
+            return false
+        }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 8), data.count == 8 else {
             return false
         }
         let count = Int(data.withUnsafeBytes {
@@ -128,6 +132,6 @@ actor AnnoyIndexStore: ANNIndexProviding {
         let dimension = Int(data.withUnsafeBytes {
             $0.loadUnaligned(fromByteOffset: 4, as: Int32.self).littleEndian
         })
-        return count > 0 && dimension > 0 && data.count >= 8 + count * dimension
+        return count > 0 && dimension > 0 && fileSize >= 8 + count * dimension
     }
 }

@@ -6,6 +6,24 @@ import ImageIO
 @preconcurrency import Vision
 
 nonisolated struct CardCropper {
+    private enum DetectorSource {
+        case bundled
+        case explicit(CardObjectDetector?)
+
+        var detector: CardObjectDetector? {
+            switch self {
+            case .bundled:
+                // Loading the bundled Core ML model is intentionally deferred
+                // until detection actually runs. CardCropper is constructed
+                // while the scanner screen is being presented, and resolving
+                // CardObjectDetector.shared here blocks that transition.
+                return CardObjectDetector.shared
+            case .explicit(let detector):
+                return detector
+            }
+        }
+    }
+
     struct Configuration {
         static let maximumObservations: Int = 5
         static let minimumConfidence: Float = 0.65
@@ -15,11 +33,15 @@ nonisolated struct CardCropper {
         static let targetSize = CGSize(width: 720, height: 1000)
     }
 
-    private let ciContext = CIContext()
-    private let detector: CardObjectDetector?
+    private static let ciContext = CIContext()
+    private let detectorSource: DetectorSource
 
-    init(detector: CardObjectDetector? = CardObjectDetector.shared) {
-        self.detector = detector
+    init() {
+        detectorSource = .bundled
+    }
+
+    init(detector: CardObjectDetector?) {
+        detectorSource = .explicit(detector)
     }
 
     func bestCrop(from image: CGImage) throws -> CGImage? {
@@ -109,7 +131,7 @@ nonisolated struct CardCropper {
         // A detector trained specifically on trading cards provides the coarse
         // location. Vision then refines the corners, but only candidates that
         // agree with the detector are allowed to suppress its fallback box.
-        let detectedCard = try? detector?.detections(in: image).first
+        let detectedCard = try? detectorSource.detector?.detections(in: image).first
 
         // Primary: VNDetectDocumentSegmentationRequest — ANE-accelerated,
         // real-time, iOS 15+. Returns a VNRectangleObservation with corners, so
@@ -403,7 +425,7 @@ nonisolated struct CardCropper {
         // Contrast-style standardization is measured harmful to the embedding
         // path (see docs/scanner-model-ai-handoff.md) — keep such ops OCR-only.
 
-        return ciContext.createCGImage(corrected, from: corrected.extent)
+        return Self.ciContext.createCGImage(corrected, from: corrected.extent)
     }
 
     private func convert(_ point: CGPoint, in size: CGSize) -> CGPoint {

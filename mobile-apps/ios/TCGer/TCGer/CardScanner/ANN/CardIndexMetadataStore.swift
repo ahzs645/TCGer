@@ -29,8 +29,12 @@ actor CardIndexMetadataStore {
 
     static let shared = CardIndexMetadataStore()
 
+    private let bundle: Bundle?
+    private let resource: String
+    private let fileExtension: String
     private var cache: [Int: CardIndexMetadataEntry] = [:]
     private var indicesByGameAndName: [TCGGame: [String: Set<Int>]] = [:]
+    private var isLoaded = false
     nonisolated let supportedGames: Set<TCGGame>
 
     init(
@@ -38,37 +42,47 @@ actor CardIndexMetadataStore {
         resource: String = "CardsIndexMetadata",
         fileExtension: String = "json"
     ) {
-        let entries = Self.loadEntries(from: bundle, resource: resource, fileExtension: fileExtension)
-        cache = entries.reduce(into: [:]) { result, entry in
-            result[entry.annIndex] = entry
-        }
-        indicesByGameAndName = Self.makeNameIndex(entries)
-        supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
+        self.bundle = bundle
+        self.resource = resource
+        self.fileExtension = fileExtension
+        supportedGames = Self.detectSupportedGames(
+            in: bundle,
+            resource: resource,
+            fileExtension: fileExtension
+        )
     }
 
     /// In-memory initializer for unit tests and imported replay manifests.
     init(entries: [CardIndexMetadataEntry]) {
+        bundle = nil
+        resource = ""
+        fileExtension = ""
         cache = entries.reduce(into: [:]) { result, entry in
             result[entry.annIndex] = entry
         }
         indicesByGameAndName = Self.makeNameIndex(entries)
+        isLoaded = true
         supportedGames = Set(entries.map(\.resolvedGame).filter { $0 != .all })
     }
 
     func entry(for index: Int) -> CardIndexMetadataEntry? {
-        cache[index]
+        loadIfNeeded()
+        return cache[index]
     }
 
     func details(for index: Int) -> CardDetails? {
+        loadIfNeeded()
         guard let entry = cache[index] else { return nil }
         return Self.makeDetails(from: entry)
     }
 
     func indices(for game: TCGGame) -> Set<Int> {
-        Set(cache.values.lazy.filter { $0.resolvedGame == game }.map(\.annIndex))
+        loadIfNeeded()
+        return Set(cache.values.lazy.filter { $0.resolvedGame == game }.map(\.annIndex))
     }
 
     func indices(for game: TCGGame, setCode: String?) -> Set<Int> {
+        loadIfNeeded()
         guard let setCode else { return indices(for: game) }
         return Set(cache.values.lazy.filter {
             $0.resolvedGame == game &&
@@ -85,6 +99,7 @@ actor CardIndexMetadataStore {
         game: TCGGame,
         setCode: String?
     ) -> (name: String, indices: Set<Int>)? {
+        loadIfNeeded()
         let names = indicesByGameAndName[game] ?? [:]
         let matches = candidates.compactMap { candidate -> (String, Set<Int>, Int, Double)? in
             guard candidate.confidence >= 0.25 else { return nil }
@@ -103,6 +118,22 @@ actor CardIndexMetadataStore {
             return $0.3 > $1.3
         }
         return matches.first.map { ($0.0, $0.1) }
+    }
+
+    private func loadIfNeeded() {
+        guard !isLoaded else { return }
+        isLoaded = true
+        guard let bundle else { return }
+
+        let entries = Self.loadEntries(
+            from: bundle,
+            resource: resource,
+            fileExtension: fileExtension
+        )
+        cache = entries.reduce(into: [:]) { result, entry in
+            result[entry.annIndex] = entry
+        }
+        indicesByGameAndName = Self.makeNameIndex(entries)
     }
 
     private nonisolated static func makeNameIndex(
@@ -149,5 +180,35 @@ actor CardIndexMetadataStore {
         } catch {
             return []
         }
+    }
+
+    /// Determines mode support without decoding and indexing the full metadata
+    /// catalog. The generated scanner metadata is compact JSON, so searching
+    /// its memory-mapped bytes for the game field touches only a tiny fraction
+    /// of the work performed by JSONDecoder and dictionary construction.
+    private nonisolated static func detectSupportedGames(
+        in bundle: Bundle,
+        resource: String,
+        fileExtension: String
+    ) -> Set<TCGGame> {
+        guard let url = bundle.url(forResource: resource, withExtension: fileExtension),
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe)
+        else {
+            return []
+        }
+
+        let tokens: [(TCGGame, [Data])] = [
+            (.pokemon, [Data(#""game":"pokemon""#.utf8), Data(#""game": "pokemon""#.utf8)]),
+            (.magic, [Data(#""game":"magic""#.utf8), Data(#""game": "magic""#.utf8)]),
+            (.yugioh, [
+                Data(#""game":"yugioh""#.utf8),
+                Data(#""game": "yugioh""#.utf8),
+                Data(#""game":"yu-gi-oh""#.utf8),
+                Data(#""game": "yu-gi-oh""#.utf8),
+            ]),
+        ]
+        return Set(tokens.compactMap { game, patterns in
+            patterns.contains { data.range(of: $0) != nil } ? game : nil
+        })
     }
 }
