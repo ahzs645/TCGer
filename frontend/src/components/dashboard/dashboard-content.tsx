@@ -261,30 +261,37 @@ export function DashboardContent() {
 
   if (loading) {
     return (
-      <div
-        className="grid grid-cols-2 gap-3 md:gap-6 md:grid-cols-2 xl:grid-cols-4"
-        data-oid="s0qun_z"
-      >
-        {Array.from({ length: 4 }).map((_, idx) => (
-          <Card key={idx} data-oid="hjq2h:n">
-            <CardHeader className="p-3 md:p-6" data-oid="7n5qcgw">
-              <Skeleton className="h-4 w-20 md:w-32" data-oid="z.qhh-b" />
-              <Skeleton
-                className="h-6 md:h-8 w-16 md:w-24"
-                data-oid="efr_ogm"
-              />
-            </CardHeader>
-            <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid="_s7._qz">
-              <Skeleton className="h-8 md:h-12 w-full" data-oid="fiam73:" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-6" data-oid="dash-loading">
+        <DashboardHeading />
+        <div
+          className="grid grid-cols-2 gap-3 md:gap-6 md:grid-cols-2 xl:grid-cols-4"
+          data-oid="s0qun_z"
+        >
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Card key={idx} data-oid="hjq2h:n">
+              <CardHeader className="p-3 md:p-6" data-oid="7n5qcgw">
+                <Skeleton className="h-4 w-20 md:w-32" data-oid="z.qhh-b" />
+                <Skeleton
+                  className="h-6 md:h-8 w-16 md:w-24"
+                  data-oid="efr_ogm"
+                />
+              </CardHeader>
+              <CardContent
+                className="p-3 pt-0 md:p-6 md:pt-0"
+                data-oid="_s7._qz"
+              >
+                <Skeleton className="h-8 md:h-12 w-full" data-oid="fiam73:" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6" data-oid="p0.l1lt">
+      <DashboardHeading />
       {noGamesEnabled && (
         <div
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
@@ -395,6 +402,18 @@ export function DashboardContent() {
       {!loadFailed && !hasNoCards && (
         <RecentActivity items={stats.recentActivity} data-oid="2rew8b1" />
       )}
+    </div>
+  );
+}
+
+function DashboardHeading() {
+  return (
+    <div data-oid="dash-heading">
+      <h1 className="text-3xl font-heading font-semibold">Dashboard</h1>
+      <p className="text-sm text-muted-foreground">
+        Your collection at a glance — totals, set completion and recent
+        activity.
+      </p>
     </div>
   );
 }

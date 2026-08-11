@@ -173,7 +173,10 @@ export default function SealedPage() {
   return (
     <AppShell data-oid="400i9:c">
       <div className="space-y-6" data-oid="46o67ox">
-        <div className="flex items-center justify-between" data-oid="24af:t7">
+        <div
+          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          data-oid="24af:t7"
+        >
           <div data-oid="eh-_rpf">
             <h1
               className="text-3xl font-heading font-semibold"
@@ -185,10 +188,21 @@ export default function SealedPage() {
               Track your sealed product investments and market values.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="uffzlfv">
-            <Plus className="mr-2 h-4 w-4" data-oid="zoob79u" />
-            Add Product
-          </Button>
+          <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+            <Button
+              size="sm"
+              disabled
+              title="Not available in the demo"
+              aria-label="Add Product (not available in the demo)"
+              data-oid="uffzlfv"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="zoob79u" />
+              Add Product
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Not available in the demo.
+            </p>
+          </div>
         </div>
 
         {/* Summary */}
@@ -365,31 +379,31 @@ export default function SealedPage() {
                     </div>
                     <div className="min-w-0" data-oid=":uqj999">
                       <p
-                        className="text-sm font-semibold truncate"
+                        className="text-sm font-semibold line-clamp-2 break-words"
                         data-oid="ziamz_:"
                       >
                         {p.name}
                       </p>
                       <div
-                        className="flex items-center gap-2 mt-0.5"
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5"
                         data-oid="yzftm0_"
                       >
                         <Badge
                           variant="outline"
-                          className="text-xs"
+                          className="text-xs whitespace-nowrap"
                           style={{ borderColor: TCG_COLORS[p.tcg] }}
                           data-oid="8y7bxo:"
                         >
                           {p.tcg}
                         </Badge>
                         <span
-                          className="text-xs text-muted-foreground"
+                          className="text-xs text-muted-foreground whitespace-nowrap"
                           data-oid=".f8d7oi"
                         >
                           {p.type}
                         </span>
                         <span
-                          className="text-xs text-muted-foreground"
+                          className="text-xs text-muted-foreground whitespace-nowrap"
                           data-oid="a8xunk1"
                         >
                           x{p.quantity}

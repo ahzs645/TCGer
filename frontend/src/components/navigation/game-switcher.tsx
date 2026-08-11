@@ -35,7 +35,7 @@ export function GameSwitcher() {
       type="single"
       value={selectedGame}
       onValueChange={(value) => value && setGame(value as SupportedGame)}
-      className="hidden items-center gap-1 rounded-lg bg-muted p-1 shadow-inner sm:flex"
+      className="hidden shrink-0 items-center gap-1 rounded-lg bg-muted p-1 shadow-inner lg:flex"
       data-oid="0f7kme."
     >
       {supportedGames.map((game) => {
@@ -60,13 +60,14 @@ export function GameSwitcher() {
           <ToggleGroupItem
             key={game}
             value={game}
+            title={GAME_LABELS[game]}
             className="flex min-w-[3rem] items-center gap-2"
             data-oid="d3w.0o-"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={iconPath}
-              alt={GAME_LABELS[game]}
+              alt=""
               width={16}
               height={16}
               className={`transition-all ${
@@ -77,7 +78,7 @@ export function GameSwitcher() {
               data-oid="ab3h7pi"
             />
 
-            <span className="hidden xl:inline" data-oid="ji47x4:">
+            <span className="sr-only" data-oid="ji47x4:">
               {GAME_LABELS[game]}
             </span>
           </ToggleGroupItem>

@@ -9,6 +9,7 @@ import {
 import { invalidateCatalogSearchIndex } from "./catalog-search";
 import { CATALOG_GAMES, type CatalogTcgCode } from "./catalog-types";
 import { catalogAssetUrl } from "./catalog-assets";
+import { isDemoMode } from "@/lib/demo-mode";
 
 export interface CatalogManifestGame {
   version: number;
@@ -242,10 +243,54 @@ async function readResponseWithProgress(
   return textParts.join("");
 }
 
+/**
+ * Returned when no manifest is published for this deployment: an empty games
+ * map, so every game resolves to "unavailable" instead of an error. Absence is
+ * a resolved value; a network, HTTP or parse failure still rejects.
+ */
+const ABSENT_MANIFEST: CatalogManifest = {
+  formatVersion: 1,
+  generatedAt: "",
+  games: {},
+};
+
+/** True for the manifest returned when nothing is published (see above). */
+export function isCatalogManifestAbsent(manifest: CatalogManifest): boolean {
+  return manifest === ABSENT_MANIFEST;
+}
+
+function isDemoExperience(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    isDemoMode() ||
+    window.location.pathname === "/demo" ||
+    window.location.pathname.startsWith("/demo/")
+  );
+}
+
+/**
+ * The generated catalog packs are never bundled with the app itself, so in the
+ * demo — which ships without a backend — asking for a same-origin manifest only
+ * logs a 404 on every page load. The deployed demo points
+ * `NEXT_PUBLIC_CATALOG_BASE_URL` at the asset origin, where the manifest does
+ * exist, and that request still goes out so offline catalogs stay installable.
+ */
+const CONFIGURED_CATALOG_ORIGIN = process.env.NEXT_PUBLIC_CATALOG_BASE_URL;
+
+function shouldSkipManifestFetch(): boolean {
+  return !CONFIGURED_CATALOG_ORIGIN?.trim() && isDemoExperience();
+}
+
 export async function fetchCatalogManifest(): Promise<CatalogManifest> {
+  if (shouldSkipManifestFetch()) return ABSENT_MANIFEST;
+
   const response = await fetch(catalogAssetUrl("manifest.json"), {
     cache: "no-cache",
   });
+  if (response.status === 404) {
+    // Nothing published here — not a failure worth surfacing.
+    return ABSENT_MANIFEST;
+  }
   if (!response.ok) {
     throw new Error(
       `Unable to load the catalog manifest (${response.status}).`,

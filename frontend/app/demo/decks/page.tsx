@@ -376,7 +376,10 @@ export default function DecksPage() {
 
   const totalDecks = DECKS.length;
   const completeDecks = DECKS.filter((d) => d.isComplete).length;
-  const totalCards = DECKS.reduce(
+  // Sum of the per-deck counts shown on each deck card below — this counts
+  // cards across deck lists, which is a different figure from the collection
+  // total reported on the dashboard.
+  const cardsAcrossDecks = DECKS.reduce(
     (s, d) => s + d.cards.reduce((a, c) => a + c.quantity, 0),
     0,
   );
@@ -384,7 +387,10 @@ export default function DecksPage() {
   return (
     <AppShell data-oid="gs5l5na">
       <div className="space-y-6" data-oid="70ey5tw">
-        <div className="flex items-center justify-between" data-oid="dd48z1d">
+        <div
+          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          data-oid="dd48z1d"
+        >
           <div data-oid="o4d11r0">
             <h1
               className="text-3xl font-heading font-semibold"
@@ -396,10 +402,21 @@ export default function DecksPage() {
               Build and manage your constructed decks across all games.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="3r454mu">
-            <Plus className="mr-2 h-4 w-4" data-oid="vzyog62" />
-            New Deck
-          </Button>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <Button
+              size="sm"
+              disabled
+              title="Not available in the demo"
+              aria-label="New Deck — not available in the demo"
+              data-oid="3r454mu"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="vzyog62" />
+              New Deck
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Deck building is not available in the demo.
+            </p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -446,7 +463,7 @@ export default function DecksPage() {
                 className="text-xs md:text-sm font-medium text-muted-foreground"
                 data-oid="xrwxr25"
               >
-                Total Cards
+                Cards Across Decks
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid="5k8e_w3">
@@ -454,8 +471,11 @@ export default function DecksPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="2t.plrk"
               >
-                {totalCards}
+                {cardsAcrossDecks}
               </div>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
+                In deck lists, not collection size
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -541,8 +561,13 @@ export default function DecksPage() {
             })}
           </div>
 
-          {/* Deck detail */}
-          <div data-oid="dldgokf">
+          {/* Deck detail — the two-column layout only kicks in at lg, so below
+              that the empty placeholder is dead weight at the foot of the page.
+              A selected deck still renders its detail card on every size. */}
+          <div
+            className={activeDeck ? "" : "hidden lg:block"}
+            data-oid="dldgokf"
+          >
             {activeDeck ? (
               <Card className="sticky top-20" data-oid="dsev3su">
                 <CardHeader data-oid="b9cp5tj">
