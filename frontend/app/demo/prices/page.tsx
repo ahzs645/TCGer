@@ -476,7 +476,10 @@ export default function PricesPage() {
                       className="flex items-start justify-between gap-3 p-3"
                       data-oid="price-mobile-row"
                     >
-                      <div className="min-w-0 flex-1" data-oid="price-mobile-id">
+                      <div
+                        className="min-w-0 flex-1"
+                        data-oid="price-mobile-id"
+                      >
                         <p
                           className="text-sm font-medium truncate"
                           data-oid="price-mobile-name"
@@ -525,7 +528,9 @@ export default function PricesPage() {
                           </span>
                           <span
                             className={
-                              p.change7d >= 0 ? "text-green-500" : "text-red-500"
+                              p.change7d >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
                             }
                             data-oid="price-mobile-7d"
                           >
