@@ -53,6 +53,7 @@ export function CardSearchPanel() {
     (card) => enabledGames[card.tcg as keyof typeof enabledGames],
   );
   const cards = filteredCards;
+  const hasResults = cards.length > 0;
   const selectedGameDisabled =
     selectedGame !== "all" &&
     !enabledGames[selectedGame as keyof typeof enabledGames];
@@ -81,7 +82,7 @@ export function CardSearchPanel() {
   }, [fetchCollections, hasFetched, isAuthenticated, token]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]" data-oid="wsi0d3e">
+    <div className="grid gap-6 lg:grid-cols-[320px_1fr]" data-oid="wsi0d3e">
       <Card className="h-fit border-dashed" data-oid="-_rj04n">
         <CardHeader data-oid="exck2hn">
           <CardTitle data-oid="._71p80">Search Parameters</CardTitle>
@@ -101,13 +102,21 @@ export function CardSearchPanel() {
               </label>
               <div className="flex gap-2" data-oid="3ihveu3">
                 <Input
+                  className="min-w-0 flex-1"
                   value={inputValue}
                   onChange={(event) => setInputValue(event.target.value)}
-                  placeholder="Search cards by name, set, or archetype..."
+                  placeholder="Search by name or set..."
                   data-oid="sthnxsr"
                 />
 
-                <Button type="submit" disabled={isFetching} data-oid="yh7r5y1">
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Search cards"
+                  disabled={isFetching}
+                  data-oid="yh7r5y1"
+                >
                   {isFetching ? (
                     <Loader2
                       className="h-4 w-4 animate-spin"
@@ -181,24 +190,29 @@ export function CardSearchPanel() {
           )}
         </CardHeader>
         <CardContent className="p-0" data-oid="bopkrlg">
-          <ScrollArea className="h-[calc(100vh-280px)]" data-oid="17p81o6">
+          <ScrollArea
+            className={hasResults ? "h-[calc(100vh-280px)]" : "h-auto"}
+            data-oid="17p81o6"
+          >
             <div className="p-6 space-y-8" data-oid="ld:vdo3">
-              {cards.length === 0 && !isFetching ? (
+              {!hasResults ? (
                 <div
                   className="flex h-40 items-center justify-center text-sm text-muted-foreground"
                   data-oid="ft_4cz3"
                 >
                   {noGamesEnabled
                     ? "All modules are disabled. Re-enable at least one trading card game in settings."
-                    : isError
-                      ? error instanceof Error
-                        ? error.message
-                        : "Search failed. Try again."
-                      : selectedGameDisabled
-                        ? "Selected game is disabled. Toggle it on in module preferences to continue."
-                        : searchQuery
-                          ? `No exact matches for "${searchQuery}". Try correcting the spelling or using a broader query.`
-                          : "No results yet. Try adjusting your query or game filter."}
+                    : isFetching
+                      ? "Searching for matching cards..."
+                      : isError
+                        ? error instanceof Error
+                          ? error.message
+                          : "Search failed. Try again."
+                        : selectedGameDisabled
+                          ? "Selected game is disabled. Toggle it on in module preferences to continue."
+                          : searchQuery
+                            ? `No exact matches for "${searchQuery}". Try correcting the spelling or using a broader query.`
+                            : "No results yet. Try adjusting your query or game filter."}
                 </div>
               ) : (
                 (() => {

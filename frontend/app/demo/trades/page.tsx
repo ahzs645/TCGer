@@ -166,7 +166,10 @@ export default function TradesPage() {
   return (
     <AppShell data-oid="nkjvlu_">
       <div className="space-y-6" data-oid="64mg-f2">
-        <div className="flex items-center justify-between" data-oid="fm9pabc">
+        <div
+          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          data-oid="fm9pabc"
+        >
           <div data-oid="99k2..z">
             <h1
               className="text-3xl font-heading font-semibold"
@@ -178,10 +181,21 @@ export default function TradesPage() {
               Track card trades with other collectors.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="e_i3k.-">
-            <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
-            New Trade
-          </Button>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <Button
+              size="sm"
+              disabled
+              title="Not available in the demo"
+              aria-label="New Trade (not available in the demo)"
+              data-oid="e_i3k.-"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
+              New Trade
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Creating trades is not available in the demo.
+            </p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -265,17 +279,36 @@ export default function TradesPage() {
 
         {/* Filter tabs */}
         <Tabs value={tab} onValueChange={setTab} data-oid="-gkig62">
-          <TabsList data-oid="qlk::r4">
-            <TabsTrigger value="all" data-oid="s5p886h">
+          <TabsList
+            className="h-auto w-full max-w-full flex-wrap gap-1 sm:h-10 sm:w-auto sm:gap-0"
+            data-oid="qlk::r4"
+          >
+            <TabsTrigger
+              value="all"
+              className="flex-1 sm:flex-none"
+              data-oid="s5p886h"
+            >
               All ({TRADES.length})
             </TabsTrigger>
-            <TabsTrigger value="pending" data-oid="5ade4e5">
+            <TabsTrigger
+              value="pending"
+              className="flex-1 sm:flex-none"
+              data-oid="5ade4e5"
+            >
               Pending ({TRADES.filter((t) => t.status === "pending").length})
             </TabsTrigger>
-            <TabsTrigger value="completed" data-oid="ldhrr.7">
+            <TabsTrigger
+              value="completed"
+              className="flex-1 sm:flex-none"
+              data-oid="ldhrr.7"
+            >
               Completed ({completedTrades.length})
             </TabsTrigger>
-            <TabsTrigger value="declined" data-oid="m88osv-">
+            <TabsTrigger
+              value="declined"
+              className="flex-1 sm:flex-none"
+              data-oid="m88osv-"
+            >
               Declined ({TRADES.filter((t) => t.status === "declined").length})
             </TabsTrigger>
           </TabsList>
