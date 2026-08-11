@@ -425,8 +425,17 @@ async function demoCatalogSets(tcg?: TcgCode): Promise<TcgSet[]> {
         (set) => [`${set.tcg}:${normalizeCatalogText(set.code)}`, set] as const,
       ),
   );
+  // Owned-derived sets report the number of cards OWNED as totalCards, which is
+  // not the set's size. Letting them overwrite a catalog entry made every set
+  // the demo owns cards from report N/N — Modern Horizons 2 showed 6/6 complete
+  // in the set list while its detail page correctly said 6/7. So only fill in
+  // sets the catalog does not already describe, and when the size is genuinely
+  // unknown report 0 so the UI says "Total unavailable" instead of claiming
+  // completion.
   for (const set of demoOwnedSets(tcg)) {
-    merged.set(`${set.tcg}:${normalizeCatalogText(set.code)}`, set);
+    const key = `${set.tcg}:${normalizeCatalogText(set.code)}` as const;
+    if (merged.has(key)) continue;
+    merged.set(key, { ...set, totalCards: 0 });
   }
   return Array.from(merged.values());
 }
