@@ -473,7 +473,9 @@ export default function DecksPage() {
               >
                 {cardsAcrossDecks}
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
+              <p
+                className="text-[10px] md:text-xs text-muted-foreground mt-0.5"
+              >
                 In deck lists, not collection size
               </p>
             </CardContent>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -17,19 +18,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useDemoCollectionTotals } from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake analytics data                                                */
 /* ------------------------------------------------------------------ */
 
-const MONTHLY_VALUES = [
+/**
+ * Demo-only value history. Only the closed months are canned — the current
+ * month is the live total from the demo store, so the chart lands on the
+ * headline number instead of contradicting it.
+ */
+const MONTHLY_HISTORY = [
   { month: "Oct", value: 1420 },
   { month: "Nov", value: 1580 },
   { month: "Dec", value: 1750 },
   { month: "Jan", value: 1690 },
   { month: "Feb", value: 1830 },
-  { month: "Mar", value: 2045 },
 ];
+
+const CURRENT_MONTH = "Mar";
 
 const TOP_GAINERS = [
   { name: "Charizard ex", tcg: "Pokemon", change: +18.5, price: 85.0 },
@@ -70,9 +78,26 @@ const RARITY_DIST = [
 /* ------------------------------------------------------------------ */
 
 export default function AnalyticsPage() {
-  const totalValue = GAME_BREAKDOWN.reduce((s, g) => s + g.value, 0);
-  const totalCards = GAME_BREAKDOWN.reduce((s, g) => s + g.cards, 0);
-  const maxBarValue = Math.max(...MONTHLY_VALUES.map((m) => m.value));
+  // The demo store is persisted, so its totals only agree with the markup the
+  // server rendered once we are mounted on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const { totalCards, uniqueCards, totalValue } = useDemoCollectionTotals();
+
+  const monthlyValues = mounted
+    ? [...MONTHLY_HISTORY, { month: CURRENT_MONTH, value: totalValue }]
+    : MONTHLY_HISTORY;
+  const maxBarValue = Math.max(1, ...monthlyValues.map((m) => m.value));
+
+  const previousMonth = MONTHLY_HISTORY[MONTHLY_HISTORY.length - 1];
+  const monthChange = totalValue - previousMonth.value;
+  const monthChangePct = (monthChange / previousMonth.value) * 100;
+  const avgCardValue = totalCards > 0 ? totalValue / totalCards : 0;
+
+  // Value by Game stays demo narrative — its shares are relative to its own
+  // sum, not to the live collection total.
+  const gameBreakdownValue = GAME_BREAKDOWN.reduce((s, g) => s + g.value, 0);
 
   return (
     <AppShell data-oid="0x:212q">

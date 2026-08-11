@@ -268,6 +268,8 @@ function isDemoExperience(): boolean {
   );
 }
 
+const CONFIGURED_CATALOG_ORIGIN = process.env.NEXT_PUBLIC_CATALOG_BASE_URL;
+
 /**
  * The generated catalog packs are never bundled with the app itself, so in the
  * demo — which ships without a backend — asking for a same-origin manifest only
@@ -275,8 +277,6 @@ function isDemoExperience(): boolean {
  * `NEXT_PUBLIC_CATALOG_BASE_URL` at the asset origin, where the manifest does
  * exist, and that request still goes out so offline catalogs stay installable.
  */
-const CONFIGURED_CATALOG_ORIGIN = process.env.NEXT_PUBLIC_CATALOG_BASE_URL;
-
 function shouldSkipManifestFetch(): boolean {
   return !CONFIGURED_CATALOG_ORIGIN?.trim() && isDemoExperience();
 }

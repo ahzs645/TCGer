@@ -412,11 +412,14 @@ export default function SealedPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0" data-oid="cc8kecn">
-                    <p className="text-sm font-semibold" data-oid="0wicg5e">
+                    <p
+                      className="text-sm font-semibold whitespace-nowrap"
+                      data-oid="0wicg5e"
+                    >
                       ${(p.currentValue * p.quantity).toFixed(2)}
                     </p>
                     <p
-                      className={`text-xs ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
+                      className={`text-xs whitespace-nowrap ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
                       data-oid="_hlp0de"
                     >
                       {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
