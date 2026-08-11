@@ -1,8 +1,9 @@
 # The local runtime, as it stands
 
 **Status:** Description of the system as built. Written after Stages 0–4 of
-`docs/data-layer-dexie-convex-plan.md` and steps 1 and 3 of the corrected
-Stage 5 sequencing (§9 of that document).
+`docs/data-layer-dexie-convex-plan.md` and steps 1–3 of the corrected Stage 5
+sequencing (§9 of that document). The local runtime's collection now runs on the
+portable contract; the Convex adapter is the remaining step (§7).
 
 **What this describes:** how TCGer stores data today, on each of its runtimes,
 and exactly how far the "one application, two interchangeable storage runtimes"
@@ -37,9 +38,13 @@ and `clearAllLocalData()` there is the only correct way to wipe local state.
 Dexie v1 (native 1). Two stores:
 
 - `records` (`&key`) — one row per *slice* of application state:
-  `profile`, `preferences`, `binders`, `wishlists`, `decks`, `trades`,
+  `profile`, `preferences`, `collectionRows`, `wishlists`, `decks`, `trades`,
   `sealed`, `initialized`.
-- `meta` (`&key`) — `schemaVersion` (currently **1**) and `legacyImport`.
+- `meta` (`&key`) — `schemaVersion` (currently **2**) and `legacyImport`.
+
+`collectionRows` holds the collection as portable rows (`binders`,
+`collectionEntries`, `cards`). Schema 1 stored it as the nested
+`binders[].cards[].copies[]` array instead; see the migration below.
 
 Behind `DemoPersistence` (`frontend/src/lib/storage/demo-persistence.ts`), a
 four-method contract: `whenHydrated`, `snapshot`, `commit`, `clear`. Two
@@ -47,16 +52,38 @@ implementations ship — Dexie (`demo-db.ts`) and in-memory
 (`createMemoryPersistence`), the latter used whenever IndexedDB is unavailable
 so blocked storage degrades instead of breaking.
 
-**Migration history.** A pre-Dexie release stored everything in one
+**Migration history.** Two steps, both exercised in a browser rather than
+reasoned about.
+
+*Pre-Dexie → schema 1.* A pre-Dexie release stored everything in one
 `localStorage` key via `zustand/persist`. On first boot `demo-db.ts` imports
 that payload, stamps it as schema 1, runs the normal migration path over it, and
 only then deletes the localStorage key. An unreadable payload is left byte for
 byte intact and the visitor gets a fresh demo rather than a broken one.
 
-**Write granularity.** Slice-level. A slice is committed when its *reference*
-stops matching what was last written. Adding one card therefore rewrites the
-entire `binders` array as a single row. This is the write amplification the row
-model is meant to remove; see §5.
+*Schema 1 → 2: nested collection to rows.* `migrateNestedCollection` converts
+`binders[].cards[].copies[]` into rows with `toPortableRows`, preserving ids —
+a binder id is in the collections URL and a copy id is what the REST contract
+hands out as a card's id. Cards from before `copies` existed are expanded into
+one row per copy. The old `binders` record is left in place rather than deleted.
+
+The nested value can arrive by **two** routes and the migration reads both,
+which is the part that is easy to get wrong:
+
+| Route | Where the nested value is | Why |
+|---|---|---|
+| stored schema 1 | the `binders` record on disk | read with `db.records.get` **directly** — `readRecordRows` filters against `DEMO_SLICES`, which no longer contains `binders`, so going through the hydrated state would see nothing |
+| localStorage import | in memory, in the imported state | the import never persists it, for the same slice-filter reason — so the in-memory value is preferred |
+
+Reading only from disk was a real bug, caught by testing: a legacy visitor
+migrated to an empty collection while the version stamp advanced to 2.
+
+**Write granularity.** Slice-level: a slice is committed when its *reference*
+stops matching what was last written. The collection is one slice, so a card
+edit still rewrites the `collectionRows` record. `LocalPortableDb` already
+tracks which *tables* a mutation touched (`onCommit` reports them), so making
+the persistence layer write per table rather than per slice is now a change to
+`demo-db.ts` alone — the information it needs is already there.
 
 ### `tcger-catalog` — downloaded card catalogs
 
@@ -138,8 +165,12 @@ the external id: `DemoBinderCard.cardId` is what every ownership check compares
 against, and it stops matching `externalId` once catalog enrichment attaches a
 real printing id to a seeded card.
 
-**These are built and tested but not yet wired in.** `demo-store.ts` and
-`demo-adapter.ts` still read and write the nested arrays. See §7.
+**These are live.** Every collection mutation in the local runtime goes through
+`collection-rules.ts` over `LocalPortableDb`. `demo-store.ts` no longer
+implements add, update, move or remove — the nested `binders` array is a
+*derived* read model, regenerated after each mutation and never edited, so the
+selectors, ownership checks and catalog enrichment keep reading a shape they
+understand without being able to drift from the rows.
 
 ## 6. How the rules are pinned
 
@@ -161,51 +192,24 @@ executable before the implementation moves.
 
 ## 7. What is not done
 
-**The switchover.** The rules, the contract, the local runtime and the
-conversions all exist and are tested, but nothing calls them in anger. The demo
-still mutates nested arrays.
+**The Convex adapter.** `bridge.ts` still has its own copy of the rules. The
+local runtime and the hosted one therefore run the same *semantics* — pinned by
+the fixture table in §6 — but not the same *code*. Pointing `bridge.ts` at the
+shared rules needs a `PortableDb` adapter over `ctx.db` (a translation layer, no
+logic) and requires the Convex bundler to resolve a workspace package for the
+first time: `convex-backend` currently imports nothing from `packages/`. That is
+a deploy-time question that cannot be answered without a deployment. The fixture
+table is imported only by tests and so carries none of that risk.
 
-It is one atomic change and cannot be split: `DEMO_SCHEMA_VERSION` must go to 2,
-`demo-store.ts` must mutate rows, `demo-adapter.ts` must call the rules, and
-`demo-db.ts` must migrate v1 → v2, all together. Bumping the version alone would
-stamp returning visitors as v2 with data nothing reads, and the
-schema-from-the-future guard would then show them a freshly seeded demo.
+**Per-table persistence.** See the write-granularity note in §2: the plumbing is
+in place, the persistence layer just does not use it yet.
 
-### The trap in that change, confirmed
-
-`DEMO_SLICES` in `demo-persistence.ts` needs `binders` replaced by
-`collectionRows`. **Doing only that silently discards every returning visitor's
-collection**, and the mechanism is verified rather than suspected:
-
-```
-demo-db.ts:661   const known = new Set<string>(DEMO_SLICES);
-demo-db.ts:667   if (!row || typeof row.key !== "string" || !known.has(row.key)) continue;
-```
-
-`readRecordRows` filters stored rows against `DEMO_SLICES`. Drop `"binders"`
-from that list and the stored `binders` row stops being read at all — so
-`migrateStoredState` receives a state with no `binders`, converts nothing,
-writes an empty `collectionRows`, and stamps schema 2. The nested row is still
-on disk (rows for unknown slices are deliberately left in place, `demo-db.ts:665`)
-but nothing will ever read it again, and the visitor sees an empty collection.
-
-The fix is for the v1→v2 step to read the row directly rather than through the
-slice filter — `await db.records.get("binders")` inside `migrateStoredState` —
-so the conversion does not depend on `binders` still being a known slice. That
-also keeps the migration honest if the slice list changes again later.
-
-Everything needed for the step itself already exists and is tested:
-`toPortableRows` converts the stored nested value, and `migrateStoredState`
-(`demo-db.ts:459`) already has the transaction, the version stamp and the
-keep-the-old-rows-on-failure handling — its body is still
-`const migrated = state; // no steps registered yet`.
-
-**The Convex adapter.** `bridge.ts` still has its own copy of the rules. Pointing
-it at the shared ones also requires the Convex bundler to resolve a workspace
-package for the first time — `convex-backend` currently imports nothing from
-`packages/` — which is a deploy-time question that cannot be answered without a
-deployment. The fixture table is imported only by tests and so carries none of
-that risk.
+**The rest of the local runtime.** Only the *collection* runs on the contract.
+Wishlists, decks, trades and sealed are still nested slices in the demo store.
+They have no server-side counterpart that has drifted, so they were not the
+urgent case, but a general local runtime wants them on rows too — and the iOS
+`LocalStore` already implements all of them by hand, which is the argument for
+doing it.
 
 **Known divergences left open**, from
 `docs/stage4-shared-collection-semantics.md` §9: quantity validation (server
