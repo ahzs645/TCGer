@@ -1431,6 +1431,7 @@ export const updateEntry = internalMutation({
     subject: v.string(),
     entryId: v.id("collectionEntries"),
     binderId: v.optional(v.id("binders")),
+    scope: v.optional(v.union(v.literal("card"), v.literal("copy"))),
     quantity: v.optional(v.number()),
     condition: v.optional(nullableString),
     language: v.optional(nullableString),
@@ -1489,6 +1490,8 @@ export const updateEntry = internalMutation({
     }
 
     const targetBinderId = args.binderId ?? entry.binderId;
+    const movesWholeCard =
+      args.scope === "card" && targetBinderId !== entry.binderId;
     const isGroupMutation =
       args.quantity !== undefined ||
       args.cardOverride !== undefined ||
@@ -1530,6 +1533,13 @@ export const updateEntry = internalMutation({
     }
 
     const timestamp = now();
+    // A card-scoped move takes the rest of the group with it. Read before the
+    // patch below, while every copy is still in the source binder.
+    const groupToMove = movesWholeCard
+      ? (await getGroupEntries(ctx, viewer._id, entry.binderId, entry.cardId)).filter(
+          (groupEntry) => groupEntry._id !== entry._id
+        )
+      : [];
     await ctx.db.patch(entry._id, {
       binderId: targetBinderId,
       quantity: 1,
@@ -1584,10 +1594,23 @@ export const updateEntry = internalMutation({
       );
     }
 
+    for (const groupEntry of groupToMove) {
+      await ctx.db.patch(groupEntry._id, {
+        binderId: targetBinderId,
+        updatedAt: timestamp
+      });
+    }
+
     const refreshed = await requireEntryForUser(ctx, entry._id, viewer._id);
-    const desiredQuantity = args.quantity ?? 1;
     const destinationGroup = await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId);
     const currentQuantity = destinationGroup.reduce((sum, groupEntry) => sum + groupEntry.quantity, 0);
+    // An omitted `quantity` means "leave it alone", matching how every other
+    // field in this handler treats undefined. It previously defaulted to 1,
+    // which the reconciliation below reads as "reduce the group to one copy" —
+    // so a PATCH that only changed a copy's condition deleted the rest. The
+    // collection sandbox's buildUpdatePayload() sends only edited fields and
+    // never sends quantity, so that was the normal edit path.
+    const desiredQuantity = args.quantity ?? currentQuantity;
 
     if (desiredQuantity > currentQuantity) {
       const tagIds = await getTagIdsForEntry(ctx, refreshed._id);
@@ -1697,15 +1720,51 @@ export const removeEntry = internalMutation({
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
     const card = await ctx.db.get(entry.cardId);
-    const before = await snapshotAuditEntries(ctx, viewer._id, [entry._id]);
-    await removeEntryForViewer(ctx, viewer._id, args.entryId);
+
+    // Remove the whole grouped card, not just the addressed row.
+    //
+    // The REST response groups a binder's entries by card and reports the
+    // group's id as `copies[0].id` (http.ts `toLegacyBinder`), so the id a
+    // client holds for "this card" is indistinguishable from the id of its
+    // first copy. Every caller of this endpoint means the card: the web
+    // quantity stepper only issues DELETE once the user reaches 0 and then
+    // reports "Card removed from binder.", and the iOS client's delete, bulk
+    // delete and mark-as-sold paths all pass a card-level id and drop the
+    // whole card from local state afterwards. Deleting one row left the other
+    // copies behind, so the card reappeared on the next refresh.
+    //
+    // Nothing deletes an individual copy through this route — quantity
+    // reductions go through PATCH — so there is no caller this can surprise.
+    const group = await getGroupEntries(
+      ctx,
+      viewer._id,
+      entry.binderId,
+      entry.cardId
+    );
+    const doomed = group.length > 0 ? group : [entry];
+    const before = await snapshotAuditEntries(
+      ctx,
+      viewer._id,
+      doomed.map((groupEntry) => groupEntry._id)
+    );
+    for (const groupEntry of doomed) {
+      await removeEntryForViewer(ctx, viewer._id, groupEntry._id);
+    }
+
+    const copyCount = doomed.reduce(
+      (sum, groupEntry) => sum + Math.max(1, groupEntry.quantity),
+      0
+    );
     await appendCollectionAudit(ctx, {
       userId: viewer._id,
       actorId: args.subject,
       operationKind: "remove",
       binderId: entry.binderId,
       cardName: card?.name,
-      summary: `Removed ${card?.name ?? "a collection copy"}`,
+      summary:
+        copyCount > 1
+          ? `Removed ${copyCount} copies of ${card?.name ?? "a collection card"}`
+          : `Removed ${card?.name ?? "a collection copy"}`,
       before,
       after: []
     });

@@ -14,8 +14,7 @@
 
 import { handleDemoRequest } from "./api/demo-adapter";
 import { API_BASE_URL as DEMO_API_BASE_URL } from "./api/base-url";
-
-const STORAGE_KEY = "tcg-demo-mode";
+import { DEMO_MODE_STORAGE_KEY } from "./storage/keys";
 
 function isDemoPath(pathname: string | null | undefined): boolean {
   return pathname === "/demo" || pathname?.startsWith("/demo/") === true;
@@ -35,16 +34,16 @@ function shouldStubBetterAuth(): boolean {
 
 export function isDemoMode(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(STORAGE_KEY) === "true";
+  return localStorage.getItem(DEMO_MODE_STORAGE_KEY) === "true";
 }
 
 export function setDemoMode(enabled: boolean): void {
   if (typeof window === "undefined") return;
   if (enabled) {
-    localStorage.setItem(STORAGE_KEY, "true");
+    localStorage.setItem(DEMO_MODE_STORAGE_KEY, "true");
     installInterceptor();
   } else {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DEMO_MODE_STORAGE_KEY);
     uninstallInterceptor();
   }
 }

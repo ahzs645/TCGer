@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -75,6 +76,7 @@ function tcgLabel(tcg: string): string {
 }
 
 export default function TradesPage() {
+  const [confirm, confirmDialog] = useConfirm();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -257,9 +259,16 @@ export default function TradesPage() {
                     userId={userId}
                     onAccept={() => acceptMutation.mutate(trade.id)}
                     onDecline={() => declineMutation.mutate(trade.id)}
-                    onCancel={() => {
-                      if (window.confirm("Cancel this trade offer?"))
-                        cancelMutation.mutate(trade.id);
+                    onCancel={async () => {
+                      const ok = await confirm({
+                        title: "Cancel this trade offer?",
+                        description:
+                          "The other collector will no longer see this offer.",
+                        confirmLabel: "Cancel offer",
+                        cancelLabel: "Keep offer",
+                        destructive: true,
+                      });
+                      if (ok) cancelMutation.mutate(trade.id);
                     }}
                     busy={isMutating && pendingMutationId === trade.id}
                   />
@@ -280,6 +289,7 @@ export default function TradesPage() {
           setTab("pending");
         }}
       />
+      {confirmDialog}
     </AppShell>
   );
 }

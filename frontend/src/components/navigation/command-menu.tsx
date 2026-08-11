@@ -61,9 +61,11 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
     router.push(getAppRoute(path, pathname));
   };
 
-  const quickCalculations = [
-    { label: "View price analytics (coming soon)", icon: Calculator },
-  ];
+  const quickCalculations: { label: string; icon: LucideIcon; path: string }[] =
+    [
+      { label: "View price analytics", icon: Calculator, path: "/analytics" },
+      { label: "Track card prices", icon: Calculator, path: "/prices" },
+    ];
 
   return (
     <>
@@ -71,14 +73,16 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
         variant="outline"
         className="items-center gap-2 text-sm text-muted-foreground"
         onClick={() => setOpen(true)}
+        aria-label="Quick actions"
+        title="Quick actions (⌘K)"
         data-oid="v61e9fn"
       >
         <Search className="h-4 w-4" data-oid=":8kbdel" />
-        <span className="hidden sm:inline" data-oid="8xyec9b">
+        <span className="hidden lg:inline" data-oid="8xyec9b">
           Quick Actions
         </span>
         <kbd
-          className="pointer-events-none hidden items-center gap-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"
+          className="pointer-events-none hidden items-center gap-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground lg:inline-flex"
           data-oid="9gg10m9"
         >
           <span className="text-xs" data-oid="xi8-6.d">
@@ -179,7 +183,7 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             {quickCalculations.map((item) => (
               <CommandItem
                 key={item.label}
-                onSelect={() => setOpen(false)}
+                onSelect={() => handleNavigate(item.path)}
                 data-oid="n-u4meb"
               >
                 <item.icon className="mr-2 h-4 w-4" data-oid="1omz2kt" />

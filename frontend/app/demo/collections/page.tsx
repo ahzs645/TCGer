@@ -18,9 +18,6 @@ export default function CollectionsPage() {
             >
               Collection sandbox
             </h1>
-            <Badge variant="outline" data-oid="8-js:u6">
-              Beta
-            </Badge>
           </div>
           <p className="text-sm text-muted-foreground" data-oid="njr3h1:">
             Per-copy inventory manager powered by your live binder data.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Repeat2, ArrowRight, Check, Clock, X, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -14,117 +14,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { Trade } from "@/lib/data/demo-portfolio";
+import { useDemoStore } from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake trade data                                                     */
 /* ------------------------------------------------------------------ */
-
-interface TradeCard {
-  name: string;
-  tcg: string;
-  value: number;
-}
-
-interface Trade {
-  id: string;
-  partner: string;
-  status: "completed" | "pending" | "declined";
-  date: string;
-  giving: TradeCard[];
-  receiving: TradeCard[];
-}
-
-const TRADES: Trade[] = [
-  {
-    id: "t1",
-    partner: "CardMaster42",
-    status: "completed",
-    date: "2025-03-15",
-    giving: [
-      { name: "Fury", tcg: "Magic", value: 12.0 },
-      { name: "Grief", tcg: "Magic", value: 8.5 },
-    ],
-
-    receiving: [
-      { name: "Ash Blossom & Joyous Spring", tcg: "Yu-Gi-Oh!", value: 5.5 },
-      { name: "Nibiru, the Primal Being", tcg: "Yu-Gi-Oh!", value: 8.95 },
-      { name: "Effect Veiler", tcg: "Yu-Gi-Oh!", value: 3.8 },
-    ],
-  },
-  {
-    id: "t2",
-    partner: "PikachuCollector",
-    status: "completed",
-    date: "2025-03-10",
-    giving: [
-      { name: "Mewtwo VSTAR", tcg: "Pokemon", value: 7.5 },
-      { name: "Pikachu", tcg: "Pokemon", value: 2.5 },
-    ],
-
-    receiving: [{ name: "Iono", tcg: "Pokemon", value: 32.0 }],
-  },
-  {
-    id: "t3",
-    partner: "ModernMage",
-    status: "pending",
-    date: "2025-03-18",
-    giving: [{ name: "Solitude", tcg: "Magic", value: 32.0 }],
-
-    receiving: [
-      { name: "Ragavan, Nimble Pilferer", tcg: "Magic", value: 68.4 },
-    ],
-  },
-  {
-    id: "t4",
-    partner: "DuelistKing",
-    status: "completed",
-    date: "2025-02-28",
-    giving: [
-      { name: "Pot of Greed", tcg: "Yu-Gi-Oh!", value: 3.2 },
-      { name: "Monster Reborn", tcg: "Yu-Gi-Oh!", value: 5.0 },
-      { name: "Raigeki", tcg: "Yu-Gi-Oh!", value: 6.25 },
-    ],
-
-    receiving: [{ name: "Accesscode Talker", tcg: "Yu-Gi-Oh!", value: 18.0 }],
-  },
-  {
-    id: "t5",
-    partner: "VintageVault",
-    status: "declined",
-    date: "2025-03-05",
-    giving: [{ name: "Charizard ex", tcg: "Pokemon", value: 85.0 }],
-
-    receiving: [
-      { name: "Lightning Bolt", tcg: "Magic", value: 1.5 },
-      { name: "Counterspell", tcg: "Magic", value: 2.25 },
-    ],
-  },
-  {
-    id: "t6",
-    partner: "TradeKing99",
-    status: "pending",
-    date: "2025-03-19",
-    giving: [
-      { name: "Endurance", tcg: "Magic", value: 26.0 },
-      { name: "Fatal Push", tcg: "Magic", value: 3.5 },
-    ],
-
-    receiving: [{ name: "Wrenn and Six", tcg: "Magic", value: 55.0 }],
-  },
-  {
-    id: "t7",
-    partner: "PKMNTrader",
-    status: "completed",
-    date: "2025-02-14",
-    giving: [{ name: "Palkia VSTAR", tcg: "Pokemon", value: 9.75 }],
-
-    receiving: [
-      { name: "Gardevoir ex", tcg: "Pokemon", value: 6.25 },
-      { name: "Eevee", tcg: "Pokemon", value: 0.75 },
-      { name: "Boss's Orders", tcg: "Pokemon", value: 2.5 },
-    ],
-  },
-];
 
 const STATUS_CONFIG = {
   completed: {
@@ -149,6 +54,57 @@ const STATUS_CONFIG = {
 
 export default function TradesPage() {
   const [tab, setTab] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // The demo store is persisted, so it only agrees with the server-rendered
+  // markup once we are on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const storeTrades = useDemoStore((state) => state.trades);
+  const addTrade = useDemoStore((state) => state.addTrade);
+  const TRADES: Trade[] = mounted ? storeTrades : [];
+
+  const [form, setForm] = useState({
+    partner: "",
+    giveName: "",
+    giveValue: "",
+    receiveName: "",
+    receiveValue: "",
+  });
+
+  const canSubmit =
+    form.partner.trim() && form.giveName.trim() && form.receiveName.trim();
+
+  const handleCreate = () => {
+    if (!canSubmit) return;
+    addTrade({
+      partner: form.partner.trim(),
+      giving: [
+        {
+          name: form.giveName.trim(),
+          tcg: "Magic",
+          value: Number(form.giveValue) || 0,
+        },
+      ],
+      receiving: [
+        {
+          name: form.receiveName.trim(),
+          tcg: "Magic",
+          value: Number(form.receiveValue) || 0,
+        },
+      ],
+    });
+    setForm({
+      partner: "",
+      giveName: "",
+      giveValue: "",
+      receiveName: "",
+      receiveValue: "",
+    });
+    setCreateOpen(false);
+    setTab("pending");
+  };
 
   const filtered =
     tab === "all" ? TRADES : TRADES.filter((t) => t.status === tab);
@@ -166,8 +122,11 @@ export default function TradesPage() {
   return (
     <AppShell data-oid="nkjvlu_">
       <div className="space-y-6" data-oid="64mg-f2">
-        <div className="flex items-center justify-between" data-oid="fm9pabc">
-          <div data-oid="99k2..z">
+        <div
+          className="flex items-start justify-between gap-3"
+          data-oid="fm9pabc"
+        >
+          <div className="min-w-0 flex-1" data-oid="99k2..z">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="9d4:6yh"
@@ -178,10 +137,16 @@ export default function TradesPage() {
               Track card trades with other collectors.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="e_i3k.-">
-            <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
-            New Trade
-          </Button>
+          <div className="shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              data-oid="e_i3k.-"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
+              New Trade
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -265,17 +230,36 @@ export default function TradesPage() {
 
         {/* Filter tabs */}
         <Tabs value={tab} onValueChange={setTab} data-oid="-gkig62">
-          <TabsList data-oid="qlk::r4">
-            <TabsTrigger value="all" data-oid="s5p886h">
+          <TabsList
+            className="h-auto w-full max-w-full flex-wrap gap-1 sm:h-10 sm:w-auto sm:gap-0"
+            data-oid="qlk::r4"
+          >
+            <TabsTrigger
+              value="all"
+              className="flex-1 sm:flex-none"
+              data-oid="s5p886h"
+            >
               All ({TRADES.length})
             </TabsTrigger>
-            <TabsTrigger value="pending" data-oid="5ade4e5">
+            <TabsTrigger
+              value="pending"
+              className="flex-1 sm:flex-none"
+              data-oid="5ade4e5"
+            >
               Pending ({TRADES.filter((t) => t.status === "pending").length})
             </TabsTrigger>
-            <TabsTrigger value="completed" data-oid="ldhrr.7">
+            <TabsTrigger
+              value="completed"
+              className="flex-1 sm:flex-none"
+              data-oid="ldhrr.7"
+            >
               Completed ({completedTrades.length})
             </TabsTrigger>
-            <TabsTrigger value="declined" data-oid="m88osv-">
+            <TabsTrigger
+              value="declined"
+              className="flex-1 sm:flex-none"
+              data-oid="m88osv-"
+            >
               Declined ({TRADES.filter((t) => t.status === "declined").length})
             </TabsTrigger>
           </TabsList>
@@ -296,50 +280,81 @@ export default function TradesPage() {
               <Card key={trade.id} data-oid="ebn8ikd">
                 <CardHeader className="p-4 pb-2" data-oid="ukukgm-">
                   <div
-                    className="flex items-center justify-between"
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 sm:flex-nowrap sm:justify-between"
                     data-oid="spvmsx-"
                   >
-                    <div className="flex items-center gap-2" data-oid="0pcurvn">
+                    <div
+                      className="flex min-w-0 flex-1 items-center gap-2"
+                      data-oid="0pcurvn"
+                    >
                       <Repeat2
-                        className="h-4 w-4 text-muted-foreground"
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
                         data-oid="zbouj7q"
                       />
-                      <CardTitle className="text-base" data-oid="2q5q.qf">
-                        Trade with {trade.partner}
+                      <CardTitle
+                        className="truncate text-base"
+                        data-oid="2q5q.qf"
+                      >
+                        {/* The "Trade with" prefix costs ~75px that the partner
+                            name needs — and the icon plus the page title
+                            already say what this is. */}
+                        <span className="hidden sm:inline">Trade with </span>
+                        {trade.partner}
                       </CardTitle>
                     </div>
-                    <div className="flex items-center gap-2" data-oid="l5dle6.">
+                    <div
+                      className="flex shrink-0 items-center gap-2"
+                      data-oid="l5dle6."
+                    >
+                      {/* Icon-only on phones: the label repeats down the whole
+                          list and costs ~78px the partner name needs. Colour
+                          plus icon carries the state; the accessible name and
+                          tooltip carry the word. */}
                       <Badge
                         variant="outline"
-                        className={`${cfg.color} ${cfg.bg}`}
+                        className={`${cfg.color} ${cfg.bg} shrink-0 px-1.5 sm:px-2.5`}
+                        aria-label={cfg.label}
+                        title={cfg.label}
                         data-oid="a_mh9sj"
                       >
                         <StatusIcon
-                          className="mr-1 h-3 w-3"
+                          className="h-3 w-3 sm:mr-1"
+                          aria-hidden="true"
                           data-oid="97c97:0"
                         />
-                        {cfg.label}
+                        <span className="hidden sm:inline">{cfg.label}</span>
                       </Badge>
                       <span
-                        className="text-xs text-muted-foreground"
+                        className="whitespace-nowrap text-xs text-muted-foreground"
+                        title={new Date(trade.date).toLocaleDateString(undefined, {
+                          dateStyle: "long",
+                        })}
                         data-oid="41iviaj"
                       >
-                        {new Date(trade.date).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                        <span className="sm:hidden">
+                          {new Date(trade.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {new Date(trade.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
                       </span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-2" data-oid="s7acok5">
                   <div
-                    className="grid gap-4 md:grid-cols-[1fr_auto_1fr]"
+                    className="grid gap-3 md:gap-4 md:grid-cols-[1fr_auto_1fr]"
                     data-oid="olvqw13"
                   >
                     {/* Giving */}
-                    <div className="space-y-2" data-oid="p47-_v1">
+                    <div className="space-y-1.5 md:space-y-2" data-oid="p47-_v1">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="ibex:g_"
@@ -349,10 +364,10 @@ export default function TradesPage() {
                       {trade.giving.map((c, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between rounded border p-2 text-sm"
+                          className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-sm md:p-2"
                           data-oid="v:apcta"
                         >
-                          <div data-oid="v:7lbbx">
+                          <div className="min-w-0 truncate" data-oid="v:7lbbx">
                             <span className="font-medium" data-oid="r.gdn1i">
                               {c.name}
                             </span>
@@ -364,7 +379,7 @@ export default function TradesPage() {
                             </span>
                           </div>
                           <span
-                            className="text-muted-foreground"
+                            className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="wf30jzj"
                           >
                             ${c.value.toFixed(2)}
@@ -391,7 +406,7 @@ export default function TradesPage() {
                     </div>
 
                     {/* Receiving */}
-                    <div className="space-y-2" data-oid="8-keg4c">
+                    <div className="space-y-1.5 md:space-y-2" data-oid="8-keg4c">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="t9d1::m"
@@ -401,10 +416,10 @@ export default function TradesPage() {
                       {trade.receiving.map((c, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between rounded border p-2 text-sm"
+                          className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-sm md:p-2"
                           data-oid="_mi6-ck"
                         >
-                          <div data-oid="13hhfie">
+                          <div className="min-w-0 truncate" data-oid="13hhfie">
                             <span className="font-medium" data-oid=".r8jhb6">
                               {c.name}
                             </span>
@@ -416,7 +431,7 @@ export default function TradesPage() {
                             </span>
                           </div>
                           <span
-                            className="text-muted-foreground"
+                            className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="ii8kio."
                           >
                             ${c.value.toFixed(2)}
@@ -437,6 +452,85 @@ export default function TradesPage() {
           })}
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New trade offer</DialogTitle>
+            <DialogDescription>
+              Log what each side is putting up. The offer starts as pending.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="trade-partner">Trading with</Label>
+              <Input
+                id="trade-partner"
+                value={form.partner}
+                placeholder="Collector name"
+                onChange={(e) => setForm({ ...form, partner: e.target.value })}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trade-give">You give</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="trade-give"
+                  className="flex-1"
+                  value={form.giveName}
+                  placeholder="Card name"
+                  onChange={(e) =>
+                    setForm({ ...form, giveName: e.target.value })
+                  }
+                />
+                <Input
+                  className="w-24"
+                  inputMode="decimal"
+                  value={form.giveValue}
+                  placeholder="$0.00"
+                  aria-label="Value of the card you give"
+                  onChange={(e) =>
+                    setForm({ ...form, giveValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trade-receive">You receive</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="trade-receive"
+                  className="flex-1"
+                  value={form.receiveName}
+                  placeholder="Card name"
+                  onChange={(e) =>
+                    setForm({ ...form, receiveName: e.target.value })
+                  }
+                />
+                <Input
+                  className="w-24"
+                  inputMode="decimal"
+                  value={form.receiveValue}
+                  placeholder="$0.00"
+                  aria-label="Value of the card you receive"
+                  onChange={(e) =>
+                    setForm({ ...form, receiveValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!canSubmit}>
+              Log trade
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

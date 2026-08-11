@@ -1,0 +1,382 @@
+/**
+ * The local runtime's implementation of {@link PortableDb}.
+ *
+ * Holds the working set in memory and writes changed rows through to a
+ * persistence sink. That is the same arrangement the iOS client already ships
+ * (`LocalStore`'s `loadPersistedState` / `persist`), and it is what lets the
+ * demo's React selectors keep reading synchronously while the rules below them
+ * are written against an async contract.
+ *
+ * Two properties matter and neither is free:
+ *
+ * 1. **Row-level writes.** The slice model this replaces committed the entire
+ *    `binders` array whenever any part of it changed, so adding one card
+ *    rewrote every card the visitor owned. Here a mutation marks one row.
+ * 2. **Atomicity.** `transaction()` buffers mutations and applies them in one
+ *    go, so a failed quantity reconciliation cannot leave half a group behind.
+ *    The contract requires this; the previous store had no notion of it.
+ */
+
+import {
+  type NewRow,
+  type PortableDb,
+  type PortableIndexName,
+  type PortableQueryOptions,
+  type PortableRow,
+  type PortableTableName,
+  type PortableTables,
+  PORTABLE_INDEXES,
+  entityId,
+} from "@tcg/api-types";
+
+/** Rows grouped by table — the shape the store keeps and persists. */
+export type PortableSnapshot = {
+  [K in PortableTableName]: PortableTables[K][];
+};
+
+/**
+ * The tables each persisted slice owns.
+ *
+ * One store holds every table, because a mutation that spans two of them —
+ * deleting a wishlist and its cards — has to be one transaction, and a
+ * transaction cannot span two stores. Persistence is still split along these
+ * lines so editing a deck does not rewrite the collection: `demo-store.ts`
+ * commits one slice per group, and the groups are the unit of write.
+ */
+export const COLLECTION_TABLES = [
+  "binders",
+  "collectionEntries",
+  "cards",
+] as const;
+export const WISHLIST_TABLES = [
+  "wishlists",
+  "wishlistCards",
+  "wishlistRules",
+] as const;
+export const DECK_TABLES = ["decks", "deckCards"] as const;
+export const TRADE_TABLES = ["trades", "tradeCards"] as const;
+export const SEALED_TABLES = ["sealedInventory"] as const;
+
+export type CollectionSnapshot = Pick<
+  PortableSnapshot,
+  (typeof COLLECTION_TABLES)[number]
+>;
+export type WishlistSnapshot = Pick<
+  PortableSnapshot,
+  (typeof WISHLIST_TABLES)[number]
+>;
+export type DeckSnapshot = Pick<PortableSnapshot, (typeof DECK_TABLES)[number]>;
+export type TradeSnapshot = Pick<
+  PortableSnapshot,
+  (typeof TRADE_TABLES)[number]
+>;
+export type SealedSnapshot = Pick<
+  PortableSnapshot,
+  (typeof SEALED_TABLES)[number]
+>;
+
+export function emptySnapshot(): PortableSnapshot {
+  return {
+    binders: [],
+    collectionEntries: [],
+    cards: [],
+    wishlists: [],
+    wishlistCards: [],
+    wishlistRules: [],
+    decks: [],
+    deckCards: [],
+    trades: [],
+    tradeCards: [],
+    sealedInventory: [],
+  };
+}
+
+/** The rows for one slice's tables, as a fresh object the store can publish. */
+export function rowsOf<K extends PortableTableName>(
+  snapshot: PortableSnapshot,
+  tables: readonly K[],
+): Pick<PortableSnapshot, K> {
+  const picked = {} as Pick<PortableSnapshot, K>;
+  for (const table of tables) picked[table] = snapshot[table];
+  return picked;
+}
+
+/**
+ * Overlay a stored slice onto a snapshot, taking only the arrays it should
+ * carry.
+ *
+ * Defensive on purpose: a slice read back from storage is whatever some
+ * previous release wrote, and a missing or non-array table has to leave the
+ * empty one in place rather than replace it with `undefined` — every read path
+ * below indexes straight into these arrays.
+ */
+export function overlayRows(
+  snapshot: PortableSnapshot,
+  slice: unknown,
+  tables: readonly PortableTableName[],
+): void {
+  if (!slice || typeof slice !== "object") return;
+  const source = slice as Record<string, unknown>;
+  for (const table of tables) {
+    const rows = source[table];
+    if (Array.isArray(rows)) snapshot[table] = rows as never;
+  }
+}
+
+/**
+ * Told which tables changed after every committed mutation, so the owner can
+ * persist just those and refresh whatever the UI reads.
+ */
+export type PortableCommitListener = (
+  snapshot: PortableSnapshot,
+  changed: ReadonlySet<PortableTableName>,
+) => void;
+
+const TABLES: readonly PortableTableName[] = [
+  ...COLLECTION_TABLES,
+  ...WISHLIST_TABLES,
+  ...DECK_TABLES,
+  ...TRADE_TABLES,
+  ...SEALED_TABLES,
+];
+
+/**
+ * Ids are minted locally and are opaque to callers, but they have to survive a
+ * round trip through the REST contract, a reload, and — eventually — being
+ * promoted into the hosted database. `entityId` is time-sortable and unique
+ * without coordination, so a row created offline keeps the identity it was
+ * created with rather than being re-minted on the way up.
+ */
+function mintId(_table: PortableTableName): string {
+  return entityId();
+}
+
+function matchesKey<T extends PortableRow>(row: T, key: Partial<T>): boolean {
+  for (const [field, value] of Object.entries(key)) {
+    if (value === undefined) continue;
+    if ((row as Record<string, unknown>)[field] !== value) return false;
+  }
+  return true;
+}
+
+export class LocalPortableDb implements PortableDb {
+  private tables: PortableSnapshot;
+  private listener: PortableCommitListener | null = null;
+
+  /** Non-null while inside `transaction()`: buffered writes, not yet visible. */
+  private staged: PortableSnapshot | null = null;
+
+  /** Serialises transactions; see {@link transaction}. */
+  private queue: Promise<void> = Promise.resolve();
+  private stagedTables: Set<PortableTableName> | null = null;
+
+  constructor(initial: PortableSnapshot = emptySnapshot()) {
+    this.tables = initial;
+  }
+
+  onCommit(listener: PortableCommitListener | null): void {
+    this.listener = listener;
+  }
+
+  /** Replace everything, e.g. after hydrating from storage or resetting. */
+  load(snapshot: PortableSnapshot): void {
+    this.tables = snapshot;
+  }
+
+  snapshot(): PortableSnapshot {
+    return this.tables;
+  }
+
+  /* -------------------------------------------------------------- */
+  /*  Reads                                                          */
+  /* -------------------------------------------------------------- */
+
+  private read<T extends PortableTableName>(table: T): PortableTables[T][] {
+    const source = this.staged ?? this.tables;
+    return source[table] as PortableTables[T][];
+  }
+
+  get<T extends PortableTableName>(
+    table: T,
+    id: string,
+  ): Promise<PortableTables[T] | null> {
+    const row = this.read(table).find((candidate) => candidate._id === id);
+    return Promise.resolve(row ?? null);
+  }
+
+  // `async` rather than returning a built promise: a method typed as async must
+  // reject on a bad index, not throw past the caller's `await`.
+  async query<T extends PortableTableName>(
+    table: T,
+    index: PortableIndexName<T>,
+    key: Partial<PortableTables[T]>,
+    options?: PortableQueryOptions,
+  ): Promise<PortableTables[T][]> {
+    // The index is not used to look anything up — the working set is in memory
+    // and a scan of it is cheaper than maintaining structures. It is still
+    // required and validated, because a rule that queries by a path the hosted
+    // runtime has no index for would work here and fall over on Convex.
+    const fields = (
+      PORTABLE_INDEXES[table] as Record<string, readonly string[]>
+    )[index];
+    if (!fields) {
+      throw new Error(`Unknown index ${String(index)} on ${table}`);
+    }
+    for (const field of Object.keys(key)) {
+      if (!fields.includes(field)) {
+        throw new Error(
+          `Index ${String(index)} on ${table} cannot serve a lookup by ${field}`,
+        );
+      }
+    }
+
+    let rows = this.read(table).filter((row) => matchesKey(row, key));
+    if (options?.order === "desc") {
+      rows = [...rows].sort((a, b) => b._creationTime - a._creationTime);
+    } else if (options?.order === "asc") {
+      rows = [...rows].sort((a, b) => a._creationTime - b._creationTime);
+    }
+    if (options?.limit !== undefined) rows = rows.slice(0, options.limit);
+    return Promise.resolve(rows);
+  }
+
+  /* -------------------------------------------------------------- */
+  /*  Writes                                                         */
+  /* -------------------------------------------------------------- */
+
+  /**
+   * Every mutation goes through here so that a write outside `transaction()`
+   * still commits atomically — the contract makes no promise that callers wrap
+   * single writes, and half-applied single writes would be just as broken.
+   */
+  private mutate<R>(
+    table: PortableTableName,
+    apply: (draft: PortableSnapshot) => R,
+  ): R {
+    if (this.staged) {
+      this.stagedTables!.add(table);
+      return apply(this.staged);
+    }
+    const draft: PortableSnapshot = { ...this.tables };
+    const result = apply(draft);
+    this.tables = draft;
+    this.listener?.(this.tables, new Set([table]));
+    return result;
+  }
+
+  insert<T extends PortableTableName>(
+    table: T,
+    doc: NewRow<PortableTables[T]>,
+  ): Promise<string> {
+    const id = mintId(table);
+    this.mutate(table, (draft) => {
+      const row = {
+        ...doc,
+        _id: id,
+        _creationTime: Date.now(),
+      } as PortableTables[T];
+      draft[table] = [...(draft[table] as PortableTables[T][]), row] as never;
+    });
+    return Promise.resolve(id);
+  }
+
+  patch<T extends PortableTableName>(
+    table: T,
+    id: string,
+    changes: Partial<NewRow<PortableTables[T]>>,
+  ): Promise<void> {
+    this.mutate(table, (draft) => {
+      const rows = draft[table] as PortableTables[T][];
+      const index = rows.findIndex((row) => row._id === id);
+      if (index < 0) return;
+      const next = [...rows];
+      // `undefined` clears, matching Convex's patch: the rules rely on this to
+      // express "this field was explicitly cleared" versus "not mentioned".
+      next[index] = { ...next[index], ...changes };
+      draft[table] = next as never;
+    });
+    return Promise.resolve();
+  }
+
+  delete<T extends PortableTableName>(table: T, id: string): Promise<void> {
+    this.mutate(table, (draft) => {
+      const rows = draft[table] as PortableTables[T][];
+      draft[table] = rows.filter((row) => row._id !== id) as never;
+    });
+    return Promise.resolve();
+  }
+
+  /**
+   * Run `fn` atomically, serialised against every other transaction.
+   *
+   * The queue is not belt-and-braces: there is exactly one staged buffer, so
+   * two transactions in flight at once would share it. The second would join
+   * the first's overlay and they would commit — or roll back — together,
+   * losing whichever writes lost the race. societyer hit precisely this and
+   * fixed it the same way (`shared/portable/localRowStore.ts`, transactions
+   * serialised through a promise queue "after a data-loss bug from concurrent
+   * mutations sharing an overlay"). It is reachable here because
+   * `handleDemoRequest` is async and nothing stops the UI issuing overlapping
+   * requests.
+   *
+   * A consequence worth stating: transactions must not nest. A rule that
+   * called this from inside another transaction's body would queue behind
+   * itself and hang. None of the collection rules do — each mutation opens
+   * exactly one transaction, the same shape societyer's runtime enforces by
+   * wrapping every mutation once.
+   */
+  transaction<R>(
+    tables: readonly PortableTableName[],
+    fn: () => Promise<R>,
+  ): Promise<R> {
+    // Declared tables are not needed here — the whole working set is in memory
+    // and access is serialised, so there is nothing to lock. Convex and Dexie
+    // both require them, which is why the contract carries them.
+    void tables;
+    const run = () => this.runExclusively(fn);
+    const result = this.queue.then(run, run);
+    // The queue must not reject, or every later transaction inherits the
+    // failure; callers still see the real rejection through `result`.
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async runExclusively<R>(fn: () => Promise<R>): Promise<R> {
+    this.staged = { ...this.tables };
+    this.stagedTables = new Set();
+    try {
+      const result = await fn();
+      this.tables = this.staged;
+      const changed = this.stagedTables;
+      this.staged = null;
+      this.stagedTables = null;
+      if (changed.size > 0) this.listener?.(this.tables, changed);
+      return result;
+    } catch (error) {
+      // Drop the buffer; `this.tables` was never touched.
+      this.staged = null;
+      this.stagedTables = null;
+      throw error;
+    }
+  }
+
+  /**
+   * Existence, not format.
+   *
+   * Convex validates its own id encoding without touching the database. This
+   * store has no encoding to check — ids minted here sit alongside ids carried
+   * over verbatim from the shipped nested shape, which must keep working
+   * because they appear in URLs and in the REST contract. The working set is in
+   * memory, so answering "is this a real id for this table" outright is both
+   * cheap and strictly more useful than a prefix test.
+   */
+  normalizeId(table: PortableTableName, id: string): string | null {
+    if (!id) return null;
+    return this.read(table).some((row) => row._id === id) ? id : null;
+  }
+}
+
+export const PORTABLE_TABLES = TABLES;

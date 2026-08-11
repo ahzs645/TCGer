@@ -6,6 +6,7 @@ import {
   isSingleUserModeEnabled,
   SINGLE_USER_TOKEN,
 } from "@/lib/single-user-mode";
+import { AUTH_STORE_STORAGE_KEY } from "@/lib/storage/keys";
 
 import { useModuleStore } from "./preferences";
 
@@ -227,7 +228,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "tcg-auth-store",
+      name: AUTH_STORE_STORAGE_KEY,
       merge: (persistedState, currentState) => {
         if (isSingleUserModeEnabled()) {
           return {

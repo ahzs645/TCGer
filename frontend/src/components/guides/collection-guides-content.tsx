@@ -46,7 +46,11 @@ import { useWishlistsStore } from "@/stores/wishlists";
 type OwnershipFilter = "all" | "owned" | "missing";
 type SearchScope = "guides" | "cards";
 
-export function CollectionGuidesContent() {
+export function CollectionGuidesContent({
+  autoSelectFirstGuide = true,
+}: {
+  autoSelectFirstGuide?: boolean;
+} = {}) {
   const { token, isAuthenticated } = useAuthStore();
   const { wishlists, fetchWishlists, hasFetched, syncWishlist } =
     useWishlistsStore();
@@ -78,10 +82,10 @@ export function CollectionGuidesContent() {
   }, [fetchWishlists, hasFetched, isAuthenticated, token]);
 
   useEffect(() => {
-    if (!selectedSlug && guidesQuery.data?.length) {
+    if (autoSelectFirstGuide && !selectedSlug && guidesQuery.data?.length) {
       setSelectedSlug(guidesQuery.data[0]!.slug);
     }
-  }, [guidesQuery.data, selectedSlug]);
+  }, [autoSelectFirstGuide, guidesQuery.data, selectedSlug]);
 
   const guides = useMemo(() => {
     const query = guideSearch.trim().toLocaleLowerCase();

@@ -732,6 +732,11 @@ const TWO_PI = Math.PI * 2;
  */
 export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
   const [hovered, setHovered] = useState(false);
+  // The ring is sized to the frame it is rendered in: on a phone-shaped canvas
+  // the full radius pushes the neighbouring packs past both edges, so shrink it
+  // until they stay inside the visible width. Wide canvases keep CAROUSEL_R.
+  const viewWidth = useThree((s) => s.viewport.width);
+  const radius = THREE.MathUtils.clamp(viewWidth * 0.5, 1.5, CAROUSEL_R);
   const groupRefs = useRef<(THREE.Group | null)[]>([]);
   const fullGeo = useMemo(() => makeWrapperGeometry(FULL_FACE_CUT, "body"), []);
   const wallGeos = useMemo(
@@ -852,9 +857,9 @@ export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
       if (!group) continue;
       const a = st.angle + i * CAROUSEL_STEP;
       group.position.set(
-        Math.sin(a) * CAROUSEL_R,
+        Math.sin(a) * radius,
         Math.sin(t * 1.2 + i * 1.1) * 0.05,
-        -CAROUSEL_R + Math.cos(a) * CAROUSEL_R,
+        -radius + Math.cos(a) * radius,
       );
       group.rotation.y = a * 0.55 + st.spin[i];
       const focus = (Math.cos(a) + 1) / 2;

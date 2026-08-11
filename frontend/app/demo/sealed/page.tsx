@@ -1,141 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Package, Plus, DollarSign, TrendingUp, Calendar } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { SealedProduct } from "@/lib/data/demo-portfolio";
+import { useDemoStore } from "@/stores/demo-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 /* ------------------------------------------------------------------ */
 /*  Fake sealed products data                                           */
 /* ------------------------------------------------------------------ */
-
-interface SealedProduct {
-  id: string;
-  name: string;
-  tcg: string;
-  type: string;
-  purchasePrice: number;
-  currentValue: number;
-  quantity: number;
-  purchaseDate: string;
-  set: string;
-}
-
-const SEALED_PRODUCTS: SealedProduct[] = [
-  {
-    id: "s1",
-    name: "Paldea Evolved Booster Box",
-    tcg: "Pokemon",
-    type: "Booster Box",
-    purchasePrice: 105.0,
-    currentValue: 128.0,
-    quantity: 2,
-    purchaseDate: "2024-08-15",
-    set: "Paldea Evolved",
-  },
-  {
-    id: "s2",
-    name: "Modern Horizons 2 Draft Box",
-    tcg: "Magic",
-    type: "Draft Booster Box",
-    purchasePrice: 240.0,
-    currentValue: 310.0,
-    quantity: 1,
-    purchaseDate: "2024-03-20",
-    set: "Modern Horizons 2",
-  },
-  {
-    id: "s3",
-    name: "25th Anniversary Tin",
-    tcg: "Yu-Gi-Oh!",
-    type: "Tin",
-    purchasePrice: 29.99,
-    currentValue: 45.0,
-    quantity: 4,
-    purchaseDate: "2024-06-10",
-    set: "25th Anniversary",
-  },
-  {
-    id: "s4",
-    name: "Pokemon 151 ETB",
-    tcg: "Pokemon",
-    type: "Elite Trainer Box",
-    purchasePrice: 49.99,
-    currentValue: 72.0,
-    quantity: 3,
-    purchaseDate: "2024-01-05",
-    set: "Pokemon 151",
-  },
-  {
-    id: "s5",
-    name: "Battles of Legend Chapter 1",
-    tcg: "Yu-Gi-Oh!",
-    type: "Booster Box",
-    purchasePrice: 70.0,
-    currentValue: 65.0,
-    quantity: 1,
-    purchaseDate: "2024-09-12",
-    set: "Battles of Legend",
-  },
-  {
-    id: "s6",
-    name: "Commander Masters Collector Box",
-    tcg: "Magic",
-    type: "Collector Booster Box",
-    purchasePrice: 290.0,
-    currentValue: 255.0,
-    quantity: 1,
-    purchaseDate: "2024-11-01",
-    set: "Commander Masters",
-  },
-  {
-    id: "s7",
-    name: "Obsidian Flames Booster Bundle",
-    tcg: "Pokemon",
-    type: "Booster Bundle",
-    purchasePrice: 32.0,
-    currentValue: 38.0,
-    quantity: 5,
-    purchaseDate: "2024-07-22",
-    set: "Obsidian Flames",
-  },
-  {
-    id: "s8",
-    name: "Maze of Millennia Booster Box",
-    tcg: "Yu-Gi-Oh!",
-    type: "Booster Box",
-    purchasePrice: 75.0,
-    currentValue: 82.0,
-    quantity: 2,
-    purchaseDate: "2024-04-18",
-    set: "Maze of Millennia",
-  },
-  {
-    id: "s9",
-    name: "Lord of the Rings Set Booster Box",
-    tcg: "Magic",
-    type: "Set Booster Box",
-    purchasePrice: 170.0,
-    currentValue: 215.0,
-    quantity: 1,
-    purchaseDate: "2024-02-14",
-    set: "Tales of Middle-earth",
-  },
-  {
-    id: "s10",
-    name: "Scarlet & Violet ETB",
-    tcg: "Pokemon",
-    type: "Elite Trainer Box",
-    purchasePrice: 42.0,
-    currentValue: 55.0,
-    quantity: 2,
-    purchaseDate: "2024-05-30",
-    set: "Scarlet & Violet",
-  },
-];
 
 const TCG_COLORS: Record<string, string> = {
   Pokemon: "#f59e0b",
@@ -145,6 +32,53 @@ const TCG_COLORS: Record<string, string> = {
 
 export default function SealedPage() {
   const [sortBy, setSortBy] = useState<"date" | "value" | "profit">("date");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // The demo store is persisted, so it only agrees with the server-rendered
+  // markup once we are on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const storeSealed = useDemoStore((state) => state.sealed);
+  const addSealedProduct = useDemoStore((state) => state.addSealedProduct);
+  const SEALED_PRODUCTS: SealedProduct[] = mounted ? storeSealed : [];
+
+  const [form, setForm] = useState({
+    name: "",
+    tcg: "Pokemon",
+    type: "Booster Box",
+    set: "",
+    quantity: "1",
+    purchasePrice: "",
+    currentValue: "",
+  });
+
+  const canSubmit = form.name.trim() && Number(form.purchasePrice) > 0;
+
+  const handleCreate = () => {
+    if (!canSubmit) return;
+    const purchase = Number(form.purchasePrice) || 0;
+    addSealedProduct({
+      name: form.name.trim(),
+      tcg: form.tcg,
+      type: form.type.trim() || "Booster Box",
+      set: form.set.trim() || form.name.trim(),
+      quantity: Math.max(1, Number(form.quantity) || 1),
+      purchasePrice: purchase,
+      // Default to break-even rather than inventing a gain.
+      currentValue: Number(form.currentValue) || purchase,
+    });
+    setForm({
+      name: "",
+      tcg: "Pokemon",
+      type: "Booster Box",
+      set: "",
+      quantity: "1",
+      purchasePrice: "",
+      currentValue: "",
+    });
+    setCreateOpen(false);
+  };
 
   const totalInvested = SEALED_PRODUCTS.reduce(
     (s, p) => s + p.purchasePrice * p.quantity,
@@ -173,8 +107,11 @@ export default function SealedPage() {
   return (
     <AppShell data-oid="400i9:c">
       <div className="space-y-6" data-oid="46o67ox">
-        <div className="flex items-center justify-between" data-oid="24af:t7">
-          <div data-oid="eh-_rpf">
+        <div
+          className="flex items-start justify-between gap-3"
+          data-oid="24af:t7"
+        >
+          <div className="min-w-0 flex-1" data-oid="eh-_rpf">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="ol_wf5d"
@@ -185,10 +122,16 @@ export default function SealedPage() {
               Track your sealed product investments and market values.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="uffzlfv">
-            <Plus className="mr-2 h-4 w-4" data-oid="zoob79u" />
-            Add Product
-          </Button>
+          <div className="shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              data-oid="uffzlfv"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="zoob79u" />
+              Add Product
+            </Button>
+          </div>
         </div>
 
         {/* Summary */}
@@ -365,44 +308,47 @@ export default function SealedPage() {
                     </div>
                     <div className="min-w-0" data-oid=":uqj999">
                       <p
-                        className="text-sm font-semibold truncate"
+                        className="text-sm font-semibold line-clamp-2 break-words"
                         data-oid="ziamz_:"
                       >
                         {p.name}
                       </p>
                       <div
-                        className="flex items-center gap-2 mt-0.5"
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5"
                         data-oid="yzftm0_"
                       >
                         <Badge
                           variant="outline"
-                          className="text-xs"
+                          className="text-xs whitespace-nowrap"
                           style={{ borderColor: TCG_COLORS[p.tcg] }}
                           data-oid="8y7bxo:"
                         >
                           {p.tcg}
                         </Badge>
+                        {/* Type and quantity are one wrap unit: as separate
+                            flex children a long type pushed the "x2" onto a
+                            line of its own. */}
                         <span
-                          className="text-xs text-muted-foreground"
+                          className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
                           data-oid=".f8d7oi"
                         >
-                          {p.type}
-                        </span>
-                        <span
-                          className="text-xs text-muted-foreground"
-                          data-oid="a8xunk1"
-                        >
-                          x{p.quantity}
+                          <span className="truncate">{p.type}</span>
+                          <span className="shrink-0" data-oid="a8xunk1">
+                            ×{p.quantity}
+                          </span>
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right shrink-0" data-oid="cc8kecn">
-                    <p className="text-sm font-semibold" data-oid="0wicg5e">
+                    <p
+                      className="text-sm font-semibold whitespace-nowrap"
+                      data-oid="0wicg5e"
+                    >
                       ${(p.currentValue * p.quantity).toFixed(2)}
                     </p>
                     <p
-                      className={`text-xs ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
+                      className={`text-xs whitespace-nowrap ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
                       data-oid="_hlp0de"
                     >
                       {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
@@ -416,6 +362,85 @@ export default function SealedPage() {
           })}
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add sealed product</DialogTitle>
+            <DialogDescription>
+              Track a box, bundle or tin. Leave the market value blank to start
+              it at break-even.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="sealed-name">Product</Label>
+              <Input
+                id="sealed-name"
+                value={form.name}
+                placeholder="e.g. Paldea Evolved Booster Box"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="sealed-type">Type</Label>
+                <Input
+                  id="sealed-type"
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sealed-qty">Quantity</Label>
+                <Input
+                  id="sealed-qty"
+                  inputMode="numeric"
+                  value={form.quantity}
+                  onChange={(e) =>
+                    setForm({ ...form, quantity: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="sealed-paid">Paid each</Label>
+                <Input
+                  id="sealed-paid"
+                  inputMode="decimal"
+                  value={form.purchasePrice}
+                  placeholder="$0.00"
+                  onChange={(e) =>
+                    setForm({ ...form, purchasePrice: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sealed-value">Market each</Label>
+                <Input
+                  id="sealed-value"
+                  inputMode="decimal"
+                  value={form.currentValue}
+                  placeholder="Same as paid"
+                  onChange={(e) =>
+                    setForm({ ...form, currentValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!canSubmit}>
+              Add product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

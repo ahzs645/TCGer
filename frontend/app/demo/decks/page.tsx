@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Layers, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Layers, Plus, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -13,356 +13,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import type { Deck } from "@/lib/data/demo-portfolio";
+import { useDemoStore } from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake deck data                                                      */
 /* ------------------------------------------------------------------ */
-
-interface DeckCard {
-  name: string;
-  quantity: number;
-  rarity: string;
-  type: string;
-}
-
-interface Deck {
-  id: string;
-  name: string;
-  tcg: string;
-  format: string;
-  description: string;
-  color: string;
-  cards: DeckCard[];
-  lastUpdated: string;
-  isComplete: boolean;
-}
-
-const DECKS: Deck[] = [
-  {
-    id: "d1",
-    name: "Branded Despia",
-    tcg: "Yu-Gi-Oh!",
-    format: "Advanced",
-    description:
-      "Fusion-focused combo deck centered around Branded Fusion and the Despia archetype.",
-    color: "#8b5cf6",
-    lastUpdated: "2025-03-18",
-    isComplete: true,
-    cards: [
-      {
-        name: "Ash Blossom & Joyous Spring",
-        quantity: 3,
-        rarity: "Ultra Rare",
-        type: "Monster",
-      },
-      {
-        name: "Nibiru, the Primal Being",
-        quantity: 2,
-        rarity: "Secret Rare",
-        type: "Monster",
-      },
-      {
-        name: "Effect Veiler",
-        quantity: 2,
-        rarity: "Ultra Rare",
-        type: "Monster",
-      },
-      {
-        name: "Called by the Grave",
-        quantity: 1,
-        rarity: "Common",
-        type: "Spell",
-      },
-      {
-        name: "Pot of Prosperity",
-        quantity: 2,
-        rarity: "Secret Rare",
-        type: "Spell",
-      },
-      {
-        name: "Infinite Impermanence",
-        quantity: 3,
-        rarity: "Secret Rare",
-        type: "Trap",
-      },
-      {
-        name: "Branded Fusion",
-        quantity: 3,
-        rarity: "Ultra Rare",
-        type: "Spell",
-      },
-      {
-        name: "Aluber the Jester of Despia",
-        quantity: 3,
-        rarity: "Ultra Rare",
-        type: "Monster",
-      },
-      {
-        name: "Fallen of Albaz",
-        quantity: 2,
-        rarity: "Super Rare",
-        type: "Monster",
-      },
-      {
-        name: "Dramaturge of Despia",
-        quantity: 2,
-        rarity: "Super Rare",
-        type: "Monster",
-      },
-      { name: "Branded Opening", quantity: 3, rarity: "Rare", type: "Spell" },
-      {
-        name: "Branded in Red",
-        quantity: 2,
-        rarity: "Ultra Rare",
-        type: "Trap",
-      },
-      {
-        name: "Solemn Judgment",
-        quantity: 1,
-        rarity: "Ultra Rare",
-        type: "Trap",
-      },
-      { name: "Raigeki", quantity: 1, rarity: "Ultra Rare", type: "Spell" },
-      {
-        name: "Monster Reborn",
-        quantity: 1,
-        rarity: "Ultra Rare",
-        type: "Spell",
-      },
-    ],
-  },
-  {
-    id: "d2",
-    name: "Izzet Murktide",
-    tcg: "Magic",
-    format: "Modern",
-    description:
-      "Tempo-control deck leveraging Murktide Regent and efficient cantrips.",
-    color: "#3b82f6",
-    lastUpdated: "2025-03-15",
-    isComplete: false,
-    cards: [
-      {
-        name: "Ragavan, Nimble Pilferer",
-        quantity: 4,
-        rarity: "Mythic Rare",
-        type: "Creature",
-      },
-      {
-        name: "Murktide Regent",
-        quantity: 4,
-        rarity: "Mythic Rare",
-        type: "Creature",
-      },
-      {
-        name: "Lightning Bolt",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Instant",
-      },
-      {
-        name: "Counterspell",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Instant",
-      },
-      {
-        name: "Force of Negation",
-        quantity: 2,
-        rarity: "Rare",
-        type: "Instant",
-      },
-      { name: "Prismatic Vista", quantity: 2, rarity: "Rare", type: "Land" },
-      {
-        name: "Mishra's Bauble",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Artifact",
-      },
-      {
-        name: "Expressive Iteration",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Sorcery",
-      },
-      { name: "Unholy Heat", quantity: 4, rarity: "Common", type: "Instant" },
-      { name: "Consider", quantity: 4, rarity: "Common", type: "Instant" },
-    ],
-  },
-  {
-    id: "d3",
-    name: "Charizard ex Control",
-    tcg: "Pokemon",
-    format: "Standard",
-    description:
-      "Aggressive fire-type deck built around Charizard ex and draw supporters.",
-    color: "#ef4444",
-    lastUpdated: "2025-03-12",
-    isComplete: true,
-    cards: [
-      {
-        name: "Charizard ex",
-        quantity: 3,
-        rarity: "Special Art Rare",
-        type: "Pokemon",
-      },
-      {
-        name: "Arcanine ex",
-        quantity: 2,
-        rarity: "Double Rare",
-        type: "Pokemon",
-      },
-      {
-        name: "Iono",
-        quantity: 4,
-        rarity: "Special Art Rare",
-        type: "Supporter",
-      },
-      { name: "Boss's Orders", quantity: 3, rarity: "Rare", type: "Supporter" },
-      { name: "Rare Candy", quantity: 4, rarity: "Uncommon", type: "Item" },
-      { name: "Nest Ball", quantity: 4, rarity: "Uncommon", type: "Item" },
-      { name: "Ultra Ball", quantity: 4, rarity: "Uncommon", type: "Item" },
-      { name: "Charmander", quantity: 4, rarity: "Common", type: "Pokemon" },
-      { name: "Charmeleon", quantity: 1, rarity: "Uncommon", type: "Pokemon" },
-      {
-        name: "Lumineon V",
-        quantity: 1,
-        rarity: "Ultra Rare",
-        type: "Pokemon",
-      },
-    ],
-  },
-  {
-    id: "d4",
-    name: "Labrynth Control",
-    tcg: "Yu-Gi-Oh!",
-    format: "Advanced",
-    description:
-      "Trap-heavy control strategy using the Labrynth archetype to outgrind opponents.",
-    color: "#f59e0b",
-    lastUpdated: "2025-02-28",
-    isComplete: true,
-    cards: [
-      {
-        name: "Infinite Impermanence",
-        quantity: 3,
-        rarity: "Secret Rare",
-        type: "Trap",
-      },
-      {
-        name: "Solemn Judgment",
-        quantity: 3,
-        rarity: "Ultra Rare",
-        type: "Trap",
-      },
-      {
-        name: "Ash Blossom & Joyous Spring",
-        quantity: 3,
-        rarity: "Ultra Rare",
-        type: "Monster",
-      },
-      {
-        name: "Pot of Prosperity",
-        quantity: 3,
-        rarity: "Secret Rare",
-        type: "Spell",
-      },
-      { name: "Pot of Greed", quantity: 1, rarity: "Rare", type: "Spell" },
-      { name: "Mirror Force", quantity: 2, rarity: "Ultra Rare", type: "Trap" },
-      {
-        name: "Mystical Space Typhoon",
-        quantity: 2,
-        rarity: "Ultra Rare",
-        type: "Spell",
-      },
-    ],
-  },
-  {
-    id: "d5",
-    name: "Lost Zone Giratina",
-    tcg: "Pokemon",
-    format: "Standard",
-    description:
-      "Combo deck utilizing Lost Zone mechanics with Giratina VSTAR as the finisher.",
-    color: "#6366f1",
-    lastUpdated: "2025-03-01",
-    isComplete: false,
-    cards: [
-      { name: "Giratina VSTAR", quantity: 2, rarity: "VSTAR", type: "Pokemon" },
-      { name: "Mew ex", quantity: 1, rarity: "Double Rare", type: "Pokemon" },
-      {
-        name: "Iono",
-        quantity: 4,
-        rarity: "Special Art Rare",
-        type: "Supporter",
-      },
-      { name: "Boss's Orders", quantity: 2, rarity: "Rare", type: "Supporter" },
-      {
-        name: "Gardevoir ex",
-        quantity: 2,
-        rarity: "Double Rare",
-        type: "Pokemon",
-      },
-      { name: "Eevee", quantity: 2, rarity: "Common", type: "Pokemon" },
-    ],
-  },
-  {
-    id: "d6",
-    name: "Hammer Time",
-    tcg: "Magic",
-    format: "Modern",
-    description:
-      "Equipment aggro deck using Colossus Hammer and Sigarda's Aid for explosive wins.",
-    color: "#10b981",
-    lastUpdated: "2025-02-20",
-    isComplete: true,
-    cards: [
-      { name: "Urza's Saga", quantity: 4, rarity: "Rare", type: "Land" },
-      {
-        name: "Path to Exile",
-        quantity: 3,
-        rarity: "Uncommon",
-        type: "Instant",
-      },
-      {
-        name: "Mishra's Bauble",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Artifact",
-      },
-      {
-        name: "Chalice of the Void",
-        quantity: 2,
-        rarity: "Rare",
-        type: "Artifact",
-      },
-      {
-        name: "Aether Vial",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Artifact",
-      },
-      {
-        name: "Sigarda's Aid",
-        quantity: 4,
-        rarity: "Rare",
-        type: "Enchantment",
-      },
-      {
-        name: "Colossus Hammer",
-        quantity: 4,
-        rarity: "Uncommon",
-        type: "Artifact",
-      },
-      {
-        name: "Puresteel Paladin",
-        quantity: 4,
-        rarity: "Rare",
-        type: "Creature",
-      },
-    ],
-  },
-];
 
 const TCG_COLORS: Record<string, string> = {
   "Yu-Gi-Oh!": "#ef4444",
@@ -372,20 +46,89 @@ const TCG_COLORS: Record<string, string> = {
 
 export default function DecksPage() {
   const [selectedDeck, setSelectedDeck] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
+
+  // The demo store is persisted, so its contents only match the server-rendered
+  // markup once we are on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const storeDecks = useDemoStore((state) => state.decks);
+  const addDeck = useDemoStore((state) => state.addDeck);
+  const removeDeck = useDemoStore((state) => state.removeDeck);
+  const DECKS: Deck[] = mounted ? storeDecks : [];
+
   const activeDeck = DECKS.find((d) => d.id === selectedDeck);
+
+  // Below lg the detail renders underneath all six deck cards, so selecting one
+  // looked like nothing happened. Bring it into view on selection — but only on
+  // the stacked layout, where it is off-screen.
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const selectDeck = (id: string | null) => {
+    setSelectedDeck(id);
+    if (!id) return;
+    requestAnimationFrame(() => {
+      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      detailRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const totalDecks = DECKS.length;
   const completeDecks = DECKS.filter((d) => d.isComplete).length;
-  const totalCards = DECKS.reduce(
+  // Sum of the per-deck counts shown on each deck card below — this counts
+  // cards across deck lists, which is a different figure from the collection
+  // total reported on the dashboard.
+  const cardsAcrossDecks = DECKS.reduce(
     (s, d) => s + d.cards.reduce((a, c) => a + c.quantity, 0),
     0,
   );
 
+  const [form, setForm] = useState({
+    name: "",
+    tcg: "Yu-Gi-Oh!",
+    format: "Advanced",
+  });
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) return;
+    // Writing the deck is a storage round trip now that decks are rows, so the
+    // id the new selection needs only exists once the insert has landed.
+    const id = await addDeck({
+      name: form.name.trim(),
+      tcg: form.tcg,
+      format: form.format,
+    });
+    setForm({ name: "", tcg: "Yu-Gi-Oh!", format: "Advanced" });
+    setCreateOpen(false);
+    setSelectedDeck(id);
+  };
+
+  const handleDelete = async (deck: Deck) => {
+    const ok = await confirm({
+      title: `Delete "${deck.name}"?`,
+      description: "The deck and its card list will be removed.",
+      confirmLabel: "Delete deck",
+      destructive: true,
+    });
+    if (!ok) return;
+    await removeDeck(deck.id);
+    if (selectedDeck === deck.id) setSelectedDeck(null);
+  };
+
   return (
     <AppShell data-oid="gs5l5na">
       <div className="space-y-6" data-oid="70ey5tw">
-        <div className="flex items-center justify-between" data-oid="dd48z1d">
-          <div data-oid="o4d11r0">
+        <div
+          className="flex items-start justify-between gap-3"
+          data-oid="dd48z1d"
+        >
+          <div className="min-w-0 flex-1" data-oid="o4d11r0">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="2osw5qk"
@@ -396,10 +139,16 @@ export default function DecksPage() {
               Build and manage your constructed decks across all games.
             </p>
           </div>
-          <Button size="sm" disabled data-oid="3r454mu">
-            <Plus className="mr-2 h-4 w-4" data-oid="vzyog62" />
-            New Deck
-          </Button>
+          <div className="shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              data-oid="3r454mu"
+            >
+              <Plus className="mr-2 h-4 w-4" data-oid="vzyog62" />
+              New Deck
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -446,7 +195,7 @@ export default function DecksPage() {
                 className="text-xs md:text-sm font-medium text-muted-foreground"
                 data-oid="xrwxr25"
               >
-                Total Cards
+                Cards Across Decks
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid="5k8e_w3">
@@ -454,8 +203,19 @@ export default function DecksPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="2t.plrk"
               >
-                {totalCards}
+                {cardsAcrossDecks}
               </div>
+              <p
+                className="text-[10px] md:text-xs text-muted-foreground mt-0.5"
+                title="Counts cards across deck lists, which is a different figure from the collection total"
+              >
+                {/* Three columns at 390px leaves ~80px per cell, where the long
+                    form wrapped to three lines. */}
+                <span className="sm:hidden">Not collection size</span>
+                <span className="hidden sm:inline">
+                  In deck lists, not collection size
+                </span>
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -470,8 +230,21 @@ export default function DecksPage() {
               return (
                 <Card
                   key={deck.id}
-                  className={`cursor-pointer transition hover:border-primary/50 ${isSelected ? "ring-2 ring-primary" : ""}`}
-                  onClick={() => setSelectedDeck(isSelected ? null : deck.id)}
+                  // The card was a clickable <div>: usable with a mouse, invisible
+                  // to the keyboard and to assistive tech. role + tabIndex + key
+                  // handling make it a real control without changing the visuals.
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={`${deck.name}, ${cardCount} cards${isSelected ? " (selected)" : ""}`}
+                  className={`cursor-pointer transition hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isSelected ? "ring-2 ring-primary" : ""}`}
+                  onClick={() => selectDeck(isSelected ? null : deck.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      selectDeck(isSelected ? null : deck.id);
+                    }
+                  }}
                   data-oid="s:vnkkz"
                 >
                   <CardContent className="p-4" data-oid="_in8wgu">
@@ -541,8 +314,14 @@ export default function DecksPage() {
             })}
           </div>
 
-          {/* Deck detail */}
-          <div data-oid="dldgokf">
+          {/* Deck detail — the two-column layout only kicks in at lg, so below
+              that the empty placeholder is dead weight at the foot of the page.
+              A selected deck still renders its detail card on every size. */}
+          <div
+            ref={detailRef}
+            className={activeDeck ? "scroll-mt-20" : "hidden lg:block"}
+            data-oid="dldgokf"
+          >
             {activeDeck ? (
               <Card className="sticky top-20" data-oid="dsev3su">
                 <CardHeader data-oid="b9cp5tj">
@@ -553,6 +332,16 @@ export default function DecksPage() {
                       data-oid="j4:805e"
                     />
                     <CardTitle data-oid="_cw8fzq">{activeDeck.name}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => handleDelete(activeDeck)}
+                      aria-label={`Delete ${activeDeck.name}`}
+                      title="Delete deck"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                   <CardDescription data-oid="u7f7r1x">
                     {activeDeck.description}
@@ -657,6 +446,74 @@ export default function DecksPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New deck</DialogTitle>
+            <DialogDescription>
+              Start an empty list. You can add cards to it from Card Search.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="deck-name">Deck name</Label>
+              <Input
+                id="deck-name"
+                value={form.name}
+                placeholder="e.g. Branded Despia"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreate();
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="deck-game">Game</Label>
+                <Select
+                  value={form.tcg}
+                  onValueChange={(value) => setForm({ ...form, tcg: value })}
+                >
+                  <SelectTrigger id="deck-game">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Yu-Gi-Oh!", "Magic", "Pokemon"].map((game) => (
+                      <SelectItem key={game} value={game}>
+                        {game}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deck-format">Format</Label>
+                <Input
+                  id="deck-format"
+                  value={form.format}
+                  placeholder="e.g. Modern"
+                  onChange={(e) => setForm({ ...form, format: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleCreate()}
+              disabled={!form.name.trim()}
+            >
+              Create deck
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {confirmDialog}
     </AppShell>
   );
 }

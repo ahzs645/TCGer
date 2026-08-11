@@ -27,6 +27,24 @@ const PHASE_HINTS: Partial<Record<PackPhase, string>> = {
 
 const PACK_COUNTS = [1, 5, 10] as const;
 
+/**
+ * The HUD is a development aid, not part of the demo: it renders under
+ * `next dev` and, against a built app, only for `?debug=1`. The demo ships as a
+ * static export (`DEMO_EXPORT=true next build`), where NODE_ENV is "production"
+ * and the flag is inlined as false, so it stays hidden there.
+ */
+function useDebugHud(): boolean {
+  const [enabled, setEnabled] = useState(process.env.NODE_ENV !== "production");
+
+  useEffect(() => {
+    if (enabled) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("debug") === "1") setEnabled(true);
+  }, [enabled]);
+
+  return enabled;
+}
+
 const TIER_LABEL_CLASSES: Record<string, string> = {
   common: "text-slate-500 dark:text-slate-300",
   uncommon: "text-emerald-600 dark:text-emerald-300",
@@ -47,6 +65,7 @@ export function PackOpening() {
   const [flashKey, setFlashKey] = useState(0);
   const [forceChase, setForceChase] = useState(false);
   const [slowMo, setSlowMo] = useState(false);
+  const showHud = useDebugHud();
   const controls = useRef<PackSceneControls>({ timeScale: 1 });
 
   useEffect(() => {
@@ -163,9 +182,22 @@ export function PackOpening() {
         }
       `}</style>
 
+      {/* back out of an opening without the HUD — the bottom offsets keep the
+          overlays clear of the fixed mobile nav, like the shell's pb-16 md:pb-0 */}
+      {!showHud &&
+        (phase === "tear" || phase === "opening" || phase === "reveal") && (
+          <button
+            type="button"
+            onClick={backToSelect}
+            className="absolute right-3 top-3 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold backdrop-blur transition hover:bg-muted"
+          >
+            Back to packs
+          </button>
+        )}
+
       {/* phase hint */}
       {PHASE_HINTS[phase] && (
-        <p className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-sm font-medium text-muted-foreground">
+        <p className="pointer-events-none absolute inset-x-0 bottom-20 text-center text-sm font-medium text-muted-foreground md:bottom-5">
           {phase === "tear" && packs.length > 1
             ? `Tear once to open all ${packs.length} packs`
             : PHASE_HINTS[phase]}
@@ -174,7 +206,7 @@ export function PackOpening() {
 
       {/* variant + pack count pickers on select screen */}
       {phase === "select" && (
-        <div className="absolute inset-x-0 bottom-12 flex flex-col items-center gap-2">
+        <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-2 md:bottom-12">
           <div className="flex justify-center gap-2">
             {PACK_VARIANTS.map((v) => (
               <button
@@ -216,7 +248,7 @@ export function PackOpening() {
 
       {/* single-pack summary */}
       {phase === "summary" && currentPack && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-y-auto p-6 pb-24 md:pb-6">
           <h2 className="text-xl font-heading font-semibold text-foreground">
             Pack results
           </h2>
@@ -237,7 +269,7 @@ export function PackOpening() {
 
       {/* combined results across all packs */}
       {phase === "final" && (
-        <div className="absolute inset-0 flex flex-col items-center gap-6 overflow-y-auto p-6">
+        <div className="absolute inset-0 flex flex-col items-center gap-6 overflow-y-auto p-6 pb-24 md:pb-6">
           <h2 className="text-xl font-heading font-semibold text-foreground">
             All results · {packs.length} packs · {variant?.name}
           </h2>
@@ -291,56 +323,63 @@ export function PackOpening() {
         </div>
       )}
 
-      {/* dev HUD */}
-      <div className="absolute right-3 top-3 w-52 space-y-2 rounded-lg border border-border bg-background/80 p-3 font-mono text-[11px] text-foreground/85 backdrop-blur">
-        <p className="flex justify-between">
-          <span className="text-muted-foreground">phase</span>
-          <span>{phase}</span>
-        </p>
-        {packs.length > 0 && (
+      {/* dev HUD — dev builds only, or ?debug=1 */}
+      {showHud && (
+        <div className="absolute right-3 top-3 w-52 space-y-2 rounded-lg border border-border bg-background/80 p-3 font-mono text-[11px] text-foreground/85 backdrop-blur">
           <p className="flex justify-between">
-            <span className="text-muted-foreground">packs</span>
+            <span className="text-muted-foreground">phase</span>
+            <span>{phase}</span>
+          </p>
+          {packs.length > 0 && (
+            <p className="flex justify-between">
+              <span className="text-muted-foreground">packs</span>
+              <span>
+                ×{packs.length} · {variant?.name}
+              </span>
+            </p>
+          )}
+          <p className="flex justify-between">
+            <span className="text-muted-foreground">revealed</span>
             <span>
-              ×{packs.length} · {variant?.name}
+              {revealedCount}/{currentPack?.length ?? 0}
             </span>
           </p>
-        )}
-        <p className="flex justify-between">
-          <span className="text-muted-foreground">revealed</span>
-          <span>
-            {revealedCount}/{currentPack?.length ?? 0}
-          </span>
-        </p>
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {phase !== "select" && (
-            <>
-              <HudButton onClick={rerollCurrent}>Reroll</HudButton>
-              <HudButton onClick={backToSelect}>Packs</HudButton>
-            </>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {phase !== "select" && (
+              <>
+                <HudButton onClick={rerollCurrent}>Reroll</HudButton>
+                <HudButton onClick={backToSelect}>Packs</HudButton>
+              </>
+            )}
+            {phase === "tear" && (
+              <HudButton onClick={handleTorn}>Skip tear</HudButton>
+            )}
+            <HudButton
+              active={forceChase}
+              onClick={() => setForceChase((v) => !v)}
+            >
+              Force chase
+            </HudButton>
+            <HudButton active={slowMo} onClick={() => setSlowMo((v) => !v)}>
+              Slow-mo
+            </HudButton>
+          </div>
+          {revealed.length > 0 && phase === "reveal" && (
+            <ul className="space-y-0.5 border-t border-border pt-1.5">
+              {revealed.map((card) => (
+                <li key={card.id} className="flex justify-between gap-2">
+                  <span className="truncate">{card.name}</span>
+                  <span
+                    className={cn("shrink-0", TIER_LABEL_CLASSES[card.tier])}
+                  >
+                    {card.tier}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
-          {phase === "tear" && (
-            <HudButton onClick={handleTorn}>Skip tear</HudButton>
-          )}
-          <HudButton active={forceChase} onClick={() => setForceChase((v) => !v)}>
-            Force chase
-          </HudButton>
-          <HudButton active={slowMo} onClick={() => setSlowMo((v) => !v)}>
-            Slow-mo
-          </HudButton>
         </div>
-        {revealed.length > 0 && phase === "reveal" && (
-          <ul className="space-y-0.5 border-t border-border pt-1.5">
-            {revealed.map((card) => (
-              <li key={card.id} className="flex justify-between gap-2">
-                <span className="truncate">{card.name}</span>
-                <span className={cn("shrink-0", TIER_LABEL_CLASSES[card.tier])}>
-                  {card.tier}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      )}
     </div>
   );
 }

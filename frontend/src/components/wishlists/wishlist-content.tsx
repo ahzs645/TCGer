@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,7 @@ import { describeWishlistRule } from "@tcg/api-types";
 import type { Card as CardType, TcgCode } from "@/types/card";
 
 export function WishlistContent() {
+  const [confirm, confirmDialog] = useConfirm();
   const { token, isAuthenticated } = useAuthStore();
   const {
     wishlists,
@@ -242,13 +244,14 @@ export function WishlistContent() {
   const handleDeleteWishlist = async (wishlistId: string) => {
     if (!token) return;
     const target = wishlists.find((w) => w.id === wishlistId);
-    if (
-      !window.confirm(
-        `Delete wishlist "${target?.name ?? "this wishlist"}"? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete "${target?.name ?? "this wishlist"}"?`,
+      description:
+        "The wishlist and everything on it will be removed. This cannot be undone.",
+      confirmLabel: "Delete wishlist",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       await removeWishlist(token, wishlistId);
       if (activeWishlistId === wishlistId) {
@@ -648,10 +651,10 @@ export function WishlistContent() {
       {activeWishlist ? (
         <>
           <CardHeader
-            className="flex flex-row items-start justify-between space-y-0 border-b"
+            className="flex flex-col items-stretch gap-3 space-y-0 border-b p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-0 sm:p-6"
             data-oid="zj7axve"
           >
-            <div className="min-w-0 flex-1" data-oid="sr-y2yh">
+            <div className="min-w-0 sm:flex-1" data-oid="sr-y2yh">
               <div className="flex items-center gap-2" data-oid="brd9u79">
                 {/* Back button on mobile */}
                 <button
@@ -663,7 +666,10 @@ export function WishlistContent() {
                 >
                   <ArrowLeft className="h-5 w-5" data-oid="kqlik-2" />
                 </button>
-                <CardTitle className="truncate" data-oid="k-t4z:_">
+                <CardTitle
+                  className="min-w-0 break-words leading-tight sm:truncate sm:leading-none"
+                  data-oid="k-t4z:_"
+                >
                   {activeWishlist.name}
                 </CardTitle>
               </div>
@@ -672,10 +678,13 @@ export function WishlistContent() {
                   `${activeWishlist.totalCards} cards tracked`}
               </CardDescription>
               <div
-                className="mt-2 flex items-center gap-4 text-sm"
+                className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:gap-x-4"
                 data-oid="e8wn6k4"
               >
-                <span className="text-muted-foreground" data-oid="ln2uro3">
+                <span
+                  className="whitespace-nowrap text-muted-foreground"
+                  data-oid="ln2uro3"
+                >
                   {activeWishlist.ownedCards} / {activeWishlist.totalCards}{" "}
                   owned
                 </span>
@@ -685,6 +694,7 @@ export function WishlistContent() {
                       ? "default"
                       : "secondary"
                   }
+                  className="whitespace-nowrap"
                   data-oid="a52cndb"
                 >
                   {activeWishlist.completionPercent}% complete
@@ -706,7 +716,10 @@ export function WishlistContent() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0 ml-2" data-oid="chre:su">
+            <div
+              className="flex items-center gap-2 sm:ml-2 sm:flex-shrink-0"
+              data-oid="chre:su"
+            >
               {activeWishlist.rules.length > 0 && (
                 <Button
                   size="sm"
@@ -736,8 +749,11 @@ export function WishlistContent() {
               </Button>
               <Button
                 size="sm"
-                variant="destructive"
+                variant="ghost"
+                className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:ml-0"
                 onClick={() => handleDeleteWishlist(activeWishlist.id)}
+                aria-label="Delete wishlist"
+                title="Delete wishlist"
                 data-oid="5ks5byx"
               >
                 <Trash className="h-4 w-4" data-oid="i.v-myk" />
@@ -800,7 +816,7 @@ export function WishlistContent() {
             </div>
           </div>
           <CardContent className="p-0" data-oid="pbacx1z">
-            <ScrollArea className="h-[calc(100vh-420px)]" data-oid="asjsn.o">
+            <ScrollArea className="lg:h-[calc(100vh-420px)]" data-oid="asjsn.o">
               <div className="p-4 sm:p-6" data-oid="9y0r1ae">
                 {filteredCards.length === 0 ? (
                   <div
@@ -1351,9 +1367,9 @@ export function WishlistContent() {
         className="hidden lg:grid lg:grid-cols-[280px_1fr] lg:gap-6"
         data-oid="lgwel0t"
       >
-        <ScrollArea className="h-[calc(100vh-220px)]" data-oid="w-63780">
+        <div className="min-w-0" data-oid="w-63780">
           {sidebarContent}
-        </ScrollArea>
+        </div>
         {detailContent}
       </div>
 
@@ -1361,6 +1377,8 @@ export function WishlistContent() {
       <div className="lg:hidden" data-oid="ao_v:h_">
         {mobileView === "list" ? sidebarContent : detailContent}
       </div>
+
+      {confirmDialog}
     </>
   );
 }

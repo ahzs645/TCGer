@@ -67,7 +67,17 @@ const navigation: NavigationItem[] = [
   { href: "/wishlists", label: "Wishlists", icon: Heart },
 ];
 
-const mobileNavPrimary = navigation.slice(0, 3);
+/**
+ * /scan needs the server-side hash store and upload API, so in demo mode it can
+ * only say "disabled". Spending one of the five desktop slots — and one of the
+ * three mobile tabs — on a dead end is a poor first impression, so demo mode
+ * drops it from the primary nav and keeps it reachable from More.
+ */
+function primaryNavigationFor(demoMode: boolean): NavigationItem[] {
+  return demoMode
+    ? navigation.filter((item) => item.href !== "/scan")
+    : navigation;
+}
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -82,8 +92,14 @@ export function AppShell({ children }: AppShellProps) {
     (item) =>
       demoMode || !item.feature || isFeatureAvailable(features, item.feature),
   );
+  const primaryNavigation = primaryNavigationFor(demoMode);
+  const mobileNavPrimary = primaryNavigation.slice(0, 3);
   const mobileNavSecondary = [
-    ...navigation.slice(3),
+    ...primaryNavigation.slice(3),
+    // Scan still belongs somewhere in demo mode — it explains why it is off.
+    ...(demoMode
+      ? navigation.filter((item) => item.href === "/scan")
+      : []),
     ...availableSecondaryNavigation,
   ];
 
@@ -99,10 +115,10 @@ export function AppShell({ children }: AppShellProps) {
           className="container flex h-16 items-center justify-between gap-4"
           data-oid="2j-vv-i"
         >
-          <div className="flex items-center gap-6" data-oid="8gzdp.f">
+          <div className="flex min-w-0 items-center gap-6" data-oid="8gzdp.f">
             <Link
               href={dashboardHref}
-              className="flex items-center gap-2 text-lg font-heading font-semibold"
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap text-lg font-heading font-semibold"
               data-oid="vv0.7_x"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -119,7 +135,7 @@ export function AppShell({ children }: AppShellProps) {
             {demoMode && (
               <Badge
                 variant="secondary"
-                className="hidden text-xs sm:inline-flex"
+                className="hidden shrink-0 text-xs xl:inline-flex"
                 data-oid="nve3vfa"
               >
                 Demo Mode
@@ -129,7 +145,7 @@ export function AppShell({ children }: AppShellProps) {
               className="hidden items-center gap-1 md:flex"
               data-oid="bq6jx8."
             >
-              {navigation.map((item) => {
+              {primaryNavigation.map((item) => {
                 const href = getAppRoute(item.href, pathname);
                 const isActive = pathname === href;
                 const Icon = item.icon;
@@ -140,7 +156,7 @@ export function AppShell({ children }: AppShellProps) {
                     size="sm"
                     asChild
                     className={cn(
-                      "xl:px-3",
+                      "min-[1360px]:px-3",
                       isActive && "bg-primary text-primary-foreground",
                     )}
                     data-oid="798:9uu"
@@ -152,7 +168,10 @@ export function AppShell({ children }: AppShellProps) {
                       data-oid="uqcdkap"
                     >
                       <Icon className="h-4 w-4" data-oid="-fddsij" />
-                      <span className="hidden xl:inline" data-oid="lkg_0_o">
+                      <span
+                        className="hidden min-[1360px]:inline"
+                        data-oid="lkg_0_o"
+                      >
                         {item.label}
                       </span>
                     </Link>
@@ -161,7 +180,7 @@ export function AppShell({ children }: AppShellProps) {
               })}
             </nav>
           </div>
-          <div className="flex items-center gap-2" data-oid="3834h_j">
+          <div className="flex shrink-0 items-center gap-2" data-oid="3834h_j">
             <CommandMenu
               secondaryNavigation={availableSecondaryNavigation}
               data-oid="i6m6x59"
@@ -183,6 +202,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Mobile bottom navigation */}
       <MobileBottomNav
         pathname={pathname}
+        primaryNavigation={mobileNavPrimary}
         secondaryNavigation={mobileNavSecondary}
         data-oid="caik0xj"
       />
@@ -192,9 +212,11 @@ export function AppShell({ children }: AppShellProps) {
 
 function MobileBottomNav({
   pathname,
+  primaryNavigation,
   secondaryNavigation,
 }: {
   pathname: string;
+  primaryNavigation: NavigationItem[];
   secondaryNavigation: NavigationItem[];
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -212,7 +234,7 @@ function MobileBottomNav({
           className="flex h-14 items-center justify-around"
           data-oid="gfppu0m"
         >
-          {mobileNavPrimary.map((item) => {
+          {primaryNavigation.map((item) => {
             const href = getAppRoute(item.href, pathname);
             const isActive = pathname === href;
             const Icon = item.icon;

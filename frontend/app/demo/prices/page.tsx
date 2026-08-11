@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, ArrowUpDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -14,10 +14,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDemoCollectionTotals } from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake price data                                                     */
 /* ------------------------------------------------------------------ */
+
+type SortKey = "price" | "7d" | "30d";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "price", label: "Price" },
+  { key: "7d", label: "7d" },
+  { key: "30d", label: "30d" },
+];
 
 interface PriceEntry {
   name: string;
@@ -239,10 +249,60 @@ const TCG_COLORS: Record<string, string> = {
   "Yu-Gi-Oh!": "#ef4444",
 };
 
+/**
+ * Sortable column header.
+ *
+ * These were bare `<th onClick>` elements: clickable with a mouse, invisible to
+ * the keyboard, and announcing no sort state. The button carries the action and
+ * `aria-sort` carries the state, so the column is operable and readable by
+ * assistive tech.
+ */
+function SortableHeader({
+  label,
+  sortKey,
+  sortBy,
+  sortAsc,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sortBy: SortKey;
+  sortAsc: boolean;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sortBy === sortKey;
+  const Icon = !active ? ArrowUpDown : sortAsc ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={`p-0 text-right font-medium text-muted-foreground ${className ?? ""}`}
+      aria-sort={active ? (sortAsc ? "ascending" : "descending") : "none"}
+      scope="col"
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex w-full items-center justify-end gap-1 p-3 text-right hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        aria-label={`Sort by ${label}${active ? (sortAsc ? ", currently ascending" : ", currently descending") : ""}`}
+      >
+        {label}
+        <Icon className="h-3 w-3" aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
 export default function PricesPage() {
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"price" | "7d" | "30d">("price");
+  const [sortBy, setSortBy] = useState<SortKey>("price");
   const [sortAsc, setSortAsc] = useState(false);
+  const totals = useDemoCollectionTotals();
+
+  // The demo store is persisted, so its totals only match the server render
+  // until the client has rehydrated — defer them to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const filtered = PRICE_DATA.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()),
@@ -254,11 +314,10 @@ export default function PricesPage() {
     return sortAsc ? -diff : diff;
   });
 
-  const totalValue = PRICE_DATA.reduce((s, p) => s + p.price * p.owned, 0);
   const avgChange =
     PRICE_DATA.reduce((s, p) => s + p.change30d, 0) / PRICE_DATA.length;
 
-  const handleSort = (key: "price" | "7d" | "30d") => {
+  const handleSort = (key: SortKey) => {
     if (sortBy === key) setSortAsc(!sortAsc);
     else {
       setSortBy(key);
@@ -300,8 +359,23 @@ export default function PricesPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="9n.l63x"
               >
-                ${totalValue.toFixed(2)}
+                {mounted ? (
+                  `$${totals.totalValue.toFixed(2)}`
+                ) : (
+                  <Skeleton
+                    className="h-6 w-24 md:h-8 md:w-32"
+                    data-oid="price-value-skeleton"
+                  />
+                )}
               </div>
+              {mounted && (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-oid="price-value-note"
+                >
+                  Across {totals.totalCards} copies
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card data-oid="6o7:bvn">
@@ -310,7 +384,7 @@ export default function PricesPage() {
                 className="text-xs md:text-sm font-medium text-muted-foreground"
                 data-oid="7s:n1d_"
               >
-                Tracked Cards
+                Cards With Prices
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid="8fpbd:n">
@@ -320,6 +394,14 @@ export default function PricesPage() {
               >
                 {PRICE_DATA.length}
               </div>
+              {mounted && (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-oid="price-tracked-note"
+                >
+                  of {totals.uniqueCards} unique cards owned
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card data-oid="uhbjw5x">
@@ -379,8 +461,155 @@ export default function PricesPage() {
           />
         </div>
 
+        {/* Price list (mobile) — same filtered + sorted rows as the table */}
+        <div className="space-y-3 sm:hidden" data-oid="price-mobile">
+          <div
+            className="flex flex-wrap items-center gap-2"
+            data-oid="price-mobile-sort"
+          >
+            <span
+              className="text-xs text-muted-foreground"
+              data-oid="price-mobile-sort-label"
+            >
+              Sort by
+            </span>
+            {SORT_OPTIONS.map((option) => (
+              <Button
+                key={option.key}
+                variant={sortBy === option.key ? "secondary" : "outline"}
+                size="sm"
+                className="h-10 gap-1 px-3 text-xs"
+                aria-pressed={sortBy === option.key}
+                onClick={() => handleSort(option.key)}
+                data-oid="price-mobile-sort-button"
+              >
+                {option.label}
+                {sortBy !== option.key ? (
+                  <ArrowUpDown
+                    className="h-3 w-3"
+                    data-oid="price-mobile-sort-idle"
+                  />
+                ) : sortAsc ? (
+                  <ArrowUp
+                    className="h-3 w-3"
+                    data-oid="price-mobile-sort-up"
+                  />
+                ) : (
+                  <ArrowDown
+                    className="h-3 w-3"
+                    data-oid="price-mobile-sort-down"
+                  />
+                )}
+              </Button>
+            ))}
+          </div>
+          <Card data-oid="price-mobile-card">
+            <CardContent className="p-0" data-oid="price-mobile-body">
+              {filtered.length === 0 ? (
+                <p
+                  className="p-4 text-sm text-muted-foreground"
+                  data-oid="price-mobile-empty"
+                >
+                  No cards match your search.
+                </p>
+              ) : (
+                <ul className="divide-y" data-oid="price-mobile-list">
+                  {filtered.map((p) => (
+                    <li
+                      key={p.name}
+                      className="flex items-start justify-between gap-3 p-3"
+                      data-oid="price-mobile-row"
+                    >
+                      <div
+                        className="min-w-0 flex-1"
+                        data-oid="price-mobile-id"
+                      >
+                        <p
+                          className="text-sm font-medium truncate"
+                          data-oid="price-mobile-name"
+                        >
+                          {p.name}
+                        </p>
+                        <div
+                          className="mt-1 flex items-center gap-2"
+                          data-oid="price-mobile-meta"
+                        >
+                          <Badge
+                            variant="outline"
+                            className="text-xs shrink-0"
+                            style={{ borderColor: TCG_COLORS[p.tcg] }}
+                            data-oid="price-mobile-tcg"
+                          >
+                            {p.tcg}
+                          </Badge>
+                          <span
+                            className="text-xs text-muted-foreground truncate"
+                            data-oid="price-mobile-set"
+                          >
+                            {p.setName}
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        className="shrink-0 text-right"
+                        data-oid="price-mobile-numbers"
+                      >
+                        <p
+                          className="text-sm font-semibold"
+                          data-oid="price-mobile-price"
+                        >
+                          ${p.price.toFixed(2)}
+                        </p>
+                        <p
+                          className="mt-1 flex items-center justify-end gap-1.5 text-xs"
+                          data-oid="price-mobile-changes"
+                        >
+                          <span
+                            className="text-muted-foreground"
+                            data-oid="price-mobile-7d-label"
+                          >
+                            7d
+                          </span>
+                          <span
+                            className={
+                              p.change7d >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
+                            }
+                            data-oid="price-mobile-7d"
+                          >
+                            {p.change7d >= 0 ? "+" : ""}
+                            {p.change7d.toFixed(1)}%
+                          </span>
+                          <span
+                            className="text-muted-foreground"
+                            data-oid="price-mobile-30d-label"
+                          >
+                            30d
+                          </span>
+                          <span
+                            className={
+                              p.change30d >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
+                            }
+                            data-oid="price-mobile-30d"
+                          >
+                            {p.change30d >= 0 ? "+" : ""}
+                            {p.change30d.toFixed(1)}%
+                          </span>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Price table */}
-        <Card data-oid="g0xkgtg">
+        <Card className="hidden sm:block" data-oid="g0xkgtg">
           <CardContent className="p-0" data-oid="_1u_zh_">
             <div className="overflow-x-auto" data-oid="nijhdug">
               <table className="w-full text-sm" data-oid=".lme0z:">
@@ -410,45 +639,28 @@ export default function PricesPage() {
                     >
                       Owned
                     </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("price")}
-                      data-oid="0r.tck9"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="yia49:7"
-                      >
-                        Price{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="k2h9vk0" />
-                      </span>
-                    </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none hidden sm:table-cell"
-                      onClick={() => handleSort("7d")}
-                      data-oid="ypqhnbk"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="t-utxh3"
-                      >
-                        7d{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="g.dmho:" />
-                      </span>
-                    </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("30d")}
-                      data-oid="fo8g:f_"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="aegzjd6"
-                      >
-                        30d{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="2q_aq2_" />
-                      </span>
-                    </th>
+                    <SortableHeader
+                      label="Price"
+                      sortKey="price"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="7d"
+                      sortKey="7d"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                      className="hidden sm:table-cell"
+                    />
+                    <SortableHeader
+                      label="30d"
+                      sortKey="30d"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody data-oid="5lzc6n9">

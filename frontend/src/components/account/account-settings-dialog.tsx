@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Activity,
-  Bell,
   CheckCircle2,
   Globe,
   Key,
@@ -47,6 +46,7 @@ import { requestCatalogPrompt } from "@/lib/catalog/use-catalog";
 import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
+import { useTheme } from "next-themes";
 import { CatalogManagementPanel } from "./catalog-management-panel";
 
 import { useShallow } from "zustand/react/shallow";
@@ -63,6 +63,12 @@ interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+] as const;
 
 export function AccountSettingsDialog({
   open,
@@ -83,6 +89,8 @@ export function AccountSettingsDialog({
     showPricing: state.showPricing,
     setShowPricing: state.setShowPricing,
   })));
+
+  const { theme, setTheme } = useTheme();
 
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -284,30 +292,42 @@ export function AccountSettingsDialog({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2" data-oid="kdvyjyg">
+          <div className="grid gap-4" data-oid="kdvyjyg">
             <PreferenceCard
-              title="Dark mode"
-              description="Sync theme across devices (coming soon)."
+              title="Appearance"
+              description={
+                theme === "system"
+                  ? "Following your device setting."
+                  : `Always ${theme === "dark" ? "dark" : "light"}.`
+              }
               icon={<Moon className="h-4 w-4" data-oid=".jeuphl" />}
               action={
-                <Button size="sm" variant="outline" disabled data-oid="914_3cm">
-                  System default
-                </Button>
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Colour theme"
+                >
+                  {THEME_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="sm"
+                      variant={theme === option.value ? "secondary" : "ghost"}
+                      aria-pressed={theme === option.value}
+                      onClick={() => setTheme(option.value)}
+                      className="px-2.5"
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
               }
               data-oid="jnse5ex"
             />
 
-            <PreferenceCard
-              title="Notifications"
-              description="Enable price alerts and collection digests."
-              icon={<Bell className="h-4 w-4" data-oid="aqqcqfv" />}
-              action={
-                <Button size="sm" variant="outline" data-oid="xuzx5.6">
-                  Configure
-                </Button>
-              }
-              data-oid="wn.x:yv"
-            />
+            {/* The notifications card sat here with a dead "Configure" button;
+                there is no notifications feature to configure, so it is gone
+                rather than faked. Card-number and pricing toggles already have
+                real controls in the Display preferences section below. */}
           </div>
         </section>
 

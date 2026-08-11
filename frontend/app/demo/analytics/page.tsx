@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -17,19 +18,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  useDemoCollectionTotals,
+  useDemoGameBreakdown,
+  useDemoRarityBreakdown,
+} from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake analytics data                                                */
 /* ------------------------------------------------------------------ */
 
-const MONTHLY_VALUES = [
-  { month: "Oct", value: 1420 },
-  { month: "Nov", value: 1580 },
-  { month: "Dec", value: 1750 },
-  { month: "Jan", value: 1690 },
-  { month: "Feb", value: 1830 },
-  { month: "Mar", value: 2045 },
+/**
+ * Shape of the canned history, expressed as a multiple of the live collection
+ * value rather than as absolute dollars. Anchoring it this way keeps the
+ * six-month trend pointing at the real headline number — with fixed dollar
+ * values, a seed worth $1430 after a canned $1830 February would tell the
+ * visitor their collection just fell 22%.
+ */
+const MONTHLY_SHAPE = [
+  { month: "Oct", factor: 0.78 },
+  { month: "Nov", factor: 0.84 },
+  { month: "Dec", factor: 0.91 },
+  { month: "Jan", factor: 0.88 },
+  { month: "Feb", factor: 0.95 },
 ];
+
+const CURRENT_MONTH = "Mar";
 
 const TOP_GAINERS = [
   { name: "Charizard ex", tcg: "Pokemon", change: +18.5, price: 85.0 },
@@ -52,27 +66,40 @@ const TOP_LOSERS = [
   { name: "Mirror Force", tcg: "Yu-Gi-Oh!", change: -3.5, price: 4.0 },
 ];
 
-const GAME_BREAKDOWN = [
-  { game: "Yu-Gi-Oh!", cards: 38, value: 412.5, color: "#ef4444" },
-  { game: "Magic: The Gathering", cards: 52, value: 890.25, color: "#8b5cf6" },
-  { game: "Pokemon", cards: 45, value: 742.75, color: "#f59e0b" },
-];
-
-const RARITY_DIST = [
-  { rarity: "Common / Uncommon", count: 32, pct: 24 },
-  { rarity: "Rare", count: 28, pct: 21 },
-  { rarity: "Ultra / Secret Rare", count: 41, pct: 30 },
-  { rarity: "Mythic / Special Art", count: 34, pct: 25 },
-];
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
 export default function AnalyticsPage() {
-  const totalValue = GAME_BREAKDOWN.reduce((s, g) => s + g.value, 0);
-  const totalCards = GAME_BREAKDOWN.reduce((s, g) => s + g.cards, 0);
-  const maxBarValue = Math.max(...MONTHLY_VALUES.map((m) => m.value));
+  // The demo store is persisted, so its totals only agree with the markup the
+  // server rendered once we are mounted on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const { totalCards, uniqueCards, totalValue } = useDemoCollectionTotals();
+
+  const monthlyHistory = MONTHLY_SHAPE.map((m) => ({
+    month: m.month,
+    value: Math.round(totalValue * m.factor * 100) / 100,
+  }));
+  const monthlyValues = mounted
+    ? [...monthlyHistory, { month: CURRENT_MONTH, value: totalValue }]
+    : monthlyHistory;
+  const maxBarValue = Math.max(1, ...monthlyValues.map((m) => m.value));
+  const latestChartValue = monthlyValues[monthlyValues.length - 1].value;
+
+  const previousMonth = monthlyHistory[monthlyHistory.length - 1];
+  const monthChange = totalValue - previousMonth.value;
+  const monthChangePct = previousMonth.value
+    ? (monthChange / previousMonth.value) * 100
+    : 0;
+  const avgCardValue = totalCards > 0 ? totalValue / totalCards : 0;
+
+  // Both breakdowns are aggregated from the same binders as the headline
+  // totals, so their counts sum back to totalCards instead of contradicting it.
+  const gameBreakdown = useDemoGameBreakdown();
+  const rarityBreakdown = useDemoRarityBreakdown();
+  const gameBreakdownValue = gameBreakdown.reduce((s, g) => s + g.value, 0);
 
   return (
     <AppShell data-oid="0x:212q">
@@ -96,29 +123,48 @@ export default function AnalyticsPage() {
         >
           <StatCard
             title="Total Value"
-            value={`$${totalValue.toFixed(2)}`}
+            value={mounted ? `$${totalValue.toFixed(2)}` : "—"}
             icon={<DollarSign className="h-5 w-5" data-oid="mt89jh7" />}
             sub="Across all games"
             data-oid="mun8pi5"
           />
           <StatCard
             title="Total Cards"
-            value={totalCards}
+            value={mounted ? totalCards.toLocaleString() : "—"}
             icon={<Layers className="h-5 w-5" data-oid="brh-qc." />}
-            sub="135 unique cards"
+            sub={
+              mounted
+                ? `${uniqueCards.toLocaleString()} unique cards`
+                : "Across your binders"
+            }
             data-oid="yip_-tb"
           />
           <StatCard
             title="30-Day Change"
-            value="+$215.00"
-            icon={<TrendingUp className="h-5 w-5" data-oid="ywyuj8w" />}
-            sub="+11.7% this month"
-            positive
+            value={
+              mounted
+                ? `${monthChange >= 0 ? "+" : "-"}$${Math.abs(monthChange).toFixed(2)}`
+                : "—"
+            }
+            icon={
+              mounted && monthChange < 0 ? (
+                <TrendingDown className="h-5 w-5" />
+              ) : (
+                <TrendingUp className="h-5 w-5" data-oid="ywyuj8w" />
+              )
+            }
+            sub={
+              mounted
+                ? `${monthChangePct >= 0 ? "+" : ""}${monthChangePct.toFixed(1)}% since ${previousMonth.month}`
+                : "Versus last month"
+            }
+            positive={mounted && monthChange >= 0}
+            negative={mounted && monthChange < 0}
             data-oid="m4lulu9"
           />
           <StatCard
             title="Avg Card Value"
-            value={`$${(totalValue / totalCards).toFixed(2)}`}
+            value={mounted ? `$${avgCardValue.toFixed(2)}` : "—"}
             icon={<BarChart3 className="h-5 w-5" data-oid="4mjb6dx" />}
             sub="Per card average"
             data-oid="_cm1w::"
@@ -137,24 +183,34 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent data-oid="pu8f.fm">
-            <div className="flex items-end gap-3 h-48" data-oid="rtts-rv">
-              {MONTHLY_VALUES.map((m) => (
+            <div
+              className="flex items-end gap-3 h-48"
+              role="img"
+              aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${latestChartValue.toFixed(2)}`}
+              data-oid="rtts-rv"
+            >
+              {monthlyValues.map((m) => (
                 <div
                   key={m.month}
-                  className="flex flex-1 flex-col items-center gap-1"
+                  className="flex h-full flex-1 flex-col items-center gap-1"
+                  title={`${m.month}: $${m.value.toFixed(2)}`}
                   data-oid="4f:xh5c"
                 >
                   <span
                     className="text-xs text-muted-foreground font-medium"
                     data-oid="geq.yah"
                   >
-                    ${m.value}
+                    ${Math.round(m.value)}
                   </span>
-                  <div
-                    className="w-full rounded-t bg-primary/80 transition-all"
-                    style={{ height: `${(m.value / maxBarValue) * 100}%` }}
-                    data-oid="yypyl_v"
-                  />
+                  <div className="flex w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-t bg-primary/80 transition-all"
+                      style={{
+                        height: `${Math.max(2, (m.value / maxBarValue) * 100)}%`,
+                      }}
+                      data-oid="yypyl_v"
+                    />
+                  </div>
 
                   <span
                     className="text-xs text-muted-foreground"
@@ -269,8 +325,8 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent data-oid="fpy-5h8">
               <div className="space-y-4" data-oid="al90b:i">
-                {GAME_BREAKDOWN.map((g) => {
-                  const pct = Math.round((g.value / totalValue) * 100);
+                {gameBreakdown.map((g) => {
+                  const pct = Math.round((g.value / gameBreakdownValue) * 100);
                   return (
                     <div key={g.game} className="space-y-2" data-oid="od0_lel">
                       <div
@@ -320,7 +376,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent data-oid="uani25c">
               <div className="space-y-4" data-oid="sbbkp7m">
-                {RARITY_DIST.map((r) => (
+                {rarityBreakdown.map((r) => (
                   <div key={r.rarity} className="space-y-2" data-oid="_4mtrj5">
                     <div
                       className="flex items-center justify-between text-sm"
@@ -363,12 +419,14 @@ function StatCard({
   icon,
   sub,
   positive,
+  negative,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   sub: string;
   positive?: boolean;
+  negative?: boolean;
 }) {
   return (
     <Card data-oid="zg0ogug">
@@ -388,7 +446,9 @@ function StatCard({
       </CardHeader>
       <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid=":ko-:3o">
         <div
-          className={`text-xl md:text-3xl font-semibold tracking-tight ${positive ? "text-green-500" : ""}`}
+          className={`text-xl md:text-3xl font-semibold tracking-tight ${
+            positive ? "text-green-500" : negative ? "text-red-500" : ""
+          }`}
           data-oid="93dq5ol"
         >
           {value}

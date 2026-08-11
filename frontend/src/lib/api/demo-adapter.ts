@@ -5,6 +5,7 @@
 
 import {
   useDemoStore,
+  whenDemoStoreHydrated,
   type DemoBinder,
   type DemoBinderCard,
   type DemoOwnedCard,
@@ -204,6 +205,7 @@ function toCollectionCard(
     quantity: card.quantity,
     condition: card.condition,
     price: card.price,
+    acquiredAt: card.addedAt,
     binderId,
     binderName,
     binderColorHex: stripHash(binderColor),
@@ -424,8 +426,17 @@ async function demoCatalogSets(tcg?: TcgCode): Promise<TcgSet[]> {
         (set) => [`${set.tcg}:${normalizeCatalogText(set.code)}`, set] as const,
       ),
   );
+  // Owned-derived sets report the number of cards OWNED as totalCards, which is
+  // not the set's size. Letting them overwrite a catalog entry made every set
+  // the demo owns cards from report N/N — Modern Horizons 2 showed 6/6 complete
+  // in the set list while its detail page correctly said 6/7. So only fill in
+  // sets the catalog does not already describe, and when the size is genuinely
+  // unknown report 0 so the UI says "Total unavailable" instead of claiming
+  // completion.
   for (const set of demoOwnedSets(tcg)) {
-    merged.set(`${set.tcg}:${normalizeCatalogText(set.code)}`, set);
+    const key = `${set.tcg}:${normalizeCatalogText(set.code)}` as const;
+    if (merged.has(key)) continue;
+    merged.set(key, { ...set, totalCards: 0 });
   }
   return Array.from(merged.values());
 }
@@ -456,11 +467,20 @@ async function demoCardsInSet(tcg: TcgCode, setCode: string): Promise<Card[]> {
  * Main entry point — called by the fetch interceptor in demo-mode.ts.
  * Parses the URL path and method and dispatches to the right handler.
  */
-export function handleDemoRequest(
+export async function handleDemoRequest(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<Response> {
+  // The demo store now hydrates from IndexedDB, which is asynchronous where
+  // localStorage was not. Handlers below call init() and read the store in the
+  // same tick, so without waiting here the first request after a cold load
+  // would answer from a store that is empty only because the read has not
+  // landed yet — a returning visitor would see an empty collection flash, and
+  // init() could seed over their data. Resolves immediately once hydrated, and
+  // never rejects: a storage failure resolves with nothing loaded.
+  await whenDemoStoreHydrated();
+
   // Strip query string for routing, but keep it for parsing params
   const [routePath, queryString] = path.split("?");
   const segments = routePath.replace(/^\//, "").split("/");
@@ -533,9 +553,9 @@ async function handleGuides(
     const ownership = params.get("ownership") || "all";
     const selectedGuides = guides.filter(
       (guide) =>
-        (!tcg || guide.tcg === tcg)
-        && (!category || guide.category === category)
-        && (!guideSlug || guide.slug === guideSlug),
+        (!tcg || guide.tcg === tcg) &&
+        (!category || guide.category === category) &&
+        (!guideSlug || guide.slug === guideSlug),
     );
     const rows: Array<{
       card: Card;
@@ -554,31 +574,48 @@ async function handleGuides(
       }>;
     }> = [];
     for (const guide of selectedGuides) {
-      const cards = guide.rule.type === "manual"
-        ? demoConnectedArtItems().map((item) => ({
-            card: {
-              id: item.externalId,
-              tcg: item.tcg,
-              name: item.name,
-              setCode: item.setCode,
-              setName: item.setName,
-              collectorNumber: item.collectorNumber,
-              rarity: item.rarity,
-              artist: item.artist,
-              imageUrl: item.imageUrl,
-              imageUrlSmall: item.imageUrlSmall,
-            } satisfies Card,
-            item,
-          }))
-        : guide.rule.type === "name" && guide.rule.query
-          ? (await demoSearchCards(guide.rule.query, guide.tcg)).map((card) => ({ card, item: undefined }))
-          : guide.rule.type === "tag" && guide.rule.query && isCatalogGame(guide.tcg)
-            ? (await searchCatalogByCollectionTag(guide.rule.query, guide.tcg, 5000))
-                .map((card) => ({ card, item: undefined }))
-          : [];
+      const cards =
+        guide.rule.type === "manual"
+          ? demoConnectedArtItems().map((item) => ({
+              card: {
+                id: item.externalId,
+                tcg: item.tcg,
+                name: item.name,
+                setCode: item.setCode,
+                setName: item.setName,
+                collectorNumber: item.collectorNumber,
+                rarity: item.rarity,
+                artist: item.artist,
+                imageUrl: item.imageUrl,
+                imageUrlSmall: item.imageUrlSmall,
+              } satisfies Card,
+              item,
+            }))
+          : guide.rule.type === "name" && guide.rule.query
+            ? (await demoSearchCards(guide.rule.query, guide.tcg)).map(
+                (card) => ({ card, item: undefined }),
+              )
+            : guide.rule.type === "tag" &&
+                guide.rule.query &&
+                isCatalogGame(guide.tcg)
+              ? (
+                  await searchCatalogByCollectionTag(
+                    guide.rule.query,
+                    guide.tcg,
+                    5000,
+                  )
+                ).map((card) => ({ card, item: undefined }))
+              : [];
       for (const { card, item } of cards) {
         const searchText = normalizeCatalogText(
-          [card.name, card.setName, card.artist, guide.title, ...guide.tags, item?.groupLabel]
+          [
+            card.name,
+            card.setName,
+            card.artist,
+            guide.title,
+            ...guide.tags,
+            item?.groupLabel,
+          ]
             .filter(Boolean)
             .join(" "),
         );
@@ -591,17 +628,19 @@ async function handleGuides(
           card,
           owned,
           ownedQuantity,
-          matchedGuides: [{
-            guideId: guide.id,
-            slug: guide.slug,
-            title: guide.title,
-            category: guide.category,
-            tags: guide.tags,
-            groupKey: item?.groupKey,
-            groupLabel: item?.groupLabel,
-            groupOrder: item?.groupOrder,
-            position: item?.position,
-          }],
+          matchedGuides: [
+            {
+              guideId: guide.id,
+              slug: guide.slug,
+              title: guide.title,
+              category: guide.category,
+              tags: guide.tags,
+              groupKey: item?.groupKey,
+              groupLabel: item?.groupLabel,
+              groupOrder: item?.groupOrder,
+              position: item?.position,
+            },
+          ],
         });
       }
     }
@@ -623,13 +662,13 @@ async function handleGuides(
     const name =
       (body as { wishlistName?: string } | undefined)?.wishlistName?.trim() ||
       guide.title;
-    const wishlistId = store().addWishlist(
+    const wishlistId = await store().addWishlist(
       name,
       `Following the “${guide.title}” collection guide.`,
     );
     if (guide.rule.type === "manual") {
       for (const item of demoConnectedArtItems()) {
-        store().addCardToWishlist(
+        await store().addCardToWishlist(
           wishlistId,
           {
             id: item.externalId,
@@ -655,7 +694,7 @@ async function handleGuides(
         );
       }
     } else {
-      store().addWishlistRule(wishlistId, {
+      await store().addWishlistRule(wishlistId, {
         type: guide.rule.type,
         tcg: guide.rule.tcg,
         query: guide.rule.query,
@@ -737,7 +776,7 @@ async function handleCollections(
       description?: string;
       colorHex?: string;
     };
-    const id = store().addBinder(
+    const id = await store().addBinder(
       data.name,
       data.colorHex ? `#${data.colorHex}` : undefined,
     );
@@ -769,6 +808,18 @@ async function handleCollections(
 
   const collectionId = segments[0];
 
+  // GET /collections/:id
+  // The server serves this (convex/http.ts) and the demo did not, so a client
+  // asking for a single binder got a 404 in demo mode only.
+  if (segments.length === 1 && method === "GET") {
+    store().init();
+    await store().enrichCardsFromCatalog();
+    const binder = store().binders.find(
+      (b: DemoBinder) => b.id === collectionId,
+    );
+    return binder ? json(toBinder(binder)) : notFound("Collection not found");
+  }
+
   // PATCH /collections/:id
   if (segments.length === 1 && method === "PATCH") {
     const data = body as {
@@ -776,7 +827,7 @@ async function handleCollections(
       description?: string;
       colorHex?: string;
     };
-    if (data.name) store().renameBinder(collectionId, data.name);
+    if (data.name) await store().renameBinder(collectionId, data.name);
     const binder = store().binders.find(
       (b: DemoBinder) => b.id === collectionId,
     );
@@ -785,7 +836,7 @@ async function handleCollections(
 
   // DELETE /collections/:id
   if (segments.length === 1 && method === "DELETE") {
-    store().removeBinder(collectionId);
+    await store().removeBinder(collectionId);
     return noContent();
   }
 
@@ -797,13 +848,18 @@ async function handleCollections(
   // PATCH /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
     const cardId = segments[2];
-    const updated = store().updateCardInBinder(
+    const patch = body as UpdateCardInput;
+    const updated = await store().updateCardInBinder(
       collectionId,
       cardId,
-      body as UpdateCardInput,
+      patch,
     );
+    // On a move the card now lives in the target binder, so the response has
+    // to describe that binder — reporting the source would tell the UI the
+    // card is still where it started.
+    const resultBinderId = patch?.targetBinderId ?? collectionId;
     const binder = store().binders.find(
-      (entry: DemoBinder) => entry.id === collectionId,
+      (entry: DemoBinder) => entry.id === resultBinderId,
     );
     if (!binder || !updated) return notFound("Card not found");
     return json(
@@ -814,14 +870,17 @@ async function handleCollections(
   // DELETE /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
     const cardId = segments[2];
-    store().removeCardFromBinder(collectionId, cardId);
+    await store().removeCardFromBinder(collectionId, cardId);
     return noContent();
   }
 
   return notFound();
 }
 
-function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
+async function handleAddCard(
+  collectionId: string,
+  body: unknown,
+): Promise<Response> {
   const data = body as AddCardInput;
   const demoCard: DemoOwnedCard | null =
     DEMO_CARDS.find((c) => c.id === data.cardId) ||
@@ -843,7 +902,7 @@ function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
     collectionId === "__library__" ? store().binders[0]?.id : collectionId;
 
   if (targetBinder) {
-    store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
+    await store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
       cardData: data.cardData,
       copy: {
         condition: data.condition,
@@ -895,7 +954,7 @@ async function handleWishlists(
       description?: string;
       colorHex?: string;
     };
-    const id = store().addWishlist(data.name, data.description);
+    const id = await store().addWishlist(data.name, data.description);
     const w = store().wishlists.find((wl: DemoWishlist) => wl.id === id)!;
     return json(toWishlist(w));
   }
@@ -921,7 +980,7 @@ async function handleWishlists(
 
   // DELETE /wishlists/:id
   if (segments.length === 1 && method === "DELETE") {
-    store().removeWishlist(wishlistId);
+    await store().removeWishlist(wishlistId);
     return noContent();
   }
 
@@ -939,7 +998,7 @@ async function handleWishlists(
       rarity: data.rarity || "Common",
       price: 0,
     };
-    store().addCardToWishlist(wishlistId, demoCard, data);
+    await store().addCardToWishlist(wishlistId, demoCard, data);
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
     )!;
@@ -967,7 +1026,7 @@ async function handleWishlists(
         rarity: card.rarity || "Common",
         price: 0,
       };
-      store().addCardToWishlist(wishlistId, demoCard, card);
+      await store().addCardToWishlist(wishlistId, demoCard, card);
     }
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
@@ -977,14 +1036,14 @@ async function handleWishlists(
 
   // DELETE /wishlists/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
-    store().removeCardFromWishlist(wishlistId, segments[2]);
+    await store().removeCardFromWishlist(wishlistId, segments[2]);
     return noContent();
   }
 
   // POST /wishlists/:id/rules
   if (segments[1] === "rules" && segments.length === 2 && method === "POST") {
     const data = body as CreateWishlistRuleInput;
-    const rule = store().addWishlistRule(wishlistId, {
+    const rule = await store().addWishlistRule(wishlistId, {
       type: data.type,
       tcg: data.tcg,
       query: data.query,
@@ -999,13 +1058,17 @@ async function handleWishlists(
   // PATCH /wishlists/:id/rules/:ruleId
   if (segments[1] === "rules" && segments.length === 3 && method === "PATCH") {
     const data = body as UpdateWishlistRuleInput;
-    const rule = store().updateWishlistRule(wishlistId, segments[2], data);
+    const rule = await store().updateWishlistRule(
+      wishlistId,
+      segments[2],
+      data,
+    );
     return rule ? json(rule) : notFound("Wishlist rule not found");
   }
 
   // DELETE /wishlists/:id/rules/:ruleId
   if (segments[1] === "rules" && segments.length === 3 && method === "DELETE") {
-    store().removeWishlistRule(wishlistId, segments[2]);
+    await store().removeWishlistRule(wishlistId, segments[2]);
     return noContent();
   }
 
