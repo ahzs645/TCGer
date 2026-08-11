@@ -106,6 +106,62 @@ be overridden by consumers — that is what clipped the wishlist sidebar. Both
 were worked around at the call site; fixing them at the source would prevent
 recurrence.
 
+### Round two — completeness and interaction pass
+
+A follow-up pass asked for the interfaces to read as finished rather than beta,
+and for the interaction screens to make sense. An automated crawl clicked every
+visible control on all 13 demo routes at both viewports (1,040 clicks, each
+after a fresh page load) and recorded whether anything observable happened.
+
+Most of what it flagged was probe error, not product error — worth recording so
+the same conclusions are not re-derived:
+
+| Flagged | Reality |
+| --- | --- |
+| Sealed sort tabs do nothing | Works; the crawler's index shifted after its reload |
+| Mobile price sort does nothing | Works; the row selector matched the wrong elements |
+| Dashboard set-completion card is dead | It is already an `<a>` to the set page |
+| Wishlist delete does nothing | It uses `window.confirm`, which Playwright auto-dismisses |
+
+Four genuine problems came out of it:
+
+**Beta and coming-soon markers on features that work.** The Collection sandbox
+carried a "Beta" badge over 4.5k lines of complete per-copy CRUD with no TODOs.
+The command menu's only Utilities entry read "View price analytics (coming
+soon)" and dismissed itself, while Analytics and Prices both exist. Account
+settings offered "Dark mode — sync theme across devices (coming soon)" behind a
+disabled button, while the user menu has had a working theme toggle all along.
+All three now do the thing they advertise. The Card Scan page-level "Beta" is
+gone too, but the Video Scan "Experimental" badge stays: it is an on-device
+model that supports Pokémon today, and that caveat is honest.
+
+**Trades, Decks and Sealed were stubs of finished features.** The live app has
+full `createTrade` / `createDeck` / `createSealedOpening` flows. The demo could
+not reach them because `demo-adapter` routes only auth, collections, wishlists,
+guides, users, settings and setup — so each page held a local `const` array and
+a disabled button. Their seed data moved to `src/lib/data/demo-portfolio.ts`
+and the demo store now owns them alongside binders and wishlists, so the create
+flows work and what you create survives navigation and reload.
+
+**Six native browser dialogs.** `window.confirm` × 5 and `window.alert` × 1,
+in an app with a full Radix dialog system. Native dialogs ignore the theme,
+cannot be dismissed like the rest of the UI, and are suppressed outright in
+some embedded contexts — which silently turns "are you sure?" into "yes". They
+are now a promise-based `useConfirm` built on the existing Dialog, with no new
+dependency.
+
+**Two mouse-only controls.** The price table's sort headers were bare
+`<th onClick>` — no keyboard access, no announced sort state. Deck cards were
+clickable `<div>`s. Both are now real controls with `aria-sort` / `aria-pressed`
+and keyboard handling, with the visuals unchanged.
+
+Verified against the demo's real static export: create/persist round-trips on
+all three pages, no Beta or coming-soon copy on any of the 13 routes, the packs
+debug HUD still gated, zero native dialogs and zero 4xx across the run. The
+original 33 regression checks still pass — three were rewritten, since they
+asserted the old "disabled with an explanatory tooltip" behaviour that working
+buttons have now superseded.
+
 ### Follow-ups not taken
 
 - **Scan (20)** was investigated but not implemented, because the nav config
