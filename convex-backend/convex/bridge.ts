@@ -1585,9 +1585,15 @@ export const updateEntry = internalMutation({
     }
 
     const refreshed = await requireEntryForUser(ctx, entry._id, viewer._id);
-    const desiredQuantity = args.quantity ?? 1;
     const destinationGroup = await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId);
     const currentQuantity = destinationGroup.reduce((sum, groupEntry) => sum + groupEntry.quantity, 0);
+    // An omitted `quantity` means "leave it alone", matching how every other
+    // field in this handler treats undefined. It previously defaulted to 1,
+    // which the reconciliation below reads as "reduce the group to one copy" —
+    // so a PATCH that only changed a copy's condition deleted the rest. The
+    // collection sandbox's buildUpdatePayload() sends only edited fields and
+    // never sends quantity, so that was the normal edit path.
+    const desiredQuantity = args.quantity ?? currentQuantity;
 
     if (desiredQuantity > currentQuantity) {
       const tagIds = await getTagIdsForEntry(ctx, refreshed._id);
