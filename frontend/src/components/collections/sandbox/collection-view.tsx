@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -166,6 +167,7 @@ function formatPrintDetails(print: TcgCard) {
 }
 
 export function CollectionView() {
+  const [confirm, confirmDialog] = useConfirm();
   const token = useAuthStore((state) => state.token);
   const router = useRouter();
   const pathname = usePathname();
@@ -1004,13 +1006,14 @@ export function CollectionView() {
     if (!token) return;
     const binder = binders.find((b) => b.id === binderId);
     if (!binder) return;
-    if (
-      !window.confirm(
-        `Delete binder "${binder.name}" and all of its cards? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete "${binder.name}"?`,
+      description:
+        "The binder and every card in it will be removed. This cannot be undone.",
+      confirmLabel: "Delete binder",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       await removeCollection(token, binderId);
       if (binderFilter === binderId) setBinderFilter("all");
@@ -2525,6 +2528,8 @@ export function CollectionView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }

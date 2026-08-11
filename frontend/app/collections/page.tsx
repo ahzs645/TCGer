@@ -21,9 +21,6 @@ export default function CollectionsPage() {
             >
               Collection sandbox
             </h1>
-            <Badge variant="outline" data-oid="ikiv_ay">
-              Beta
-            </Badge>
             <div className="ml-auto flex items-center gap-2">
               <BulkAddDialog />
               <CollectionHistoryDialog />

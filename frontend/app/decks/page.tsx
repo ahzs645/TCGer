@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -78,6 +79,7 @@ function tcgLabel(tcg: string): string {
 }
 
 export default function DecksPage() {
+  const [confirm, confirmDialog] = useConfirm();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -286,14 +288,15 @@ export default function DecksPage() {
                   {activeDeck ? (
                     <DeckDetail
                       deck={activeDeck}
-                      onDelete={() => {
-                        if (
-                          window.confirm(
-                            `Delete deck "${activeDeck.name}"? This cannot be undone.`,
-                          )
-                        ) {
-                          deleteMutation.mutate(activeDeck.id);
-                        }
+                      onDelete={async () => {
+                        const ok = await confirm({
+                          title: `Delete "${activeDeck.name}"?`,
+                          description:
+                            "The deck and its card list will be removed. This cannot be undone.",
+                          confirmLabel: "Delete deck",
+                          destructive: true,
+                        });
+                        if (ok) deleteMutation.mutate(activeDeck.id);
                       }}
                       deleting={deleteMutation.isPending}
                     />
@@ -333,6 +336,7 @@ export default function DecksPage() {
           setSelectedDeck(deck.id);
         }}
       />
+      {confirmDialog}
     </AppShell>
   );
 }
@@ -456,6 +460,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
   const [validationMode, setValidationMode] = useState<"classical" | "genesys">(
     "classical",
   );
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [banlistCards, setBanlistCards] = useState("{}");
   const [maxPoints, setMaxPoints] = useState("100");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -556,13 +561,23 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
     anchor.download = `${deck.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ydk`;
     anchor.click();
     URL.revokeObjectURL(url);
-    if (result.skipped.length) {
-      window.alert(`${result.skipped.length} card(s) lacked an eight-digit passcode.`);
-    }
+    setExportNotice(
+      result.skipped.length
+        ? `${result.skipped.length} card${result.skipped.length === 1 ? "" : "s"} left out — no eight-digit passcode.`
+        : null,
+    );
   }
 
   return (
     <div className="space-y-5">
+      {exportNotice && (
+        <p
+          role="status"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+        >
+          {exportNotice}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void downloadYdk()}>
           <Download className="mr-2 h-4 w-4" /> Export YDK

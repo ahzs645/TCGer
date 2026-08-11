@@ -61,9 +61,11 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
     router.push(getAppRoute(path, pathname));
   };
 
-  const quickCalculations = [
-    { label: "View price analytics (coming soon)", icon: Calculator },
-  ];
+  const quickCalculations: { label: string; icon: LucideIcon; path: string }[] =
+    [
+      { label: "View price analytics", icon: Calculator, path: "/analytics" },
+      { label: "Track card prices", icon: Calculator, path: "/prices" },
+    ];
 
   return (
     <>
@@ -179,7 +181,7 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             {quickCalculations.map((item) => (
               <CommandItem
                 key={item.label}
-                onSelect={() => setOpen(false)}
+                onSelect={() => handleNavigate(item.path)}
                 data-oid="n-u4meb"
               >
                 <item.icon className="mr-2 h-4 w-4" data-oid="1omz2kt" />

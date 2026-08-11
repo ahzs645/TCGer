@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Clock3, Loader2, RotateCcw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ function makeIdempotencyKey(auditId: string) {
 }
 
 export function CollectionHistoryDialog() {
+  const [confirm, confirmDialog] = useConfirm();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<CollectionMutationAuditEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,13 +79,12 @@ export function CollectionHistoryDialog() {
 
   const handleUndo = async (entry: CollectionMutationAuditEntry) => {
     if (!token || !user || !entry.canUndo) return;
-    if (
-      !window.confirm(
-        `Undo “${entry.summary}”? This runs only if those copies have not changed.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Undo this change?",
+      description: `“${entry.summary}” will be reverted, but only if those copies have not changed since.`,
+      confirmLabel: "Undo change",
+    });
+    if (!confirmed) return;
 
     setUndoingId(entry.id);
     setError(null);
@@ -108,6 +109,7 @@ export function CollectionHistoryDialog() {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
@@ -196,5 +198,8 @@ export function CollectionHistoryDialog() {
         </ScrollArea>
       </DialogContent>
     </Dialog>
+
+    {confirmDialog}
+    </>
   );
 }

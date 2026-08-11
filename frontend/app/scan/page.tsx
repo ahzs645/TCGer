@@ -16,9 +16,6 @@ export default function ScanPage() {
             >
               Card Scan
             </h1>
-            <Badge variant="outline" data-oid="oz6.a8n">
-              Beta
-            </Badge>
           </div>
           <p
             className="max-w-3xl text-sm text-muted-foreground"

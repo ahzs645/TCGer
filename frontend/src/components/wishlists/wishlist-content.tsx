@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,7 @@ import { describeWishlistRule } from "@tcg/api-types";
 import type { Card as CardType, TcgCode } from "@/types/card";
 
 export function WishlistContent() {
+  const [confirm, confirmDialog] = useConfirm();
   const { token, isAuthenticated } = useAuthStore();
   const {
     wishlists,
@@ -242,13 +244,14 @@ export function WishlistContent() {
   const handleDeleteWishlist = async (wishlistId: string) => {
     if (!token) return;
     const target = wishlists.find((w) => w.id === wishlistId);
-    if (
-      !window.confirm(
-        `Delete wishlist "${target?.name ?? "this wishlist"}"? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete "${target?.name ?? "this wishlist"}"?`,
+      description:
+        "The wishlist and everything on it will be removed. This cannot be undone.",
+      confirmLabel: "Delete wishlist",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       await removeWishlist(token, wishlistId);
       if (activeWishlistId === wishlistId) {
@@ -1374,6 +1377,8 @@ export function WishlistContent() {
       <div className="lg:hidden" data-oid="ao_v:h_">
         {mobileView === "list" ? sidebarContent : detailContent}
       </div>
+
+      {confirmDialog}
     </>
   );
 }
