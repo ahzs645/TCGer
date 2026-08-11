@@ -33,17 +33,25 @@ import type {
 } from "@/stores/demo-store";
 import type { Deck, SealedProduct, Trade } from "@/lib/data/demo-portfolio";
 import type { UserPreferences } from "@tcg/api-types";
-import type { PortableSnapshot } from "./local-portable-db";
+import type {
+  CollectionSnapshot,
+  DeckSnapshot,
+  SealedSnapshot,
+  TradeSnapshot,
+  WishlistSnapshot,
+} from "./local-portable-db";
 
 /** Bumped when the shape of a persisted slice changes incompatibly. */
-export const DEMO_SCHEMA_VERSION = 2;
+export const DEMO_SCHEMA_VERSION = 3;
 
 /**
  * The persisted projection of the demo store.
  *
- * Deliberately a subset: `decks`, `trades` and `sealed` are re-seeded from
- * `demo-portfolio.ts` on every boot, so they are only persisted once the
- * visitor has actually changed them (see `dirtySlices`).
+ * Every slice that holds application data is now a group of portable rows.
+ * `decks`, `trades` and `sealed` are still re-seeded from `demo-portfolio.ts`
+ * on every boot and only persisted once the visitor has actually changed them,
+ * which the store arranges by reference identity rather than by leaving them
+ * out of this list.
  */
 export interface PersistedDemoState {
   profile: DemoProfile;
@@ -52,11 +60,19 @@ export interface PersistedDemoState {
    * The collection, as portable rows. This is the persisted truth as of schema
    * 2; `binders` below is the derived read model and is no longer written.
    */
-  collectionRows: PortableSnapshot;
+  collectionRows: CollectionSnapshot;
+  /** Wishlists, their cards and their rules, as rows. Schema 3. */
+  wishlistRows: WishlistSnapshot;
+  /** Decks and their cards, as rows. Schema 3. */
+  deckRows: DeckSnapshot;
+  /** Trades and the cards on each side of them, as rows. Schema 3. */
+  tradeRows: TradeSnapshot;
+  /** Sealed product holdings, as rows. Schema 3. */
+  sealedRows: SealedSnapshot;
   /**
-   * Schema 1's nested collection. Kept on the type because the v1 -> v2
-   * migration reads it, but absent from {@link DEMO_SLICES} so nothing commits
-   * it any more.
+   * The nested shapes earlier schemas stored. Kept on the type because the
+   * migrations read them, but absent from {@link DEMO_SLICES} so nothing
+   * commits them any more: `binders` was schema 1, the other four schema 2.
    */
   binders: DemoBinder[];
   wishlists: DemoWishlist[];
@@ -72,10 +88,10 @@ export const DEMO_SLICES: readonly DemoSlice[] = [
   "profile",
   "preferences",
   "collectionRows",
-  "wishlists",
-  "decks",
-  "trades",
-  "sealed",
+  "wishlistRows",
+  "deckRows",
+  "tradeRows",
+  "sealedRows",
   "initialized",
 ] as const;
 

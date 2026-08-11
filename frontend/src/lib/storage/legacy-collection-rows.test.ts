@@ -18,7 +18,7 @@ import {
   indexDemoCards,
   LOCAL_USER_ID,
 } from "./legacy-collection-rows";
-import { LocalPortableDb } from "./local-portable-db";
+import { LocalPortableDb, emptySnapshot } from "./local-portable-db";
 
 function seededBinders(): DemoBinder[] {
   useDemoStore.getState().init();
@@ -222,7 +222,7 @@ test("a pre-copies card is expanded into one row per copy", () => {
 
 test("converted rows are usable by the rules", async () => {
   const rows = toPortableRows(seededBinders());
-  const db = new LocalPortableDb(rows);
+  const db = new LocalPortableDb({ ...emptySnapshot(), ...rows });
 
   const binderId = rows.binders[0]!._id;
   assert.equal(db.normalizeId("binders", binderId), binderId);

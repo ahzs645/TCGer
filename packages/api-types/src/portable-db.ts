@@ -106,10 +106,206 @@ export interface CardRow extends PortableRow {
   updatedAt: number;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Wishlists                                                          */
+/* ------------------------------------------------------------------ */
+
+export interface WishlistRow extends PortableRow {
+  userId: string;
+  name: string;
+  description?: string;
+  colorHex?: string;
+  /** A card counts as owned if *any* printing of it is, not just this one. */
+  matchAnyPrinting?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * One wanted card.
+ *
+ * Unlike the collection there is no shared `cards` row behind this: a wishlist
+ * entry is a *want*, and two wishlists wanting the same printing have nothing
+ * to share — no quantity to reconcile, no group to keep consistent. Convex
+ * models it the same way (`wishlistCards` carries its own printing fields
+ * rather than referencing a card table).
+ */
+export interface WishlistCardRow extends PortableRow {
+  wishlistId: string;
+  externalId: string;
+  tcg: string;
+  name: string;
+  /**
+   * The id a *local* catalog knows this printing by, when it differs from
+   * `externalId`. The demo seeds cards as `ygo-7` and only learns the real
+   * printing id once catalog enrichment runs, and every local ownership check
+   * compares against the former — the same distinction `demoCardIdFromRow`
+   * preserves for the collection. A hosted runtime has no second identity and
+   * leaves this unset.
+   */
+  localCardId?: string;
+  baseExternalId?: string;
+  printingKey?: string;
+  setCode?: string;
+  setName?: string;
+  rarity?: string;
+  imageUrl?: string;
+  imageUrlSmall?: string;
+  collectorNumber?: string;
+  releasedAt?: string;
+  language?: string;
+  notes?: string;
+  /**
+   * The card payload exactly as the client sent it, or absent when the card was
+   * added without one.
+   *
+   * The columns above are denormalised out of this — they are what indexes and
+   * rules read. This is what a client gets handed back, and it is kept whole
+   * for two reasons: it carries a dozen structured fields (Pokédex entries,
+   * format legality, provenance) that would otherwise need a dozen more
+   * columns in a contract every runtime has to implement, and "no payload" is
+   * a fact the demo's catalog matcher branches on, which a rebuilt-from-columns
+   * payload could not express. Convex's `deckCards.cardData` is the same idea.
+   */
+  cardData?: Record<string, unknown>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** A saved expansion rule — "every card in this set" — for a smart wishlist. */
+export interface WishlistRuleRow extends PortableRow {
+  wishlistId: string;
+  type: "name" | "set" | "artist" | "tag";
+  tcg?: string;
+  query?: string;
+  setCode?: string;
+  setName?: string;
+  includeAllPrintings: boolean;
+  autoSync: boolean;
+  lastSyncedAt?: number;
+  lastMatchCount?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Decks                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface DeckRow extends PortableRow {
+  userId: string;
+  name: string;
+  description?: string;
+  tcg: string;
+  format?: string;
+  colorHex?: string;
+  isPublic: boolean;
+  /** Demo-only: whether the list is finished. Convex has no counterpart. */
+  isComplete?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DeckCardRow extends PortableRow {
+  deckId: string;
+  /**
+   * Optional, unlike Convex's `deckCards.externalId`. A deck the local runtime
+   * built from a pasted list names its cards and nothing else; requiring an id
+   * here would mean inventing one, and an invented id is worse than none.
+   */
+  externalId?: string;
+  tcg?: string;
+  name: string;
+  quantity: number;
+  zone?: "main" | "extra" | "side";
+  isCommander?: boolean;
+  isSideboard?: boolean;
+  imageUrl?: string;
+  imageUrlSmall?: string;
+  setCode?: string;
+  setName?: string;
+  rarity?: string;
+  /** "Monster", "Spell", "Creature" — Convex keeps this inside `cardData`. */
+  cardType?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Trades                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One trade with another collector.
+ *
+ * Convex's `trades` has `senderId`/`receiverId`, both `v.id("users")`, because
+ * the hosted runtime knows both parties. A local runtime has exactly one user
+ * and the counterparty is a name typed into a box, so the second party is
+ * `partner` rather than an id. The status vocabulary is the local one for the
+ * same reason — nothing here is *offered* to a second account that could
+ * cancel it.
+ */
+export interface TradeRow extends PortableRow {
+  userId: string;
+  partner: string;
+  status: "pending" | "completed" | "declined";
+  /** The calendar day the trade is filed under, `YYYY-MM-DD`. */
+  tradedOn: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TradeCardRow extends PortableRow {
+  tradeId: string;
+  /** Which way the card moves, from this user's point of view. */
+  side: "giving" | "receiving";
+  name: string;
+  tcg: string;
+  quantity: number;
+  externalId?: string;
+  imageUrl?: string;
+  estimatedValue?: number;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sealed product                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A sealed product the user holds.
+ *
+ * Convex splits this in two — `sealedProducts` is a shared catalog keyed by
+ * `catalogKey`, `sealedInventory` is one user's holding of one of them. A local
+ * runtime has no shared catalog to point at, so the product's own fields are
+ * denormalised onto the holding. An adapter over `ctx.db` would join the two;
+ * the reverse (a catalog row per local purchase) would invent rows that the
+ * hosted runtime would then have to deduplicate.
+ */
+export interface SealedInventoryRow extends PortableRow {
+  userId: string;
+  name: string;
+  tcg: string;
+  productType: string;
+  setName?: string;
+  quantity: number;
+  purchasePrice: number;
+  /** What it is worth now. Local valuation; Convex derives this from pricing. */
+  currentValue: number;
+  purchasedOn: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PortableTables {
   binders: BinderRow;
   collectionEntries: CollectionEntryRow;
   cards: CardRow;
+  wishlists: WishlistRow;
+  wishlistCards: WishlistCardRow;
+  wishlistRules: WishlistRuleRow;
+  decks: DeckRow;
+  deckCards: DeckCardRow;
+  trades: TradeRow;
+  tradeCards: TradeCardRow;
+  sealedInventory: SealedInventoryRow;
 }
 
 export type PortableTableName = keyof PortableTables;
@@ -131,6 +327,31 @@ export const PORTABLE_INDEXES = {
   cards: {
     by_tcg_external: ["tcg", "externalId"],
     by_tcg_printing_key: ["tcg", "printingKey"],
+  },
+  wishlists: {
+    by_user: ["userId"],
+  },
+  wishlistCards: {
+    by_wishlist: ["wishlistId"],
+    by_wishlist_external_tcg: ["wishlistId", "externalId", "tcg"],
+  },
+  wishlistRules: {
+    by_wishlist: ["wishlistId"],
+  },
+  decks: {
+    by_user: ["userId"],
+  },
+  deckCards: {
+    by_deck: ["deckId"],
+  },
+  trades: {
+    by_user: ["userId"],
+  },
+  tradeCards: {
+    by_trade: ["tradeId"],
+  },
+  sealedInventory: {
+    by_user: ["userId"],
   },
 } as const satisfies Record<
   PortableTableName,

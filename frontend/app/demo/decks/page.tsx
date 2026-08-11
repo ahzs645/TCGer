@@ -95,9 +95,11 @@ export default function DecksPage() {
     format: "Advanced",
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.name.trim()) return;
-    const id = addDeck({
+    // Writing the deck is a storage round trip now that decks are rows, so the
+    // id the new selection needs only exists once the insert has landed.
+    const id = await addDeck({
       name: form.name.trim(),
       tcg: form.tcg,
       format: form.format,
@@ -115,7 +117,7 @@ export default function DecksPage() {
       destructive: true,
     });
     if (!ok) return;
-    removeDeck(deck.id);
+    await removeDeck(deck.id);
     if (selectedDeck === deck.id) setSelectedDeck(null);
   };
 
@@ -462,7 +464,7 @@ export default function DecksPage() {
                 placeholder="e.g. Branded Despia"
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
+                  if (e.key === "Enter") void handleCreate();
                 }}
                 autoFocus
               />
@@ -501,7 +503,10 @@ export default function DecksPage() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={!form.name.trim()}>
+            <Button
+              onClick={() => void handleCreate()}
+              disabled={!form.name.trim()}
+            >
               Create deck
             </Button>
           </DialogFooter>

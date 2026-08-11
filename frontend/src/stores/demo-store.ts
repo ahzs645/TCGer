@@ -34,9 +34,21 @@ import {
   type UpdateFields,
 } from "@tcg/api-types";
 import {
+  COLLECTION_TABLES,
+  DECK_TABLES,
   LocalPortableDb,
+  SEALED_TABLES,
+  TRADE_TABLES,
+  WISHLIST_TABLES,
   emptySnapshot,
+  overlayRows,
+  rowsOf,
+  type CollectionSnapshot,
+  type DeckSnapshot,
   type PortableSnapshot,
+  type SealedSnapshot,
+  type TradeSnapshot,
+  type WishlistSnapshot,
 } from "@/lib/storage/local-portable-db";
 import {
   cardRowId,
@@ -45,11 +57,23 @@ import {
   toPortableRows,
   LOCAL_USER_ID,
 } from "@/lib/storage/legacy-collection-rows";
+import {
+  toDeckRows,
+  toDemoDecks,
+  toDemoSealed,
+  toDemoTrades,
+  toDemoWishlistRule,
+  toDemoWishlists,
+  toSealedRows,
+  toTradeRows,
+  toWishlistRows,
+} from "@/lib/storage/legacy-portfolio-rows";
 import type {
   AddWishlistCardInput,
   Card,
   CardDataPayload,
   CollectionCardCopy,
+  PortableTableName,
   UpdateCardInput,
   TcgCode,
   UserPreferences,
@@ -169,30 +193,97 @@ const DEFAULT_DEMO_PROFILE: DemoProfile = {
 };
 
 const EMPTY_BINDERS: DemoBinder[] = [];
-const EMPTY_ROWS: PortableSnapshot = emptySnapshot();
+const EMPTY_ROWS: CollectionSnapshot = rowsOf(
+  emptySnapshot(),
+  COLLECTION_TABLES,
+);
+const EMPTY_WISHLISTS: DemoWishlist[] = [];
+const EMPTY_WISHLIST_ROWS: WishlistSnapshot = rowsOf(
+  emptySnapshot(),
+  WISHLIST_TABLES,
+);
 
 /**
- * The collection's storage, and the thing the shared rules run against.
+ * The seeded portfolio, as rows, allocated **once**.
  *
- * Rows are the truth: every collection mutation goes through
- * `@tcg/api-types`'s rules over this store, and `binders` is rebuilt from the
- * result. The nested array is a derived read model — regenerated, never edited
- * — so it cannot drift from the rows the way two hand-written implementations
- * drifted from each other.
+ * Identity is the mechanism, not an optimisation: `persistChangedSlices`
+ * commits a slice when its reference stops matching the baseline, and both the
+ * baseline and the store start out holding exactly these objects. That is what
+ * keeps decks, trades and sealed product out of storage until a visitor
+ * actually changes one — they are re-seeded from `demo-portfolio.ts` on every
+ * boot, so writing them would be storing a copy of a constant.
  */
-const collectionDb = new LocalPortableDb();
+let seededPortfolio: {
+  deckRows: DeckSnapshot;
+  tradeRows: TradeSnapshot;
+  sealedRows: SealedSnapshot;
+  decks: Deck[];
+  trades: Trade[];
+  sealed: SealedProduct[];
+} | null = null;
+
+function seedPortfolio() {
+  if (!seededPortfolio) {
+    const deckRows = toDeckRows(DEMO_DECKS);
+    const tradeRows = toTradeRows(DEMO_TRADES);
+    const sealedRows = toSealedRows(DEMO_SEALED_PRODUCTS);
+    seededPortfolio = {
+      deckRows,
+      tradeRows,
+      sealedRows,
+      decks: toDemoDecks(deckRows),
+      trades: toDemoTrades(tradeRows),
+      sealed: toDemoSealed(sealedRows),
+    };
+  }
+  return seededPortfolio;
+}
 
 /**
- * Publish the rows and the read model derived from them.
+ * The row store as it is before anything is read or seeded: an empty
+ * collection and wishlist, and the portfolio fixtures.
+ *
+ * The portfolio is present from the first tick rather than waiting for
+ * `init()`, because its pages render straight off the store and used to show
+ * the fixtures immediately.
+ */
+function initialSnapshot(): PortableSnapshot {
+  const portfolio = seedPortfolio();
+  return {
+    ...emptySnapshot(),
+    ...portfolio.deckRows,
+    ...portfolio.tradeRows,
+    ...portfolio.sealedRows,
+  };
+}
+
+/**
+ * The local runtime's storage, and the thing the shared rules run against.
+ *
+ * Rows are the truth: every mutation below goes through this store, and the
+ * nested arrays the UI reads (`binders`, `wishlists`, `decks`, `trades`,
+ * `sealed`) are *derived* read models — regenerated after each mutation, never
+ * edited — so they cannot drift from the rows the way two hand-written
+ * implementations drifted from each other.
+ *
+ * One store rather than five, because a mutation that spans two tables (a
+ * wishlist and its cards) has to be one transaction and a transaction cannot
+ * span two stores. Persistence is still split per slice; see
+ * `local-portable-db.ts`.
+ */
+const localDb = new LocalPortableDb(initialSnapshot());
+
+/**
+ * Publish the collection rows and the read model derived from them.
  *
  * `cardData` is carried across the rebuild from the previous nested cards:
- * catalog enrichment writes it and the row model does not carry it, so losing
- * it here would drop card art on the next mutation.
+ * catalog enrichment writes it and the collection's row model does not carry
+ * it, so losing it here would drop card art on the next mutation.
  */
 let derivedBinders: DemoBinder[] = EMPTY_BINDERS;
 
 function publishCollection(): DemoBinder[] {
-  const rows = collectionDb.snapshot();
+  const rows = rowsOf(localDb.snapshot(), COLLECTION_TABLES);
   // Read from the module-level cache rather than the store: the collection
   // actions call this, and reaching back into `useDemoStore` from inside its
   // own initializer makes the store's type circular.
@@ -202,23 +293,33 @@ function publishCollection(): DemoBinder[] {
   return next;
 }
 
-/**
- * Install rows and return the read model, without touching the store.
- *
- * Seeding and reset fold the result into their own single `setState`, so the
- * collection lands in one commit rather than two — the portfolio slices are
- * excluded from persistence by reference identity, and a second write would
- * break that.
- */
-function loadCollection(
-  rows: PortableSnapshot,
-  nested?: DemoBinder[],
-): DemoBinder[] {
-  collectionDb.load(rows);
-  derivedBinders = nested ?? toDemoBinders(rows);
-  return derivedBinders;
+function publishWishlists(): DemoWishlist[] {
+  const rows = rowsOf(localDb.snapshot(), WISHLIST_TABLES);
+  const next = toDemoWishlists(rows);
+  useDemoStore.setState({ wishlistRows: rows, wishlists: next });
+  return next;
 }
-const EMPTY_WISHLISTS: DemoWishlist[] = [];
+
+function publishDecks(): Deck[] {
+  const rows = rowsOf(localDb.snapshot(), DECK_TABLES);
+  const next = toDemoDecks(rows);
+  useDemoStore.setState({ deckRows: rows, decks: next });
+  return next;
+}
+
+function publishTrades(): Trade[] {
+  const rows = rowsOf(localDb.snapshot(), TRADE_TABLES);
+  const next = toDemoTrades(rows);
+  useDemoStore.setState({ tradeRows: rows, trades: next });
+  return next;
+}
+
+function publishSealed(): SealedProduct[] {
+  const rows = rowsOf(localDb.snapshot(), SEALED_TABLES);
+  const next = toDemoSealed(rows);
+  useDemoStore.setState({ sealedRows: rows, sealed: next });
+  return next;
+}
 
 export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   showCardNumbers: true,
@@ -655,18 +756,29 @@ function writeSlice(target: object, slice: DemoSlice, value: unknown): void {
   (target as Record<string, unknown>)[slice] = value;
 }
 
+/** Every named table holds an array, whatever else the stored object carries. */
+function hasRowTables(
+  value: unknown,
+  tables: readonly PortableTableName[],
+): boolean {
+  if (!value || typeof value !== "object") return false;
+  const rows = value as Record<string, unknown>;
+  return tables.every((table) => Array.isArray(rows[table]));
+}
+
 /** Loose shape check — a stored payload predates any version field. */
 function isPlausibleSlice(slice: DemoSlice, value: unknown): boolean {
   switch (slice) {
-    case "collectionRows": {
-      if (!value || typeof value !== "object") return false;
-      const rows = value as Partial<PortableSnapshot>;
-      return (
-        Array.isArray(rows.binders) &&
-        Array.isArray(rows.collectionEntries) &&
-        Array.isArray(rows.cards)
-      );
-    }
+    case "collectionRows":
+      return hasRowTables(value, COLLECTION_TABLES);
+    case "wishlistRows":
+      return hasRowTables(value, WISHLIST_TABLES);
+    case "deckRows":
+      return hasRowTables(value, DECK_TABLES);
+    case "tradeRows":
+      return hasRowTables(value, TRADE_TABLES);
+    case "sealedRows":
+      return hasRowTables(value, SEALED_TABLES);
     case "binders":
     case "wishlists":
     case "decks":
@@ -801,16 +913,21 @@ function createDefaultDemoPersistence(): MaybeSyncPersistence {
 
 /** The persisted slices as they are before anything is stored or seeded. */
 function initialPersistedState(): PersistedDemoState {
+  const portfolio = seedPortfolio();
   return {
     initialized: false,
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
     collectionRows: EMPTY_ROWS,
+    wishlistRows: EMPTY_WISHLIST_ROWS,
+    deckRows: portfolio.deckRows,
+    tradeRows: portfolio.tradeRows,
+    sealedRows: portfolio.sealedRows,
     binders: EMPTY_BINDERS,
     wishlists: EMPTY_WISHLISTS,
-    decks: DEMO_DECKS,
-    trades: DEMO_TRADES,
-    sealed: DEMO_SEALED_PRODUCTS,
+    decks: portfolio.decks,
+    trades: portfolio.trades,
+    sealed: portfolio.sealed,
   };
 }
 
@@ -819,10 +936,9 @@ let persistence: MaybeSyncPersistence = createDefaultDemoPersistence();
 /**
  * What is believed to be on disk, by reference. A slice is committed only when
  * the store's value stops being the value we last wrote (or last read), which
- * is also what keeps `decks`/`trades`/`sealed` out of storage: `init()` and
- * `resetDemo()` assign the very `DEMO_DECKS` / `DEMO_TRADES` /
- * `DEMO_SEALED_PRODUCTS` arrays this baseline starts with, so they only ever
- * differ once an action has built a new array from them.
+ * is also what keeps the portfolio out of storage: `init()` and `resetDemo()`
+ * assign the very `seedPortfolio()` row objects this baseline starts with, so
+ * they only ever differ once an action has built new ones from them.
  */
 let persistBaseline: PersistedDemoState = initialPersistedState();
 
@@ -908,19 +1024,47 @@ function applyHydratedSnapshot(): void {
       snapshot.initialized === undefined &&
       !preHydrationDirty.has("initialized") &&
       (snapshot.collectionRows !== undefined ||
-        snapshot.wishlists !== undefined)
+        snapshot.wishlistRows !== undefined)
     ) {
       patch.initialized = true;
       changed = true;
     }
     // Rows are the truth, so they go into the store that owns them and the
-    // read model is derived from them — assigning `binders` from the patch
-    // would leave the two disagreeing until the next mutation.
+    // read models are derived from them — assigning the nested arrays from the
+    // patch would leave the two disagreeing until the next mutation. Only the
+    // slices that were actually applied are overlaid: the rest keep whatever
+    // the row store already has, which is the seed for the portfolio and a
+    // pre-hydration write for anything the visitor touched while the read was
+    // in flight.
+    const rows = { ...localDb.snapshot() };
+    let rowsChanged = false;
     if (patch.collectionRows) {
-      collectionDb.load(patch.collectionRows);
+      overlayRows(rows, patch.collectionRows, COLLECTION_TABLES);
       patch.binders = toDemoBinders(patch.collectionRows);
       derivedBinders = patch.binders;
+      rowsChanged = true;
     }
+    if (patch.wishlistRows) {
+      overlayRows(rows, patch.wishlistRows, WISHLIST_TABLES);
+      patch.wishlists = toDemoWishlists(patch.wishlistRows);
+      rowsChanged = true;
+    }
+    if (patch.deckRows) {
+      overlayRows(rows, patch.deckRows, DECK_TABLES);
+      patch.decks = toDemoDecks(patch.deckRows);
+      rowsChanged = true;
+    }
+    if (patch.tradeRows) {
+      overlayRows(rows, patch.tradeRows, TRADE_TABLES);
+      patch.trades = toDemoTrades(patch.tradeRows);
+      rowsChanged = true;
+    }
+    if (patch.sealedRows) {
+      overlayRows(rows, patch.sealedRows, SEALED_TABLES);
+      patch.sealed = toDemoSealed(patch.sealedRows);
+      rowsChanged = true;
+    }
+    if (rowsChanged) localDb.load(rows);
     if (changed) applyToStore(patch);
   }
 
@@ -979,27 +1123,53 @@ export function setDemoPersistence(next: DemoPersistence): void {
   persistence = next;
   persistBaseline = initialPersistedState();
   // The row store is module state and would otherwise survive the swap,
-  // leaking one persistence backend's collection into the next.
-  collectionDb.load(emptySnapshot());
+  // leaking one persistence backend's data into the next.
+  localDb.load(initialSnapshot());
   derivedBinders = EMPTY_BINDERS;
   applyToStore(initialPersistedState());
   beginDemoHydration();
 }
 
+/**
+ * The whole seed, as one row snapshot plus the read models derived from it.
+ *
+ * Built in one go so `init()` and `resetDemo()` can land it in a single
+ * `setState`: the portfolio slices are kept out of storage by reference
+ * identity, and a second write would break that.
+ */
+function seededState() {
+  const binders = seedBinders();
+  const collectionRows = toPortableRows(binders);
+  const wishlistRows = toWishlistRows(seedWishlists());
+  const portfolio = seedPortfolio();
+  localDb.load({
+    ...emptySnapshot(),
+    ...collectionRows,
+    ...wishlistRows,
+    ...portfolio.deckRows,
+    ...portfolio.tradeRows,
+    ...portfolio.sealedRows,
+  });
+  derivedBinders = binders;
+  return {
+    initialized: true as const,
+    collectionRows,
+    binders,
+    wishlistRows,
+    wishlists: toDemoWishlists(wishlistRows),
+    deckRows: portfolio.deckRows,
+    decks: portfolio.decks,
+    tradeRows: portfolio.tradeRows,
+    trades: portfolio.trades,
+    sealedRows: portfolio.sealedRows,
+    sealed: portfolio.sealed,
+  };
+}
+
 /** Seed the fixtures, but only if this visitor genuinely has nothing. */
 function seedDemoIfEmpty(): void {
   if (useDemoStore.getState().initialized) return;
-  const seeded = seedBinders();
-  loadCollection(toPortableRows(seeded), seeded);
-  useDemoStore.setState({
-    initialized: true,
-    collectionRows: collectionDb.snapshot(),
-    binders: seeded,
-    wishlists: seedWishlists(),
-    decks: DEMO_DECKS,
-    trades: DEMO_TRADES,
-    sealed: DEMO_SEALED_PRODUCTS,
-  });
+  useDemoStore.setState(seededState());
 }
 
 function resetDemoState(): void {
@@ -1008,18 +1178,10 @@ function resetDemoState(): void {
   // commit issued now could land either side of the `clear()` below. Once the
   // clear has resolved the baseline is reset and the fresh state is committed
   // from scratch — decks/trades/sealed excluded, since they are seeds again.
-  const seeded = seedBinders();
-  loadCollection(toPortableRows(seeded), seeded);
   applyToStore({
-    initialized: true,
+    ...seededState(),
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
-    binders: seeded,
-    collectionRows: collectionDb.snapshot(),
-    wishlists: seedWishlists(),
-    decks: DEMO_DECKS,
-    trades: DEMO_TRADES,
-    sealed: DEMO_SEALED_PRODUCTS,
   });
 
   const active = persistence;
@@ -1043,13 +1205,17 @@ interface DemoState {
   initialized: boolean;
   profile: DemoProfile;
   preferences: UserPreferences;
-  /** The collection, as portable rows. The truth. */
-  collectionRows: PortableSnapshot;
-  /** Derived from {@link collectionRows} after every mutation. Never edited. */
+  /* Rows are the truth; each nested array below it is derived from them after
+   * every mutation and never edited. */
+  collectionRows: CollectionSnapshot;
   binders: DemoBinder[];
+  wishlistRows: WishlistSnapshot;
   wishlists: DemoWishlist[];
+  deckRows: DeckSnapshot;
   decks: Deck[];
+  tradeRows: TradeSnapshot;
   trades: Trade[];
+  sealedRows: SealedSnapshot;
   sealed: SealedProduct[];
 
   // Lifecycle
@@ -1068,14 +1234,14 @@ interface DemoState {
     tcg: Deck["tcg"];
     format: string;
     description?: string;
-  }) => string;
-  removeDeck: (id: string) => void;
+  }) => Promise<string>;
+  removeDeck: (id: string) => Promise<void>;
   addTrade: (input: {
     partner: string;
     giving: Trade["giving"];
     receiving: Trade["receiving"];
-  }) => string;
-  setTradeStatus: (id: string, status: Trade["status"]) => void;
+  }) => Promise<string>;
+  setTradeStatus: (id: string, status: Trade["status"]) => Promise<void>;
   addSealedProduct: (input: {
     name: string;
     tcg: SealedProduct["tcg"];
@@ -1084,8 +1250,8 @@ interface DemoState {
     quantity: number;
     purchasePrice: number;
     currentValue: number;
-  }) => string;
-  removeSealedProduct: (id: string) => void;
+  }) => Promise<string>;
+  removeSealedProduct: (id: string) => Promise<void>;
 
   // Binders
   addBinder: (name: string, color?: string) => Promise<string>;
@@ -1108,18 +1274,21 @@ interface DemoState {
   ) => Promise<void>;
 
   // Wishlists
-  addWishlist: (name: string, description?: string) => string;
-  removeWishlist: (id: string) => void;
+  addWishlist: (name: string, description?: string) => Promise<string>;
+  removeWishlist: (id: string) => Promise<void>;
   addCardToWishlist: (
     wishlistId: string,
     card: DemoOwnedCard,
     cardData?: AddWishlistCardInput,
-  ) => void;
-  removeCardFromWishlist: (wishlistId: string, cardInstanceId: string) => void;
+  ) => Promise<void>;
+  removeCardFromWishlist: (
+    wishlistId: string,
+    cardInstanceId: string,
+  ) => Promise<void>;
   addWishlistRule: (
     wishlistId: string,
     rule: Omit<DemoWishlistRule, "id" | "createdAt" | "updatedAt">,
-  ) => DemoWishlistRule | null;
+  ) => Promise<DemoWishlistRule | null>;
   updateWishlistRule: (
     wishlistId: string,
     ruleId: string,
@@ -1129,8 +1298,8 @@ interface DemoState {
         "autoSync" | "includeAllPrintings" | "lastSyncedAt" | "lastMatchCount"
       >
     >,
-  ) => DemoWishlistRule | null;
-  removeWishlistRule: (wishlistId: string, ruleId: string) => void;
+  ) => Promise<DemoWishlistRule | null>;
+  removeWishlistRule: (wishlistId: string, ruleId: string) => Promise<void>;
 
   // Queries
   isCardInCollection: (cardId: string) => boolean;
@@ -1147,10 +1316,14 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   preferences: DEFAULT_DEMO_PREFERENCES,
   collectionRows: EMPTY_ROWS,
   binders: EMPTY_BINDERS,
+  wishlistRows: EMPTY_WISHLIST_ROWS,
   wishlists: EMPTY_WISHLISTS,
-  decks: DEMO_DECKS,
-  trades: DEMO_TRADES,
-  sealed: DEMO_SEALED_PRODUCTS,
+  deckRows: seedPortfolio().deckRows,
+  decks: seedPortfolio().decks,
+  tradeRows: seedPortfolio().tradeRows,
+  trades: seedPortfolio().trades,
+  sealedRows: seedPortfolio().sealedRows,
+  sealed: seedPortfolio().sealed,
 
   /**
    * Seed the demo fixtures on a first visit, and do nothing on a return
@@ -1241,38 +1414,61 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     );
     if (!matches.size) return 0;
 
-    set((state) => ({
-      binders: state.binders.map((binder) => ({
-        ...binder,
-        cards: binder.cards.map((card) => {
-          const match = matches.get(`binder:${card.id}`);
-          if (!match || !needsCatalogImage(card)) return card;
-          return {
-            ...card,
-            name: match.name,
-            setCode: match.setCode ?? card.setCode,
-            setName: match.setName ?? card.setName,
-            rarity: match.rarity ?? card.rarity,
-            cardData: mergeCatalogCardData(card.cardData, match),
-          };
-        }),
-      })),
-      wishlists: state.wishlists.map((wishlist) => ({
-        ...wishlist,
-        cards: wishlist.cards.map((card) => {
-          const match = matches.get(`wishlist:${card.id}`);
-          if (!match || !needsCatalogImage(card)) return card;
-          return {
-            ...card,
-            name: match.name,
-            setCode: match.setCode ?? card.setCode,
-            setName: match.setName ?? card.setName,
-            rarity: match.rarity ?? card.rarity,
-            cardData: mergeCatalogCardData(card.cardData, match),
-          };
-        }),
-      })),
+    // The collection's card art lives on the nested read model rather than in
+    // rows (`CardRow` has no `cardData`), so enrichment edits the read model
+    // and `derivedBinders` is re-pointed at it — otherwise the next collection
+    // mutation would rebuild from rows through a stale index and drop the art.
+    const enrichedBinders = get().binders.map((binder) => ({
+      ...binder,
+      cards: binder.cards.map((card) => {
+        const match = matches.get(`binder:${card.id}`);
+        if (!match || !needsCatalogImage(card)) return card;
+        return {
+          ...card,
+          name: match.name,
+          setCode: match.setCode ?? card.setCode,
+          setName: match.setName ?? card.setName,
+          rarity: match.rarity ?? card.rarity,
+          cardData: mergeCatalogCardData(card.cardData, match),
+        };
+      }),
     }));
+    derivedBinders = enrichedBinders;
+    set({ binders: enrichedBinders });
+
+    // Wishlist cards *are* rows, so their enrichment is a write to storage.
+    const now = Date.now();
+    const enrich = localDb.snapshot().wishlistCards.flatMap((row) => {
+      const match = matches.get(`wishlist:${row._id}`);
+      if (!match || row.imageUrl || row.imageUrlSmall) return [];
+      return [[row, match] as const];
+    });
+    if (!enrich.length) return matches.size;
+
+    await localDb.transaction(["wishlistCards"], async () => {
+      for (const [row, match] of enrich) {
+        const merged = mergeCatalogCardData(
+          row.cardData as AddWishlistCardInput | undefined,
+          match,
+        );
+        const localCardId = row.localCardId ?? row.externalId;
+        await localDb.patch("wishlistCards", row._id, {
+          externalId: merged.externalId,
+          localCardId:
+            localCardId === merged.externalId ? undefined : localCardId,
+          name: match.name,
+          setCode: match.setCode ?? row.setCode,
+          setName: match.setName ?? row.setName,
+          rarity: match.rarity ?? row.rarity,
+          imageUrl: merged.imageUrl,
+          imageUrlSmall: merged.imageUrlSmall,
+          collectorNumber: merged.collectorNumber ?? row.collectorNumber,
+          cardData: merged as unknown as Record<string, unknown>,
+          updatedAt: now,
+        });
+      }
+    });
+    publishWishlists();
     return matches.size;
   },
 
@@ -1297,57 +1493,85 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     ...get().preferences,
   }),
 
-  // ── Binders ──────────────────────────────────────────────────
-  /* ---------- Decks, trades and sealed inventory ---------- */
+  /* ---------- Decks, trades and sealed inventory ----------
+   *
+   * These four slices have no server-side counterpart that implements them a
+   * second time, so — unlike the collection — their mutations are not extracted
+   * into `@tcg/api-types`. What they do share with the collection is the
+   * storage contract: every write below goes through `PortableDb`, one
+   * transaction per mutation, so the *code* is already runtime-independent even
+   * though there is currently only one runtime running it.
+   */
 
-  addDeck: ({ name, tcg, format, description }) => {
-    const id = uid();
-    set((state) => ({
-      decks: [
-        {
-          id,
-          name,
-          tcg,
-          format,
-          description: description?.trim() || "No description yet.",
-          color: DECK_COLORS[state.decks.length % DECK_COLORS.length],
-          cards: [],
-          lastUpdated: new Date().toISOString().slice(0, 10),
-          isComplete: false,
-        },
-        ...state.decks,
-      ],
-    }));
+  addDeck: async ({ name, tcg, format, description }) => {
+    const now = Date.now();
+    const id = await localDb.insert("decks", {
+      userId: LOCAL_USER_ID,
+      name,
+      tcg,
+      format,
+      description: description?.trim() || "No description yet.",
+      colorHex: DECK_COLORS[
+        localDb.snapshot().decks.length % DECK_COLORS.length
+      ].replace(/^#/, ""),
+      isPublic: false,
+      isComplete: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    publishDecks();
     return id;
   },
 
-  removeDeck: (id) =>
-    set((state) => ({ decks: state.decks.filter((d) => d.id !== id) })),
+  removeDeck: async (id) => {
+    // The deck's cards go with it; orphaned rows would be invisible and
+    // permanent.
+    const cards = await localDb.query("deckCards", "by_deck", { deckId: id });
+    await localDb.transaction(DECK_TABLES, async () => {
+      for (const card of cards) await localDb.delete("deckCards", card._id);
+      await localDb.delete("decks", id);
+    });
+    publishDecks();
+  },
 
-  addTrade: ({ partner, giving, receiving }) => {
-    const id = uid();
-    set((state) => ({
-      trades: [
-        {
-          id,
-          partner,
-          status: "pending",
-          date: new Date().toISOString().slice(0, 10),
-          giving,
-          receiving,
-        },
-        ...state.trades,
-      ],
-    }));
+  addTrade: async ({ partner, giving, receiving }) => {
+    const now = Date.now();
+    const id = await localDb.transaction(TRADE_TABLES, async () => {
+      const tradeId = await localDb.insert("trades", {
+        userId: LOCAL_USER_ID,
+        partner,
+        status: "pending",
+        tradedOn: new Date(now).toISOString().slice(0, 10),
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (const [side, cards] of [
+        ["giving", giving],
+        ["receiving", receiving],
+      ] as const) {
+        for (const card of cards) {
+          await localDb.insert("tradeCards", {
+            tradeId,
+            side,
+            name: card.name,
+            tcg: card.tcg,
+            quantity: 1,
+            estimatedValue: card.value,
+          });
+        }
+      }
+      return tradeId;
+    });
+    publishTrades();
     return id;
   },
 
-  setTradeStatus: (id, status) =>
-    set((state) => ({
-      trades: state.trades.map((t) => (t.id === id ? { ...t, status } : t)),
-    })),
+  setTradeStatus: async (id, status) => {
+    await localDb.patch("trades", id, { status, updatedAt: Date.now() });
+    publishTrades();
+  },
 
-  addSealedProduct: ({
+  addSealedProduct: async ({
     name,
     tcg,
     type,
@@ -1356,40 +1580,40 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     purchasePrice,
     currentValue,
   }) => {
-    const id = uid();
-    set((state) => ({
-      sealed: [
-        {
-          id,
-          name,
-          tcg,
-          type,
-          quantity,
-          purchasePrice,
-          currentValue,
-          purchaseDate: new Date().toISOString().slice(0, 10),
-          set: setName,
-        },
-        ...state.sealed,
-      ],
-    }));
+    const now = Date.now();
+    const id = await localDb.insert("sealedInventory", {
+      userId: LOCAL_USER_ID,
+      name,
+      tcg,
+      productType: type,
+      setName,
+      quantity,
+      purchasePrice,
+      currentValue,
+      purchasedOn: new Date(now).toISOString().slice(0, 10),
+      createdAt: now,
+      updatedAt: now,
+    });
+    publishSealed();
     return id;
   },
 
-  removeSealedProduct: (id) =>
-    set((state) => ({ sealed: state.sealed.filter((p) => p.id !== id) })),
+  removeSealedProduct: async (id) => {
+    await localDb.delete("sealedInventory", id);
+    publishSealed();
+  },
+
+  // ── Binders ──────────────────────────────────────────────────
 
   addBinder: async (name, color) => {
     const now = Date.now();
-    const id = await collectionDb.insert("binders", {
+    const id = await localDb.insert("binders", {
       userId: LOCAL_USER_ID,
       kind: "binder",
       name,
       colorHex: (
         color ??
-        BINDER_COLORS[
-          collectionDb.snapshot().binders.length % BINDER_COLORS.length
-        ]
+        BINDER_COLORS[localDb.snapshot().binders.length % BINDER_COLORS.length]
       ).replace(/^#/, ""),
       createdAt: now,
       updatedAt: now,
@@ -1401,28 +1625,25 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   removeBinder: async (id) => {
     // The binder's copies go with it; orphaned entries would still be counted
     // by every collection selector.
-    const entries = await collectionDb.query("collectionEntries", "by_binder", {
+    const entries = await localDb.query("collectionEntries", "by_binder", {
       binderId: id,
     });
-    await collectionDb.transaction(
-      ["binders", "collectionEntries"],
-      async () => {
-        for (const entry of entries) {
-          await collectionDb.delete("collectionEntries", entry._id);
-        }
-        await collectionDb.delete("binders", id);
-      },
-    );
+    await localDb.transaction(["binders", "collectionEntries"], async () => {
+      for (const entry of entries) {
+        await localDb.delete("collectionEntries", entry._id);
+      }
+      await localDb.delete("binders", id);
+    });
     publishCollection();
   },
 
   renameBinder: async (id, name) => {
-    await collectionDb.patch("binders", id, { name, updatedAt: Date.now() });
+    await localDb.patch("binders", id, { name, updatedAt: Date.now() });
     publishCollection();
   },
 
   addCardToBinder: async (binderId, card, quantity = 1, details) => {
-    await addCopies(collectionDb, {
+    await addCopies(localDb, {
       userId: LOCAL_USER_ID,
       binderId,
       // The row id is derived from the demo card id, so a card added now and
@@ -1470,7 +1691,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
   updateCardInBinder: async (binderId, cardOrCopyId, updates) => {
     try {
-      const entry = await updateEntry(collectionDb, {
+      const entry = await updateEntry(localDb, {
         userId: LOCAL_USER_ID,
         entryId: cardOrCopyId,
         updates: updates as UpdateFields,
@@ -1493,7 +1714,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
   removeCardFromBinder: async (binderId, cardInstanceId) => {
     try {
-      await removeCardRule(collectionDb, {
+      await removeCardRule(localDb, {
         userId: LOCAL_USER_ID,
         entryId: cardInstanceId,
       });
@@ -1504,137 +1725,162 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   },
 
   // ── Wishlists ────────────────────────────────────────────────
-  addWishlist: (name, description) => {
-    const id = uid();
-    set((state) => ({
-      wishlists: [
-        ...state.wishlists,
-        {
-          id,
-          name,
-          description: description ?? "",
-          color: BINDER_COLORS[state.wishlists.length % BINDER_COLORS.length],
-          cards: [],
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }));
+  addWishlist: async (name, description) => {
+    const now = Date.now();
+    const id = await localDb.insert("wishlists", {
+      userId: LOCAL_USER_ID,
+      name,
+      description: description || undefined,
+      colorHex: BINDER_COLORS[
+        localDb.snapshot().wishlists.length % BINDER_COLORS.length
+      ].replace(/^#/, ""),
+      createdAt: now,
+      updatedAt: now,
+    });
+    publishWishlists();
     return id;
   },
 
-  removeWishlist: (id) => {
-    set((state) => ({
-      wishlists: state.wishlists.filter((w) => w.id !== id),
-    }));
+  removeWishlist: async (id) => {
+    // Cards and rules go with the wishlist. Collected outside the transaction
+    // and deleted inside it, the same shape `removeBinder` uses.
+    const [cards, rules] = await Promise.all([
+      localDb.query("wishlistCards", "by_wishlist", { wishlistId: id }),
+      localDb.query("wishlistRules", "by_wishlist", { wishlistId: id }),
+    ]);
+    await localDb.transaction(WISHLIST_TABLES, async () => {
+      for (const card of cards) await localDb.delete("wishlistCards", card._id);
+      for (const rule of rules) await localDb.delete("wishlistRules", rule._id);
+      await localDb.delete("wishlists", id);
+    });
+    publishWishlists();
   },
 
-  addCardToWishlist: (wishlistId, card, cardData) => {
-    set((state) => ({
-      wishlists: state.wishlists.map((w) => {
-        if (w.id !== wishlistId) return w;
-        if (w.cards.some((c) => c.cardId === card.id)) return w; // already added
-        return {
-          ...w,
-          cards: [
-            ...w.cards,
-            {
-              id: uid(),
-              cardId: card.id,
-              name: card.name,
-              tcg: card.tcg,
-              setCode: card.setCode,
-              setName: card.setName,
-              rarity: card.rarity,
-              addedAt: new Date().toISOString(),
-              cardData,
-            },
-          ],
-        };
-      }),
-    }));
+  addCardToWishlist: async (wishlistId, card, cardData) => {
+    const wishlist = await localDb.get("wishlists", wishlistId);
+    if (!wishlist) return;
+
+    const existing = await localDb.query("wishlistCards", "by_wishlist", {
+      wishlistId,
+    });
+    // Deduplicated on the id the caller used, which for a seeded card is the
+    // local catalog's id and not the printing id enrichment later attaches.
+    if (existing.some((row) => (row.localCardId ?? row.externalId) === card.id))
+      return;
+
+    const now = Date.now();
+    const externalId = cardData?.externalId ?? card.id;
+    await localDb.insert("wishlistCards", {
+      wishlistId,
+      externalId,
+      localCardId: card.id === externalId ? undefined : card.id,
+      tcg: card.tcg,
+      // Display columns from the card, identity columns from the payload —
+      // they differ for a seeded card and `legacy-portfolio-rows.ts` explains
+      // why both are kept.
+      name: card.name,
+      baseExternalId: cardData?.baseExternalId,
+      printingKey: cardData?.printingKey,
+      setCode: card.setCode,
+      setName: card.setName,
+      rarity: card.rarity,
+      imageUrl: cardData?.imageUrl,
+      imageUrlSmall: cardData?.imageUrlSmall,
+      collectorNumber: cardData?.collectorNumber,
+      releasedAt: cardData?.releasedAt,
+      language: cardData?.language,
+      notes: cardData?.notes,
+      cardData: cardData as unknown as Record<string, unknown> | undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+    publishWishlists();
   },
 
-  removeCardFromWishlist: (wishlistId, cardInstanceId) => {
-    set((state) => ({
-      wishlists: state.wishlists.map((w) => {
-        if (w.id !== wishlistId) return w;
-        return {
-          ...w,
-          cards: w.cards.filter((c) => c.id !== cardInstanceId),
-        };
-      }),
-    }));
+  removeCardFromWishlist: async (wishlistId, cardInstanceId) => {
+    const row = await localDb.get("wishlistCards", cardInstanceId);
+    if (!row || row.wishlistId !== wishlistId) return;
+    await localDb.delete("wishlistCards", cardInstanceId);
+    publishWishlists();
   },
 
-  addWishlistRule: (wishlistId, rule) => {
-    const timestamp = new Date().toISOString();
-    let saved: DemoWishlistRule | null = null;
-    set((state) => ({
-      wishlists: state.wishlists.map((w) => {
-        if (w.id !== wishlistId) return w;
-        const rules = w.rules ?? [];
-        // Re-adding the same rule refreshes it rather than duplicating.
-        const existing = rules.find(
-          (candidate) =>
-            candidate.type === rule.type &&
-            candidate.tcg === rule.tcg &&
-            candidate.query === rule.query &&
-            candidate.setCode === rule.setCode,
-        );
-        if (existing) {
-          saved = {
-            ...existing,
-            ...rule,
-            setName: rule.setName ?? existing.setName,
-            updatedAt: timestamp,
-          };
-          const next = saved;
-          return {
-            ...w,
-            rules: rules.map((candidate) =>
-              candidate.id === existing.id ? next : candidate,
-            ),
-          };
-        }
-        saved = {
-          ...rule,
-          id: uid(),
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        };
-        return { ...w, rules: [...rules, saved] };
-      }),
-    }));
-    return saved;
+  addWishlistRule: async (wishlistId, rule) => {
+    const wishlist = await localDb.get("wishlists", wishlistId);
+    if (!wishlist) return null;
+
+    const now = Date.now();
+    const rules = await localDb.query("wishlistRules", "by_wishlist", {
+      wishlistId,
+    });
+    // Re-adding the same rule refreshes it rather than duplicating.
+    const existing = rules.find(
+      (candidate) =>
+        candidate.type === rule.type &&
+        candidate.tcg === rule.tcg &&
+        candidate.query === rule.query &&
+        candidate.setCode === rule.setCode,
+    );
+
+    let ruleId: string;
+    if (existing) {
+      await localDb.patch("wishlistRules", existing._id, {
+        ...rule,
+        setName: rule.setName ?? existing.setName,
+        lastSyncedAt:
+          rule.lastSyncedAt === undefined
+            ? existing.lastSyncedAt
+            : Date.parse(rule.lastSyncedAt),
+        updatedAt: now,
+      });
+      ruleId = existing._id;
+    } else {
+      ruleId = await localDb.insert("wishlistRules", {
+        wishlistId,
+        type: rule.type,
+        tcg: rule.tcg,
+        query: rule.query,
+        setCode: rule.setCode,
+        setName: rule.setName,
+        includeAllPrintings: rule.includeAllPrintings,
+        autoSync: rule.autoSync,
+        lastSyncedAt:
+          rule.lastSyncedAt === undefined
+            ? undefined
+            : Date.parse(rule.lastSyncedAt),
+        lastMatchCount: rule.lastMatchCount,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    publishWishlists();
+    const saved = await localDb.get("wishlistRules", ruleId);
+    return saved ? toDemoWishlistRule(saved) : null;
   },
 
-  updateWishlistRule: (wishlistId, ruleId, patch) => {
-    const timestamp = new Date().toISOString();
-    let saved: DemoWishlistRule | null = null;
-    set((state) => ({
-      wishlists: state.wishlists.map((w) => {
-        if (w.id !== wishlistId) return w;
-        return {
-          ...w,
-          rules: (w.rules ?? []).map((rule) => {
-            if (rule.id !== ruleId) return rule;
-            saved = { ...rule, ...patch, updatedAt: timestamp };
-            return saved;
-          }),
-        };
-      }),
-    }));
-    return saved;
+  updateWishlistRule: async (wishlistId, ruleId, patch) => {
+    const rule = await localDb.get("wishlistRules", ruleId);
+    if (!rule || rule.wishlistId !== wishlistId) return null;
+    await localDb.patch("wishlistRules", ruleId, {
+      autoSync: patch.autoSync ?? rule.autoSync,
+      includeAllPrintings:
+        patch.includeAllPrintings ?? rule.includeAllPrintings,
+      lastSyncedAt:
+        patch.lastSyncedAt === undefined
+          ? rule.lastSyncedAt
+          : Date.parse(patch.lastSyncedAt),
+      lastMatchCount: patch.lastMatchCount ?? rule.lastMatchCount,
+      updatedAt: Date.now(),
+    });
+    publishWishlists();
+    const saved = await localDb.get("wishlistRules", ruleId);
+    return saved ? toDemoWishlistRule(saved) : null;
   },
 
-  removeWishlistRule: (wishlistId, ruleId) => {
-    set((state) => ({
-      wishlists: state.wishlists.map((w) =>
-        w.id === wishlistId
-          ? { ...w, rules: (w.rules ?? []).filter((r) => r.id !== ruleId) }
-          : w,
-      ),
-    }));
+  removeWishlistRule: async (wishlistId, ruleId) => {
+    const rule = await localDb.get("wishlistRules", ruleId);
+    if (!rule || rule.wishlistId !== wishlistId) return;
+    await localDb.delete("wishlistRules", ruleId);
+    publishWishlists();
   },
 
   // ── Queries ──────────────────────────────────────────────────

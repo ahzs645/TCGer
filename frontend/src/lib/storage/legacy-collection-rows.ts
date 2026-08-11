@@ -26,7 +26,7 @@ import type {
   CollectionCardCopy,
   CollectionEntryRow,
 } from "@tcg/api-types";
-import type { PortableSnapshot } from "./local-portable-db";
+import type { CollectionSnapshot } from "./local-portable-db";
 import type { DemoBinder, DemoBinderCard } from "@/stores/demo-store";
 
 /** The local runtime has one user; the rules still scope every row by id. */
@@ -155,7 +155,7 @@ function toEntryRows(
 export function toPortableRows(
   binders: DemoBinder[],
   now = Date.now(),
-): PortableSnapshot {
+): CollectionSnapshot {
   const binderRows: BinderRow[] = [];
   const entryRows: CollectionEntryRow[] = [];
   const cardRows = new Map<string, CardRow>();
@@ -211,7 +211,7 @@ export function toPortableRows(
  * beneath them run through the shared rules.
  */
 export function toDemoBinders(
-  rows: PortableSnapshot,
+  rows: CollectionSnapshot,
   demoCards?: ReadonlyMap<string, DemoBinderCard>,
 ): DemoBinder[] {
   const cardsById = new Map(rows.cards.map((card) => [card._id, card]));

@@ -38,13 +38,21 @@ import {
   type PersistedDemoState,
 } from "./demo-persistence";
 import { readLegacyDemoState, removeLegacyDemoState } from "./demo-local";
-import type { DemoBinder } from "@/stores/demo-store";
+import type { DemoBinder, DemoWishlist } from "@/stores/demo-store";
+import type { Deck, SealedProduct, Trade } from "@/lib/data/demo-portfolio";
 
 /**
- * The record key schema 1 stored the nested collection under. No longer a
- * slice, so it is addressed by literal rather than through `DEMO_SLICES`.
+ * The record keys earlier schemas stored nested arrays under. None of them is a
+ * slice any more, so each is addressed by literal rather than through
+ * `DEMO_SLICES` — which is the whole point: `readRecordRows` filters against
+ * that list, so a migration that went through the hydrated state would find
+ * nothing here.
  */
 const LEGACY_BINDERS_KEY = "binders";
+const LEGACY_WISHLISTS_KEY = "wishlists";
+const LEGACY_DECKS_KEY = "decks";
+const LEGACY_TRADES_KEY = "trades";
+const LEGACY_SEALED_KEY = "sealed";
 import { DEMO_DB_NAME } from "./keys";
 
 // Database name comes from the storage registry: clearAllLocalData() deletes
@@ -453,16 +461,17 @@ class DexieDemoPersistence implements DemoPersistence {
     return payload.state;
   }
 
-  /**
-   * Row-shape migration hook, keyed on the application-level version in `meta`.
+  /*
+   * Row-shape migrations, keyed on the application-level version in `meta` and
+   * applied in order by `migrateStoredState` below.
    *
-   * `DEMO_SCHEMA_VERSION` is 1 and there is nothing to migrate yet, so this
-   * only re-stamps. When the shape of a slice changes incompatibly: bump
-   * `DEMO_SCHEMA_VERSION` in `demo-persistence.ts`, add a step below that
-   * transforms `state` from `fromVersion` upward, and leave the Dexie
+   * To add one: bump `DEMO_SCHEMA_VERSION` in `demo-persistence.ts`, add a step
+   * that transforms `state` from `fromVersion` upward, and leave the Dexie
    * `version(1)` block alone — the object stores are unaffected by a change of
-   * what is inside a value.
+   * what is inside a value. Read the old record *directly*; see the note on
+   * `readLegacyArray`.
    */
+
   /**
    * Schema 1 -> 2: the nested collection becomes portable rows.
    *
@@ -505,6 +514,76 @@ class DexieDemoPersistence implements DemoPersistence {
     return { ...state, collectionRows: toPortableRows(nested) };
   }
 
+  /**
+   * Read a nested slice that is no longer stored, from wherever it actually is.
+   *
+   * Two routes, and only one of them is on disk — the same pair the collection
+   * migration handles. The in-memory value is preferred because the localStorage
+   * import hands its state over *without persisting it*: `toRecordRows` writes
+   * only slices in `DEMO_SLICES`, and these are no longer in it, so a
+   * disk-only read would convert nothing and stamp the new version over a
+   * visitor who still had data.
+   */
+  private async readLegacyArray(
+    db: DemoDatabase,
+    key: string,
+    inMemory: unknown,
+  ): Promise<unknown[] | undefined> {
+    if (Array.isArray(inMemory)) return inMemory;
+    try {
+      const row = await db.records.get(key);
+      return Array.isArray(row?.value) ? row.value : undefined;
+    } catch (error) {
+      warnOnce(
+        `migrate-read-${key}`,
+        `Could not read the stored ${key} while migrating them to rows.`,
+        error,
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Schema 2 -> 3: wishlists, decks, trades and sealed product become rows.
+   *
+   * One step for all four rather than four bumps over the same records: they
+   * are converted by the same kind of pure function, they land in the same
+   * write, and a visitor should cross this boundary once.
+   */
+  private async migrateNestedPortfolio(
+    db: DemoDatabase,
+    state: Partial<PersistedDemoState>,
+  ): Promise<Partial<PersistedDemoState>> {
+    const [wishlists, decks, trades, sealed] = await Promise.all([
+      state.wishlistRows
+        ? undefined
+        : this.readLegacyArray(db, LEGACY_WISHLISTS_KEY, state.wishlists),
+      state.deckRows
+        ? undefined
+        : this.readLegacyArray(db, LEGACY_DECKS_KEY, state.decks),
+      state.tradeRows
+        ? undefined
+        : this.readLegacyArray(db, LEGACY_TRADES_KEY, state.trades),
+      state.sealedRows
+        ? undefined
+        : this.readLegacyArray(db, LEGACY_SEALED_KEY, state.sealed),
+    ]);
+
+    if (!wishlists && !decks && !trades && !sealed) return state;
+
+    const { toDeckRows, toSealedRows, toTradeRows, toWishlistRows } =
+      await import("./legacy-portfolio-rows");
+
+    const migrated = { ...state };
+    if (wishlists) {
+      migrated.wishlistRows = toWishlistRows(wishlists as DemoWishlist[]);
+    }
+    if (decks) migrated.deckRows = toDeckRows(decks as Deck[]);
+    if (trades) migrated.tradeRows = toTradeRows(trades as Trade[]);
+    if (sealed) migrated.sealedRows = toSealedRows(sealed as SealedProduct[]);
+    return migrated;
+  }
+
   private async migrateStoredState(
     db: DemoDatabase,
     state: Partial<PersistedDemoState>,
@@ -513,6 +592,9 @@ class DexieDemoPersistence implements DemoPersistence {
     let migrated = state;
     if (fromVersion < 2) {
       migrated = await this.migrateNestedCollection(db, migrated);
+    }
+    if (fromVersion < 3) {
+      migrated = await this.migrateNestedPortfolio(db, migrated);
     }
     try {
       await db.transaction("rw", db.records, db.meta, async () => {

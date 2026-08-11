@@ -254,14 +254,16 @@ test("resetDemo() drops stored state and restores the seed fixtures", async () =
   assert.ok(state.binders.length > 0);
   assert.ok(state.binders.every((binder) => binder.name !== "Old Collection"));
   assert.ok(state.wishlists.length > 0);
-  assert.equal(state.decks, DEMO_DECKS);
+  // Deep, not reference: the portfolio is a read model derived from the seeded
+  // rows now, so it is a fresh array that must still describe the same decks.
+  assert.deepEqual(state.decks, DEMO_DECKS);
 
   // Cleared first, then re-persisted from a clean baseline.
   assert.equal(fake.clears, 1);
   const written = allCommittedSlices(fake);
   assert.ok(written.includes("collectionRows"));
   assert.ok(written.includes("initialized"));
-  assert.ok(!written.includes("decks"));
+  assert.ok(!written.includes("deckRows"));
 });
 
 test("resetDemo() waits for a snapshot that is still in flight", async () => {
@@ -308,9 +310,9 @@ test("commits only the slices an action actually changed", async () => {
   assert.equal(fake.commits.length, 2);
   assert.deepEqual(committedSlices(fake.commits[1]), ["profile"]);
 
-  useDemoStore.getState().addWishlist("A Wishlist");
+  await useDemoStore.getState().addWishlist("A Wishlist");
   assert.equal(fake.commits.length, 3);
-  assert.deepEqual(committedSlices(fake.commits[2]), ["wishlists"]);
+  assert.deepEqual(committedSlices(fake.commits[2]), ["wishlistRows"]);
 
   useDemoStore.getState().updatePreferences({ showPricing: false });
   assert.equal(fake.commits.length, 4);
@@ -329,30 +331,30 @@ test("does not persist decks, trades or sealed until they are mutated", async ()
   assert.deepEqual(committedSlices(fake.commits[0]), [
     "collectionRows",
     "initialized",
-    "wishlists",
+    "wishlistRows",
   ]);
-  assert.equal(useDemoStore.getState().decks, DEMO_DECKS);
-  assert.equal(useDemoStore.getState().trades, DEMO_TRADES);
-  assert.equal(useDemoStore.getState().sealed, DEMO_SEALED_PRODUCTS);
+  assert.deepEqual(useDemoStore.getState().decks, DEMO_DECKS);
+  assert.deepEqual(useDemoStore.getState().trades, DEMO_TRADES);
+  assert.deepEqual(useDemoStore.getState().sealed, DEMO_SEALED_PRODUCTS);
 
   fake.commits.length = 0;
-  useDemoStore.getState().addDeck({
+  await useDemoStore.getState().addDeck({
     name: "Brew",
     tcg: "magic",
     format: "Modern",
   });
-  assert.deepEqual(committedSlices(fake.commits[0]), ["decks"]);
+  assert.deepEqual(committedSlices(fake.commits[0]), ["deckRows"]);
 
   fake.commits.length = 0;
-  useDemoStore.getState().addTrade({
+  await useDemoStore.getState().addTrade({
     partner: "Someone",
     giving: [],
     receiving: [],
   });
-  assert.deepEqual(committedSlices(fake.commits[0]), ["trades"]);
+  assert.deepEqual(committedSlices(fake.commits[0]), ["tradeRows"]);
 
   fake.commits.length = 0;
-  useDemoStore.getState().addSealedProduct({
+  await useDemoStore.getState().addSealedProduct({
     name: "Booster Box",
     tcg: "magic",
     type: "Booster Box",
@@ -361,7 +363,7 @@ test("does not persist decks, trades or sealed until they are mutated", async ()
     purchasePrice: 200,
     currentValue: 240,
   });
-  assert.deepEqual(committedSlices(fake.commits[0]), ["sealed"]);
+  assert.deepEqual(committedSlices(fake.commits[0]), ["sealedRows"]);
 });
 
 test("a mutated portfolio slice is restored on the next visit", async () => {
@@ -369,7 +371,7 @@ test("a mutated portfolio slice is restored on the next visit", async () => {
   setDemoPersistence(first);
   await whenDemoStoreHydrated();
   useDemoStore.getState().init();
-  useDemoStore.getState().addDeck({
+  await useDemoStore.getState().addDeck({
     name: "Persisted Brew",
     tcg: "magic",
     format: "Modern",

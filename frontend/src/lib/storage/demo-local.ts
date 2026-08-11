@@ -187,10 +187,14 @@ function looksLikeDemoState(value: Record<string, unknown>): boolean {
 const SLICE_READERS: Record<DemoSlice, (value: unknown) => unknown> = {
   profile: readProfile,
   preferences: readPreferences,
-  // The localStorage payload is schema 1 by definition: it predates rows, so
-  // it always carries `binders` and never `collectionRows`. The v1 -> v2
-  // migration converts what this reader imports.
+  // The localStorage payload is schema 1 by definition: it predates rows
+  // entirely, so it always carries the nested arrays and never a row slice.
+  // The v1 -> v2 and v2 -> v3 migrations convert what this reader imports.
   collectionRows: () => undefined,
+  wishlistRows: () => undefined,
+  deckRows: () => undefined,
+  tradeRows: () => undefined,
+  sealedRows: () => undefined,
   binders: readBinders,
   wishlists: readWishlists,
   decks: readDecks,

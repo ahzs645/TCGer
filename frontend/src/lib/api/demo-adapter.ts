@@ -662,13 +662,13 @@ async function handleGuides(
     const name =
       (body as { wishlistName?: string } | undefined)?.wishlistName?.trim() ||
       guide.title;
-    const wishlistId = store().addWishlist(
+    const wishlistId = await store().addWishlist(
       name,
       `Following the “${guide.title}” collection guide.`,
     );
     if (guide.rule.type === "manual") {
       for (const item of demoConnectedArtItems()) {
-        store().addCardToWishlist(
+        await store().addCardToWishlist(
           wishlistId,
           {
             id: item.externalId,
@@ -694,7 +694,7 @@ async function handleGuides(
         );
       }
     } else {
-      store().addWishlistRule(wishlistId, {
+      await store().addWishlistRule(wishlistId, {
         type: guide.rule.type,
         tcg: guide.rule.tcg,
         query: guide.rule.query,
@@ -954,7 +954,7 @@ async function handleWishlists(
       description?: string;
       colorHex?: string;
     };
-    const id = store().addWishlist(data.name, data.description);
+    const id = await store().addWishlist(data.name, data.description);
     const w = store().wishlists.find((wl: DemoWishlist) => wl.id === id)!;
     return json(toWishlist(w));
   }
@@ -980,7 +980,7 @@ async function handleWishlists(
 
   // DELETE /wishlists/:id
   if (segments.length === 1 && method === "DELETE") {
-    store().removeWishlist(wishlistId);
+    await store().removeWishlist(wishlistId);
     return noContent();
   }
 
@@ -998,7 +998,7 @@ async function handleWishlists(
       rarity: data.rarity || "Common",
       price: 0,
     };
-    store().addCardToWishlist(wishlistId, demoCard, data);
+    await store().addCardToWishlist(wishlistId, demoCard, data);
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
     )!;
@@ -1026,7 +1026,7 @@ async function handleWishlists(
         rarity: card.rarity || "Common",
         price: 0,
       };
-      store().addCardToWishlist(wishlistId, demoCard, card);
+      await store().addCardToWishlist(wishlistId, demoCard, card);
     }
     const w = store().wishlists.find(
       (wl: DemoWishlist) => wl.id === wishlistId,
@@ -1036,14 +1036,14 @@ async function handleWishlists(
 
   // DELETE /wishlists/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
-    store().removeCardFromWishlist(wishlistId, segments[2]);
+    await store().removeCardFromWishlist(wishlistId, segments[2]);
     return noContent();
   }
 
   // POST /wishlists/:id/rules
   if (segments[1] === "rules" && segments.length === 2 && method === "POST") {
     const data = body as CreateWishlistRuleInput;
-    const rule = store().addWishlistRule(wishlistId, {
+    const rule = await store().addWishlistRule(wishlistId, {
       type: data.type,
       tcg: data.tcg,
       query: data.query,
@@ -1058,13 +1058,17 @@ async function handleWishlists(
   // PATCH /wishlists/:id/rules/:ruleId
   if (segments[1] === "rules" && segments.length === 3 && method === "PATCH") {
     const data = body as UpdateWishlistRuleInput;
-    const rule = store().updateWishlistRule(wishlistId, segments[2], data);
+    const rule = await store().updateWishlistRule(
+      wishlistId,
+      segments[2],
+      data,
+    );
     return rule ? json(rule) : notFound("Wishlist rule not found");
   }
 
   // DELETE /wishlists/:id/rules/:ruleId
   if (segments[1] === "rules" && segments.length === 3 && method === "DELETE") {
-    store().removeWishlistRule(wishlistId, segments[2]);
+    await store().removeWishlistRule(wishlistId, segments[2]);
     return noContent();
   }
 

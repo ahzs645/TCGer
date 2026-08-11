@@ -18,9 +18,6 @@
  */
 
 import {
-  type BinderRow,
-  type CardRow,
-  type CollectionEntryRow,
   type NewRow,
   type PortableDb,
   type PortableIndexName,
@@ -33,14 +30,97 @@ import {
 } from "@tcg/api-types";
 
 /** Rows grouped by table — the shape the store keeps and persists. */
-export interface PortableSnapshot {
-  binders: BinderRow[];
-  collectionEntries: CollectionEntryRow[];
-  cards: CardRow[];
-}
+export type PortableSnapshot = {
+  [K in PortableTableName]: PortableTables[K][];
+};
+
+/**
+ * The tables each persisted slice owns.
+ *
+ * One store holds every table, because a mutation that spans two of them —
+ * deleting a wishlist and its cards — has to be one transaction, and a
+ * transaction cannot span two stores. Persistence is still split along these
+ * lines so editing a deck does not rewrite the collection: `demo-store.ts`
+ * commits one slice per group, and the groups are the unit of write.
+ */
+export const COLLECTION_TABLES = [
+  "binders",
+  "collectionEntries",
+  "cards",
+] as const;
+export const WISHLIST_TABLES = [
+  "wishlists",
+  "wishlistCards",
+  "wishlistRules",
+] as const;
+export const DECK_TABLES = ["decks", "deckCards"] as const;
+export const TRADE_TABLES = ["trades", "tradeCards"] as const;
+export const SEALED_TABLES = ["sealedInventory"] as const;
+
+export type CollectionSnapshot = Pick<
+  PortableSnapshot,
+  (typeof COLLECTION_TABLES)[number]
+>;
+export type WishlistSnapshot = Pick<
+  PortableSnapshot,
+  (typeof WISHLIST_TABLES)[number]
+>;
+export type DeckSnapshot = Pick<PortableSnapshot, (typeof DECK_TABLES)[number]>;
+export type TradeSnapshot = Pick<
+  PortableSnapshot,
+  (typeof TRADE_TABLES)[number]
+>;
+export type SealedSnapshot = Pick<
+  PortableSnapshot,
+  (typeof SEALED_TABLES)[number]
+>;
 
 export function emptySnapshot(): PortableSnapshot {
-  return { binders: [], collectionEntries: [], cards: [] };
+  return {
+    binders: [],
+    collectionEntries: [],
+    cards: [],
+    wishlists: [],
+    wishlistCards: [],
+    wishlistRules: [],
+    decks: [],
+    deckCards: [],
+    trades: [],
+    tradeCards: [],
+    sealedInventory: [],
+  };
+}
+
+/** The rows for one slice's tables, as a fresh object the store can publish. */
+export function rowsOf<K extends PortableTableName>(
+  snapshot: PortableSnapshot,
+  tables: readonly K[],
+): Pick<PortableSnapshot, K> {
+  const picked = {} as Pick<PortableSnapshot, K>;
+  for (const table of tables) picked[table] = snapshot[table];
+  return picked;
+}
+
+/**
+ * Overlay a stored slice onto a snapshot, taking only the arrays it should
+ * carry.
+ *
+ * Defensive on purpose: a slice read back from storage is whatever some
+ * previous release wrote, and a missing or non-array table has to leave the
+ * empty one in place rather than replace it with `undefined` — every read path
+ * below indexes straight into these arrays.
+ */
+export function overlayRows(
+  snapshot: PortableSnapshot,
+  slice: unknown,
+  tables: readonly PortableTableName[],
+): void {
+  if (!slice || typeof slice !== "object") return;
+  const source = slice as Record<string, unknown>;
+  for (const table of tables) {
+    const rows = source[table];
+    if (Array.isArray(rows)) snapshot[table] = rows as never;
+  }
 }
 
 /**
@@ -53,9 +133,11 @@ export type PortableCommitListener = (
 ) => void;
 
 const TABLES: readonly PortableTableName[] = [
-  "binders",
-  "collectionEntries",
-  "cards",
+  ...COLLECTION_TABLES,
+  ...WISHLIST_TABLES,
+  ...DECK_TABLES,
+  ...TRADE_TABLES,
+  ...SEALED_TABLES,
 ];
 
 /**
