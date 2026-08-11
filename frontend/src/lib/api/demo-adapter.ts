@@ -204,6 +204,7 @@ function toCollectionCard(
     quantity: card.quantity,
     condition: card.condition,
     price: card.price,
+    acquiredAt: card.addedAt,
     binderId,
     binderName,
     binderColorHex: stripHash(binderColor),

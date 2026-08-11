@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
 import {
   matchCatalogCards,
@@ -174,9 +175,29 @@ const CONDITIONS = [
   "Moderately Played",
   "Heavily Played",
 ];
-function randomCondition(): string {
-  return CONDITIONS[Math.floor(Math.random() * CONDITIONS.length)];
+
+/**
+ * The seed data is generated from a fixed seed so the demo collection is
+ * identical on every visit — quantities and conditions used to come from
+ * Math.random(), which made the dashboard totals drift between page loads.
+ */
+const DEMO_SEED = 2024;
+
+/** mulberry32 — a tiny deterministic PRNG returning floats in [0, 1). */
+function createRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
+
+/** Seeded cards are back-dated across this window so activity looks alive. */
+const DEMO_ACTIVITY_WINDOW_DAYS = 42;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const BINDER_COLORS = [
   "#3b82f6",
@@ -194,10 +215,21 @@ const BINDER_COLORS = [
 /* ------------------------------------------------------------------ */
 
 function seedBinders(): DemoBinder[] {
-  const now = new Date().toISOString();
+  const random = createRandom(DEMO_SEED);
+  const seededAt = Date.now();
+  const now = new Date(seededAt).toISOString();
+
+  // 1..max, drawn from the seeded stream instead of Math.random().
+  const pickQuantity = (max: number) => 1 + Math.floor(random() * max);
 
   const makeCard = (card: DemoCard, qty = 1): DemoBinderCard => {
-    const condition = randomCondition();
+    const condition = CONDITIONS[Math.floor(random() * CONDITIONS.length)];
+    // Back-date each card so Recent Activity reads as a feed rather than as a
+    // single bulk import stamped with today's date.
+    const addedAt = new Date(
+      seededAt - Math.floor(random() * DEMO_ACTIVITY_WINDOW_DAYS * DAY_MS),
+    ).toISOString();
+    const printing = splitSeedPrintingCode(card.setCode);
     return {
       id: uid(),
       cardId: card.id,
@@ -209,10 +241,32 @@ function seedBinders(): DemoBinder[] {
       condition,
       price: card.price,
       quantity: qty,
-      addedAt: now,
+      addedAt,
+      // Carrying the split printing code lets set completion match the seeded
+      // copies against exact printings instead of reporting 0/N.
+      cardData: {
+        externalId: card.id,
+        name: card.name,
+        tcg: card.tcg,
+        setCode: printing.setCode ?? card.setCode,
+        setName: card.setName,
+        rarity: card.rarity,
+        collectorNumber: printing.collectorNumber,
+      },
       copies: Array.from({ length: qty }, () =>
         makeDemoCopy({ condition, price: card.price }),
       ),
+    };
+  };
+
+  // A binder is only as old as its oldest card and as fresh as its newest.
+  const stampBinderDates = (binder: DemoBinder): DemoBinder => {
+    const added = binder.cards.map((card) => Date.parse(card.addedAt));
+    if (!added.length) return binder;
+    return {
+      ...binder,
+      createdAt: new Date(Math.min(...added)).toISOString(),
+      updatedAt: new Date(Math.max(...added)).toISOString(),
     };
   };
 
@@ -225,9 +279,7 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Main Deck",
       color: "#3b82f6",
-      cards: ygoCards
-        .slice(0, 6)
-        .map((c) => makeCard(c, Math.ceil(Math.random() * 3))),
+      cards: ygoCards.slice(0, 6).map((c) => makeCard(c, pickQuantity(3))),
       createdAt: now,
       updatedAt: now,
     },
@@ -235,9 +287,7 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Modern Staples",
       color: "#8b5cf6",
-      cards: mtgCards
-        .slice(0, 8)
-        .map((c) => makeCard(c, Math.ceil(Math.random() * 4))),
+      cards: mtgCards.slice(0, 8).map((c) => makeCard(c, pickQuantity(4))),
       createdAt: now,
       updatedAt: now,
     },
@@ -245,9 +295,7 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Scarlet & Violet",
       color: "#ef4444",
-      cards: pkmCards
-        .slice(0, 5)
-        .map((c) => makeCard(c, Math.ceil(Math.random() * 2))),
+      cards: pkmCards.slice(0, 5).map((c) => makeCard(c, pickQuantity(2))),
       createdAt: now,
       updatedAt: now,
     },
@@ -255,9 +303,7 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Staples",
       color: "#f59e0b",
-      cards: ygoCards
-        .slice(6, 12)
-        .map((c) => makeCard(c, Math.ceil(Math.random() * 3))),
+      cards: ygoCards.slice(6, 12).map((c) => makeCard(c, pickQuantity(3))),
       createdAt: now,
       updatedAt: now,
     },
@@ -273,13 +319,11 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Commander",
       color: "#6366f1",
-      cards: mtgCards
-        .slice(8, 15)
-        .map((c) => makeCard(c, Math.ceil(Math.random() * 2))),
+      cards: mtgCards.slice(8, 15).map((c) => makeCard(c, pickQuantity(2))),
       createdAt: now,
       updatedAt: now,
     },
-  ];
+  ].map(stampBinderDates);
 }
 
 function seedWishlists(): DemoWishlist[] {
@@ -1033,3 +1077,69 @@ export const useDemoStore = create<DemoState>()(
     },
   ),
 );
+
+/* ------------------------------------------------------------------ */
+/*  Collection totals                                                   */
+/* ------------------------------------------------------------------ */
+
+export interface DemoCollectionTotals {
+  /** Sum of every copy across every binder. */
+  totalCards: number;
+  /** Distinct card ids, however many copies of each are owned. */
+  uniqueCards: number;
+  /** Sum of price × quantity, rounded to cents. */
+  totalValue: number;
+}
+
+function collectionTotals(binders: DemoBinder[]): DemoCollectionTotals {
+  const unique = new Set<string>();
+  let totalCards = 0;
+  let totalValue = 0;
+  for (const binder of binders) {
+    for (const card of binder.cards) {
+      const quantity = Math.max(card.quantity ?? 0, 0);
+      unique.add(card.cardId);
+      totalCards += quantity;
+      totalValue += (card.price ?? 0) * quantity;
+    }
+  }
+  return {
+    totalCards,
+    uniqueCards: unique.size,
+    totalValue: Math.round(totalValue * 100) / 100,
+  };
+}
+
+let seedTotals: DemoCollectionTotals | null = null;
+
+/** Totals for the untouched seed collection — computed once, never changes. */
+function seedCollectionTotals(): DemoCollectionTotals {
+  if (!seedTotals) seedTotals = collectionTotals(seedBinders());
+  return seedTotals;
+}
+
+/**
+ * Aggregate totals for the demo collection.
+ *
+ * Safe to call from a client component during render: it reads the live store
+ * once the demo has been initialised, and otherwise reports the fixed-seed
+ * starting collection without mutating the store.
+ */
+export function getDemoCollectionTotals(): DemoCollectionTotals {
+  const { initialized, binders } = useDemoStore.getState();
+  return initialized ? collectionTotals(binders) : seedCollectionTotals();
+}
+
+/**
+ * Reactive variant of {@link getDemoCollectionTotals} — re-renders the caller
+ * whenever the demo collection changes.
+ */
+export function useDemoCollectionTotals(): DemoCollectionTotals {
+  return useDemoStore(
+    useShallow((state) =>
+      state.initialized
+        ? collectionTotals(state.binders)
+        : seedCollectionTotals(),
+    ),
+  );
+}
