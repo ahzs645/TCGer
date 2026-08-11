@@ -15,7 +15,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isEntityId } from "@tcg/api-types";
 import {
   DEMO_DECKS,
   DEMO_SEALED_PRODUCTS,
@@ -167,19 +166,23 @@ test("ids that already exist are preserved, never re-minted", () => {
   );
 });
 
-test("rows that never had an id get a promotion-safe one", () => {
-  // Deck and trade cards are positional value objects in the shipped shape;
-  // there is nothing to preserve, so they are minted rather than invented.
-  const deckCards = toDeckRows(DEMO_DECKS).deckCards;
-  assert.ok(deckCards.length > 0);
-  assert.ok(deckCards.every((row) => isEntityId(row._id)));
+test("rows that never had an id get a stable derived one", () => {
+  // Deck and trade cards are positional value objects in the shipped shape, so
+  // there is nothing to preserve — but the id still has to be the same on every
+  // boot, because these lists are re-converted from the fixtures each time.
+  const first = toDeckRows(DEMO_DECKS).deckCards.map((row) => row._id);
+  const second = toDeckRows(DEMO_DECKS).deckCards.map((row) => row._id);
+  assert.ok(first.length > 0);
+  assert.deepEqual(first, second);
+  assert.equal(new Set(first).size, first.length);
+  assert.equal(first[0], `${DEMO_DECKS[0].id}:card:0`);
 
-  const tradeCards = toTradeRows(DEMO_TRADES).tradeCards;
-  assert.ok(tradeCards.length > 0);
-  assert.ok(tradeCards.every((row) => isEntityId(row._id)));
-  assert.equal(
-    new Set(tradeCards.map((row) => row._id)).size,
-    tradeCards.length,
+  // Both sides of a trade share a parent, so the side is part of the id.
+  const tradeCards = toTradeRows(DEMO_TRADES).tradeCards.map((row) => row._id);
+  assert.equal(new Set(tradeCards).size, tradeCards.length);
+  assert.deepEqual(
+    toTradeRows(DEMO_TRADES).tradeCards.map((row) => row._id),
+    tradeCards,
   );
 });
 

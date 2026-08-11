@@ -27,17 +27,16 @@
  *    older than anything `insert()` will mint later.
  */
 
-import {
-  entityId,
-  type DeckCardRow,
-  type DeckRow,
-  type SealedInventoryRow,
-  type TradeCardRow,
-  type TradeRow,
-  type WishlistCardRow,
-  type WishlistRow,
-  type WishlistRuleRow,
-  type AddWishlistCardInput,
+import type {
+  DeckCardRow,
+  DeckRow,
+  SealedInventoryRow,
+  TradeCardRow,
+  TradeRow,
+  WishlistCardRow,
+  WishlistRow,
+  WishlistRuleRow,
+  AddWishlistCardInput,
 } from "@tcg/api-types";
 import type {
   DeckSnapshot,
@@ -122,6 +121,22 @@ function descendingAt(now: number, index: number): number {
 }
 
 const DEFAULT_COLOR = "#3b82f6";
+
+/**
+ * The row id for a child that had none in the shipped shape.
+ *
+ * Deck cards and trade cards are positional value objects — `{ name, quantity,
+ * rarity, type }`, no id anywhere — so there is nothing to preserve. Derived
+ * from the parent and the position rather than minted with `entityId()`, for
+ * the same reason `cardRowId` is deterministic in the collection conversion:
+ * these lists are re-converted from the fixtures on every boot, and a minted id
+ * would make the same seeded card a different row each time. Nothing mutates a
+ * child list in place today; a child added later goes through `insert()` and
+ * gets a minted id like every other locally created row.
+ */
+function childRowId(parentId: string, kind: string, index: number): string {
+  return `${parentId}:${kind}:${index}`;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Wishlists                                                          */
@@ -312,12 +327,11 @@ export function toDemoWishlists(rows: WishlistSnapshot): DemoWishlist[] {
 function deckCardRow(
   card: DeckCard,
   deckId: string,
+  index: number,
   creationTime: number,
 ): DeckCardRow {
   return {
-    // Deck cards are positional value objects in the shipped shape — they have
-    // no id to preserve, so this is the one place a new one is minted.
-    _id: entityId(),
+    _id: childRowId(deckId, "card", index),
     _creationTime: creationTime,
     deckId,
     name: card.name,
@@ -348,9 +362,9 @@ export function toDeckRows(decks: Deck[], now = Date.now()): DeckSnapshot {
       createdAt: creationTime,
       updatedAt: updated,
     });
-    for (const card of deck.cards) {
-      cardRows.push(deckCardRow(card, deck.id, creationTime));
-    }
+    deck.cards.forEach((card, position) => {
+      cardRows.push(deckCardRow(card, deck.id, position, creationTime));
+    });
   });
 
   return { decks: deckRows, deckCards: cardRows };
@@ -393,10 +407,11 @@ function tradeCardRow(
   card: TradeCard,
   tradeId: string,
   side: TradeCardRow["side"],
+  index: number,
   creationTime: number,
 ): TradeCardRow {
   return {
-    _id: entityId(),
+    _id: childRowId(tradeId, side, index),
     _creationTime: creationTime,
     tradeId,
     side,
@@ -423,12 +438,16 @@ export function toTradeRows(trades: Trade[], now = Date.now()): TradeSnapshot {
       createdAt: creationTime,
       updatedAt: creationTime,
     });
-    for (const card of trade.giving) {
-      cardRows.push(tradeCardRow(card, trade.id, "giving", creationTime));
-    }
-    for (const card of trade.receiving) {
-      cardRows.push(tradeCardRow(card, trade.id, "receiving", creationTime));
-    }
+    trade.giving.forEach((card, position) => {
+      cardRows.push(
+        tradeCardRow(card, trade.id, "giving", position, creationTime),
+      );
+    });
+    trade.receiving.forEach((card, position) => {
+      cardRows.push(
+        tradeCardRow(card, trade.id, "receiving", position, creationTime),
+      );
+    });
   });
 
   return { trades: tradeRows, tradeCards: cardRows };

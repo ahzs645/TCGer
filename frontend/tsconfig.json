@@ -23,10 +23,10 @@
         "./src/*"
       ],
       "@tcg/api-types": [
-        "../packages/api-types/dist/index.d.ts"
+        "../packages/api-types/dist/index"
       ],
       "@tcg/api-types/*": [
-        "../packages/api-types/dist/*.d.ts"
+        "../packages/api-types/dist/*"
       ]
     },
     "plugins": [

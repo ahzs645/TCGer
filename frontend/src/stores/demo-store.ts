@@ -246,6 +246,13 @@ function seedPortfolio() {
  * The portfolio is present from the first tick rather than waiting for
  * `init()`, because its pages render straight off the store and used to show
  * the fixtures immediately.
+ *
+ * This runs at *module evaluation*, which is why the conversions it calls are
+ * pure local code: under the Next bundler the `@tcg/api-types` namespace is not
+ * populated yet at this point in the graph, and calling into it here fails with
+ * a bare "is not a function" that no unit test reproduces (node resolves the
+ * package eagerly). `demo-db.ts` states the same rule for itself. Anything
+ * needing `entityId()` has to wait until a mutation.
  */
 function initialSnapshot(): PortableSnapshot {
   const portfolio = seedPortfolio();

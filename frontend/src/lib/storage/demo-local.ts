@@ -247,7 +247,11 @@ function readDecks(value: unknown): Deck[] | undefined {
   if (!rows) return undefined;
   return rows.map((row) => ({
     ...row,
-    cards: readIdentifiedRows(row.cards) ?? [],
+    // Deck cards carry no `id` — they are `{ name, quantity, rarity, type }`
+    // and nothing addresses them individually — so requiring one dropped every
+    // card of every imported deck. Binder and wishlist cards genuinely are
+    // keyed by id, which is why they still go through `readIdentifiedRows`.
+    cards: asObjectArray(row.cards),
   })) as unknown as Deck[];
 }
 
