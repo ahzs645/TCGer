@@ -735,3 +735,53 @@ defensible; picking accidentally is not.
 | `convex-backend/convex/lib/library.ts` | 845 | Server-side entry/copy semantics |
 | `convex-backend/convex/http.ts` + `bridge.ts` | 2,216 + 2,604 | The Express↔Convex HTTP bridge |
 | `.github/workflows/pages.yml` | — | Static demo build + file assertions |
+
+---
+
+## 8. Stage 5 revisited — the prerequisite, verified
+
+Added after Stages 0–3 shipped and Stage 4 was implemented (see
+`docs/stage4-shared-collection-semantics.md` §9). Stage 4's analysis found that
+§4's *scoping* of Stage 4 named the wrong pair of functions, so Stage 5's
+"not recommended" was re-checked against the code rather than inherited.
+
+**The verdict stands, and the blocker is larger than §4 stated.**
+
+What §4 got wrong, in Stage 5's favour: the browser is **already** connected to
+Convex. `frontend/src/components/providers/convex-client-provider.tsx:71`
+constructs a `ConvexReactClient` and `convex` is a direct frontend dependency.
+So "prerequisite-blocked on the browser talking to Convex directly" is too
+strong as written — the connection exists.
+
+What it is used for, though, is **auth only** (`ConvexBetterAuthProvider`). A
+repo-wide search for `useQuery(api.`, `useMutation(api.`, `useAction(api.` and
+`useConvex()` across `frontend/src` and `frontend/app` returns **nothing**.
+Every byte of application data still goes REST → Express → Convex HTTP →
+`bridge.ts`.
+
+What removing Express from the browser's path would actually cost: even with
+`BACKEND_MODE=convex`, only some routers are swapped for Convex proxies
+(collections, wishlists, decks, finance, sealed, analytics, trades, guides —
+`backend/src/api/routes/index.ts:23-110`). The rest are still real Express
+implementations with no Convex counterpart, and the browser calls them:
+
+| Router | Lines | What it does |
+|---|---|---|
+| `scan.router.ts` + `modules/card-scan/` | 587 + 5,397 | card scanning |
+| `cards.router.ts` | 105 | external card-API proxying |
+| `users`, `settings`, `prices`, `shops`, `alerts`, `automations`, `shipments`, `news`, `setup` | ~300 | assorted |
+
+Against ~32.5k lines of Express source in total. Stage 5 is therefore not "write
+the handlers once and adapt them" — it is a port of the card-scan pipeline and a
+dozen routers into Convex or into the browser, on top of the auth, pricing
+enrichment and `hybrid`-mode changes §4 already listed.
+
+**And the goal it was meant to serve has been met another way.** Stage 5 existed
+to stop the demo and the server implementing the same rules differently. That is
+now done by `packages/api-types/src/collection-semantics.ts` — a fixture table
+driven by a harness on each side — at roughly 500 lines, no change to the
+authenticated path, and no architecture change at all. Reverting any single rule
+fix turns exactly one fixture red.
+
+Stage 5 should be reopened only if the browser starts making real Convex data
+calls for its own reasons. It is not worth doing for the demo.
