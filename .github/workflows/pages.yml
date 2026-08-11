@@ -57,6 +57,12 @@ jobs:
           fi
           npm --prefix marketing-site run build -- --base "$BASE_PATH"
 
+      - name: Create static legal and support routes
+        run: |
+          mkdir -p marketing-site/dist/privacy marketing-site/dist/support
+          cp marketing-site/dist/index.html marketing-site/dist/privacy/index.html
+          cp marketing-site/dist/index.html marketing-site/dist/support/index.html
+
       - name: Build Starlight docs
         run: |
           BASE_PATH="${{ steps.pages.outputs.base_path }}"
@@ -100,6 +106,8 @@ jobs:
 
       - name: Verify demo runtime files
         run: |
+          test -f marketing-site/dist/privacy/index.html
+          test -f marketing-site/dist/support/index.html
           test -f marketing-site/dist/manifest.webmanifest
           test -f marketing-site/dist/pwa-192.png
           test -f marketing-site/dist/pwa-512.png
