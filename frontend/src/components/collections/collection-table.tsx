@@ -108,19 +108,21 @@ export function CollectionTable() {
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const token = useAuthStore((state) => state.token);
   const { collections, addCollection, removeCollection, updateCollectionCard } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      addCollection: state.addCollection,
-      removeCollection: state.removeCollection,
-      updateCollectionCard: state.updateCollectionCard,
-    })));
-  const { enabledGames, showPricing, showCardNumbers } = useModuleStore(useShallow(
-    (state) => ({
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        addCollection: state.addCollection,
+        removeCollection: state.removeCollection,
+        updateCollectionCard: state.updateCollectionCard,
+      })),
+    );
+  const { enabledGames, showPricing, showCardNumbers } = useModuleStore(
+    useShallow((state) => ({
       enabledGames: state.enabledGames,
       showPricing: state.showPricing,
       showCardNumbers: state.showCardNumbers,
-    }),
-  ));
+    })),
+  );
   const [activeCollectionId, setActiveCollectionId] = useState<string>(
     collections.length ? ALL_COLLECTION_ID : "",
   );
@@ -158,6 +160,11 @@ export function CollectionTable() {
     }
     await updateCollectionCard(token, fromBinderId, cardId, {
       targetBinderId: toBinderId,
+      // This moves a card, not one of its copies. Without the explicit scope
+      // the request is identical to the sandbox's move-a-copy — the card's id
+      // in the grouped response *is* its first copy's id — so a three-copy
+      // card moved one copy and left two behind.
+      scope: "card",
     });
   };
 
@@ -1028,9 +1035,7 @@ function CardDetailsPanel({
       selectedCopy.finishCode ?? (selectedCopy.isFoil ? "foil" : "");
     if (finishCode !== originalFinishCode) {
       updates.finishCode = finishCode || null;
-      updates.finishLabel = finishCode
-        ? formatFinishLabel(finishCode)
-        : null;
+      updates.finishLabel = finishCode ? formatFinishLabel(finishCode) : null;
       updates.isFoil = isFoilFinish(finishCode);
     }
     if (edition !== (selectedCopy.edition ?? "")) {
@@ -1634,10 +1639,7 @@ function CardDetailsPanel({
                             Not specified
                           </SelectItem>
                           {finishChoices.map((finish) => (
-                            <SelectItem
-                              key={finish.code}
-                              value={finish.code}
-                            >
+                            <SelectItem key={finish.code} value={finish.code}>
                               {finish.label}
                             </SelectItem>
                           ))}

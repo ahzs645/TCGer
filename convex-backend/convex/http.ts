@@ -2054,6 +2054,8 @@ http.route({
           subject: identity.subject,
           entryId: asCollectionEntryId(segments[2]),
           binderId: targetBinderId,
+          // Omitted means "copy", the behaviour this endpoint has always had.
+          scope: body.scope === "card" ? "card" : undefined,
           quantity: typeof body.quantity === "number" ? body.quantity : undefined,
           condition:
             typeof body.condition === "string" || body.condition === null

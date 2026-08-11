@@ -110,6 +110,8 @@ export type UpdateFields = {
 } & {
   quantity?: number;
   targetBinderId?: string;
+  /** See `updateCardSchema.scope`. Defaults to moving the addressed copy. */
+  scope?: "card" | "copy";
 };
 
 export class CollectionRuleError extends Error {
@@ -327,11 +329,27 @@ export async function updateEntry(
       }
     }
 
+    const movingBinder = targetBinderId !== entry.binderId;
+    // A card-scoped move takes the whole group with it. Collected before the
+    // patch, while the entries are all still in the source binder.
+    const alsoMoving =
+      movingBinder && updates.scope === "card"
+        ? (await groupEntries(db, entry.binderId, entry.cardId)).filter(
+            (row) => row._id !== args.entryId,
+          )
+        : [];
+
     await db.patch("collectionEntries", args.entryId, {
       ...applyUpdate(entry, updates, now),
       binderId: targetBinderId,
       quantity: 1,
     });
+    for (const row of alsoMoving) {
+      await db.patch("collectionEntries", row._id, {
+        binderId: targetBinderId,
+        updatedAt: now,
+      });
+    }
 
     const group = await groupEntries(db, targetBinderId, entry.cardId);
     const current = group.reduce((sum, row) => sum + row.quantity, 0);

@@ -258,6 +258,45 @@ export const COLLECTION_SEMANTICS_CASES: CollectionSemanticsCase[] = [
     ],
   },
   {
+    id: "card-scoped-move-relocates-the-whole-group",
+    description:
+      "scope: 'card' moves every copy. Without it the collection table's " +
+      "'move card' moved one copy of a three-copy card, because the request " +
+      "was indistinguishable from the sandbox's 'move copy'.",
+    needsSecondBinder: true,
+    seed: [{ quantity: 3, cardData: COUNTERSPELL }],
+    action: {
+      kind: "patch",
+      target: "copy0",
+      body: { targetBinderId: SECONDARY_BINDER_TOKEN, scope: "card" },
+    },
+    expect: [
+      {
+        binder: "primary",
+        externalId: COUNTERSPELL.externalId,
+        quantity: null,
+      },
+      { binder: "secondary", externalId: COUNTERSPELL.externalId, quantity: 3 },
+    ],
+  },
+  {
+    id: "copy-scoped-move-is-the-default",
+    description:
+      "An explicit scope: 'copy' behaves exactly as an omitted scope does, so " +
+      "the new field cannot change what existing clients get.",
+    needsSecondBinder: true,
+    seed: [{ quantity: 3, cardData: COUNTERSPELL }],
+    action: {
+      kind: "patch",
+      target: "copy0",
+      body: { targetBinderId: SECONDARY_BINDER_TOKEN, scope: "copy" },
+    },
+    expect: [
+      { binder: "primary", externalId: COUNTERSPELL.externalId, quantity: 2 },
+      { binder: "secondary", externalId: COUNTERSPELL.externalId, quantity: 1 },
+    ],
+  },
+  {
     id: "move-the-only-copy-empties-the-source",
     description:
       "Moving the last copy leaves no trace of the card in the source binder.",

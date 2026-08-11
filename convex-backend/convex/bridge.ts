@@ -1431,6 +1431,7 @@ export const updateEntry = internalMutation({
     subject: v.string(),
     entryId: v.id("collectionEntries"),
     binderId: v.optional(v.id("binders")),
+    scope: v.optional(v.union(v.literal("card"), v.literal("copy"))),
     quantity: v.optional(v.number()),
     condition: v.optional(nullableString),
     language: v.optional(nullableString),
@@ -1489,6 +1490,8 @@ export const updateEntry = internalMutation({
     }
 
     const targetBinderId = args.binderId ?? entry.binderId;
+    const movesWholeCard =
+      args.scope === "card" && targetBinderId !== entry.binderId;
     const isGroupMutation =
       args.quantity !== undefined ||
       args.cardOverride !== undefined ||
@@ -1530,6 +1533,13 @@ export const updateEntry = internalMutation({
     }
 
     const timestamp = now();
+    // A card-scoped move takes the rest of the group with it. Read before the
+    // patch below, while every copy is still in the source binder.
+    const groupToMove = movesWholeCard
+      ? (await getGroupEntries(ctx, viewer._id, entry.binderId, entry.cardId)).filter(
+          (groupEntry) => groupEntry._id !== entry._id
+        )
+      : [];
     await ctx.db.patch(entry._id, {
       binderId: targetBinderId,
       quantity: 1,
@@ -1582,6 +1592,13 @@ export const updateEntry = internalMutation({
           colorHex: tag.colorHex ?? "64748b"
         }))
       );
+    }
+
+    for (const groupEntry of groupToMove) {
+      await ctx.db.patch(groupEntry._id, {
+        binderId: targetBinderId,
+        updatedAt: timestamp
+      });
     }
 
     const refreshed = await requireEntryForUser(ctx, entry._id, viewer._id);
