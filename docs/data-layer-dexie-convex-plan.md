@@ -776,12 +776,83 @@ the handlers once and adapt them" — it is a port of the card-scan pipeline and
 dozen routers into Convex or into the browser, on top of the auth, pricing
 enrichment and `hybrid`-mode changes §4 already listed.
 
-**And the goal it was meant to serve has been met another way.** Stage 5 existed
-to stop the demo and the server implementing the same rules differently. That is
-now done by `packages/api-types/src/collection-semantics.ts` — a fixture table
-driven by a harness on each side — at roughly 500 lines, no change to the
-authenticated path, and no architecture change at all. Reverting any single rule
-fix turns exactly one fixture red.
+The facts above are correct. **The conclusion drawn from them was wrong — see
+§9.**
 
-Stage 5 should be reopened only if the browser starts making real Convex data
-calls for its own reasons. It is not worth doing for the demo.
+---
+
+## 9. Correction: §8 answered the wrong question
+
+§8 concluded that Stage 5 was not worth doing because its goal — stopping the
+demo and the server implementing the same rules differently — had been met by
+the fixture table. That framing of the goal came from §4 and was never checked
+against the product's actual intent, which is **one application over two
+interchangeable storage runtimes**: a local one for on-device / PWA / desktop
+use, and Convex for the hosted site. That is societyer's pattern exactly — pick
+a runtime at startup, no sync engine between them.
+
+Under that goal, three things in §8 and in
+`docs/stage4-shared-collection-semantics.md` are wrong:
+
+**1. Stage 5 does not require the browser to talk to Convex directly.** §4 says
+it is "prerequisite-blocked" on removing the Express bridge from the browser's
+path, and §8 went further and costed that removal (card-scan, a dozen routers).
+That is societyer's *deployment topology*, not a requirement of a portable
+`ctx.db`. A storage-agnostic handler runs in two places without either of them
+moving:
+
+- **hosted** — inside Convex, reached through Express exactly as today;
+- **local** — inside the browser over Dexie, with no server in the picture.
+
+The Express bridge never has to move for Stage 5 to pay off. The blocker §4
+recorded, and that §8 elaborated at length, does not exist for this purpose.
+
+**2. "The demo is resettable fixture data" is false.** This is the load-bearing
+argument in `stage4-shared-collection-semantics.md` §7.3 — that a bug in
+`bridge.ts` costs a real user their collection while a bug in `demo-store.ts`
+costs a visitor a page reload. In on-device / PWA / desktop mode the local
+runtime *is* the user's only copy. The demo store is not fixture data; it is an
+unfinished first draft of that runtime.
+
+**3. There are five implementations, not four.** §2 of the Stage 4 document
+counts four and never counts the one that most disproves its own conclusion:
+`mobile-apps/ios/TCGer/TCGer/Services/APIService.swift` defines `LocalStore`,
+**2,447 lines**, reached through 104 `isOnDevice` branches, whose own comment
+reads *"True when the app runs entirely on this phone with no backend server."*
+It implements `getCollections`, `createCollection`, `searchCards`, `getSets`,
+`previewImport`, `commitImport`, `exportCollections`, binder pages and tags —
+the same surface again, by hand, in a third language.
+
+So the pattern this plan calls "not recommended" is **already shipped on iOS**,
+and the web half of it is already half-built and called "the demo"
+(`demo-store.ts` + `demo-adapter.ts`, 3,285 lines). The web also already carries
+`public/manifest.webmanifest`, `public/sw.js` and a single-user mode. The
+question was never whether to adopt this architecture; it is that the codebase
+adopted it three times without a shared contract.
+
+The Stage 4 document predicted this reversal in its own "What would change my
+mind": *"If the demo stops being a demo … the asymmetry disappears, and option
+(c)'s normalisation becomes prerequisite work rather than optional cleanup."*
+That condition was already true when §8 was written. It was not checked.
+
+### What the corrected sequencing looks like
+
+The fixture table is not wasted — it becomes the safety net for the rest, and is
+the seed of Stage 5's differential harness. On top of it:
+
+1. **Define the bounded storage contract**, scoped to collections first — the
+   `ctx.db` subset the rules actually use (`get`, `query…withIndex`, `insert`,
+   `patch`, `delete`).
+2. **Normalise the local store to the row model** (Stage 4 option (c)). Now
+   prerequisite work, not optional cleanup: `binders[].cards[].copies[]` cannot
+   back the contract. Carries a v1→v2 demo migration; see §6 of the Stage 4
+   document for the population hazards.
+3. **Extract the rules over the contract** (Stage 4 option (b)), and have both
+   `bridge.ts` and the local runtime call them.
+4. **Promote the fixture table to a differential harness** — same operations,
+   both runtimes, diff the results.
+
+Order matters: 1 and 2 are prerequisites for 3, and 4 is what makes 3 safe to
+land. Steps 2 and 3 touch stored user data and the authenticated path
+respectively, which is where the risk in this plan actually lives — not in the
+Express bridge.
