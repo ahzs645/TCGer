@@ -1219,7 +1219,9 @@ export function CollectionView() {
             >
               <div data-oid="w7vue49">
                 <CardTitle data-oid="bvy.w40">Collection overview</CardTitle>
-                <CardDescription data-oid=".nj0f9u">
+                {/* Desktop-only hint: the inspector panel it refers to is
+                    `hidden lg:block`, and below lg a tap opens the drawer. */}
+                <CardDescription className="hidden lg:block" data-oid=".nj0f9u">
                   Select a row to inspect individual copies.
                 </CardDescription>
               </div>
@@ -1257,7 +1259,10 @@ export function CollectionView() {
                   ? "Loading…"
                   : `${filteredCards.length} card row${filteredCards.length === 1 ? "" : "s"}`}
               </span>
-              <span data-oid="xoowgdd">
+              <span
+                className={cn(!selectedCard && "hidden lg:inline")}
+                data-oid="xoowgdd"
+              >
                 {selectedCard
                   ? `Binder: ${selectedCard.binderName ?? "Unsorted"}`
                   : "Select a row to edit"}
@@ -1299,7 +1304,13 @@ export function CollectionView() {
                       >
                         <button
                           type="button"
-                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted"
+                          aria-expanded={Boolean(expanded)}
+                          aria-label={
+                            expanded
+                              ? `Collapse ${card.name}`
+                              : `Expand ${card.name}`
+                          }
+                          className="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleRowExpansion(card.id);
@@ -1471,7 +1482,13 @@ export function CollectionView() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 rounded-full"
+                              aria-expanded={Boolean(expanded)}
+                              aria-label={
+                                expanded
+                                  ? `Collapse ${card.name}`
+                                  : `Expand ${card.name}`
+                              }
+                              className="relative h-8 w-8 rounded-full before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 toggleRowExpansion(card.id);

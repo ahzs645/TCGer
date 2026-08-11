@@ -204,6 +204,7 @@ export function BinderList({
                           e.stopPropagation();
                           onEditBinder(binder.id);
                         }}
+                        aria-label={`Edit binder ${binder.name}`}
                         data-oid="4l88yds"
                       >
                         <Pencil className="h-3 w-3" data-oid="me3v8pd" />
@@ -216,6 +217,7 @@ export function BinderList({
                           e.stopPropagation();
                           onEditBinderColor(binder.id);
                         }}
+                        aria-label={`Change color of binder ${binder.name}`}
                         data-oid=":em9fw4"
                       >
                         <Palette className="h-3 w-3" data-oid="18-t3lp" />
