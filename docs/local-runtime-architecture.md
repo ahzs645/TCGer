@@ -190,6 +190,29 @@ exactly one case red.
 This is what makes the switchover in §7 safe to attempt — the specification is
 executable before the implementation moves.
 
+## 6a. How this was verified
+
+The demo ships as a **static export** to GitHub Pages (`npm run build:demo`,
+`output: 'export'`), so a dev-server-only check would not have covered the
+artifact that actually deploys. Both were run.
+
+| Suite | Dev server | Static export |
+|---|---|---|
+| storage + both migration routes (11 checks) | pass | pass |
+| schema 1 → 2 against a seeded v1 database (6 checks) | pass | pass |
+| interface regression (33 checks) | pass | — |
+| unit / convex | 56 / 51 | — |
+
+The two migration routes are the ones worth re-running after any change here:
+a seeded schema 1 Dexie database, and a `tcg-demo-store` localStorage payload.
+Harnesses live in the session scratchpad rather than the repo — they drive a
+real browser through Playwright and are not part of CI.
+
+Note on the fetch interceptor: every browser suite exercises it, because demo
+mode answers *all* API calls through `maybeHandleDemoFetch` →
+`handleDemoRequest`. There is no separate coverage of the URL-matching itself,
+but no UI screen renders without it.
+
 ## 7. What is not done
 
 **The Convex adapter.** `bridge.ts` still has its own copy of the rules. The
