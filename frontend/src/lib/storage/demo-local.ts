@@ -13,6 +13,7 @@
  * Nothing here throws. Callers treat `null` as "no legacy data" and carry on.
  */
 
+import { DEMO_STORE_STORAGE_KEY } from "./keys";
 import type {
   DemoBinder,
   DemoProfile,
@@ -27,11 +28,12 @@ import type { DemoSlice, PersistedDemoState } from "./demo-persistence";
  *
  * TODO(keys): this belongs in the persistence-key registry
  * (`frontend/src/lib/storage/keys.ts`, Stage 0 of the data-layer plan) and
- * should be imported from there once that module lands. It is a literal here on
- * purpose: the registry is being written in parallel and importing it now would
- * couple two in-flight changes to each other.
+ * Re-exported from the storage registry so there is exactly one definition of
+ * this string in the tree — a second literal here is precisely the drift the
+ * registry exists to prevent, and a mismatch would make clearAllLocalData()
+ * silently miss the key.
  */
-export const LEGACY_DEMO_STORAGE_KEY = "tcg-demo-store";
+export const LEGACY_DEMO_STORAGE_KEY = DEMO_STORE_STORAGE_KEY;
 
 export interface LegacyDemoPayload {
   /** Only the slices that parsed AND validated. Never empty. */

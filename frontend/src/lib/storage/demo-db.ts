@@ -38,9 +38,11 @@ import {
   type PersistedDemoState,
 } from "./demo-persistence";
 import { readLegacyDemoState, removeLegacyDemoState } from "./demo-local";
+import { DEMO_DB_NAME } from "./keys";
 
-/** IndexedDB database name. Sits alongside `tcger-catalog` / `tcger-scan-cache`. */
-const DEMO_DB_NAME = "tcger-demo";
+// Database name comes from the storage registry: clearAllLocalData() deletes
+// whatever the registry lists, so a local literal that drifted would leave this
+// database behind on a "reset local data".
 
 /** `meta` row holding the application-level schema version (see below). */
 const META_SCHEMA_VERSION_KEY = "schemaVersion";
