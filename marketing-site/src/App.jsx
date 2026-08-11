@@ -6,6 +6,8 @@ const API_DOCS = `${BASE}api/docs/`;
 const PRODUCT_DOCS = `${BASE}docs/`;
 const DEMO = `${BASE}demo/`;
 const GH = "https://github.com/ahzs645/TCGer";
+const PRIVACY = `${BASE}privacy/`;
+const SUPPORT = `${BASE}support/`;
 
 function getTheme() {
   if (typeof window === "undefined") return "dark";
@@ -14,6 +16,17 @@ function getTheme() {
     if (s === "light" || s === "dark") return s;
   } catch {}
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getLegalPage() {
+  if (typeof window === "undefined") return null;
+  const basePath = BASE === "/" ? "" : BASE.replace(/\/$/, "");
+  const path = window.location.pathname
+    .replace(basePath, "")
+    .replace(/\/+$/, "") || "/";
+  if (path === "/privacy") return "privacy";
+  if (path === "/support") return "support";
+  return null;
 }
 
 const NAV = [
@@ -130,6 +143,185 @@ function Icon({ name, size = 22 }) {
   return <svg {...p}>{icons[name]}</svg>;
 }
 
+function LegalPage({ page, theme, setTheme }) {
+  const isPrivacy = page === "privacy";
+
+  return (
+    <div className="legal-shell">
+      <header className="legal-header">
+        <a className="logo" href={BASE}>
+          <span className="logo-icon"><img src={`${BASE}logo.svg`} alt="" /></span>
+          <span className="logo-name">TCGer</span>
+        </a>
+        <nav className="legal-nav" aria-label="Legal and support navigation">
+          <a aria-current={isPrivacy ? "page" : undefined} href={PRIVACY}>Privacy</a>
+          <a aria-current={!isPrivacy ? "page" : undefined} href={SUPPORT}>Support</a>
+          <button className="theme-btn" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} aria-label="Toggle theme">
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={15} />
+          </button>
+        </nav>
+      </header>
+
+      <main className="legal-main">
+        <a className="legal-back" href={BASE}>← Back to TCGer</a>
+        <div className="legal-kicker">{isPrivacy ? "Privacy" : "Help & Support"}</div>
+        <h1>{isPrivacy ? "Privacy Policy" : "TCGer Support"}</h1>
+        <p className="legal-lede">
+          {isPrivacy
+            ? "TCGer is designed to keep your collection under your control. Phone-only mode stores collection data on your device; server mode connects only to the server you choose."
+            : "Get help with phone-only collections, self-hosted server connections, scanning, account access, and data deletion."}
+        </p>
+
+        {isPrivacy ? (
+          <article className="legal-card legal-copy">
+            <p className="legal-updated"><strong>Effective date:</strong> August 10, 2026</p>
+
+            <section>
+              <h2>Who operates TCGer</h2>
+              <p>
+                This policy applies to the TCGer iOS app and the TCGer project website. TCGer is an open-source
+                collection-management project maintained through its public GitHub repository. Privacy questions can
+                be submitted through the <a href={SUPPORT}>TCGer support page</a>.
+              </p>
+            </section>
+
+            <section>
+              <h2>How storage modes work</h2>
+              <h3>Phone-only mode</h3>
+              <p>
+                Your binders, cards, wishlists, transactions, preferences, and scanner results are stored locally on
+                your device. TCGer does not upload this collection data to a TCGer account or developer-operated
+                database. You can erase it from Settings in the app.
+              </p>
+              <h3>Server mode</h3>
+              <p>
+                You may connect TCGer to a server address that you or another organization operates. When you do,
+                the app sends the information needed for the features you use to that server. This can include your
+                email address, username, authentication credentials, collection records, wishlists, transactions,
+                notes, and card or binder images. The operator of that server is responsible for its privacy and
+                retention practices.
+              </p>
+            </section>
+
+            <section>
+              <h2>Information processed by the app</h2>
+              <ul>
+                <li><strong>Account information:</strong> email address, username, password, and session credentials when you create or use an account on a selected server.</li>
+                <li><strong>Collection content:</strong> cards, binders, wishlists, tags, notes, prices, transactions, and other details you enter.</li>
+                <li><strong>Images:</strong> photos you select or capture for scanning, card records, or binder pages. Phone-only scanning is processed on device unless you choose a server-backed feature.</li>
+                <li><strong>App settings:</strong> display choices, enabled games, server address, and local cache state.</li>
+                <li><strong>Network information:</strong> internet services can receive standard request information such as IP address, time, requested resource, and user agent.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Device permissions</h2>
+              <ul>
+                <li><strong>Camera:</strong> used to scan trading cards and binder pages.</li>
+                <li><strong>Photos:</strong> used only when you choose images to import or scan.</li>
+                <li><strong>Face ID or Touch ID:</strong> used by iOS to unlock the app when you enable biometric lock. TCGer does not receive your biometric data.</li>
+                <li><strong>Local network:</strong> used when you connect to a TCGer server on your home or local network.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>External services</h2>
+              <p>
+                TCGer downloads catalog information, prices, and card images from services such as TCGdex, Scryfall,
+                YGOPRODeck, Pokémon card-data providers, JustTCG, and the TCGer catalog CDN. Requests to those services
+                are subject to their own privacy policies. TCGer does not include advertising or third-party tracking SDKs.
+              </p>
+            </section>
+
+            <section>
+              <h2>Retention and deletion</h2>
+              <p>
+                Phone-only data remains on your device until you delete it, reset the app, or remove the app. For a
+                server account, use <strong>Settings → Delete Server Account</strong> in the iOS app to request deletion
+                of the account and its associated TCGer data. Server backups may retain encrypted copies for a limited
+                disaster-recovery period according to the server operator’s policy.
+              </p>
+            </section>
+
+            <section>
+              <h2>Security</h2>
+              <p>
+                TCGer stores session tokens and optional personal API credentials in the iOS Keychain. You are
+                responsible for choosing a trusted server and using HTTPS when connecting over the internet. No
+                security measure can guarantee absolute protection.
+              </p>
+            </section>
+
+            <section>
+              <h2>Children</h2>
+              <p>
+                TCGer is a general-audience collection utility and is not directed to children under 13. The project
+                does not knowingly operate a service that collects children’s personal information.
+              </p>
+            </section>
+
+            <section>
+              <h2>Changes and contact</h2>
+              <p>
+                Material changes will be reflected on this page with a new effective date. To ask a privacy question
+                or report a concern, visit <a href={SUPPORT}>TCGer Support</a> or open an issue in the
+                {" "}<a href={`${GH}/issues/new/choose`} target="_blank" rel="noreferrer">public issue tracker</a>.
+                Do not include passwords, API keys, private collection exports, or other sensitive information in a
+                public issue.
+              </p>
+            </section>
+          </article>
+        ) : (
+          <div className="support-grid">
+            <section className="legal-card support-card">
+              <h2>Get help</h2>
+              <p>Search existing reports or open a new issue for reproducible problems and feature questions.</p>
+              <a className="btn btn-warm" href={`${GH}/issues`} target="_blank" rel="noreferrer">Open GitHub Issues</a>
+            </section>
+            <section className="legal-card support-card">
+              <h2>Before reporting a problem</h2>
+              <ol>
+                <li>Check the app version under Settings → About.</li>
+                <li>Say whether you use phone-only or server mode.</li>
+                <li>Include the iOS version and steps that reproduce the issue.</li>
+                <li>Remove passwords, tokens, API keys, and private collection data.</li>
+              </ol>
+            </section>
+            <section className="legal-card support-card">
+              <h2>Account and data deletion</h2>
+              <p>
+                Phone-only users can erase collection data in Settings. Signed-in server users can choose
+                <strong> Delete Server Account</strong> in Settings. If the server is unavailable, contact that server’s
+                operator because TCGer maintainers cannot access independently hosted accounts.
+              </p>
+            </section>
+            <section className="legal-card support-card">
+              <h2>Self-hosted servers</h2>
+              <p>
+                Confirm the server health endpoint is reachable, use HTTPS for internet-facing deployments, and check
+                the deployment documentation before sharing logs publicly.
+              </p>
+              <a className="btn btn-ghost" href={`${PRODUCT_DOCS}reference/architecture/`}>Read the architecture guide</a>
+            </section>
+          </div>
+        )}
+      </main>
+
+      <footer className="ftr legal-footer">
+        <div className="ftr-left">
+          <div className="ftr-brand"><img src={`${BASE}logo.svg`} alt="" /><span>TCGer</span></div>
+          <p>Open-source multi-game collection management.</p>
+        </div>
+        <div className="ftr-links">
+          <a href={PRIVACY}>Privacy</a>
+          <a href={SUPPORT}>Support</a>
+          <a href={GH} target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [stuck, setStuck] = useState(false);
@@ -172,6 +364,11 @@ export default function App() {
     els.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
   }, []);
+
+  const legalPage = getLegalPage();
+  if (legalPage) {
+    return <LegalPage page={legalPage} theme={theme} setTheme={setTheme} />;
+  }
 
   return (
     <>
@@ -356,6 +553,8 @@ export default function App() {
           <p>Open-source multi-game collection management.</p>
         </div>
         <div className="ftr-links">
+          <a href={PRIVACY}>Privacy</a>
+          <a href={SUPPORT}>Support</a>
           <a href={GH} target="_blank" rel="noreferrer">GitHub</a>
           <a href={API_DOCS}>API Docs</a>
           <a href={`${PRODUCT_DOCS}reference/architecture/`}>Architecture</a>

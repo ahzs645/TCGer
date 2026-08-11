@@ -682,6 +682,15 @@ final class EnvironmentStore: ObservableObject {
         currentUser = nil
     }
 
+    func finishServerAccountDeletion() {
+        signOut()
+        credentials = .empty
+        serverConfiguration = .onDevice
+        appSettings = nil
+        isServerVerified = false
+        enableLocalSession(force: true)
+    }
+
     func resetEverything() {
         serverConfiguration = .empty
         credentials = .empty

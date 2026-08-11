@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
     @State private var showingProfile = false
+    @State private var showingDeleteServerAccount = false
     @State private var showingClearCacheAlert = false
     @State private var cacheSize: String = "Calculating..."
     @State private var lastSyncDate: Date?
@@ -57,6 +58,8 @@ struct SettingsView: View {
     }
 
     private static let versionTapsToUnlock = 7
+    private static let privacyPolicyURL = URL(string: "https://tcger.ahmadjalil.com/privacy/")!
+    private static let supportURL = URL(string: "https://tcger.ahmadjalil.com/support/")!
 
     /// Marketing version + build from the bundle, so the About row reflects the
     /// installed binary instead of a hardcoded string.
@@ -144,6 +147,12 @@ struct SettingsView: View {
                                 Label("Administrator", systemImage: "checkmark.shield.fill")
                                     .font(.caption)
                                     .foregroundColor(.blue)
+                            }
+
+                            if !environmentStore.isUsingSingleUserMode {
+                                Button("Delete Server Account", role: .destructive) {
+                                    showingDeleteServerAccount = true
+                                }
                             }
                         }
                     } header: {
@@ -693,6 +702,14 @@ struct SettingsView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture(perform: registerVersionTap)
+
+                    Link(destination: Self.privacyPolicyURL) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
+
+                    Link(destination: Self.supportURL) {
+                        Label("Support", systemImage: "questionmark.circle")
+                    }
                 } header: {
                     Text("About")
                 }
@@ -789,6 +806,10 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
+                    .environmentObject(environmentStore)
+            }
+            .sheet(isPresented: $showingDeleteServerAccount) {
+                DeleteServerAccountView()
                     .environmentObject(environmentStore)
             }
             .sheet(isPresented: $showingExportSheet) {

@@ -4,7 +4,7 @@ import type { GenericCtx } from "@convex-dev/better-auth/utils";
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { username } from "better-auth/plugins";
-import { components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import type { DataModel } from "../_generated/dataModel";
 import authConfig from "../auth.config";
 
@@ -37,7 +37,7 @@ const getBetterAuthSecret = (): string => {
   }
   if (!isLocalDeployment()) {
     throw new Error(
-      "BETTER_AUTH_SECRET is required on non-local Convex deployments"
+      "BETTER_AUTH_SECRET is required on non-local Convex deployments",
     );
   }
   return fallbackSecret;
@@ -67,23 +67,29 @@ const parseOriginsEnv = (value: string | undefined): string[] => {
     .filter(Boolean);
 };
 
-const isNonEmptyString = (value: string | undefined): value is string => Boolean(value);
+const isNonEmptyString = (value: string | undefined): value is string =>
+  Boolean(value);
 
 export const authComponent = createClient<DataModel>(components.betterAuth, {
-  verbose: false
+  verbose: false,
 });
 
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   const siteUrl = process.env.SITE_URL;
   const trustedOrigins = Array.from(
-    new Set([siteUrl, ...parseOriginsEnv(process.env.BETTER_AUTH_TRUSTED_ORIGINS)].filter(isNonEmptyString))
+    new Set(
+      [
+        siteUrl,
+        ...parseOriginsEnv(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+      ].filter(isNonEmptyString),
+    ),
   );
   const useSecureCookies =
     parseBooleanEnv(process.env.BETTER_AUTH_USE_SECURE_COOKIES) ??
     siteUrl?.startsWith("https://") ??
     false;
 
-  return ({
+  return {
     appName: "TCGer",
     baseURL: siteUrl,
     basePath: "/api/auth",
@@ -91,79 +97,94 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : undefined,
     database: authComponent.adapter(ctx),
     emailAndPassword: {
-      enabled: true
+      enabled: true,
     },
     advanced: {
       useSecureCookies,
-      disableOriginCheck: process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true",
-      disableCSRFCheck: process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true"
+      disableOriginCheck:
+        process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true",
+      disableCSRFCheck: process.env.BETTER_AUTH_DISABLE_ORIGIN_CHECK === "true",
     },
     plugins: [
       username({
         minUsernameLength: 3,
-        maxUsernameLength: 50
+        maxUsernameLength: 50,
       }),
       convex({
-        authConfig
-      })
+        authConfig,
+      }),
     ],
     user: {
+      deleteUser: {
+        enabled: true,
+        afterDelete: async (user) => {
+          if (!("runMutation" in ctx)) {
+            throw new Error(
+              "Account deletion requires a Convex mutation context",
+            );
+          }
+          await ctx.runMutation(internal.accountDeletion.request, {
+            authSubject: user.id,
+          });
+        },
+      },
       additionalFields: {
         isAdmin: {
           type: "boolean",
           defaultValue: false,
-          input: false
+          input: false,
         },
         showCardNumbers: {
           type: "boolean",
           defaultValue: true,
-          input: false
+          input: false,
         },
         showPricing: {
           type: "boolean",
           defaultValue: true,
-          input: false
+          input: false,
         },
         enabledYugioh: {
           type: "boolean",
           defaultValue: true,
-          input: false
+          input: false,
         },
         enabledMagic: {
           type: "boolean",
           defaultValue: true,
-          input: false
+          input: false,
         },
         enabledPokemon: {
           type: "boolean",
           defaultValue: true,
-          input: false
+          input: false,
         },
         enabledOnepiece: {
           type: "boolean",
           defaultValue: false,
-          input: false
+          input: false,
         },
         enabledLorcana: {
           type: "boolean",
           defaultValue: false,
-          input: false
+          input: false,
         },
         enabledDragonball: {
           type: "boolean",
           defaultValue: false,
-          input: false
+          input: false,
         },
         defaultGame: {
           type: "string",
           required: false,
-          input: false
-        }
-      }
-    }
-  }) satisfies BetterAuthOptions;
+          input: false,
+        },
+      },
+    },
+  } satisfies BetterAuthOptions;
 };
 
 export const options = createAuthOptions({} as GenericCtx<DataModel>);
 
-export const createAuth = (ctx: GenericCtx<DataModel>) => betterAuth(createAuthOptions(ctx));
+export const createAuth = (ctx: GenericCtx<DataModel>) =>
+  betterAuth(createAuthOptions(ctx));

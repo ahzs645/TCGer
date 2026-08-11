@@ -133,4 +133,33 @@ extension APIService {
             throw APIError.serverError(status: response.statusCode)
         }
     }
+
+    private struct DeleteAccountRequest: Codable, Sendable {
+        let password: String
+    }
+
+    func deleteServerAccount(
+        config: ServerConfiguration,
+        token: String,
+        password: String
+    ) async throws {
+        let body = DeleteAccountRequest(password: password)
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "users/me",
+            method: "DELETE",
+            token: token,
+            body: body
+        )
+
+        guard response.statusCode == 200 || response.statusCode == 202 else {
+            if response.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+    }
 }

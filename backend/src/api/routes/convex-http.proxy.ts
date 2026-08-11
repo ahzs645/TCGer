@@ -42,7 +42,8 @@ export function buildAuthProxyHeaders(req: Request) {
   const origin = req.header('origin');
   const publicSiteUrl = env.APP_ORIGIN ? new URL(env.APP_ORIGIN) : null;
   const forwardedHost = publicSiteUrl?.host ?? req.header('host');
-  const forwardedProto = publicSiteUrl?.protocol.replace(/:$/, '') ?? req.header('x-forwarded-proto');
+  const forwardedProto =
+    publicSiteUrl?.protocol.replace(/:$/, '') ?? req.header('x-forwarded-proto');
 
   if (authorization) {
     headers.set('Authorization', authorization);
@@ -81,7 +82,7 @@ function buildProxyBody(req: Request) {
   if (contentType.includes('multipart/form-data')) {
     return {
       body: req as never,
-      duplex: 'half' as const
+      duplex: 'half' as const,
     };
   }
 
@@ -90,11 +91,11 @@ function buildProxyBody(req: Request) {
   }
 
   return {
-    body: JSON.stringify(req.body)
+    body: JSON.stringify(req.body),
   };
 }
 
-function relayProxyResponse(proxyResponse: globalThis.Response, res: ExpressResponse) {
+export function relayProxyResponse(proxyResponse: globalThis.Response, res: ExpressResponse) {
   const contentType = proxyResponse.headers.get('content-type');
   const contentDisposition = proxyResponse.headers.get('content-disposition');
   const location = proxyResponse.headers.get('location');
@@ -116,16 +117,42 @@ function relayProxyResponse(proxyResponse: globalThis.Response, res: ExpressResp
   res.status(proxyResponse.status);
 }
 
+export async function fetchConvexAuth(
+  req: Request,
+  targetPath = `/api${req.originalUrl}`,
+  method = req.method,
+) {
+  const targetUrl = new URL(targetPath, env.CONVEX_HTTP_ORIGIN);
+  return await fetch(targetUrl, {
+    method,
+    headers: buildAuthProxyHeaders(req),
+    redirect: 'manual',
+    ...buildProxyBody(req),
+  });
+}
+
+export async function sendProxyResponse(proxyResponse: globalThis.Response, res: ExpressResponse) {
+  relayProxyResponse(proxyResponse, res);
+
+  if (proxyResponse.status === 204 || proxyResponse.status === 304) {
+    res.send();
+    return;
+  }
+
+  const payload = Buffer.from(await proxyResponse.arrayBuffer());
+  res.send(payload);
+}
+
 export async function proxyToConvexHttp(
   req: AuthRequest,
   res: ExpressResponse,
-  targetPath = req.originalUrl
+  targetPath = req.originalUrl,
 ) {
   const targetUrl = new URL(targetPath, env.CONVEX_HTTP_ORIGIN);
   const proxyResponse = await fetch(targetUrl, {
     method: req.method,
     headers: buildProxyHeaders(req),
-    ...buildProxyBody(req)
+    ...buildProxyBody(req),
   });
 
   relayProxyResponse(proxyResponse, res);
@@ -142,23 +169,8 @@ export async function proxyToConvexHttp(
 export async function proxyToConvexAuth(
   req: Request,
   res: ExpressResponse,
-  targetPath = `/api${req.originalUrl}`
+  targetPath = `/api${req.originalUrl}`,
 ) {
-  const targetUrl = new URL(targetPath, env.CONVEX_HTTP_ORIGIN);
-  const proxyResponse = await fetch(targetUrl, {
-    method: req.method,
-    headers: buildAuthProxyHeaders(req),
-    redirect: 'manual',
-    ...buildProxyBody(req)
-  });
-
-  relayProxyResponse(proxyResponse, res);
-
-  if (proxyResponse.status === 204 || proxyResponse.status === 304) {
-    res.send();
-    return;
-  }
-
-  const payload = Buffer.from(await proxyResponse.arrayBuffer());
-  res.send(payload);
+  const proxyResponse = await fetchConvexAuth(req, targetPath);
+  await sendProxyResponse(proxyResponse, res);
 }
