@@ -29,6 +29,7 @@ import {
   type PortableTableName,
   type PortableTables,
   PORTABLE_INDEXES,
+  entityId,
 } from "@tcg/api-types";
 
 /** Rows grouped by table — the shape the store keeps and persists. */
@@ -57,16 +58,15 @@ const TABLES: readonly PortableTableName[] = [
   "cards",
 ];
 
-let idCounter = 0;
-
 /**
  * Ids are minted locally and are opaque to callers, but they have to survive a
- * round trip through the REST contract and a reload, so they carry a prefix
- * this store can recognise in `normalizeId` and are unique within a session.
+ * round trip through the REST contract, a reload, and — eventually — being
+ * promoted into the hosted database. `entityId` is time-sortable and unique
+ * without coordination, so a row created offline keeps the identity it was
+ * created with rather than being re-minted on the way up.
  */
-function mintId(table: PortableTableName): string {
-  idCounter += 1;
-  return `local_${table}_${Date.now().toString(36)}_${idCounter.toString(36)}`;
+function mintId(_table: PortableTableName): string {
+  return entityId();
 }
 
 function matchesKey<T extends PortableRow>(row: T, key: Partial<T>): boolean {

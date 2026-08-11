@@ -15,6 +15,9 @@ import {
   projectBinder,
   removeCard,
   updateEntry,
+  entityId,
+  entityIdTimestamp,
+  isEntityId,
   type CardIdentity,
   type CardRow,
   type CopyFields,
@@ -276,4 +279,42 @@ test("a failed transaction does not roll back a concurrent one", async () => {
     "the committed add must survive the rollback",
   );
   assert.equal(entries[0]!.cardId !== "nonexistent", true, "no orphan row");
+});
+
+test("minted ids are time-sortable and unique", () => {
+  const ids = Array.from({ length: 500 }, () => entityId());
+
+  assert.equal(new Set(ids).size, ids.length, "ids collided");
+  assert.deepEqual(
+    [...ids].sort(),
+    ids,
+    "ids must sort lexicographically in creation order, including within one millisecond",
+  );
+  for (const id of ids) {
+    assert.ok(isEntityId(id), `${id} is not a well-formed entity id`);
+  }
+});
+
+test("an id carries the time it was minted", () => {
+  const at = 1_800_000_000_000;
+  const stamp = entityIdTimestamp(entityId(at));
+  assert.equal(stamp, at, "timestamp did not survive the round trip");
+  assert.equal(entityIdTimestamp("not-an-id"), null);
+});
+
+test("rows are created with promotion-safe ids", async () => {
+  const db = new LocalPortableDb();
+  const binderId = await makeBinder(db, "Ids");
+  assert.ok(
+    isEntityId(binderId),
+    `a locally created row must carry an id the hosted runtime could accept, got ${binderId}`,
+  );
+
+  const [entry] = await addCopies(db, {
+    userId: USER,
+    binderId,
+    card: { tcg: "magic", externalId: "id-shape", name: "Shape" },
+    quantity: 1,
+  });
+  assert.ok(isEntityId(entry!._id), "entry id");
 });

@@ -239,6 +239,24 @@ doing it.
 rejects, demo clamps), the condition vocabulary (enforced on neither live path),
 and bulk add (no demo implementation).
 
+**Ids are promotion-safe.** Locally created rows carry an `entityId`
+(`packages/api-types/src/ids.ts`) — Crockford base32, time-sortable, unique
+without coordination — rather than a value only one runtime could mint. A
+Convex `_id` cannot be minted offline, so without this a row created locally
+would have to be re-minted on promotion and every reference to it rewritten.
+There is no promotion feature yet; this exists so that building one does not
+also mean retrofitting identity, which is what societyer's own `ids.ts` header
+warns about. Ids carried over by the schema 1 migration keep their original
+values and still resolve, because `normalizeId` checks existence rather than
+format.
+
+**Moves say what they mean.** `updateCardSchema` carries an explicit `scope`
+(`card` | `copy`). Omitted means `copy`, which is what the endpoint always did,
+so no existing client changes behaviour; the collection table sends
+`scope: "card"` because its UI promises to move the card. This is the fix for
+the aliasing described below — the contract gained the expressiveness rather
+than the server guessing.
+
 **One product bug recorded rather than fixed.** The grouped response reports a
 card's id as its first copy's id, so "move this card" from the collection table
 and "move this copy" from the sandbox are byte-identical requests. The clients
