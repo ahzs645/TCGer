@@ -336,7 +336,7 @@ export default function AnalyticsPage() {
                   {history.history.map((m) => (
                     <div
                       key={m.date}
-                      className="flex flex-1 flex-col items-center gap-1"
+                      className="flex h-full flex-1 items-end"
                       title={`${new Date(m.date).toLocaleDateString()}: ${currency(m.value)}`}
                     >
                       <div

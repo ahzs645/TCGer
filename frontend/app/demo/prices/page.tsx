@@ -446,7 +446,10 @@ export default function PricesPage() {
                     data-oid="price-mobile-sort-idle"
                   />
                 ) : sortAsc ? (
-                  <ArrowUp className="h-3 w-3" data-oid="price-mobile-sort-up" />
+                  <ArrowUp
+                    className="h-3 w-3"
+                    data-oid="price-mobile-sort-up"
+                  />
                 ) : (
                   <ArrowDown
                     className="h-3 w-3"

@@ -89,6 +89,7 @@ export default function AnalyticsPage() {
     ? [...MONTHLY_HISTORY, { month: CURRENT_MONTH, value: totalValue }]
     : MONTHLY_HISTORY;
   const maxBarValue = Math.max(1, ...monthlyValues.map((m) => m.value));
+  const latestChartValue = monthlyValues[monthlyValues.length - 1].value;
 
   const previousMonth = MONTHLY_HISTORY[MONTHLY_HISTORY.length - 1];
   const monthChange = totalValue - previousMonth.value;
@@ -184,7 +185,7 @@ export default function AnalyticsPage() {
             <div
               className="flex items-end gap-3 h-48"
               role="img"
-              aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${totalValue.toFixed(2)}`}
+              aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${latestChartValue.toFixed(2)}`}
               data-oid="rtts-rv"
             >
               {monthlyValues.map((m) => (
@@ -324,7 +325,7 @@ export default function AnalyticsPage() {
             <CardContent data-oid="fpy-5h8">
               <div className="space-y-4" data-oid="al90b:i">
                 {GAME_BREAKDOWN.map((g) => {
-                  const pct = Math.round((g.value / totalValue) * 100);
+                  const pct = Math.round((g.value / gameBreakdownValue) * 100);
                   return (
                     <div key={g.game} className="space-y-2" data-oid="od0_lel">
                       <div
@@ -417,12 +418,14 @@ function StatCard({
   icon,
   sub,
   positive,
+  negative,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   sub: string;
   positive?: boolean;
+  negative?: boolean;
 }) {
   return (
     <Card data-oid="zg0ogug">
@@ -442,7 +445,9 @@ function StatCard({
       </CardHeader>
       <CardContent className="p-3 pt-0 md:p-6 md:pt-0" data-oid=":ko-:3o">
         <div
-          className={`text-xl md:text-3xl font-semibold tracking-tight ${positive ? "text-green-500" : ""}`}
+          className={`text-xl md:text-3xl font-semibold tracking-tight ${
+            positive ? "text-green-500" : negative ? "text-red-500" : ""
+          }`}
           data-oid="93dq5ol"
         >
           {value}

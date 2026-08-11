@@ -164,7 +164,10 @@ export function DashboardContent() {
           binderId: card.binderId ?? binder.id,
           binderName: card.binderName ?? binder.name,
           binderColorHex: card.binderColorHex ?? binder.colorHex,
-          updatedAt: binder.updatedAt,
+          // Prefer the card's own acquisition date so Recent Activity reflects
+          // per-card history; every card in a binder would otherwise collapse
+          // onto the binder's single timestamp.
+          updatedAt: card.acquiredAt ?? binder.updatedAt,
         })),
       ),
     [collections],
