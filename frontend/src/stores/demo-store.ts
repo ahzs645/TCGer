@@ -86,6 +86,8 @@ interface DemoCopyInput {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  serialNumber?: string;
+  acquiredAt?: string;
   isFoil?: boolean;
   finishCode?: string;
   finishLabel?: string;
@@ -162,7 +164,7 @@ export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   enabledDragonball: false,
   defaultGame: null,
   focusedSetOrder: [],
-  setCompletionMode: 'standard',
+  setCompletionMode: "standard",
 };
 
 /* ------------------------------------------------------------------ */
@@ -182,6 +184,8 @@ function makeDemoCopy(input: DemoCopyInput = {}): CollectionCardCopy {
     notes: input.notes,
     price: input.price,
     acquisitionPrice: input.acquisitionPrice,
+    serialNumber: input.serialNumber,
+    acquiredAt: input.acquiredAt,
     isFoil: input.isFoil,
     finishCode: input.finishCode,
     finishLabel: input.finishLabel,
@@ -483,9 +487,7 @@ function catalogLookupForCard(
   };
 }
 
-function needsCatalogImage(
-  card: DemoBinderCard | DemoWishlistCard,
-): boolean {
+function needsCatalogImage(card: DemoBinderCard | DemoWishlistCard): boolean {
   return !card.cardData?.imageUrl && !card.cardData?.imageUrlSmall;
 }
 
@@ -597,7 +599,9 @@ function isPlausibleSlice(slice: DemoSlice, value: unknown): boolean {
       return Array.isArray(value);
     case "profile":
     case "preferences":
-      return typeof value === "object" && value !== null && !Array.isArray(value);
+      return (
+        typeof value === "object" && value !== null && !Array.isArray(value)
+      );
     case "initialized":
       return typeof value === "boolean";
   }
@@ -1282,8 +1286,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
           id,
           name,
           color:
-            color ??
-            BINDER_COLORS[state.binders.length % BINDER_COLORS.length],
+            color ?? BINDER_COLORS[state.binders.length % BINDER_COLORS.length],
           cards: [],
           createdAt: now,
           updatedAt: now,
@@ -1302,9 +1305,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   renameBinder: (id, name) => {
     set((state) => ({
       binders: state.binders.map((b) =>
-        b.id === id
-          ? { ...b, name, updatedAt: new Date().toISOString() }
-          : b,
+        b.id === id ? { ...b, name, updatedAt: new Date().toISOString() } : b,
       ),
     }));
   },
@@ -1317,6 +1318,8 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       notes: details?.copy?.notes,
       price: details?.copy?.price ?? card.price,
       acquisitionPrice: details?.copy?.acquisitionPrice,
+      serialNumber: details?.copy?.serialNumber,
+      acquiredAt: details?.copy?.acquiredAt,
       isFoil: details?.copy?.isFoil,
       finishCode: details?.copy?.finishCode,
       finishLabel: details?.copy?.finishLabel,
@@ -1327,6 +1330,13 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       isPeelOff: details?.copy?.isPeelOff,
       isSigned: details?.copy?.isSigned,
       isAltered: details?.copy?.isAltered,
+      // Dropped here until now while `makeDemoCopy` already supported them, so
+      // grading and storage details silently vanished on add. The server
+      // persists all six (convex/lib/library.ts `addEntryForViewer`).
+      gradingCompany: details?.copy?.gradingCompany,
+      gradingScore: details?.copy?.gradingScore,
+      certNumber: details?.copy?.certNumber,
+      storageLocation: details?.copy?.storageLocation,
     };
     const newCopies = Array.from({ length: quantity }, () =>
       makeDemoCopy(copyInput),
@@ -1387,126 +1397,211 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
   updateCardInBinder: (binderId, cardOrCopyId, updates) => {
     let updatedResult: DemoBinderCard | null = null;
-    set((state) => ({
-      binders: state.binders.map((binder) => {
-        if (binder.id !== binderId) return binder;
-        const cardIndex = binder.cards.findIndex(
-          (card) =>
-            card.id === cardOrCopyId ||
-            card.copies?.some((copy) => copy.id === cardOrCopyId),
+    set((state) => {
+      const sourceIndex = state.binders.findIndex((b) => b.id === binderId);
+      if (sourceIndex < 0) return {};
+      const binder = state.binders[sourceIndex];
+      const cardIndex = binder.cards.findIndex(
+        (card) =>
+          card.id === cardOrCopyId ||
+          card.copies?.some((copy) => copy.id === cardOrCopyId),
+      );
+      if (cardIndex < 0) return {};
+
+      const current = binder.cards[cardIndex];
+      const fallbackCopies =
+        current.copies ??
+        Array.from({ length: current.quantity }, () =>
+          makeDemoCopy({
+            condition: current.condition,
+            price: current.price,
+          }),
         );
-        if (cardIndex < 0) return binder;
+      const targetsWholeCard = current.id === cardOrCopyId;
+      const copyUpdates = fallbackCopies.map((copy) => {
+        if (!targetsWholeCard && copy.id !== cardOrCopyId) return copy;
+        return {
+          ...copy,
+          condition:
+            updates.condition === undefined
+              ? copy.condition
+              : (updates.condition ?? undefined),
+          language:
+            updates.language === undefined
+              ? copy.language
+              : (updates.language ?? undefined),
+          notes:
+            updates.notes === undefined
+              ? copy.notes
+              : (updates.notes ?? undefined),
+          serialNumber:
+            updates.serialNumber === undefined
+              ? copy.serialNumber
+              : (updates.serialNumber ?? undefined),
+          acquiredAt:
+            updates.acquiredAt === undefined
+              ? copy.acquiredAt
+              : (updates.acquiredAt ?? undefined),
+          // Clearing the finish clears the foil flag with it, matching
+          // convex/bridge.ts. The sandbox editor sends both together so this
+          // is invisible there, but the print-selection path sends
+          // `finishCode: null` on its own.
+          isFoil:
+            updates.isFoil ??
+            (updates.finishCode === null ? false : copy.isFoil),
+          finishCode:
+            updates.finishCode === undefined
+              ? copy.finishCode
+              : (updates.finishCode ?? undefined),
+          finishLabel:
+            updates.finishLabel === undefined
+              ? copy.finishLabel
+              : (updates.finishLabel ?? undefined),
+          edition:
+            updates.edition === undefined
+              ? copy.edition
+              : (updates.edition ?? undefined),
+          stamp:
+            updates.stamp === undefined
+              ? copy.stamp
+              : (updates.stamp ?? undefined),
+          isSealedPromo: updates.isSealedPromo ?? copy.isSealedPromo,
+          isOversized: updates.isOversized ?? copy.isOversized,
+          isPeelOff: updates.isPeelOff ?? copy.isPeelOff,
+          isSigned: updates.isSigned ?? copy.isSigned,
+          isAltered: updates.isAltered ?? copy.isAltered,
+          gradingCompany:
+            updates.gradingCompany === undefined
+              ? copy.gradingCompany
+              : (updates.gradingCompany ?? undefined),
+          gradingScore:
+            updates.gradingScore === undefined
+              ? copy.gradingScore
+              : (updates.gradingScore ?? undefined),
+          certNumber:
+            updates.certNumber === undefined
+              ? copy.certNumber
+              : (updates.certNumber ?? undefined),
+          storageLocation:
+            updates.storageLocation === undefined
+              ? copy.storageLocation
+              : (updates.storageLocation ?? undefined),
+        };
+      });
 
-        const current = binder.cards[cardIndex];
-        const fallbackCopies =
-          current.copies ??
-          Array.from({ length: current.quantity }, () =>
-            makeDemoCopy({
-              condition: current.condition,
-              price: current.price,
-            }),
-          );
-        const targetsWholeCard = current.id === cardOrCopyId;
-        const copyUpdates = fallbackCopies.map((copy) => {
-          if (!targetsWholeCard && copy.id !== cardOrCopyId) return copy;
-          return {
-            ...copy,
-            condition:
-              updates.condition === undefined
-                ? copy.condition
-                : (updates.condition ?? undefined),
-            language:
-              updates.language === undefined
-                ? copy.language
-                : (updates.language ?? undefined),
-            notes:
-              updates.notes === undefined
-                ? copy.notes
-                : (updates.notes ?? undefined),
-            isFoil: updates.isFoil ?? copy.isFoil,
-            finishCode:
-              updates.finishCode === undefined
-                ? copy.finishCode
-                : (updates.finishCode ?? undefined),
-            finishLabel:
-              updates.finishLabel === undefined
-                ? copy.finishLabel
-                : (updates.finishLabel ?? undefined),
-            edition:
-              updates.edition === undefined
-                ? copy.edition
-                : (updates.edition ?? undefined),
-            stamp:
-              updates.stamp === undefined
-                ? copy.stamp
-                : (updates.stamp ?? undefined),
-            isSealedPromo:
-              updates.isSealedPromo ?? copy.isSealedPromo,
-            isOversized: updates.isOversized ?? copy.isOversized,
-            isPeelOff: updates.isPeelOff ?? copy.isPeelOff,
-            isSigned: updates.isSigned ?? copy.isSigned,
-            isAltered: updates.isAltered ?? copy.isAltered,
-            gradingCompany:
-              updates.gradingCompany === undefined
-                ? copy.gradingCompany
-                : (updates.gradingCompany ?? undefined),
-            gradingScore:
-              updates.gradingScore === undefined
-                ? copy.gradingScore
-                : (updates.gradingScore ?? undefined),
-            certNumber:
-              updates.certNumber === undefined
-                ? copy.certNumber
-                : (updates.certNumber ?? undefined),
-            storageLocation:
-              updates.storageLocation === undefined
-                ? copy.storageLocation
-                : (updates.storageLocation ?? undefined),
-          };
-        });
-
-        let copies = copyUpdates;
-        if (updates.quantity !== undefined && targetsWholeCard) {
-          const desired = Math.max(1, updates.quantity);
-          if (desired < copies.length) {
-            copies = copies.slice(0, desired);
-          } else {
-            const template = copies[0] ?? makeDemoCopy();
-            while (copies.length < desired) {
-              copies = [
-                ...copies,
-                { ...template, id: uid(), serialNumber: undefined },
-              ];
-            }
+      let copies = copyUpdates;
+      if (updates.quantity !== undefined && targetsWholeCard) {
+        const desired = Math.max(1, updates.quantity);
+        if (desired < copies.length) {
+          copies = copies.slice(0, desired);
+        } else {
+          const template = copies[0] ?? makeDemoCopy();
+          while (copies.length < desired) {
+            copies = [
+              ...copies,
+              { ...template, id: uid(), serialNumber: undefined },
+            ];
           }
         }
+      }
 
-        const override = updates.cardOverride;
-        const cardData = override?.cardData ?? current.cardData;
-        const next: DemoBinderCard = {
-          ...current,
-          cardId: override?.cardId ?? current.cardId,
-          name: cardData?.name ?? current.name,
-          tcg: (cardData?.tcg as TcgCode | undefined) ?? current.tcg,
-          setCode: cardData?.setCode ?? current.setCode,
-          setName: cardData?.setName ?? current.setName,
-          rarity: cardData?.rarity ?? current.rarity,
-          condition: copies[0]?.condition ?? current.condition,
-          price: copies[0]?.price ?? current.price,
-          quantity: copies.length,
-          cardData,
-          copies,
-        };
+      const override = updates.cardOverride;
+      const cardData = override?.cardData ?? current.cardData;
+      const next: DemoBinderCard = {
+        ...current,
+        cardId: override?.cardId ?? current.cardId,
+        name: cardData?.name ?? current.name,
+        tcg: (cardData?.tcg as TcgCode | undefined) ?? current.tcg,
+        setCode: cardData?.setCode ?? current.setCode,
+        setName: cardData?.setName ?? current.setName,
+        rarity: cardData?.rarity ?? current.rarity,
+        condition: copies[0]?.condition ?? current.condition,
+        price: copies[0]?.price ?? current.price,
+        quantity: copies.length,
+        cardData,
+        copies,
+      };
+      const stamp = new Date().toISOString();
+      const destinationId = updates.targetBinderId;
+      const movesBinder =
+        destinationId !== undefined &&
+        destinationId !== binderId &&
+        state.binders.some((b) => b.id === destinationId);
+
+      if (!movesBinder) {
         updatedResult = next;
         const cards = [...binder.cards];
         cards[cardIndex] = next;
-        return {
-          ...binder,
-          updatedAt: new Date().toISOString(),
-          cards,
+        const binders = [...state.binders];
+        binders[sourceIndex] = { ...binder, updatedAt: stamp, cards };
+        return { binders };
+      }
+
+      // Move to another binder. `targetBinderId` is in the shared contract
+      // and the bridge implements it (convex/bridge.ts, reached as
+      // `binderId` after http.ts maps it), but the demo used to ignore it
+      // and answer 200 with an unmoved card — so the UI reported a move
+      // that never happened.
+      //
+      // One copy moves, not the group, because that is what the server does:
+      // it patches the single addressed entry's binder. The card-level id in
+      // the REST response is an alias for the first copy's id (http.ts
+      // `toLegacyBinder`), so "move this card" and "move this copy" are
+      // indistinguishable on the wire — the sandbox sends a copy id, the
+      // collection table sends a card id, and both arrive as the same string.
+      // Moving the whole group here would make the demo disagree with
+      // production for the table's move.
+      const moving = targetsWholeCard
+        ? copies.slice(0, 1)
+        : copies.filter((copy) => copy.id === cardOrCopyId);
+      const staying = copies.filter((copy) => !moving.includes(copy));
+
+      const sourceCards = [...binder.cards];
+      if (staying.length === 0) {
+        sourceCards.splice(cardIndex, 1);
+      } else {
+        sourceCards[cardIndex] = {
+          ...next,
+          quantity: staying.length,
+          copies: staying,
         };
-      }),
-    }));
+      }
+
+      const binders = state.binders.map((candidate) => {
+        if (candidate.id === binderId) {
+          return { ...candidate, updatedAt: stamp, cards: sourceCards };
+        }
+        if (candidate.id !== destinationId) return candidate;
+
+        const existingIndex = candidate.cards.findIndex(
+          (card) => card.cardId === next.cardId,
+        );
+        const cards = [...candidate.cards];
+        if (existingIndex >= 0) {
+          const existing = cards[existingIndex];
+          const merged = [...(existing.copies ?? []), ...moving];
+          cards[existingIndex] = {
+            ...existing,
+            quantity: merged.length,
+            copies: merged,
+          };
+          updatedResult = cards[existingIndex];
+        } else {
+          const created: DemoBinderCard = {
+            ...next,
+            id: uid(),
+            quantity: moving.length,
+            copies: moving,
+            addedAt: stamp,
+          };
+          cards.push(created);
+          updatedResult = created;
+        }
+        return { ...candidate, updatedAt: stamp, cards };
+      });
+
+      return { binders };
+    });
     return updatedResult;
   },
 
@@ -1533,8 +1628,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
           id,
           name,
           description: description ?? "",
-          color:
-            BINDER_COLORS[state.wishlists.length % BINDER_COLORS.length],
+          color: BINDER_COLORS[state.wishlists.length % BINDER_COLORS.length],
           cards: [],
           createdAt: new Date().toISOString(),
         },
@@ -1660,9 +1754,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
   // ── Queries ──────────────────────────────────────────────────
   isCardInCollection: (cardId) => {
-    return get().binders.some((b) =>
-      b.cards.some((c) => c.cardId === cardId),
-    );
+    return get().binders.some((b) => b.cards.some((c) => c.cardId === cardId));
   },
 
   getOwnedQuantity: (cardId) => {
@@ -1843,13 +1935,12 @@ function gameBreakdown(binders: DemoBinder[]): DemoGameBreakdownEntry[] {
     }
   }
   return GAME_ORDER.map((tcg) => ({
-      tcg,
-      game: GAME_LABELS[tcg],
-      color: GAME_COLORS[tcg],
-      cards: acc.get(tcg)?.cards ?? 0,
-      value: Math.round((acc.get(tcg)?.value ?? 0) * 100) / 100,
-    }))
-    .filter((entry) => entry.cards > 0);
+    tcg,
+    game: GAME_LABELS[tcg],
+    color: GAME_COLORS[tcg],
+    cards: acc.get(tcg)?.cards ?? 0,
+    value: Math.round((acc.get(tcg)?.value ?? 0) * 100) / 100,
+  })).filter((entry) => entry.cards > 0);
 }
 
 function rarityBreakdown(binders: DemoBinder[]): DemoRarityBreakdownEntry[] {

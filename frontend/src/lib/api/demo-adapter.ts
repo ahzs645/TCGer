@@ -553,9 +553,9 @@ async function handleGuides(
     const ownership = params.get("ownership") || "all";
     const selectedGuides = guides.filter(
       (guide) =>
-        (!tcg || guide.tcg === tcg)
-        && (!category || guide.category === category)
-        && (!guideSlug || guide.slug === guideSlug),
+        (!tcg || guide.tcg === tcg) &&
+        (!category || guide.category === category) &&
+        (!guideSlug || guide.slug === guideSlug),
     );
     const rows: Array<{
       card: Card;
@@ -574,31 +574,48 @@ async function handleGuides(
       }>;
     }> = [];
     for (const guide of selectedGuides) {
-      const cards = guide.rule.type === "manual"
-        ? demoConnectedArtItems().map((item) => ({
-            card: {
-              id: item.externalId,
-              tcg: item.tcg,
-              name: item.name,
-              setCode: item.setCode,
-              setName: item.setName,
-              collectorNumber: item.collectorNumber,
-              rarity: item.rarity,
-              artist: item.artist,
-              imageUrl: item.imageUrl,
-              imageUrlSmall: item.imageUrlSmall,
-            } satisfies Card,
-            item,
-          }))
-        : guide.rule.type === "name" && guide.rule.query
-          ? (await demoSearchCards(guide.rule.query, guide.tcg)).map((card) => ({ card, item: undefined }))
-          : guide.rule.type === "tag" && guide.rule.query && isCatalogGame(guide.tcg)
-            ? (await searchCatalogByCollectionTag(guide.rule.query, guide.tcg, 5000))
-                .map((card) => ({ card, item: undefined }))
-          : [];
+      const cards =
+        guide.rule.type === "manual"
+          ? demoConnectedArtItems().map((item) => ({
+              card: {
+                id: item.externalId,
+                tcg: item.tcg,
+                name: item.name,
+                setCode: item.setCode,
+                setName: item.setName,
+                collectorNumber: item.collectorNumber,
+                rarity: item.rarity,
+                artist: item.artist,
+                imageUrl: item.imageUrl,
+                imageUrlSmall: item.imageUrlSmall,
+              } satisfies Card,
+              item,
+            }))
+          : guide.rule.type === "name" && guide.rule.query
+            ? (await demoSearchCards(guide.rule.query, guide.tcg)).map(
+                (card) => ({ card, item: undefined }),
+              )
+            : guide.rule.type === "tag" &&
+                guide.rule.query &&
+                isCatalogGame(guide.tcg)
+              ? (
+                  await searchCatalogByCollectionTag(
+                    guide.rule.query,
+                    guide.tcg,
+                    5000,
+                  )
+                ).map((card) => ({ card, item: undefined }))
+              : [];
       for (const { card, item } of cards) {
         const searchText = normalizeCatalogText(
-          [card.name, card.setName, card.artist, guide.title, ...guide.tags, item?.groupLabel]
+          [
+            card.name,
+            card.setName,
+            card.artist,
+            guide.title,
+            ...guide.tags,
+            item?.groupLabel,
+          ]
             .filter(Boolean)
             .join(" "),
         );
@@ -611,17 +628,19 @@ async function handleGuides(
           card,
           owned,
           ownedQuantity,
-          matchedGuides: [{
-            guideId: guide.id,
-            slug: guide.slug,
-            title: guide.title,
-            category: guide.category,
-            tags: guide.tags,
-            groupKey: item?.groupKey,
-            groupLabel: item?.groupLabel,
-            groupOrder: item?.groupOrder,
-            position: item?.position,
-          }],
+          matchedGuides: [
+            {
+              guideId: guide.id,
+              slug: guide.slug,
+              title: guide.title,
+              category: guide.category,
+              tags: guide.tags,
+              groupKey: item?.groupKey,
+              groupLabel: item?.groupLabel,
+              groupOrder: item?.groupOrder,
+              position: item?.position,
+            },
+          ],
         });
       }
     }
@@ -789,6 +808,18 @@ async function handleCollections(
 
   const collectionId = segments[0];
 
+  // GET /collections/:id
+  // The server serves this (convex/http.ts) and the demo did not, so a client
+  // asking for a single binder got a 404 in demo mode only.
+  if (segments.length === 1 && method === "GET") {
+    store().init();
+    await store().enrichCardsFromCatalog();
+    const binder = store().binders.find(
+      (b: DemoBinder) => b.id === collectionId,
+    );
+    return binder ? json(toBinder(binder)) : notFound("Collection not found");
+  }
+
   // PATCH /collections/:id
   if (segments.length === 1 && method === "PATCH") {
     const data = body as {
@@ -817,13 +848,14 @@ async function handleCollections(
   // PATCH /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
     const cardId = segments[2];
-    const updated = store().updateCardInBinder(
-      collectionId,
-      cardId,
-      body as UpdateCardInput,
-    );
+    const patch = body as UpdateCardInput;
+    const updated = store().updateCardInBinder(collectionId, cardId, patch);
+    // On a move the card now lives in the target binder, so the response has
+    // to describe that binder — reporting the source would tell the UI the
+    // card is still where it started.
+    const resultBinderId = patch?.targetBinderId ?? collectionId;
     const binder = store().binders.find(
-      (entry: DemoBinder) => entry.id === collectionId,
+      (entry: DemoBinder) => entry.id === resultBinderId,
     );
     if (!binder || !updated) return notFound("Card not found");
     return json(

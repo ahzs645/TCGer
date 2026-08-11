@@ -533,3 +533,103 @@ Stated explicitly so nothing is inferred from silence.
   to reconcile and it would make options (b) and (c) worse, not better.
 - **`mobile-apps/`** — not read, per the plan's own scope note. If the iOS client consumes the
   same grouped REST shape, option (d) gets more valuable and option (c) gets no better.
+
+---
+
+## 9. Outcome — what was actually done
+
+Written after implementing the recommendation. The document above is the
+analysis as it stood before any code changed; this section records what was
+decided, what was built, and what was deliberately left.
+
+### Shipped
+
+**The sequencing in §7, steps 1–4.**
+
+1. **`demo-db.ts`'s legacy-import version stamp** (§6) — fixed. `importLegacyState`
+   now stamps `LEGACY_PAYLOAD_SCHEMA_VERSION = 1` and lets the normal migration
+   path run on the same boot, instead of labelling nested data with the current
+   version. Verified in a browser: a seeded pre-Stage-2 `tcg-demo-store` payload
+   imports and lands with `meta.schemaVersion = 1`.
+
+2. **`bridge.ts:1588`'s `args.quantity ?? 1`** — confirmed a bug by executing it,
+   then fixed. `convex/quantityOmitted.test.ts` failed with "expected 1 to be 3"
+   before the change: a condition-only PATCH on a 3-copy card deleted 2 copies.
+   It is now `args.quantity ?? currentQuantity`, so an omitted quantity means
+   "leave it alone", like every other field in the handler.
+
+3. **D3–D6 in the demo** — fixed, and D1 resolved server-side:
+   - **D4** — `addCardToBinder` now passes `gradingCompany`, `gradingScore`,
+     `certNumber`, `storageLocation` (and `serialNumber`/`acquiredAt`, added to
+     `DemoCopyInput` and `makeDemoCopy`) into the copy it builds.
+   - **D5** — the copy-update map gained `serialNumber` and `acquiredAt`.
+   - **D6** — `isFoil` is now cleared when `finishCode` is cleared, matching
+     `bridge.ts`.
+   - **D3** — `targetBinderId` is implemented. The demo no longer answers 200
+     with an unmoved card.
+   - **D1** — resolved by fixing the *server*, not the demo. See below.
+
+4. **The shared fixture table** — `packages/api-types/src/collection-semantics.ts`,
+   eight cases, data only. Driven by two harnesses over the same REST contract:
+   `frontend/src/lib/api/collection-semantics.test.ts` (`tsx --test`, through
+   `handleDemoRequest`) and `convex-backend/convex/collectionSemantics.test.ts`
+   (`convex-test`, through the real HTTP router). Both green.
+
+   The table was checked for teeth rather than assumed to have them: reverting
+   the D6 fix turns exactly one case red (`clearing-finish-clears-foil`) and
+   leaves the other seven green.
+
+### D1 resolved: DELETE removes the whole card
+
+§3.1 recorded that "neither side is obviously the intended one". Reading the
+clients settles it — every caller means *the card*:
+
+| Caller | Id sent | What it does next |
+|---|---|---|
+| `card-preview.tsx:415` (web) | card-level | only fires at quantity 0; reports "Card removed from binder." |
+| `CollectionDetailView.swift:694` (iOS) | `card.id` | `cards.removeAll { $0.id == card.id }` |
+| `CollectionDetailView.swift:967` (iOS bulk) | `cardId` | same |
+| `CollectionDetailView.swift:1087` (iOS sold) | `card.id` | sells `card.quantity` — every copy — then deletes |
+
+Nothing deletes an individual copy through this route; quantity reductions go
+through PATCH. Confirmed by execution first (`convex/removeCardLevelId.test.ts`
+logged "2 copies remain" against a 3-copy card), then fixed in
+`bridge.removeEntry`, which now removes the whole group and writes one audit
+entry naming the copy count.
+
+**This is the one change here that alters authenticated-path behaviour
+destructively, and it is worth a reviewer's attention.** The bug it replaces was
+not data loss — it was a deleted card reappearing on the next refresh — whereas
+the fix makes DELETE delete more. It is guarded by the argument above (no client
+deletes a copy) and by the audit log, which snapshots every removed entry.
+
+### Found while building: two things §2 did not have
+
+- **D10 — the demo had no `GET /collections/:id`.** The server serves it; the
+  demo fell through to a generic 404. Found because the fixture harness needed
+  to read one binder. Implemented (~8 lines).
+- **"Move card" and "move copy" are the same request on the wire.** The REST
+  response reports the group's id as `copies[0].id` (`http.ts toLegacyBinder`),
+  so `collection-table.tsx:160` moving a *card* and `collection-view.tsx:802`
+  moving a *copy* send byte-identical PATCHes. Unlike D1 the clients do **not**
+  agree, so this cannot be resolved by picking a server behaviour — it needs a
+  contract change (an explicit scope, or non-aliased ids) and none was invented
+  here. The demo was made to match the server (move the addressed copy), and the
+  fixture pins that, so at least the two sides no longer disagree. **The
+  underlying product bug remains: moving a 3-copy card from the collection table
+  moves one copy.**
+
+### Not done, and why
+
+- **Option (b), (c) and Stage 5** — unchanged from §5/§7. Option (c)'s premise
+  is still false now that `schemaVersion` 1 is released, and Stage 5 remains
+  prerequisite-blocked on the browser talking to Convex directly.
+- **Option (d)** (moving `toLegacyBinder` into `packages/`) — not done. §5 rates
+  its blast radius as "shape only", but `convex-backend` currently imports
+  *nothing* from `packages/`, so this would make the Convex deployment bundle a
+  workspace package for the first time — a build/deploy change, not just a code
+  move. The fixture table above is imported only by tests, so it carries none of
+  that risk. Worth doing, but as its own change with a deploy verified.
+- **D7 (quantity validation), D8 (condition vocabulary), D9 (bulk add)** — still
+  divergent, as scoped. §7 step 3 covers D3–D6 only. D9 in particular is a whole
+  endpoint the demo does not implement.
