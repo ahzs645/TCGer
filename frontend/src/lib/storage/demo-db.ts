@@ -44,6 +44,18 @@ import { DEMO_DB_NAME } from "./keys";
 // whatever the registry lists, so a local literal that drifted would leave this
 // database behind on a "reset local data".
 
+/**
+ * The schema version a legacy `tcg-demo-store` payload is written in.
+ *
+ * It is whatever shape the zustand/persist build wrote, which is schema 1 —
+ * NOT whatever DEMO_SCHEMA_VERSION happens to be when the import runs. Stamping
+ * the current version on it would mark unmigrated data as already-migrated, and
+ * because the localStorage source is deleted straight afterwards there would be
+ * nothing left to recover from. Latent while DEMO_SCHEMA_VERSION is 1; silent
+ * corruption the first time it is bumped.
+ */
+const LEGACY_PAYLOAD_SCHEMA_VERSION = 1;
+
 /** `meta` row holding the application-level schema version (see below). */
 const META_SCHEMA_VERSION_KEY = "schemaVersion";
 /** `meta` row recording that the legacy localStorage payload was absorbed. */
@@ -323,22 +335,29 @@ class DexieDemoPersistence implements DemoPersistence {
     // another tab, or by a removal that failed after a successful import. An
     // empty `records` table is a second, independent guard — if anything has
     // ever been persisted here, this is not a first boot (§5 R1).
+    // The version the data we end up with is actually written in — which is
+    // not necessarily the one in `meta` yet, since a legacy import writes its
+    // own.
+    let loadedVersion = storedVersion;
+
     if (storedVersion === null && recordCount === 0) {
       loaded = await this.importLegacyState(db);
       if (generation !== this.generation || this.db !== db) return;
+      if (loaded) loadedVersion = LEGACY_PAYLOAD_SCHEMA_VERSION;
     }
 
     if (!loaded) {
       loaded = readRecordRows(await db.records.toArray());
       if (generation !== this.generation || this.db !== db) return;
-      if (
-        loaded &&
-        storedVersion !== null &&
-        storedVersion < DEMO_SCHEMA_VERSION
-      ) {
-        loaded = await this.migrateStoredState(db, loaded, storedVersion);
-        if (generation !== this.generation || this.db !== db) return;
-      }
+    }
+
+    // Migration runs on whichever path produced the data. Gating it on the
+    // read path alone meant an imported legacy payload skipped it entirely
+    // while already carrying a version marker — unmigrated data labelled
+    // migrated, with the localStorage original already deleted.
+    if (loaded && loadedVersion !== null && loadedVersion < DEMO_SCHEMA_VERSION) {
+      loaded = await this.migrateStoredState(db, loaded, loadedVersion);
+      if (generation !== this.generation || this.db !== db) return;
     }
 
     // Replay: anything `commit()` buffered while this read was in flight is
@@ -383,7 +402,10 @@ class DexieDemoPersistence implements DemoPersistence {
       await db.transaction("rw", db.records, db.meta, async () => {
         await db.records.bulkPut(rows);
         await db.meta.bulkPut([
-          { key: META_SCHEMA_VERSION_KEY, value: DEMO_SCHEMA_VERSION },
+          {
+            key: META_SCHEMA_VERSION_KEY,
+            value: LEGACY_PAYLOAD_SCHEMA_VERSION,
+          },
           {
             key: META_LEGACY_IMPORT_KEY,
             value: {
