@@ -209,3 +209,71 @@ test("row writes touch one table, not the whole collection", async () => {
     "commit should name exactly the tables the add touched",
   );
 });
+
+test("concurrent transactions do not share an overlay", async () => {
+  const db = new LocalPortableDb();
+  const binderId = await makeBinder(db, "Concurrent");
+
+  // Two overlapping mutations. Before transactions were serialised the second
+  // joined the first's staged buffer, so the loser's writes vanished — the
+  // data-loss bug societyer records in its own local row store.
+  await Promise.all([
+    addCopies(db, {
+      userId: USER,
+      binderId,
+      card: { tcg: "magic", externalId: "concurrent-a", name: "A" },
+      quantity: 2,
+    }),
+    addCopies(db, {
+      userId: USER,
+      binderId,
+      card: { tcg: "magic", externalId: "concurrent-b", name: "B" },
+      quantity: 3,
+    }),
+  ]);
+
+  const entries = await binderEntries(db, binderId);
+  assert.equal(entries.length, 5, "both adds must survive, 2 + 3");
+  const cards = await Promise.all(
+    entries.map((entry) => db.get("cards", entry.cardId)),
+  );
+  const names = new Set(cards.map((card) => card?.name));
+  assert.deepEqual([...names].sort(), ["A", "B"], "both cards must exist");
+});
+
+test("a failed transaction does not roll back a concurrent one", async () => {
+  const db = new LocalPortableDb();
+  const binderId = await makeBinder(db, "Isolation");
+
+  const good = addCopies(db, {
+    userId: USER,
+    binderId,
+    card: { tcg: "magic", externalId: "survivor", name: "Survivor" },
+    quantity: 1,
+  });
+  const bad = db
+    .transaction(["collectionEntries"], async () => {
+      await db.insert("collectionEntries", {
+        userId: USER,
+        binderId,
+        cardId: "nonexistent",
+        quantity: 1,
+        createdAt: 0,
+        updatedAt: 0,
+      });
+      throw new Error("rollback me");
+    })
+    .catch((error: unknown) => error);
+
+  await good;
+  const outcome = await bad;
+  assert.ok(outcome instanceof Error, "the failing transaction must reject");
+
+  const entries = await binderEntries(db, binderId);
+  assert.equal(
+    entries.length,
+    1,
+    "the committed add must survive the rollback",
+  );
+  assert.equal(entries[0]!.cardId !== "nonexistent", true, "no orphan row");
+});

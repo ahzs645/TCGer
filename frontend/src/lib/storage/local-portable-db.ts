@@ -83,6 +83,9 @@ export class LocalPortableDb implements PortableDb {
 
   /** Non-null while inside `transaction()`: buffered writes, not yet visible. */
   private staged: PortableSnapshot | null = null;
+
+  /** Serialises transactions; see {@link transaction}. */
+  private queue: Promise<void> = Promise.resolve();
   private stagedTables: Set<PortableTableName> | null = null;
 
   constructor(initial: PortableSnapshot = emptySnapshot()) {
@@ -221,19 +224,45 @@ export class LocalPortableDb implements PortableDb {
     return Promise.resolve();
   }
 
-  async transaction<R>(
+  /**
+   * Run `fn` atomically, serialised against every other transaction.
+   *
+   * The queue is not belt-and-braces: there is exactly one staged buffer, so
+   * two transactions in flight at once would share it. The second would join
+   * the first's overlay and they would commit — or roll back — together,
+   * losing whichever writes lost the race. societyer hit precisely this and
+   * fixed it the same way (`shared/portable/localRowStore.ts`, transactions
+   * serialised through a promise queue "after a data-loss bug from concurrent
+   * mutations sharing an overlay"). It is reachable here because
+   * `handleDemoRequest` is async and nothing stops the UI issuing overlapping
+   * requests.
+   *
+   * A consequence worth stating: transactions must not nest. A rule that
+   * called this from inside another transaction's body would queue behind
+   * itself and hang. None of the collection rules do — each mutation opens
+   * exactly one transaction, the same shape societyer's runtime enforces by
+   * wrapping every mutation once.
+   */
+  transaction<R>(
     tables: readonly PortableTableName[],
     fn: () => Promise<R>,
   ): Promise<R> {
     // Declared tables are not needed here — the whole working set is in memory
-    // and single-threaded, so there is nothing to lock. Convex and Dexie both
-    // require them, which is why the contract carries them.
+    // and access is serialised, so there is nothing to lock. Convex and Dexie
+    // both require them, which is why the contract carries them.
     void tables;
-    if (this.staged) {
-      // Already inside one. Nesting shares the outer buffer rather than
-      // committing early, so an inner failure still rolls the outer back.
-      return fn();
-    }
+    const run = () => this.runExclusively(fn);
+    const result = this.queue.then(run, run);
+    // The queue must not reject, or every later transaction inherits the
+    // failure; callers still see the real rejection through `result`.
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async runExclusively<R>(fn: () => Promise<R>): Promise<R> {
     this.staged = { ...this.tables };
     this.stagedTables = new Set();
     try {
