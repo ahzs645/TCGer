@@ -5,6 +5,7 @@
 
 import {
   useDemoStore,
+  whenDemoStoreHydrated,
   type DemoBinder,
   type DemoBinderCard,
   type DemoOwnedCard,
@@ -466,11 +467,20 @@ async function demoCardsInSet(tcg: TcgCode, setCode: string): Promise<Card[]> {
  * Main entry point — called by the fetch interceptor in demo-mode.ts.
  * Parses the URL path and method and dispatches to the right handler.
  */
-export function handleDemoRequest(
+export async function handleDemoRequest(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<Response> {
+  // The demo store now hydrates from IndexedDB, which is asynchronous where
+  // localStorage was not. Handlers below call init() and read the store in the
+  // same tick, so without waiting here the first request after a cold load
+  // would answer from a store that is empty only because the read has not
+  // landed yet — a returning visitor would see an empty collection flash, and
+  // init() could seed over their data. Resolves immediately once hydrated, and
+  // never rejects: a storage failure resolves with nothing loaded.
+  await whenDemoStoreHydrated();
+
   // Strip query string for routing, but keep it for parsing params
   const [routePath, queryString] = path.split("?");
   const segments = routePath.replace(/^\//, "").split("/");

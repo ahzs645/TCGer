@@ -26,6 +26,7 @@ import {
   type DemoSlice,
   type PersistedDemoState,
 } from "@/lib/storage/demo-persistence";
+import { createDemoPersistence } from "@/lib/storage/demo-db";
 import type {
   AddWishlistCardInput,
   Card,
@@ -708,14 +709,14 @@ function createLocalStoragePersistence(): MaybeSyncPersistence | null {
 }
 
 function createDefaultDemoPersistence(): MaybeSyncPersistence {
-  return (
-    createLocalStoragePersistence() ?? {
-      // No storage at all (SSR, prerender, a browser with it disabled). The
-      // memory fallback is synchronous by construction, so mark it as such.
-      ...createMemoryPersistence(),
-      hydratesSynchronously: true,
-    }
-  );
+  // Dexie. Deliberately NOT marked `hydratesSynchronously`: IndexedDB reads are
+  // async, so init()/resetDemo() must take the deferred path and wait rather
+  // than deciding to seed over a collection that has merely not loaded yet.
+  //
+  // createDemoPersistence() already falls back to the in-memory contract when
+  // there is no window (SSR/prerender) or IndexedDB is unusable (private
+  // browsing, sandboxed iframe), so the demo keeps working without storage.
+  return createDemoPersistence();
 }
 
 /** The persisted slices as they are before anything is stored or seeded. */
@@ -801,8 +802,20 @@ function applyHydratedSnapshot(): void {
       // A write that landed while the read was in flight is newer than the
       // read, so it wins — the reference's `preHydrationOps` buffer, inverted.
       if (preHydrationDirty.has(slice)) continue;
-      const stored = snapshot[slice];
+      let stored = snapshot[slice];
       if (stored === undefined || stored === current[slice]) continue;
+      if (slice === "preferences") {
+        // A payload written by an older build predates any preference added
+        // since, and the persistence layer validates this slice as "an object"
+        // only — it cannot fill the gaps without importing this module and
+        // creating a cycle. Merging over the defaults here means a missing
+        // field reads as its default rather than undefined, which would
+        // otherwise reach `getPreferences()` and the settings UI.
+        stored = {
+          ...DEFAULT_DEMO_PREFERENCES,
+          ...(stored as Partial<UserPreferences>),
+        } as PersistedDemoState["preferences"];
+      }
       writeSlice(patch, slice, stored);
       writeSlice(persistBaseline, slice, stored);
       changed = true;
