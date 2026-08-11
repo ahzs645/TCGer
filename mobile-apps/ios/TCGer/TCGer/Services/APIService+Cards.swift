@@ -169,6 +169,9 @@ extension APIService {
         cardId: String
     ) async throws -> [Card] {
         if config.isOnDevice {
+            if let game = TCGGame(rawValue: tcg) {
+                await prepareLocalCatalog(for: game)
+            }
             return LocalStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
         }
 

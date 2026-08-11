@@ -410,6 +410,8 @@ struct ScannerSessionReviewView: View {
 private struct ScannerMatchPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: CardScannerViewModel
+    @State private var printSelectionCard: Card?
+    @State private var selectedPrint: Card?
     let resultID: CardScanResult.ID
     let color: Color
 
@@ -436,6 +438,23 @@ private struct ScannerMatchPickerView: View {
                             }
                             .padding(.vertical, 3)
                         }
+
+                        if let card = result.primary.resolvedCard,
+                           card.supportsPrintSelection {
+                            Button {
+                                selectedPrint = card
+                                printSelectionCard = card
+                            } label: {
+                                Label("Other Printings", systemImage: "rectangle.stack")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(color)
+
+                            Text("Choose another set printing or a World Championship version of this card.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .padding()
                 } else {
@@ -454,6 +473,13 @@ private struct ScannerMatchPickerView: View {
                 }
             }
         }
+        .sheet(item: $printSelectionCard, onDismiss: applySelectedPrint) { card in
+            SelectPrintSheet(
+                card: card,
+                selectedPrint: $selectedPrint,
+                onCancel: { selectedPrint = nil }
+            )
+        }
     }
 
     private var result: CardScanResult? {
@@ -464,6 +490,13 @@ private struct ScannerMatchPickerView: View {
         guard let result else { return [] }
         let candidates = [result.primary] + result.alternatives.filter { $0.id != result.primary.id }
         return Array(candidates.sorted { $0.confidence.score > $1.confidence.score }.prefix(5))
+    }
+
+    private func applySelectedPrint() {
+        defer { selectedPrint = nil }
+        guard let selectedPrint else { return }
+        viewModel.selectCandidate(.manual(card: selectedPrint), for: resultID)
+        HapticManager.selection()
     }
 
     private func capturedCard(_ result: CardScanResult) -> some View {

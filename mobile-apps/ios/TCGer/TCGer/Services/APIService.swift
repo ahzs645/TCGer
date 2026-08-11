@@ -928,6 +928,15 @@ final class LocalStore {
             return grouped
         }
 
+        if let game = TCGGame(rawValue: tcg),
+           let entry = CatalogStore.shared.entry(id: cardId) {
+            let exactName = SearchTextNormalizer.key(entry.card.name)
+            return CatalogStore.shared
+                .search(query: entry.card.name, tcg: game, limit: 500)
+                .filter { SearchTextNormalizer.key($0.card.name) == exactName }
+                .map(CatalogStore.shared.card(from:))
+        }
+
         if let card = searchCatalog.first(where: { $0.id == cardId || $0.tcg == tcg && $0.id == cardId }) {
             return [card]
         }

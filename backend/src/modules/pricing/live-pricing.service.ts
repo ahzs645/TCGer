@@ -13,6 +13,7 @@ import {
 } from './pricing.types';
 
 export * from './pricing.types';
+export * from './collectr-test-price-provider';
 
 function readPrice(
   attributes: Record<string, unknown> | undefined,

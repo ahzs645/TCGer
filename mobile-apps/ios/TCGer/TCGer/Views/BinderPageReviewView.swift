@@ -1241,6 +1241,8 @@ private struct BinderCardDetectionDetailView: View {
     let onExcludeGeneral: () -> Void
     let onExclude: (BinderCardExclusionReason) -> Void
     @State private var showingCardSearch = false
+    @State private var printSelectionCard: Card?
+    @State private var selectedPrint: Card?
     @State private var correctionFeedback: String?
     @State private var correctionFeedbackIsError = false
 
@@ -1293,6 +1295,22 @@ private struct BinderCardDetectionDetailView: View {
                         .foregroundStyle(correctionFeedbackIsError ? Color.orange : Color.green)
                     }
 
+                    if let card = detection.selectedCandidate?.resolvedCard,
+                       card.supportsPrintSelection {
+                        Button {
+                            selectedPrint = card
+                            printSelectionCard = card
+                        } label: {
+                            Label("Other Printings", systemImage: "rectangle.stack")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Text("Includes alternate set printings and World Championship versions when available.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if detection.candidateOptions.count > 1 {
                         alternatives
                     }
@@ -1337,6 +1355,18 @@ private struct BinderCardDetectionDetailView: View {
                 applyManualMatch(details: CardDetails(card: card))
                 showingCardSearch = false
             }
+        }
+        .sheet(item: $printSelectionCard, onDismiss: {
+            if let selectedPrint {
+                applyManualMatch(details: CardDetails(card: selectedPrint))
+            }
+            selectedPrint = nil
+        }) { card in
+            SelectPrintSheet(
+                card: card,
+                selectedPrint: $selectedPrint,
+                onCancel: { selectedPrint = nil }
+            )
         }
     }
 

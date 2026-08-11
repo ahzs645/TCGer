@@ -40,14 +40,20 @@ struct SelectPrintSheet: View {
                     EmptyPrintsView()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(prints) { print in
-                                PrintRow(
-                                    print: print,
-                                    isSelected: selectedPrint?.id == print.id,
-                                    onTap: {
-                                        selectedPrint = print
-                                    }
+                        LazyVStack(alignment: .leading, spacing: 18) {
+                            if !worldChampionshipPrints.isEmpty {
+                                printSection(
+                                    title: "World Championship Versions",
+                                    subtitle: "Official replica cards with a printed signature and championship card back.",
+                                    prints: worldChampionshipPrints
+                                )
+                            }
+
+                            if !standardPrints.isEmpty {
+                                printSection(
+                                    title: worldChampionshipPrints.isEmpty ? nil : "Other Printings",
+                                    subtitle: nil,
+                                    prints: standardPrints
                                 )
                             }
                         }
@@ -84,9 +90,58 @@ struct SelectPrintSheet: View {
         }
     }
 
+    private var worldChampionshipPrints: [Card] {
+        prints
+            .filter { $0.pokemonPrint?.worldChampionship != nil }
+            .sorted {
+                let left = $0.pokemonPrint?.worldChampionship?.year ?? 0
+                let right = $1.pokemonPrint?.worldChampionship?.year ?? 0
+                if left != right { return left > right }
+                return ($0.pokemonPrint?.worldChampionship?.playerName ?? "")
+                    .localizedCaseInsensitiveCompare(
+                        $1.pokemonPrint?.worldChampionship?.playerName ?? ""
+                    ) == .orderedAscending
+            }
+    }
+
+    private var standardPrints: [Card] {
+        prints.filter { $0.pokemonPrint?.worldChampionship == nil }
+    }
+
+    @ViewBuilder
+    private func printSection(
+        title: String?,
+        subtitle: String?,
+        prints: [Card]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                Text(title)
+                    .font(.headline)
+            }
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(prints) { print in
+                PrintRow(
+                    print: print,
+                    isSelected: selectedPrint?.id == print.id,
+                    onTap: { selectedPrint = print }
+                )
+            }
+        }
+    }
+
     @MainActor
     private func loadPrints() async {
-        guard let token = environmentStore.authToken else {
+        let token: String
+        if environmentStore.serverConfiguration.isOnDevice {
+            token = environmentStore.authToken ?? ""
+        } else if let authToken = environmentStore.authToken {
+            token = authToken
+        } else {
             errorMessage = "Not authenticated"
             isLoading = false
             return
@@ -95,32 +150,61 @@ struct SelectPrintSheet: View {
         isLoading = true
         errorMessage = nil
 
+        var loadedPrints: [Card] = []
+        var loadingError: Error?
+
         do {
-            prints = try await apiService.getCardPrints(
+            loadedPrints = try await apiService.getCardPrints(
                 config: environmentStore.serverConfiguration,
                 token: token,
                 tcg: card.tcg,
                 cardId: card.id
             )
+        } catch {
+            loadingError = error
+        }
 
-            // If current selected print is in the list, keep it selected;
-            // otherwise select the first available option.
-            if !prints.contains(where: { $0.id == selectedPrint?.id }) {
+        do {
+            let game = TCGGame(rawValue: card.tcg) ?? .all
+            let namedPrints = try await apiService.searchAllCards(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                query: card.name,
+                game: game,
+                includeAllPrintings: true,
+                limit: 500
+            )
+            let exactName = SearchTextNormalizer.key(card.name)
+            loadedPrints.append(contentsOf: namedPrints.filter {
+                SearchTextNormalizer.key($0.name) == exactName
+            })
+        } catch {
+            loadingError = loadingError ?? error
+        }
+
+        var seenIDs: Set<String> = []
+        prints = loadedPrints.filter { seenIDs.insert($0.id).inserted }
+
+        if prints.isEmpty, let loadingError {
+            errorMessage = loadingError.localizedDescription
+            isLoading = false
+            return
+        }
+
+        // If current selected print is in the list, keep it selected;
+        // otherwise select the scanned printing when available.
+        if !prints.contains(where: { $0.id == selectedPrint?.id }) {
+            selectedPrint = prints.first(where: { $0.id == card.id }) ?? prints.first ?? card
+        }
+
+        isLoading = false
+
+        // Automatically skip the picker when one or fewer print options are available.
+        if prints.count <= 1 {
+            if selectedPrint == nil {
                 selectedPrint = prints.first ?? card
             }
-
-            isLoading = false
-
-            // Automatically skip the picker when one or fewer print options are available.
-            if prints.count <= 1 {
-                if selectedPrint == nil {
-                    selectedPrint = prints.first ?? card
-                }
-                dismiss()
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
+            dismiss()
         }
     }
 }

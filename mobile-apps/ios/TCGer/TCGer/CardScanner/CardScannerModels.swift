@@ -248,6 +248,39 @@ struct CardScanCandidate: Identifiable, Hashable, Sendable {
     }
 }
 
+extension CardScanCandidate {
+    /// The catalog card represented by this match. Some scanner strategies
+    /// only retain identity fields, so provide a usable fallback for print
+    /// lookup and manual selection.
+    var resolvedCard: Card? {
+        if let sourceCard = details.sourceCard {
+            return sourceCard
+        }
+        guard details.identity.game != .all else { return nil }
+        return Card(
+            id: details.identity.id,
+            name: details.identity.name,
+            tcg: details.identity.game.rawValue,
+            setCode: details.identity.setCode,
+            setName: details.identity.setName,
+            rarity: details.rarity,
+            imageUrl: details.imageURL?.absoluteString,
+            imageUrlSmall: details.imageURL?.absoluteString,
+            price: details.price,
+            collectorNumber: nil,
+            releasedAt: nil
+        )
+    }
+
+    static func manual(card: Card) -> CardScanCandidate {
+        CardScanCandidate(
+            details: CardDetails(card: card),
+            confidence: CardScanConfidence(score: 1, reason: "Selected manually"),
+            originatingStrategy: .manual
+        )
+    }
+}
+
 struct CardScanResult: Identifiable {
     let id: UUID
     let mode: ScanMode
