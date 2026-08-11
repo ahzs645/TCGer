@@ -18,6 +18,114 @@ as findings.
 
 ---
 
+## Outcome (updated after the fix pass)
+
+All 25 findings were worked. **24 are fixed and verified in a browser; 1 is
+deferred as a product decision.** Verification re-ran the exact measurement
+behind each finding against the demo's real shipped artifact (the
+`DEMO_EXPORT=true` static export), not against a dev server: 32 of 33
+automated checks pass, and the 33rd was a probe defect, not a product one.
+
+| # | Finding | Status |
+| --- | --- | --- |
+| 01 | Account menu off-screen | Fixed — rightmost control now ends at 1244/1330/1370/1418/1450/1610 for 1280→1920 |
+| 02 | Logo clipped to "TCGe" | Fixed — link measures 101px at every width (was 69px) |
+| 03 | `/demo/guides` has no nav | Fixed — 12 header controls present |
+| 04 | Analytics chart draws no bars | Fixed — 6 bars, heights 119–152px in a 192px row; live app too |
+| 05 | Wishlist sidebar clipped 33px | Fixed — button 280px, labels read 92% / 100% / 75% |
+| 06 | Card explorer dead space | Fixed — page height 900px against a 900px viewport |
+| 07 | Placeholder truncated | Fixed — 222px input, placeholder fits |
+| 08 | Totals disagree / drift | Fixed — dashboard, analytics and prices all read 68 cards / $1430.07, identical across fresh sessions |
+| 09 | Set completion contradicts itself | Fixed — list and detail both read 6/7 for MH2 |
+| 10 | Exact printings 0/N | Fixed — MH2 6/7, LOB 4/6, STA 3/3 |
+| 11 | Activity all one date | Fixed — 4 distinct dates |
+| 12 | `catalog/manifest.json` 404 | Fixed — no 4xx on any demo route |
+| 13 | Trades scrolls sideways | Fixed — scrollWidth 390 against a 390px viewport |
+| 14 | Price columns clipped | Fixed — 41 change values fully on-screen |
+| 15 | Header/button collision | Fixed on trades, decks and sealed |
+| 16 | Desktop placeholders on mobile | Fixed on decks and collections |
+| 17 | Sub-44px tap targets | Fixed — 44×44 `::before`, visual glyph unchanged |
+| 18 | Wishlist detail cramped | Fixed — title no longer truncates |
+| 19 | Unexplained disabled actions | Fixed on all three |
+| 20 | Scan is a dead end | Investigated, not implemented — see below |
+| 21 | Packs ships its dev HUD | Fixed — hidden in a production build, `?debug=1` opts in |
+| 22 | Every tab titled "TCGer Demo" | Fixed — 12/12 distinct titles |
+| 23 | Dashboard has no `<h1>` | Fixed |
+| 24 | Placeholder card art | **Deferred — product decision, see below** |
+| 25 | Guides opens on an empty guide | Fixed — opens on the index |
+
+`tsc --noEmit` clean, 14/14 tests pass, lint 0 errors. The swarm added exactly
+2 lint warnings (75 → 77), both instances of the `mounted`-flag
+`set-state-in-effect` pattern that `dashboard-content.tsx` already uses and
+already warns on.
+
+### Corrections to this review
+
+- **Finding 08 was wrong about Decks.** "156 total cards" was never
+  hardcoded — the page already summed `quantity` across all six decks
+  (31+36+30+17+13+29). It is legitimately a different figure from the
+  collection total, so the value stayed and only the label changed to
+  "Cards Across Decks".
+- **The unnamed control in "What holds up" was a false positive.** The audit
+  did not filter on visibility, so it flagged a Radix `Select` trigger inside
+  the `hidden lg:block` inspector — in the DOM, never reachable at 390px.
+  Adding `aria-label` there would have been actively wrong: on a
+  `role="combobox"` trigger it replaces the name computed from content,
+  trading the announced value for a static field name.
+- **Finding 16's premise was partly wrong.** Decks does not expand inline on
+  mobile; the detail renders full-width below all six deck cards. Only the
+  empty placeholder is hidden, so a selected deck still renders at every width.
+
+### Deferred
+
+**24 — placeholder card art.** `DemoCard` in `src/lib/data/demo-cards.ts`
+carries `id/tcg/name/setCode/setName/rarity/price` and no image field; there
+are zero image URLs in the file. Fixing this means either licensing and
+shipping ~60 card images in the static export, or wiring the demo to a live
+card API — which defeats the point of an offline demo. That is a product
+call, not a bug fix.
+
+### New findings from the fix pass
+
+**26. `/sets/[tcg]/[setCode]` 500s in a server build (pre-existing).** Under
+`next start`, the route throws *"Page changed from static to dynamic at
+runtime, reason: headers"* — it is prerendered via `generateStaticParams` but
+`getToken()` reads `headers()` at request time. Confirmed pre-existing: it
+reproduces with our only file under that directory removed. The demo is
+unaffected because it ships as a static export, where the route prerenders
+correctly and returns 6/7 — but the **live app** serves this route the same
+way and would hit it. Fixing it means choosing a rendering strategy for that
+route, which is beyond this review's scope.
+
+**27. Two shared UI primitives carry traps that will recur.**
+`src/components/ui/tabs.tsx:33` puts `min-w-[120px]` on every `TabsTrigger`
+while `TabsList` never wraps — that is what made trades overflow, and it will
+do the same to any other narrow tab row. `src/components/ui/scroll-area.tsx`
+forwards no viewport className, so its `display: table` content wrapper cannot
+be overridden by consumers — that is what clipped the wishlist sidebar. Both
+were worked around at the call site; fixing them at the source would prevent
+recurrence.
+
+### Follow-ups not taken
+
+- **Scan (20)** was investigated but not implemented, because the nav config
+  needed changes in a file another agent owned mid-run. The minimal change is
+  about six lines in `app-shell.tsx`: derive `primaryNavigation` from
+  `demoMode`, filter `/scan` out of it, append Scan to `mobileNavSecondary`,
+  and thread `primaryNavigation.slice(0, 3)` into `MobileBottomNav`. Note
+  `command-menu.tsx:114-121` hardcodes its own "Card Scan" entry and would
+  want the same treatment.
+- **The header fix cost the game switcher on tablets.** Because the container
+  caps content at 1312px at every width, nav labels and game labels cannot
+  coexist; the switcher moved from `sm:flex` to `lg:flex`, so there is no
+  visible game filter between 640px and 1023px (⌘K still has "Switch TCG").
+  Raising the "Quick Actions" text and ⌘K `<kbd>` in `command-menu.tsx:77-88`
+  to `lg:` frees ~134px and would let the switcher return to `sm:flex`.
+- **Decks has no scroll-into-view on mobile.** Tapping a deck renders its
+  detail below all six cards, so it can look like nothing happened.
+
+---
+
 ## Blockers
 
 ### 1. The account menu is completely off-screen at every common laptop width
