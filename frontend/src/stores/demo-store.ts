@@ -4,6 +4,14 @@ import { useShallow } from "zustand/react/shallow";
 import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
 import { GAME_LABELS } from "@/lib/utils";
 import {
+  DEMO_DECKS,
+  DEMO_SEALED_PRODUCTS,
+  DEMO_TRADES,
+  type Deck,
+  type SealedProduct,
+  type Trade,
+} from "@/lib/data/demo-portfolio";
+import {
   matchCatalogCards,
   type CatalogCardLookup,
 } from "@/lib/catalog/catalog-search";
@@ -199,6 +207,15 @@ function createRandom(seed: number): () => number {
 /** Seeded cards are back-dated across this window so activity looks alive. */
 const DEMO_ACTIVITY_WINDOW_DAYS = 42;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const DECK_COLORS = [
+  "#8b5cf6",
+  "#3b82f6",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#6366f1",
+];
 
 const BINDER_COLORS = [
   "#3b82f6",
@@ -475,6 +492,9 @@ interface DemoState {
   preferences: UserPreferences;
   binders: DemoBinder[];
   wishlists: DemoWishlist[];
+  decks: Deck[];
+  trades: Trade[];
+  sealed: SealedProduct[];
 
   // Lifecycle
   init: () => void;
@@ -485,6 +505,31 @@ interface DemoState {
   updateProfile: (data: Partial<DemoProfile>) => void;
   updatePreferences: (data: Partial<UserPreferences>) => UserPreferences;
   getPreferences: () => UserPreferences;
+
+  // Decks, trades and sealed inventory
+  addDeck: (input: {
+    name: string;
+    tcg: Deck["tcg"];
+    format: string;
+    description?: string;
+  }) => string;
+  removeDeck: (id: string) => void;
+  addTrade: (input: {
+    partner: string;
+    giving: Trade["giving"];
+    receiving: Trade["receiving"];
+  }) => string;
+  setTradeStatus: (id: string, status: Trade["status"]) => void;
+  addSealedProduct: (input: {
+    name: string;
+    tcg: SealedProduct["tcg"];
+    type: string;
+    set: string;
+    quantity: number;
+    purchasePrice: number;
+    currentValue: number;
+  }) => string;
+  removeSealedProduct: (id: string) => void;
 
   // Binders
   addBinder: (name: string, color?: string) => string;
@@ -545,6 +590,9 @@ export const useDemoStore = create<DemoState>()(
       preferences: DEFAULT_DEMO_PREFERENCES,
       binders: [],
       wishlists: [],
+      decks: DEMO_DECKS,
+      trades: DEMO_TRADES,
+      sealed: DEMO_SEALED_PRODUCTS,
 
       init: () => {
         if (get().initialized) return;
@@ -552,6 +600,9 @@ export const useDemoStore = create<DemoState>()(
           initialized: true,
           binders: seedBinders(),
           wishlists: seedWishlists(),
+          decks: DEMO_DECKS,
+          trades: DEMO_TRADES,
+          sealed: DEMO_SEALED_PRODUCTS,
         });
       },
 
@@ -562,6 +613,9 @@ export const useDemoStore = create<DemoState>()(
           preferences: DEFAULT_DEMO_PREFERENCES,
           binders: seedBinders(),
           wishlists: seedWishlists(),
+          decks: DEMO_DECKS,
+          trades: DEMO_TRADES,
+          sealed: DEMO_SEALED_PRODUCTS,
         });
       },
 
@@ -670,6 +724,87 @@ export const useDemoStore = create<DemoState>()(
       }),
 
       // ── Binders ──────────────────────────────────────────────────
+      /* ---------- Decks, trades and sealed inventory ---------- */
+
+      addDeck: ({ name, tcg, format, description }) => {
+        const id = uid();
+        set((state) => ({
+          decks: [
+            {
+              id,
+              name,
+              tcg,
+              format,
+              description: description?.trim() || "No description yet.",
+              color: DECK_COLORS[state.decks.length % DECK_COLORS.length],
+              cards: [],
+              lastUpdated: new Date().toISOString().slice(0, 10),
+              isComplete: false,
+            },
+            ...state.decks,
+          ],
+        }));
+        return id;
+      },
+
+      removeDeck: (id) =>
+        set((state) => ({ decks: state.decks.filter((d) => d.id !== id) })),
+
+      addTrade: ({ partner, giving, receiving }) => {
+        const id = uid();
+        set((state) => ({
+          trades: [
+            {
+              id,
+              partner,
+              status: "pending",
+              date: new Date().toISOString().slice(0, 10),
+              giving,
+              receiving,
+            },
+            ...state.trades,
+          ],
+        }));
+        return id;
+      },
+
+      setTradeStatus: (id, status) =>
+        set((state) => ({
+          trades: state.trades.map((t) => (t.id === id ? { ...t, status } : t)),
+        })),
+
+      addSealedProduct: ({
+        name,
+        tcg,
+        type,
+        set: setName,
+        quantity,
+        purchasePrice,
+        currentValue,
+      }) => {
+        const id = uid();
+        set((state) => ({
+          sealed: [
+            {
+              id,
+              name,
+              tcg,
+              type,
+              quantity,
+              purchasePrice,
+              currentValue,
+              purchaseDate: new Date().toISOString().slice(0, 10),
+              set: setName,
+            },
+            ...state.sealed,
+          ],
+        }));
+        return id;
+      },
+
+      removeSealedProduct: (id) =>
+        set((state) => ({ sealed: state.sealed.filter((p) => p.id !== id) })),
+
       addBinder: (name, color) => {
         const id = uid();
         const now = new Date().toISOString();

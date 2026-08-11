@@ -249,6 +249,50 @@ const TCG_COLORS: Record<string, string> = {
   "Yu-Gi-Oh!": "#ef4444",
 };
 
+/**
+ * Sortable column header.
+ *
+ * These were bare `<th onClick>` elements: clickable with a mouse, invisible to
+ * the keyboard, and announcing no sort state. The button carries the action and
+ * `aria-sort` carries the state, so the column is operable and readable by
+ * assistive tech.
+ */
+function SortableHeader({
+  label,
+  sortKey,
+  sortBy,
+  sortAsc,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sortBy: SortKey;
+  sortAsc: boolean;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sortBy === sortKey;
+  const Icon = !active ? ArrowUpDown : sortAsc ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={`p-0 text-right font-medium text-muted-foreground ${className ?? ""}`}
+      aria-sort={active ? (sortAsc ? "ascending" : "descending") : "none"}
+      scope="col"
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex w-full items-center justify-end gap-1 p-3 text-right hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        aria-label={`Sort by ${label}${active ? (sortAsc ? ", currently ascending" : ", currently descending") : ""}`}
+      >
+        {label}
+        <Icon className="h-3 w-3" aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
 export default function PricesPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("price");
@@ -595,45 +639,28 @@ export default function PricesPage() {
                     >
                       Owned
                     </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("price")}
-                      data-oid="0r.tck9"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="yia49:7"
-                      >
-                        Price{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="k2h9vk0" />
-                      </span>
-                    </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none hidden sm:table-cell"
-                      onClick={() => handleSort("7d")}
-                      data-oid="ypqhnbk"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="t-utxh3"
-                      >
-                        7d{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="g.dmho:" />
-                      </span>
-                    </th>
-                    <th
-                      className="p-3 text-right font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("30d")}
-                      data-oid="fo8g:f_"
-                    >
-                      <span
-                        className="inline-flex items-center gap-1"
-                        data-oid="aegzjd6"
-                      >
-                        30d{" "}
-                        <ArrowUpDown className="h-3 w-3" data-oid="2q_aq2_" />
-                      </span>
-                    </th>
+                    <SortableHeader
+                      label="Price"
+                      sortKey="price"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="7d"
+                      sortKey="7d"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                      className="hidden sm:table-cell"
+                    />
+                    <SortableHeader
+                      label="30d"
+                      sortKey="30d"
+                      sortBy={sortBy}
+                      sortAsc={sortAsc}
+                      onSort={handleSort}
+                    />
                   </tr>
                 </thead>
                 <tbody data-oid="5lzc6n9">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Repeat2, ArrowRight, Check, Clock, X, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -14,117 +14,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { Trade } from "@/lib/data/demo-portfolio";
+import { useDemoStore } from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake trade data                                                     */
 /* ------------------------------------------------------------------ */
-
-interface TradeCard {
-  name: string;
-  tcg: string;
-  value: number;
-}
-
-interface Trade {
-  id: string;
-  partner: string;
-  status: "completed" | "pending" | "declined";
-  date: string;
-  giving: TradeCard[];
-  receiving: TradeCard[];
-}
-
-const TRADES: Trade[] = [
-  {
-    id: "t1",
-    partner: "CardMaster42",
-    status: "completed",
-    date: "2025-03-15",
-    giving: [
-      { name: "Fury", tcg: "Magic", value: 12.0 },
-      { name: "Grief", tcg: "Magic", value: 8.5 },
-    ],
-
-    receiving: [
-      { name: "Ash Blossom & Joyous Spring", tcg: "Yu-Gi-Oh!", value: 5.5 },
-      { name: "Nibiru, the Primal Being", tcg: "Yu-Gi-Oh!", value: 8.95 },
-      { name: "Effect Veiler", tcg: "Yu-Gi-Oh!", value: 3.8 },
-    ],
-  },
-  {
-    id: "t2",
-    partner: "PikachuCollector",
-    status: "completed",
-    date: "2025-03-10",
-    giving: [
-      { name: "Mewtwo VSTAR", tcg: "Pokemon", value: 7.5 },
-      { name: "Pikachu", tcg: "Pokemon", value: 2.5 },
-    ],
-
-    receiving: [{ name: "Iono", tcg: "Pokemon", value: 32.0 }],
-  },
-  {
-    id: "t3",
-    partner: "ModernMage",
-    status: "pending",
-    date: "2025-03-18",
-    giving: [{ name: "Solitude", tcg: "Magic", value: 32.0 }],
-
-    receiving: [
-      { name: "Ragavan, Nimble Pilferer", tcg: "Magic", value: 68.4 },
-    ],
-  },
-  {
-    id: "t4",
-    partner: "DuelistKing",
-    status: "completed",
-    date: "2025-02-28",
-    giving: [
-      { name: "Pot of Greed", tcg: "Yu-Gi-Oh!", value: 3.2 },
-      { name: "Monster Reborn", tcg: "Yu-Gi-Oh!", value: 5.0 },
-      { name: "Raigeki", tcg: "Yu-Gi-Oh!", value: 6.25 },
-    ],
-
-    receiving: [{ name: "Accesscode Talker", tcg: "Yu-Gi-Oh!", value: 18.0 }],
-  },
-  {
-    id: "t5",
-    partner: "VintageVault",
-    status: "declined",
-    date: "2025-03-05",
-    giving: [{ name: "Charizard ex", tcg: "Pokemon", value: 85.0 }],
-
-    receiving: [
-      { name: "Lightning Bolt", tcg: "Magic", value: 1.5 },
-      { name: "Counterspell", tcg: "Magic", value: 2.25 },
-    ],
-  },
-  {
-    id: "t6",
-    partner: "TradeKing99",
-    status: "pending",
-    date: "2025-03-19",
-    giving: [
-      { name: "Endurance", tcg: "Magic", value: 26.0 },
-      { name: "Fatal Push", tcg: "Magic", value: 3.5 },
-    ],
-
-    receiving: [{ name: "Wrenn and Six", tcg: "Magic", value: 55.0 }],
-  },
-  {
-    id: "t7",
-    partner: "PKMNTrader",
-    status: "completed",
-    date: "2025-02-14",
-    giving: [{ name: "Palkia VSTAR", tcg: "Pokemon", value: 9.75 }],
-
-    receiving: [
-      { name: "Gardevoir ex", tcg: "Pokemon", value: 6.25 },
-      { name: "Eevee", tcg: "Pokemon", value: 0.75 },
-      { name: "Boss's Orders", tcg: "Pokemon", value: 2.5 },
-    ],
-  },
-];
 
 const STATUS_CONFIG = {
   completed: {
@@ -149,6 +54,57 @@ const STATUS_CONFIG = {
 
 export default function TradesPage() {
   const [tab, setTab] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // The demo store is persisted, so it only agrees with the server-rendered
+  // markup once we are on the client.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const storeTrades = useDemoStore((state) => state.trades);
+  const addTrade = useDemoStore((state) => state.addTrade);
+  const TRADES: Trade[] = mounted ? storeTrades : [];
+
+  const [form, setForm] = useState({
+    partner: "",
+    giveName: "",
+    giveValue: "",
+    receiveName: "",
+    receiveValue: "",
+  });
+
+  const canSubmit =
+    form.partner.trim() && form.giveName.trim() && form.receiveName.trim();
+
+  const handleCreate = () => {
+    if (!canSubmit) return;
+    addTrade({
+      partner: form.partner.trim(),
+      giving: [
+        {
+          name: form.giveName.trim(),
+          tcg: "Magic",
+          value: Number(form.giveValue) || 0,
+        },
+      ],
+      receiving: [
+        {
+          name: form.receiveName.trim(),
+          tcg: "Magic",
+          value: Number(form.receiveValue) || 0,
+        },
+      ],
+    });
+    setForm({
+      partner: "",
+      giveName: "",
+      giveValue: "",
+      receiveName: "",
+      receiveValue: "",
+    });
+    setCreateOpen(false);
+    setTab("pending");
+  };
 
   const filtered =
     tab === "all" ? TRADES : TRADES.filter((t) => t.status === tab);
@@ -184,17 +140,12 @@ export default function TradesPage() {
           <div className="flex flex-col items-start gap-1 sm:items-end">
             <Button
               size="sm"
-              disabled
-              title="Not available in the demo"
-              aria-label="New Trade (not available in the demo)"
+              onClick={() => setCreateOpen(true)}
               data-oid="e_i3k.-"
             >
               <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
               New Trade
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Creating trades is not available in the demo.
-            </p>
           </div>
         </div>
 
@@ -470,6 +421,85 @@ export default function TradesPage() {
           })}
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New trade offer</DialogTitle>
+            <DialogDescription>
+              Log what each side is putting up. The offer starts as pending.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="trade-partner">Trading with</Label>
+              <Input
+                id="trade-partner"
+                value={form.partner}
+                placeholder="Collector name"
+                onChange={(e) => setForm({ ...form, partner: e.target.value })}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trade-give">You give</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="trade-give"
+                  className="flex-1"
+                  value={form.giveName}
+                  placeholder="Card name"
+                  onChange={(e) =>
+                    setForm({ ...form, giveName: e.target.value })
+                  }
+                />
+                <Input
+                  className="w-24"
+                  inputMode="decimal"
+                  value={form.giveValue}
+                  placeholder="$0.00"
+                  aria-label="Value of the card you give"
+                  onChange={(e) =>
+                    setForm({ ...form, giveValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trade-receive">You receive</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="trade-receive"
+                  className="flex-1"
+                  value={form.receiveName}
+                  placeholder="Card name"
+                  onChange={(e) =>
+                    setForm({ ...form, receiveName: e.target.value })
+                  }
+                />
+                <Input
+                  className="w-24"
+                  inputMode="decimal"
+                  value={form.receiveValue}
+                  placeholder="$0.00"
+                  aria-label="Value of the card you receive"
+                  onChange={(e) =>
+                    setForm({ ...form, receiveValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!canSubmit}>
+              Log trade
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
