@@ -6,10 +6,6 @@ struct SetDetailView: View {
     @State private var cards: [Card] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedCard: Card?
-    @State private var showingPrintSelection = false
-    @State private var selectedPrint: Card?
-    @State private var currentPrintOptions: [Card] = []
     @State private var addSheetCard: Card?
     @State private var wishlistSheetCard: Card?
     @State private var ownedCardIds: Set<String> = []
@@ -249,14 +245,14 @@ struct SetDetailView: View {
                                         if isSelecting {
                                             toggleSelection(card.id)
                                         } else {
-                                            Task { await handleCardSelection(card) }
+                                            addSheetCard = card
                                         }
                                     }
                                     .cardPreviewContextMenu(card: card, onSelect: {
                                         if isSelecting {
                                             toggleSelection(card.id)
                                         } else {
-                                            Task { await handleCardSelection(card) }
+                                            addSheetCard = card
                                         }
                                     }, onAddToWishlist: {
                                         wishlistSheetCard = card
@@ -377,48 +373,22 @@ struct SetDetailView: View {
             guard !Task.isCancelled else { return }
             await loadOwnershipData(useCache: false)
         }
-        .sheet(isPresented: $showingPrintSelection) {
-            if let card = selectedCard {
-                SelectPrintSheet(
-                    card: card,
-                    selectedPrint: $selectedPrint,
-                    initialPrints: currentPrintOptions,
-                    onCancel: {
-                        selectedPrint = nil
-                        selectedCard = nil
-                        currentPrintOptions = []
-                    }
-                )
-                .environmentObject(environmentStore)
-            }
-        }
-        .onChange(of: showingPrintSelection) { oldValue, newValue in
-            if !newValue,
-               let baseCard = selectedCard,
-               baseCard.supportsPrintSelection,
-               let chosenPrint = selectedPrint {
-                addSheetCard = chosenPrint
-                selectedCard = nil
-            }
-        }
         .sheet(item: $wishlistSheetCard) { card in
             AddToWishlistSheet(card: card)
                 .environmentObject(environmentStore)
         }
         .sheet(item: $addSheetCard, onDismiss: {
-            selectedPrint = nil
-            currentPrintOptions = []
             addSheetCard = nil
         }) { card in
-            AddCardToBinderSheet(card: card) { binderId, details in
+            AddCardToBinderSheet(card: card) { selectedCard, binderId, details in
                 try await apiService.addCardToBinder(
                     config: environmentStore.serverConfiguration,
                     token: environmentStore.authToken,
                     binderId: binderId,
-                    card: card,
+                    card: selectedCard,
                     details: details
                 )
-                ownedCardIds.insert(card.id)
+                ownedCardIds.insert(selectedCard.id)
             }
         }
         .sheet(isPresented: $showingBulkBinderPicker) {
@@ -526,67 +496,6 @@ struct SetDetailView: View {
             selectedCardIds.remove(cardId)
         } else {
             selectedCardIds.insert(cardId)
-        }
-    }
-
-    private func handleCardSelection(_ card: Card) async {
-        if card.supportsPrintSelection {
-            await preparePrintSelection(for: card)
-        } else {
-            await MainActor.run {
-                currentPrintOptions = []
-                selectedPrint = nil
-                selectedCard = nil
-                addSheetCard = card
-                showingPrintSelection = false
-            }
-        }
-    }
-
-    private func preparePrintSelection(for card: Card) async {
-        await MainActor.run {
-            selectedCard = card
-            selectedPrint = nil
-            currentPrintOptions = []
-            addSheetCard = nil
-            showingPrintSelection = false
-        }
-
-        guard let token = environmentStore.authToken else {
-            await MainActor.run {
-                errorMessage = "Not authenticated"
-                selectedCard = nil
-            }
-            return
-        }
-
-        do {
-            let prints = try await apiService.getCardPrints(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                tcg: card.tcg,
-                cardId: card.id
-            )
-
-            await MainActor.run {
-                guard selectedCard?.id == card.id else { return }
-                currentPrintOptions = prints
-                selectedPrint = prints.first ?? card
-
-                if prints.count <= 1 {
-                    addSheetCard = selectedPrint
-                    selectedCard = nil
-                    showingPrintSelection = false
-                } else {
-                    showingPrintSelection = true
-                }
-            }
-        } catch {
-            await MainActor.run {
-                if selectedCard?.id == card.id {
-                    selectedCard = nil
-                }
-            }
         }
     }
 

@@ -1078,8 +1078,6 @@ private struct ScanResultSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCandidate: CardScanCandidate
     @State private var cardToAdd: Card?
-    @State private var printSelectionCard: Card?
-    @State private var selectedPrint: Card?
     @State private var debugCapture: APIService.ScanDebugCaptureResponse?
     @State private var debugCaptureError: String?
     @State private var isUpdatingDebugCapture = false
@@ -1114,9 +1112,6 @@ private struct ScanResultSheet: View {
                     if debugCapture != nil || debugCaptureError != nil {
                         debugCaptureSection
                     }
-                    if candidateCard?.supportsPrintSelection == true {
-                        printingsSection
-                    }
                     if !result.alternatives.isEmpty {
                         alternativesSection
                     }
@@ -1139,16 +1134,9 @@ private struct ScanResultSheet: View {
             }
         }
         .sheet(item: $cardToAdd) { card in
-            AddCardToBinderSheet(card: card) { binderId, details in
-                try await onAddCard(card, binderId, details)
+            AddCardToBinderSheet(card: card) { selectedCard, binderId, details in
+                try await onAddCard(selectedCard, binderId, details)
             }
-        }
-        .sheet(item: $printSelectionCard, onDismiss: applySelectedPrint) { card in
-            SelectPrintSheet(
-                card: card,
-                selectedPrint: $selectedPrint,
-                onCancel: { selectedPrint = nil }
-            )
         }
     }
 
@@ -1514,38 +1502,6 @@ private struct ScanResultSheet: View {
         .padding()
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
-    }
-
-    private var printingsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Other Printings")
-                .font(.headline)
-            Text("Choose another set printing or a World Championship version of this card.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button {
-                guard let candidateCard else { return }
-                selectedPrint = candidateCard
-                printSelectionCard = candidateCard
-            } label: {
-                Label("Choose Printing", systemImage: "rectangle.stack")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(color)
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-    }
-
-    private func applySelectedPrint() {
-        defer { selectedPrint = nil }
-        guard let selectedPrint else { return }
-        let candidate = CardScanCandidate.manual(card: selectedPrint)
-        selectedCandidate = candidate
-        onSelectCandidate(candidate)
-        HapticManager.selection()
     }
 
     private func reviewStatusSection(capture: APIService.ScanDebugCaptureResponse) -> some View {

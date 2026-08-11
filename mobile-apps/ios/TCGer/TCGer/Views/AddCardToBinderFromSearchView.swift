@@ -12,10 +12,6 @@ struct AddCardToBinderFromSearchView: View {
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var hasSearched = false
-    @State private var selectedCard: Card?
-    @State private var showingPrintSelection = false
-    @State private var selectedPrint: Card?
-    @State private var currentPrintOptions: [Card] = []
     @State private var addSheetCard: Card?
 
     private let apiService = APIService()
@@ -55,7 +51,7 @@ struct AddCardToBinderFromSearchView: View {
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
                         onCardTap: { card in
-                            Task { await handleCardSelection(card) }
+                            addSheetCard = card
                         }
                     )
                 }
@@ -86,42 +82,15 @@ struct AddCardToBinderFromSearchView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingPrintSelection) {
-                if let card = selectedCard {
-                    SelectPrintSheet(
-                        card: card,
-                        selectedPrint: $selectedPrint,
-                        initialPrints: currentPrintOptions,
-                        onCancel: {
-                            selectedPrint = nil
-                            selectedCard = nil
-                            currentPrintOptions = []
-                        }
-                    )
-                    .environmentObject(environmentStore)
-                }
-            }
-            .onChange(of: showingPrintSelection) { oldValue, newValue in
-                if !newValue,
-                   let baseCard = selectedCard,
-                   baseCard.supportsPrintSelection,
-                   let chosenPrint = selectedPrint {
-                    addSheetCard = chosenPrint
-                    selectedCard = nil
-                }
-            }
             .sheet(item: $addSheetCard, onDismiss: {
-                // Clean up state when sheet is dismissed
-                selectedPrint = nil
-                currentPrintOptions = []
                 addSheetCard = nil
             }) { card in
-                AddCardToBinderSheet(card: card, initialBinderId: binderId) { binderId, details in
+                AddCardToBinderSheet(card: card, initialBinderId: binderId) { selectedCard, binderId, details in
                     try await apiService.addCardToBinder(
                         config: environmentStore.serverConfiguration,
                         token: environmentStore.authToken,
                         binderId: binderId,
-                        card: card,
+                        card: selectedCard,
                         details: details
                     )
                     await onCardAdded(binderId)
@@ -147,73 +116,6 @@ struct AddCardToBinderFromSearchView: View {
                     selectedGame = game
                 }
                 validateSelectedGame()
-            }
-        }
-    }
-
-    private func handleCardSelection(_ card: Card) async {
-        if card.supportsPrintSelection {
-            await preparePrintSelection(for: card)
-        } else {
-            await MainActor.run {
-                currentPrintOptions = []
-                selectedPrint = nil
-                selectedCard = nil
-                addSheetCard = card
-                showingPrintSelection = false
-            }
-        }
-    }
-
-    private func preparePrintSelection(for card: Card) async {
-        await MainActor.run {
-            selectedCard = card
-            selectedPrint = nil
-            currentPrintOptions = []
-            addSheetCard = nil
-            showingPrintSelection = false
-        }
-
-        guard let token = environmentStore.authToken else {
-            await MainActor.run {
-                errorMessage = "Not authenticated"
-                selectedCard = nil
-            }
-            return
-        }
-
-        do {
-            let prints = try await apiService.getCardPrints(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                tcg: card.tcg,
-                cardId: card.id
-            )
-
-            await MainActor.run {
-                guard selectedCard?.id == card.id else { return }
-
-                currentPrintOptions = prints
-                selectedPrint = prints.first ?? card
-
-                if prints.count <= 1 {
-                    addSheetCard = selectedPrint
-                    selectedCard = nil
-                    showingPrintSelection = false
-                } else {
-                    showingPrintSelection = true
-                }
-            }
-        } catch {
-            await MainActor.run {
-                if selectedCard?.id == card.id {
-                    errorMessage = error.localizedDescription
-                    selectedCard = nil
-                    addSheetCard = nil
-                    selectedPrint = nil
-                    currentPrintOptions = []
-                    showingPrintSelection = false
-                }
             }
         }
     }
