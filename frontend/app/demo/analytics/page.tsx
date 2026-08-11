@@ -18,23 +18,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useDemoCollectionTotals } from "@/stores/demo-store";
+import {
+  useDemoCollectionTotals,
+  useDemoGameBreakdown,
+  useDemoRarityBreakdown,
+} from "@/stores/demo-store";
 
 /* ------------------------------------------------------------------ */
 /*  Fake analytics data                                                */
 /* ------------------------------------------------------------------ */
 
 /**
- * Demo-only value history. Only the closed months are canned — the current
- * month is the live total from the demo store, so the chart lands on the
- * headline number instead of contradicting it.
+ * Shape of the canned history, expressed as a multiple of the live collection
+ * value rather than as absolute dollars. Anchoring it this way keeps the
+ * six-month trend pointing at the real headline number — with fixed dollar
+ * values, a seed worth $1430 after a canned $1830 February would tell the
+ * visitor their collection just fell 22%.
  */
-const MONTHLY_HISTORY = [
-  { month: "Oct", value: 1420 },
-  { month: "Nov", value: 1580 },
-  { month: "Dec", value: 1750 },
-  { month: "Jan", value: 1690 },
-  { month: "Feb", value: 1830 },
+const MONTHLY_SHAPE = [
+  { month: "Oct", factor: 0.78 },
+  { month: "Nov", factor: 0.84 },
+  { month: "Dec", factor: 0.91 },
+  { month: "Jan", factor: 0.88 },
+  { month: "Feb", factor: 0.95 },
 ];
 
 const CURRENT_MONTH = "Mar";
@@ -60,19 +66,6 @@ const TOP_LOSERS = [
   { name: "Mirror Force", tcg: "Yu-Gi-Oh!", change: -3.5, price: 4.0 },
 ];
 
-const GAME_BREAKDOWN = [
-  { game: "Yu-Gi-Oh!", cards: 38, value: 412.5, color: "#ef4444" },
-  { game: "Magic: The Gathering", cards: 52, value: 890.25, color: "#8b5cf6" },
-  { game: "Pokemon", cards: 45, value: 742.75, color: "#f59e0b" },
-];
-
-const RARITY_DIST = [
-  { rarity: "Common / Uncommon", count: 32, pct: 24 },
-  { rarity: "Rare", count: 28, pct: 21 },
-  { rarity: "Ultra / Secret Rare", count: 41, pct: 30 },
-  { rarity: "Mythic / Special Art", count: 34, pct: 25 },
-];
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -85,20 +78,28 @@ export default function AnalyticsPage() {
 
   const { totalCards, uniqueCards, totalValue } = useDemoCollectionTotals();
 
+  const monthlyHistory = MONTHLY_SHAPE.map((m) => ({
+    month: m.month,
+    value: Math.round(totalValue * m.factor * 100) / 100,
+  }));
   const monthlyValues = mounted
-    ? [...MONTHLY_HISTORY, { month: CURRENT_MONTH, value: totalValue }]
-    : MONTHLY_HISTORY;
+    ? [...monthlyHistory, { month: CURRENT_MONTH, value: totalValue }]
+    : monthlyHistory;
   const maxBarValue = Math.max(1, ...monthlyValues.map((m) => m.value));
   const latestChartValue = monthlyValues[monthlyValues.length - 1].value;
 
-  const previousMonth = MONTHLY_HISTORY[MONTHLY_HISTORY.length - 1];
+  const previousMonth = monthlyHistory[monthlyHistory.length - 1];
   const monthChange = totalValue - previousMonth.value;
-  const monthChangePct = (monthChange / previousMonth.value) * 100;
+  const monthChangePct = previousMonth.value
+    ? (monthChange / previousMonth.value) * 100
+    : 0;
   const avgCardValue = totalCards > 0 ? totalValue / totalCards : 0;
 
-  // Value by Game stays demo narrative — its shares are relative to its own
-  // sum, not to the live collection total.
-  const gameBreakdownValue = GAME_BREAKDOWN.reduce((s, g) => s + g.value, 0);
+  // Both breakdowns are aggregated from the same binders as the headline
+  // totals, so their counts sum back to totalCards instead of contradicting it.
+  const gameBreakdown = useDemoGameBreakdown();
+  const rarityBreakdown = useDemoRarityBreakdown();
+  const gameBreakdownValue = gameBreakdown.reduce((s, g) => s + g.value, 0);
 
   return (
     <AppShell data-oid="0x:212q">
@@ -324,7 +325,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent data-oid="fpy-5h8">
               <div className="space-y-4" data-oid="al90b:i">
-                {GAME_BREAKDOWN.map((g) => {
+                {gameBreakdown.map((g) => {
                   const pct = Math.round((g.value / gameBreakdownValue) * 100);
                   return (
                     <div key={g.game} className="space-y-2" data-oid="od0_lel">
@@ -375,7 +376,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent data-oid="uani25c">
               <div className="space-y-4" data-oid="sbbkp7m">
-                {RARITY_DIST.map((r) => (
+                {rarityBreakdown.map((r) => (
                   <div key={r.rarity} className="space-y-2" data-oid="_4mtrj5">
                     <div
                       className="flex items-center justify-between text-sm"

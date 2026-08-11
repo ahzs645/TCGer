@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
+import { GAME_LABELS } from "@/lib/utils";
 import {
   matchCatalogCards,
   type CatalogCardLookup,
@@ -1140,6 +1141,181 @@ export function useDemoCollectionTotals(): DemoCollectionTotals {
       state.initialized
         ? collectionTotals(state.binders)
         : seedCollectionTotals(),
+    ),
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Collection breakdowns                                               */
+/* ------------------------------------------------------------------ */
+
+export interface DemoGameBreakdownEntry {
+  tcg: TcgCode;
+  game: string;
+  color: string;
+  cards: number;
+  value: number;
+}
+
+export interface DemoRarityBreakdownEntry {
+  rarity: string;
+  count: number;
+  pct: number;
+}
+
+/**
+ * Binder cards carry the app-wide TcgCode, not just the three games the demo
+ * seeds — the sandbox lets a visitor add cards from any supported game — so
+ * the breakdown covers all of them and reuses the shared label map.
+ */
+const GAME_ORDER: TcgCode[] = [
+  "yugioh",
+  "magic",
+  "pokemon",
+  "onepiece",
+  "lorcana",
+  "dragonball",
+];
+
+const GAME_COLORS: Record<TcgCode, string> = {
+  yugioh: "#ef4444",
+  magic: "#8b5cf6",
+  pokemon: "#f59e0b",
+  onepiece: "#0ea5e9",
+  lorcana: "#14b8a6",
+  dragonball: "#f97316",
+};
+
+/**
+ * Rarity tiers, in display order. Each demo rarity string maps to exactly one
+ * bucket so the counts always sum back to the collection total; anything
+ * unrecognised falls into the "Rare" middle tier rather than being dropped.
+ */
+const RARITY_TIERS: Array<{ label: string; matches: string[] }> = [
+  { label: "Common / Uncommon", matches: ["Common", "Uncommon"] },
+  { label: "Rare", matches: ["Rare", "Super Rare", "Double Rare"] },
+  {
+    label: "Ultra / Secret Rare",
+    matches: [
+      "Ultra Rare",
+      "Secret Rare",
+      "Prismatic Secret Rare",
+      "VMAX",
+      "VSTAR",
+      "Alt Art VMAX",
+    ],
+  },
+  {
+    label: "Mythic / Special Art",
+    matches: ["Mythic Rare", "Special Art Rare", "Shining"],
+  },
+];
+
+function rarityTier(rarity: string): string {
+  for (const tier of RARITY_TIERS) {
+    if (tier.matches.includes(rarity)) return tier.label;
+  }
+  return "Rare";
+}
+
+function gameBreakdown(binders: DemoBinder[]): DemoGameBreakdownEntry[] {
+  const acc = new Map<TcgCode, { cards: number; value: number }>();
+  for (const binder of binders) {
+    for (const card of binder.cards) {
+      const quantity = Math.max(card.quantity ?? 0, 0);
+      const entry = acc.get(card.tcg) ?? { cards: 0, value: 0 };
+      entry.cards += quantity;
+      entry.value += (card.price ?? 0) * quantity;
+      acc.set(card.tcg, entry);
+    }
+  }
+  return GAME_ORDER.map((tcg) => ({
+      tcg,
+      game: GAME_LABELS[tcg],
+      color: GAME_COLORS[tcg],
+      cards: acc.get(tcg)?.cards ?? 0,
+      value: Math.round((acc.get(tcg)?.value ?? 0) * 100) / 100,
+    }))
+    .filter((entry) => entry.cards > 0);
+}
+
+function rarityBreakdown(binders: DemoBinder[]): DemoRarityBreakdownEntry[] {
+  const acc = new Map<string, number>();
+  let total = 0;
+  for (const binder of binders) {
+    for (const card of binder.cards) {
+      const quantity = Math.max(card.quantity ?? 0, 0);
+      const tier = rarityTier(card.rarity);
+      acc.set(tier, (acc.get(tier) ?? 0) + quantity);
+      total += quantity;
+    }
+  }
+  return RARITY_TIERS.map((tier) => {
+    const count = acc.get(tier.label) ?? 0;
+    return {
+      rarity: tier.label,
+      count,
+      pct: total ? Math.round((count / total) * 100) : 0,
+    };
+  }).filter((entry) => entry.count > 0);
+}
+
+/**
+ * These selectors return arrays of freshly built objects, which `useShallow`
+ * compares element-by-element by reference — so an uncached selector would
+ * never compare equal and would re-render on every store read. Memoising on
+ * the `binders` array identity keeps the snapshot stable between changes.
+ */
+const gameBreakdownCache = new WeakMap<
+  DemoBinder[],
+  DemoGameBreakdownEntry[]
+>();
+const rarityBreakdownCache = new WeakMap<
+  DemoBinder[],
+  DemoRarityBreakdownEntry[]
+>();
+
+/** The pristine seed binders, allocated once so the caches can key off them. */
+let seedBindersCache: DemoBinder[] | null = null;
+function cachedSeedBinders(): DemoBinder[] {
+  if (!seedBindersCache) seedBindersCache = seedBinders();
+  return seedBindersCache;
+}
+
+function memoized<T>(
+  cache: WeakMap<DemoBinder[], T>,
+  binders: DemoBinder[],
+  compute: (binders: DemoBinder[]) => T,
+): T {
+  const hit = cache.get(binders);
+  if (hit) return hit;
+  const value = compute(binders);
+  cache.set(binders, value);
+  return value;
+}
+
+/** Per-game copy counts and value for the demo collection. */
+export function useDemoGameBreakdown(): DemoGameBreakdownEntry[] {
+  return useDemoStore(
+    useShallow((state) =>
+      memoized(
+        gameBreakdownCache,
+        state.initialized ? state.binders : cachedSeedBinders(),
+        gameBreakdown,
+      ),
+    ),
+  );
+}
+
+/** Copy counts per rarity tier for the demo collection. */
+export function useDemoRarityBreakdown(): DemoRarityBreakdownEntry[] {
+  return useDemoStore(
+    useShallow((state) =>
+      memoized(
+        rarityBreakdownCache,
+        state.initialized ? state.binders : cachedSeedBinders(),
+        rarityBreakdown,
+      ),
     ),
   );
 }
