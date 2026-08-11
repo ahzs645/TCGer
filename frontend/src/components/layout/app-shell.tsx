@@ -67,7 +67,17 @@ const navigation: NavigationItem[] = [
   { href: "/wishlists", label: "Wishlists", icon: Heart },
 ];
 
-const mobileNavPrimary = navigation.slice(0, 3);
+/**
+ * /scan needs the server-side hash store and upload API, so in demo mode it can
+ * only say "disabled". Spending one of the five desktop slots — and one of the
+ * three mobile tabs — on a dead end is a poor first impression, so demo mode
+ * drops it from the primary nav and keeps it reachable from More.
+ */
+function primaryNavigationFor(demoMode: boolean): NavigationItem[] {
+  return demoMode
+    ? navigation.filter((item) => item.href !== "/scan")
+    : navigation;
+}
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -82,8 +92,14 @@ export function AppShell({ children }: AppShellProps) {
     (item) =>
       demoMode || !item.feature || isFeatureAvailable(features, item.feature),
   );
+  const primaryNavigation = primaryNavigationFor(demoMode);
+  const mobileNavPrimary = primaryNavigation.slice(0, 3);
   const mobileNavSecondary = [
-    ...navigation.slice(3),
+    ...primaryNavigation.slice(3),
+    // Scan still belongs somewhere in demo mode — it explains why it is off.
+    ...(demoMode
+      ? navigation.filter((item) => item.href === "/scan")
+      : []),
     ...availableSecondaryNavigation,
   ];
 
@@ -129,7 +145,7 @@ export function AppShell({ children }: AppShellProps) {
               className="hidden items-center gap-1 md:flex"
               data-oid="bq6jx8."
             >
-              {navigation.map((item) => {
+              {primaryNavigation.map((item) => {
                 const href = getAppRoute(item.href, pathname);
                 const isActive = pathname === href;
                 const Icon = item.icon;
@@ -186,6 +202,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Mobile bottom navigation */}
       <MobileBottomNav
         pathname={pathname}
+        primaryNavigation={mobileNavPrimary}
         secondaryNavigation={mobileNavSecondary}
         data-oid="caik0xj"
       />
@@ -195,9 +212,11 @@ export function AppShell({ children }: AppShellProps) {
 
 function MobileBottomNav({
   pathname,
+  primaryNavigation,
   secondaryNavigation,
 }: {
   pathname: string;
+  primaryNavigation: NavigationItem[];
   secondaryNavigation: NavigationItem[];
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -215,7 +234,7 @@ function MobileBottomNav({
           className="flex h-14 items-center justify-around"
           data-oid="gfppu0m"
         >
-          {mobileNavPrimary.map((item) => {
+          {primaryNavigation.map((item) => {
             const href = getAppRoute(item.href, pathname);
             const isActive = pathname === href;
             const Icon = item.icon;

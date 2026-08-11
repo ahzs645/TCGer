@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layers, Plus, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -60,6 +60,24 @@ export default function DecksPage() {
   const DECKS: Deck[] = mounted ? storeDecks : [];
 
   const activeDeck = DECKS.find((d) => d.id === selectedDeck);
+
+  // Below lg the detail renders underneath all six deck cards, so selecting one
+  // looked like nothing happened. Bring it into view on selection — but only on
+  // the stacked layout, where it is off-screen.
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const selectDeck = (id: string | null) => {
+    setSelectedDeck(id);
+    if (!id) return;
+    requestAnimationFrame(() => {
+      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      detailRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const totalDecks = DECKS.length;
   const completeDecks = DECKS.filter((d) => d.isComplete).length;
@@ -212,11 +230,11 @@ export default function DecksPage() {
                   aria-pressed={isSelected}
                   aria-label={`${deck.name}, ${cardCount} cards${isSelected ? " (selected)" : ""}`}
                   className={`cursor-pointer transition hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isSelected ? "ring-2 ring-primary" : ""}`}
-                  onClick={() => setSelectedDeck(isSelected ? null : deck.id)}
+                  onClick={() => selectDeck(isSelected ? null : deck.id)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setSelectedDeck(isSelected ? null : deck.id);
+                      selectDeck(isSelected ? null : deck.id);
                     }
                   }}
                   data-oid="s:vnkkz"
@@ -292,7 +310,8 @@ export default function DecksPage() {
               that the empty placeholder is dead weight at the foot of the page.
               A selected deck still renders its detail card on every size. */}
           <div
-            className={activeDeck ? "" : "hidden lg:block"}
+            ref={detailRef}
+            className={activeDeck ? "scroll-mt-20" : "hidden lg:block"}
             data-oid="dldgokf"
           >
             {activeDeck ? (

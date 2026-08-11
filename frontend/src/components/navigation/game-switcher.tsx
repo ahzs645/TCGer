@@ -35,7 +35,7 @@ export function GameSwitcher() {
       type="single"
       value={selectedGame}
       onValueChange={(value) => value && setGame(value as SupportedGame)}
-      className="hidden shrink-0 items-center gap-1 rounded-lg bg-muted p-1 shadow-inner lg:flex"
+      className="hidden shrink-0 items-center gap-1 rounded-lg bg-muted p-1 shadow-inner sm:flex"
       data-oid="0f7kme."
     >
       {supportedGames.map((game) => {
