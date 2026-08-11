@@ -434,7 +434,7 @@ export default function PricesPage() {
                 key={option.key}
                 variant={sortBy === option.key ? "secondary" : "outline"}
                 size="sm"
-                className="gap-1 px-3 text-xs"
+                className="h-10 gap-1 px-3 text-xs"
                 aria-pressed={sortBy === option.key}
                 onClick={() => handleSort(option.key)}
                 data-oid="price-mobile-sort-button"
