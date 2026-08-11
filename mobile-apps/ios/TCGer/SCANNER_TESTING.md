@@ -210,6 +210,23 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 The recorded device decisions are the baseline; the test prints each frame's
 old → new outcome and fails on any new false accept or newly-lost accept.
+Ground truth comes from two places: the curated `expectedCards` table, and
+the `expectedCardId` / `expectedNoMatch` the recorder itself writes whenever
+a human corrects a scan in the app — before 2026-08-11 only the curated
+table was consulted, so every corrected frame in an archive replayed
+completely unscored. Two consequences of using recorder labels:
+
+- A correction records the REJECTED prediction as that frame's `identified` /
+  `bestMatchCardId`. Those frames no longer anchor the lost-accept floor:
+  abstaining instead of repeating the card the human threw out is the fix
+  working, not a regression.
+- Re-editing one pocket writes a fresh correction frame per edit with
+  identical crop bytes and superseded labels. Only the last edit is scored;
+  earlier ones print `(superseded label, not scored)`.
+
+`knownWrongAccepts` holds labeled frames the pipeline currently gets wrong.
+They are open defects listed so a *new* wrong accept still fails the
+assertion — removing an entry is the goal.
 `BinderSessionReplayTests` does the same for recorded binder pages (frames
 whose evidence outcome starts with `binderPage`), asserting each page stays
 at or above its recorded device count or an explicitly measured Simulator
@@ -217,6 +234,22 @@ floor for known platform divergences.
 Caveat: Simulator Vision (doc-seg/rectangles) diverges from device Vision on
 some frames, so device-confirmed conclusions need a device build — the test
 keeps a documented allowlist of known Simulator divergences.
+
+`BinderSessionReplayTests` also scores binder **identity** against human
+labels, which the archive format does not store directly. A correction made
+in the binder review sheet is written as its own frame (`manualCorrection:
+<cardID>`) whose image is the detection crop; `BinderPocketLabels.swift`
+hashes those crops back onto the page's `attemptImageFiles` to recover
+(page frame, attempt index), collapsing repeated edits of one pocket to the
+last one. Each labeled pocket is then aligned to a replay detection by quad
+IoU (>= 0.3) and printed as a `BINDERLABEL` line. Precision is asserted —
+a labeled pocket that auto-includes (`isIncluded`) the wrong card fails,
+because that card enters the collection on a blanket page confirm — while
+recall is only reported. These labels are the hard cases by construction:
+a pocket only has one because the pipeline was wrong or silent there.
+Current state (Simulator, 2026-08-11, the two sessions with corrections):
+24 labeled pockets, 6 correct, 1 wrong auto-include (allowlisted as an open
+defect in `knownWrongAutoIncludes`), 17 abstained, 0 unlocalized.
 
 Large binder exports can exceed the Simulator test-process lifetime when run
 as one replay. Split them into deterministic chunks with a comma-separated
@@ -277,7 +310,9 @@ xcodebuild test -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer \
 ```
 
 Treat this manual expected ID as an experiment label, not archive metadata;
-the current binder export format does not persist per-slot corrections.
+the binder export format does not persist per-slot corrections directly.
+Where the session does contain review-sheet corrections, prefer the recovered
+labels from `BinderPocketLabels.swift` over hand-passing an expected ID.
 
 To regression-test an alternate warp against every strongly accepted binder
 attempt, use the accepted device candidate as a pseudo-label. This does not

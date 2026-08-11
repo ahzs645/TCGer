@@ -130,6 +130,26 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-211223/frame-0015.jpg",
     ]
 
+    /// Labeled frames the pipeline currently accepts as the wrong card. These
+    /// are open defects, not accepted behavior — they are listed so that a NEW
+    /// wrong accept still fails the assertion below. Removing an entry is the
+    /// goal; adding one requires the same scrutiny as any precision regression.
+    private static let knownWrongAccepts: Set<String> = [
+        // Basic Energy: Water (dp1-125) retrieved as Grass (dp1-123) at 0.77.
+        // The two printings differ only in the energy symbol, which the
+        // center-crop preprocessing keeps but the global embedding averages
+        // away; the recorded top-2 margin was 0.050, exactly at
+        // `BinderPageScanner.reviewPreselectionMargin`, so it also auto-
+        // includes on a blanket page confirm.
+        "scan-session-20260810-220315/frame-0009.jpg",
+        // Absol (ex13-18) retrieved as Medicham (ex5-42) at 0.72. A separate
+        // capture of the same card in the 21:12 session retrieves Shiftry
+        // (ex2-22) — two different wrong Pokemon from two foil crops of one
+        // card, so the neighborhood is unstable, not a near-twin printing
+        // problem the OCR tiebreak could resolve.
+        "scan-session-20260810-220315/frame-0012.jpg",
+    ]
+
     func testReplayDevModeSessions() async throws {
         guard let dir = ProcessInfo.processInfo.environment["DEVMODE_SESSIONS_DIR"] else {
             throw XCTSkip("Set DEVMODE_SESSIONS_DIR to an unzipped Export All archive to run.")
@@ -161,6 +181,30 @@ final class DevModeSessionReplayTests: XCTestCase {
             let binderImages = Set(evidence.lazy.filter {
                 $0.outcome.hasPrefix("binderPage")
             }.map(\.imageFile))
+            // Re-editing one review pocket writes a fresh correction frame per
+            // edit, all with identical crop bytes and superseded labels (the
+            // 21:12 session labels one pocket ecard1-1, then noMatch, then
+            // ecard1-33). Scoring the stale ones fails the pipeline for
+            // answering what the human ultimately said. Last edit wins, same
+            // collapse ScannerCorrectionReplayTests applies.
+            var supersededFrames: Set<String> = []
+            var latestLabelByDigest: [String: (index: Int, imageFile: String)] = [:]
+            for frame in bundle.frames
+            where frame.expectedCardId != nil || frame.expectedNoMatch != nil {
+                guard let digest = SessionImageDigest.of(
+                    session.appendingPathComponent(frame.imageFile)
+                ) else { continue }
+                guard let previous = latestLabelByDigest[digest] else {
+                    latestLabelByDigest[digest] = (frame.index, frame.imageFile)
+                    continue
+                }
+                if previous.index < frame.index {
+                    supersededFrames.insert(previous.imageFile)
+                    latestLabelByDigest[digest] = (frame.index, frame.imageFile)
+                } else {
+                    supersededFrames.insert(frame.imageFile)
+                }
+            }
             for frame in bundle.frames.sorted(by: { $0.index < $1.index }) {
                 // Binder pages have their own replay harness. Treating a full
                 // 3x3 page as one card creates meaningless single-card hits.
@@ -190,27 +234,53 @@ final class DevModeSessionReplayTests: XCTestCase {
                 let baseline = frame.identified ? (frame.bestMatchCardId ?? "?") : "noMatch"
                 let current = newCardID ?? "noMatch"
                 var verdict = ""
-                if let expected = Self.expectedCards[key] {
+                // Labels the recorder already wrote (a human correction in the
+                // app writes `expectedCardId`/`expectedNoMatch` into
+                // results.json) count as ground truth alongside the curated
+                // table above, which stays authoritative where both exist.
+                // Without this every corrected frame in an archive replays
+                // completely unscored.
+                let isSuperseded = supersededFrames.contains(frame.imageFile)
+                let recordedExpectation = (frame.expectedNoMatch == true || isSuperseded)
+                    ? nil
+                    : frame.expectedCardId
+                if let expected = Self.expectedCards[key] ?? recordedExpectation {
                     expectedTotal += 1
                     if newCardID == expected {
                         expectedHits += 1
                         verdict = " ✓ RECOVERED (expected \(expected))"
                     } else if let newCardID {
-                        wrongAccepts.append("\(key) expected \(expected), got \(newCardID)")
+                        if !Self.knownWrongAccepts.contains(key) {
+                            wrongAccepts.append("\(key) expected \(expected), got \(newCardID)")
+                        }
                         verdict = " ✗ WRONG ACCEPT (expected \(expected))"
                     } else {
                         verdict = " • abstained (expected \(expected))"
                     }
                 }
-                if Self.expectedNoMatch.contains(key) {
+                if Self.expectedNoMatch.contains(key)
+                    || (frame.expectedNoMatch == true && !isSuperseded) {
                     if newCardID != nil {
-                        wrongAccepts.append("\(key) expected noMatch, got \(current)")
+                        if !Self.knownWrongAccepts.contains(key) {
+                            wrongAccepts.append("\(key) expected noMatch, got \(current)")
+                        }
                         verdict = " ✗ FALSE ACCEPT"
                     } else {
                         verdict = " ✓ still declined"
                     }
                 }
-                if frame.identified, newCardID == nil {
+                if isSuperseded {
+                    verdict += " (superseded label, not scored)"
+                }
+                // A manual correction records the REJECTED prediction as the
+                // frame's baseline (`identified` / `bestMatchCardId` are the
+                // human's "previous" values), so a frame the user overruled
+                // must not anchor the lost-accept floor: abstaining instead of
+                // repeating the wrong card is the fix working, not a
+                // regression. Only accepts the human did not contradict count.
+                let baselineWasRejected = frame.expectedNoMatch == true
+                    || (frame.expectedCardId.map { $0 != frame.bestMatchCardId } ?? false)
+                if frame.identified, newCardID == nil, !baselineWasRejected {
                     if Self.knownSimulatorDivergences.contains(key) {
                         verdict += " (known Simulator divergence: was \(baseline))"
                     } else {

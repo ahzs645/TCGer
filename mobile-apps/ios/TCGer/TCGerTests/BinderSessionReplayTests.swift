@@ -40,7 +40,33 @@ final class BinderSessionReplayTests: XCTestCase {
         "scan-session-20260809-223944/frame-0025.jpg": 5,
         "scan-session-20260809-223944/frame-0037.jpg": 7,
         "scan-session-20260809-223944/frame-0039.jpg": 5,
+        // 2026-08-11, first replay of the newly ingested 22:03 session. Like
+        // the batch above, these pages were recorded on device and never had
+        // Simulator floors established; nothing in that ingest changed
+        // detection or retrieval, and the values below reproduced identically
+        // across two consecutive runs. Device baselines were 8 / 5 / 4.
+        "scan-session-20260810-220315/frame-0002.jpg": 7,
+        "scan-session-20260810-220315/frame-0005.jpg": 4,
+        "scan-session-20260810-220315/frame-0018.jpg": 3,
     ]
+
+    /// Labeled pockets the current baseline auto-includes with the WRONG card.
+    /// These are open defects held here so the assertion can catch new ones —
+    /// not accepted behavior. Each entry is a card that silently enters the
+    /// user's collection when they confirm a page without inspecting it.
+    private static let knownWrongAutoIncludes: Set<String> = [
+        // Absol (ex13-18) retrieved as Shiftry (ex2-22) at 0.77 with a top-2
+        // margin wide enough to clear `isReliableSuggestion`. Different card,
+        // different Pokemon, different set — a plain retrieval error that the
+        // margin gate cannot see, since the gate only measures separation, not
+        // correctness. Measured 2026-08-11 (Simulator, iPhone 17 Pro).
+        "scan-session-20260809-211223/frame-0008.jpg#0",
+    ]
+
+    /// Pocket alignment threshold. Pockets in a 3x3 page are far apart, so
+    /// anything sharing this much area with the recorded quad is the same
+    /// pocket even after a corner-refinement change.
+    private static let pocketOverlapThreshold: CGFloat = 0.3
 
     private struct EvidenceRecord: Decodable {
         let imageFile: String
@@ -113,12 +139,19 @@ final class BinderSessionReplayTests: XCTestCase {
         var newWithCandidate = 0
         var newMatched = 0
         var candidateRegressions: [String] = []
+        var labeledTotal = 0
+        var labeledCorrect = 0
+        var labeledAbstained = 0
+        var labeledUnaligned = 0
+        var wrongAutoIncludes: [String] = []
+        var wrongSuggestions: [String] = []
 
         for session in sessions {
             let evidenceURL = session.appendingPathComponent("evidence.json")
             guard let data = try? Data(contentsOf: evidenceURL),
                   let records = try? JSONDecoder().decode([EvidenceRecord].self, from: data)
             else { continue }
+            let pocketLabels = BinderPocketLabelLoader.labelsByPage(in: session)
             for record in records where record.outcome.hasPrefix("binderPage")
                 && (frameFilter.isEmpty || frameFilter.contains(record.imageFile)) {
                 let imageURL = session.appendingPathComponent(record.imageFile)
@@ -143,6 +176,63 @@ final class BinderSessionReplayTests: XCTestCase {
                     )
                 }
 
+                // Human per-pocket ground truth, recovered by hashing the
+                // correction crops back onto this page's attempt images. These
+                // pockets are the hard ones by construction — the human only
+                // corrected what the pipeline got wrong or missed entirely —
+                // so this is the only identity signal in the binder archive.
+                for label in pocketLabels[record.imageFile] ?? [] {
+                    labeledTotal += 1
+                    let labelKey = "\(session.lastPathComponent)/\(label.key)"
+                    guard let quad = label.quad else {
+                        labeledUnaligned += 1
+                        print("BINDERLABEL \(labelKey): no recorded quad, cannot align")
+                        continue
+                    }
+                    let aligned = result.detections
+                        .map { ($0, BinderPocketLabelLoader.overlap(recorded: quad, detection: $0.quad)) }
+                        .filter { $0.1 >= Self.pocketOverlapThreshold }
+                        .max { $0.1 < $1.1 }
+                    guard let (detection, overlap) = aligned else {
+                        labeledUnaligned += 1
+                        print(
+                            "BINDERLABEL \(labelKey): • pocket not localized "
+                            + "(truth \(label.cardID ?? "noMatch"))"
+                        )
+                        continue
+                    }
+
+                    let truth = label.cardID
+                    let got = detection.selectedCandidate?.details.identity.id
+                    let overlapText = String(format: "iou %.2f", overlap)
+                    if got == truth {
+                        labeledCorrect += 1
+                        print("BINDERLABEL \(labelKey): ✓ \(truth ?? "noMatch") [\(overlapText)]")
+                    } else if let got {
+                        // `isIncluded` is what a blanket page confirm imports.
+                        // A wrong card there silently enters the collection;
+                        // a wrong card the user must tap first does not.
+                        let severity = detection.isIncluded ? "✗ WRONG AUTO-INCLUDE" : "~ wrong suggestion"
+                        let entry = "\(labelKey) expected \(truth ?? "noMatch"), got \(got)"
+                            + String(format: " @%.2f", detection.selectedCandidate?.confidence.score ?? 0)
+                        if detection.isIncluded {
+                            if !Self.knownWrongAutoIncludes.contains(labelKey) {
+                                wrongAutoIncludes.append(entry)
+                            }
+                        } else {
+                            wrongSuggestions.append(entry)
+                        }
+                        print("BINDERLABEL \(labelKey): \(severity) \(entry) [\(overlapText)]")
+                    } else {
+                        labeledAbstained += 1
+                        print(
+                            "BINDERLABEL \(labelKey): • abstained "
+                            + "(truth \(truth ?? "noMatch"), device said "
+                            + "\(label.recordedTopCandidateID ?? "nothing")) [\(overlapText)]"
+                        )
+                    }
+                }
+
                 saveQuadOverlay(
                     image: image,
                     detections: result.detections,
@@ -162,6 +252,12 @@ final class BinderSessionReplayTests: XCTestCase {
         }
 
         print("BINDERREPLAY summary: \(pages) pages | candidates \(baselineWithCandidate) -> \(newWithCandidate) | matched \(baselineMatched) -> \(newMatched)")
+        print(
+            "BINDERLABEL summary: \(labeledTotal) human-labeled pockets | "
+            + "\(labeledCorrect) correct, \(wrongAutoIncludes.count) wrong auto-included, "
+            + "\(wrongSuggestions.count) wrong suggested, \(labeledAbstained) abstained, "
+            + "\(labeledUnaligned) not localized"
+        )
         print("BINDERREPLAY overlays: /tmp/binder-replay-overlays/")
         XCTAssertGreaterThan(pages, 0, "no binder pages found under \(dir)")
         if ProcessInfo.processInfo.environment["DEVMODE_BINDER_DIAGNOSTIC_ONLY"] != "1" {
@@ -170,8 +266,19 @@ final class BinderSessionReplayTests: XCTestCase {
                 "binder pages fell below their device/current-Simulator candidate floors: "
                     + "\(candidateRegressions)"
             )
-        } else if !candidateRegressions.isEmpty {
-            print("BINDERREPLAY diagnostic-only floor differences: \(candidateRegressions)")
+            // Precision on human-labeled pockets is asserted; recall is only
+            // reported. A pocket the pipeline declines costs the user a manual
+            // entry they were already making, but a wrong card auto-included
+            // on a blanket page confirm enters the collection unnoticed.
+            XCTAssertTrue(
+                wrongAutoIncludes.isEmpty,
+                "human-labeled binder pockets auto-included the wrong card: \(wrongAutoIncludes)"
+            )
+        } else if !candidateRegressions.isEmpty || !wrongAutoIncludes.isEmpty {
+            print(
+                "BINDERREPLAY diagnostic-only differences: floors \(candidateRegressions) "
+                + "| wrong auto-includes \(wrongAutoIncludes)"
+            )
         }
     }
 }

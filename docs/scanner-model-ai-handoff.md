@@ -1,6 +1,158 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-10 (Lucario Trainer Kit search and image-less variant audit)
+Last updated: 2026-08-11 (22:03 binder session analysis, recovered binder labels)
+
+## Session Results 2026-08-11 (22:03 device binder export)
+
+Archive: `TCGer-DevMode-scan-session-20260810-220315.zip`, ingested as
+`scan-session-20260810-220315` (107 files, session digest recipe v2). Device,
+Pokemon, binder mode: 610 s, 9 page captures of 5 physical pages, 41 distinct
+pockets, 14 human corrections.
+
+Recorded outcome, 73 raw detections: 12 matched (>= 0.82), 29 uncertain
+(0.72-0.82), 32 nothing. Best-of-captures per distinct pocket: 11 matched,
+16 uncertain, 14 nothing. **13 of the 14 corrections were on pockets where
+the pipeline offered nothing at all**; only one was a wrong suggestion. The
+precision guards hold; recall is the gap.
+
+Findings:
+
+- **Binder dev-mode evidence is synthesized, not real diagnostics.**
+  `CardScannerViewModel.recordBinderPageForDevMode` builds a fresh
+  `ScanDiagnostics` and fabricates one attempt per detection from the final
+  `BinderCardDetection.status`; `context.diagnostics` is never set on the
+  binder path. `gateScore`, `footerPairNumbers`, `titleMatchedName`, and
+  `ocrVerifiedCollectorNumber` are therefore hardcoded nil/`[]` on every
+  binder attempt — an empty `footerPairNumbers` in a binder archive is NOT
+  evidence that OCR failed. `kind` is always `detectedCrop` even though the
+  strategy runs up to three attempts, and `noCandidates` only means "no
+  strategy returned success", conflating gate rejection, below-threshold,
+  ambiguity, and titlePrintingUnresolved. Fix this before drawing further
+  conclusions from binder dumps.
+- **Failures cluster on foil.** All 14 corrected cards are holo,
+  reverse-holo, or glare-washed; the 12 clean accepts are matte. One all-foil
+  Platinum/HGSS page scored 0/8 on both of its captures with crisp,
+  human-legible crops. All 14 truth cards are present in
+  `CardsIndexMetadata.json`, so this is not index coverage. Border-ring
+  saturation separates weakly (median 0.62 accepted vs 0.45 for both failure
+  modes) — directional, overlapping, not usable as a gate.
+- **The encoder never sees the card name or the collector number.** DINOv2
+  preprocessing is resize-shortest-edge-256 then center-crop-224; on a
+  720x1000 crop that keeps only y in [18.5 %, 81.5 %]. Parity holds (the
+  index is built the same way), so nothing is broken — but the two most
+  printing-discriminative bands are structurally unavailable to the model,
+  and printing ties were 29 of 73 detections.
+- **Re-capturing a page discards the previous result, yet top-1 is stable
+  across captures.** Every pocket with candidates in >= 2 captures produced
+  the identical top-1 card ID (10/10). Page A scored 1, then 0, then 4
+  accepts across three captures of the same page, union 4, with 8 of 9
+  pockets holding a consistent top-1. `CardScannerViewModel` replaces the
+  page record on rescan; merging per pocket is free recall.
+- Basic Energy is its own failure class: dp1-125 Water Energy retrieves
+  dp1-123 Grass Energy at 0.784 with a top-2 margin of exactly 0.050 — it
+  clears `reviewPreselectionMargin` and auto-includes on a blanket confirm.
+- Capture is 1536x2048 (3.1 MP); `CardScannerCamera` sets only
+  `sessionPreset = .photo` and never sets `maxPhotoDimensions`. A pocket
+  lands at ~236x452 native px before upscaling to 720x1000, putting the
+  collector number at ~5 px tall — footer OCR cannot work in binder mode at
+  this capture size regardless of the OCR code.
+
+### Binder per-pocket ground truth is now recoverable and asserted
+
+The archive still has no binder label field, but the recorder writes a review
+correction from the same `CGImage` it wrote into the page's
+`attemptImageFiles`, so the files are byte-identical and hashing both sides
+recovers (page frame, attempt index). This was done ad hoc for the 21:12
+session before; it is now a tested helper,
+`TCGerTests/BinderPocketLabels.swift`, consumed by `BinderSessionReplayTests`.
+26 of 26 corrections across the library join to exactly one pocket, no
+collisions; after collapsing repeated edits of a pocket to the last one, 24
+distinct labeled pockets remain.
+
+First scored run (Simulator, iPhone 17 Pro, 2026-08-11, the two sessions with
+corrections): **24 labeled pockets, 6 correct, 1 wrong auto-include, 17
+abstained, 0 unlocalized** (pocket alignment IoU 0.50-0.93). The wrong
+auto-include is `scan-session-20260809-211223/frame-0008.jpg#0` — Absol
+(ex13-18) retrieved as Shiftry (ex2-22) at 0.77 with a top-2 margin wide
+enough to clear `isReliableSuggestion`, so a blanket page confirm imports it.
+The margin gate cannot catch this: it measures separation, not correctness.
+Held in `BinderSessionReplayTests.knownWrongAutoIncludes` as an open defect.
+
+`DevModeSessionReplayTests` now also reads the recorder's own
+`expectedCardId`/`expectedNoMatch` as ground truth (previously only the
+curated `expectedCards` table was consulted, so corrected frames replayed
+unscored), collapses superseded re-edits, and no longer anchors its
+lost-accept floor to predictions the human rejected. That surfaced two
+genuine wrong accepts on the new session, both listed in `knownWrongAccepts`:
+dp1-125 -> dp1-123 (Water Energy read as Grass Energy) and ex13-18 -> ex5-42
+(Absol read as Medicham). Note that a separate capture of that same Absol in
+the 21:12 session comes back as Shiftry through the binder path: two
+different wrong Pokemon from two foil crops of one card, so this is an
+unstable retrieval neighborhood, not a near-twin printing the OCR tiebreak
+could settle.
+
+### Web cross-check: the encoder is not the problem, the score is
+
+Ran the same crops through the node/web path
+(`backend/src/scripts/eval-recognition.ts --no-ocr`, which is a line-for-line
+port of `frontend/src/lib/scan/embedding-matcher.ts` with no quality gate, no
+face gate, and no 0.72 threshold, so it reports raw retrieval). The index is
+byte-identical to the iOS one — 21828 x 384, same int8 payload hash, same row
+order as `CardsIndexMetadata.annIndex` — so any difference is encoder or crop,
+never the index.
+
+- **iOS and web agree.** On the 41 pockets where iOS produced a candidate,
+  the web encoder returns the same top-1 for 38. Transformers.js q8 ONNX and
+  the CoreML `CardEmbeddings.mlpackage` are interchangeable here; there is no
+  iOS-specific encoder defect in this class of input.
+- **The score tracks the iOS decision sanely** across all 73 pockets of the
+  22:03 session — median web top-1 similarity 0.845 for iOS-accepted, 0.750
+  for uncertain, 0.692 for iOS-nothing.
+- **On the 24 human-labeled (i.e. hard, foil) pockets the score carries
+  almost no signal.** Correct top-1: n=12, median 0.700, range 0.624-0.802.
+  Wrong top-1: n=12, median 0.699, range 0.643-0.835. The two distributions
+  are indistinguishable, and of the 6 crops clearing 0.72, **4 are wrong**.
+  Threshold tuning has no favorable operating point on this class — the
+  highest-scoring crop in the entire labeled set (0.835) is a wrong answer.
+- **Retrieval is far better than the pipeline's output suggests.** True card
+  at rank 1 for 12/24 and within top-5 for 17/24, on pockets where the device
+  delivered nothing 23 out of 24 times. A re-rank stage over the shortlist is
+  therefore worth much more than any threshold change (consistent with the
+  earlier NCC re-rank result, 13/14 recovered where truth was in a top-5).
+- **These are not printing ties.** Only 2 of the 12 wrong top-1s share a name
+  with the truth (base4-45/base1-31 Jynx, and dp1-125/dp1-123 Energy, which
+  is a same-class tie rather than a same-name one). The other 10 are entirely
+  different Pokemon — Absol read as Shiftry, Giratina as Machamp, Altaria as
+  Goomy. The collector-number OCR tiebreak arbitrates only among shortlist
+  candidates and so cannot address them; exact TITLE evidence could, but the
+  center-crop preprocessing removes the name band before inference.
+- 6 of the 32 iOS-nothing pockets have a web top-1 at or above 0.72 (max
+  0.835), i.e. the raw score would have passed. Whether iOS lost those to the
+  face gate or to re-cropping an already-rectified crop cannot be told apart
+  from the archive — see the synthesized-evidence finding above.
+
+Reproduce:
+
+```bash
+cd backend
+npx tsx src/scripts/eval-recognition.ts --images /path/to/pocket-crops \
+  --labels /path/to/labels.json --no-ocr --out /tmp/eval-manifest.json
+```
+
+Model weights are already cached under
+`node_modules/@huggingface/transformers/.cache/onnx-community/dinov2-small`,
+so this runs offline.
+
+Validation (Simulator, iPhone 17 Pro, 2026-08-11): full 12-session single-card
+replay passes — 31/76 labeled correct, 0 previously-accepted lost, 0
+unallowlisted wrong accepts; on the two sessions that carry corrections the
+scored label count went from 0 to 24, since those labels were previously
+ignored entirely. Binder replay over those two sessions passes with
+assertions on: 16 pages, candidates 85 -> 88, matched 26 -> 36. Three pages
+of the new session sit below their device candidate baselines in the
+Simulator (8/5/4 -> 7/4/3, identical across two consecutive runs, on a change
+that touches no detection or retrieval code); they are recorded in
+`simulatorCandidateFloors` under the same convention as the 2026-08-10 batch.
 
 ## Manual Match Search: Lucario Trainer Kit 3/11
 
