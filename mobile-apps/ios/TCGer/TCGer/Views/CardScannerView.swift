@@ -645,15 +645,26 @@ struct CardScannerView: View {
                 viewModel.reopenBinderReview()
             } label: {
                 HStack(spacing: 8) {
-                    Label("\(viewModel.binderPagesScanned) pages", systemImage: "rectangle.stack")
-                    Text("·")
-                    Text("\(viewModel.binderCardsScanned) cards")
-                    if viewModel.binderCardsAdded > 0 {
-                        Text("·")
-                        Text("\(viewModel.binderCardsAdded) added")
+                    Text(
+                        "\(viewModel.binderPagesScanned) pages · " +
+                            "\(viewModel.binderCardsScanned) cards" +
+                            (viewModel.binderCardsAdded > 0
+                                ? " · \(viewModel.binderCardsAdded) added"
+                                : "")
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .allowsTightening(true)
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 4) {
+                        Text("Review")
+                        Image(systemName: "chevron.right")
                     }
-                    Label("Review", systemImage: "chevron.right")
-                        .fontWeight(.semibold)
+                    .fontWeight(.semibold)
+                    .fixedSize()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)

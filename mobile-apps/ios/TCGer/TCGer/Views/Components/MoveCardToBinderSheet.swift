@@ -12,6 +12,7 @@ struct MoveCardToBinderSheet: View {
     @State private var availableBinders: [Collection] = []
     @State private var selectedBinderId: String?
     @State private var isLoading = true
+    @State private var isCreatingBinder = false
     @State private var errorMessage: String?
     @State private var selectedCopyIds: Set<String>
 
@@ -53,21 +54,21 @@ struct MoveCardToBinderSheet: View {
                     if isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity, alignment: .center)
-                    } else if availableBinders.isEmpty {
-                        VStack(spacing: 12) {
-                            Text("No binders available")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text("Create a binder first to assign cards.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 8)
                     } else {
                         BinderPickerSheetButton(
                             binders: availableBinders,
-                            selectedBinderId: $selectedBinderId
+                            selectedBinderId: $selectedBinderId,
+                            onCreate: { name, description, colorHex, defaultCondition in
+                                await createBinder(
+                                    name: name,
+                                    description: description,
+                                    colorHex: colorHex,
+                                    defaultCondition: defaultCondition
+                                )
+                            }
                         )
+                        .binderPickerFieldStyle()
+                        .disabled(isProcessing || isCreatingBinder)
                     }
                 } header: {
                     Text("Destination Binder")
@@ -124,13 +125,13 @@ struct MoveCardToBinderSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .disabled(isProcessing)
+                    .disabled(isProcessing || isCreatingBinder)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isProcessing ? "Moving..." : "Move") {
                         Task { await performMove() }
                     }
-                    .disabled(isProcessing || selectedBinderId == nil || availableBinders.isEmpty || (supportsCopySelection && selectedCopyIds.isEmpty))
+                    .disabled(isProcessing || isCreatingBinder || selectedBinderId == nil || availableBinders.isEmpty || (supportsCopySelection && selectedCopyIds.isEmpty))
                 }
             }
         }
@@ -163,6 +164,42 @@ struct MoveCardToBinderSheet: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+
+    @MainActor
+    private func createBinder(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String?
+    ) async {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !isCreatingBinder else { return }
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        isCreatingBinder = true
+        defer { isCreatingBinder = false }
+
+        do {
+            let collection = try await apiService.createCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                name: name,
+                description: description,
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
+            )
+            availableBinders.removeAll { $0.id == collection.id }
+            availableBinders.append(collection)
+            availableBinders = availableBinders.sortedForDisplay()
+            selectedBinderId = collection.id
+            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

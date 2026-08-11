@@ -20,7 +20,6 @@ struct BinderPageReviewView: View {
     @State private var isLoadingCollections = true
     @State private var isAdding = false
     @State private var isCreatingBinder = false
-    @State private var showingCreateBinderSheet = false
     @State private var errorMessage: String?
     @State private var showsAllCards = false
     @State private var statusFilter: BinderCardDetectionStatus?
@@ -129,16 +128,6 @@ struct BinderPageReviewView: View {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
-        }
-        .sheet(isPresented: $showingCreateBinderSheet) {
-            CreateBinderSheet { name, description, colorHex, defaultCondition in
-                await createBinder(
-                    name: name,
-                    description: description,
-                    colorHex: colorHex,
-                    defaultCondition: defaultCondition
-                )
-            }
         }
     }
 
@@ -563,7 +552,16 @@ struct BinderPageReviewView: View {
     }
 
     private func binderControls(record: BinderPageRecord) -> some View {
-        VStack(spacing: 12) {
+        let binderSelection = Binding<String?>(
+            get: { destinationBinderID(for: record) },
+            set: { binderID in
+                if let binderID {
+                    selectBinder(binderID, for: record)
+                }
+            }
+        )
+
+        return VStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Save Destination")
                     .font(.headline)
@@ -585,65 +583,33 @@ struct BinderPageReviewView: View {
 
             Divider()
 
-            HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.binderDestinationMode == .oneBinder
                     ? "Session Binder"
                     : "Page \(record.pageNumber) Binder")
                     .font(.headline)
-                    .fixedSize()
-
-                Spacer(minLength: 4)
 
                 if isLoadingCollections {
-                    ProgressView().controlSize(.small)
-                } else if collections.isEmpty {
-                    Text("No binders yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    ProgressView("Loading binders…")
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                 } else {
-                    Menu {
-                        ForEach(collections) { collection in
-                            Button {
-                                selectBinder(collection.id, for: record)
-                            } label: {
-                                if collection.id == destinationBinderID(for: record) {
-                                    Label(collection.name, systemImage: "checkmark")
-                                } else {
-                                    Text(collection.name)
-                                }
-                            }
+                    BinderPickerSheetButton(
+                        binders: collections,
+                        selectedBinderId: binderSelection,
+                        onCreate: { name, description, colorHex, defaultCondition in
+                            await createBinder(
+                                name: name,
+                                description: description,
+                                colorHex: colorHex,
+                                defaultCondition: defaultCondition
+                            )
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(selectedBinderName(for: record))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .frame(maxWidth: 170, alignment: .trailing)
-                    }
-                    .layoutPriority(-1)
+                    )
+                    .binderPickerFieldStyle()
+                    .disabled(isAdding || isCreatingBinder)
                 }
-
-                Button {
-                    showingCreateBinderSheet = true
-                } label: {
-                    ZStack {
-                        Circle().fill(Color.accentColor.opacity(0.14))
-                        if isCreatingBinder {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "plus")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                    }
-                    .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .disabled(isLoadingCollections || isCreatingBinder)
-                .accessibilityLabel("New Binder")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -966,11 +932,6 @@ struct BinderPageReviewView: View {
             ? "Selected"
             : detection.exclusionReason.map { "Excluded: \($0.displayName)" } ?? "Excluded"
         return "\(page)Card \(cardIndex + 1) · \(set) · \(status) · \(inclusion)"
-    }
-
-    private func selectedBinderName(for record: BinderPageRecord) -> String {
-        guard let selectedBinderID = destinationBinderID(for: record) else { return "Select Binder" }
-        return collections.first(where: { $0.id == selectedBinderID })?.name ?? "Select Binder"
     }
 
     private func destinationBinderID(for record: BinderPageRecord) -> String? {

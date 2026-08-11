@@ -17,7 +17,6 @@ struct ScannerSessionReviewView: View {
     @State private var isLoadingCollections = true
     @State private var isAdding = false
     @State private var isCreatingBinder = false
-    @State private var showingCreateBinderSheet = false
     @State private var errorMessage: String?
 
     let color: Color
@@ -98,16 +97,6 @@ struct ScannerSessionReviewView: View {
                 color: color
             )
             .presentationDetents([.large])
-        }
-        .sheet(isPresented: $showingCreateBinderSheet) {
-            CreateBinderSheet { name, description, colorHex, defaultCondition in
-                await createBinder(
-                    name: name,
-                    description: description,
-                    colorHex: colorHex,
-                    defaultCondition: defaultCondition
-                )
-            }
         }
         .alert(
             "Scan Review Error",
@@ -213,53 +202,24 @@ struct ScannerSessionReviewView: View {
 
     private var binderActionBar: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                if isLoadingCollections {
-                    ProgressView("Loading binders…")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else if collections.isEmpty {
-                    Text("Create a binder to continue")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    BinderPickerSheetButton(
-                        binders: collections,
-                        selectedBinderId: $selectedBinderID
-                    )
-                    .padding(.horizontal, 14)
-                    .frame(height: ReviewBinderControlMetrics.height)
-                    .modifier(ReviewBinderPickerSurface())
-                }
-
-                Button {
-                    showingCreateBinderSheet = true
-                } label: {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.headline)
-                        .foregroundStyle(.tint)
-                        .frame(
-                            width: ReviewBinderControlMetrics.height,
-                            height: ReviewBinderControlMetrics.height
+            if isLoadingCollections {
+                ProgressView("Loading binders…")
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            } else {
+                BinderPickerSheetButton(
+                    binders: collections,
+                    selectedBinderId: $selectedBinderID,
+                    onCreate: { name, description, colorHex, defaultCondition in
+                        await createBinder(
+                            name: name,
+                            description: description,
+                            colorHex: colorHex,
+                            defaultCondition: defaultCondition
                         )
-                        .background(
-                            Color.accentColor.opacity(0.12),
-                            in: RoundedRectangle(
-                                cornerRadius: ReviewBinderControlMetrics.cornerRadius,
-                                style: .continuous
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: ReviewBinderControlMetrics.cornerRadius,
-                                style: .continuous
-                            )
-                            .stroke(Color.accentColor.opacity(0.22), lineWidth: 1)
-                        }
-                }
-                .buttonStyle(.plain)
-                .disabled(isLoadingCollections || isAdding || isCreatingBinder)
-                .accessibilityLabel("Create binder")
+                    }
+                )
+                .binderPickerFieldStyle()
+                .disabled(isAdding || isCreatingBinder)
             }
 
             Button {
@@ -444,31 +404,6 @@ struct ScannerSessionReviewView: View {
             collectorNumber: nil,
             releasedAt: nil
         )
-    }
-}
-
-private enum ReviewBinderControlMetrics {
-    static let height: CGFloat = 52
-    static let cornerRadius: CGFloat = 14
-}
-
-private struct ReviewBinderPickerSurface: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background(
-                Color(.secondarySystemBackground),
-                in: RoundedRectangle(
-                    cornerRadius: ReviewBinderControlMetrics.cornerRadius,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: ReviewBinderControlMetrics.cornerRadius,
-                    style: .continuous
-                )
-                .stroke(Color(.separator).opacity(0.28), lineWidth: 1)
-            }
     }
 }
 

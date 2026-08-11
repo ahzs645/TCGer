@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Shared "New Binder" form (name, description, color, default condition)
-/// used by the collections screen and the binder-page review target picker.
+/// used by the collections screen and binder-selection flows.
 struct CreateBinderSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""

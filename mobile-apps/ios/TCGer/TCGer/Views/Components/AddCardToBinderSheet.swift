@@ -29,6 +29,7 @@ struct AddCardToBinderSheet: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
+    @State private var isCreatingBinder = false
     @State private var wishlistCard: Card?
     @State private var didAddToWishlist = false
 
@@ -67,21 +68,21 @@ struct AddCardToBinderSheet: View {
                             ProgressView()
                             Spacer()
                         }
-                    } else if collections.isEmpty {
-                        VStack(spacing: 12) {
-                            Text("No Binders Available")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text("Create a binder first to add cards")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 8)
                     } else {
                         BinderPickerSheetButton(
                             binders: collections,
-                            selectedBinderId: $selectedBinderId
+                            selectedBinderId: $selectedBinderId,
+                            onCreate: { name, description, colorHex, defaultCondition in
+                                await createBinder(
+                                    name: name,
+                                    description: description,
+                                    colorHex: colorHex,
+                                    defaultCondition: defaultCondition
+                                )
+                            }
                         )
+                        .binderPickerFieldStyle()
+                        .disabled(isAdding || isCreatingBinder)
                     }
                 } header: {
                     Text("Binder")
@@ -170,7 +171,7 @@ struct AddCardToBinderSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .disabled(isAdding)
+                    .disabled(isAdding || isCreatingBinder)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isAdding ? "Adding..." : "Add") {
@@ -178,7 +179,7 @@ struct AddCardToBinderSheet: View {
                             await addCard()
                         }
                     }
-                    .disabled(selectedBinderId == nil || isAdding)
+                    .disabled(selectedBinderId == nil || isAdding || isCreatingBinder)
                 }
             }
         }
@@ -236,6 +237,43 @@ struct AddCardToBinderSheet: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+
+    @MainActor
+    private func createBinder(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String?
+    ) async {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !isCreatingBinder else { return }
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        isCreatingBinder = true
+        defer { isCreatingBinder = false }
+
+        do {
+            let collection = try await apiService.createCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                name: name,
+                description: description,
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
+            )
+            collections.removeAll { $0.id == collection.id }
+            collections.append(collection)
+            collections = collections.sortedForDisplay()
+            selectedBinderId = collection.id
+            applyBinderDefaultCondition()
+            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
