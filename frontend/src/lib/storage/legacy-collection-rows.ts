@@ -46,14 +46,36 @@ function epoch(value: string | undefined, fallback: number): number {
  * fallback — the same resolution order `resolveCard` uses.
  */
 function cardKey(card: DemoBinderCard): string {
-  const externalId = card.cardData?.externalId ?? card.cardId;
-  return `${card.tcg}:${externalId}`;
+  return `${card.tcg}:${card.cardId}`;
+}
+
+/** The row id for a printing. Deterministic, so the demo card id survives. */
+export function cardRowId(tcg: string, demoCardId: string): string {
+  return `${CARD_ROW_PREFIX}${tcg}:${demoCardId}`;
+}
+
+const CARD_ROW_PREFIX = "card:";
+
+/**
+ * Recover the demo card id a row was built from.
+ *
+ * `DemoBinderCard.cardId` is what every ownership check compares against
+ * (`isCardInCollection`, `getOwnedQuantity`, and the owned badges they feed),
+ * and it is *not* the same as `externalId` once catalog enrichment has attached
+ * a real printing id to a seeded card. Carrying it in the row id keeps those
+ * checks answering exactly as they did before rows existed.
+ */
+export function demoCardIdFromRow(row: CardRow): string {
+  if (!row._id.startsWith(CARD_ROW_PREFIX)) return row.externalId;
+  const rest = row._id.slice(CARD_ROW_PREFIX.length);
+  const separator = rest.indexOf(":");
+  return separator < 0 ? row.externalId : rest.slice(separator + 1);
 }
 
 function toCardRow(card: DemoBinderCard, now: number): CardRow {
   const data = card.cardData;
   return {
-    _id: `card_${cardKey(card)}`,
+    _id: cardRowId(card.tcg, card.cardId),
     _creationTime: epoch(card.addedAt, now),
     tcg: card.tcg,
     externalId: data?.externalId ?? card.cardId,
@@ -172,4 +194,121 @@ export function toPortableRows(
     collectionEntries: entryRows,
     cards: [...cardRows.values()],
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rows → the nested read model                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Rebuild the nested shape from rows.
+ *
+ * The rows are the truth and this is a *derived* read model, not a second copy
+ * that can drift: it is regenerated from the rows after every mutation and is
+ * never edited in place. It exists so the collection selectors — totals, game
+ * and rarity breakdowns, ownership checks, catalog enrichment — keep reading
+ * synchronously off a shape they already understand, while the mutations
+ * beneath them run through the shared rules.
+ */
+export function toDemoBinders(
+  rows: PortableSnapshot,
+  demoCards?: ReadonlyMap<string, DemoBinderCard>,
+): DemoBinder[] {
+  const cardsById = new Map(rows.cards.map((card) => [card._id, card]));
+  const byBinder = new Map<string, CollectionEntryRow[]>();
+  for (const entry of rows.collectionEntries) {
+    const list = byBinder.get(entry.binderId);
+    if (list) list.push(entry);
+    else byBinder.set(entry.binderId, [entry]);
+  }
+
+  return rows.binders.map((binder) => {
+    const entries = (byBinder.get(binder._id) ?? [])
+      .slice()
+      .sort((a, b) => a._creationTime - b._creationTime);
+
+    const grouped = new Map<string, DemoBinderCard>();
+    for (const entry of entries) {
+      const card = cardsById.get(entry.cardId);
+      const copy = {
+        id: entry._id,
+        condition: entry.condition,
+        language: entry.language,
+        notes: entry.notes,
+        price: entry.price,
+        acquisitionPrice: entry.acquisitionPrice,
+        serialNumber: entry.serialNumber,
+        acquiredAt: entry.acquiredAt,
+        isFoil: entry.isFoil,
+        finishCode: entry.finishCode,
+        finishLabel: entry.finishLabel,
+        edition: entry.edition,
+        stamp: entry.stamp,
+        isSealedPromo: entry.isSealedPromo,
+        isOversized: entry.isOversized,
+        isPeelOff: entry.isPeelOff,
+        isSigned: entry.isSigned,
+        isAltered: entry.isAltered,
+        gradingCompany: entry.gradingCompany,
+        gradingScore: entry.gradingScore,
+        certNumber: entry.certNumber,
+        storageLocation: entry.storageLocation,
+        tags: [],
+      } satisfies CollectionCardCopy;
+
+      const existing = grouped.get(entry.cardId);
+      if (existing) {
+        existing.copies!.push(copy);
+        existing.quantity = existing.copies!.length;
+        continue;
+      }
+
+      const demoCardId = card ? demoCardIdFromRow(card) : entry.cardId;
+      // Preserve whatever the previous nested card carried that rows do not
+      // model — chiefly `cardData`, which catalog enrichment writes back.
+      const previous = demoCards?.get(`${binder._id}:${demoCardId}`);
+      grouped.set(entry.cardId, {
+        id: entry._id,
+        cardId: demoCardId,
+        name: card?.name ?? previous?.name ?? "",
+        tcg: (card?.tcg ?? previous?.tcg ?? "magic") as DemoBinderCard["tcg"],
+        setCode: card?.setCode ?? previous?.setCode ?? "",
+        setName: card?.setName ?? previous?.setName ?? "",
+        rarity: card?.rarity ?? previous?.rarity ?? "",
+        condition: entry.condition ?? previous?.condition ?? "Near Mint",
+        price: entry.price ?? previous?.price ?? 0,
+        quantity: 1,
+        addedAt: entry.acquiredAt ?? new Date(entry.createdAt).toISOString(),
+        cardData: previous?.cardData,
+        copies: [copy],
+      });
+    }
+
+    return {
+      id: binder._id,
+      name: binder.name,
+      color: binder.colorHex ? `#${binder.colorHex}` : "#3b82f6",
+      cards: [...grouped.values()],
+      createdAt: new Date(binder.createdAt).toISOString(),
+      updatedAt: new Date(binder.updatedAt).toISOString(),
+    };
+  });
+}
+
+/** Key `toDemoBinders` uses to carry non-row fields across a rebuild. */
+export function demoCardKey(binderId: string, demoCardId: string): string {
+  return `${binderId}:${demoCardId}`;
+}
+
+/** Index the current nested cards so a rebuild can preserve `cardData`. */
+export function indexDemoCards(
+  binders: DemoBinder[],
+): Map<string, DemoBinderCard> {
+  const index = new Map<string, DemoBinderCard>();
+  for (const binder of binders) {
+    for (const card of binder.cards) {
+      index.set(demoCardKey(binder.id, card.cardId), card);
+    }
+  }
+  return index;
 }

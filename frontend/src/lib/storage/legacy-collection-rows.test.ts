@@ -12,7 +12,12 @@ import test from "node:test";
 
 import { projectBinder, type CardRow } from "@tcg/api-types";
 import { useDemoStore, type DemoBinder } from "@/stores/demo-store";
-import { toPortableRows, LOCAL_USER_ID } from "./legacy-collection-rows";
+import {
+  toPortableRows,
+  toDemoBinders,
+  indexDemoCards,
+  LOCAL_USER_ID,
+} from "./legacy-collection-rows";
 import { LocalPortableDb } from "./local-portable-db";
 
 function seededBinders(): DemoBinder[] {
@@ -156,9 +161,7 @@ test("cards are deduplicated across binders", () => {
   const rows = toPortableRows(binders);
 
   const distinct = new Set(
-    binders.flatMap((b) =>
-      b.cards.map((c) => `${c.tcg}:${c.cardData?.externalId ?? c.cardId}`),
-    ),
+    binders.flatMap((b) => b.cards.map((c) => `${c.tcg}:${c.cardId}`)),
   );
   assert.equal(
     rows.cards.length,
@@ -234,4 +237,88 @@ test("converted rows are usable by the rules", async () => {
     cardId: entries[0]!.cardId,
   });
   assert.ok(group.length > 0, "group lookup returned nothing");
+});
+
+test("nested → rows → nested is lossless for everything the UI reads", () => {
+  const binders = seededBinders();
+  const rows = toPortableRows(binders);
+  const back = toDemoBinders(rows, indexDemoCards(binders));
+
+  assert.equal(back.length, binders.length, "binder count");
+
+  for (const original of binders) {
+    const rebuilt: DemoBinder | undefined = back.find(
+      (b) => b.id === original.id,
+    );
+    assert.ok(rebuilt, `binder ${original.name} lost`);
+    assert.equal(rebuilt.name, original.name);
+    assert.equal(rebuilt.color, original.color, "colour round trip");
+    assert.equal(rebuilt.cards.length, original.cards.length, "card count");
+
+    for (const card of original.cards) {
+      const mirror: DemoBinder["cards"][number] | undefined =
+        rebuilt.cards.find((c) => c.cardId === card.cardId);
+      assert.ok(
+        mirror,
+        `${card.name}: cardId ${card.cardId} did not survive — ownership badges read this`,
+      );
+      assert.equal(mirror.name, card.name, `${card.name}: name`);
+      assert.equal(mirror.tcg, card.tcg, `${card.name}: tcg`);
+      assert.equal(mirror.rarity, card.rarity, `${card.name}: rarity`);
+      assert.equal(
+        mirror.quantity,
+        card.copies?.length || Math.max(1, card.quantity),
+        `${card.name}: quantity`,
+      );
+      assert.deepEqual(
+        mirror.cardData,
+        card.cardData,
+        `${card.name}: cardData must survive, catalog enrichment writes it`,
+      );
+    }
+  }
+});
+
+test("round trip preserves the totals the dashboard shows", () => {
+  const binders = seededBinders();
+  const back = toDemoBinders(toPortableRows(binders), indexDemoCards(binders));
+
+  const count = (list: DemoBinder[]) =>
+    list.reduce(
+      (sum, b) =>
+        sum +
+        b.cards.reduce(
+          (n, c) => n + (c.copies?.length || Math.max(1, c.quantity)),
+          0,
+        ),
+      0,
+    );
+  const value = (list: DemoBinder[]) =>
+    list.reduce(
+      (sum, b) =>
+        sum +
+        b.cards.reduce(
+          (n, c) =>
+            n +
+            (c.copies?.length
+              ? c.copies.reduce((a, copy) => a + (copy.price ?? c.price), 0)
+              : c.price * Math.max(1, c.quantity)),
+          0,
+        ),
+      0,
+    );
+
+  assert.equal(count(back), count(binders), "total cards");
+  assert.equal(
+    value(back).toFixed(2),
+    value(binders).toFixed(2),
+    "total value",
+  );
+
+  const uniqueBefore = new Set(
+    binders.flatMap((b) => b.cards.map((c) => c.cardId)),
+  ).size;
+  const uniqueAfter = new Set(back.flatMap((b) => b.cards.map((c) => c.cardId)))
+    .size;
+  assert.equal(uniqueAfter, uniqueBefore, "unique cards");
 });
