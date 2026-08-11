@@ -16,6 +16,7 @@ import type {
   DemoPersistence,
   PersistedDemoState,
 } from "@/lib/storage/demo-persistence";
+import { toPortableRows } from "@/lib/storage/legacy-collection-rows";
 
 /* ------------------------------------------------------------------ */
 /*  Test doubles                                                        */
@@ -44,9 +45,7 @@ function createFakePersistence(
   stored: Partial<PersistedDemoState> | null,
   options: { deferHydration?: boolean } = {},
 ): FakePersistence {
-  let state: Partial<PersistedDemoState> | null = stored
-    ? { ...stored }
-    : null;
+  let state: Partial<PersistedDemoState> | null = stored ? { ...stored } : null;
   let release = () => {};
   const gate = options.deferHydration
     ? new Promise<void>((resolve) => {
@@ -89,6 +88,14 @@ function allCommittedSlices(fake: FakePersistence): string[] {
   return [...seen].sort();
 }
 
+/**
+ * A stored collection, in the shape schema 2 persists: rows, not the nested
+ * arrays. The store derives `binders` back from these on hydration.
+ */
+function storedCollection(binders: DemoBinder[]) {
+  return toPortableRows(binders);
+}
+
 function makeStoredBinder(name: string): DemoBinder {
   return {
     id: `stored-${name}`,
@@ -106,7 +113,10 @@ function makeStoredBinder(name: string): DemoBinder {
 
 test("applies a stored snapshot to the store on hydration", async () => {
   const binders = [makeStoredBinder("Returning Visitor")];
-  const fake = createFakePersistence({ initialized: true, binders });
+  const fake = createFakePersistence({
+    initialized: true,
+    collectionRows: storedCollection(binders),
+  });
 
   setDemoPersistence(fake);
   await whenDemoStoreHydrated();
@@ -122,7 +132,9 @@ test("treats a stored collection with no initialized flag as a return visit", as
   const binders = [makeStoredBinder("Legacy Payload")];
   // The released localStorage payload has no version and no guarantees; a
   // collection without the flag still means somebody has been here.
-  const fake = createFakePersistence({ binders });
+  const fake = createFakePersistence({
+    collectionRows: storedCollection(binders),
+  });
 
   setDemoPersistence(fake);
   await whenDemoStoreHydrated();
@@ -134,14 +146,14 @@ test("treats a stored collection with no initialized flag as a return visit", as
 test("keeps a write that landed while the read was still in flight", async () => {
   const stored = [makeStoredBinder("From Storage")];
   const fake = createFakePersistence(
-    { initialized: true, binders: stored },
+    { initialized: true, collectionRows: storedCollection(stored) },
     { deferHydration: true },
   );
 
   setDemoPersistence(fake);
   // A visitor acting inside the read window: their write is newer than the
   // snapshot, so hydration must not roll it back.
-  useDemoStore.getState().addBinder("Typed During Hydration");
+  await useDemoStore.getState().addBinder("Typed During Hydration");
   fake.release();
   await whenDemoStoreHydrated();
 
@@ -150,7 +162,10 @@ test("keeps a write that landed while the read was still in flight", async () =>
   assert.equal(binders[0].name, "Typed During Hydration");
   // ...and it is re-committed once the backend is done reading.
   assert.ok(
-    fake.commits.some((commit) => commit.binders?.[0]?.name === "Typed During Hydration"),
+    fake.commits.some(
+      (commit) =>
+        commit.collectionRows?.binders?.[0]?.name === "Typed During Hydration",
+    ),
   );
 });
 
@@ -161,7 +176,7 @@ test("keeps a write that landed while the read was still in flight", async () =>
 test("init() does not re-seed over a snapshot that has not arrived yet", async () => {
   const stored = [makeStoredBinder("Do Not Overwrite Me")];
   const fake = createFakePersistence(
-    { initialized: true, binders: stored },
+    { initialized: true, collectionRows: storedCollection(stored) },
     { deferHydration: true },
   );
 
@@ -202,7 +217,10 @@ test("init() seeds a genuinely empty store once hydration has resolved", async (
 
 test("init() is a no-op on a store that is already initialized", async () => {
   const binders = [makeStoredBinder("Untouched")];
-  const fake = createFakePersistence({ initialized: true, binders });
+  const fake = createFakePersistence({
+    initialized: true,
+    collectionRows: storedCollection(binders),
+  });
 
   setDemoPersistence(fake);
   await whenDemoStoreHydrated();
@@ -219,7 +237,7 @@ test("init() is a no-op on a store that is already initialized", async () => {
 test("resetDemo() drops stored state and restores the seed fixtures", async () => {
   const fake = createFakePersistence({
     initialized: true,
-    binders: [makeStoredBinder("Old Collection")],
+    collectionRows: storedCollection([makeStoredBinder("Old Collection")]),
     profile: { username: "Someone Else", email: "someone@example.com" },
   });
 
@@ -241,14 +259,17 @@ test("resetDemo() drops stored state and restores the seed fixtures", async () =
   // Cleared first, then re-persisted from a clean baseline.
   assert.equal(fake.clears, 1);
   const written = allCommittedSlices(fake);
-  assert.ok(written.includes("binders"));
+  assert.ok(written.includes("collectionRows"));
   assert.ok(written.includes("initialized"));
   assert.ok(!written.includes("decks"));
 });
 
 test("resetDemo() waits for a snapshot that is still in flight", async () => {
   const fake = createFakePersistence(
-    { initialized: true, binders: [makeStoredBinder("Stale")] },
+    {
+      initialized: true,
+      collectionRows: storedCollection([makeStoredBinder("Stale")]),
+    },
     { deferHydration: true },
   );
 
@@ -272,16 +293,16 @@ test("resetDemo() waits for a snapshot that is still in flight", async () => {
 test("commits only the slices an action actually changed", async () => {
   const fake = createFakePersistence({
     initialized: true,
-    binders: [makeStoredBinder("Existing")],
+    collectionRows: storedCollection([makeStoredBinder("Existing")]),
   });
 
   setDemoPersistence(fake);
   await whenDemoStoreHydrated();
   fake.commits.length = 0;
 
-  useDemoStore.getState().addBinder("Second Binder");
+  await useDemoStore.getState().addBinder("Second Binder");
   assert.equal(fake.commits.length, 1);
-  assert.deepEqual(committedSlices(fake.commits[0]), ["binders"]);
+  assert.deepEqual(committedSlices(fake.commits[0]), ["collectionRows"]);
 
   useDemoStore.getState().updateProfile({ username: "Renamed" });
   assert.equal(fake.commits.length, 2);
@@ -306,7 +327,7 @@ test("does not persist decks, trades or sealed until they are mutated", async ()
   // Seeding writes the collection, not the portfolio fixtures — those are
   // re-imported from demo-portfolio.ts on every boot anyway.
   assert.deepEqual(committedSlices(fake.commits[0]), [
-    "binders",
+    "collectionRows",
     "initialized",
     "wishlists",
   ]);

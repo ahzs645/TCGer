@@ -776,7 +776,7 @@ async function handleCollections(
       description?: string;
       colorHex?: string;
     };
-    const id = store().addBinder(
+    const id = await store().addBinder(
       data.name,
       data.colorHex ? `#${data.colorHex}` : undefined,
     );
@@ -827,7 +827,7 @@ async function handleCollections(
       description?: string;
       colorHex?: string;
     };
-    if (data.name) store().renameBinder(collectionId, data.name);
+    if (data.name) await store().renameBinder(collectionId, data.name);
     const binder = store().binders.find(
       (b: DemoBinder) => b.id === collectionId,
     );
@@ -836,7 +836,7 @@ async function handleCollections(
 
   // DELETE /collections/:id
   if (segments.length === 1 && method === "DELETE") {
-    store().removeBinder(collectionId);
+    await store().removeBinder(collectionId);
     return noContent();
   }
 
@@ -849,7 +849,11 @@ async function handleCollections(
   if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
     const cardId = segments[2];
     const patch = body as UpdateCardInput;
-    const updated = store().updateCardInBinder(collectionId, cardId, patch);
+    const updated = await store().updateCardInBinder(
+      collectionId,
+      cardId,
+      patch,
+    );
     // On a move the card now lives in the target binder, so the response has
     // to describe that binder — reporting the source would tell the UI the
     // card is still where it started.
@@ -866,14 +870,17 @@ async function handleCollections(
   // DELETE /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
     const cardId = segments[2];
-    store().removeCardFromBinder(collectionId, cardId);
+    await store().removeCardFromBinder(collectionId, cardId);
     return noContent();
   }
 
   return notFound();
 }
 
-function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
+async function handleAddCard(
+  collectionId: string,
+  body: unknown,
+): Promise<Response> {
   const data = body as AddCardInput;
   const demoCard: DemoOwnedCard | null =
     DEMO_CARDS.find((c) => c.id === data.cardId) ||
@@ -895,7 +902,7 @@ function handleAddCard(collectionId: string, body: unknown): Promise<Response> {
     collectionId === "__library__" ? store().binders[0]?.id : collectionId;
 
   if (targetBinder) {
-    store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
+    await store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
       cardData: data.cardData,
       copy: {
         condition: data.condition,

@@ -27,6 +27,24 @@ import {
   type PersistedDemoState,
 } from "@/lib/storage/demo-persistence";
 import { createDemoPersistence } from "@/lib/storage/demo-db";
+import {
+  addCopies,
+  removeCard as removeCardRule,
+  updateEntry,
+  type UpdateFields,
+} from "@tcg/api-types";
+import {
+  LocalPortableDb,
+  emptySnapshot,
+  type PortableSnapshot,
+} from "@/lib/storage/local-portable-db";
+import {
+  cardRowId,
+  indexDemoCards,
+  toDemoBinders,
+  toPortableRows,
+  LOCAL_USER_ID,
+} from "@/lib/storage/legacy-collection-rows";
 import type {
   AddWishlistCardInput,
   Card,
@@ -151,6 +169,55 @@ const DEFAULT_DEMO_PROFILE: DemoProfile = {
 };
 
 const EMPTY_BINDERS: DemoBinder[] = [];
+const EMPTY_ROWS: PortableSnapshot = emptySnapshot();
+
+/**
+ * The collection's storage, and the thing the shared rules run against.
+ *
+ * Rows are the truth: every collection mutation goes through
+ * `@tcg/api-types`'s rules over this store, and `binders` is rebuilt from the
+ * result. The nested array is a derived read model — regenerated, never edited
+ * — so it cannot drift from the rows the way two hand-written implementations
+ * drifted from each other.
+ */
+const collectionDb = new LocalPortableDb();
+
+/**
+ * Publish the rows and the read model derived from them.
+ *
+ * `cardData` is carried across the rebuild from the previous nested cards:
+ * catalog enrichment writes it and the row model does not carry it, so losing
+ * it here would drop card art on the next mutation.
+ */
+let derivedBinders: DemoBinder[] = EMPTY_BINDERS;
+
+function publishCollection(): DemoBinder[] {
+  const rows = collectionDb.snapshot();
+  // Read from the module-level cache rather than the store: the collection
+  // actions call this, and reaching back into `useDemoStore` from inside its
+  // own initializer makes the store's type circular.
+  const next = toDemoBinders(rows, indexDemoCards(derivedBinders));
+  derivedBinders = next;
+  useDemoStore.setState({ collectionRows: rows, binders: next });
+  return next;
+}
+
+/**
+ * Install rows and return the read model, without touching the store.
+ *
+ * Seeding and reset fold the result into their own single `setState`, so the
+ * collection lands in one commit rather than two — the portfolio slices are
+ * excluded from persistence by reference identity, and a second write would
+ * break that.
+ */
+function loadCollection(
+  rows: PortableSnapshot,
+  nested?: DemoBinder[],
+): DemoBinder[] {
+  collectionDb.load(rows);
+  derivedBinders = nested ?? toDemoBinders(rows);
+  return derivedBinders;
+}
 const EMPTY_WISHLISTS: DemoWishlist[] = [];
 
 export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
@@ -591,6 +658,15 @@ function writeSlice(target: object, slice: DemoSlice, value: unknown): void {
 /** Loose shape check — a stored payload predates any version field. */
 function isPlausibleSlice(slice: DemoSlice, value: unknown): boolean {
   switch (slice) {
+    case "collectionRows": {
+      if (!value || typeof value !== "object") return false;
+      const rows = value as Partial<PortableSnapshot>;
+      return (
+        Array.isArray(rows.binders) &&
+        Array.isArray(rows.collectionEntries) &&
+        Array.isArray(rows.cards)
+      );
+    }
     case "binders":
     case "wishlists":
     case "decks":
@@ -729,6 +805,7 @@ function initialPersistedState(): PersistedDemoState {
     initialized: false,
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
+    collectionRows: EMPTY_ROWS,
     binders: EMPTY_BINDERS,
     wishlists: EMPTY_WISHLISTS,
     decks: DEMO_DECKS,
@@ -830,10 +907,19 @@ function applyHydratedSnapshot(): void {
     if (
       snapshot.initialized === undefined &&
       !preHydrationDirty.has("initialized") &&
-      (snapshot.binders !== undefined || snapshot.wishlists !== undefined)
+      (snapshot.collectionRows !== undefined ||
+        snapshot.wishlists !== undefined)
     ) {
       patch.initialized = true;
       changed = true;
+    }
+    // Rows are the truth, so they go into the store that owns them and the
+    // read model is derived from them — assigning `binders` from the patch
+    // would leave the two disagreeing until the next mutation.
+    if (patch.collectionRows) {
+      collectionDb.load(patch.collectionRows);
+      patch.binders = toDemoBinders(patch.collectionRows);
+      derivedBinders = patch.binders;
     }
     if (changed) applyToStore(patch);
   }
@@ -892,6 +978,10 @@ export function whenDemoStoreHydrated(): Promise<void> {
 export function setDemoPersistence(next: DemoPersistence): void {
   persistence = next;
   persistBaseline = initialPersistedState();
+  // The row store is module state and would otherwise survive the swap,
+  // leaking one persistence backend's collection into the next.
+  collectionDb.load(emptySnapshot());
+  derivedBinders = EMPTY_BINDERS;
   applyToStore(initialPersistedState());
   beginDemoHydration();
 }
@@ -899,9 +989,12 @@ export function setDemoPersistence(next: DemoPersistence): void {
 /** Seed the fixtures, but only if this visitor genuinely has nothing. */
 function seedDemoIfEmpty(): void {
   if (useDemoStore.getState().initialized) return;
+  const seeded = seedBinders();
+  loadCollection(toPortableRows(seeded), seeded);
   useDemoStore.setState({
     initialized: true,
-    binders: seedBinders(),
+    collectionRows: collectionDb.snapshot(),
+    binders: seeded,
     wishlists: seedWishlists(),
     decks: DEMO_DECKS,
     trades: DEMO_TRADES,
@@ -915,11 +1008,14 @@ function resetDemoState(): void {
   // commit issued now could land either side of the `clear()` below. Once the
   // clear has resolved the baseline is reset and the fresh state is committed
   // from scratch — decks/trades/sealed excluded, since they are seeds again.
+  const seeded = seedBinders();
+  loadCollection(toPortableRows(seeded), seeded);
   applyToStore({
     initialized: true,
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
-    binders: seedBinders(),
+    binders: seeded,
+    collectionRows: collectionDb.snapshot(),
     wishlists: seedWishlists(),
     decks: DEMO_DECKS,
     trades: DEMO_TRADES,
@@ -947,6 +1043,9 @@ interface DemoState {
   initialized: boolean;
   profile: DemoProfile;
   preferences: UserPreferences;
+  /** The collection, as portable rows. The truth. */
+  collectionRows: PortableSnapshot;
+  /** Derived from {@link collectionRows} after every mutation. Never edited. */
   binders: DemoBinder[];
   wishlists: DemoWishlist[];
   decks: Deck[];
@@ -989,9 +1088,9 @@ interface DemoState {
   removeSealedProduct: (id: string) => void;
 
   // Binders
-  addBinder: (name: string, color?: string) => string;
-  removeBinder: (id: string) => void;
-  renameBinder: (id: string, name: string) => void;
+  addBinder: (name: string, color?: string) => Promise<string>;
+  removeBinder: (id: string) => Promise<void>;
+  renameBinder: (id: string, name: string) => Promise<void>;
   addCardToBinder: (
     binderId: string,
     card: DemoOwnedCard,
@@ -1002,8 +1101,11 @@ interface DemoState {
     binderId: string,
     cardOrCopyId: string,
     updates: UpdateCardInput,
-  ) => DemoBinderCard | null;
-  removeCardFromBinder: (binderId: string, cardInstanceId: string) => void;
+  ) => Promise<DemoBinderCard | null>;
+  removeCardFromBinder: (
+    binderId: string,
+    cardInstanceId: string,
+  ) => Promise<void>;
 
   // Wishlists
   addWishlist: (name: string, description?: string) => string;
@@ -1043,6 +1145,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   initialized: false,
   profile: DEFAULT_DEMO_PROFILE,
   preferences: DEFAULT_DEMO_PREFERENCES,
+  collectionRows: EMPTY_ROWS,
   binders: EMPTY_BINDERS,
   wishlists: EMPTY_WISHLISTS,
   decks: DEMO_DECKS,
@@ -1276,346 +1379,128 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   removeSealedProduct: (id) =>
     set((state) => ({ sealed: state.sealed.filter((p) => p.id !== id) })),
 
-  addBinder: (name, color) => {
-    const id = uid();
-    const now = new Date().toISOString();
-    set((state) => ({
-      binders: [
-        ...state.binders,
-        {
-          id,
-          name,
-          color:
-            color ?? BINDER_COLORS[state.binders.length % BINDER_COLORS.length],
-          cards: [],
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-    }));
+  addBinder: async (name, color) => {
+    const now = Date.now();
+    const id = await collectionDb.insert("binders", {
+      userId: LOCAL_USER_ID,
+      kind: "binder",
+      name,
+      colorHex: (
+        color ??
+        BINDER_COLORS[
+          collectionDb.snapshot().binders.length % BINDER_COLORS.length
+        ]
+      ).replace(/^#/, ""),
+      createdAt: now,
+      updatedAt: now,
+    });
+    publishCollection();
     return id;
   },
 
-  removeBinder: (id) => {
-    set((state) => ({
-      binders: state.binders.filter((b) => b.id !== id),
-    }));
-  },
-
-  renameBinder: (id, name) => {
-    set((state) => ({
-      binders: state.binders.map((b) =>
-        b.id === id ? { ...b, name, updatedAt: new Date().toISOString() } : b,
-      ),
-    }));
-  },
-
-  addCardToBinder: (binderId, card, quantity = 1, details) => {
-    const now = new Date().toISOString();
-    const copyInput: DemoCopyInput = {
-      condition: details?.copy?.condition ?? "Near Mint",
-      language: details?.copy?.language,
-      notes: details?.copy?.notes,
-      price: details?.copy?.price ?? card.price,
-      acquisitionPrice: details?.copy?.acquisitionPrice,
-      serialNumber: details?.copy?.serialNumber,
-      acquiredAt: details?.copy?.acquiredAt,
-      isFoil: details?.copy?.isFoil,
-      finishCode: details?.copy?.finishCode,
-      finishLabel: details?.copy?.finishLabel,
-      edition: details?.copy?.edition,
-      stamp: details?.copy?.stamp,
-      isSealedPromo: details?.copy?.isSealedPromo,
-      isOversized: details?.copy?.isOversized,
-      isPeelOff: details?.copy?.isPeelOff,
-      isSigned: details?.copy?.isSigned,
-      isAltered: details?.copy?.isAltered,
-      // Dropped here until now while `makeDemoCopy` already supported them, so
-      // grading and storage details silently vanished on add. The server
-      // persists all six (convex/lib/library.ts `addEntryForViewer`).
-      gradingCompany: details?.copy?.gradingCompany,
-      gradingScore: details?.copy?.gradingScore,
-      certNumber: details?.copy?.certNumber,
-      storageLocation: details?.copy?.storageLocation,
-    };
-    const newCopies = Array.from({ length: quantity }, () =>
-      makeDemoCopy(copyInput),
-    );
-    set((state) => ({
-      binders: state.binders.map((b) => {
-        if (b.id !== binderId) return b;
-        const existing = b.cards.find((c) => c.cardId === card.id);
-        if (existing) {
-          const existingCopies =
-            existing.copies ??
-            Array.from({ length: existing.quantity }, () =>
-              makeDemoCopy({
-                condition: existing.condition,
-                price: existing.price,
-              }),
-            );
-          return {
-            ...b,
-            updatedAt: now,
-            cards: b.cards.map((c) =>
-              c.cardId === card.id
-                ? {
-                    ...c,
-                    quantity: existingCopies.length + newCopies.length,
-                    cardData: details?.cardData ?? c.cardData,
-                    copies: [...existingCopies, ...newCopies],
-                  }
-                : c,
-            ),
-          };
-        }
-        return {
-          ...b,
-          updatedAt: now,
-          cards: [
-            ...b.cards,
-            {
-              id: uid(),
-              cardId: card.id,
-              name: card.name,
-              tcg: card.tcg,
-              setCode: card.setCode,
-              setName: card.setName,
-              rarity: card.rarity,
-              condition: "Near Mint",
-              price: card.price,
-              quantity,
-              addedAt: now,
-              cardData: details?.cardData,
-              copies: newCopies,
-            },
-          ],
-        };
-      }),
-    }));
-  },
-
-  updateCardInBinder: (binderId, cardOrCopyId, updates) => {
-    let updatedResult: DemoBinderCard | null = null;
-    set((state) => {
-      const sourceIndex = state.binders.findIndex((b) => b.id === binderId);
-      if (sourceIndex < 0) return {};
-      const binder = state.binders[sourceIndex];
-      const cardIndex = binder.cards.findIndex(
-        (card) =>
-          card.id === cardOrCopyId ||
-          card.copies?.some((copy) => copy.id === cardOrCopyId),
-      );
-      if (cardIndex < 0) return {};
-
-      const current = binder.cards[cardIndex];
-      const fallbackCopies =
-        current.copies ??
-        Array.from({ length: current.quantity }, () =>
-          makeDemoCopy({
-            condition: current.condition,
-            price: current.price,
-          }),
-        );
-      const targetsWholeCard = current.id === cardOrCopyId;
-      const copyUpdates = fallbackCopies.map((copy) => {
-        if (!targetsWholeCard && copy.id !== cardOrCopyId) return copy;
-        return {
-          ...copy,
-          condition:
-            updates.condition === undefined
-              ? copy.condition
-              : (updates.condition ?? undefined),
-          language:
-            updates.language === undefined
-              ? copy.language
-              : (updates.language ?? undefined),
-          notes:
-            updates.notes === undefined
-              ? copy.notes
-              : (updates.notes ?? undefined),
-          serialNumber:
-            updates.serialNumber === undefined
-              ? copy.serialNumber
-              : (updates.serialNumber ?? undefined),
-          acquiredAt:
-            updates.acquiredAt === undefined
-              ? copy.acquiredAt
-              : (updates.acquiredAt ?? undefined),
-          // Clearing the finish clears the foil flag with it, matching
-          // convex/bridge.ts. The sandbox editor sends both together so this
-          // is invisible there, but the print-selection path sends
-          // `finishCode: null` on its own.
-          isFoil:
-            updates.isFoil ??
-            (updates.finishCode === null ? false : copy.isFoil),
-          finishCode:
-            updates.finishCode === undefined
-              ? copy.finishCode
-              : (updates.finishCode ?? undefined),
-          finishLabel:
-            updates.finishLabel === undefined
-              ? copy.finishLabel
-              : (updates.finishLabel ?? undefined),
-          edition:
-            updates.edition === undefined
-              ? copy.edition
-              : (updates.edition ?? undefined),
-          stamp:
-            updates.stamp === undefined
-              ? copy.stamp
-              : (updates.stamp ?? undefined),
-          isSealedPromo: updates.isSealedPromo ?? copy.isSealedPromo,
-          isOversized: updates.isOversized ?? copy.isOversized,
-          isPeelOff: updates.isPeelOff ?? copy.isPeelOff,
-          isSigned: updates.isSigned ?? copy.isSigned,
-          isAltered: updates.isAltered ?? copy.isAltered,
-          gradingCompany:
-            updates.gradingCompany === undefined
-              ? copy.gradingCompany
-              : (updates.gradingCompany ?? undefined),
-          gradingScore:
-            updates.gradingScore === undefined
-              ? copy.gradingScore
-              : (updates.gradingScore ?? undefined),
-          certNumber:
-            updates.certNumber === undefined
-              ? copy.certNumber
-              : (updates.certNumber ?? undefined),
-          storageLocation:
-            updates.storageLocation === undefined
-              ? copy.storageLocation
-              : (updates.storageLocation ?? undefined),
-        };
-      });
-
-      let copies = copyUpdates;
-      if (updates.quantity !== undefined && targetsWholeCard) {
-        const desired = Math.max(1, updates.quantity);
-        if (desired < copies.length) {
-          copies = copies.slice(0, desired);
-        } else {
-          const template = copies[0] ?? makeDemoCopy();
-          while (copies.length < desired) {
-            copies = [
-              ...copies,
-              { ...template, id: uid(), serialNumber: undefined },
-            ];
-          }
-        }
-      }
-
-      const override = updates.cardOverride;
-      const cardData = override?.cardData ?? current.cardData;
-      const next: DemoBinderCard = {
-        ...current,
-        cardId: override?.cardId ?? current.cardId,
-        name: cardData?.name ?? current.name,
-        tcg: (cardData?.tcg as TcgCode | undefined) ?? current.tcg,
-        setCode: cardData?.setCode ?? current.setCode,
-        setName: cardData?.setName ?? current.setName,
-        rarity: cardData?.rarity ?? current.rarity,
-        condition: copies[0]?.condition ?? current.condition,
-        price: copies[0]?.price ?? current.price,
-        quantity: copies.length,
-        cardData,
-        copies,
-      };
-      const stamp = new Date().toISOString();
-      const destinationId = updates.targetBinderId;
-      const movesBinder =
-        destinationId !== undefined &&
-        destinationId !== binderId &&
-        state.binders.some((b) => b.id === destinationId);
-
-      if (!movesBinder) {
-        updatedResult = next;
-        const cards = [...binder.cards];
-        cards[cardIndex] = next;
-        const binders = [...state.binders];
-        binders[sourceIndex] = { ...binder, updatedAt: stamp, cards };
-        return { binders };
-      }
-
-      // Move to another binder. `targetBinderId` is in the shared contract
-      // and the bridge implements it (convex/bridge.ts, reached as
-      // `binderId` after http.ts maps it), but the demo used to ignore it
-      // and answer 200 with an unmoved card — so the UI reported a move
-      // that never happened.
-      //
-      // One copy moves, not the group, because that is what the server does:
-      // it patches the single addressed entry's binder. The card-level id in
-      // the REST response is an alias for the first copy's id (http.ts
-      // `toLegacyBinder`), so "move this card" and "move this copy" are
-      // indistinguishable on the wire — the sandbox sends a copy id, the
-      // collection table sends a card id, and both arrive as the same string.
-      // Moving the whole group here would make the demo disagree with
-      // production for the table's move.
-      const moving = targetsWholeCard
-        ? copies.slice(0, 1)
-        : copies.filter((copy) => copy.id === cardOrCopyId);
-      const staying = copies.filter((copy) => !moving.includes(copy));
-
-      const sourceCards = [...binder.cards];
-      if (staying.length === 0) {
-        sourceCards.splice(cardIndex, 1);
-      } else {
-        sourceCards[cardIndex] = {
-          ...next,
-          quantity: staying.length,
-          copies: staying,
-        };
-      }
-
-      const binders = state.binders.map((candidate) => {
-        if (candidate.id === binderId) {
-          return { ...candidate, updatedAt: stamp, cards: sourceCards };
-        }
-        if (candidate.id !== destinationId) return candidate;
-
-        const existingIndex = candidate.cards.findIndex(
-          (card) => card.cardId === next.cardId,
-        );
-        const cards = [...candidate.cards];
-        if (existingIndex >= 0) {
-          const existing = cards[existingIndex];
-          const merged = [...(existing.copies ?? []), ...moving];
-          cards[existingIndex] = {
-            ...existing,
-            quantity: merged.length,
-            copies: merged,
-          };
-          updatedResult = cards[existingIndex];
-        } else {
-          const created: DemoBinderCard = {
-            ...next,
-            id: uid(),
-            quantity: moving.length,
-            copies: moving,
-            addedAt: stamp,
-          };
-          cards.push(created);
-          updatedResult = created;
-        }
-        return { ...candidate, updatedAt: stamp, cards };
-      });
-
-      return { binders };
+  removeBinder: async (id) => {
+    // The binder's copies go with it; orphaned entries would still be counted
+    // by every collection selector.
+    const entries = await collectionDb.query("collectionEntries", "by_binder", {
+      binderId: id,
     });
-    return updatedResult;
+    await collectionDb.transaction(
+      ["binders", "collectionEntries"],
+      async () => {
+        for (const entry of entries) {
+          await collectionDb.delete("collectionEntries", entry._id);
+        }
+        await collectionDb.delete("binders", id);
+      },
+    );
+    publishCollection();
   },
 
-  removeCardFromBinder: (binderId, cardInstanceId) => {
-    set((state) => ({
-      binders: state.binders.map((b) => {
-        if (b.id !== binderId) return b;
-        return {
-          ...b,
-          updatedAt: new Date().toISOString(),
-          cards: b.cards.filter((c) => c.id !== cardInstanceId),
-        };
-      }),
-    }));
+  renameBinder: async (id, name) => {
+    await collectionDb.patch("binders", id, { name, updatedAt: Date.now() });
+    publishCollection();
+  },
+
+  addCardToBinder: async (binderId, card, quantity = 1, details) => {
+    await addCopies(collectionDb, {
+      userId: LOCAL_USER_ID,
+      binderId,
+      // The row id is derived from the demo card id, so a card added now and
+      // the same card converted from schema 1 land on one row.
+      card: {
+        tcg: card.tcg,
+        externalId: details?.cardData?.externalId ?? card.id,
+        printingKey: details?.cardData?.printingKey,
+        name: details?.cardData?.name ?? card.name,
+        setCode: details?.cardData?.setCode ?? card.setCode,
+        setName: details?.cardData?.setName ?? card.setName,
+        rarity: details?.cardData?.rarity ?? card.rarity,
+        collectorNumber: details?.cardData?.collectorNumber,
+        imageUrl: details?.cardData?.imageUrl,
+        imageUrlSmall: details?.cardData?.imageUrlSmall,
+        language: details?.cardData?.language,
+      },
+      quantity,
+      fields: {
+        condition: details?.copy?.condition ?? "Near Mint",
+        language: details?.copy?.language,
+        notes: details?.copy?.notes,
+        price: details?.copy?.price ?? card.price,
+        acquisitionPrice: details?.copy?.acquisitionPrice,
+        serialNumber: details?.copy?.serialNumber,
+        acquiredAt: details?.copy?.acquiredAt,
+        isFoil: details?.copy?.isFoil,
+        finishCode: details?.copy?.finishCode,
+        finishLabel: details?.copy?.finishLabel,
+        edition: details?.copy?.edition,
+        stamp: details?.copy?.stamp,
+        isSealedPromo: details?.copy?.isSealedPromo,
+        isOversized: details?.copy?.isOversized,
+        isPeelOff: details?.copy?.isPeelOff,
+        isSigned: details?.copy?.isSigned,
+        isAltered: details?.copy?.isAltered,
+        gradingCompany: details?.copy?.gradingCompany,
+        gradingScore: details?.copy?.gradingScore,
+        certNumber: details?.copy?.certNumber,
+        storageLocation: details?.copy?.storageLocation,
+      },
+    });
+    publishCollection();
+  },
+
+  updateCardInBinder: async (binderId, cardOrCopyId, updates) => {
+    try {
+      const entry = await updateEntry(collectionDb, {
+        userId: LOCAL_USER_ID,
+        entryId: cardOrCopyId,
+        updates: updates as UpdateFields,
+      });
+      const binders = publishCollection();
+      const binder = binders.find(
+        (candidate) => candidate.id === entry.binderId,
+      );
+      return (
+        binder?.cards.find((card) =>
+          card.copies?.some((copy) => copy.id === entry._id),
+        ) ?? null
+      );
+    } catch {
+      // The REST layer turns a null into its own 404; the rules already
+      // rejected the request for a reason the caller cannot act on.
+      return null;
+    }
+  },
+
+  removeCardFromBinder: async (binderId, cardInstanceId) => {
+    try {
+      await removeCardRule(collectionDb, {
+        userId: LOCAL_USER_ID,
+        entryId: cardInstanceId,
+      });
+      publishCollection();
+    } catch {
+      // Removing something that is not there is not an error worth surfacing.
+    }
   },
 
   // ── Wishlists ────────────────────────────────────────────────

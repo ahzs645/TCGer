@@ -33,9 +33,10 @@ import type {
 } from "@/stores/demo-store";
 import type { Deck, SealedProduct, Trade } from "@/lib/data/demo-portfolio";
 import type { UserPreferences } from "@tcg/api-types";
+import type { PortableSnapshot } from "./local-portable-db";
 
 /** Bumped when the shape of a persisted slice changes incompatibly. */
-export const DEMO_SCHEMA_VERSION = 1;
+export const DEMO_SCHEMA_VERSION = 2;
 
 /**
  * The persisted projection of the demo store.
@@ -47,6 +48,16 @@ export const DEMO_SCHEMA_VERSION = 1;
 export interface PersistedDemoState {
   profile: DemoProfile;
   preferences: UserPreferences;
+  /**
+   * The collection, as portable rows. This is the persisted truth as of schema
+   * 2; `binders` below is the derived read model and is no longer written.
+   */
+  collectionRows: PortableSnapshot;
+  /**
+   * Schema 1's nested collection. Kept on the type because the v1 -> v2
+   * migration reads it, but absent from {@link DEMO_SLICES} so nothing commits
+   * it any more.
+   */
   binders: DemoBinder[];
   wishlists: DemoWishlist[];
   decks: Deck[];
@@ -60,7 +71,7 @@ export type DemoSlice = keyof PersistedDemoState;
 export const DEMO_SLICES: readonly DemoSlice[] = [
   "profile",
   "preferences",
-  "binders",
+  "collectionRows",
   "wishlists",
   "decks",
   "trades",

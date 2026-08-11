@@ -187,6 +187,10 @@ function looksLikeDemoState(value: Record<string, unknown>): boolean {
 const SLICE_READERS: Record<DemoSlice, (value: unknown) => unknown> = {
   profile: readProfile,
   preferences: readPreferences,
+  // The localStorage payload is schema 1 by definition: it predates rows, so
+  // it always carries `binders` and never `collectionRows`. The v1 -> v2
+  // migration converts what this reader imports.
+  collectionRows: () => undefined,
   binders: readBinders,
   wishlists: readWishlists,
   decks: readDecks,

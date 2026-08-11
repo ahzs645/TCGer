@@ -38,6 +38,13 @@ import {
   type PersistedDemoState,
 } from "./demo-persistence";
 import { readLegacyDemoState, removeLegacyDemoState } from "./demo-local";
+import type { DemoBinder } from "@/stores/demo-store";
+
+/**
+ * The record key schema 1 stored the nested collection under. No longer a
+ * slice, so it is addressed by literal rather than through `DEMO_SLICES`.
+ */
+const LEGACY_BINDERS_KEY = "binders";
 import { DEMO_DB_NAME } from "./keys";
 
 // Database name comes from the storage registry: clearAllLocalData() deletes
@@ -456,12 +463,57 @@ class DexieDemoPersistence implements DemoPersistence {
    * `version(1)` block alone — the object stores are unaffected by a change of
    * what is inside a value.
    */
+  /**
+   * Schema 1 -> 2: the nested collection becomes portable rows.
+   *
+   * The stored `binders` row is read **directly** rather than through the
+   * hydrated state, because `readRecordRows` filters rows against
+   * `DEMO_SLICES` and `binders` is no longer in it. Taking it from `state`
+   * would mean converting nothing, writing an empty collection, and stamping
+   * schema 2 over a visitor who still had one.
+   */
+  private async migrateNestedCollection(
+    db: DemoDatabase,
+    state: Partial<PersistedDemoState>,
+  ): Promise<Partial<PersistedDemoState>> {
+    if (state.collectionRows) return state;
+
+    // Two ways a schema 1 collection reaches here, and only one of them is on
+    // disk. The localStorage import hands its nested value over in memory and
+    // never persists it — `toRecordRows` writes only slices in `DEMO_SLICES`,
+    // which `binders` is no longer one of — so preferring `state` is what makes
+    // that path convert rather than silently produce an empty collection.
+    let nested: DemoBinder[] | undefined = Array.isArray(state.binders)
+      ? state.binders
+      : undefined;
+    try {
+      if (!nested) {
+        const row = await db.records.get(LEGACY_BINDERS_KEY);
+        if (Array.isArray(row?.value)) nested = row.value as DemoBinder[];
+      }
+    } catch (error) {
+      warnOnce(
+        "migrate-read-binders",
+        "Could not read the stored collection while migrating it to rows.",
+        error,
+      );
+      return state;
+    }
+    if (!nested) return state;
+
+    const { toPortableRows } = await import("./legacy-collection-rows");
+    return { ...state, collectionRows: toPortableRows(nested) };
+  }
+
   private async migrateStoredState(
     db: DemoDatabase,
     state: Partial<PersistedDemoState>,
     fromVersion: number,
   ): Promise<Partial<PersistedDemoState>> {
-    const migrated = state; // no steps registered yet
+    let migrated = state;
+    if (fromVersion < 2) {
+      migrated = await this.migrateNestedCollection(db, migrated);
+    }
     try {
       await db.transaction("rw", db.records, db.meta, async () => {
         const rows = toRecordRows(migrated);
