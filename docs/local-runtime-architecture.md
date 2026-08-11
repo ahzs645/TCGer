@@ -2,8 +2,8 @@
 
 **Status:** Description of the system as built. Written after Stages 0–4 of
 `docs/data-layer-dexie-convex-plan.md` and steps 1–3 of the corrected Stage 5
-sequencing (§9 of that document). The local runtime's collection now runs on the
-portable contract; the Convex adapter is the remaining step (§7).
+sequencing (§9 of that document). Every slice of the local runtime now runs on
+the portable contract; the Convex adapter is the remaining step (§7).
 
 **What this describes:** how TCGer stores data today, on each of its runtimes,
 and exactly how far the "one application, two interchangeable storage runtimes"
@@ -38,13 +38,23 @@ and `clearAllLocalData()` there is the only correct way to wipe local state.
 Dexie v1 (native 1). Two stores:
 
 - `records` (`&key`) — one row per *slice* of application state:
-  `profile`, `preferences`, `collectionRows`, `wishlists`, `decks`, `trades`,
-  `sealed`, `initialized`.
-- `meta` (`&key`) — `schemaVersion` (currently **2**) and `legacyImport`.
+  `profile`, `preferences`, `collectionRows`, `wishlistRows`, `deckRows`,
+  `tradeRows`, `sealedRows`, `initialized`.
+- `meta` (`&key`) — `schemaVersion` (currently **3**) and `legacyImport`.
 
-`collectionRows` holds the collection as portable rows (`binders`,
-`collectionEntries`, `cards`). Schema 1 stored it as the nested
-`binders[].cards[].copies[]` array instead; see the migration below.
+Every slice that holds application data is a group of portable rows:
+`collectionRows` is `binders` / `collectionEntries` / `cards`, `wishlistRows` is
+`wishlists` / `wishlistCards` / `wishlistRules`, `deckRows` is `decks` /
+`deckCards`, `tradeRows` is `trades` / `tradeCards`, and `sealedRows` is
+`sealedInventory`. Schema 1 stored the collection as the nested
+`binders[].cards[].copies[]` array and schema 2 stored the other four as nested
+arrays under `wishlists` / `decks` / `trades` / `sealed`; see the migrations
+below.
+
+`decks`, `trades` and `sealed` are re-seeded from `demo-portfolio.ts` on every
+boot and are only written once the visitor has changed one. The store arranges
+that by reference identity — the baseline and the initial state hold the very
+same seeded row objects — rather than by leaving them out of the slice list.
 
 Behind `DemoPersistence` (`frontend/src/lib/storage/demo-persistence.ts`), a
 four-method contract: `whenHydrated`, `snapshot`, `commit`, `clear`. Two
@@ -52,7 +62,7 @@ implementations ship — Dexie (`demo-db.ts`) and in-memory
 (`createMemoryPersistence`), the latter used whenever IndexedDB is unavailable
 so blocked storage degrades instead of breaking.
 
-**Migration history.** Two steps, both exercised in a browser rather than
+**Migration history.** Three steps, all exercised in a browser rather than
 reasoned about.
 
 *Pre-Dexie → schema 1.* A pre-Dexie release stored everything in one
@@ -78,9 +88,23 @@ which is the part that is easy to get wrong:
 Reading only from disk was a real bug, caught by testing: a legacy visitor
 migrated to an empty collection while the version stamp advanced to 2.
 
+*Schema 2 → 3: the rest of the store to rows.* `migrateNestedPortfolio` converts
+`wishlists`, `decks`, `trades` and `sealed` in one step. One bump for four
+slices, not four bumps: they are converted by the same kind of pure function,
+they land in the same write, and a visitor should cross this boundary once.
+
+The same two routes apply, and the same reasoning — each of the four old records
+is read with `db.records.get` directly, and the in-memory value from a
+localStorage import wins over the stored one. Ids are preserved throughout; only
+deck cards and trade cards get new ones, because the shipped shape gives them
+none, and those are derived from the parent id and position rather than minted,
+so a re-converted fixture is the same row on every boot.
+
 **Write granularity.** Slice-level: a slice is committed when its *reference*
 stops matching what was last written. The collection is one slice, so a card
-edit still rewrites the `collectionRows` record. `LocalPortableDb` already
+edit still rewrites the `collectionRows` record — but editing a deck no longer
+rewrites the collection, because the slices are separate records.
+`LocalPortableDb` already
 tracks which *tables* a mutation touched (`onCommit` reports them), so making
 the persistence layer write per table rather than per slice is now a change to
 `demo-db.ts` alone — the information it needs is already there.
@@ -132,7 +156,14 @@ collection.
 ## 4. The portable contract
 
 `packages/api-types/src/portable-db.ts`. Six methods — `get`, `insert`, `patch`,
-`delete`, `query`, `transaction` — plus `normalizeId`.
+`delete`, `query`, `transaction` — plus `normalizeId`, over eleven tables:
+`binders`, `collectionEntries`, `cards`, `wishlists`, `wishlistCards`,
+`wishlistRules`, `decks`, `deckCards`, `trades`, `tradeCards` and
+`sealedInventory`. The names and indexes match `convex/schema.ts` so both
+runtimes describe the same access paths; where the local shape genuinely differs
+the row says so rather than pretending — a trade carries a `partner` string
+because there is no second account to hold an id, and sealed inventory
+denormalises the product because there is no shared catalog to point at.
 
 It is small because it was **measured, not designed**: across `convex/bridge.ts`
 and `convex/lib/library.ts` the handlers use five `ctx.db` verbs, and every read
@@ -159,9 +190,11 @@ written once against the contract. `collection-projection.ts` turns rows back
 into the grouped REST shape (the logic that existed twice as `toLegacyBinder`
 and a hand copy in the demo adapter).
 
-`legacy-collection-rows.ts` converts between the shipped nested shape and rows,
-in both directions, losslessly. Card rows are keyed by the **demo card id**, not
-the external id: `DemoBinderCard.cardId` is what every ownership check compares
+`legacy-collection-rows.ts` and `legacy-portfolio-rows.ts` convert between the
+shipped nested shapes and rows, in both directions, losslessly — including the
+absence of an optional key, since `{ rules: undefined }` and `{}` are different
+facts to the code that reads them. Card rows are keyed by the **demo card id**,
+not the external id: `DemoBinderCard.cardId` is what every ownership check compares
 against, and it stops matching `externalId` once catalog enrichment attaches a
 real printing id to a seeded card.
 
@@ -170,7 +203,23 @@ real printing id to a seeded card.
 implements add, update, move or remove — the nested `binders` array is a
 *derived* read model, regenerated after each mutation and never edited, so the
 selectors, ownership checks and catalog enrichment keep reading a shape they
-understand without being able to drift from the rows.
+understand without being able to drift from the rows. `wishlists`, `decks`,
+`trades` and `sealed` are derived read models on the same terms.
+
+**No shared rules for the other four.** The collection needed them because
+`bridge.ts` implemented the same semantics differently and a fixture table could
+pin the difference. Nothing on the hosted side implements the demo's wishlists,
+decks, trades or sealed inventory, so there is no second implementation to
+converge with, and extracting rules would mean writing a contract with nothing
+on the other end of it. What those four *do* share with the collection is the
+storage contract: every mutation goes through `PortableDb`, one transaction
+each, so the code is already runtime-independent even though only one runtime
+runs it today.
+
+**One store, five slices.** `demo-store.ts` keeps a single `LocalPortableDb`
+holding all eleven tables, because deleting a wishlist and its cards has to be
+one transaction and a transaction cannot span two stores. Persistence stays
+split per slice, so the write-granularity note in §2 still holds.
 
 ## 6. How the rules are pinned
 
@@ -198,15 +247,29 @@ artifact that actually deploys. Both were run.
 
 | Suite | Dev server | Static export |
 |---|---|---|
-| storage + both migration routes (11 checks) | pass | pass |
+| storage + both legacy routes (11 checks) | pass | pass |
 | schema 1 → 2 against a seeded v1 database (6 checks) | pass | pass |
+| schema 2 → 3, seeded v2 database + localStorage route (21 checks) | pass | pass |
 | interface regression (33 checks) | pass | — |
-| unit / convex | 56 / 51 | — |
+| unit / convex | 72 / 53 | — |
 
-The two migration routes are the ones worth re-running after any change here:
-a seeded schema 1 Dexie database, and a `tcg-demo-store` localStorage payload.
-Harnesses live in the session scratchpad rather than the repo — they drive a
-real browser through Playwright and are not part of CI.
+The migration routes are the ones worth re-running after any change here: a
+seeded schema 1 Dexie database, a seeded schema 2 one, and a `tcg-demo-store`
+localStorage payload — which crosses 1 → 2 → 3 in a single boot and is the only
+place two steps run back to back. Harnesses live in the session scratchpad
+rather than the repo — they drive a real browser through Playwright and are not
+part of CI.
+
+**These suites earn their keep.** The schema 2 → 3 work was blocked by a bug no
+unit suite could see: `frontend/tsconfig.json` mapped `@tcg/api-types` at
+`dist/index.d.ts`, and Next applies `paths` to *runtime* resolution as well as
+to type checking. A declaration file has no runtime exports, so every import
+from the package compiled to `(void 0)` in the browser bundle — `entityId()`,
+`addCopies()`, `PORTABLE_INDEXES`, all of it. Node resolves the package through
+`node_modules` and ignores `paths`, so `tsc`, `npm test` and the Convex suite
+were green while every collection mutation in a real browser threw. The mapping
+now points at `dist/index`. Nothing had caught it because no browser harness had
+ever *created* a row.
 
 Note on the fetch interceptor: every browser suite exercises it, because demo
 mode answers *all* API calls through `maybeHandleDemoFetch` →
@@ -227,12 +290,11 @@ table is imported only by tests and so carries none of that risk.
 **Per-table persistence.** See the write-granularity note in §2: the plumbing is
 in place, the persistence layer just does not use it yet.
 
-**The rest of the local runtime.** Only the *collection* runs on the contract.
-Wishlists, decks, trades and sealed are still nested slices in the demo store.
-They have no server-side counterpart that has drifted, so they were not the
-urgent case, but a general local runtime wants them on rows too — and the iOS
-`LocalStore` already implements all of them by hand, which is the argument for
-doing it.
+**Deck and trade card mutations.** The rows exist and are queryable, but the
+demo has no UI for editing a deck's list or a trade's contents, so nothing
+inserts a `deckCards` or `tradeCards` row outside the conversion. Their ids are
+derived from position for that reason; the first mutation that reorders a list
+will need to mint them instead.
 
 **Known divergences left open**, from
 `docs/stage4-shared-collection-semantics.md` §9: quantity validation (server
