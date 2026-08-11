@@ -123,10 +123,10 @@ export default function TradesPage() {
     <AppShell data-oid="nkjvlu_">
       <div className="space-y-6" data-oid="64mg-f2">
         <div
-          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          className="flex items-start justify-between gap-3"
           data-oid="fm9pabc"
         >
-          <div data-oid="99k2..z">
+          <div className="min-w-0 flex-1" data-oid="99k2..z">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="9d4:6yh"
@@ -137,7 +137,7 @@ export default function TradesPage() {
               Track card trades with other collectors.
             </p>
           </div>
-          <div className="flex flex-col items-start gap-1 sm:items-end">
+          <div className="shrink-0">
             <Button
               size="sm"
               onClick={() => setCreateOpen(true)}
@@ -280,50 +280,81 @@ export default function TradesPage() {
               <Card key={trade.id} data-oid="ebn8ikd">
                 <CardHeader className="p-4 pb-2" data-oid="ukukgm-">
                   <div
-                    className="flex items-center justify-between"
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 sm:flex-nowrap sm:justify-between"
                     data-oid="spvmsx-"
                   >
-                    <div className="flex items-center gap-2" data-oid="0pcurvn">
+                    <div
+                      className="flex min-w-0 flex-1 items-center gap-2"
+                      data-oid="0pcurvn"
+                    >
                       <Repeat2
-                        className="h-4 w-4 text-muted-foreground"
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
                         data-oid="zbouj7q"
                       />
-                      <CardTitle className="text-base" data-oid="2q5q.qf">
-                        Trade with {trade.partner}
+                      <CardTitle
+                        className="truncate text-base"
+                        data-oid="2q5q.qf"
+                      >
+                        {/* The "Trade with" prefix costs ~75px that the partner
+                            name needs — and the icon plus the page title
+                            already say what this is. */}
+                        <span className="hidden sm:inline">Trade with </span>
+                        {trade.partner}
                       </CardTitle>
                     </div>
-                    <div className="flex items-center gap-2" data-oid="l5dle6.">
+                    <div
+                      className="flex shrink-0 items-center gap-2"
+                      data-oid="l5dle6."
+                    >
+                      {/* Icon-only on phones: the label repeats down the whole
+                          list and costs ~78px the partner name needs. Colour
+                          plus icon carries the state; the accessible name and
+                          tooltip carry the word. */}
                       <Badge
                         variant="outline"
-                        className={`${cfg.color} ${cfg.bg}`}
+                        className={`${cfg.color} ${cfg.bg} shrink-0 px-1.5 sm:px-2.5`}
+                        aria-label={cfg.label}
+                        title={cfg.label}
                         data-oid="a_mh9sj"
                       >
                         <StatusIcon
-                          className="mr-1 h-3 w-3"
+                          className="h-3 w-3 sm:mr-1"
+                          aria-hidden="true"
                           data-oid="97c97:0"
                         />
-                        {cfg.label}
+                        <span className="hidden sm:inline">{cfg.label}</span>
                       </Badge>
                       <span
-                        className="text-xs text-muted-foreground"
+                        className="whitespace-nowrap text-xs text-muted-foreground"
+                        title={new Date(trade.date).toLocaleDateString(undefined, {
+                          dateStyle: "long",
+                        })}
                         data-oid="41iviaj"
                       >
-                        {new Date(trade.date).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                        <span className="sm:hidden">
+                          {new Date(trade.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {new Date(trade.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
                       </span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-2" data-oid="s7acok5">
                   <div
-                    className="grid gap-4 md:grid-cols-[1fr_auto_1fr]"
+                    className="grid gap-3 md:gap-4 md:grid-cols-[1fr_auto_1fr]"
                     data-oid="olvqw13"
                   >
                     {/* Giving */}
-                    <div className="space-y-2" data-oid="p47-_v1">
+                    <div className="space-y-1.5 md:space-y-2" data-oid="p47-_v1">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="ibex:g_"
@@ -333,10 +364,10 @@ export default function TradesPage() {
                       {trade.giving.map((c, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between rounded border p-2 text-sm"
+                          className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-sm md:p-2"
                           data-oid="v:apcta"
                         >
-                          <div data-oid="v:7lbbx">
+                          <div className="min-w-0 truncate" data-oid="v:7lbbx">
                             <span className="font-medium" data-oid="r.gdn1i">
                               {c.name}
                             </span>
@@ -348,7 +379,7 @@ export default function TradesPage() {
                             </span>
                           </div>
                           <span
-                            className="text-muted-foreground"
+                            className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="wf30jzj"
                           >
                             ${c.value.toFixed(2)}
@@ -375,7 +406,7 @@ export default function TradesPage() {
                     </div>
 
                     {/* Receiving */}
-                    <div className="space-y-2" data-oid="8-keg4c">
+                    <div className="space-y-1.5 md:space-y-2" data-oid="8-keg4c">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="t9d1::m"
@@ -385,10 +416,10 @@ export default function TradesPage() {
                       {trade.receiving.map((c, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between rounded border p-2 text-sm"
+                          className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-sm md:p-2"
                           data-oid="_mi6-ck"
                         >
-                          <div data-oid="13hhfie">
+                          <div className="min-w-0 truncate" data-oid="13hhfie">
                             <span className="font-medium" data-oid=".r8jhb6">
                               {c.name}
                             </span>
@@ -400,7 +431,7 @@ export default function TradesPage() {
                             </span>
                           </div>
                           <span
-                            className="text-muted-foreground"
+                            className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="ii8kio."
                           >
                             ${c.value.toFixed(2)}

@@ -389,7 +389,15 @@ export function DashboardContent() {
 
       {!loadFailed && !hasNoCards && (
         <GameBreakdown
-          byGame={stats.byGame}
+          byGame={
+            Object.fromEntries(
+              Object.entries(stats.byGame).filter(
+                ([game, info]) =>
+                  info.copies > 0 ||
+                  enabledGames[game as keyof typeof enabledGames],
+              ),
+            ) as DashboardStats["byGame"]
+          }
           totalCopies={stats.totalCopies}
           data-oid="dpq.rba"
         />
@@ -664,7 +672,9 @@ function RecentActivity({
                 </p>
               </div>
               <time
-                className="text-xs text-muted-foreground"
+                // "Aug 11" was breaking across two lines in this narrow column.
+                className="shrink-0 whitespace-nowrap text-xs text-muted-foreground"
+                dateTime={item.timestamp}
                 data-oid="sb8ut6f"
               >
                 {new Date(item.timestamp).toLocaleDateString(undefined, {

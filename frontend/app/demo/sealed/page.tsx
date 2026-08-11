@@ -108,10 +108,10 @@ export default function SealedPage() {
     <AppShell data-oid="400i9:c">
       <div className="space-y-6" data-oid="46o67ox">
         <div
-          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          className="flex items-start justify-between gap-3"
           data-oid="24af:t7"
         >
-          <div data-oid="eh-_rpf">
+          <div className="min-w-0 flex-1" data-oid="eh-_rpf">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="ol_wf5d"
@@ -122,7 +122,7 @@ export default function SealedPage() {
               Track your sealed product investments and market values.
             </p>
           </div>
-          <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+          <div className="shrink-0">
             <Button
               size="sm"
               onClick={() => setCreateOpen(true)}
@@ -325,17 +325,17 @@ export default function SealedPage() {
                         >
                           {p.tcg}
                         </Badge>
+                        {/* Type and quantity are one wrap unit: as separate
+                            flex children a long type pushed the "x2" onto a
+                            line of its own. */}
                         <span
-                          className="text-xs text-muted-foreground whitespace-nowrap"
+                          className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
                           data-oid=".f8d7oi"
                         >
-                          {p.type}
-                        </span>
-                        <span
-                          className="text-xs text-muted-foreground whitespace-nowrap"
-                          data-oid="a8xunk1"
-                        >
-                          x{p.quantity}
+                          <span className="truncate">{p.type}</span>
+                          <span className="shrink-0" data-oid="a8xunk1">
+                            ×{p.quantity}
+                          </span>
                         </span>
                       </div>
                     </div>

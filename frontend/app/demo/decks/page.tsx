@@ -123,10 +123,10 @@ export default function DecksPage() {
     <AppShell data-oid="gs5l5na">
       <div className="space-y-6" data-oid="70ey5tw">
         <div
-          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
+          className="flex items-start justify-between gap-3"
           data-oid="dd48z1d"
         >
-          <div data-oid="o4d11r0">
+          <div className="min-w-0 flex-1" data-oid="o4d11r0">
             <h1
               className="text-3xl font-heading font-semibold"
               data-oid="2osw5qk"
@@ -137,7 +137,7 @@ export default function DecksPage() {
               Build and manage your constructed decks across all games.
             </p>
           </div>
-          <div className="flex flex-col items-start gap-1 sm:items-end">
+          <div className="shrink-0">
             <Button
               size="sm"
               onClick={() => setCreateOpen(true)}
@@ -205,8 +205,14 @@ export default function DecksPage() {
               </div>
               <p
                 className="text-[10px] md:text-xs text-muted-foreground mt-0.5"
+                title="Counts cards across deck lists, which is a different figure from the collection total"
               >
-                In deck lists, not collection size
+                {/* Three columns at 390px leaves ~80px per cell, where the long
+                    form wrapped to three lines. */}
+                <span className="sm:hidden">Not collection size</span>
+                <span className="hidden sm:inline">
+                  In deck lists, not collection size
+                </span>
               </p>
             </CardContent>
           </Card>
