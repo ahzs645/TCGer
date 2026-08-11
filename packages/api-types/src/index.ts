@@ -16,3 +16,6 @@ export * from './shipping';
 export * from './health';
 export * from './guides';
 export * from './collection-tags';
+export * from './portable-db';
+export * from './collection-rules';
+export * from './collection-projection';

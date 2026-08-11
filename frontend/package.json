@@ -12,7 +12,7 @@
     "postbuild:demo": "git checkout -- app/api",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test src/lib/api/demo-adapter.test.ts src/lib/api/collection-semantics.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts src/stores/demo-store.test.ts",
+    "test": "tsx --test src/lib/storage/portable-rules.test.ts src/lib/api/demo-adapter.test.ts src/lib/api/collection-semantics.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts src/stores/demo-store.test.ts",
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {
