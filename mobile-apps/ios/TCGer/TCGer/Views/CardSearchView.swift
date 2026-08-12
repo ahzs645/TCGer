@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct CardSearchView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @State private var selectedGame: TCGGame = .all
     @State private var searchResults: [Card] = []
     @State private var isSearching = false
@@ -30,6 +32,8 @@ struct CardSearchView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                supplementalSearchControls
+
                 // Search Results
                 if isSearching {
                     ProgressView("Searching...")
@@ -73,14 +77,34 @@ struct CardSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
                 text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search for cards..."
+                isPresented: $isSearchPresented,
+                prompt: "Cards, sets, or codes"
             )
-            .safeAreaBar(edge: .top, spacing: 0) {
-                searchControlBar
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        showingFilters = true
+                    } label: {
+                        Label(
+                            searchFilters.isActive ? "Filters, \(searchFilters.activeCount) active" : "Filters",
+                            systemImage: searchFilters.isActive
+                                ? "line.3.horizontal.decrease.circle.fill"
+                                : "line.3.horizontal.decrease.circle"
+                        )
+                    }
+                    .badge(searchFilters.activeCount)
+                }
+
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .onSubmit(of: .search) {
+                isSearchPresented = false
                 Task { await performSearch() }
             }
             .sheet(isPresented: $showingFilters) {
@@ -150,7 +174,8 @@ struct CardSearchView: View {
         }
     }
 
-    private var searchControlBar: some View {
+    @ViewBuilder
+    private var supplementalSearchControls: some View {
         VStack(spacing: 0) {
             if environmentStore.shouldShowGamePicker {
                 GamePickerPills(
@@ -160,13 +185,8 @@ struct CardSearchView: View {
                     ),
                     games: environmentStore.gamePickerGames
                 )
+                .padding(.vertical, 8)
             }
-
-            CardSearchFilterBar(
-                filters: searchFilters,
-                onOpen: { showingFilters = true },
-                onClear: clearSearchFilters
-            )
 
             if let wishlistId = addToWishlistId,
                hasSearched,

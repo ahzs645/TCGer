@@ -23,8 +23,19 @@ extension APIService {
 
     func getPricingSourceConfiguration(
         config: ServerConfiguration,
-        token: String?
+        token: String?,
+        source: PricingSource
     ) async throws -> PricingSourceConfiguration {
+        if source == .collectrPrivateTest {
+            let collectrConfiguration = try CollectrPrivateCredentialStore.load()
+            let mappingCount = CollectrProductMappingStore().mappings.count
+            return PricingSourceConfiguration(
+                url: collectrConfiguration?.baseURL ?? CollectrPrivateAPIConfiguration.defaultBaseURL,
+                label: "Collectr Private Test",
+                configured: collectrConfiguration != nil && mappingCount > 0
+            )
+        }
+
         if config.isOnDevice {
             return PricingSourceConfiguration(
                 url: "https://api.justtcg.com/v1",
@@ -53,8 +64,13 @@ extension APIService {
 
     func testPricingSource(
         config: ServerConfiguration,
-        token: String?
+        token: String?,
+        source: PricingSource
     ) async throws -> TestSourceResult {
+        if source == .collectrPrivateTest {
+            return try await testCollectrPrivateConnection()
+        }
+
         if config.isOnDevice {
             return try await testOnDeviceJustTCGConnection()
         }
@@ -64,7 +80,7 @@ extension APIService {
             path: "settings/test-source",
             method: "POST",
             token: token,
-            body: TestSourceRequest(source: "justtcg")
+            body: TestSourceRequest(source: source.rawValue)
         )
 
         guard response.statusCode == 200 else {
@@ -85,6 +101,72 @@ extension APIService {
 
     func removeOnDevicePricingAPIKey() throws {
         try JustTCGCredentialStore.deleteAPIKey()
+    }
+
+    func collectrPrivateConfiguration() throws -> CollectrPrivateAPIConfiguration? {
+        try CollectrPrivateCredentialStore.load()
+    }
+
+    func saveCollectrPrivateConfiguration(_ configuration: CollectrPrivateAPIConfiguration) throws {
+        try CollectrPrivateCredentialStore.save(configuration)
+    }
+
+    func removeCollectrPrivateConfiguration() throws {
+        try CollectrPrivateCredentialStore.delete()
+    }
+
+    func collectrProductMappings() -> [CollectrProductMapping] {
+        CollectrProductMappingStore().mappings
+    }
+
+    func saveCollectrProductMapping(
+        tcg: String,
+        externalID: String,
+        collectrProductID: String
+    ) throws {
+        try CollectrProductMappingStore().save(
+            tcg: tcg,
+            externalID: externalID,
+            collectrProductID: collectrProductID
+        )
+    }
+
+    func removeCollectrProductMapping(id: String) throws {
+        try CollectrProductMappingStore().remove(id: id)
+    }
+
+    private func testCollectrPrivateConnection() async throws -> TestSourceResult {
+        guard let collectrConfiguration = try CollectrPrivateCredentialStore.load() else {
+            return TestSourceResult(
+                ok: false,
+                latencyMs: 0,
+                error: "No Collectr private test session is saved on this iPhone."
+            )
+        }
+        guard let mapping = CollectrProductMappingStore().mappings.first else {
+            return TestSourceResult(
+                ok: false,
+                latencyMs: 0,
+                error: "Add at least one TCGer-to-Collectr product mapping."
+            )
+        }
+
+        let startedAt = ContinuousClock.now
+        let quote = try await CollectrTestPriceProvider(
+            configuration: collectrConfiguration,
+            mappings: [mapping]
+        ).fetchPrice(
+            tcg: mapping.tcg,
+            externalID: mapping.externalID
+        )
+        let elapsed = startedAt.duration(to: .now)
+        let latencyMs = Int(elapsed.components.seconds * 1_000)
+            + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+        return TestSourceResult(
+            ok: quote != nil,
+            latencyMs: latencyMs,
+            error: quote == nil ? "The live response does not contain a valid market_price." : nil
+        )
     }
 
     private func testOnDeviceJustTCGConnection() async throws -> TestSourceResult {

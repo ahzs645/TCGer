@@ -85,55 +85,6 @@ struct CardSearchFilterState: Equatable {
     }
 }
 
-struct CardSearchFilterBar: View {
-    let filters: CardSearchFilterState
-    let onOpen: () -> Void
-    let onClear: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Button(action: onOpen) {
-                HStack(spacing: 6) {
-                    Image(systemName: filters.isActive
-                          ? "line.3.horizontal.decrease.circle.fill"
-                          : "line.3.horizontal.decrease.circle")
-                    Text("Filters")
-                    if filters.activeCount > 0 {
-                        Text("\(filters.activeCount)")
-                            .font(.caption2.bold())
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 18, minHeight: 18)
-                            .background(Color.accentColor, in: Circle())
-                    }
-                }
-            }
-            .buttonStyle(.bordered)
-
-            if filters.isActive {
-                Text(filters.summary)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            } else {
-                Text("Set, rarity, and card type")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-
-            if filters.isActive {
-                Button("Clear", action: onClear)
-                    .font(.footnote.weight(.semibold))
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
-    }
-}
-
 struct CardSearchFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore

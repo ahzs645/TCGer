@@ -347,9 +347,11 @@ struct SettingsView: View {
                                     .foregroundColor(.green)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Pricing Source")
-                                    Text(isLocalMode
-                                        ? "Personal JustTCG key on this phone"
-                                        : "Configure and test JustTCG")
+                                    Text(environmentStore.pricingSource == .collectrPrivateTest
+                                        ? "Collectr live private test"
+                                        : (isLocalMode
+                                            ? "Personal JustTCG key on this phone"
+                                            : "Configure and test JustTCG"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -358,9 +360,11 @@ struct SettingsView: View {
                     } header: {
                         Text("Pricing")
                     } footer: {
-                        Text(isLocalMode
-                            ? "Phone-only mode can use a separate personal JustTCG key stored in this iPhone's Keychain. A server-held key remains safer."
-                            : "JustTCG is the primary commercial pricing provider. Its API key is configured on the server, never stored in the mobile app.")
+                        Text(environmentStore.pricingSource == .collectrPrivateTest
+                            ? "The private test uses your Keychain-stored Collectr session and explicit product mappings."
+                            : (isLocalMode
+                                ? "Phone-only mode can use a separate personal JustTCG key stored in this iPhone's Keychain. A server-held key remains safer."
+                                : "JustTCG is the primary commercial pricing provider. Its API key is configured on the server, never stored in the mobile app."))
                     }
                 }
 

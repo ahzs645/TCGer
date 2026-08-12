@@ -67,6 +67,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var enabledDragonball: Bool
     @Published var showCardNumbers: Bool
     @Published var showPricing: Bool
+    @Published var pricingSource: PricingSource
     @Published var defaultGame: String?
     @Published var offlineModeEnabled: Bool
     @Published var autoSyncEnabled: Bool
@@ -100,6 +101,7 @@ final class EnvironmentStore: ObservableObject {
         static let enabledDragonball = "enabledDragonball"
         static let showCardNumbers = "showCardNumbers"
         static let showPricing = "showPricing"
+        static let pricingSource = PricingSource.storageKey
         static let defaultGame = "defaultGame"
         static let offlineModeEnabled = "offlineModeEnabled"
         static let autoSyncEnabled = "autoSyncEnabled"
@@ -199,6 +201,7 @@ final class EnvironmentStore: ObservableObject {
         } else {
             showPricing = storage.bool(forKey: Keys.showPricing)
         }
+        pricingSource = PricingSource.selected(in: storage)
 
         // Default game preference
         defaultGame = storage.string(forKey: Keys.defaultGame)
@@ -394,6 +397,13 @@ final class EnvironmentStore: ObservableObject {
             .dropFirst()
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.showPricing)
+            }
+            .store(in: &cancellables)
+
+        $pricingSource
+            .dropFirst()
+            .sink { [weak self] source in
+                self?.storage.set(source.rawValue, forKey: Keys.pricingSource)
             }
             .store(in: &cancellables)
 
@@ -708,6 +718,7 @@ final class EnvironmentStore: ObservableObject {
         enabledDragonball = false
         showCardNumbers = true
         showPricing = true
+        pricingSource = .justTCG
         defaultGame = nil
         offlineModeEnabled = false
         autoSyncEnabled = true
@@ -734,6 +745,9 @@ final class EnvironmentStore: ObservableObject {
         storage.set(false, forKey: Keys.verified)
         storage.removeObject(forKey: Keys.showCardNumbers)
         storage.removeObject(forKey: Keys.showPricing)
+        storage.removeObject(forKey: Keys.pricingSource)
+        CollectrProductMappingStore().removeAll()
+        try? CollectrPrivateCredentialStore.delete()
         storage.removeObject(forKey: Keys.defaultGame)
         storage.removeObject(forKey: Keys.offlineModeEnabled)
         storage.removeObject(forKey: Keys.autoSyncEnabled)
