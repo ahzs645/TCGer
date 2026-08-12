@@ -106,7 +106,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <LayoutDashboard className="mr-2 h-4 w-4" data-oid="i:qe8qx" />
               Dashboard
-              <CommandShortcut data-oid="eit846e">G D</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/packs")}
@@ -114,7 +113,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <PackageOpen className="mr-2 h-4 w-4" />
               Open Packs
-              <CommandShortcut>G O</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/cards")}
@@ -122,7 +120,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <Search className="mr-2 h-4 w-4" data-oid="ms58nkv" />
               Card Search
-              <CommandShortcut data-oid="qkvae.x">G C</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/scan")}
@@ -130,7 +127,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <Camera className="mr-2 h-4 w-4" data-oid="pvvjix9" />
               Card Scan
-              <CommandShortcut data-oid="3ct3-e0">G S</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/collections")}
@@ -138,7 +134,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <Table className="mr-2 h-4 w-4" data-oid="h9q6j_g" />
               Collections
-              <CommandShortcut data-oid="i4bgrkm">G L</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/wishlists")}
@@ -146,7 +141,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
             >
               <Heart className="mr-2 h-4 w-4" data-oid="tc7wp2." />
               Wishlists
-              <CommandShortcut data-oid="garf36s">G W</CommandShortcut>
             </CommandItem>
             {secondaryNavigation.map((item) => {
               const Icon = item.icon;

@@ -276,8 +276,8 @@ export function PackOpening() {
 
       {/* texture + pack count pickers on select screen */}
       {phase === "select" && (
-        <div className="absolute inset-x-3 bottom-14 flex flex-col items-center gap-2 sm:bottom-12">
-          <div className="flex max-w-full flex-wrap justify-center gap-2 overflow-x-auto">
+        <div className="absolute inset-x-3 bottom-12 flex flex-col items-center gap-2 rounded-xl border border-border bg-background/85 p-2 shadow-lg backdrop-blur sm:bottom-10">
+          <div className="flex w-full max-w-full gap-2 overflow-x-auto pb-1">
             {skins.map((s) => {
               const active = browseSkin.id === s.id;
               const tint = s.kind === "variant" ? skinVariant(s).palette.mid : null;
@@ -287,7 +287,7 @@ export function PackOpening() {
                   type="button"
                   onClick={() => setBrowseSkin(s)}
                   className={cn(
-                    "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition",
+                    "min-h-10 shrink-0 rounded-full border border-border px-3 py-2 text-xs font-semibold transition",
                     // Hovering must not repaint a selected chip: bg-muted under
                     // text-primary-foreground is dark on dark, so the label
                     // disappears under the cursor that just picked it.

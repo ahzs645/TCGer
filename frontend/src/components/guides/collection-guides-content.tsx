@@ -385,7 +385,7 @@ export function CollectionGuidesContent({
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className={selectedGuide ? "hidden lg:block" : "block"}>
-            <div className="space-y-3">
+            <div className="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:pr-2">
               {guides.map((guide) => (
                 <GuideListCard
                   key={guide.id}

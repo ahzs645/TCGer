@@ -26,6 +26,7 @@ import type { ServerFeatures } from "@tcg/api-types";
 interface NavigationItem {
   href: string;
   label: string;
+  mobileLabel?: string;
   icon: LucideIcon;
   feature?: keyof ServerFeatures;
 }
@@ -56,10 +57,15 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
 import { getAppRoute } from "@/lib/app-routes";
 import { cn } from "@/lib/utils";
-import { isDemoMode } from "@/lib/demo-mode";
 import { getUserPreferences } from "@/lib/api/user-preferences";
 import { isFeatureAvailable, useServerFeatures } from "@/lib/api/health";
 import { useAuthStore } from "@/stores/auth";
@@ -69,11 +75,11 @@ import { GameSwitcher } from "../navigation/game-switcher";
 import { UserMenu } from "../navigation/user-menu";
 
 const navigation: NavigationItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Dashboard", mobileLabel: "Home", icon: LayoutDashboard },
   { href: "/packs", label: "Open Packs", icon: PackageOpen },
-  { href: "/cards", label: "Card Search", icon: Search },
+  { href: "/cards", label: "Card Search", mobileLabel: "Search", icon: Search },
   { href: "/scan", label: "Scan", icon: Camera },
-  { href: "/collections", label: "Collections", icon: Table },
+  { href: "/collections", label: "Collections", mobileLabel: "Collection", icon: Table },
   { href: "/wishlists", label: "Wishlists", icon: Heart },
 ];
 
@@ -101,7 +107,8 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const dashboardHref = getAppRoute("/", pathname);
   const features = useServerFeatures();
-  const demoMode = isDemoMode();
+  // Stable during SSR and hydration; the persisted demo flag is client-only.
+  const demoMode = pathname === "/demo" || pathname.startsWith("/demo/");
   const availableSecondaryNavigation = secondaryNavigation.filter(
     (item) =>
       demoMode || !item.feature || isFeatureAvailable(features, item.feature),
@@ -206,6 +213,36 @@ export function AppShell({ children }: AppShellProps) {
                   </Button>
                 );
               })}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden min-[1360px]:inline">More</span>
+                    <span className="sr-only min-[1360px]:hidden">
+                      More sections
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {availableSecondaryNavigation.map((item) => {
+                    const href = getAppRoute(item.href, pathname);
+                    const active = isNavigationItemActive(pathname, href);
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link
+                          href={href}
+                          className="flex items-center gap-2"
+                          aria-current={active ? "page" : undefined}
+                        >
+                          <Icon className="h-4 w-4" aria-hidden="true" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-2" data-oid="3834h_j">
@@ -287,7 +324,12 @@ function MobileBottomNav({
                   className={cn("h-5 w-5", isActive && "text-primary")}
                   data-oid="r2kr0-3"
                 />
-                <span data-oid="i47bowi">{item.label}</span>
+                <span
+                  className="whitespace-nowrap text-[10px] min-[360px]:text-xs"
+                  data-oid="i47bowi"
+                >
+                  {item.mobileLabel ?? item.label}
+                </span>
               </Link>
             );
           })}
@@ -302,6 +344,7 @@ function MobileBottomNav({
             )}
             aria-expanded={moreOpen}
             aria-controls="mobile-more-menu"
+            aria-current={isSecondaryActive ? "page" : undefined}
             data-oid="jcj-2s0"
           >
             <MoreHorizontal
