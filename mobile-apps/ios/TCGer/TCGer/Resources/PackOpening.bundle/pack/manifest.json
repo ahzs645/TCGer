@@ -1,0 +1,11 @@
+{
+  "mesh": "/pack/models/pack.obj",
+  "rim": [
+    0.23,
+    0.29,
+    0.42
+  ],
+  "covers": {},
+  "bases": {},
+  "decals": {}
+}

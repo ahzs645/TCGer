@@ -6,7 +6,9 @@ extension APIService {
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            return LocalStore.shared.authenticate(username: credentials.username)
+            let response = LocalStore.shared.authenticate(username: credentials.username)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return response
         }
 
         let payload = UsernameLoginPayload(
@@ -41,7 +43,9 @@ extension APIService {
         username: String
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            return LocalStore.shared.authenticate(username: username, email: email)
+            let response = LocalStore.shared.authenticate(username: username, email: email)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return response
         }
 
         let payload = SignupPayload(
@@ -60,7 +64,9 @@ extension APIService {
         username: String
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            return LocalStore.shared.authenticate(username: username, email: email)
+            let response = LocalStore.shared.authenticate(username: username, email: email)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return response
         }
 
         // Step 1: Sign up via Better Auth

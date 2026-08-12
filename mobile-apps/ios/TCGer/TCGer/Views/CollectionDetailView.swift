@@ -1,14 +1,28 @@
 import SwiftUI
 
+private extension String {
+    var binderMetadataValue: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 struct CollectionDetailView: View {
     let collection: Collection
+    let parentProvidesNavigation: Bool
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isEditing = false
     @State private var editedName: String
     @State private var editedDescription: String
     @State private var selectedColor: Color
     @State private var editedDefaultCondition: String
+    @State private var editedContainerType: String
+    @State private var editedImageUrl: String
+    @State private var editedAssociatedTcg: String
+    @State private var editedAssociatedSetCode: String
+    @State private var editedAssociatedSetName: String
     @State private var showingAddCard = false
     @State private var errorMessage: String?
     @State private var isSaving = false
@@ -43,14 +57,21 @@ struct CollectionDetailView: View {
     init(
         collection: Collection,
         startsInEditMode: Bool = false,
-        initialSearchText: String = ""
+        initialSearchText: String = "",
+        parentProvidesNavigation: Bool = false
     ) {
         self.collection = collection
+        self.parentProvidesNavigation = parentProvidesNavigation
         _isEditing = State(initialValue: startsInEditMode)
         _editedName = State(initialValue: collection.name)
         _editedDescription = State(initialValue: collection.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(collection.colorHex))
         _editedDefaultCondition = State(initialValue: collection.defaultCondition ?? "")
+        _editedContainerType = State(initialValue: collection.containerType ?? "")
+        _editedImageUrl = State(initialValue: collection.imageUrl ?? "")
+        _editedAssociatedTcg = State(initialValue: collection.associatedTcg ?? "")
+        _editedAssociatedSetCode = State(initialValue: collection.associatedSetCode ?? "")
+        _editedAssociatedSetName = State(initialValue: collection.associatedSetName ?? "")
         _cards = State(initialValue: collection.cards)
         _searchText = State(initialValue: initialSearchText)
     }
@@ -63,8 +84,20 @@ struct CollectionDetailView: View {
             cards: cards,
             createdAt: collection.createdAt,
             updatedAt: collection.updatedAt,
-            colorHex: isEditing ? selectedColor.toHex() : collection.colorHex
+            colorHex: isEditing ? selectedColor.toHex() : collection.colorHex,
+            defaultCondition: editedDefaultCondition.isEmpty ? nil : editedDefaultCondition,
+            containerType: editedContainerType.binderMetadataValue,
+            imageUrl: editedImageUrl.binderMetadataValue,
+            associatedTcg: editedAssociatedTcg.binderMetadataValue,
+            associatedSetCode: editedAssociatedSetCode.binderMetadataValue,
+            associatedSetName: editedAssociatedSetName.binderMetadataValue
         )
+    }
+
+    private var editedCoverURLIsValid: Bool {
+        guard let value = editedImageUrl.binderMetadataValue else { return true }
+        guard let url = URL(string: value), let scheme = url.scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
     }
 
     private var filteredCards: [CollectionCard] {
@@ -152,7 +185,6 @@ struct CollectionDetailView: View {
 
     var body: some View {
         ZStack {
-            NavigationStack {
                 ZStack {
                     Color(.systemBackground)
                         .ignoresSafeArea()
@@ -174,6 +206,21 @@ struct CollectionDetailView: View {
                                 )
                             } header: {
                                 Text("Default Condition")
+                            }
+
+                            BinderPresentationFields(
+                                containerType: $editedContainerType,
+                                imageUrl: $editedImageUrl,
+                                associatedTcg: $editedAssociatedTcg,
+                                associatedSetCode: $editedAssociatedSetCode,
+                                associatedSetName: $editedAssociatedSetName
+                            )
+
+                            if !editedCoverURLIsValid {
+                                Section {
+                                    Label("Enter an http or https cover image URL.", systemImage: "exclamationmark.triangle")
+                                        .foregroundStyle(.red)
+                                }
                             }
                         } else {
                             Section {
@@ -207,6 +254,22 @@ struct CollectionDetailView: View {
                                         Text("Default condition: \(defaultCondition)")
                                             .font(.footnote)
                                             .foregroundColor(.secondary)
+                                    }
+                                    if let containerType = editedContainerType.binderMetadataValue {
+                                        Label(containerType, systemImage: "shippingbox")
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let game = TCGGame(rawValue: editedAssociatedTcg), game != .all {
+                                        Label(
+                                            [editedAssociatedSetName.binderMetadataValue, editedAssociatedSetCode.binderMetadataValue]
+                                                .compactMap { $0 }
+                                                .joined(separator: " · ")
+                                                .binderMetadataValue ?? game.displayName,
+                                            systemImage: game.systemIconName
+                                        )
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
                                     }
                                     if collection.isUnsortedBinder && !cards.isEmpty {
                                         Label(
@@ -461,8 +524,10 @@ struct CollectionDetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") {
-                            dismiss()
+                        if !parentProvidesNavigation {
+                            Button("Done") {
+                                dismiss()
+                            }
                         }
                     }
 
@@ -486,7 +551,7 @@ struct CollectionDetailView: View {
                                             await saveChanges()
                                         }
                                     }
-                                    .disabled(editedName.isEmpty || isSaving)
+                                    .disabled(editedName.isEmpty || !editedCoverURLIsValid || isSaving)
                                     .foregroundColor(.green)
                                     .fontWeight(.semibold)
                                 } else {
@@ -675,8 +740,8 @@ struct CollectionDetailView: View {
                 } message: {
                     Text("This action permanently removes the binder and its cards.")
                 }
-            }
         }
+        .modifier(CollectionDetailNavigationModifier(parentProvidesNavigation: parentProvidesNavigation))
         .confirmationDialog("Delete \(selectedEntryIds.count) cards?", isPresented: $showingBulkDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete \(selectedEntryIds.count) cards", role: .destructive) {
                 Task { await bulkDelete() }
@@ -843,10 +908,20 @@ struct CollectionDetailView: View {
                 // "" clears the stored default; nil would leave it unchanged.
                 defaultCondition: editedDefaultCondition == (collection.defaultCondition ?? "")
                     ? nil
-                    : editedDefaultCondition
+                    : editedDefaultCondition,
+                containerType: editedContainerType.binderMetadataValue,
+                imageUrl: editedImageUrl.binderMetadataValue,
+                associatedTcg: editedAssociatedTcg.binderMetadataValue,
+                associatedSetCode: editedAssociatedSetCode.binderMetadataValue,
+                associatedSetName: editedAssociatedSetName.binderMetadataValue
             )
 
             cards = updated.cards
+            editedContainerType = updated.containerType ?? ""
+            editedImageUrl = updated.imageUrl ?? ""
+            editedAssociatedTcg = updated.associatedTcg ?? ""
+            editedAssociatedSetCode = updated.associatedSetCode ?? ""
+            editedAssociatedSetName = updated.associatedSetName ?? ""
             isEditing = false
             isSaving = false
         } catch {
@@ -979,7 +1054,7 @@ struct CollectionDetailView: View {
     private func beginEditing(_ card: CollectionCard) {
         let copies = card.copies
         if copies.count > 1 {
-            withAnimation(.snappy) {
+            withAnimation(accessibilityReduceMotion ? nil : .snappy) {
                 _ = expandedCardIds.insert(card.id)
             }
         } else {
@@ -1005,7 +1080,7 @@ struct CollectionDetailView: View {
 
     @MainActor
     private func toggleCopies(for card: CollectionCard) {
-        withAnimation(.snappy) {
+        withAnimation(accessibilityReduceMotion ? nil : .snappy) {
             if expandedCardIds.contains(card.id) {
                 expandedCardIds.remove(card.id)
             } else {
@@ -1314,6 +1389,19 @@ struct CollectionDetailView: View {
             cardToSell = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CollectionDetailNavigationModifier: ViewModifier {
+    let parentProvidesNavigation: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if parentProvidesNavigation {
+            content
+        } else {
+            NavigationStack { content }
         }
     }
 }

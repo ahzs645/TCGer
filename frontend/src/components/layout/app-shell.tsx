@@ -72,6 +72,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
 import { getAppRoute } from "@/lib/app-routes";
+import {
+  areSealedProductsEnabled,
+  SEALED_PRODUCTS_PREFERENCE_EVENT,
+} from "@/lib/catalog/catalog-client";
 import { cn } from "@/lib/utils";
 import { getUserPreferences } from "@/lib/api/user-preferences";
 import { isFeatureAvailable, useServerFeatures } from "@/lib/api/health";
@@ -86,7 +90,12 @@ const navigation: NavigationItem[] = [
   { href: "/packs", label: "Open Packs", icon: PackageOpen },
   { href: "/cards", label: "Card Search", mobileLabel: "Search", icon: Search },
   { href: "/scan", label: "Scan", icon: Camera },
-  { href: "/collections", label: "Collections", mobileLabel: "Collection", icon: Table },
+  {
+    href: "/collections",
+    label: "Collections",
+    mobileLabel: "Collection",
+    icon: Table,
+  },
   { href: "/wishlists", label: "Wishlists", icon: Heart },
 ];
 
@@ -114,11 +123,21 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const dashboardHref = getAppRoute("/", pathname);
   const features = useServerFeatures();
+  const [sealedProductsEnabled, setSealedProductsPreference] = useState(true);
+  useEffect(() => {
+    const refresh = () =>
+      setSealedProductsPreference(areSealedProductsEnabled());
+    refresh();
+    window.addEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, refresh);
+    return () =>
+      window.removeEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, refresh);
+  }, []);
   // Stable during SSR and hydration; the persisted demo flag is client-only.
   const demoMode = pathname === "/demo" || pathname.startsWith("/demo/");
   const availableSecondaryNavigation = secondaryNavigation.filter(
     (item) =>
-      demoMode || !item.feature || isFeatureAvailable(features, item.feature),
+      (item.href !== "/sealed" || sealedProductsEnabled) &&
+      (demoMode || !item.feature || isFeatureAvailable(features, item.feature)),
   );
   const primaryNavigation = primaryNavigationFor(demoMode);
   const mobilePrimaryHrefs = ["/", "/collections", "/cards"];
@@ -131,9 +150,7 @@ export function AppShell({ children }: AppShellProps) {
       (item) => !mobilePrimaryHrefs.includes(item.href),
     ),
     // Scan still belongs somewhere in demo mode — it explains why it is off.
-    ...(demoMode
-      ? navigation.filter((item) => item.href === "/scan")
-      : []),
+    ...(demoMode ? navigation.filter((item) => item.href === "/scan") : []),
     ...availableSecondaryNavigation,
   ];
   const isDesktopSecondaryActive = availableSecondaryNavigation.some((item) =>
@@ -306,9 +323,8 @@ function MobileBottomNav({
   secondaryNavigation: NavigationItem[];
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const isSecondaryActive = secondaryNavigation.some(
-    (item) =>
-      isNavigationItemActive(pathname, getAppRoute(item.href, pathname)),
+  const isSecondaryActive = secondaryNavigation.some((item) =>
+    isNavigationItemActive(pathname, getAppRoute(item.href, pathname)),
   );
 
   return (
@@ -407,32 +423,32 @@ function MobileBottomNav({
             </DrawerClose>
           </DrawerHeader>
           <div className="grid grid-cols-3 gap-2 px-4" data-oid="0868z5k">
-              {secondaryNavigation.map((item) => {
-                const href = getAppRoute(item.href, pathname);
-                const isActive = isNavigationItemActive(pathname, href);
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={href}
-                    onClick={() => setMoreOpen(false)}
-                    aria-current={isActive ? "page" : undefined}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-muted",
-                    )}
-                    data-oid="z7lzxox"
-                  >
-                    <Icon
-                      className={cn("h-6 w-6", isActive && "text-primary")}
-                      data-oid="a99zp0q"
-                    />
-                    <span data-oid="nwb.sx9">{item.label}</span>
-                  </Link>
-                );
-              })}
+            {secondaryNavigation.map((item) => {
+              const href = getAppRoute(item.href, pathname);
+              const isActive = isNavigationItemActive(pathname, href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={href}
+                  onClick={() => setMoreOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                  data-oid="z7lzxox"
+                >
+                  <Icon
+                    className={cn("h-6 w-6", isActive && "text-primary")}
+                    data-oid="a99zp0q"
+                  />
+                  <span data-oid="nwb.sx9">{item.label}</span>
+                </Link>
+              );
+            })}
           </div>
         </DrawerContent>
       </Drawer>

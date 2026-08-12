@@ -112,6 +112,7 @@ final class ScannerDebugViewModel: ObservableObject {
     private weak var environmentStore: EnvironmentStore?
     private var lastAnalysis = Date.distantPast
     private var isAnalyzing = false
+    private var frameConsumerTask: Task<Void, Never>?
     private let isSimulator: Bool
     var isCameraAvailable: Bool { !isSimulator }
 
@@ -124,9 +125,20 @@ final class ScannerDebugViewModel: ObservableObject {
 #else
         isSimulator = false
 #endif
-        cameraController.onSampleBuffer = { [weak self] sampleBuffer in
-            Task { await self?.handle(sampleBuffer) }
+        // Consume the camera's newest-1 frame stream serially: stale frames
+        // collapse in the stream's single buffered slot instead of each
+        // spawning a Task that retains its buffer until the hop runs.
+        let stream = cameraController.makeFrameStream()
+        frameConsumerTask = Task { [weak self] in
+            for await pixelBuffer in stream {
+                guard let self, !Task.isCancelled else { return }
+                await self.handle(pixelBuffer)
+            }
         }
+    }
+
+    deinit {
+        frameConsumerTask?.cancel()
     }
 
     func configure(environment: EnvironmentStore) {
@@ -534,7 +546,7 @@ final class ScannerDebugViewModel: ObservableObject {
         }
     }
 
-    private func handle(_ sampleBuffer: CMSampleBuffer) async {
+    private func handle(_ pixelBuffer: CVPixelBuffer) async {
         guard isRunning, !isSimulator, !isAnalyzing else { return }
         let now = Date()
         guard now.timeIntervalSince(lastAnalysis) >= throttle else { return }
@@ -561,7 +573,7 @@ final class ScannerDebugViewModel: ObservableObject {
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            guard let cgImage = ScannerDebugViewModel.makeCGImage(from: sampleBuffer) else {
+            guard let cgImage = ScannerDebugViewModel.makeCGImage(from: pixelBuffer) else {
                 await MainActor.run { self.isAnalyzing = false }
                 return
             }
@@ -631,8 +643,7 @@ final class ScannerDebugViewModel: ObservableObject {
         }
     }
 
-    nonisolated private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
+    nonisolated private static func makeCGImage(from pixelBuffer: CVPixelBuffer) -> CGImage? {
         var cgImage: CGImage?
         let status = VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &cgImage)
         if status == kCVReturnSuccess, let cgImage { return cgImage }

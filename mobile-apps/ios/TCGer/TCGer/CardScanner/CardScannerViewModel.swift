@@ -1,9 +1,11 @@
 import AVFoundation
 import Combine
+import CoreVideo
 import Foundation
 import ImageIO
 import SwiftUI
 import VideoToolbox
+import Vision
 
 @MainActor
 final class CardScannerViewModel: ObservableObject {
@@ -90,6 +92,8 @@ final class CardScannerViewModel: ObservableObject {
     private let isSimulator: Bool
     private var lastAnalysisDate: Date = .distantPast
     private let analysisInterval: TimeInterval = 1.0
+    private var cameraThrottle = ScannerCameraThrottle()
+    private var frameConsumerTask: Task<Void, Never>?
     private var previewFrame: CGRect?
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
@@ -146,15 +150,49 @@ final class CardScannerViewModel: ObservableObject {
         cameraController.onPhotoCaptureError = { [weak self] error in
             Task { await self?.handleCaptureFailure(error) }
         }
-        cameraController.onSampleBuffer = { [weak self] sampleBuffer in
-            guard let self else { return }
-            Task {
-                await self.handleSampleBuffer(sampleBuffer)
-            }
-        }
         cameraController.onPreviewFrameChange = { [weak self] frame in
             Task { @MainActor in
                 self?.previewFrame = frame
+            }
+        }
+        startFrameConsumer()
+        restoreStagedSession()
+    }
+
+    /// The staging tray is persistent: the view model dies with the scanner
+    /// sheet, but staged scans live in `ScannerStagingStore` until the user
+    /// adds or discards them — reopening the scanner (or relaunching the app)
+    /// restores them here.
+    private func restoreStagedSession() {
+        Task { [weak self] in
+            let restored = await ScannerStagingStore.shared.restore()
+            guard let self, !restored.isEmpty else { return }
+            let existingIDs = Set(self.sessionResults.map(\.id))
+            let fresh = restored.filter { !existingIDs.contains($0.result.id) }
+            guard !fresh.isEmpty else { return }
+            self.sessionResults = fresh.map(\.result) + self.sessionResults
+            self.addedSessionResultIDs.formUnion(
+                fresh.filter(\.addedToCollection).map(\.result.id)
+            )
+        }
+    }
+
+    deinit {
+        frameConsumerTask?.cancel()
+    }
+
+    /// One serial consumer over the camera's newest-1 frame stream. While an
+    /// analysis is in flight the loop is suspended, so incoming frames collapse
+    /// into the stream's single buffered slot instead of each allocating a Task
+    /// and queueing a main-actor hop — the back-pressure lives in the stream,
+    /// not in an unbounded actor mailbox.
+    private func startFrameConsumer() {
+        frameConsumerTask?.cancel()
+        let stream = cameraController.makeFrameStream()
+        frameConsumerTask = Task { [weak self] in
+            for await pixelBuffer in stream {
+                guard let self, !Task.isCancelled else { return }
+                await self.consumeLiveFrame(pixelBuffer)
             }
         }
     }
@@ -563,6 +601,9 @@ final class CardScannerViewModel: ObservableObject {
         if latestResult?.id == id {
             clearResult()
         }
+        Task.detached(priority: .utility) {
+            await ScannerStagingStore.shared.remove(id: id)
+        }
     }
 
     func clearSession() {
@@ -570,6 +611,9 @@ final class CardScannerViewModel: ObservableObject {
         addedSessionResultIDs.removeAll()
         liveConsensus.reset()
         resetLiveConfirmation()
+        Task.detached(priority: .utility) {
+            await ScannerStagingStore.shared.clear()
+        }
     }
 
     func selectCandidate(_ candidate: CardScanCandidate, for resultID: CardScanResult.ID) {
@@ -595,10 +639,16 @@ final class CardScannerViewModel: ObservableObject {
             latestResult = updatedResult
             state = .result(updatedResult)
         }
+        Task.detached(priority: .utility) {
+            await ScannerStagingStore.shared.update(updatedResult)
+        }
     }
 
     func markSessionResultsAdded(_ resultIDs: Set<CardScanResult.ID>) {
         addedSessionResultIDs.formUnion(resultIDs)
+        Task.detached(priority: .utility) {
+            await ScannerStagingStore.shared.markAdded(resultIDs)
+        }
     }
 
     private func rebuildContext() {
@@ -680,15 +730,22 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    private func handleSampleBuffer(_ sampleBuffer: CMSampleBuffer) async {
+    private func consumeLiveFrame(_ pixelBuffer: CVPixelBuffer) async {
         guard !isSimulator else { return }
+
+        // A presented result or binder review covers the preview — idle the
+        // camera immediately; the throttle pins its empty streak at zero so
+        // dismissal returns to the scanning rate on the very next frame.
+        let overlayCovered = latestResult != nil || binderReviewPresentation != nil
+        cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
+        if overlayCovered { return }
+
         guard !isPhotoImportActive else { return }
         guard captureMode == .card else { return }
         guard triggerMode == .automatic else { return }
         guard case .ready = state else { return }
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
-        guard latestResult == nil else { return }
         guard let context else { return }
         if !context.serverConfiguration.isOnDevice, context.authToken == nil { return }
         guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
@@ -698,60 +755,96 @@ final class CardScannerViewModel: ObservableObject {
 
         isAnalyzingFrame = true
         lastAnalysisDate = now
-        let coordinator = self.coordinator
-        let guideGeometry = scannerGuideGeometry
+        defer { isAnalyzingFrame = false }
 
-        Task.detached(priority: .userInitiated) { [weak self, context, guideGeometry] in
-            guard let self else { return }
-            guard let cgImage = CardScannerViewModel.makeCGImage(from: sampleBuffer) else {
-                await MainActor.run {
-                    self.isAnalyzingFrame = false
-                }
-                return
-            }
+        var scanContext = context
+        let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
+        scanContext.diagnostics = diagnostics
 
-            let framedImage = guideGeometry.flatMap {
-                ScannerGuideCropper().crop(cgImage, using: $0)
-            } ?? cgImage
-            var scanContext = context
-            let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
-            scanContext.diagnostics = diagnostics
-            let scanStarted = Date()
-            let result = await coordinator.scan(image: framedImage, context: scanContext, source: .livePreview)
-            if diagnostics != nil {
-                let elapsedMs = Date().timeIntervalSince(scanStarted) * 1_000
-                await ScannerDevModeStore.shared.record(
-                    image: framedImage,
-                    source: .livePreview,
-                    mode: scanContext.mode,
-                    elapsedMs: elapsedMs,
-                    result: result,
-                    diagnostics: diagnostics
-                )
-            }
+        // Awaited, not detached-and-forgotten: the consumer loop stays
+        // suspended here, which is what lets the camera stream shed frames.
+        let analysis = await Self.analyzeLiveFrame(
+            pixelBuffer,
+            context: scanContext,
+            guideGeometry: scannerGuideGeometry,
+            coordinator: coordinator,
+            recordsDevMode: diagnostics != nil
+        )
+        guard let analysis else { return }
+        guard captureMode == .card else { return }
 
-            await MainActor.run {
-                self.isAnalyzingFrame = false
-                guard self.captureMode == .card else {
-                    return
-                }
-                switch result {
-                case .success(let scanResult):
-                    self.handleLiveSuccess(scanResult)
-                case .failure(let error):
-                    switch error {
-                    case .noMatch:
-                        _ = self.liveConsensus.observeNoMatch()
-                        self.resetLiveConfirmation()
-                        break
-                    default:
-                        // Keep live scanning failures non-blocking to avoid locking the scanner UI.
-                        self.resetLiveConfirmation()
-                        self.state = .ready
-                    }
-                }
+        switch analysis.result {
+        case .success(let scanResult):
+            cameraController.setIdle(cameraThrottle.noteAnalysis(cardVisible: true))
+            handleLiveSuccess(scanResult)
+        case .failure(let error):
+            cameraController.setIdle(cameraThrottle.noteAnalysis(cardVisible: analysis.cardPresent))
+            switch error {
+            case .noMatch:
+                _ = liveConsensus.observeNoMatch()
+                resetLiveConfirmation()
+            default:
+                // Keep live scanning failures non-blocking to avoid locking the scanner UI.
+                resetLiveConfirmation()
+                state = .ready
             }
         }
+    }
+
+    private struct LiveFrameAnalysis {
+        let result: Result<CardScanResult, CardScannerError>
+        /// Whether anything card-shaped was in the frame — a no-match on an
+        /// unrecognized card must not idle the camera under the user's hands.
+        let cardPresent: Bool
+    }
+
+    /// Decode + crop + scan off the main actor (nonisolated async runs on the
+    /// global executor). Returns nil when the pixel buffer can't be decoded.
+    nonisolated private static func analyzeLiveFrame(
+        _ pixelBuffer: CVPixelBuffer,
+        context: CardScannerContext,
+        guideGeometry: ScannerGuideGeometry?,
+        coordinator: CardScannerCoordinator,
+        recordsDevMode: Bool
+    ) async -> LiveFrameAnalysis? {
+        guard let cgImage = makeCGImage(from: pixelBuffer) else { return nil }
+        let framedImage = guideGeometry.flatMap {
+            ScannerGuideCropper().crop(cgImage, using: $0)
+        } ?? cgImage
+        let scanStarted = Date()
+        let result = await coordinator.scan(image: framedImage, context: context, source: .livePreview)
+        if recordsDevMode {
+            let elapsedMs = Date().timeIntervalSince(scanStarted) * 1_000
+            await ScannerDevModeStore.shared.record(
+                image: framedImage,
+                source: .livePreview,
+                mode: context.mode,
+                elapsedMs: elapsedMs,
+                result: result,
+                diagnostics: context.diagnostics
+            )
+        }
+        let cardPresent: Bool
+        switch result {
+        case .success:
+            cardPresent = true
+        case .failure(.noMatch):
+            cardPresent = cardLikelyPresent(in: framedImage)
+        case .failure:
+            // Transient errors say nothing about the viewfinder; don't let
+            // them accumulate toward idling the camera.
+            cardPresent = true
+        }
+        return LiveFrameAnalysis(result: result, cardPresent: cardPresent)
+    }
+
+    /// Cheap presence-only check (~5ms document segmentation): is anything
+    /// card-shaped in the frame at all? Feeds the idle throttle, never the
+    /// recognition pipeline.
+    nonisolated private static func cardLikelyPresent(in image: CGImage) -> Bool {
+        let request = VNDetectDocumentSegmentationRequest()
+        try? VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        return (request.results ?? []).contains { $0.confidence >= 0.3 }
     }
 
     func isModeSupported(_ mode: ScanMode) -> Bool {
@@ -839,6 +932,10 @@ final class CardScannerViewModel: ObservableObject {
             sessionResults.removeFirst(sessionResults.count - 100)
             addedSessionResultIDs.subtract(removedIDs)
         }
+        // The store applies the same 100-scan cap on its side.
+        Task.detached(priority: .utility) {
+            await ScannerStagingStore.shared.stage(result)
+        }
     }
 
     private func resetLiveConfirmation() {
@@ -859,6 +956,10 @@ final class CardScannerViewModel: ObservableObject {
 
     nonisolated private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
+        return makeCGImage(from: pixelBuffer)
+    }
+
+    nonisolated private static func makeCGImage(from pixelBuffer: CVPixelBuffer) -> CGImage? {
         var cgImage: CGImage?
         let status = VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &cgImage)
         if status == kCVReturnSuccess, let cgImage {

@@ -18,7 +18,7 @@ private struct OwnedCardSearchResult: Identifiable {
 struct CardSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
-    @State private var searchText = ""
+    @State private var searchText: String
     @State private var isSearchPresented = false
     @State private var searchScope = CardSearchScope.catalog
     @State private var selectedGame: TCGGame = .all
@@ -37,11 +37,25 @@ struct CardSearchView: View {
     @State private var showingFilters = false
     @State private var searchFilters = CardSearchFilterState()
     @State private var selectedOwnedResult: OwnedCardSearchResult?
+    @State private var loadedCollections: [Collection]?
+
+    private let initialSearchText: String
 
     var addToWishlistId: String?
     var onCardAdded: (() -> Void)?
 
     private let apiService = APIService()
+
+    init(
+        initialSearchText: String = "",
+        addToWishlistId: String? = nil,
+        onCardAdded: (() -> Void)? = nil
+    ) {
+        self.initialSearchText = initialSearchText
+        _searchText = State(initialValue: initialSearchText)
+        self.addToWishlistId = addToWishlistId
+        self.onCardAdded = onCardAdded
+    }
 
     private var filteredSearchResults: [Card] {
         searchResults.filter { searchFilters.matches($0, game: selectedGame) }
@@ -51,6 +65,10 @@ struct CardSearchView: View {
         ownedSearchResults.filter {
             searchFilters.matches($0.previewCard, game: selectedGame)
         }
+    }
+
+    private var hasOwnedCards: Bool {
+        loadedCollections?.contains(where: { !$0.cards.isEmpty }) == true
     }
 
     private var rawResultsAreEmpty: Bool {
@@ -227,6 +245,10 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
+            .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
+                loadedCollections = nil
+                Task { await loadCollectionAvailability() }
+            }
             .onChange(of: searchScope) {
                 searchResults = []
                 ownedSearchResults = []
@@ -235,6 +257,12 @@ struct CardSearchView: View {
                 if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Task { await performSearch() }
                 }
+            }
+            .onChange(of: initialSearchText) { _, nextQuery in
+                guard nextQuery != searchText else { return }
+                searchText = nextQuery
+                hasSearched = false
+                Task { await performSearch() }
             }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
@@ -245,13 +273,21 @@ struct CardSearchView: View {
                 }
                 validateSelectedGame()
             }
+            .task {
+                await loadCollectionAvailability()
+                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   !hasSearched {
+                    await performSearch()
+                }
+            }
         }
     }
 
     @ViewBuilder
     private var supplementalSearchControls: some View {
         VStack(spacing: 0) {
-            if addToWishlistId == nil {
+            if addToWishlistId == nil,
+               hasOwnedCards {
                 Picker("Search Scope", selection: $searchScope) {
                     ForEach(CardSearchScope.allCases) { scope in
                         Text(scope.rawValue).tag(scope)
@@ -354,6 +390,26 @@ struct CardSearchView: View {
         searchFilters = CardSearchFilterState()
         if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Task { await performSearch() }
+        }
+    }
+
+    @MainActor
+    private func loadCollectionAvailability() async {
+        guard loadedCollections == nil else { return }
+
+        do {
+            let collections = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: environmentStore.authToken,
+                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
+            )
+            loadedCollections = collections
+            if !hasOwnedCards, searchScope == .collection {
+                searchScope = .catalog
+            }
+        } catch {
+            // Availability is supplemental; catalog search should remain usable
+            // if collections cannot be loaded.
         }
     }
 
@@ -461,11 +517,17 @@ struct CardSearchView: View {
 
         do {
             if searchScope == .collection {
-                let collections = try await apiService.getCollections(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    useCache: environmentStore.offlineModeEnabled
-                )
+                let collections: [Collection]
+                if let loadedCollections {
+                    collections = loadedCollections
+                } else {
+                    collections = try await apiService.getCollections(
+                        config: environmentStore.serverConfiguration,
+                        token: token,
+                        useCache: environmentStore.offlineModeEnabled
+                    )
+                    self.loadedCollections = collections
+                }
                 ownedSearchResults = collections.flatMap { collection in
                     collection.cards.compactMap { card in
                         let preview = card.previewCard

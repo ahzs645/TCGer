@@ -2,23 +2,38 @@ import SwiftUI
 
 struct ColorPickerGrid: View {
     @Binding var selectedColor: Color
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     private let columns = [
         GridItem(.adaptive(minimum: 44, maximum: 44), spacing: 12)
     ]
 
+    static let accessibilityColorNames = [
+        "Light blue", "Blue", "Dark blue",
+        "Light green", "Green", "Dark green",
+        "Light orange", "Orange", "Yellow",
+        "Red", "Pink", "Dark pink",
+        "Light purple", "Purple", "Dark purple",
+        "Light teal", "Teal", "Gray",
+    ]
+
     var body: some View {
         LazyVGrid(columns: columns, spacing: 12) {
             ForEach(Color.binderColors.indices, id: \.self) { index in
-                ColorCircle(
-                    color: Color.binderColors[index],
-                    isSelected: selectedColor.toHex() == Color.binderColors[index].toHex()
-                )
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3)) {
+                let isSelected = selectedColor.toHex() == Color.binderColors[index].toHex()
+                Button {
+                    withAnimation(accessibilityReduceMotion ? nil : .spring(response: 0.3)) {
                         selectedColor = Color.binderColors[index]
                     }
+                } label: {
+                    ColorCircle(
+                        color: Color.binderColors[index],
+                        isSelected: isSelected
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Self.accessibilityColorNames[index])
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .accessibilityElement(children: .contain)
@@ -29,6 +44,7 @@ struct ColorPickerGrid: View {
 struct ColorCircle: View {
     let color: Color
     let isSelected: Bool
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         ZStack {
@@ -48,7 +64,7 @@ struct ColorCircle: View {
                     .foregroundColor(colorBrightness(color) > 0.6 ? .black : .white)
             }
         }
-        .animation(.spring(response: 0.3), value: isSelected)
+        .animation(accessibilityReduceMotion ? nil : .spring(response: 0.3), value: isSelected)
     }
 
     private func colorBrightness(_ color: Color) -> Double {

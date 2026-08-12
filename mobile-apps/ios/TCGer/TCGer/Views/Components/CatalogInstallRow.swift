@@ -3,9 +3,20 @@ import SwiftUI
 struct CatalogInstallRow: View {
     let game: TCGGame
     @ObservedObject var catalogStore: CatalogStore
+    let includeSealedProducts: Bool
 
     @State private var errorMessage: String?
     @State private var showingRemoveConfirmation = false
+
+    init(
+        game: TCGGame,
+        catalogStore: CatalogStore,
+        includeSealedProducts: Bool = false
+    ) {
+        self.game = game
+        self.catalogStore = catalogStore
+        self.includeSealedProducts = includeSealedProducts
+    }
 
     private var metadata: CatalogManifestGame? {
         catalogStore.metadata(for: game)
@@ -27,12 +38,18 @@ struct CatalogInstallRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                if let sealedCatalogSummary {
+                    Text(sealedCatalogSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Text(statusSummary)
                     .font(.caption2)
                     .foregroundStyle(statusColor)
 
-                if catalogStore.installingGames.contains(game) {
-                    ProgressView(value: catalogStore.installProgress[game] ?? 0)
+                if isInstalling {
+                    ProgressView(value: currentProgress)
                         .progressViewStyle(.linear)
                         .accessibilityLabel("Installing \(game.displayName) catalog")
                 }
@@ -55,9 +72,10 @@ struct CatalogInstallRow: View {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
                 catalogStore.remove(game)
+                catalogStore.removeSealed(game)
             }
         } message: {
-            Text("Your saved cards will stay on this phone.")
+            Text("Your saved cards and sealed inventory will stay on this phone.")
         }
     }
 
@@ -82,7 +100,7 @@ struct CatalogInstallRow: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        if catalogStore.installingGames.contains(game) {
+        if isInstalling {
             ProgressView()
                 .controlSize(.small)
         } else {
@@ -93,8 +111,12 @@ struct CatalogInstallRow: View {
                 }
                 .disabled(!isAvailable)
             case .installed:
-                if catalogStore.isUpdateAvailable(game), isAvailable {
+                if needsCatalogUpdate, isAvailable {
                     Button("Update") {
+                        install()
+                    }
+                } else if needsSealedInstall {
+                    Button("Add Products") {
                         install()
                     }
                 } else {
@@ -111,7 +133,15 @@ struct CatalogInstallRow: View {
             return "Not available in this build"
         }
         let count = metadata.cardCount.formatted(.number)
-        return "\(count) cards • ~\(metadata.formattedCatalogSize)"
+        return "\(count) cards • ~\(metadata.formattedDownloadSize) download"
+    }
+
+    private var sealedCatalogSummary: String? {
+        guard includeSealedProducts,
+              let metadata = catalogStore.sealedMetadata(for: game) else {
+            return nil
+        }
+        return "\(metadata.productCount.formatted(.number)) sealed products • ~\(metadata.formattedDownloadSize) download"
     }
 
     private var statusSummary: String {
@@ -122,15 +152,17 @@ struct CatalogInstallRow: View {
         case .notInstalled:
             return "Not installed"
         case .installed(let version):
-            return catalogStore.isUpdateAvailable(game)
-                ? "Version \(version) installed • update available"
+            if needsCatalogUpdate { return "Version \(version) installed • update available" }
+            if needsSealedInstall { return "Cards installed • sealed products not installed" }
+            return includeSealedProducts && catalogStore.isSealedAvailable(game)
+                ? "Cards and sealed products installed"
                 : "Version \(version) installed"
         }
     }
 
     private var statusColor: Color {
         guard isAvailable else { return .secondary }
-        if catalogStore.isUpdateAvailable(game) { return .orange }
+        if needsCatalogUpdate || needsSealedInstall { return .orange }
         if case .installed = catalogStore.installState(for: game) { return .green }
         return .secondary
     }
@@ -140,15 +172,53 @@ struct CatalogInstallRow: View {
         Task {
             do {
                 try await catalogStore.install(game)
+                if includeSealedProducts, catalogStore.isSealedAvailable(game) {
+                    try await catalogStore.installSealed(game)
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
+
+    private var isInstalling: Bool {
+        catalogStore.installingGames.contains(game) ||
+            catalogStore.installingSealedGames.contains(game)
+    }
+
+    private var currentProgress: Double {
+        if catalogStore.installingSealedGames.contains(game) {
+            return catalogStore.sealedInstallProgress[game] ?? 0
+        }
+        return catalogStore.installProgress[game] ?? 0
+    }
+
+    private var needsSealedInstall: Bool {
+        guard includeSealedProducts, catalogStore.isSealedAvailable(game) else { return false }
+        if case .notInstalled = catalogStore.sealedInstallState(for: game) { return true }
+        return catalogStore.isSealedUpdateAvailable(game)
+    }
+
+    private var needsCatalogUpdate: Bool {
+        catalogStore.isUpdateAvailable(game) ||
+            (includeSealedProducts && catalogStore.isSealedUpdateAvailable(game))
+    }
 }
 
 extension CatalogManifestGame {
-    var formattedCatalogSize: String {
-        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    var formattedDownloadSize: String {
+        ByteCountFormatter.string(
+            fromByteCount: Int64(compressedBytes ?? bytes),
+            countStyle: .file
+        )
+    }
+}
+
+extension SealedCatalogManifestEntry {
+    var formattedDownloadSize: String {
+        ByteCountFormatter.string(
+            fromByteCount: Int64(compressedBytes ?? bytes),
+            countStyle: .file
+        )
     }
 }

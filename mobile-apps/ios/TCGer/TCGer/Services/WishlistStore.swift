@@ -19,6 +19,7 @@ final class WishlistStore: ObservableObject {
     }
 
     private let loader: Loader
+    private let repository: (any WishlistRepository)?
     private let refreshInterval: TimeInterval
     private var source: Source?
     private var lastLoadedAt: Date?
@@ -26,11 +27,23 @@ final class WishlistStore: ObservableObject {
 
     init(
         refreshInterval: TimeInterval = 30,
-        loader: @escaping Loader = { config, token in
-            try await APIService().getWishlists(config: config, token: token)
-        }
+        repository: any WishlistRepository
     ) {
         self.refreshInterval = refreshInterval
+        self.repository = repository
+        self.loader = { config, token in
+            try await repository.wishlists(config: config, token: token)
+        }
+    }
+
+    /// Loader-only initializer retained for focused cache/coalescing tests.
+    /// Mutation methods require the repository-backed initializer.
+    init(
+        refreshInterval: TimeInterval = 30,
+        loader: @escaping Loader
+    ) {
+        self.refreshInterval = refreshInterval
+        self.repository = nil
         self.loader = loader
     }
 
@@ -81,6 +94,36 @@ final class WishlistStore: ObservableObject {
         revision &+= 1
     }
 
+    @discardableResult
+    func create(
+        config: ServerConfiguration,
+        token: String,
+        input: CreateWishlistInput
+    ) async throws -> Wishlist {
+        guard let repository else {
+            throw RepositoryConfigurationError.mutationsUnavailable
+        }
+        let wishlist = try await repository.createWishlist(
+            config: config,
+            token: token,
+            input: input
+        )
+        insert(wishlist)
+        return wishlist
+    }
+
+    func delete(
+        config: ServerConfiguration,
+        token: String,
+        id: String
+    ) async throws {
+        guard let repository else {
+            throw RepositoryConfigurationError.mutationsUnavailable
+        }
+        try await repository.deleteWishlist(config: config, token: token, id: id)
+        remove(id: id)
+    }
+
     private var isFresh: Bool {
         guard hasLoaded, let lastLoadedAt else { return false }
         return Date().timeIntervalSince(lastLoadedAt) < refreshInterval
@@ -120,5 +163,13 @@ final class WishlistStore: ObservableObject {
         guard source == requestedSource else { return }
         activeLoad = nil
         isLoading = false
+    }
+}
+
+private enum RepositoryConfigurationError: LocalizedError {
+    case mutationsUnavailable
+
+    var errorDescription: String? {
+        "This wishlist store was configured for read-only loading."
     }
 }

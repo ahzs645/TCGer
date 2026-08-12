@@ -10,20 +10,19 @@ final class CacheManager {
         let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         cacheDirectory = documentsPath.appendingPathComponent("TCGerCache", isDirectory: true)
 
-        // Create cache directory if it doesn't exist
-        if !fileManager.fileExists(atPath: cacheDirectory.path) {
-            try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-        }
+        // Creation is retried by each throwing operation so an initialization
+        // failure is surfaced to the caller instead of being silently lost.
     }
 
     // MARK: - Cache Operations
 
     func save<T: Encodable>(_ data: T, forKey key: String) throws {
+        try ensureCacheDirectory()
         let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let jsonData = try encoder.encode(data)
-        try jsonData.write(to: fileURL)
+        try jsonData.write(to: fileURL, options: [.atomic])
 
         // Update last cache time
         UserDefaults.standard.set(Date(), forKey: "lastCacheUpdate_\(key)")
@@ -51,6 +50,7 @@ final class CacheManager {
     }
 
     func clearAll() throws {
+        try ensureCacheDirectory()
         let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
         for fileURL in contents {
             try fileManager.removeItem(at: fileURL)
@@ -102,6 +102,10 @@ final class CacheManager {
 
     func updateLastSyncDate() {
         UserDefaults.standard.set(Date(), forKey: "lastSuccessfulSync")
+    }
+
+    private func ensureCacheDirectory() throws {
+        try fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
     }
 }
 

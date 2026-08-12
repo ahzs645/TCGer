@@ -98,17 +98,32 @@ struct ServerSetupView: View {
     @ViewBuilder
     private var catalogSetup: some View {
         Section {
-            Text("Add any bundled game catalogs you want for full offline card search and set browsing. Installation is quick and uses no network data.")
+            Text("Choose the game catalogs you want for full offline search and browsing. Every game downloads separately.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
 
         Section {
+            Toggle(isOn: $environmentStore.sealedProductsEnabled) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sealed Products")
+                    Text("Also download searchable boxes, packs, decks, and other sealed products")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             ForEach(TCGGame.catalogGames.filter(environmentStore.isGameEnabled)) { game in
-                CatalogInstallRow(game: game, catalogStore: catalogStore)
+                CatalogInstallRow(
+                    game: game,
+                    catalogStore: catalogStore,
+                    includeSealedProducts: environmentStore.sealedProductsEnabled
+                )
             }
         } header: {
-            Text("Card Catalogs")
+            Text("Offline Catalogs")
+        } footer: {
+            Text("Turn Sealed Products off if you only collect cards; its product data will not be downloaded.")
         }
 
         Section {
@@ -171,6 +186,7 @@ struct ServerSetupView: View {
         environmentStore.enableLocalSession(force: true)
         if loadSampleData {
             LocalStore.shared.loadSampleData()
+            environmentStore.loadSampleSmartFolders()
         }
     }
 }

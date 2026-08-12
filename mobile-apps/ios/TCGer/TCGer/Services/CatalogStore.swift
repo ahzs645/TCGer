@@ -137,8 +137,15 @@ actor RemoteCatalogSource: CatalogSource {
 
         var games = remoteManifest.games
         for (game, bundledEntry) in bundledManifest.games {
+            let remoteSealed = games[game]?.sealedProducts
             if games[game].map({ $0.version < bundledEntry.version }) ?? true {
                 games[game] = bundledEntry
+            }
+            let preferredSealed = [remoteSealed, bundledEntry.sealedProducts]
+                .compactMap { $0 }
+                .max { $0.version < $1.version }
+            if let preferredSealed {
+                games[game]?.sealedProducts = preferredSealed
             }
         }
         let merged = CatalogManifest(
@@ -183,6 +190,17 @@ nonisolated struct CatalogManifestGame: Codable, Sendable {
     let cardCount: Int
     let setCount: Int
     let bytes: Int
+    var compressedBytes: Int? = nil
+    let sha256: String
+    let file: String
+    var sealedProducts: SealedCatalogManifestEntry? = nil
+}
+
+nonisolated struct SealedCatalogManifestEntry: Codable, Sendable {
+    let version: Int
+    let productCount: Int
+    let bytes: Int
+    var compressedBytes: Int? = nil
     let sha256: String
     let file: String
 }
@@ -273,6 +291,8 @@ final class CatalogStore: ObservableObject {
     @Published private(set) var manifest: CatalogManifest?
     @Published private(set) var installingGames: Set<TCGGame> = []
     @Published private(set) var installProgress: [TCGGame: Double] = [:]
+    @Published private(set) var installingSealedGames: Set<TCGGame> = []
+    @Published private(set) var sealedInstallProgress: [TCGGame: Double] = [:]
 
     nonisolated private struct CatalogPack: Decodable, Sendable {
         let formatVersion: Int
@@ -281,6 +301,14 @@ final class CatalogStore: ObservableObject {
         let updatedAt: String
         let sets: [CatalogSetEntry]
         let cards: [CatalogCardEntry]
+    }
+
+    nonisolated private struct SealedCatalogPack: Decodable, Sendable {
+        let formatVersion: Int
+        let tcg: String
+        let version: Int
+        let updatedAt: String
+        let products: [SealedProduct]
     }
 
     nonisolated private struct SetSearchMetadata: Sendable {
@@ -327,6 +355,10 @@ final class CatalogStore: ObservableObject {
         let pack: CatalogPack
         let setSearchMetadata: [String: SetSearchMetadata]
         let cardSearchMetadata: [CardSearchMetadata]
+        let nameTrigramPostings: [String: [Int]]
+        let fieldTrigramPostings: [String: [Int]]
+        let setTrigramPostings: [String: [Int]]
+        let numericPostings: [String: [Int]]
 
         init(pack: CatalogPack) {
             self.pack = pack
@@ -346,8 +378,12 @@ final class CatalogStore: ObservableObject {
             setSearchMetadata = setMetadata
             var metadata: [CardSearchMetadata] = []
             metadata.reserveCapacity(pack.cards.count)
+            var namePostings: [String: [Int]] = [:]
+            var fieldPostings: [String: [Int]] = [:]
+            var setPostings: [String: [Int]] = [:]
+            var numberPostings: [String: [Int]] = [:]
 
-            for card in pack.cards {
+            for (index, card) in pack.cards.enumerated() {
                 let set = card.setCode.flatMap { setMetadata[$0] }
                 let collectorNumber = card.collectorNumber.map(Self.normalize)
                 let displayCollectorNumber = CatalogStore.displayCollectorNumber(
@@ -392,16 +428,44 @@ final class CatalogStore: ObservableObject {
                 }
                 searchableFields.append(contentsOf: CatalogSearchAliases.normalizedAliases(forCardID: card.id))
 
-                metadata.append(CardSearchMetadata(
+                let cardMetadata = CardSearchMetadata(
                     name: Self.normalize(card.name),
                     nameWords: SearchTextNormalizer.wordKeys(card.name),
                     searchableFields: searchableFields,
                     collectorNumber: collectorNumber,
                     displayCollectorNumber: displayCollectorNumber,
                     worldChampionshipYear: worlds.map { String($0.year) }
-                ))
+                )
+                metadata.append(cardMetadata)
+
+                Self.add(index, for: Self.trigrams(cardMetadata.name), to: &namePostings)
+                Self.add(
+                    index,
+                    for: Set(cardMetadata.searchableFields.flatMap(Self.trigrams)),
+                    to: &fieldPostings
+                )
+                // `SetSearchMetadata` is already normalized, and normalizing
+                // again here makes that invariant explicit at the index edge.
+                let searchableSetValues = [set?.name, set?.code]
+                    .compactMap { $0 }
+                    .map(Self.normalize)
+                Self.add(
+                    index,
+                    for: Set(searchableSetValues.flatMap(Self.trigrams)),
+                    to: &setPostings
+                )
+                let numericValues = [
+                    cardMetadata.collectorNumber,
+                    cardMetadata.displayCollectorNumber,
+                    cardMetadata.worldChampionshipYear,
+                ].compactMap { $0 }
+                Self.add(index, for: Set(numericValues), to: &numberPostings)
             }
             cardSearchMetadata = metadata
+            nameTrigramPostings = namePostings
+            fieldTrigramPostings = fieldPostings
+            setTrigramPostings = setPostings
+            numericPostings = numberPostings
         }
 
         var version: Int { pack.version }
@@ -411,12 +475,37 @@ final class CatalogStore: ObservableObject {
         private static func normalize(_ value: String) -> String {
             SearchTextNormalizer.key(value)
         }
+
+        private static func trigrams(_ value: String) -> Set<String> {
+            let characters = Array(value)
+            guard characters.count >= 3 else { return [] }
+            return Set((0...(characters.count - 3)).map {
+                String(characters[$0...($0 + 2)])
+            })
+        }
+
+        private static func add<S: Sequence>(
+            _ index: Int,
+            for keys: S,
+            to postings: inout [String: [Int]]
+        ) where S.Element == String {
+            for key in keys {
+                postings[key, default: []].append(index)
+            }
+        }
+    }
+
+    nonisolated private struct SearchableCatalogPack: Sendable {
+        let game: TCGGame
+        let pack: LoadedCatalogPack
     }
 
     private let source: any CatalogSource
     private let defaults: UserDefaults
     private var loadedPacks: [TCGGame: LoadedCatalogPack] = [:]
+    private var loadedSealedPacks: [TCGGame: SealedCatalogPack] = [:]
     private var enabledGames: Set<TCGGame> = []
+    private var sealedProductsEnabled = true
 
     init(
         source: any CatalogSource = CatalogAssetConfiguration.catalogSource(),
@@ -445,6 +534,11 @@ final class CatalogStore: ObservableObject {
             for game in TCGGame.catalogGames where enabledGames.contains(game) && isInstalled(game) {
                 await loadIfNeeded(game)
             }
+            if sealedProductsEnabled {
+                for game in TCGGame.catalogGames where enabledGames.contains(game) && isSealedInstalled(game) {
+                    await loadSealedIfNeeded(game)
+                }
+            }
         } catch {
             // The source already tries its disk cache and bundled resources.
             // With no manifest at all, local mode keeps its small seed catalog.
@@ -454,6 +548,10 @@ final class CatalogStore: ObservableObject {
     func metadata(for game: TCGGame) -> CatalogManifestGame? {
         guard game != .all else { return nil }
         return manifest?.games[game.rawValue]
+    }
+
+    func sealedMetadata(for game: TCGGame) -> SealedCatalogManifestEntry? {
+        metadata(for: game)?.sealedProducts
     }
 
     func installState(for game: TCGGame) -> CatalogInstallState {
@@ -475,6 +573,25 @@ final class CatalogStore: ObservableObject {
         return installedVersion < metadata.version
     }
 
+    func sealedInstallState(for game: TCGGame) -> CatalogInstallState {
+        guard let version = defaults.object(forKey: sealedInstallKey(for: game)) as? Int else {
+            return .notInstalled
+        }
+        return .installed(version: version)
+    }
+
+    func isSealedAvailable(_ game: TCGGame) -> Bool {
+        sealedMetadata(for: game) != nil
+    }
+
+    func isSealedUpdateAvailable(_ game: TCGGame) -> Bool {
+        guard let metadata = sealedMetadata(for: game),
+              case .installed(let version) = sealedInstallState(for: game) else {
+            return false
+        }
+        return version < metadata.version
+    }
+
     func isLoaded(_ game: TCGGame) -> Bool {
         loadedPacks[game] != nil
     }
@@ -490,9 +607,17 @@ final class CatalogStore: ObservableObject {
         for loadedGame in Array(loadedPacks.keys) where !games.contains(loadedGame) {
             loadedPacks.removeValue(forKey: loadedGame)
         }
+        for loadedGame in Array(loadedSealedPacks.keys) where !games.contains(loadedGame) {
+            loadedSealedPacks.removeValue(forKey: loadedGame)
+        }
 
         for game in TCGGame.catalogGames where games.contains(game) && isInstalled(game) {
             await loadIfNeeded(game)
+        }
+        if sealedProductsEnabled {
+            for game in TCGGame.catalogGames where games.contains(game) && isSealedInstalled(game) {
+                await loadSealedIfNeeded(game)
+            }
         }
     }
 
@@ -507,6 +632,20 @@ final class CatalogStore: ObservableObject {
         } else {
             enabledGames.remove(game)
             loadedPacks.removeValue(forKey: game)
+            loadedSealedPacks.removeValue(forKey: game)
+        }
+    }
+
+    func setSealedProductsEnabled(_ enabled: Bool) {
+        sealedProductsEnabled = enabled
+        if enabled {
+            for game in TCGGame.catalogGames where enabledGames.contains(game) && isSealedInstalled(game) {
+                Task(priority: .utility) { await loadSealedIfNeeded(game) }
+            }
+        } else {
+            for game in TCGGame.catalogGames {
+                removeSealed(game)
+            }
         }
     }
 
@@ -550,6 +689,50 @@ final class CatalogStore: ObservableObject {
         objectWillChange.send()
     }
 
+    func installSealed(_ game: TCGGame, forceReload: Bool = false) async throws {
+        guard game != .all, let metadata = sealedMetadata(for: game) else {
+            throw StoreError.resourceUnavailable(game.rawValue)
+        }
+        if installingSealedGames.contains(game) {
+            while installingSealedGames.contains(game) {
+                try? await Task.sleep(for: .milliseconds(25))
+            }
+        }
+        if forceReload {
+            loadedSealedPacks.removeValue(forKey: game)
+            await source.remove(metadata.file)
+        }
+        if loadedSealedPacks[game]?.version != metadata.version {
+            try await loadSealed(game, metadata: metadata)
+        }
+        defaults.set(metadata.version, forKey: sealedInstallKey(for: game))
+        if !enabledGames.contains(game) || !sealedProductsEnabled {
+            loadedSealedPacks.removeValue(forKey: game)
+        }
+        objectWillChange.send()
+    }
+
+    func removeSealed(_ game: TCGGame) {
+        let file = sealedMetadata(for: game)?.file
+        defaults.removeObject(forKey: sealedInstallKey(for: game))
+        loadedSealedPacks.removeValue(forKey: game)
+        sealedInstallProgress.removeValue(forKey: game)
+        if let file {
+            let source = self.source
+            Task(priority: .utility) { await source.remove(file) }
+        }
+        objectWillChange.send()
+    }
+
+    func sealedProducts(tcg: TCGGame? = nil) -> [SealedProduct] {
+        guard sealedProductsEnabled else { return [] }
+        let games = tcg.map { [$0] } ?? TCGGame.catalogGames
+        return games.flatMap { game -> [SealedProduct] in
+            guard enabledGames.contains(game) else { return [] }
+            return loadedSealedPacks[game]?.products ?? []
+        }
+    }
+
     func loadIfNeeded(_ game: TCGGame) async {
         guard TCGGame.catalogGames.contains(game),
               enabledGames.contains(game),
@@ -575,6 +758,26 @@ final class CatalogStore: ObservableObject {
                 "Failed to load the \(game.rawValue, privacy: .public) catalog: \(error.localizedDescription, privacy: .public)"
             )
             loadedPacks.removeValue(forKey: game)
+        }
+    }
+
+    func loadSealedIfNeeded(_ game: TCGGame) async {
+        guard sealedProductsEnabled,
+              TCGGame.catalogGames.contains(game),
+              enabledGames.contains(game),
+              loadedSealedPacks[game] == nil,
+              isSealedInstalled(game),
+              let metadata = sealedMetadata(for: game),
+              metadata.version == sealedInstalledVersion(for: game) else {
+            return
+        }
+        do {
+            try await loadSealed(game, metadata: metadata)
+        } catch {
+            Self.logger.error(
+                "Failed to load the \(game.rawValue, privacy: .public) sealed catalog: \(error.localizedDescription, privacy: .public)"
+            )
+            loadedSealedPacks.removeValue(forKey: game)
         }
     }
 
@@ -662,6 +865,170 @@ final class CatalogStore: ObservableObject {
         }
 
         return results
+    }
+
+    /// Snapshot the immutable loaded packs on the main actor, then use the
+    /// precomputed trigram postings and perform all matching/ranking work on a
+    /// utility task. The synchronous variant above remains available for
+    /// import-only code paths and as a behavior reference.
+    func searchAsync(query: String, tcg: TCGGame, limit: Int) async -> [CatalogEntry] {
+        let snapshots = searchablePacks(for: tcg).map {
+            SearchableCatalogPack(game: $0.0, pack: $0.1)
+        }
+        return await Task.detached(priority: .userInitiated) {
+            Self.indexedSearch(query: query, packs: snapshots, limit: limit)
+        }.value
+    }
+
+    nonisolated private static func indexedSearch(
+        query: String,
+        packs: [SearchableCatalogPack],
+        limit: Int
+    ) -> [CatalogEntry] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty, limit > 0 else { return [] }
+        let normalizedNeedle = SearchTextNormalizer.key(needle)
+        guard !normalizedNeedle.isEmpty else { return [] }
+        let queryTerms = SearchTextNormalizer.termKeys(needle)
+        var results: [CatalogEntry] = []
+        results.reserveCapacity(min(limit, 200))
+
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in candidateIndices(
+                for: normalizedNeedle,
+                postings: pack.nameTrigramPostings,
+                count: pack.cards.count
+            ) where pack.cardSearchMetadata[index].name.hasPrefix(normalizedNeedle) {
+                results.append(CatalogEntry(tcg: snapshot.game, card: pack.cards[index]))
+                if results.count == limit { return results }
+            }
+        }
+
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in candidateIndices(
+                for: normalizedNeedle,
+                postings: pack.nameTrigramPostings,
+                count: pack.cards.count
+            ) {
+                let metadata = pack.cardSearchMetadata[index]
+                guard !metadata.name.hasPrefix(normalizedNeedle),
+                      metadata.name.contains(normalizedNeedle) else { continue }
+                results.append(CatalogEntry(tcg: snapshot.game, card: pack.cards[index]))
+                if results.count == limit { return results }
+            }
+        }
+
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in candidateIndices(
+                for: normalizedNeedle,
+                postings: pack.setTrigramPostings,
+                count: pack.cards.count
+            ) {
+                let card = pack.cards[index]
+                let metadata = pack.cardSearchMetadata[index]
+                guard !metadata.name.contains(normalizedNeedle),
+                      let setCode = card.setCode,
+                      pack.setSearchMetadata[setCode]?.contains(normalizedNeedle) == true else {
+                    continue
+                }
+                results.append(CatalogEntry(tcg: snapshot.game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        let existingIDs = Set(results.map(\.card.id))
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in multiTermCandidateIndices(queryTerms, pack: pack) {
+                let card = pack.cards[index]
+                guard !existingIDs.contains(card.id),
+                      pack.cardSearchMetadata[index].matchesAll(queryTerms) else { continue }
+                results.append(CatalogEntry(tcg: snapshot.game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        // Edit-distance fallback remains linear, but only runs when all exact
+        // indexed passes return nothing for one sufficiently long word.
+        if results.isEmpty,
+           queryTerms.count == 1,
+           let queryTerm = queryTerms.first,
+           queryTerm.count >= 5,
+           queryTerm.allSatisfy(\.isLetter) {
+            for snapshot in packs {
+                let pack = snapshot.pack
+                for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
+                    where metadata.namePrefixIsSingleEditAway(from: queryTerm) {
+                    results.append(CatalogEntry(tcg: snapshot.game, card: card))
+                    if results.count == limit { return results }
+                }
+            }
+            let prefixIDs = Set(results.map(\.card.id))
+            for snapshot in packs {
+                let pack = snapshot.pack
+                for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
+                    where !prefixIDs.contains(card.id)
+                        && metadata.nameIsSingleEditAway(from: queryTerm) {
+                    results.append(CatalogEntry(tcg: snapshot.game, card: card))
+                    if results.count == limit { return results }
+                }
+            }
+        }
+
+        return results
+    }
+
+    nonisolated private static func candidateIndices(
+        for value: String,
+        postings: [String: [Int]],
+        count: Int
+    ) -> [Int] {
+        let grams = trigrams(value)
+        guard !grams.isEmpty else { return Array(0..<count) }
+        let lists = grams.compactMap { postings[$0] }
+        guard lists.count == grams.count,
+              var candidates = lists.min(by: { $0.count < $1.count }) else { return [] }
+        for list in lists {
+            let allowed = Set(list)
+            candidates.removeAll { !allowed.contains($0) }
+            if candidates.isEmpty { break }
+        }
+        return candidates.sorted()
+    }
+
+    nonisolated private static func multiTermCandidateIndices(
+        _ terms: [String],
+        pack: LoadedCatalogPack
+    ) -> [Int] {
+        var candidates: [Int]?
+        for term in terms {
+            let next = term.allSatisfy(\.isNumber)
+                ? (pack.numericPostings[term] ?? [])
+                : candidateIndices(
+                    for: term,
+                    postings: pack.fieldTrigramPostings,
+                    count: pack.cards.count
+                )
+            if let current = candidates {
+                let allowed = Set(next)
+                candidates = current.filter(allowed.contains)
+            } else {
+                candidates = next
+            }
+            if candidates?.isEmpty == true { return [] }
+        }
+        return candidates ?? []
+    }
+
+    nonisolated private static func trigrams(_ value: String) -> Set<String> {
+        let characters = Array(value)
+        guard characters.count >= 3 else { return [] }
+        return Set((0...(characters.count - 3)).map {
+            String(characters[$0...($0 + 2)])
+        })
     }
 
     func sets(tcg: TCGGame) -> [CatalogSetEntry] {
@@ -801,12 +1168,24 @@ final class CatalogStore: ObservableObject {
         installedVersion(for: game) != nil
     }
 
+    private func isSealedInstalled(_ game: TCGGame) -> Bool {
+        sealedInstalledVersion(for: game) != nil
+    }
+
     private func installedVersion(for game: TCGGame) -> Int? {
         defaults.object(forKey: installKey(for: game)) as? Int
     }
 
     private func installKey(for game: TCGGame) -> String {
         "tcger.catalog.installedVersion.\(game.rawValue)"
+    }
+
+    private func sealedInstalledVersion(for game: TCGGame) -> Int? {
+        defaults.object(forKey: sealedInstallKey(for: game)) as? Int
+    }
+
+    private func sealedInstallKey(for game: TCGGame) -> String {
+        "tcger.catalog.sealed.installedVersion.\(game.rawValue)"
     }
 
     private func searchablePacks(for tcg: TCGGame) -> [(TCGGame, LoadedCatalogPack)] {
@@ -859,8 +1238,51 @@ final class CatalogStore: ObservableObject {
             throw StoreError.invalidPack(expected: game)
         }
 
-        loadedPacks[game] = LoadedCatalogPack(pack: pack)
+        // Normalization and posting-list construction touch every catalog row;
+        // keep that work off the main actor just like JSON decoding.
+        let loadedPack = await Task.detached(priority: .utility) {
+            LoadedCatalogPack(pack: pack)
+        }.value
+        loadedPacks[game] = loadedPack
         installProgress[game] = 1
+    }
+
+    private func loadSealed(
+        _ game: TCGGame,
+        metadata: SealedCatalogManifestEntry
+    ) async throws {
+        guard !installingSealedGames.contains(game) else { return }
+        installingSealedGames.insert(game)
+        sealedInstallProgress[game] = 0.05
+        defer {
+            installingSealedGames.remove(game)
+            sealedInstallProgress.removeValue(forKey: game)
+        }
+
+        let file = metadata.file
+        var data = try await source.data(for: file)
+        sealedInstallProgress[game] = 0.3
+        var digest = await Self.digest(for: data)
+        if digest != metadata.sha256 {
+            await source.remove(file)
+            data = try await source.data(for: file)
+            digest = await Self.digest(for: data)
+            guard digest == metadata.sha256 else {
+                throw StoreError.checksumMismatch(expected: game)
+            }
+        }
+        let pack = try await Task.detached(priority: .utility) {
+            try JSONDecoder().decode(SealedCatalogPack.self, from: data)
+        }.value
+        sealedInstallProgress[game] = 0.9
+        guard pack.formatVersion == 1 else {
+            throw StoreError.unsupportedFormat(pack.formatVersion)
+        }
+        guard pack.tcg == game.rawValue, pack.version == metadata.version else {
+            throw StoreError.invalidPack(expected: game)
+        }
+        loadedSealedPacks[game] = pack
+        sealedInstallProgress[game] = 1
     }
 
     nonisolated private static func digest(for data: Data) async -> String {

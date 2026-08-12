@@ -22,6 +22,25 @@ struct CollectionCardView: View {
 
                 Spacer()
 
+                if let imageUrl = collection.imageUrl, let url = URL(string: imageUrl) {
+                    CachedAsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            Color(.tertiarySystemFill)
+                                .overlay {
+                                    Image(systemName: "photo")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                        }
+                    }
+                    .frame(width: 36, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .accessibilityLabel("Binder cover")
+                }
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)

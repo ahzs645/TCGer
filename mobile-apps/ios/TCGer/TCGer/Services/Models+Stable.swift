@@ -157,6 +157,11 @@ struct StableCollection: Identifiable, Codable {
     let updatedAt: String
     let colorHex: String?
     let defaultCondition: String?
+    let containerType: String?
+    let imageUrl: String?
+    let associatedTcg: String?
+    let associatedSetCode: String?
+    let associatedSetName: String?
 
     func asModel() -> Collection {
         Collection(
@@ -167,7 +172,12 @@ struct StableCollection: Identifiable, Codable {
             createdAt: createdAt,
             updatedAt: updatedAt,
             colorHex: colorHex,
-            defaultCondition: defaultCondition
+            defaultCondition: defaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
         )
     }
 }

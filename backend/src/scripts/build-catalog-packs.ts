@@ -3,7 +3,7 @@ import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/p
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
-import { createGunzip } from 'node:zlib';
+import { createGunzip, gzipSync } from 'node:zlib';
 import { buildYugiohPrintingKey } from '../modules/adapters/yugioh-printing-key';
 import {
   canonicalizeYugiohSetCode,
@@ -103,8 +103,17 @@ interface ManifestGame {
   cardCount: number;
   setCount: number;
   bytes: number;
+  compressedBytes?: number;
   sha256: string;
   file: string;
+  sealedProducts?: {
+    version: number;
+    productCount: number;
+    bytes: number;
+    compressedBytes?: number;
+    sha256: string;
+    file: string;
+  };
 }
 
 interface CatalogManifest {
@@ -1148,8 +1157,10 @@ async function writePack(
     cardCount: pack.cards.length,
     setCount: pack.sets.length,
     bytes: Buffer.byteLength(contents),
+    compressedBytes: gzipSync(contents, { level: 9 }).byteLength,
     sha256,
     file,
+    sealedProducts: existingEntry?.sealedProducts,
   };
 }
 
@@ -1162,7 +1173,7 @@ async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<v
     await mkdir(destination, { recursive: true });
     const currentFiles = new Set(
       Object.values(manifest.games)
-        .map((entry) => entry?.file)
+        .flatMap((entry) => [entry?.file, entry?.sealedProducts?.file])
         .filter((file): file is string => Boolean(file)),
     );
     for (const filename of await readdir(destination)) {
@@ -1175,6 +1186,12 @@ async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<v
       const entry = manifest.games[game];
       if (entry) {
         await copyFile(resolve(outDir, entry.file), resolve(destination, entry.file));
+        if (entry.sealedProducts) {
+          await copyFile(
+            resolve(outDir, entry.sealedProducts.file),
+            resolve(destination, entry.sealedProducts.file),
+          );
+        }
       }
     }
   }

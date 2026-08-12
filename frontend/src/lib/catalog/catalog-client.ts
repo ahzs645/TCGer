@@ -16,6 +16,48 @@ export interface CatalogManifestGame {
   cardCount: number;
   setCount: number;
   bytes: number;
+  compressedBytes?: number;
+  sha256: string;
+  file: string;
+  sealedProducts?: SealedCatalogManifestEntry;
+}
+
+export interface SealedCatalogManifestEntry {
+  version: number;
+  productCount: number;
+  bytes: number;
+  compressedBytes?: number;
+  sha256: string;
+  file: string;
+}
+
+export interface SealedCatalogProduct {
+  id: string;
+  tcg: CatalogTcgCode;
+  name: string;
+  productType: string;
+  setCode?: string;
+  cardsPerPack?: number;
+  packsPerBox?: number;
+  releaseDate?: string;
+  imageUrl?: string;
+  marketPrice?: number;
+  upc?: string;
+}
+
+interface SealedCatalogPack {
+  formatVersion: 1;
+  tcg: CatalogTcgCode;
+  version: number;
+  updatedAt: string;
+  products: SealedCatalogProduct[];
+}
+
+export interface InstalledSealedCatalog {
+  tcg: CatalogTcgCode;
+  version: number;
+  productCount: number;
+  bytes: number;
   sha256: string;
   file: string;
 }
@@ -84,6 +126,38 @@ function parseManifestGame(value: unknown): CatalogManifestGame | undefined {
     cardCount: value.cardCount,
     setCount: value.setCount,
     bytes: value.bytes,
+    compressedBytes: isOptionalNumber(value.compressedBytes)
+      ? value.compressedBytes
+      : undefined,
+    sha256: value.sha256,
+    file: value.file,
+    sealedProducts: parseSealedManifestEntry(value.sealedProducts),
+  };
+}
+
+function parseSealedManifestEntry(
+  value: unknown,
+): SealedCatalogManifestEntry | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.version !== "number" ||
+    typeof value.productCount !== "number" ||
+    typeof value.bytes !== "number" ||
+    !isString(value.sha256) ||
+    !isString(value.file) ||
+    !value.file ||
+    value.file.includes("/") ||
+    value.file.includes("\\")
+  ) {
+    return undefined;
+  }
+  return {
+    version: value.version,
+    productCount: value.productCount,
+    bytes: value.bytes,
+    compressedBytes: isOptionalNumber(value.compressedBytes)
+      ? value.compressedBytes
+      : undefined,
     sha256: value.sha256,
     file: value.file,
   };
@@ -174,6 +248,52 @@ function parseCatalogPack(
     updatedAt: value.updatedAt,
     sets: value.sets,
     cards: value.cards,
+  };
+}
+
+function isSealedCatalogProduct(value: unknown): value is SealedCatalogProduct {
+  return (
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.tcg) &&
+    isCatalogGameCode(value.tcg) &&
+    isString(value.name) &&
+    isString(value.productType) &&
+    isOptionalString(value.setCode) &&
+    isOptionalNumber(value.cardsPerPack) &&
+    isOptionalNumber(value.packsPerBox) &&
+    isOptionalString(value.releaseDate) &&
+    isOptionalString(value.imageUrl) &&
+    isOptionalNumber(value.marketPrice) &&
+    isOptionalString(value.upc)
+  );
+}
+
+function isCatalogGameCode(value: string): value is CatalogTcgCode {
+  return CATALOG_GAMES.includes(value as CatalogTcgCode);
+}
+
+function parseSealedCatalogPack(
+  value: unknown,
+  expectedTcg: CatalogTcgCode,
+): SealedCatalogPack {
+  if (
+    !isRecord(value) ||
+    value.formatVersion !== 1 ||
+    value.tcg !== expectedTcg ||
+    typeof value.version !== "number" ||
+    !isString(value.updatedAt) ||
+    !Array.isArray(value.products) ||
+    !value.products.every(isSealedCatalogProduct)
+  ) {
+    throw new Error(`The ${expectedTcg} sealed-product catalog is invalid.`);
+  }
+  return {
+    formatVersion: 1,
+    tcg: expectedTcg,
+    version: value.version,
+    updatedAt: value.updatedAt,
+    products: value.products,
   };
 }
 
@@ -389,4 +509,142 @@ export async function removeCatalog(tcg: CatalogTcgCode): Promise<void> {
   } catch {
     // IndexedDB is authoritative; stale HTTP cache entries are harmless.
   }
+}
+
+const SEALED_CATALOG_CACHE = "tcger-sealed-catalog";
+const SEALED_CATALOG_INSTALL_PREFIX = "tcger.catalog.sealed.installed.";
+export const SEALED_PRODUCTS_ENABLED_KEY = "tcger.sealedProducts.enabled";
+export const SEALED_PRODUCTS_PREFERENCE_EVENT =
+  "tcger:sealed-products-preference-changed";
+
+function sealedInstallKey(tcg: CatalogTcgCode): string {
+  return `${SEALED_CATALOG_INSTALL_PREFIX}${tcg}`;
+}
+
+export function areSealedProductsEnabled(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  return localStorage.getItem(SEALED_PRODUCTS_ENABLED_KEY) !== "false";
+}
+
+export function setSealedProductsEnabled(enabled: boolean): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(SEALED_PRODUCTS_ENABLED_KEY, String(enabled));
+  window.dispatchEvent(new Event(SEALED_PRODUCTS_PREFERENCE_EVENT));
+}
+
+function installedSealedCatalog(
+  tcg: CatalogTcgCode,
+): InstalledSealedCatalog | undefined {
+  if (typeof localStorage === "undefined") return undefined;
+  const value = localStorage.getItem(sealedInstallKey(tcg));
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      !isRecord(parsed) ||
+      parsed.tcg !== tcg ||
+      typeof parsed.version !== "number" ||
+      typeof parsed.productCount !== "number" ||
+      typeof parsed.bytes !== "number" ||
+      !isString(parsed.sha256) ||
+      !isString(parsed.file)
+    ) {
+      return undefined;
+    }
+    return parsed as unknown as InstalledSealedCatalog;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getInstalledSealedCatalogs(): Promise<
+  InstalledSealedCatalog[]
+> {
+  return CATALOG_GAMES.flatMap((tcg) => installedSealedCatalog(tcg) ?? []);
+}
+
+export async function downloadSealedCatalog(
+  tcg: CatalogTcgCode,
+  onProgress?: CatalogProgressCallback,
+): Promise<void> {
+  if (typeof caches === "undefined" || typeof localStorage === "undefined") {
+    throw new Error("Offline sealed-product catalogs are unavailable in this browser.");
+  }
+  const manifest = await fetchCatalogManifest();
+  const entry = manifest.games[tcg]?.sealedProducts;
+  if (!entry) throw new Error(`No ${tcg} sealed-product catalog is published.`);
+
+  const url = catalogAssetUrl(entry.file);
+  const response = await fetch(url, { cache: "force-cache" });
+  if (!response.ok) {
+    throw new Error(
+      `Unable to download the ${tcg} sealed-product catalog (${response.status}).`,
+    );
+  }
+  const text = await readResponseWithProgress(response, entry.bytes, onProgress);
+  const digest = await sha256Hex(text);
+  if (digest && digest !== entry.sha256) {
+    throw new Error(`The ${tcg} sealed-product catalog failed its integrity check.`);
+  }
+  const pack = parseSealedCatalogPack(JSON.parse(text) as unknown, tcg);
+  if (pack.version !== entry.version) {
+    throw new Error(
+      `The ${tcg} sealed-product catalog version does not match its manifest entry.`,
+    );
+  }
+
+  onProgress?.(progressValue("saving", entry.bytes, entry.bytes));
+  const cache = await caches.open(SEALED_CATALOG_CACHE);
+  await cache.put(
+    url,
+    new Response(text, {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }),
+  );
+  const installed: InstalledSealedCatalog = {
+    tcg,
+    version: entry.version,
+    productCount: entry.productCount,
+    bytes: entry.bytes,
+    sha256: entry.sha256,
+    file: entry.file,
+  };
+  localStorage.setItem(sealedInstallKey(tcg), JSON.stringify(installed));
+}
+
+export async function removeSealedCatalog(
+  tcg: CatalogTcgCode,
+): Promise<void> {
+  const installed = installedSealedCatalog(tcg);
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(sealedInstallKey(tcg));
+  }
+  if (!installed || typeof caches === "undefined") return;
+  const cache = await caches.open(SEALED_CATALOG_CACHE);
+  await cache.delete(catalogAssetUrl(installed.file));
+}
+
+export async function removeAllSealedCatalogs(): Promise<void> {
+  await Promise.all(CATALOG_GAMES.map(removeSealedCatalog));
+}
+
+export async function getInstalledSealedProducts(
+  tcg?: CatalogTcgCode,
+): Promise<SealedCatalogProduct[]> {
+  if (!areSealedProductsEnabled() || typeof caches === "undefined") return [];
+  const games = tcg ? [tcg] : CATALOG_GAMES;
+  const cache = await caches.open(SEALED_CATALOG_CACHE);
+  const products: SealedCatalogProduct[] = [];
+  for (const game of games) {
+    const installed = installedSealedCatalog(game);
+    if (!installed) continue;
+    const response = await cache.match(catalogAssetUrl(installed.file));
+    if (!response) continue;
+    const pack = parseSealedCatalogPack(
+      JSON.parse(await response.text()) as unknown,
+      game,
+    );
+    products.push(...pack.products);
+  }
+  return products;
 }

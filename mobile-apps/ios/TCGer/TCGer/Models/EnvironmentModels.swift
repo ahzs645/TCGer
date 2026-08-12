@@ -220,5 +220,9 @@ struct LoginCredentials: Codable, Equatable, Sendable {
         !username.isEmpty && !password.isEmpty
     }
 
+    var withoutPassword: LoginCredentials {
+        LoginCredentials(username: username, password: "")
+    }
+
     static let empty = LoginCredentials()
 }

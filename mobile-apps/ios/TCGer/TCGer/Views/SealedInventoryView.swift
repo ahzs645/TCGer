@@ -10,9 +10,11 @@ struct SealedInventoryView: View {
     @State private var errorMessage: String?
     @State private var showingCatalog = false
     @State private var showingBarcodeScanner = false
+    @State private var showingPackOpening = false
     @State private var scannedProduct: SealedProduct?
     @State private var barcodeError: String?
     @State private var searchText = ""
+    @State private var actionSheet: SealedActionSheet?
 
     private let apiService = APIService()
 
@@ -93,7 +95,12 @@ struct SealedInventoryView: View {
                         if !filteredLedgers.isEmpty {
                             Section("Opened Product P&L") {
                                 ForEach(filteredLedgers) { ledger in
-                                    SealedLedgerRow(ledger: ledger)
+                                    Button {
+                                        actionSheet = .ledger(ledger)
+                                    } label: {
+                                        SealedLedgerRow(ledger: ledger)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
@@ -106,6 +113,14 @@ struct SealedInventoryView: View {
                                                 Task { await deleteItem(item) }
                                             } label: {
                                                 Label("Delete", systemImage: "trash")
+                                            }
+                                            if !environmentStore.serverConfiguration.isOnDevice {
+                                                Button {
+                                                    actionSheet = .open(item)
+                                                } label: {
+                                                    Label("Open", systemImage: "shippingbox.and.arrow.backward")
+                                                }
+                                                .tint(.orange)
                                             }
                                         }
                                     }
@@ -125,6 +140,13 @@ struct SealedInventoryView: View {
             )
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        showingPackOpening = true
+                    } label: {
+                        Image(systemName: "shippingbox.and.arrow.backward.fill")
+                    }
+                    .accessibilityLabel("Open packs")
+
                     Button {
                         showingBarcodeScanner = true
                     } label: {
@@ -154,6 +176,9 @@ struct SealedInventoryView: View {
                     Task { await findProduct(barcode: barcode) }
                 }
             }
+            .fullScreenCover(isPresented: $showingPackOpening) {
+                PackOpeningView()
+            }
             .sheet(item: $scannedProduct) { product in
                 ScannedSealedProductSheet(product: product) { quantity, purchasePrice in
                     Task {
@@ -163,6 +188,20 @@ struct SealedInventoryView: View {
                             purchasePrice: purchasePrice
                         )
                     }
+                }
+            }
+            .sheet(item: $actionSheet) { action in
+                switch action {
+                case .open(let item):
+                    RecordSealedOpeningSheet(item: item) {
+                        await loadInventory()
+                    }
+                    .environmentObject(environmentStore)
+                case .ledger(let ledger):
+                    SealedLedgerDetailSheet(ledger: ledger) {
+                        await loadInventory()
+                    }
+                    .environmentObject(environmentStore)
                 }
             }
         .alert("Barcode Scan", isPresented: Binding(
@@ -240,6 +279,18 @@ struct SealedInventoryView: View {
             inventory.removeAll { $0.id == item.id }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private enum SealedActionSheet: Identifiable {
+    case open(SealedInventoryItem)
+    case ledger(SealedOpeningLedger)
+
+    var id: String {
+        switch self {
+        case .open(let item): "open-\(item.id)"
+        case .ledger(let ledger): "ledger-\(ledger.id)"
         }
     }
 }
@@ -341,6 +392,242 @@ private struct SealedInventoryRow: View {
             Spacer()
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct RecordSealedOpeningSheet: View {
+    let item: SealedInventoryItem
+    let onSaved: () async -> Void
+
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var openedQuantity = 1
+    @State private var openedAt = Date()
+    @State private var notes = ""
+    @State private var collections: [Collection] = []
+    @State private var selectedCollectionCardIDs = Set<String>()
+    @State private var searchText = ""
+    @State private var isLoadingCards = true
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private let apiService = APIService()
+
+    private var pulledCards: [(collection: Collection, card: CollectionCard)] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return collections.flatMap { collection in
+            collection.cards.compactMap { card in
+                guard query.isEmpty || card.name.localizedCaseInsensitiveContains(query) else { return nil }
+                return (collection, card)
+            }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Opening") {
+                    Text(item.product.name).font(.headline)
+                    Stepper(
+                        "Quantity: \(openedQuantity)",
+                        value: $openedQuantity,
+                        in: 1...max(1, item.quantity)
+                    )
+                    DatePicker("Opened", selection: $openedAt, displayedComponents: [.date, .hourAndMinute])
+                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                }
+
+                Section {
+                    if isLoadingCards {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if pulledCards.isEmpty {
+                        Text("No collection cards found. You can record the opening now and link pulls later from the server.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(pulledCards, id: \.card.id) { entry in
+                            Button {
+                                if selectedCollectionCardIDs.contains(entry.card.id) {
+                                    selectedCollectionCardIDs.remove(entry.card.id)
+                                } else {
+                                    selectedCollectionCardIDs.insert(entry.card.id)
+                                }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.card.name).foregroundStyle(.primary)
+                                        Text(entry.collection.name).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: selectedCollectionCardIDs.contains(entry.card.id) ? "checkmark.circle.fill" : "circle")
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Link Pulled Cards (\(selectedCollectionCardIDs.count))")
+                } footer: {
+                    Text("Select copies already added to your collection that came from this opening.")
+                }
+
+                if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
+            }
+            .navigationTitle("Record Opening")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search collection cards")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { Task { await save() } }.disabled(isSaving)
+                }
+            }
+            .task { await loadCards() }
+        }
+    }
+
+    @MainActor
+    private func loadCards() async {
+        guard let token = environmentStore.authToken else { isLoadingCards = false; return }
+        do {
+            collections = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                useCache: environmentStore.offlineModeEnabled
+            )
+        } catch { errorMessage = "Cards couldn’t be loaded for linking: \(error.localizedDescription)" }
+        isLoadingCards = false
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = environmentStore.authToken else { return }
+        isSaving = true
+        errorMessage = nil
+        do {
+            _ = try await apiService.createSealedOpening(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                inventoryId: item.id,
+                openedQuantity: openedQuantity,
+                collectionIds: Array(selectedCollectionCardIDs),
+                openedAt: ISO8601DateFormatter().string(from: openedAt),
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes
+            )
+            await onSaved()
+            HapticManager.notification(.success)
+            dismiss()
+        } catch { errorMessage = error.localizedDescription; isSaving = false }
+    }
+}
+
+private struct SealedLedgerDetailSheet: View {
+    let ledger: SealedOpeningLedger
+    let onChanged: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCard: SealedLedgerCard?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Summary") {
+                    LabeledContent("Invested", value: ledger.invested.priceText)
+                    LabeledContent("Live Value", value: ledger.liveValue.priceText)
+                    LabeledContent("Realized", value: ledger.realizedProceeds.priceText)
+                    LabeledContent("Profit / Loss") {
+                        Text("\(ledger.profitLoss >= 0 ? "+" : "")\(ledger.profitLoss.priceText)")
+                            .foregroundStyle(ledger.profitLoss >= 0 ? .green : .red)
+                    }
+                }
+                Section("Opened Cards") {
+                    ForEach(ledger.cards) { card in
+                        Button {
+                            if card.status == "active" { selectedCard = card }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(card.cardName).foregroundStyle(.primary)
+                                    HStack { GameBadge(tcg: card.tcg); Text("×\(card.quantity)") }
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text(card.status.capitalized)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(card.status == "sold" ? .green : .secondary)
+                                    Text((card.status == "sold" ? card.realizedProceeds : card.liveValue).priceText)
+                                        .font(.subheadline.monospacedDigit())
+                                }
+                            }
+                        }
+                        .disabled(card.status != "active")
+                    }
+                }
+            }
+            .navigationTitle(ledger.productName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
+            .sheet(item: $selectedCard) { card in
+                RecordOpenedCardSaleSheet(card: card) {
+                    await onChanged()
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+private struct RecordOpenedCardSaleSheet: View {
+    let card: SealedLedgerCard
+    let onSaved: () async -> Void
+
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var proceeds = ""
+    @State private var soldAt = Date()
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private let apiService = APIService()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section { Text(card.cardName).font(.headline); GameBadge(tcg: card.tcg) }
+                Section("Sale") {
+                    TextField("Total proceeds", text: $proceeds).keyboardType(.decimalPad)
+                    DatePicker("Sold", selection: $soldAt, displayedComponents: [.date, .hourAndMinute])
+                }
+                if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
+            }
+            .navigationTitle("Record Sale")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
+                        .disabled(Double(proceeds) == nil || isSaving)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = environmentStore.authToken, let value = Double(proceeds), value >= 0 else { return }
+        isSaving = true
+        do {
+            _ = try await apiService.recordOpenedCardSale(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                cardId: card.id,
+                proceeds: value,
+                soldAt: ISO8601DateFormatter().string(from: soldAt)
+            )
+            await onSaved()
+            HapticManager.notification(.success)
+            dismiss()
+        } catch { errorMessage = error.localizedDescription; isSaving = false }
     }
 }
 

@@ -9,7 +9,7 @@ extension APIService {
     ) async throws -> CardSearchResponse {
         if config.isOnDevice {
             await prepareLocalCatalog(for: game)
-            let response = LocalStore.shared.searchCards(query: query, game: game)
+            let response = await LocalStore.shared.searchCardsAsync(query: query, game: game)
             return CardSearchResponse(
                 cards: await applyingSelectedPricing(to: response.cards),
                 total: response.total
@@ -61,7 +61,7 @@ extension APIService {
             // The on-device catalog is already fully local, so its regular
             // search is exhaustive.
             await prepareLocalCatalog(for: game)
-            let cards = LocalStore.shared.searchCards(query: query, game: game).cards
+            let cards = await LocalStore.shared.searchCardsAsync(query: query, game: game).cards
             return await applyingSelectedPricing(to: cards)
         }
 

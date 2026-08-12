@@ -9,6 +9,8 @@ WEB_INDEX="${REPO_ROOT}/frontend/public/scan-index/pokemon-embeddings.json"
 GATE_FIXTURE="${REPO_ROOT}/backend/fixtures/models/card-face-rejection-gate-dinov2.v1.json"
 GATE_DESTINATION="${SCAN_INDEX_DIR}/CardFaceGate.json"
 TSX="${REPO_ROOT}/node_modules/.bin/tsx"
+PACK_EMBED_SCRIPT="${REPO_ROOT}/packages/pack-core/scripts/build-embed.mjs"
+PACK_BUNDLE_DIR="${REPO_ROOT}/mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle"
 
 # Xcode launched from Finder does not inherit the user's shell PATH. Make the
 # validator able to find common Homebrew Node installations before reporting
@@ -27,8 +29,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/ios-assets.sh build|check
 
-  build  Generate/sync catalogs and the iOS scanner assets, then validate them.
-  check  Validate all catalog copies and required iOS scanner resources.
+  build  Generate/sync catalogs, scanner assets, and the shared pack-opening bundle, then validate them.
+  check  Validate catalogs, scanner resources, and the shared pack-opening bundle.
 EOF
 }
 
@@ -172,6 +174,30 @@ function validatePack(packFile, game, manifestEntry) {
   }
 }
 
+function validateSealedPack(packFile, game, manifestEntry) {
+  const parsed = readJson(packFile, `${game} sealed-product catalog pack`);
+  if (!parsed) return;
+  const pack = parsed.value;
+  if (pack.formatVersion !== 1) fail(packFile, `formatVersion must be 1, got ${pack.formatVersion}`);
+  if (pack.tcg !== game) fail(packFile, `tcg must be ${game}, got ${pack.tcg}`);
+  if (!Array.isArray(pack.products)) fail(packFile, 'products must be an array');
+
+  const byteCount = Buffer.byteLength(parsed.contents);
+  const digest = crypto.createHash('sha256').update(parsed.contents).digest('hex');
+  if (manifestEntry.bytes !== byteCount) {
+    fail(packFile, `manifest bytes ${manifestEntry.bytes} != actual ${byteCount}`);
+  }
+  if (manifestEntry.sha256 !== digest) {
+    fail(packFile, `manifest sha256 ${manifestEntry.sha256} != actual ${digest}`);
+  }
+  if (Array.isArray(pack.products) && manifestEntry.productCount !== pack.products.length) {
+    fail(packFile, `manifest productCount ${manifestEntry.productCount} != actual ${pack.products.length}`);
+  }
+  if (manifestEntry.version !== pack.version) {
+    fail(packFile, `manifest version ${manifestEntry.version} != pack version ${pack.version}`);
+  }
+}
+
 function validateCatalogDirectory(directory) {
   const before = failures.length;
   const manifestFile = path.join(directory, 'manifest.json');
@@ -206,6 +232,15 @@ function validateCatalogDirectory(directory) {
       continue;
     }
     validatePack(path.join(directory, entry.file), game, entry);
+    if (entry.sealedProducts) {
+      const sealed = entry.sealedProducts;
+      const sealedPattern = new RegExp(`^${game}\\.sealed\\.v${sealed.version}\\.[a-f0-9]{16}\\.pack\\.json$`);
+      if (typeof sealed.file !== 'string' || !sealedPattern.test(sealed.file)) {
+        fail(manifestFile, `games.${game}.sealedProducts.file is invalid: ${sealed.file}`);
+      } else {
+        validateSealedPack(path.join(directory, sealed.file), game, sealed);
+      }
+    }
   }
 
   if (failures.length === before) {
@@ -216,6 +251,34 @@ function validateCatalogDirectory(directory) {
 validateCatalogDirectory(path.join(root, 'data/catalog'));
 validateCatalogDirectory(path.join(root, 'frontend/public/catalog'));
 validateCatalogDirectory(path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/Catalogs'));
+
+const packOpeningDirectory = path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle');
+const packOpeningBefore = failures.length;
+for (const relativePath of [
+  'index.html',
+  'styles.css',
+  'pack-opening.js',
+  'pack/manifest.json',
+  'pack/models/pack.obj',
+  'pack/card-backs/pokemon.png',
+]) {
+  const file = path.join(packOpeningDirectory, relativePath);
+  try {
+    if (!fs.statSync(file).isFile()) fail(file, 'must be a regular file');
+  } catch (error) {
+    fail(file, error.code === 'ENOENT' ? 'missing shared pack-opening resource' : error.message);
+  }
+}
+try {
+  const javascript = fs.readFileSync(path.join(packOpeningDirectory, 'pack-opening.js'), 'utf8');
+  if (javascript.length < 100_000) fail(packOpeningDirectory, 'JavaScript bundle is unexpectedly small');
+  if (javascript.includes('next/image') || javascript.includes('@/lib/utils')) {
+    fail(packOpeningDirectory, 'JavaScript bundle still contains website-only imports');
+  }
+} catch {}
+if (failures.length === packOpeningBefore) {
+  successes.push(`${relative(packOpeningDirectory)} — portable Three.js bundle and required assets present`);
+}
 
 const scanDirectory = path.join(root, 'mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex');
 
@@ -320,6 +383,17 @@ NODE
 build_assets() {
   local generation_failed=0
   local coreml_python=""
+
+  status "BUILD" "shared Three.js pack opening from packages/pack-core"
+  if [[ ! -f "${PACK_EMBED_SCRIPT}" ]]; then
+    status "FAILED" "pack-core embed builder is missing (is the submodule checked out?)"
+    generation_failed=1
+  elif node "${PACK_EMBED_SCRIPT}" --out "${PACK_BUNDLE_DIR}"; then
+    status "BUILT" "PackOpening.bundle"
+  else
+    status "FAILED" "shared pack-opening bundle"
+    generation_failed=1
+  fi
 
   status "BUILD" "offline catalog packs (canonical + web/iOS synchronized copies)"
   if [[ ! -x "${TSX}" ]]; then

@@ -170,12 +170,14 @@ extension APIService {
         matchAnyPrinting: Bool? = nil
     ) async throws -> Wishlist {
         if config.isOnDevice {
-            return LocalStore.shared.createWishlist(
+            let wishlist = LocalStore.shared.createWishlist(
                 name: name,
                 description: description,
                 colorHex: colorHex,
                 matchAnyPrinting: matchAnyPrinting
             )
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return wishlist
         }
         let body = CreateWishlistRequest(
             name: name,
@@ -250,7 +252,11 @@ extension APIService {
         token: String,
         id: String
     ) async throws {
-        if config.isOnDevice { LocalStore.shared.deleteWishlist(id: id); return }
+        if config.isOnDevice {
+            LocalStore.shared.deleteWishlist(id: id)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return
+        }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(id)",
@@ -433,6 +439,7 @@ extension APIService {
     ) async throws {
         if config.isOnDevice {
             LocalStore.shared.removeWishlistRule(wishlistId: wishlistId, ruleId: ruleId)
+            try LocalStore.shared.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -454,7 +461,11 @@ extension APIService {
         wishlistId: String,
         cardId: String
     ) async throws {
-        if config.isOnDevice { LocalStore.shared.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId); return }
+        if config.isOnDevice {
+            LocalStore.shared.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return
+        }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(wishlistId)/cards/\(cardId)",

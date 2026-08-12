@@ -15,9 +15,22 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var isConfigured = false
     private var videoDevice: AVCaptureDevice?
 
+    /// While scanning we cap the camera at 15fps: the live pipeline analyzes at
+    /// most one frame a second, so 30fps only doubles the frames we throw away.
+    /// Idle drops to 2fps — an empty viewfinder doesn't need a hot sensor.
+    /// Only `activeVideoMinFrameDuration` is capped, never `max`: capping the
+    /// maximum duration would also cap exposure time, and a card under indoor
+    /// light needs the long exposures the camera chooses for itself.
+    private static let scanningFPS = 15.0
+    private static let idleFPS = 2.0
+    // Touched only on videoOutputQueue (delegate callbacks) or via its .async.
+    private var frameContinuation: AsyncStream<CVPixelBuffer>.Continuation?
+    private(set) var droppedFrameCount = 0
+    // Touched only on sessionQueue.
+    private var isIdleRate = false
+
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
     var onPhotoCaptureError: ((Error) -> Void)?
-    var onSampleBuffer: ((CMSampleBuffer) -> Void)?
     var onPreviewFrameChange: ((CGRect) -> Void)?
 
     override init() {
@@ -25,11 +38,66 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         session.sessionPreset = .photo
     }
 
+    /// The live-analysis frame conduit. `.bufferingNewest(1)` is the actual
+    /// back-pressure valve: `captureOutput` yields and returns instantly, so
+    /// `alwaysDiscardsLateVideoFrames` never engages (AVFoundation sees a
+    /// delegate that is never late) — without this policy the stream's default
+    /// unbounded FIFO would accumulate pool-owned pixel buffers while the
+    /// consumer is mid-analysis, starving the capture pool and handing the
+    /// pipeline the OLDEST held frame. Newest-1 means: drop stale frames,
+    /// always work on a recent one, hold at most one buffer beyond the one in
+    /// flight. Making a new stream finishes the previous one.
+    func makeFrameStream() -> AsyncStream<CVPixelBuffer> {
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: CVPixelBuffer.self,
+            bufferingPolicy: .bufferingNewest(1)
+        )
+        videoOutputQueue.async { [weak self] in
+            guard let self else {
+                continuation.finish()
+                return
+            }
+            self.frameContinuation?.finish()
+            self.frameContinuation = continuation
+        }
+        return stream
+    }
+
+    /// Drop to the low idle frame rate, or return to the scanning rate.
+    /// Called per frame by the consumer; repeats of the current state are
+    /// ignored so only transitions pay for a device configuration lock.
+    func setIdle(_ idle: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self, idle != self.isIdleRate else { return }
+            self.isIdleRate = idle
+            self.applyFrameRateCapOnSessionQueue(idle ? Self.idleFPS : Self.scanningFPS)
+        }
+    }
+
+    private func applyFrameRateCapOnSessionQueue(_ fps: Double) {
+        guard let device = videoDevice, (try? device.lockForConfiguration()) != nil else { return }
+        device.activeVideoMinFrameDuration = Self.frameDuration(capping: fps, on: device)
+        device.unlockForConfiguration()
+    }
+
+    private static func frameDuration(capping fps: Double, on device: AVCaptureDevice) -> CMTime {
+        let ranges = device.activeFormat.videoSupportedFrameRateRanges
+        let lo = ranges.map(\.minFrameRate).min() ?? fps
+        let hi = ranges.map(\.maxFrameRate).max() ?? fps
+        return CMTime(seconds: 1 / min(max(fps, lo), hi), preferredTimescale: 600)
+    }
+
     func configureIfNeeded() {
         guard !isConfigured else { return }
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.configureSession()
+            // AFTER commitConfiguration, not inside it: setting a session
+            // preset resets the frame-duration properties, so capping the
+            // rate before the preset lands is a no-op.
+            self.applyFrameRateCapOnSessionQueue(
+                self.isIdleRate ? Self.idleFPS : Self.scanningFPS
+            )
         }
         isConfigured = true
     }
@@ -185,7 +253,20 @@ extension CardScannerCameraController: AVCaptureVideoDataOutputSampleBufferDeleg
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        onSampleBuffer?(sampleBuffer)
+        // Yield the bare pixel buffer, not the sample buffer: the stream's
+        // newest-1 slot may hold it across the consumer's analysis, and a
+        // retained CMSampleBuffer would pin capture-pool metadata with it.
+        if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            frameContinuation?.yield(pixelBuffer)
+        }
+    }
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didDrop sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        droppedFrameCount += 1
     }
 }
 

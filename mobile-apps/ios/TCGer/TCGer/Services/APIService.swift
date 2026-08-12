@@ -109,11 +109,17 @@ private struct AnyEncodable: Encodable {
 final class LocalStore {
     static let shared = LocalStore()
 
+    private let persistenceRepository: LocalStorePersistenceRepository
+    private(set) var persistenceFailure: LocalStorePersistenceFailure?
+    /// The exact domain snapshot represented by the most recent successful
+    /// repository write (or load). Failed writes restore this snapshot so the
+    /// process never continues from state that would disappear on relaunch.
+    private var lastDurableState: PersistedState?
+
     private enum Constants {
         static let userId = "local-user"
         static let token = "local-device-token"
         static let unsortedBinderId = "__library__"
-        static let storeFilename = "TCGerLocalStore.json"
         /// Prefix for every record created by the optional sample collection.
         static let samplePrefix = "sample-"
         /// Sample ids written by builds that seeded phone-only mode automatically.
@@ -157,7 +163,10 @@ final class LocalStore {
         return formatter
     }()
 
-    init() {
+    init(persistenceRepository: LocalStorePersistenceRepository? = nil) {
+        self.persistenceRepository = persistenceRepository ?? FileLocalStorePersistenceRepository()
+        self.persistenceFailure = nil
+        self.lastDurableState = nil
         self.preferences = APIService.UserPreferences(
             showCardNumbers: true,
             showPricing: true,
@@ -213,6 +222,7 @@ final class LocalStore {
         self.transactions = []
         self.sampleDataLoaded = false
         seedBaseline()
+        lastDurableState = persistedState()
         loadPersistedState()
     }
 
@@ -246,21 +256,19 @@ final class LocalStore {
         var sampleDataLoaded: Bool?
     }
 
-    private static var storeURL: URL? {
-        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
+    private func loadPersistedState() {
+        do {
+            guard let data = try persistenceRepository.load() else { return }
+            let state = try JSONDecoder().decode(PersistedState.self, from: data)
+            applyPersistedState(state)
+            lastDurableState = persistedState()
+            persistenceFailure = nil
+        } catch {
+            recordPersistenceFailure(error, operation: .load)
         }
-        return documents.appendingPathComponent(Constants.storeFilename)
     }
 
-    private func loadPersistedState() {
-        guard let url = LocalStore.storeURL,
-              FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url),
-              let state = try? JSONDecoder().decode(PersistedState.self, from: data) else {
-            return
-        }
-
+    private func applyPersistedState(_ state: PersistedState) {
         collections = state.collections
         binderPages = state.binderPages ?? []
         tags = state.tags
@@ -297,13 +305,8 @@ final class LocalStore {
         }
     }
 
-    private static func isLegacyDemoUser(_ user: User) -> Bool {
-        user.id == "demo-user-001" || user.email == "demo@tcger.app"
-    }
-
-    private func persist() {
-        guard let url = LocalStore.storeURL else { return }
-        let state = PersistedState(
+    private func persistedState() -> PersistedState {
+        PersistedState(
             collections: collections,
             binderPages: binderPages,
             tags: tags,
@@ -322,15 +325,89 @@ final class LocalStore {
             appSettings: appSettings,
             sampleDataLoaded: sampleDataLoaded
         )
-        guard let data = try? JSONEncoder().encode(state) else { return }
-        try? data.write(to: url, options: [.atomic])
     }
 
-    /// Erase everything stored on this phone and start from an empty library.
-    func resetLocalData() {
-        if let url = LocalStore.storeURL {
-            try? FileManager.default.removeItem(at: url)
+    private func encodedPersistedState(_ state: PersistedState) throws -> Data {
+        try JSONEncoder().encode(state)
+    }
+
+    @discardableResult
+    private func persist() -> Bool {
+        let candidate = persistedState()
+        do {
+            try persistenceRepository.save(try encodedPersistedState(candidate))
+            lastDurableState = candidate
+            persistenceFailure = nil
+            return true
+        } catch {
+            if let lastDurableState {
+                applyPersistedState(lastDurableState)
+            }
+            recordPersistenceFailure(error, operation: .save)
+            return false
         }
+    }
+
+    /// Call immediately after a nonthrowing LocalStore mutation when its
+    /// public caller already has a throwing contract (all APIService writes
+    /// do). This prevents the API layer from returning an object that was
+    /// rolled back after a failed disk write.
+    func requireLatestMutationPersisted() throws {
+        guard let failure = persistenceFailure, failure.operation == .save else { return }
+        throw LocalStorePersistenceError.saveFailed(failure.message)
+    }
+
+    private func persistOrThrow() throws {
+        guard persist() else {
+            try requireLatestMutationPersisted()
+            throw LocalStorePersistenceError.saveFailed("Unknown local persistence failure.")
+        }
+    }
+
+    private func recordPersistenceFailure(
+        _ error: Error,
+        operation: LocalStorePersistenceFailure.Operation
+    ) {
+        let failure = LocalStorePersistenceFailure(
+            operation: operation,
+            message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        )
+        persistenceFailure = failure
+        NotificationCenter.default.post(
+            name: .localStorePersistenceFailed,
+            object: self,
+            userInfo: ["failure": failure]
+        )
+    }
+
+    /// Snapshots are newest-first and can be presented by Settings without
+    /// exposing repository internals.
+    func availableLocalBackups() throws -> [URL] {
+        try persistenceRepository.availableBackups()
+    }
+
+    /// Validates the selected snapshot before atomically making it current.
+    /// The pre-restore current state is rotated into the backup set by `save`.
+    func restoreLocalBackup(from url: URL) throws {
+        do {
+            let data = try persistenceRepository.loadBackup(at: url)
+            let state = try JSONDecoder().decode(PersistedState.self, from: data)
+            try persistenceRepository.save(data)
+            applyPersistedState(state)
+            lastDurableState = persistedState()
+            persistenceFailure = nil
+        } catch {
+            recordPersistenceFailure(error, operation: .restore)
+            throw error
+        }
+    }
+
+    private static func isLegacyDemoUser(_ user: User) -> Bool {
+        user.id == "demo-user-001" || user.email == "demo@tcger.app"
+    }
+
+    /// Erase the active phone data while retaining the bounded recovery chain.
+    func resetLocalData() {
         collections = []
         binderPages = []
         wishlists = []
@@ -348,6 +425,7 @@ final class LocalStore {
         nextTransactionId = 1
         sampleDataLoaded = false
         seedBaseline()
+        persist()
     }
 
     func authenticate(username: String? = nil, email: String? = nil) -> AuthResponse {
@@ -507,17 +585,40 @@ final class LocalStore {
         }
 
         let store = CatalogStore.shared
-        var base = store.search(query: trimmed, tcg: game, limit: 200).map(store.card(from:))
+        let entries = store.search(query: trimmed, tcg: game, limit: 200)
+        return searchCards(query: trimmed, game: game, catalogEntries: entries)
+    }
+
+    func searchCardsAsync(query: String, game: TCGGame) async -> CardSearchResponse {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return CardSearchResponse(cards: [], total: 0)
+        }
+        let entries = await CatalogStore.shared.searchAsync(
+            query: trimmed,
+            tcg: game,
+            limit: 200
+        )
+        return searchCards(query: trimmed, game: game, catalogEntries: entries)
+    }
+
+    private func searchCards(
+        query: String,
+        game: TCGGame,
+        catalogEntries: [CatalogEntry]
+    ) -> CardSearchResponse {
+        let store = CatalogStore.shared
+        var base = catalogEntries.map(store.card(from:))
         base.append(contentsOf: searchCatalog.filter { card in
             guard gameMatches(card.tcg, requested: game),
                   !store.isLoaded(TCGGame(rawValue: card.tcg) ?? .all) else {
                 return false
             }
-            return cardMatchesSearch(card, query: trimmed)
+            return cardMatchesSearch(card, query: query)
         })
 
         let owned = ownedCatalogCards().filter { card in
-            gameMatches(card.tcg, requested: game) && cardMatchesSearch(card, query: trimmed)
+            gameMatches(card.tcg, requested: game) && cardMatchesSearch(card, query: query)
         }
         let results = Array(catalogCards(base: base, owned: owned).prefix(200))
 
@@ -816,6 +917,7 @@ final class LocalStore {
         var createdBinders: [String] = []
         var importedRows = 0
         var importedCopies = 0
+        let stateBeforeImport = persistedState()
 
         for item in parsed.rows {
             let binderId = resolveImportBinder(
@@ -826,7 +928,7 @@ final class LocalStore {
             let (tagIds, newTags) = resolveImportTags(item.tags)
 
             do {
-                try addCardToBinder(
+                try addCardToBinderInMemory(
                     binderId: binderId,
                     cardId: item.card.id,
                     quantity: item.row.quantity,
@@ -853,6 +955,10 @@ final class LocalStore {
                 importedRows += 1
                 importedCopies += item.row.quantity
             } catch {
+                // An import is a single transaction. Restore every collection,
+                // tag, id counter, and copy changed by earlier rows before
+                // reporting the row that caused the transaction to abort.
+                applyPersistedState(stateBeforeImport)
                 issues.append(
                     APIService.CollectionImportIssue(
                         row: item.row.row,
@@ -860,10 +966,41 @@ final class LocalStore {
                         message: "Could not import \(item.row.cardName): \(error.localizedDescription)"
                     )
                 )
+                return APIService.CollectionImportResult(
+                    valid: false,
+                    rows: previewRows,
+                    issues: issues,
+                    sourceRows: parsed.sourceRows,
+                    totalCopies: parsed.totalCopies,
+                    importedRows: 0,
+                    importedCopies: 0,
+                    createdBinders: []
+                )
             }
         }
 
-        persist()
+        // All imported rows, newly-created binders, and newly-created tags are
+        // persisted together. `persist` restores the last durable snapshot if
+        // this one repository write fails.
+        guard persist() else {
+            issues.append(
+                APIService.CollectionImportIssue(
+                    row: 0,
+                    field: nil,
+                    message: persistenceFailure?.message ?? "The import could not be saved."
+                )
+            )
+            return APIService.CollectionImportResult(
+                valid: false,
+                rows: previewRows,
+                issues: issues,
+                sourceRows: parsed.sourceRows,
+                totalCopies: parsed.totalCopies,
+                importedRows: 0,
+                importedCopies: 0,
+                createdBinders: []
+            )
+        }
 
         return APIService.CollectionImportResult(
             valid: issues.isEmpty,
@@ -891,7 +1028,7 @@ final class LocalStore {
                 return existing.id
             }
             if options.createMissingBinders {
-                let created = createCollection(name: trimmed, description: nil, colorHex: nil)
+                let created = createCollectionInMemory(name: trimmed, description: nil, colorHex: nil)
                 createdBinders.append(created.name)
                 return created.id
             }
@@ -959,7 +1096,38 @@ final class LocalStore {
         name: String,
         description: String?,
         colorHex: String?,
-        defaultCondition: String? = nil
+        defaultCondition: String? = nil,
+        containerType: String? = nil,
+        imageUrl: String? = nil,
+        associatedTcg: String? = nil,
+        associatedSetCode: String? = nil,
+        associatedSetName: String? = nil
+    ) -> Collection {
+        let collection = createCollectionInMemory(
+            name: name,
+            description: description,
+            colorHex: colorHex,
+            defaultCondition: defaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
+        )
+        persist()
+        return collection
+    }
+
+    private func createCollectionInMemory(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String? = nil,
+        containerType: String? = nil,
+        imageUrl: String? = nil,
+        associatedTcg: String? = nil,
+        associatedSetCode: String? = nil,
+        associatedSetName: String? = nil
     ) -> Collection {
         let now = LocalStore.isoFormatter.string(from: Date())
         let collection = Collection(
@@ -970,11 +1138,15 @@ final class LocalStore {
             createdAt: now,
             updatedAt: now,
             colorHex: colorHex ?? "4a90e2",
-            defaultCondition: defaultCondition
+            defaultCondition: defaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
         )
         nextBinderId += 1
         collections.append(collection)
-        persist()
         return collection
     }
 
@@ -983,7 +1155,12 @@ final class LocalStore {
         name: String?,
         description: String?,
         colorHex: String?,
-        defaultCondition: String? = nil
+        defaultCondition: String? = nil,
+        containerType: String? = nil,
+        imageUrl: String? = nil,
+        associatedTcg: String? = nil,
+        associatedSetCode: String? = nil,
+        associatedSetName: String? = nil
     ) throws -> Collection {
         guard id != Constants.unsortedBinderId else {
             throw APIService.APIError.serverError(status: 400, message: "The Unsorted Library cannot be edited")
@@ -1008,10 +1185,15 @@ final class LocalStore {
             createdAt: existing.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date()),
             colorHex: colorHex ?? existing.colorHex,
-            defaultCondition: resolvedDefaultCondition
+            defaultCondition: resolvedDefaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
         )
         collections[index] = updated
-        persist()
+        try persistOrThrow()
         return updated
     }
 
@@ -1022,12 +1204,13 @@ final class LocalStore {
         guard let index = collections.firstIndex(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Collection not found")
         }
+        let removedImageURLs = binderPages
+            .filter { $0.binderId == id }
+            .compactMap(\.imageUrl)
         collections.remove(at: index)
-        for page in binderPages where page.binderId == id {
-            removeLocalBinderPageImage(at: page.imageUrl)
-        }
         binderPages.removeAll { $0.binderId == id }
-        persist()
+        try persistOrThrow()
+        removedImageURLs.forEach(removeLocalBinderPageImage(at:))
     }
 
     func getBinderPages(binderId: String) -> [SavedBinderPage] {
@@ -1085,7 +1268,6 @@ final class LocalStore {
         let url = directory.appendingPathComponent("\(UUID().uuidString).jpg")
         try imageData.write(to: url, options: [.atomic])
         let existing = binderPages[index]
-        removeLocalBinderPageImage(at: existing.imageUrl)
         let page = SavedBinderPage(
             id: existing.id,
             binderId: existing.binderId,
@@ -1098,7 +1280,13 @@ final class LocalStore {
             updatedAt: LocalStore.isoFormatter.string(from: Date())
         )
         binderPages[index] = page
-        persist()
+        do {
+            try persistOrThrow()
+            removeLocalBinderPageImage(at: existing.imageUrl)
+        } catch {
+            removeLocalBinderPageImage(at: url.absoluteString)
+            throw error
+        }
         return page
     }
 
@@ -1107,7 +1295,6 @@ final class LocalStore {
             $0.binderId == binderId && $0.pageNumber == pageNumber
         }) else { return }
         let existing = binderPages[index]
-        removeLocalBinderPageImage(at: existing.imageUrl)
         binderPages[index] = SavedBinderPage(
             id: existing.id,
             binderId: existing.binderId,
@@ -1119,7 +1306,9 @@ final class LocalStore {
             createdAt: existing.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date())
         )
-        persist()
+        if persist() {
+            removeLocalBinderPageImage(at: existing.imageUrl)
+        }
     }
 
     private static var binderPageImageDirectory: URL? {
@@ -1137,6 +1326,12 @@ final class LocalStore {
     }
 
     func createTag(label: String, colorHex: String?) -> CollectionCardTag {
+        let newTag = createTagInMemory(label: label, colorHex: colorHex)
+        persist()
+        return newTag
+    }
+
+    private func createTagInMemory(label: String, colorHex: String?) -> CollectionCardTag {
         let newTag = CollectionCardTag(
             id: "local-tag-\(nextTagId)",
             label: label,
@@ -1144,11 +1339,45 @@ final class LocalStore {
         )
         nextTagId += 1
         tags.append(newTag)
-        persist()
         return newTag
     }
 
     func addCardToBinder(
+        binderId: String,
+        cardId: String,
+        quantity: Int,
+        condition: String?,
+        language: String?,
+        notes: String?,
+        price: Double?,
+        acquisitionPrice: Double?,
+        variant: CardCopyVariant = .empty,
+        isSigned: Bool?,
+        isAltered: Bool?,
+        tagIds: [String]?,
+        newTags: [APIService.TagPayload]?,
+        card: Card?
+    ) throws {
+        try addCardToBinderInMemory(
+            binderId: binderId,
+            cardId: cardId,
+            quantity: quantity,
+            condition: condition,
+            language: language,
+            notes: notes,
+            price: price,
+            acquisitionPrice: acquisitionPrice,
+            variant: variant,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            tagIds: tagIds,
+            newTags: newTags,
+            card: card
+        )
+        try persistOrThrow()
+    }
+
+    private func addCardToBinderInMemory(
         binderId: String,
         cardId: String,
         quantity: Int,
@@ -1170,7 +1399,7 @@ final class LocalStore {
         }
 
         let preparedNewTags = (newTags ?? []).map { payload in
-            createTag(label: payload.label, colorHex: payload.colorHex)
+            createTagInMemory(label: payload.label, colorHex: payload.colorHex)
         }
         let selectedTags = tags.filter { tagIds?.contains($0.id) == true } + preparedNewTags
         let resolvedCard = card ?? searchCatalog.first(where: { $0.id == cardId }) ?? placeholderCard(id: cardId)
@@ -1252,7 +1481,6 @@ final class LocalStore {
         }
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
-        persist()
     }
 
     func updateCardInBinder(
@@ -1344,7 +1572,7 @@ final class LocalStore {
             guard let updatedDestination = destinationCards.first(where: { $0.cardId == sourceCard.cardId }) else {
                 throw APIService.APIError.serverError(status: 500, message: "Failed to move card")
             }
-            persist()
+            try persistOrThrow()
             return updatedDestination
         }
 
@@ -1469,7 +1697,7 @@ final class LocalStore {
 
         sourceCards[sourceCardIndex] = updatedCard
         collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
-        persist()
+        try persistOrThrow()
         return updatedCard
     }
 
@@ -1499,7 +1727,7 @@ final class LocalStore {
         }
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
-        persist()
+        try persistOrThrow()
     }
 
     private static func cardBack(for tcg: String) -> String? {
@@ -1842,6 +2070,11 @@ final class LocalStore {
             condition: String = CardCondition.nearMint.rawValue,
             notes: String? = nil,
             acquisitionPrice: Double? = nil,
+            variant: CardCopyVariant = .empty,
+            gradingCompany: String? = nil,
+            gradingScore: String? = nil,
+            certNumber: String? = nil,
+            storageLocation: String? = nil,
             tagLabels: [String] = []
         ) -> CollectionCard {
             CollectionCard(
@@ -1868,7 +2101,12 @@ final class LocalStore {
                     notes: notes,
                     price: card.price,
                     acquisitionPrice: acquisitionPrice,
-                    tags: existingTags(labeled: tagLabels)
+                    variant: variant,
+                    tags: existingTags(labeled: tagLabels),
+                    gradingCompany: gradingCompany,
+                    gradingScore: gradingScore,
+                    certNumber: certNumber,
+                    storageLocation: storageLocation
                 )
             )
         }
@@ -1880,6 +2118,10 @@ final class LocalStore {
                 quantity: 2,
                 notes: "Pulled from pack",
                 acquisitionPrice: 8.99,
+                gradingCompany: "PSA",
+                gradingScore: "10",
+                certNumber: "TCGER-DEMO-0001",
+                storageLocation: "Display case · Shelf A",
                 tagLabels: ["PC"]
             ),
             sampleCollectionCard(
@@ -1888,6 +2130,16 @@ final class LocalStore {
                 quantity: 1,
                 condition: "Excellent",
                 acquisitionPrice: 1.25,
+                variant: CardCopyVariant(
+                    finishCode: "foil",
+                    finishLabel: "Foil",
+                    edition: nil,
+                    stamp: nil,
+                    isSealedPromo: false,
+                    isOversized: false,
+                    isPeelOff: false
+                ),
+                storageLocation: "Trade binder · Page 2",
                 tagLabels: ["For Trade"]
             ),
             sampleCollectionCard(id: "sample-cc-5", card: pikaBase, quantity: 2),
@@ -1905,7 +2157,13 @@ final class LocalStore {
                 cards: starterCards,
                 createdAt: now,
                 updatedAt: now,
-                colorHex: "7c4dff"
+                colorHex: "7c4dff",
+                defaultCondition: CardCondition.nearMint.rawValue,
+                containerType: "9-pocket zip binder",
+                imageUrl: LocalStore.cardBack(for: "pokemon"),
+                associatedTcg: "pokemon",
+                associatedSetCode: "PAF",
+                associatedSetName: "Paldean Fates"
             ),
             Collection(
                 id: "sample-binder-2",
@@ -1942,7 +2200,11 @@ final class LocalStore {
                 ],
                 createdAt: now,
                 updatedAt: now,
-                colorHex: "26a69a"
+                colorHex: "26a69a",
+                defaultCondition: "Excellent",
+                containerType: "Trade binder",
+                imageUrl: LocalStore.cardBack(for: "yugioh"),
+                associatedTcg: "yugioh"
             )
         ])
 
@@ -1994,7 +2256,11 @@ final class LocalStore {
         variant: CardCopyVariant = .empty,
         isSigned: Bool? = nil,
         isAltered: Bool? = nil,
-        tags: [CollectionCardTag]
+        tags: [CollectionCardTag],
+        gradingCompany: String? = nil,
+        gradingScore: String? = nil,
+        certNumber: String? = nil,
+        storageLocation: String? = nil
     ) -> [CollectionCardCopy] {
         let now = LocalStore.isoFormatter.string(from: Date())
         let count = max(1, quantity)
@@ -2022,10 +2288,10 @@ final class LocalStore {
                     isSigned: isSigned,
                     isAltered: isAltered,
                     imageUrls: nil,
-                    gradingCompany: nil,
-                    gradingScore: nil,
-                    certNumber: nil,
-                    storageLocation: nil,
+                    gradingCompany: gradingCompany,
+                    gradingScore: gradingScore,
+                    certNumber: certNumber,
+                    storageLocation: storageLocation,
                     tags: tags
                 )
             )
@@ -2042,7 +2308,13 @@ final class LocalStore {
             cards: cards ?? collection.cards,
             createdAt: collection.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date()),
-            colorHex: collection.colorHex
+            colorHex: collection.colorHex,
+            defaultCondition: collection.defaultCondition,
+            containerType: collection.containerType,
+            imageUrl: collection.imageUrl,
+            associatedTcg: collection.associatedTcg,
+            associatedSetCode: collection.associatedSetCode,
+            associatedSetName: collection.associatedSetName
         )
     }
 
@@ -2278,7 +2550,7 @@ final class LocalStore {
             matchAnyPrinting: matchAnyPrinting ?? wl.matchAnyPrinting
         )
         wishlists[idx] = updated
-        persist()
+        try persistOrThrow()
         return applyingOwnership(updated, maps: ownershipMaps())
     }
 
@@ -2306,7 +2578,7 @@ final class LocalStore {
         var cards = wl.cards
         cards.append(wc)
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
-        persist()
+        try persistOrThrow()
         let quantity = ownedQuantity(for: wc, matchAnyPrinting: wl.matchesAnyPrinting, maps: maps)
         wc.owned = quantity > 0
         wc.ownedQuantity = quantity
@@ -2333,7 +2605,7 @@ final class LocalStore {
 
         let updated = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
         wishlists[idx] = updated
-        persist()
+        try persistOrThrow()
         return applyingOwnership(updated, maps: ownershipMaps())
     }
 
@@ -2393,7 +2665,7 @@ final class LocalStore {
         }
 
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: wl.cards, rules: rules, updatedAt: now)
-        persist()
+        try persistOrThrow()
         return rule
     }
 
@@ -2433,7 +2705,7 @@ final class LocalStore {
         rules[ruleIndex] = updated
 
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: wl.cards, rules: rules, updatedAt: now)
-        persist()
+        try persistOrThrow()
         return updated
     }
 
@@ -2493,11 +2765,23 @@ final class LocalStore {
 
     // MARK: - Sealed Accessors
 
-    func getSealedProducts() -> [SealedProduct] { sealedProducts }
+    func getSealedProducts() -> [SealedProduct] {
+        var productsByName = Dictionary(
+            uniqueKeysWithValues: sealedProducts.map {
+                ("\($0.tcg)|\($0.name.lowercased())", $0)
+            }
+        )
+        for product in CatalogStore.shared.sealedProducts() {
+            productsByName["\(product.tcg)|\(product.name.lowercased())"] = product
+        }
+        return productsByName.values.sorted {
+            ($0.releaseDate ?? "", $0.name) > ($1.releaseDate ?? "", $1.name)
+        }
+    }
     func getSealedInventory() -> [SealedInventoryItem] { sealedInventory }
 
     func addSealedInventory(productId: String, quantity: Int, purchasePrice: Double?) -> SealedInventoryItem? {
-        guard let product = sealedProducts.first(where: { $0.id == productId }) else { return nil }
+        guard let product = getSealedProducts().first(where: { $0.id == productId }) else { return nil }
         let now = LocalStore.isoFormatter.string(from: Date())
         let item = SealedInventoryItem(id: "local-si-\(Int.random(in: 100...9999))", product: product, quantity: quantity, purchasePrice: purchasePrice, purchaseDate: now, notes: nil, createdAt: now)
         sealedInventory.insert(item, at: 0)
@@ -2520,7 +2804,7 @@ final class LocalStore {
             createdAt: item.createdAt
         )
         sealedInventory[idx] = updated
-        persist()
+        try persistOrThrow()
         return updated
     }
 

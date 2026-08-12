@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Activity,
@@ -9,6 +9,7 @@ import {
   Key,
   Loader2,
   Moon,
+  RotateCcw,
   Settings2,
   ShieldCheck,
   User as UserIcon,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -43,8 +45,13 @@ import {
 } from "@/lib/api/user-preferences";
 import { isDemoMode } from "@/lib/demo-mode";
 import { requestCatalogPrompt } from "@/lib/catalog/use-catalog";
+import {
+  DEMO_TRANSACTIONS_STORAGE_KEY,
+  SMART_FOLDER_STORAGE_KEY_PREFIX,
+} from "@/lib/storage/keys";
 import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { useDemoStore } from "@/stores/demo-store";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 import { useTheme } from "next-themes";
 import { CatalogManagementPanel } from "./catalog-management-panel";
@@ -97,6 +104,8 @@ export function AccountSettingsDialog({
   const updateStoredPreferences = useAuthStore(
     (state) => state.updateStoredPreferences,
   );
+  const resetDemo = useDemoStore((state) => state.resetDemo);
+  const [confirm, confirmDialog] = useConfirm();
   const [appSettings, setAppSettings] = useState<AdminAppSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
@@ -110,6 +119,11 @@ export function AccountSettingsDialog({
     "showCardNumbers" | "showPricing" | null
   >(null);
   const [updatingGame, setUpdatingGame] = useState<ManageableGame | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [resettingDemo, setResettingDemo] = useState(false);
+  const [demoResetMessage, setDemoResetMessage] = useState<string | null>(null);
 
   const activeCount = useMemo(
     () => Object.values(enabledGames).filter(Boolean).length,
@@ -117,33 +131,49 @@ export function AccountSettingsDialog({
   );
   const isAdmin = user?.isAdmin ?? false;
 
-  useEffect(() => {
-    if (open && isAdmin && token) {
-      setLoadingSettings(true);
-      Promise.all([
-        getAdminSettings(token).then(setAppSettings),
-        getSourceDefaults(token).then(setSourceDefaults),
-      ])
-        .catch((error) => console.error("Failed to load settings:", error))
-        .finally(() => setLoadingSettings(false));
+  const loadAdminSettings = useCallback(async () => {
+    if (!isAdmin || !token) return;
+    setLoadingSettings(true);
+    setSettingsError(null);
+    try {
+      const [settings, defaults] = await Promise.all([
+        getAdminSettings(token),
+        getSourceDefaults(token),
+      ]);
+      setAppSettings(settings);
+      setSourceDefaults(defaults);
+    } catch (error) {
+      setSettingsError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load admin settings.",
+      );
+    } finally {
+      setLoadingSettings(false);
     }
-  }, [open, isAdmin, token]);
+  }, [isAdmin, token]);
 
-  useEffect(() => {
-    if (!open || !token) {
-      return;
-    }
-
+  const loadPreferences = useCallback(async () => {
+    if (!token) return;
     setLoadingPreferences(true);
-    getUserPreferences(token)
-      .then((preferences) => {
-        updateStoredPreferences(preferences);
-      })
-      .catch((error) =>
-        console.error("Failed to load user preferences:", error),
-      )
-      .finally(() => setLoadingPreferences(false));
-  }, [open, token, updateStoredPreferences]);
+    setPreferencesError(null);
+    try {
+      const preferences = await getUserPreferences(token);
+      updateStoredPreferences(preferences);
+    } catch (error) {
+      setPreferencesError(
+        error instanceof Error ? error.message : "Failed to load preferences.",
+      );
+    } finally {
+      setLoadingPreferences(false);
+    }
+  }, [token, updateStoredPreferences]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadAdminSettings();
+    void loadPreferences();
+  }, [loadAdminSettings, loadPreferences, open]);
 
   const handleSettingChange = async (
     key: string,
@@ -153,12 +183,15 @@ export function AccountSettingsDialog({
 
     const updatedSettings = { ...appSettings, [key]: value };
     setAppSettings(updatedSettings);
+    setSaveError(null);
 
     try {
       await updateSettings({ [key]: value } as never, token);
     } catch (error) {
-      console.error("Failed to update settings:", error);
       setAppSettings(appSettings);
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to update settings.",
+      );
     }
   };
 
@@ -196,6 +229,7 @@ export function AccountSettingsDialog({
     if (previousValue === value) return;
 
     setUpdatingPreference(preference);
+    setSaveError(null);
 
     if (preference === "showCardNumbers") {
       setShowCardNumbers(value);
@@ -207,12 +241,14 @@ export function AccountSettingsDialog({
       await updateUserPreferences({ [preference]: value }, token);
       updateStoredPreferences({ [preference]: value });
     } catch (error) {
-      console.error("Failed to update user preference:", error);
       if (preference === "showCardNumbers") {
         setShowCardNumbers(previousValue);
       } else {
         setShowPricing(previousValue);
       }
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to save preference.",
+      );
     } finally {
       setUpdatingPreference(null);
     }
@@ -229,6 +265,7 @@ export function AccountSettingsDialog({
     }
 
     setUpdatingGame(game);
+    setSaveError(null);
     toggleGame(game);
 
     const preferencePayload = {
@@ -240,15 +277,48 @@ export function AccountSettingsDialog({
       updateStoredPreferences(preferencePayload);
       if (newValue && isDemoMode()) requestCatalogPrompt(game);
     } catch (error) {
-      console.error("Failed to update enabled game:", error);
       toggleGame(game);
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update game modules.",
+      );
     } finally {
       setUpdatingGame(null);
     }
   };
 
+  const handleResetDemo = async () => {
+    const confirmed = await confirm({
+      title: "Reset all demo data?",
+      description:
+        "This removes your demo collection changes, smart folders, transactions, decks, trades, and preferences, then restores the sample fixtures.",
+      confirmLabel: "Reset demo data",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setResettingDemo(true);
+    setDemoResetMessage(null);
+    try {
+      resetDemo();
+      localStorage.removeItem(DEMO_TRANSACTIONS_STORAGE_KEY);
+      localStorage.removeItem(
+        `${SMART_FOLDER_STORAGE_KEY_PREFIX}${user?.id ?? "demo-user-001"}`,
+      );
+      setDemoResetMessage("Demo data restored. Reloading the sample app…");
+      window.setTimeout(() => window.location.reload(), 600);
+    } catch (error) {
+      setDemoResetMessage(
+        error instanceof Error ? error.message : "Failed to reset demo data.",
+      );
+      setResettingDemo(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} data-oid="he1m9xo">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange} data-oid="he1m9xo">
       <DialogContent
         className="max-w-3xl sm:max-w-4xl max-h-[85vh] overflow-y-auto"
         data-oid="md5o42-"
@@ -260,6 +330,27 @@ export function AccountSettingsDialog({
             active.
           </DialogDescription>
         </DialogHeader>
+
+        {(preferencesError || saveError || settingsError) && (
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            <p>{saveError ?? preferencesError ?? settingsError}</p>
+            {!saveError && (preferencesError || settingsError) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (preferencesError) void loadPreferences();
+                  if (settingsError) void loadAdminSettings();
+                }}
+              >
+                Try again
+              </Button>
+            )}
+          </div>
+        )}
 
         <section className="space-y-4" data-oid="q24fta7">
           <div
@@ -491,9 +582,15 @@ export function AccountSettingsDialog({
               </div>
 
               {loadingSettings ? (
-                <div className="flex justify-center p-4" data-oid="7174euq">
+                <div
+                  className="flex justify-center p-4"
+                  role="status"
+                  aria-label="Loading admin settings"
+                  data-oid="7174euq"
+                >
                   <div
                     className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                    aria-hidden="true"
                     data-oid="z4.pbhj"
                   />
                 </div>
@@ -613,9 +710,15 @@ export function AccountSettingsDialog({
               </div>
 
               {loadingSettings ? (
-                <div className="flex justify-center p-4" data-oid="yw-aik9">
+                <div
+                  className="flex justify-center p-4"
+                  role="status"
+                  aria-label="Loading source settings"
+                  data-oid="yw-aik9"
+                >
                   <div
                     className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                    aria-hidden="true"
                     data-oid="6xv_fno"
                   />
                 </div>
@@ -697,6 +800,39 @@ export function AccountSettingsDialog({
           </>
         )}
 
+        {isDemoMode() && (
+          <>
+            <Separator />
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Demo Data</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Restore every demo feature to its original sample data.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleResetDemo()}
+                  disabled={resettingDemo}
+                >
+                  {resettingDemo ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4" />
+                  )}
+                  {resettingDemo ? "Resetting…" : "Reset demo data"}
+                </Button>
+              </div>
+              {demoResetMessage && (
+                <p className="text-sm text-muted-foreground" role="status">
+                  {demoResetMessage}
+                </p>
+              )}
+            </section>
+          </>
+        )}
+
         <DialogFooter
           className="justify-between sm:justify-between"
           data-oid="mbyehjf"
@@ -713,8 +849,10 @@ export function AccountSettingsDialog({
             Close
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      {confirmDialog}
+    </>
   );
 }
 
@@ -875,6 +1013,8 @@ function DataSourceCard({
           {result && (
             <span
               className={`text-xs tabular-nums ${result.ok ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              role="status"
+              aria-live="polite"
               data-oid="bha5d5."
             >
               {result.ok ? `${result.latencyMs}ms` : result.error || "Failed"}
@@ -897,6 +1037,8 @@ function DataSourceCard({
             size="sm"
             variant="ghost"
             onClick={() => setShowOverride(!showOverride)}
+            aria-label={`${showOverride ? "Hide" : "Show"} settings for ${label}`}
+            aria-expanded={showOverride}
             data-oid=".v0njo-"
           >
             {needsKey ? (
@@ -915,6 +1057,7 @@ function DataSourceCard({
           </p>
           <div className="flex items-center gap-2" data-oid="kgidhwj">
             <Input
+              aria-label={`${label} base URL override`}
               value={urlDraft}
               onChange={(e) => setUrlDraft(e.target.value)}
               placeholder={defaultUrl}
@@ -959,6 +1102,7 @@ function DataSourceCard({
               </p>
               <div className="flex items-center gap-2" data-oid="1r.pgk3">
                 <Input
+                  aria-label="Scrydex API key"
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
                   placeholder={
@@ -989,6 +1133,7 @@ function DataSourceCard({
           {onScrydexTeamIdChange && (
             <div className="flex items-center gap-2" data-oid=":1qu:rp">
               <Input
+                aria-label="Scrydex team ID"
                 value={teamIdDraft}
                 onChange={(e) => setTeamIdDraft(e.target.value)}
                 placeholder={

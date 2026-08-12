@@ -60,7 +60,9 @@ extension APIService {
         email: String? = nil
     ) async throws -> UpdatedProfile {
         if config.isOnDevice {
-            return LocalStore.shared.updateUserProfile(username: username, email: email)
+            let profile = LocalStore.shared.updateUserProfile(username: username, email: email)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return profile
         }
 
         let body = UpdateProfileRequest(

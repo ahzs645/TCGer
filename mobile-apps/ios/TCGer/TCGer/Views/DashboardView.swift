@@ -216,12 +216,28 @@ private struct RecentCollectionsSection: View {
                 .font(.headline)
 
             ForEach(collections) { collection in
-                CollectionCardView(collection: collection, showPricing: showPricing)
-                    .onTapGesture {
-                        onSelect(collection)
-                    }
+                Button {
+                    onSelect(collection)
+                } label: {
+                    CollectionCardView(collection: collection, showPricing: showPricing)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(collection.name)
+                .accessibilityValue(accessibilityValue(for: collection))
+                .accessibilityHint("Opens this binder")
             }
         }
+    }
+
+    private func accessibilityValue(for collection: Collection) -> String {
+        var parts = [
+            "\(collection.uniqueCards) unique cards",
+            "\(collection.totalCopies) total copies",
+        ]
+        if showPricing {
+            parts.append("estimated value \(collection.totalValue.priceText)")
+        }
+        return parts.joined(separator: ", ")
     }
 }
 

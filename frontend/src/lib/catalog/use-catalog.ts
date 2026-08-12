@@ -7,9 +7,14 @@ import {
   type CatalogDownloadProgress,
   type CatalogManifest,
   type CatalogManifestGame,
+  type InstalledSealedCatalog,
   downloadCatalog,
+  downloadSealedCatalog,
   fetchCatalogManifest,
+  getInstalledSealedCatalogs,
   removeCatalog,
+  removeAllSealedCatalogs,
+  removeSealedCatalog,
 } from "./catalog-client";
 import { getInstalledCatalogs, type InstalledCatalogPack } from "./catalog-db";
 import { isDemoMode } from "@/lib/demo-mode";
@@ -38,6 +43,8 @@ export interface CatalogGameState {
   status: CatalogInstallStatus;
   installed?: InstalledCatalogPack;
   manifest?: CatalogManifestGame;
+  sealedStatus: CatalogInstallStatus;
+  sealedInstalled?: InstalledSealedCatalog;
 }
 
 type CatalogGameStates = Record<CatalogTcgCode, CatalogGameState>;
@@ -47,26 +54,32 @@ type CatalogProgressState = Partial<
 type CatalogErrorState = Partial<Record<CatalogTcgCode, string>>;
 
 const EMPTY_STATES: CatalogGameStates = {
-  pokemon: { status: "unavailable" },
-  magic: { status: "unavailable" },
-  yugioh: { status: "unavailable" },
-  onepiece: { status: "unavailable" },
-  lorcana: { status: "unavailable" },
-  dragonball: { status: "unavailable" },
+  pokemon: { status: "unavailable", sealedStatus: "unavailable" },
+  magic: { status: "unavailable", sealedStatus: "unavailable" },
+  yugioh: { status: "unavailable", sealedStatus: "unavailable" },
+  onepiece: { status: "unavailable", sealedStatus: "unavailable" },
+  lorcana: { status: "unavailable", sealedStatus: "unavailable" },
+  dragonball: { status: "unavailable", sealedStatus: "unavailable" },
 };
 
 function buildStates(
   manifest: CatalogManifest | null,
   installedPacks: InstalledCatalogPack[],
+  installedSealedPacks: InstalledSealedCatalog[],
 ): CatalogGameStates {
   const installedByGame = new Map(
     installedPacks.map((pack) => [pack.tcg, pack] as const),
+  );
+  const installedSealedByGame = new Map(
+    installedSealedPacks.map((pack) => [pack.tcg, pack] as const),
   );
   const states = { ...EMPTY_STATES };
 
   for (const tcg of CATALOG_GAMES) {
     const installed = installedByGame.get(tcg);
     const manifestEntry = manifest?.games[tcg];
+    const sealedInstalled = installedSealedByGame.get(tcg);
+    const sealedManifest = manifestEntry?.sealedProducts;
     const status: CatalogInstallStatus = installed
       ? manifestEntry && manifestEntry.version > installed.version
         ? "update-available"
@@ -78,6 +91,14 @@ function buildStates(
       status,
       installed,
       manifest: manifestEntry,
+      sealedStatus: sealedInstalled
+        ? sealedManifest && sealedManifest.version > sealedInstalled.version
+          ? "update-available"
+          : "installed"
+        : sealedManifest
+          ? "not-installed"
+          : "unavailable",
+      sealedInstalled,
     };
   }
 
@@ -128,16 +149,19 @@ export function useCatalog() {
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const [installedResult, manifestResult] = await Promise.allSettled([
+    const [installedResult, sealedResult, manifestResult] = await Promise.allSettled([
       getInstalledCatalogs(),
+      getInstalledSealedCatalogs(),
       fetchCatalogManifest(),
     ]);
     const installedPacks =
       installedResult.status === "fulfilled" ? installedResult.value : [];
+    const installedSealedPacks =
+      sealedResult.status === "fulfilled" ? sealedResult.value : [];
     const nextManifest =
       manifestResult.status === "fulfilled" ? manifestResult.value : null;
     setManifest(nextManifest);
-    setStates(buildStates(nextManifest, installedPacks));
+    setStates(buildStates(nextManifest, installedPacks, installedSealedPacks));
     setIsLoading(false);
   }, []);
 
@@ -150,22 +174,37 @@ export function useCatalog() {
   }, [refresh]);
 
   const install = useCallback(
-    async (tcg: CatalogTcgCode) => {
+    async (tcg: CatalogTcgCode, includeSealedProducts = false) => {
       setErrors((current) => ({ ...current, [tcg]: undefined }));
       setProgress((current) => ({
         ...current,
         [tcg]: {
           phase: "downloading",
           loadedBytes: 0,
-          totalBytes: states[tcg].manifest?.bytes ?? null,
+          totalBytes:
+            (states[tcg].manifest?.bytes ?? 0) +
+              (includeSealedProducts
+                ? states[tcg].manifest?.sealedProducts?.bytes ?? 0
+                : 0) || null,
           percent: 0,
         },
       }));
       try {
-        await downloadCatalog(tcg, (value) => {
-          setProgress((current) => ({ ...current, [tcg]: value }));
-        });
-        await enrichVisibleDemoCollections(tcg);
+        if (states[tcg].status !== "installed") {
+          await downloadCatalog(tcg, (value) => {
+            setProgress((current) => ({ ...current, [tcg]: value }));
+          });
+          await enrichVisibleDemoCollections(tcg);
+        }
+        if (
+          includeSealedProducts &&
+          states[tcg].sealedStatus !== "installed" &&
+          states[tcg].manifest?.sealedProducts
+        ) {
+          await downloadSealedCatalog(tcg, (value) => {
+            setProgress((current) => ({ ...current, [tcg]: value }));
+          });
+        }
         setProgress((current) => ({ ...current, [tcg]: undefined }));
         await refresh();
         dispatchCatalogChanged();
@@ -189,6 +228,7 @@ export function useCatalog() {
       setErrors((current) => ({ ...current, [tcg]: undefined }));
       try {
         await removeCatalog(tcg);
+        await removeSealedCatalog(tcg);
         await refresh();
         dispatchCatalogChanged();
       } catch (error) {
@@ -210,6 +250,12 @@ export function useCatalog() {
     [progress],
   );
 
+  const removeSealed = useCallback(async () => {
+    await removeAllSealedCatalogs();
+    await refresh();
+    dispatchCatalogChanged();
+  }, [refresh]);
+
   return {
     states,
     manifest,
@@ -221,5 +267,6 @@ export function useCatalog() {
     install,
     update: install,
     remove,
+    removeSealed,
   };
 }

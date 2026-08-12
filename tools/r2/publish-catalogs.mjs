@@ -150,33 +150,42 @@ async function main() {
   for (const [game, entry] of Object.entries(manifest.games).sort(
     ([left], [right]) => left.localeCompare(right),
   )) {
-    const { contents } = await loadVerifiedPack(dataDir, entry);
-    const key = `${prefix}/${entry.file}`;
-    const body = gzipSync(contents, { level: 9 });
-    uploads.push({
-      game,
-      key,
-      rawBytes: contents.byteLength,
-      transferBytes: body.byteLength,
-    });
-    if (dryRun) continue;
-    if (await objectMatches(client, bucket, key, entry.sha256)) {
-      console.log(JSON.stringify({ action: "skip", game, key }));
-      continue;
+    const packs = [
+      { kind: "cards", entry },
+      ...(entry.sealedProducts
+        ? [{ kind: "sealed-products", entry: entry.sealedProducts }]
+        : []),
+    ];
+    for (const pack of packs) {
+      const { contents } = await loadVerifiedPack(dataDir, pack.entry);
+      const key = `${prefix}/${pack.entry.file}`;
+      const body = gzipSync(contents, { level: 9 });
+      uploads.push({
+        game,
+        kind: pack.kind,
+        key,
+        rawBytes: contents.byteLength,
+        transferBytes: body.byteLength,
+      });
+      if (dryRun) continue;
+      if (await objectMatches(client, bucket, key, pack.entry.sha256)) {
+        console.log(JSON.stringify({ action: "skip", game, kind: pack.kind, key }));
+        continue;
+      }
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: "application/json; charset=utf-8",
+          ContentEncoding: "gzip",
+          CacheControl: IMMUTABLE_CACHE,
+          StorageClass: "STANDARD",
+          Metadata: { "source-sha256": pack.entry.sha256 },
+        }),
+      );
+      console.log(JSON.stringify({ action: "upload", game, kind: pack.kind, key }));
     }
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: "application/json; charset=utf-8",
-        ContentEncoding: "gzip",
-        CacheControl: IMMUTABLE_CACHE,
-        StorageClass: "STANDARD",
-        Metadata: { "source-sha256": entry.sha256 },
-      }),
-    );
-    console.log(JSON.stringify({ action: "upload", game, key }));
   }
 
   const manifestKey = `${prefix}/manifest.json`;

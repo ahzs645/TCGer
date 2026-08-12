@@ -17,6 +17,18 @@ extension APIService {
         let notes: String?
     }
 
+    private struct CreateSealedOpeningRequest: Encodable {
+        let openedQuantity: Int
+        let collectionIds: [String]
+        let openedAt: String?
+        let notes: String?
+    }
+
+    private struct RecordOpenedCardSaleRequest: Encodable {
+        let proceeds: Double
+        let soldAt: String?
+    }
+
     func getSealedProducts(
         config: ServerConfiguration,
         token: String,
@@ -131,6 +143,75 @@ extension APIService {
         return ledgers
     }
 
+    func createSealedOpening(
+        config: ServerConfiguration,
+        token: String,
+        inventoryId: String,
+        openedQuantity: Int,
+        collectionIds: [String] = [],
+        openedAt: String? = nil,
+        notes: String? = nil
+    ) async throws -> SealedOpeningRecord {
+        guard !config.isOnDevice else {
+            throw APIError.serverError(
+                status: 501,
+                message: "Sealed opening ledgers require a connected TCGer server."
+            )
+        }
+        let body = CreateSealedOpeningRequest(
+            openedQuantity: openedQuantity,
+            collectionIds: collectionIds,
+            openedAt: openedAt,
+            notes: notes
+        )
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/inventory/\(inventoryId)/open",
+            method: "POST",
+            token: token,
+            body: body
+        )
+        guard response.statusCode == 201 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let opening = try? JSONDecoder().decode(SealedOpeningRecord.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return opening
+    }
+
+    func recordOpenedCardSale(
+        config: ServerConfiguration,
+        token: String,
+        cardId: String,
+        proceeds: Double,
+        soldAt: String? = nil
+    ) async throws -> SealedOpenedCardRecord {
+        guard !config.isOnDevice else {
+            throw APIError.serverError(
+                status: 501,
+                message: "Opened-card sales require a connected TCGer server."
+            )
+        }
+        let body = RecordOpenedCardSaleRequest(proceeds: proceeds, soldAt: soldAt)
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/openings/cards/\(cardId)/sale",
+            method: "PATCH",
+            token: token,
+            body: body
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let card = try? JSONDecoder().decode(SealedOpenedCardRecord.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return card
+    }
+
     func addSealedInventory(
         config: ServerConfiguration,
         token: String,
@@ -144,6 +225,7 @@ extension APIService {
             guard let item = LocalStore.shared.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
                 throw APIError.serverError(status: 404, message: "Product not found")
             }
+            try LocalStore.shared.requireLatestMutationPersisted()
             return item
         }
         let body = AddSealedInventoryRequest(
@@ -212,7 +294,11 @@ extension APIService {
         token: String,
         itemId: String
     ) async throws {
-        if config.isOnDevice { LocalStore.shared.deleteSealedInventory(itemId: itemId); return }
+        if config.isOnDevice {
+            LocalStore.shared.deleteSealedInventory(itemId: itemId)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return
+        }
         let (data, response) = try await makeRequest(
             config: config, path: "sealed/inventory/\(itemId)", method: "DELETE", token: token
         )

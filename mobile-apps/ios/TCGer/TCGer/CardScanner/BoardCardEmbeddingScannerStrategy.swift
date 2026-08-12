@@ -25,6 +25,16 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// a wrong accept at 0.707 was measured on exactly this path. Applies
         /// only to plain-embedding accepts — OCR-verified results are exempt.
         static let retryAttemptMargin: Double = 0.02
+        /// Footer-OCR cache: reuse the previous frame's reading only when the
+        /// new crop's embedding is this close to the cached crop's. A steady
+        /// card produces near-identical embeddings frame after frame; two
+        /// different cards this close are near twins, and twins are exactly
+        /// where a stale footer reading could confirm the wrong printing — so
+        /// the bar is deliberately strict, and misses just re-run OCR.
+        static let ocrCacheMinimumCosine: Float = 0.97
+        /// And only within this window. Live analyses run ~1/s, so this
+        /// covers a handful of frames of one steady card, not a card swap.
+        static let ocrCacheLifetime: TimeInterval = 3.0
     }
 
     let kind: ScanStrategyKind = .mlDetector
@@ -37,6 +47,21 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let ocr: CollectorNumberOCR
     private let titleOCR: CardTitleOCR
     private let rejectionGate: CardFaceRejectionGate?
+
+    /// Single-slot footer-OCR cache for "the card currently in front of the
+    /// camera". A steady card re-reads the same footer at ~1/s through an
+    /// `.accurate` Vision text request; the reading cannot change while the
+    /// crop's embedding hasn't, so live frames reuse it and skip the request.
+    /// Guarded by embedding cosine + a short lifetime rather than an
+    /// invalidation web: this strategy never sees the no-card frames between
+    /// two cards, so recency and similarity are the only trustworthy signals.
+    private struct FooterOCRCacheEntry {
+        let embedding: [Float]
+        let reading: CollectorNumberOCR.FooterReading
+        let readAt: Date
+    }
+    private let footerOCRCacheLock = NSLock()
+    private var footerOCRCacheEntry: FooterOCRCacheEntry?
 
     init(
         cropper: CardCropper = CardCropper(),
@@ -350,7 +375,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 needsOCRVerification ||
                     (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
             }
-            let reading = ocr.readFooter(from: cropped)
+            let reading = footerReading(for: cropped, embedding: embedding, source: source)
             evidenceFooterPairs = reading.pairNumbers
             let pairNumbers = Set(reading.pairNumbers)
             var matched = ocrEligibleCandidates.first { candidate in
@@ -457,6 +482,60 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             alternatives: alternatives,
             elapsed: 0
         )
+    }
+
+    /// Live-preview frames reuse the previous frame's footer reading when the
+    /// crop embedding says it is the same steady card; intentional captures
+    /// always read fresh. A cache hit only short-circuits the Vision request —
+    /// every downstream confirmation rule runs unchanged on the reading.
+    /// Internal (not private) so tests can exercise the cache policy directly.
+    func footerReading(
+        for cropped: CGImage,
+        embedding: [Float],
+        source: ScanInvocationKind
+    ) -> CollectorNumberOCR.FooterReading {
+        if source == .livePreview, let cached = cachedFooterReading(matching: embedding) {
+            return cached
+        }
+        let fresh = ocr.readFooter(from: cropped)
+        footerOCRCacheLock.lock()
+        // The original read's timestamp is kept on reuse (see below), so a
+        // steady card still re-reads every `ocrCacheLifetime` seconds.
+        footerOCRCacheEntry = FooterOCRCacheEntry(
+            embedding: embedding,
+            reading: fresh,
+            readAt: Date()
+        )
+        footerOCRCacheLock.unlock()
+        return fresh
+    }
+
+    func cachedFooterReading(matching embedding: [Float]) -> CollectorNumberOCR.FooterReading? {
+        footerOCRCacheLock.lock()
+        defer { footerOCRCacheLock.unlock() }
+        guard let entry = footerOCRCacheEntry else { return nil }
+        guard Date().timeIntervalSince(entry.readAt) <= Configuration.ocrCacheLifetime else {
+            footerOCRCacheEntry = nil
+            return nil
+        }
+        guard Self.cosineSimilarity(entry.embedding, embedding) >= Configuration.ocrCacheMinimumCosine
+        else { return nil }
+        return entry.reading
+    }
+
+    private static func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
+        guard a.count == b.count, !a.isEmpty else { return -1 }
+        var dot: Float = 0
+        var normA: Float = 0
+        var normB: Float = 0
+        for index in a.indices {
+            dot += a[index] * b[index]
+            normA += a[index] * a[index]
+            normB += b[index] * b[index]
+        }
+        let denominator = (normA * normB).squareRoot()
+        guard denominator > 0 else { return -1 }
+        return dot / denominator
     }
 
     private func scoreForDistance(_ distance: Double) -> Double {

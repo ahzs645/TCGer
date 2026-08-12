@@ -36,6 +36,7 @@
     "guides:validate": "node tools/guides/validate-system-guides.mjs",
     "pokemon:import-rarity-vectors": "node tools/pokemon/import-rarity-vectors.mjs",
     "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
+    "assets:r2:publish-pack-assets": "node tools/r2/publish-pack-assets.mjs",
     "lint": "turbo lint",
     "test": "turbo test",
     "format": "turbo format"

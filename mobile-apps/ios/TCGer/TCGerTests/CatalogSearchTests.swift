@@ -89,6 +89,41 @@ final class CatalogSearchTests: XCTestCase {
         )
     }
 
+    func testIndexedAsyncSearchMatchesLegacyRankingAndLimits() async throws {
+        let fixture = try await makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+
+        let cases: [(query: String, limit: Int)] = [
+            ("Lucario", 20),
+            ("cario", 20),
+            ("trainer kit", 20),
+            ("Lucario 3/11", 20),
+            ("DPBP#506", 20),
+            ("3", 20),
+            ("Lucaio", 20),
+            ("Lucario", 2),
+            ("Lukx", 20),
+        ]
+
+        for testCase in cases {
+            let legacy = fixture.store.search(
+                query: testCase.query,
+                tcg: .pokemon,
+                limit: testCase.limit
+            )
+            let indexed = await fixture.store.searchAsync(
+                query: testCase.query,
+                tcg: .pokemon,
+                limit: testCase.limit
+            )
+            XCTAssertEqual(
+                indexed.map(\.card.id),
+                legacy.map(\.card.id),
+                "Indexed search changed results for \(testCase.query)"
+            )
+        }
+    }
+
     func testDerivedCollectorFractionsArePokemonOnly() {
         XCTAssertEqual(
             CatalogStore.displayCollectorNumber("3", tcg: .pokemon, officialCardCount: 11),

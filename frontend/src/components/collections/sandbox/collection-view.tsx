@@ -69,6 +69,12 @@ import {
 import { FilterDialog } from "./filter-dialog";
 import { BinderList } from "./binder-list";
 import {
+  SmartFolderManager,
+  loadSmartFolders,
+  matchesSmartFolder,
+  type SmartFolder,
+} from "../smart-folder-manager";
+import {
   DetailPanel,
   MobileDetailDrawer,
   type CopyTrackingDraft,
@@ -192,6 +198,7 @@ function formatPrintDetails(print: TcgCard) {
 export function CollectionView() {
   const [confirm, confirmDialog] = useConfirm();
   const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.user?.id);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -206,23 +213,29 @@ export function CollectionView() {
     isLoading,
     error,
     clearError,
-  } = useCollectionsStore(useShallow((state) => ({
-    collections: state.collections,
-    fetchCollections: state.fetchCollections,
-    updateCollectionCard: state.updateCollectionCard,
-    addCollection: state.addCollection,
-    updateCollection: state.updateCollection,
-    removeCollection: state.removeCollection,
-    hasFetched: state.hasFetched,
-    isLoading: state.isLoading,
-    error: state.error,
-    clearError: state.clearError,
-  })));
+  } = useCollectionsStore(
+    useShallow((state) => ({
+      collections: state.collections,
+      fetchCollections: state.fetchCollections,
+      updateCollectionCard: state.updateCollectionCard,
+      addCollection: state.addCollection,
+      updateCollection: state.updateCollection,
+      removeCollection: state.removeCollection,
+      hasFetched: state.hasFetched,
+      isLoading: state.isLoading,
+      error: state.error,
+      clearError: state.clearError,
+    })),
+  );
   const { tags, fetchTags, addTag } = useTagsStore();
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
   const showPricing = useModuleStore((state) => state.showPricing);
 
   const [binderFilter, setBinderFilter] = useState<string>("all");
+  const [smartFolders, setSmartFolders] = useState<SmartFolder[]>([]);
+  const [activeSmartFolderId, setActiveSmartFolderId] = useState<string | null>(
+    null,
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [activeConditions, setActiveConditions] = useState<
@@ -319,6 +332,14 @@ export function CollectionView() {
   }, [searchParams]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setSmartFolders(loadSmartFolders(userId)),
+      0,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [userId]);
+
+  useEffect(() => {
     if (token && !hasFetched) {
       fetchCollections(token);
     }
@@ -336,11 +357,22 @@ export function CollectionView() {
     () => binders.find((binder) => binder.id === binderFilter) ?? null,
     [binders, binderFilter],
   );
-  const workingCards = useMemo(
-    () =>
-      binderFilter === "all" ? flattenedCards : (activeBinder?.cards ?? []),
-    [binderFilter, flattenedCards, activeBinder],
-  );
+  const workingCards = useMemo(() => {
+    const binderCards =
+      binderFilter === "all" ? flattenedCards : (activeBinder?.cards ?? []);
+    const folder = smartFolders.find(
+      (candidate) => candidate.id === activeSmartFolderId,
+    );
+    return folder
+      ? binderCards.filter((card) => matchesSmartFolder(card, folder))
+      : binderCards;
+  }, [
+    binderFilter,
+    flattenedCards,
+    activeBinder,
+    smartFolders,
+    activeSmartFolderId,
+  ]);
 
   const maxPrice = useMemo(() => {
     const maxValue = flattenedCards.reduce(
@@ -662,8 +694,7 @@ export function CollectionView() {
         (selectedCopy?.finishCode ?? (selectedCopy?.isFoil ? "foil" : "")) &&
       selectedPrintEdition === (selectedCopy?.edition ?? "") &&
       selectedPrintStamp === (selectedCopy?.stamp ?? "") &&
-      selectedPrintIsSealedPromo ===
-        (selectedCopy?.isSealedPromo ?? false) &&
+      selectedPrintIsSealedPromo === (selectedCopy?.isSealedPromo ?? false) &&
       selectedPrintIsOversized === (selectedCopy?.isOversized ?? false) &&
       selectedPrintIsPeelOff === (selectedCopy?.isPeelOff ?? false)) ||
     isSavingPrintSelection;
@@ -720,6 +751,7 @@ export function CollectionView() {
   };
 
   const handleBinderChange = (binderId: string) => {
+    setActiveSmartFolderId(null);
     setBinderFilter(binderId);
     router.replace(
       binderId === "all"
@@ -1290,6 +1322,22 @@ export function CollectionView() {
             onEditBinderColor={token ? handleEditBinderColor : undefined}
             onDeleteBinder={token ? handleDeleteBinder : undefined}
             data-oid="5zjh1dp"
+          />
+          <SmartFolderManager
+            userId={userId}
+            cards={flattenedCards}
+            folders={smartFolders}
+            activeFolderId={activeSmartFolderId}
+            onFoldersChange={setSmartFolders}
+            onSelect={(folderId) => {
+              setActiveSmartFolderId(folderId);
+              if (folderId) {
+                setBinderFilter("all");
+                router.replace(getAppRoute("/collections", pathname), {
+                  scroll: false,
+                });
+              }
+            }}
           />
         </CardContent>
       </Card>
@@ -2142,9 +2190,7 @@ export function CollectionView() {
               {selectedPrintCard?.tcg === "pokemon" ? (
                 <div className="mt-4 space-y-4 rounded-lg border bg-muted/20 p-4">
                   <div>
-                    <p className="text-sm font-semibold">
-                      Collectible variant
-                    </p>
+                    <p className="text-sm font-semibold">Collectible variant</p>
                     <p className="text-xs text-muted-foreground">
                       Apply the finish and physical attributes to this copy.
                     </p>

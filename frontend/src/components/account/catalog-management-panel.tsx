@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { GAME_LABELS, getCardBackImage } from "@/lib/utils";
 import {
   CATALOG_GAMES,
@@ -13,6 +14,11 @@ import {
   type CatalogInstallStatus,
   useCatalog,
 } from "@/lib/catalog/use-catalog";
+import {
+  areSealedProductsEnabled,
+  SEALED_PRODUCTS_PREFERENCE_EVENT,
+  setSealedProductsEnabled,
+} from "@/lib/catalog/catalog-client";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -31,9 +37,18 @@ function actionLabel(status: CatalogInstallStatus): string {
 }
 
 export function CatalogManagementPanel() {
-  const { states, progress, errors, isLoading, install, update, remove } =
+  const { states, progress, errors, isLoading, install, update, remove, removeSealed } =
     useCatalog();
   const [removing, setRemoving] = useState<CatalogTcgCode | null>(null);
+  const includeSealedProducts = useSyncExternalStore(
+    (onStoreChange) => {
+      window.addEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
+      return () =>
+        window.removeEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
+    },
+    areSealedProductsEnabled,
+    () => true,
+  );
 
   const handleRemove = async (tcg: CatalogTcgCode) => {
     setRemoving(tcg);
@@ -48,10 +63,17 @@ export function CatalogManagementPanel() {
 
   const handleInstall = async (tcg: CatalogTcgCode, isUpdate: boolean) => {
     try {
-      await (isUpdate ? update(tcg) : install(tcg));
+      await (isUpdate
+        ? update(tcg, includeSealedProducts)
+        : install(tcg, includeSealedProducts));
     } catch {
       // The hook exposes the user-facing error in the matching row.
     }
+  };
+
+  const handleSealedPreference = (enabled: boolean) => {
+    setSealedProductsEnabled(enabled);
+    if (!enabled) void removeSealed();
   };
 
   return (
@@ -60,15 +82,29 @@ export function CatalogManagementPanel() {
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <HardDrive className="h-4 w-4" />
-            Card Catalogs
+            Offline Catalogs
           </h3>
           <p className="text-sm text-muted-foreground">
-            Download searchable card data for offline demo and PWA use.
+            Download each game separately for offline demo and PWA use.
           </p>
         </div>
         {isLoading && (
           <Loader2 className="mt-1 h-4 w-4 animate-spin text-muted-foreground" />
         )}
+      </div>
+
+      <div className="flex items-center justify-between gap-4 rounded-lg border bg-background p-3">
+        <div>
+          <p className="text-sm font-medium">Sealed products</p>
+          <p className="text-xs text-muted-foreground">
+            Include searchable boxes, packs, decks, and other sealed products.
+          </p>
+        </div>
+        <Switch
+          checked={includeSealedProducts}
+          onCheckedChange={handleSealedPreference}
+          aria-label="Include sealed-product catalogs"
+        />
       </div>
 
       <div className="grid gap-3">
@@ -79,9 +115,14 @@ export function CatalogManagementPanel() {
           const installed = state.installed;
           const isUpdate = state.status === "update-available";
           const isInstalled = Boolean(installed);
+          const sealedEntry = entry?.sealedProducts;
+          const needsSealedInstall =
+            includeSealedProducts &&
+            Boolean(sealedEntry) &&
+            state.sealedStatus !== "installed";
           const isRemoving = removing === tcg;
           const cardCount = entry?.cardCount ?? installed?.cardCount;
-          const bytes = entry?.bytes ?? installed?.bytes;
+          const bytes = entry?.compressedBytes ?? entry?.bytes ?? installed?.bytes;
 
           return (
             <div key={tcg} className="rounded-lg border bg-background p-3">
@@ -114,6 +155,13 @@ export function CatalogManagementPanel() {
                       : "Catalog not published"}
                     {bytes !== undefined ? ` · ${formatBytes(bytes)}` : ""}
                   </p>
+                  {includeSealedProducts && sealedEntry && (
+                    <p className="text-xs text-muted-foreground">
+                      {sealedEntry.productCount.toLocaleString()} sealed products
+                      {` · ${formatBytes(sealedEntry.compressedBytes ?? sealedEntry.bytes)} download`}
+                      {state.sealedStatus === "installed" ? " · installed" : ""}
+                    </p>
+                  )}
                   {download && (
                     <div className="mt-2 space-y-1">
                       <div
@@ -153,12 +201,12 @@ export function CatalogManagementPanel() {
                   )}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {state.status !== "installed" && (
+                  {(state.status !== "installed" || needsSealedInstall) && (
                     <Button
                       size="sm"
                       variant={isUpdate ? "default" : "outline"}
                       disabled={Boolean(download) || !entry || isRemoving}
-                      onClick={() => void handleInstall(tcg, isUpdate)}
+                      onClick={() => void handleInstall(tcg, isUpdate || state.sealedStatus === "update-available")}
                     >
                       {download ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -167,7 +215,13 @@ export function CatalogManagementPanel() {
                       ) : (
                         <Download className="mr-2 h-4 w-4" />
                       )}
-                      {download ? "Working…" : actionLabel(state.status)}
+                      {download
+                        ? "Working…"
+                        : state.status === "installed" && needsSealedInstall
+                          ? state.sealedStatus === "update-available"
+                            ? "Update Products"
+                            : "Add Products"
+                          : actionLabel(state.status)}
                     </Button>
                   )}
                   {isInstalled && (

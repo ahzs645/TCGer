@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WishlistDetailView: View {
     let wishlist: Wishlist
+    let parentProvidesNavigation: Bool
     var onUpdate: (() -> Void)?
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
@@ -35,9 +36,11 @@ struct WishlistDetailView: View {
     init(
         wishlist: Wishlist,
         startsInEditMode: Bool = false,
+        parentProvidesNavigation: Bool = false,
         onUpdate: (() -> Void)? = nil
     ) {
         self.wishlist = wishlist
+        self.parentProvidesNavigation = parentProvidesNavigation
         self.onUpdate = onUpdate
         _isEditing = State(initialValue: startsInEditMode)
         _cards = State(initialValue: wishlist.cards)
@@ -96,7 +99,7 @@ struct WishlistDetailView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             VStack(spacing: 0) {
                 List {
                 // Header — only rendered when it has content, otherwise the
@@ -263,7 +266,9 @@ struct WishlistDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    if !parentProvidesNavigation {
+                        Button("Done") { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
@@ -339,6 +344,7 @@ struct WishlistDetailView: View {
                 await refreshWishlist()
             }
         }
+        .modifier(WishlistDetailNavigationModifier(parentProvidesNavigation: parentProvidesNavigation))
     }
 
     @MainActor
@@ -475,6 +481,19 @@ struct WishlistDetailView: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct WishlistDetailNavigationModifier: ViewModifier {
+    let parentProvidesNavigation: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if parentProvidesNavigation {
+            content
+        } else {
+            NavigationStack { content }
         }
     }
 }

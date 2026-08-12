@@ -156,6 +156,17 @@ struct DeckImportResult: Codable, Sendable {
     let skippedCards: [String]
 }
 
+struct DeckYDKExport: Codable, Sendable {
+    let content: String
+    let skipped: [Skipped]
+
+    struct Skipped: Codable, Hashable, Sendable {
+        let externalId: String
+        let name: String
+        let reason: String
+    }
+}
+
 // MARK: - Trades
 
 struct TradeCard: Identifiable, Codable, Hashable, Sendable {
@@ -196,4 +207,32 @@ struct TradeMatch: Identifiable, Codable, Hashable, Sendable {
     let matchScore: Double
 
     var id: String { userId }
+}
+
+// MARK: - Sealed Opening Writes
+
+struct SealedOpeningRecord: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let userId: String
+    let sealedInventoryId: String
+    let openedQuantity: Int
+    let openedAt: String
+    let notes: String?
+    let createdAt: String
+    let updatedAt: String
+}
+
+struct SealedOpenedCardRecord: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let openingId: String
+    let collectionId: String?
+    let externalId: String
+    let tcg: String
+    let cardName: String
+    let quantity: Int
+    let status: String
+    let realizedProceeds: Double?
+    let soldAt: String?
+    let createdAt: String
+    let updatedAt: String
 }

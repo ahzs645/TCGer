@@ -11,8 +11,41 @@ extension APIService {
         let createMissingBinders: Bool
     }
 
+    enum CollectionImportSourceFormat: String, Codable, CaseIterable, Sendable, Identifiable {
+        case auto
+        case csv
+        case json
+        case cardmarketText = "cardmarket-text"
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .auto: return "Auto-detect"
+            case .csv: return "TCGer CSV"
+            case .json: return "JSON"
+            case .cardmarketText: return "Cardmarket Yu-Gi-Oh text"
+            }
+        }
+    }
+
+    struct CollectionImportResolution: Codable, Hashable, Sendable {
+        let externalId: String
+        let baseExternalId: String?
+        let printingKey: String?
+        let artworkId: String?
+        let collectorNumber: String?
+        let setCode: String?
+        let setName: String?
+        let rarity: String?
+        let cardName: String?
+    }
+
     struct CollectionImportRequest: Encodable {
-        let csv: String
+        let content: String
+        let format: CollectionImportSourceFormat
+        let fileName: String?
+        let resolutions: [String: CollectionImportResolution]
         let options: CollectionImportOptions
     }
 
@@ -55,6 +88,36 @@ extension APIService {
         let issues: [CollectionImportIssue]
         let sourceRows: Int
         let totalCopies: Int
+        var format: CollectionImportSourceFormat? = nil
+        var failures: [CollectionImportFailure]? = nil
+        var ambiguities: [CollectionImportAmbiguity]? = nil
+    }
+
+    struct CollectionImportFailure: Codable, Hashable, Sendable, Identifiable {
+        let sourceRow: Int
+        let code: String
+        let message: String
+        let original: String?
+        let field: String?
+
+        var id: String { "\(sourceRow)-\(code)-\(field ?? "")" }
+    }
+
+    struct CollectionImportAmbiguity: Codable, Hashable, Sendable, Identifiable {
+        struct Query: Codable, Hashable, Sendable {
+            let tcg: String
+            let name: String
+            let collectorNumber: String?
+            let setCode: String?
+            let rarity: String?
+        }
+
+        let sourceRow: Int
+        let code: String
+        let message: String
+        let query: Query
+
+        var id: Int { sourceRow }
     }
 
     struct CollectionImportResult: Codable, Sendable {
@@ -66,16 +129,28 @@ extension APIService {
         let importedRows: Int
         let importedCopies: Int
         let createdBinders: [String]
+        var format: CollectionImportSourceFormat? = nil
+        var failures: [CollectionImportFailure]? = nil
+        var ambiguities: [CollectionImportAmbiguity]? = nil
     }
 
     func previewCollectionImport(
         config: ServerConfiguration,
         token: String,
-        csv: String,
+        content: String,
+        format: CollectionImportSourceFormat,
+        fileName: String?,
+        resolutions: [String: CollectionImportResolution],
         options: CollectionImportOptions
     ) async throws -> CollectionImportPreview {
         if config.isOnDevice {
-            return LocalStore.shared.previewImport(csv: csv, options: options)
+            guard format == .csv || (format == .auto && fileName?.lowercased().hasSuffix(".csv") != false) else {
+                throw APIError.serverError(
+                    status: 400,
+                    message: "On-device imports currently support TCGer CSV only. Connect to a server for JSON and Cardmarket text."
+                )
+            }
+            return LocalStore.shared.previewImport(csv: content, options: options)
         }
 
         let (data, response) = try await makeRequest(
@@ -83,7 +158,13 @@ extension APIService {
             path: "collections/import/preview",
             method: "POST",
             token: token,
-            body: CollectionImportRequest(csv: csv, options: options)
+            body: CollectionImportRequest(
+                content: content,
+                format: format,
+                fileName: fileName,
+                resolutions: resolutions,
+                options: options
+            )
         )
         guard response.statusCode == 200 || response.statusCode == 422 else {
             throw APIError.serverError(
@@ -100,11 +181,22 @@ extension APIService {
     func commitCollectionImport(
         config: ServerConfiguration,
         token: String,
-        csv: String,
+        content: String,
+        format: CollectionImportSourceFormat,
+        fileName: String?,
+        resolutions: [String: CollectionImportResolution],
         options: CollectionImportOptions
     ) async throws -> CollectionImportResult {
         if config.isOnDevice {
-            return LocalStore.shared.commitImport(csv: csv, options: options)
+            guard format == .csv || (format == .auto && fileName?.lowercased().hasSuffix(".csv") != false) else {
+                throw APIError.serverError(
+                    status: 400,
+                    message: "On-device imports currently support TCGer CSV only. Connect to a server for JSON and Cardmarket text."
+                )
+            }
+            let result = LocalStore.shared.commitImport(csv: content, options: options)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return result
         }
 
         let (data, response) = try await makeRequest(
@@ -112,7 +204,13 @@ extension APIService {
             path: "collections/import/commit",
             method: "POST",
             token: token,
-            body: CollectionImportRequest(csv: csv, options: options)
+            body: CollectionImportRequest(
+                content: content,
+                format: format,
+                fileName: fileName,
+                resolutions: resolutions,
+                options: options
+            )
         )
         guard response.statusCode == 201 || response.statusCode == 422 else {
             throw APIError.serverError(
@@ -124,6 +222,96 @@ extension APIService {
             throw APIError.decodingError
         }
         return result
+    }
+
+    func collectionImportTemplate(
+        config: ServerConfiguration,
+        token: String
+    ) async throws -> Data {
+        if config.isOnDevice {
+            let header = "tcg,external_id,card_name,base_external_id,printing_key,artwork_id,collector_number,set_code,set_name,rarity,binder_name,quantity,condition,language,notes,price,acquisition_price,serial_number,acquired_at,is_foil,finish_code,finish_label,edition,stamp,is_sealed_promo,is_oversized,is_peel_off,is_signed,is_altered,tags\n"
+            return Data(header.utf8)
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/import/template",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        return data
+    }
+
+    struct CollectionMutationAuditEntry: Codable, Hashable, Sendable, Identifiable {
+        let id: String
+        let operationKind: String
+        let actorId: String
+        let affectedCopies: Int
+        let binderId: String?
+        let cardName: String?
+        let summary: String
+        let sourceAuditId: String?
+        let canUndo: Bool
+        let createdAt: String
+    }
+
+    private struct CollectionMutationHistoryResponse: Decodable {
+        let entries: [CollectionMutationAuditEntry]
+    }
+
+    private struct UndoCollectionMutationRequest: Encodable {
+        let idempotencyKey: String
+    }
+
+    func getCollectionMutationHistory(
+        config: ServerConfiguration,
+        token: String,
+        limit: Int = 50
+    ) async throws -> [CollectionMutationAuditEntry] {
+        guard !config.isOnDevice else { return [] }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/history",
+            queryItems: [URLQueryItem(name: "limit", value: String(min(100, max(1, limit))))],
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let result = try? JSONDecoder().decode(CollectionMutationHistoryResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return result.entries
+    }
+
+    func undoCollectionMutation(
+        config: ServerConfiguration,
+        token: String,
+        auditId: String,
+        idempotencyKey: String
+    ) async throws -> CollectionMutationAuditEntry {
+        guard !config.isOnDevice else {
+            throw APIError.serverError(status: 400, message: "Collection history is available in server mode.")
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/history/\(auditId)/undo",
+            method: "POST",
+            token: token,
+            body: UndoCollectionMutationRequest(idempotencyKey: idempotencyKey)
+        )
+        guard response.statusCode == 201 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        struct Result: Decodable { let audit: CollectionMutationAuditEntry }
+        guard let result = try? JSONDecoder().decode(Result.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return result.audit
     }
 
     func getCollections(
@@ -192,15 +380,24 @@ extension APIService {
             ImageCache.shared.prefetch(urlStrings: imageURLs)
 
             return collections
-        } catch {
-            if let cached: [Collection] = try? CacheManager.shared.load(
-                [Collection].self,
-                forKey: CacheManager.CacheKey.collections
-            ) {
+        } catch let error as APIError {
+            if case .networkError(let underlyingError) = error,
+               !Self.isCancellation(underlyingError),
+               let cached: [Collection] = try? CacheManager.shared.load(
+                    [Collection].self,
+                    forKey: CacheManager.CacheKey.collections
+               ) {
                 return cached
             }
             throw error
+        } catch {
+            throw error
         }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        return (error as? URLError)?.code == .cancelled
     }
 
     func getCollection(
@@ -271,12 +468,14 @@ extension APIService {
         placements: [BinderPagePlacement]
     ) async throws -> SavedBinderPage {
         if config.isOnDevice {
-            return LocalStore.shared.upsertBinderPage(
+            let page = LocalStore.shared.upsertBinderPage(
                 binderId: binderId,
                 pageNumber: pageNumber,
                 capturedAt: capturedAt,
                 placements: placements
             )
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return page
         }
         let body = UpsertBinderPageRequest(
             pageNumber: pageNumber,
@@ -349,6 +548,7 @@ extension APIService {
     ) async throws {
         if config.isOnDevice {
             LocalStore.shared.removeBinderPageImage(binderId: binderId, pageNumber: pageNumber)
+            try LocalStore.shared.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -368,6 +568,11 @@ extension APIService {
         let description: String?
         let colorHex: String?
         let defaultCondition: String?
+        let containerType: String?
+        let imageUrl: String?
+        let associatedTcg: String?
+        let associatedSetCode: String?
+        let associatedSetName: String?
     }
 
     func createCollection(
@@ -376,22 +581,39 @@ extension APIService {
         name: String,
         description: String?,
         colorHex: String? = nil,
-        defaultCondition: String? = nil
+        defaultCondition: String? = nil,
+        containerType: String? = nil,
+        imageUrl: String? = nil,
+        associatedTcg: String? = nil,
+        associatedSetCode: String? = nil,
+        associatedSetName: String? = nil
     ) async throws -> Collection {
         if config.isOnDevice {
-            return LocalStore.shared.createCollection(
+            let collection = LocalStore.shared.createCollection(
                 name: name,
                 description: description,
                 colorHex: colorHex,
-                defaultCondition: defaultCondition
+                defaultCondition: defaultCondition,
+                containerType: containerType,
+                imageUrl: imageUrl,
+                associatedTcg: associatedTcg,
+                associatedSetCode: associatedSetCode,
+                associatedSetName: associatedSetName
             )
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return collection
         }
 
         let body = CreateCollectionRequest(
             name: name,
             description: description,
             colorHex: colorHex,
-            defaultCondition: defaultCondition
+            defaultCondition: defaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
         )
         let (data, response) = try await makeRequest(
             config: config,
@@ -421,6 +643,31 @@ extension APIService {
         let colorHex: String?
         // Empty string clears the binder default; nil leaves it unchanged.
         let defaultCondition: String?
+        let containerType: String?
+        let imageUrl: String?
+        let associatedTcg: String?
+        let associatedSetCode: String?
+        let associatedSetName: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case name, description, colorHex, defaultCondition, containerType, imageUrl
+            case associatedTcg, associatedSetCode, associatedSetName
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(name, forKey: .name)
+            try container.encodeIfPresent(description, forKey: .description)
+            try container.encodeIfPresent(colorHex, forKey: .colorHex)
+            try container.encodeIfPresent(defaultCondition, forKey: .defaultCondition)
+            // Binder presentation values are a complete editor snapshot. Encode
+            // nil as JSON null so clearing a field reaches the nullable API.
+            try container.encode(containerType, forKey: .containerType)
+            try container.encode(imageUrl, forKey: .imageUrl)
+            try container.encode(associatedTcg, forKey: .associatedTcg)
+            try container.encode(associatedSetCode, forKey: .associatedSetCode)
+            try container.encode(associatedSetName, forKey: .associatedSetName)
+        }
     }
 
     func updateCollection(
@@ -430,7 +677,12 @@ extension APIService {
         name: String? = nil,
         description: String? = nil,
         colorHex: String? = nil,
-        defaultCondition: String? = nil
+        defaultCondition: String? = nil,
+        containerType: String? = nil,
+        imageUrl: String? = nil,
+        associatedTcg: String? = nil,
+        associatedSetCode: String? = nil,
+        associatedSetName: String? = nil
     ) async throws -> Collection {
         if config.isOnDevice {
             return try LocalStore.shared.updateCollection(
@@ -438,7 +690,12 @@ extension APIService {
                 name: name,
                 description: description,
                 colorHex: colorHex,
-                defaultCondition: defaultCondition
+                defaultCondition: defaultCondition,
+                containerType: containerType,
+                imageUrl: imageUrl,
+                associatedTcg: associatedTcg,
+                associatedSetCode: associatedSetCode,
+                associatedSetName: associatedSetName
             )
         }
 
@@ -446,7 +703,12 @@ extension APIService {
             name: name,
             description: description,
             colorHex: colorHex,
-            defaultCondition: defaultCondition
+            defaultCondition: defaultCondition,
+            containerType: containerType,
+            imageUrl: imageUrl,
+            associatedTcg: associatedTcg,
+            associatedSetCode: associatedSetCode,
+            associatedSetName: associatedSetName
         )
         let (data, response) = try await makeRequest(
             config: config,
@@ -530,7 +792,9 @@ extension APIService {
         colorHex: String? = nil
     ) async throws -> CollectionCardTag {
         if config.isOnDevice {
-            return LocalStore.shared.createTag(label: label, colorHex: colorHex)
+            let tag = LocalStore.shared.createTag(label: label, colorHex: colorHex)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return tag
         }
 
         let payload = TagPayload(label: label, colorHex: colorHex)

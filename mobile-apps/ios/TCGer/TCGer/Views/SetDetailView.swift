@@ -224,31 +224,44 @@ struct SetDetailView: View {
                             GridItem(.flexible())
                         ], spacing: 16) {
                             ForEach(displayedCards) { card in
-                                SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
-                                    .overlay(alignment: .topLeading) {
-                                        if isSelecting {
-                                            Image(
-                                                systemName: selectedCardIds.contains(card.id)
-                                                    ? "checkmark.circle.fill"
-                                                    : "circle"
-                                            )
-                                            .font(.title2)
-                                            .foregroundStyle(
-                                                selectedCardIds.contains(card.id)
-                                                    ? Color.accentColor
-                                                    : Color.secondary
-                                            )
-                                            .background(Circle().fill(.background))
-                                            .padding(6)
-                                        }
+                                let isSelected = selectedCardIds.contains(card.id)
+                                Button {
+                                    if isSelecting {
+                                        toggleSelection(card.id)
+                                    } else {
+                                        addSheetCard = card
                                     }
-                                    .onTapGesture {
-                                        if isSelecting {
-                                            toggleSelection(card.id)
-                                        } else {
-                                            addSheetCard = card
+                                } label: {
+                                    SetCardCell(card: card, showPricing: environmentStore.showPricing, isOwned: ownershipLoaded ? ownedCardIds.contains(card.id) : nil)
+                                        .overlay(alignment: .topLeading) {
+                                            if isSelecting {
+                                                Image(
+                                                    systemName: isSelected
+                                                        ? "checkmark.circle.fill"
+                                                        : "circle"
+                                                )
+                                                .font(.title2)
+                                                .foregroundStyle(
+                                                    isSelected
+                                                        ? Color.accentColor
+                                                        : Color.secondary
+                                                )
+                                                .background(Circle().fill(.background))
+                                                .padding(6)
+                                            }
                                         }
-                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(card.name)
+                                .accessibilityValue(accessibilityValue(for: card))
+                                .accessibilityHint(
+                                    isSelecting
+                                        ? "Selects or deselects this card"
+                                        : "Opens options to add this card"
+                                )
+                                .accessibilityAddTraits(
+                                    isSelecting && isSelected ? .isSelected : []
+                                )
                                     .cardPreviewContextMenu(card: card, onSelect: {
                                         if isSelecting {
                                             toggleSelection(card.id)
@@ -265,11 +278,17 @@ struct SetDetailView: View {
                 }
             }
         }
-        .searchable(
-            text: $searchText,
-            isPresented: $isSearchPresented,
-            prompt: "Search this set"
+        .modifier(
+            SetSearchPresenter(
+                text: $searchText,
+                isPresented: $isSearchPresented
+            )
         )
+        .onChange(of: isSearchPresented) { _, isPresented in
+            if !isPresented {
+                searchText = ""
+            }
+        }
         .safeAreaBar(edge: .top, spacing: 0) {
             if !isLoading, errorMessage == nil, !cards.isEmpty {
                 cardControlBar
@@ -278,17 +297,21 @@ struct SetDetailView: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    isSearchPresented = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel("Search this set")
 
-            ToolbarItem(placement: .primaryAction) {
                 Button(isSelecting ? "Done" : "Select") {
                     isSelecting.toggle()
                     if !isSelecting {
                         selectedCardIds.removeAll()
                     }
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
+
                 Menu {
                     if scanScope != nil {
                         Button {
@@ -502,6 +525,23 @@ struct SetDetailView: View {
         }
     }
 
+    private func accessibilityValue(for card: Card) -> String {
+        var parts: [String] = []
+        if let collectorNumber = card.collectorNumber {
+            parts.append("card number \(collectorNumber)")
+        }
+        if let rarity = card.rarity {
+            parts.append(rarity)
+        }
+        if ownershipLoaded {
+            parts.append(ownedCardIds.contains(card.id) ? "owned" : "not owned")
+        }
+        if environmentStore.showPricing, let price = card.price {
+            parts.append(price.priceText)
+        }
+        return parts.joined(separator: ", ")
+    }
+
     @MainActor
     private func loadOwnershipData(useCache: Bool = true) async {
         guard let token = environmentStore.authToken else { return }
@@ -577,6 +617,24 @@ struct SetDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+}
+
+private struct SetSearchPresenter: ViewModifier {
+    @Binding var text: String
+    @Binding var isPresented: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isPresented {
+            content.searchable(
+                text: $text,
+                isPresented: $isPresented,
+                prompt: "Search this set"
+            )
+        } else {
+            content
         }
     }
 }

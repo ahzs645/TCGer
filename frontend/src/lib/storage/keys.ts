@@ -104,6 +104,9 @@ export const THEME_STORAGE_KEY = "theme";
 export const CATALOG_PROMPT_DISMISSED_KEY_PREFIX =
   "tcger:catalog-prompt-dismissed:";
 
+/** User-scoped smart-folder definitions (`:<user id>` suffix). */
+export const SMART_FOLDER_STORAGE_KEY_PREFIX = "tcger.smart-folders.v1:";
+
 /**
  * Build the dismissal key for one game at one catalog version.
  *
@@ -231,6 +234,7 @@ export const LOCAL_STORAGE_KEYS = [
  */
 export const LOCAL_STORAGE_KEY_PREFIXES = [
   CATALOG_PROMPT_DISMISSED_KEY_PREFIX,
+  SMART_FOLDER_STORAGE_KEY_PREFIX,
   DEMO_STORE_BACKUP_KEY_PREFIX,
 ] as const;
 

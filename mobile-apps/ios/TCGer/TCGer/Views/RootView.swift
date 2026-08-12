@@ -64,6 +64,13 @@ struct RootView: View {
                 isAppLocked = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .localStorePersistenceFailed)) { notification in
+            guard let failure = notification.userInfo?["failure"] as? LocalStorePersistenceFailure else {
+                errorMessage = "Local data could not be saved. The latest local change was reverted."
+                return
+            }
+            errorMessage = "Local data \(failure.operation.userFacingFailurePhrase): \(failure.message)"
+        }
     }
 
     private var shouldPresentMainContent: Bool {
@@ -427,6 +434,17 @@ struct RootView: View {
             appName: "TCG Manager",
             updatedAt: ISO8601DateFormatter().string(from: Date())
         )
+    }
+}
+
+private extension LocalStorePersistenceFailure.Operation {
+    var userFacingFailurePhrase: String {
+        switch self {
+        case .load: "could not be loaded"
+        case .save: "could not be saved; the latest local change was reverted"
+        case .reset: "could not be reset"
+        case .restore: "could not be restored"
+        }
     }
 }
 

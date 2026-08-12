@@ -107,13 +107,16 @@ async function main() {
   await mkdir(output, { recursive: true });
 
   for (const [game, entry] of Object.entries(manifest.games).sort()) {
-    const path = outputPath(output, entry?.file);
-    const contents = await download(
-      `${baseUrl}/${encodeURIComponent(entry.file)}`,
-    );
-    validatePack(entry, contents);
-    await writeAtomically(path, contents);
-    console.log(`Downloaded ${game}: ${entry.file}`);
+    const packs = [entry, entry?.sealedProducts].filter(Boolean);
+    for (const pack of packs) {
+      const path = outputPath(output, pack.file);
+      const contents = await download(
+        `${baseUrl}/${encodeURIComponent(pack.file)}`,
+      );
+      validatePack(pack, contents);
+      await writeAtomically(path, contents);
+      console.log(`Downloaded ${game}: ${pack.file}`);
+    }
   }
 
   // Write the manifest last so readers never observe references to partial packs.

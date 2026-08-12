@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SmartFolderDetailView: View {
     let folder: SmartFolder
+    let parentProvidesNavigation: Bool
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var matchingCards: [CollectionCard] = []
@@ -10,9 +11,13 @@ struct SmartFolderDetailView: View {
 
     private let apiService = APIService()
 
+    init(folder: SmartFolder, parentProvidesNavigation: Bool = false) {
+        self.folder = folder
+        self.parentProvidesNavigation = parentProvidesNavigation
+    }
+
     var body: some View {
-        NavigationStack {
-            Group {
+        Group {
                 if isLoading {
                     ProgressView("Finding matching cards...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -62,13 +67,15 @@ struct SmartFolderDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    if !parentProvidesNavigation {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
             .task {
                 await loadMatchingCards()
             }
-        }
+        .modifier(SmartFolderNavigationModifier(parentProvidesNavigation: parentProvidesNavigation))
     }
 
     @MainActor
@@ -90,6 +97,19 @@ struct SmartFolderDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
+        }
+    }
+}
+
+private struct SmartFolderNavigationModifier: ViewModifier {
+    let parentProvidesNavigation: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if parentProvidesNavigation {
+            content
+        } else {
+            NavigationStack { content }
         }
     }
 }

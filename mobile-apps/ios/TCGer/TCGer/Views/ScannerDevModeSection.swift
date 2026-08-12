@@ -153,7 +153,7 @@ struct ScannerDevModeSessionsView: View {
     @State private var deletionRequest: DeletionRequest?
 
     var body: some View {
-        List(selection: $selectedSessionIDs) {
+        List(selection: isSelecting ? $selectedSessionIDs : nil) {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct WishlistsView: View {
@@ -13,8 +14,8 @@ struct WishlistsView: View {
     @State private var newWishlistMatchAnyPrinting = false
     @State private var actionErrorMessage: String?
     @State private var searchText = ""
-
-    private let apiService = APIService()
+    @State private var lastHandledDeepLinkID: UUID?
+    @State private var pendingWishlistID: String?
 
     private var filteredWishlists: [Wishlist] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -38,6 +39,12 @@ struct WishlistsView: View {
                     wishlistContent
                 }
             }
+        }
+        .onAppear {
+            handleDeepLink(environmentStore.pendingDeepLinkRequest)
+        }
+        .onReceive(environmentStore.$pendingDeepLinkRequest.dropFirst()) { request in
+            handleDeepLink(request)
         }
     }
 
@@ -136,15 +143,18 @@ struct WishlistsView: View {
         .sheet(isPresented: $showingCreateSheet) {
             createWishlistSheet
         }
-        .sheet(item: $wishlistPresentation) { presentation in
-            WishlistDetailView(
-                wishlist: presentation.wishlist,
-                startsInEditMode: presentation.startsInEditMode,
-                onUpdate: {
-                    Task { await loadWishlists(force: true) }
-                }
-            )
-            .environmentObject(environmentStore)
+        .navigationDestination(isPresented: wishlistIsPresented) {
+            if let presentation = wishlistPresentation {
+                WishlistDetailView(
+                    wishlist: presentation.wishlist,
+                    startsInEditMode: presentation.startsInEditMode,
+                    parentProvidesNavigation: true,
+                    onUpdate: {
+                        Task { await loadWishlists(force: true) }
+                    }
+                )
+                .environmentObject(environmentStore)
+            }
         }
         .alert("Wishlist Error", isPresented: actionErrorIsPresented) {
             Button("OK", role: .cancel) {
@@ -202,6 +212,7 @@ struct WishlistsView: View {
             token: token,
             force: force
         )
+        resolvePendingWishlist()
     }
 
     @MainActor
@@ -211,15 +222,16 @@ struct WishlistsView: View {
         guard !name.isEmpty else { return }
 
         do {
-            let wishlist = try await apiService.createWishlist(
+            _ = try await wishlistStore.create(
                 config: environmentStore.serverConfiguration,
                 token: token,
-                name: name,
-                description: newWishlistDescription.isEmpty ? nil : newWishlistDescription,
-                colorHex: newWishlistColor.toHex(),
-                matchAnyPrinting: newWishlistMatchAnyPrinting
+                input: CreateWishlistInput(
+                    name: name,
+                    description: newWishlistDescription.isEmpty ? nil : newWishlistDescription,
+                    colorHex: newWishlistColor.toHex(),
+                    matchAnyPrinting: newWishlistMatchAnyPrinting
+                )
             )
-            wishlistStore.insert(wishlist)
             resetCreateForm()
             showingCreateSheet = false
         } catch {
@@ -232,12 +244,11 @@ struct WishlistsView: View {
         guard let token = environmentStore.authToken else { return }
 
         do {
-            try await apiService.deleteWishlist(
+            try await wishlistStore.delete(
                 config: environmentStore.serverConfiguration,
                 token: token,
                 id: wishlist.id
             )
-            wishlistStore.remove(id: wishlist.id)
         } catch {
             actionErrorMessage = error.localizedDescription
         }
@@ -259,6 +270,42 @@ struct WishlistsView: View {
         newWishlistDescription = ""
         newWishlistColor = .blue
         newWishlistMatchAnyPrinting = false
+    }
+
+    private var wishlistIsPresented: Binding<Bool> {
+        Binding(
+            get: { wishlistPresentation != nil },
+            set: { if !$0 { wishlistPresentation = nil } }
+        )
+    }
+
+    private func handleDeepLink(_ request: AppDeepLinkRequest?) {
+        guard let request,
+              request.id != lastHandledDeepLinkID,
+              case .wishlist(let wishlistID) = request.destination else { return }
+        lastHandledDeepLinkID = request.id
+        pendingWishlistID = wishlistID
+        resolvePendingWishlist(request: request)
+    }
+
+    private func resolvePendingWishlist(request: AppDeepLinkRequest? = nil) {
+        guard let pendingWishlistID else { return }
+        let currentRequest = request ?? environmentStore.pendingDeepLinkRequest
+        guard let currentRequest,
+              case .wishlist = currentRequest.destination else { return }
+        guard let wishlist = wishlistStore.wishlists.first(where: { $0.id == pendingWishlistID }) else {
+            if wishlistStore.hasLoaded,
+               environmentStore.claimDeepLinkRequest(currentRequest, for: .wishlists) {
+                self.pendingWishlistID = nil
+            }
+            return
+        }
+        guard environmentStore.claimDeepLinkRequest(currentRequest, for: .wishlists) else {
+            self.pendingWishlistID = nil
+            return
+        }
+        self.pendingWishlistID = nil
+        wishlistPresentation = WishlistPresentation(wishlist: wishlist, startsInEditMode: false)
     }
 }
 

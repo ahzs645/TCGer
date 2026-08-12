@@ -50,6 +50,11 @@ enum AccentColorChoice: String, CaseIterable, Identifiable {
 }
 
 final class EnvironmentStore: ObservableObject {
+    private static let sampleSmartFolderIDs: Set<UUID> = [
+        UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000001")!,
+        UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000002")!
+    ]
+
     @Published var serverConfiguration: ServerConfiguration
     @Published var credentials: LoginCredentials
     @Published var isAuthenticated: Bool
@@ -70,6 +75,7 @@ final class EnvironmentStore: ObservableObject {
     @Published var pricingSource: PricingSource
     @Published var defaultGame: String?
     @Published var offlineModeEnabled: Bool
+    @Published var sealedProductsEnabled: Bool
     @Published var autoSyncEnabled: Bool
     @Published var appColorScheme: AppColorScheme
     @Published var accentColorChoice: AccentColorChoice
@@ -78,6 +84,8 @@ final class EnvironmentStore: ObservableObject {
     @Published var tabOrder: [AppTab]
     @Published var hiddenTabs: Set<AppTab>
     @Published private(set) var pendingDeepLinkTab: AppTab?
+    @Published private(set) var pendingDeepLinkRequest: AppDeepLinkRequest?
+    private var handledDeepLinkRequestIDs: [AppDeepLinkConsumer: UUID] = [:]
     @Published private(set) var focusedSetOrder: [String]
     @Published private(set) var setCompletionMode: SetCompletionMode
     @Published var setBrowserSort: SetBrowserSort
@@ -104,6 +112,7 @@ final class EnvironmentStore: ObservableObject {
         static let pricingSource = PricingSource.storageKey
         static let defaultGame = "defaultGame"
         static let offlineModeEnabled = "offlineModeEnabled"
+        static let sealedProductsEnabled = "tcg.sealedProducts.enabled"
         static let autoSyncEnabled = "autoSyncEnabled"
         static let appColorScheme = "tcg.appearance.colorScheme"
         static let accentColor = "tcg.appearance.accentColor"
@@ -134,6 +143,7 @@ final class EnvironmentStore: ObservableObject {
 
     init() {
         pendingDeepLinkTab = nil
+        pendingDeepLinkRequest = nil
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
             // A previously-saved empty config falls back to on-device mode so a
@@ -146,7 +156,13 @@ final class EnvironmentStore: ObservableObject {
 
         if let data = storage.data(forKey: Keys.credentials),
            let decoded = try? JSONDecoder().decode(LoginCredentials.self, from: data) {
-            credentials = decoded
+            credentials = decoded.withoutPassword
+            // Migrate credentials written by older builds, which included the
+            // password in UserDefaults. Passwords remain memory-only now.
+            if !decoded.password.isEmpty,
+               let sanitized = try? JSONEncoder().encode(decoded.withoutPassword) {
+                storage.set(sanitized, forKey: Keys.credentials)
+            }
         } else {
             credentials = .empty
         }
@@ -208,6 +224,11 @@ final class EnvironmentStore: ObservableObject {
 
         // Offline mode defaults to false
         offlineModeEnabled = storage.bool(forKey: Keys.offlineModeEnabled)
+
+        // Sealed products remain available for existing users, but the entire
+        // optional catalog and tab can be disabled from Offline Catalogs.
+        sealedProductsEnabled =
+            (storage.object(forKey: Keys.sealedProductsEnabled) as? Bool) ?? true
 
         // Auto sync defaults to true
         if storage.object(forKey: Keys.autoSyncEnabled) == nil {
@@ -288,7 +309,7 @@ final class EnvironmentStore: ObservableObject {
             .dropFirst()
             .sink { [weak self] creds in
                 guard let self else { return }
-                if let data = try? JSONEncoder().encode(creds) {
+                if let data = try? JSONEncoder().encode(creds.withoutPassword) {
                     storage.set(data, forKey: Keys.credentials)
                 }
             }
@@ -476,6 +497,14 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $sealedProductsEnabled
+            .dropFirst()
+            .sink { [weak self] enabled in
+                self?.storage.set(enabled, forKey: Keys.sealedProductsEnabled)
+                CatalogStore.shared.setSealedProductsEnabled(enabled)
+            }
+            .store(in: &cancellables)
+
         $focusedSetOrder
             .dropFirst()
             .sink { [weak self] value in
@@ -497,6 +526,7 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        CatalogStore.shared.setSealedProductsEnabled(sealedProductsEnabled)
         Task(priority: .utility) {
             await CatalogStore.shared.configure(
                 enabledGames: serverConfiguration.isOnDevice ? enabledGames : []
@@ -518,7 +548,7 @@ final class EnvironmentStore: ObservableObject {
     // MARK: - Tab Bar
 
     var availableTabs: [AppTab] {
-        tabOrder.filter { $0.isSupported(by: serverFeatures) }
+        tabOrder.filter(isTabAvailable)
     }
 
     /// Tabs the user wants in the bar, in their chosen order. Authentication
@@ -545,8 +575,12 @@ final class EnvironmentStore: ObservableObject {
         reordered.move(fromOffsets: source, toOffset: destination)
         var iterator = reordered.makeIterator()
         tabOrder = tabOrder.map { tab in
-            tab.isSupported(by: serverFeatures) ? (iterator.next() ?? tab) : tab
+            isTabAvailable(tab) ? (iterator.next() ?? tab) : tab
         }
+    }
+
+    private func isTabAvailable(_ tab: AppTab) -> Bool {
+        tab.isSupported(by: serverFeatures) && (tab != .sealed || sealedProductsEnabled)
     }
 
     func resetTabBar() {
@@ -721,6 +755,7 @@ final class EnvironmentStore: ObservableObject {
         pricingSource = .justTCG
         defaultGame = nil
         offlineModeEnabled = false
+        sealedProductsEnabled = true
         autoSyncEnabled = true
         appColorScheme = .system
         accentColorChoice = .blue
@@ -746,6 +781,7 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.showCardNumbers)
         storage.removeObject(forKey: Keys.showPricing)
         storage.removeObject(forKey: Keys.pricingSource)
+        storage.removeObject(forKey: Keys.sealedProductsEnabled)
         CollectrProductMappingStore().removeAll()
         try? CollectrPrivateCredentialStore.delete()
         storage.removeObject(forKey: Keys.defaultGame)
@@ -755,6 +791,49 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.accentColor)
         storage.removeObject(forKey: Keys.biometricLockEnabled)
         storage.removeObject(forKey: Keys.smartFolders)
+    }
+
+    /// Representative automatic filters installed with the optional sample collection.
+    func loadSampleSmartFolders() {
+        let samples = [
+            SmartFolder(
+                id: UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000001")!,
+                name: "Pokémon chase cards",
+                colorHex: "ef4444",
+                rules: [
+                    SmartFolderRule(
+                        id: UUID(uuidString: "A4800CCB-E478-4BF5-A358-000000000001")!,
+                        type: .tcg,
+                        value: "pokemon"
+                    ),
+                    SmartFolderRule(
+                        id: UUID(uuidString: "A4800CCB-E478-4BF5-A358-000000000002")!,
+                        type: .rarity,
+                        value: "Ultra Rare"
+                    )
+                ],
+                matchMode: .any
+            ),
+            SmartFolder(
+                id: UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000002")!,
+                name: "Foils",
+                colorHex: "8b5cf6",
+                rules: [
+                    SmartFolderRule(
+                        id: UUID(uuidString: "A4800CCB-E478-4BF5-A358-000000000003")!,
+                        type: .isFoil,
+                        value: "true"
+                    )
+                ],
+                matchMode: .all
+            )
+        ]
+        let existing = Set(smartFolders.map(\.id))
+        smartFolders.append(contentsOf: samples.filter { !existing.contains($0.id) })
+    }
+
+    func removeSampleSmartFolders() {
+        smartFolders.removeAll { Self.sampleSmartFolderIDs.contains($0.id) }
     }
 
     func applyUserPreferences(_ preferences: APIService.UserPreferences) {
@@ -775,35 +854,91 @@ final class EnvironmentStore: ObservableObject {
 
     static let appGroupSuite = "group.firstform.TCGer.shared"
 
-    func handleDeepLink(_ url: URL) {
-        guard url.scheme?.lowercased() == "tcger",
-              let host = url.host?.lowercased() else { return }
+    static func deepLinkDestination(for url: URL) -> AppDeepLinkDestination? {
+        let scheme = url.scheme?.lowercased()
+        let urlHost = url.host?.lowercased()
+        let pathComponents = url.pathComponents.dropFirst()
+        let route: String
+        let identifierComponent: String?
 
-        switch host {
-        case "scan":
-            let game = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?
-                .first(where: { $0.name.lowercased() == "game" })?
+        if scheme == "tcger", let urlHost {
+            route = urlHost
+            identifierComponent = pathComponents.first
+        } else if scheme == "https", urlHost == "tcger.ahmadjalil.com",
+                  let firstPathComponent = pathComponents.first {
+            route = firstPathComponent.lowercased()
+            identifierComponent = pathComponents.dropFirst().first
+        } else {
+            return nil
+        }
+
+        let identifier = identifierComponent?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        let queryValue: (String) -> String? = { name in
+            queryItems?
+                .first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })?
                 .value?
-                .lowercased()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        switch route {
+        case "scan":
+            let game = queryValue("game")?.lowercased()
+            return .scan(game: game?.isEmpty == false ? game : nil)
+        case "search":
+            let query = queryValue("q")
+            return .search(query: query?.isEmpty == false ? query : nil)
+        case "wishlist":
+            if let identifier, !identifier.isEmpty { return .wishlist(id: identifier) }
+            return .tab(.wishlists)
+        case "wishlists":
+            return .tab(.wishlists)
+        case "binder":
+            if let identifier, !identifier.isEmpty { return .binder(id: identifier) }
+            return .tab(.collections)
+        case "collections":
+            return .tab(.collections)
+        default:
+            guard let tab = AppTab(rawValue: route) else { return nil }
+            return .tab(tab)
+        }
+    }
+
+    func handleDeepLink(_ url: URL) {
+        guard let destination = Self.deepLinkDestination(for: url) else { return }
+
+        if case .scan(let game) = destination {
             if let game, ["pokemon", "yugioh", "mtg"].contains(game) {
                 storage.set(game, forKey: Keys.scannerPendingMode)
             } else {
                 storage.removeObject(forKey: Keys.scannerPendingMode)
             }
-            pendingDeepLinkTab = .scan
-        case "wishlists", "wishlist":
-            pendingDeepLinkTab = .wishlists
-        case "binder", "collections":
-            pendingDeepLinkTab = .collections
-        default:
-            break
         }
+
+        pendingDeepLinkRequest = AppDeepLinkRequest(destination: destination)
+        pendingDeepLinkTab = destination.tab
+    }
+
+    /// A deep link is an event, not durable navigation state. Each routing
+    /// layer can claim the current request once without preventing the app
+    /// shell and the destination screen from both handling it.
+    func claimDeepLinkRequest(
+        _ request: AppDeepLinkRequest,
+        for consumer: AppDeepLinkConsumer
+    ) -> Bool {
+        guard pendingDeepLinkRequest?.id == request.id,
+              handledDeepLinkRequestIDs[consumer] != request.id else {
+            return false
+        }
+        handledDeepLinkRequestIDs[consumer] = request.id
+        return true
     }
 
     /// Programmatic tab switches (e.g. tapping a dashboard overview tile) go
     /// through the deep-link pipeline so tab visibility rules still apply.
     func openTab(_ tab: AppTab) {
+        pendingDeepLinkRequest = AppDeepLinkRequest(destination: .tab(tab))
         pendingDeepLinkTab = tab
     }
 

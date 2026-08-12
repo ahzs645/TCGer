@@ -48,6 +48,8 @@
 	<string>TCGer needs local network access to connect to your TCGer server.</string>
 	<key>TCGerCatalogBaseURL</key>
 	<string>$(TCGER_CATALOG_BASE_URL)</string>
+	<key>TCGerPackAssetBaseURL</key>
+	<string>$(TCGER_PACK_ASSET_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

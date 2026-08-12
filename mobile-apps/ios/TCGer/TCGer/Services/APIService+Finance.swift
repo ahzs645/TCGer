@@ -46,7 +46,9 @@ extension APIService {
         date: String? = nil
     ) async throws -> Transaction {
         if config.isOnDevice {
-            return LocalStore.shared.createTransaction(type: type, cardName: cardName, tcg: tcg, quantity: quantity ?? 1, amount: amount, platform: platform, notes: notes)
+            let transaction = LocalStore.shared.createTransaction(type: type, cardName: cardName, tcg: tcg, quantity: quantity ?? 1, amount: amount, platform: platform, notes: notes)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return transaction
         }
         let body = CreateTransactionRequest(
             type: type, cardName: cardName, tcg: tcg, quantity: quantity,
@@ -72,7 +74,11 @@ extension APIService {
         token: String,
         transactionId: String
     ) async throws {
-        if config.isOnDevice { LocalStore.shared.deleteTransaction(id: transactionId); return }
+        if config.isOnDevice {
+            LocalStore.shared.deleteTransaction(id: transactionId)
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return
+        }
         let (data, response) = try await makeRequest(
             config: config, path: "finance/transactions/\(transactionId)", method: "DELETE", token: token
         )

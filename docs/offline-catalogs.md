@@ -6,6 +6,11 @@ seeded demo cards plus cards the user already owned. Offline catalog packs close
 that gap: each game's full card list ships as a small local pack, so search, set
 browsing, and set detail work entirely on-device.
 
+Sealed products are published as a second, optional pack for each game. They
+are never folded into the card pack, so users who do not track boxes, packs,
+decks, or other sealed products can disable the feature without downloading or
+storing that data.
+
 Pack format, per-game fields, and image-URL derivation rules are specified in
 [catalog-pack-format.md](./catalog-pack-format.md). This page covers how the
 feature works and how to maintain it.
@@ -53,6 +58,19 @@ To regenerate only the catalog packs, the underlying command is:
 cd backend
 npx --no-install tsx src/scripts/build-catalog-packs.ts --sync
 ```
+
+After the card manifest exists, build the optional TCGCSV-backed product packs
+from the repository root:
+
+```bash
+npm run catalogs:build-sealed
+```
+
+The sealed builder reads TCGCSV sequentially at a polite rate, filters card
+singles, code cards, and accessories, and writes one content-addressed product
+pack per game. Dragon Ball combines its Masters and Fusion World categories
+into the app's single Dragon Ball module. `--game <game>` rebuilds one game;
+use `--max-groups` only with a temporary `--out` directory for quick checks.
 
 This fetches from tcgdex, Scryfall's compressed `default_cards` JSONL feed,
 YGOPRODeck, OPTCG API, and Lorcast; writes `data/catalog/` (canonical output);
@@ -109,10 +127,13 @@ model/index resources.
 - `Services/CatalogStore.swift` reads through a small `CatalogSource` protocol.
   Production uses an R2-backed source with persistent on-device caching and
   bundled fallback; builds without a configured CDN use bundled resources only.
-- Install state is per game in UserDefaults. Settings has a "Card Catalogs"
+- Install state is per game in UserDefaults. Settings has an "Offline Catalogs"
   section (install/update/remove, counts, sizes); the "This Phone" onboarding
   offers the same rows. Enabling a game in local mode without its catalog
   prompts to install it.
+- A persisted Sealed Products switch controls the optional product packs and
+  the Sealed tab. Turning it off removes downloaded product packs while
+  preserving every sealed inventory record the user already created.
 - Installed packs load lazily per enabled game at background priority; the
   Magic pack (~107k compact entries) is only decoded when Magic is both
   enabled and installed. Search matches card names first (prefix, then

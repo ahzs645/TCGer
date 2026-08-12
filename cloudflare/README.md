@@ -6,6 +6,8 @@ production URL layout is:
 ```text
 https://assets.tcger.ahmadjalil.com/catalogs/manifest.json
 https://assets.tcger.ahmadjalil.com/catalogs/{content-addressed pack}.json
+https://assets.tcger.ahmadjalil.com/pack/manifest.json
+https://assets.tcger.ahmadjalil.com/pack/objects/{content-addressed asset}
 ```
 
 No Worker is required. R2's custom-domain integration serves the objects
@@ -94,3 +96,34 @@ packs when the network or CDN is unavailable.
 Card-image storage is intentionally outside this catalog-delivery design.
 Clients continue using their existing image sources until that system is
 designed and deployed separately.
+
+## Pack-opening wrappers
+
+Projected wrapper sheets remain in the Google Drive authoring folder rather
+than being committed to the application repository. Each studio export carries
+its stable id, label, card pool, and accent in `manifest.entry.json`. The
+publisher discovers every such entry recursively, so neither web nor iOS keeps
+a separate hard-coded list of selectable packs. The current labels follow
+SealedDex's Base set artwork names: Charizard, Venusaur, and Blastoise.
+
+Validate the Drive exports and inspect the R2 plan:
+
+```bash
+npm run assets:r2:publish-pack-assets -- \
+  --projected-dir "/path/to/Base set - projected" \
+  --dry-run
+```
+
+Publish with the local Wrangler login:
+
+```bash
+npm run assets:r2:publish-pack-assets -- \
+  --projected-dir "/path/to/Base set - projected" \
+  --wrangler
+```
+
+For CI or another machine, omit `--wrangler` and provide the same S3-compatible
+R2 credentials used by the catalog publisher. The mesh and three cover sheets
+are stored under content-addressed object keys with a one-year immutable cache;
+`pack/manifest.json` is uploaded last with five-minute revalidation. Production
+web builds set `NEXT_PUBLIC_PACK_ASSET_BASE_URL` to the custom-domain origin.

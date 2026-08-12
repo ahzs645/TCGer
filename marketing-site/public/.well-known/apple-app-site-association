@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "6347A46LMY.firstform.TCGer"
+        ],
+        "components": [
+          { "/": "/binder/*", "comment": "Open a binder" },
+          { "/": "/wishlist/*", "comment": "Open a wishlist" },
+          { "/": "/scan", "comment": "Open the card scanner" },
+          { "/": "/search", "comment": "Open card search" }
+        ]
+      }
+    ]
+  }
+}

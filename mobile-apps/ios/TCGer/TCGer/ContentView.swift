@@ -8,8 +8,11 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @EnvironmentObject private var featureDependencies: AppFeatureDependencies
     @State private var showingSearch = false
+    @State private var searchQuery: String?
     @State private var selectedTab = AppTab.home.rawValue
+    @State private var moreNavigationPath: [AppTab] = []
 
     private static let moreTabSelection = "__more__"
 
@@ -32,14 +35,14 @@ struct ContentView: View {
     /// UIKit's automatic More navigation controller. That controller would wrap
     /// destinations which already own a navigation stack, producing two bars.
     private var primaryTabs: [AppTab] {
-        guard tabs.count > 5 else { return tabs }
-        return Array(tabs.prefix(4))
+        tabLayout.primaryTabs
     }
 
     private var overflowTabs: [AppTab] {
-        guard tabs.count > 5 else { return [] }
-        return Array(tabs.dropFirst(4))
+        tabLayout.overflowTabs
     }
+
+    private var tabLayout: AppTabLayout { AppTabLayout(tabs: tabs) }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -55,33 +58,36 @@ struct ContentView: View {
                 }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
         .environment(\.showingSearch, $showingSearch)
-        .sheet(isPresented: $showingSearch) {
-            CardSearchView()
+        .sheet(isPresented: $showingSearch, onDismiss: {
+            searchQuery = nil
+        }) {
+            CardSearchView(initialSearchText: searchQuery ?? "")
         }
         .onAppear {
             reconcileSelection()
-            applyDeepLink(environmentStore.pendingDeepLinkTab)
+            applyDeepLink(environmentStore.pendingDeepLinkRequest)
         }
         .onChange(of: tabs) {
             reconcileSelection()
+            applyDeepLink(environmentStore.pendingDeepLinkRequest)
         }
-        .onReceive(environmentStore.$pendingDeepLinkTab.dropFirst()) { tab in
-            applyDeepLink(tab)
+        .onReceive(environmentStore.$pendingDeepLinkRequest.dropFirst()) { request in
+            applyDeepLink(request)
         }
     }
 
     private var moreTabsView: some View {
-        NavigationStack {
+        NavigationStack(path: $moreNavigationPath) {
             List(overflowTabs) { tab in
-                NavigationLink {
-                    destination(for: tab, parentProvidesNavigation: true)
-                } label: {
+                NavigationLink(value: tab) {
                     Label(tab.title, systemImage: tab.systemImage)
                 }
             }
             .navigationTitle("More")
+            .navigationDestination(for: AppTab.self) { tab in
+                destination(for: tab, parentProvidesNavigation: true)
+            }
         }
         .tint(environmentStore.accentColorChoice.color)
     }
@@ -92,15 +98,26 @@ struct ContentView: View {
         case .home:
             DashboardView(parentProvidesNavigation: parentProvidesNavigation)
         case .collections:
-            CollectionsView(parentProvidesNavigation: parentProvidesNavigation)
+            CollectionsView(
+                parentProvidesNavigation: parentProvidesNavigation,
+                repository: featureDependencies.collections
+            )
         case .sets:
             SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
+        case .decks:
+            DecksView(parentProvidesNavigation: parentProvidesNavigation)
         case .wishlists:
             WishlistsView(parentProvidesNavigation: parentProvidesNavigation)
         case .guides:
             CollectionGuidesView(parentProvidesNavigation: parentProvidesNavigation)
         case .sealed:
             SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
+        case .prices:
+            PricesView(parentProvidesNavigation: parentProvidesNavigation)
+        case .analytics:
+            AnalyticsView(parentProvidesNavigation: parentProvidesNavigation)
+        case .trades:
+            TradesView(parentProvidesNavigation: parentProvidesNavigation)
         case .scan:
             CardScannerView()
         case .settings:
@@ -118,24 +135,47 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
         case .sealed:
             return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
-        case .sets, .wishlists, .guides, .scan:
+        case .sets, .decks, .wishlists, .guides, .prices, .analytics, .trades, .scan:
             return environmentStore.isAuthenticated
         }
     }
 
-    private func applyDeepLink(_ tab: AppTab?) {
-        guard let tab, tabs.contains(tab) else { return }
+    private func applyDeepLink(_ request: AppDeepLinkRequest?) {
+        guard let request else { return }
+        let destination = request.destination
 
-        if primaryTabs.contains(tab) {
+        if case .search(let query) = destination {
+            guard environmentStore.claimDeepLinkRequest(request, for: .appShell) else { return }
+            searchQuery = query
+            showingSearch = true
+            return
+        }
+
+        guard let tab = destination.tab, tabs.contains(tab) else { return }
+        guard environmentStore.claimDeepLinkRequest(request, for: .appShell) else { return }
+
+        switch tabLayout.presentation(for: tab) {
+        case .primary:
             selectedTab = tab.rawValue
-        } else if overflowTabs.contains(tab) {
+            moreNavigationPath.removeAll()
+        case .more:
             selectedTab = Self.moreTabSelection
+            moreNavigationPath = [tab]
+        case .unavailable:
+            break
         }
     }
 
     private func reconcileSelection() {
         if selectedTab == Self.moreTabSelection, !overflowTabs.isEmpty {
+            if let activeOverflowTab = moreNavigationPath.last,
+               !overflowTabs.contains(activeOverflowTab) {
+                moreNavigationPath.removeAll()
+            }
             return
+        }
+        if overflowTabs.isEmpty {
+            moreNavigationPath.removeAll()
         }
         if primaryTabs.contains(where: { $0.rawValue == selectedTab }) {
             return

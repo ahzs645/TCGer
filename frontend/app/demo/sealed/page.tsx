@@ -19,6 +19,10 @@ import type { SealedProduct } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getInstalledSealedProducts,
+  type SealedCatalogProduct,
+} from "@/lib/catalog/catalog-client";
 
 /* ------------------------------------------------------------------ */
 /*  Fake sealed products data                                           */
@@ -33,11 +37,17 @@ const TCG_COLORS: Record<string, string> = {
 export default function SealedPage() {
   const [sortBy, setSortBy] = useState<"date" | "value" | "profit">("date");
   const [createOpen, setCreateOpen] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<SealedCatalogProduct[]>([]);
 
   // The demo store is persisted, so it only agrees with the server-rendered
   // markup once we are on the client.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (createOpen) {
+      void getInstalledSealedProducts().then(setCatalogProducts).catch(() => setCatalogProducts([]));
+    }
+  }, [createOpen]);
 
   const storeSealed = useDemoStore((state) => state.sealed);
   const addSealedProduct = useDemoStore((state) => state.addSealedProduct);
@@ -377,11 +387,43 @@ export default function SealedPage() {
               <Label htmlFor="sealed-name">Product</Label>
               <Input
                 id="sealed-name"
+                list="sealed-product-catalog"
                 value={form.name}
                 placeholder="e.g. Paldea Evolved Booster Box"
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  const product = catalogProducts.find((entry) => entry.name === name);
+                  setForm({
+                    ...form,
+                    name,
+                    ...(product
+                      ? {
+                          tcg: product.tcg === "pokemon"
+                            ? "Pokemon"
+                            : product.tcg === "magic"
+                              ? "Magic"
+                              : product.tcg === "yugioh"
+                                ? "Yu-Gi-Oh!"
+                                : product.tcg,
+                          type: product.productType,
+                          set: product.setCode ?? "",
+                          currentValue: product.marketPrice?.toFixed(2) ?? "",
+                        }
+                      : {}),
+                  });
+                }}
                 autoFocus
               />
+              <datalist id="sealed-product-catalog">
+                {catalogProducts.slice(0, 500).map((product) => (
+                  <option key={product.id} value={product.name} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                {catalogProducts.length
+                  ? `${catalogProducts.length.toLocaleString()} downloaded products available as suggestions.`
+                  : "Download optional sealed-product catalogs in Account settings for suggestions."}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

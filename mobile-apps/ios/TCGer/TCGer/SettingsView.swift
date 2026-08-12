@@ -11,6 +11,7 @@ struct SettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
     @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
+    @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var scannerDevModeRecordingEnabled = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
     @State private var serverStatus: ServerStatusState = .checking
@@ -30,11 +31,17 @@ struct SettingsView: View {
     @State private var exportData: Data?
     @State private var exportFilename: String?
     @State private var gameDisableBlock: GameDisableBlock?
+    @State private var gameDisableCheckError: String?
+    @State private var gamesBeingUpdated: Set<TCGGame> = []
     @State private var pendingCatalogInstall: TCGGame?
     @State private var catalogInstallError: String?
     @State private var sampleDataLoaded = false
+    @State private var localBackupURLs: [URL] = []
+    @State private var showingRestoreLocalBackupAlert = false
+    @State private var localDataMessage: String?
     @State private var showingRemoveSampleAlert = false
     @State private var showingEraseLocalDataAlert = false
+    @State private var showingHideDeveloperToolsAlert = false
     @State private var versionTapCount = 0
 
     init(parentProvidesNavigation: Bool = false) {
@@ -46,15 +53,11 @@ struct SettingsView: View {
         environmentStore.serverConfiguration.isOnDevice
     }
 
-    /// Developer tools are always present in debug builds; release builds (and
-    /// TestFlight/phone-only installs) reveal them after the About → Version row
-    /// is tapped `versionTapsToUnlock` times.
+    /// Developer tools stay hidden in every build until the About → Version
+    /// row is tapped `versionTapsToUnlock` times. Keeping debug builds on the
+    /// same path makes it possible to verify the customer-facing Settings UI.
     private var showDeveloperTools: Bool {
-        #if DEBUG
-        return true
-        #else
-        return developerToolsUnlocked
-        #endif
+        developerToolsUnlocked
     }
 
     private static let versionTapsToUnlock = 7
@@ -83,6 +86,14 @@ struct SettingsView: View {
         } else if versionTapCount >= Self.versionTapsToUnlock - 3 {
             HapticManager.selection()
         }
+    }
+
+    private func hideDeveloperTools() {
+        developerToolsUnlocked = false
+        showScannerTestingTools = false
+        scannerDevModeRecordingEnabled = false
+        versionTapCount = 0
+        HapticManager.notification(.success)
     }
 
     /// Phone-only mode has no account, so preferences are always editable;
@@ -174,26 +185,31 @@ struct SettingsView: View {
                             .font(.subheadline)
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
                             ForEach(AccentColorChoice.allCases) { accent in
-                                Circle()
-                                    .fill(accent.color)
-                                    .frame(width: 36, height: 36)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.primary, lineWidth: environmentStore.accentColorChoice == accent ? 2.5 : 0)
-                                    )
-                                    .overlay(
-                                        Group {
-                                            if environmentStore.accentColorChoice == accent {
-                                                Image(systemName: "checkmark")
-                                                    .font(.caption.bold())
-                                                    .foregroundColor(.white)
+                                Button {
+                                    environmentStore.accentColorChoice = accent
+                                } label: {
+                                    Circle()
+                                        .fill(accent.color)
+                                        .frame(width: 36, height: 36)
+                                        .overlay(
+                                            Circle()
+                                                .strokeBorder(Color.primary, lineWidth: environmentStore.accentColorChoice == accent ? 2.5 : 0)
+                                        )
+                                        .overlay(
+                                            Group {
+                                                if environmentStore.accentColorChoice == accent {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.caption.bold())
+                                                        .foregroundColor(.white)
+                                                }
                                             }
-                                        }
-                                    )
-                                    .onTapGesture {
-                                        environmentStore.accentColorChoice = accent
-                                    }
-                                    .accessibilityLabel(accent.displayName)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(accent.displayName)
+                                .accessibilityAddTraits(
+                                    environmentStore.accentColorChoice == accent ? .isSelected : []
+                                )
                             }
                         }
                     }
@@ -215,7 +231,7 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Appearance")
+                    Text("Appearance & Layout")
                 }
 
                 // Connection Section
@@ -253,15 +269,18 @@ struct SettingsView: View {
                     ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
                         TCGModuleToggleRow(
                             game: game,
-                            isOn: gameEnabledBinding(for: game),
-                            isEnabled: canEditPreferences
+                            isOn: environmentStore.isGameEnabled(game),
+                            isEnabled: canEditPreferences,
+                            isUpdating: gamesBeingUpdated.contains(game)
                         ) { isOn in
+                            guard !gamesBeingUpdated.contains(game) else { return }
+                            gamesBeingUpdated.insert(game)
                             Task {
                                 await handleGameToggle(
-                                    game: game.rawValue,
-                                    displayName: game.displayName,
+                                    game: game,
                                     isOn: isOn
                                 )
+                                gamesBeingUpdated.remove(game)
                             }
                         }
 
@@ -270,20 +289,35 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("TCG Modules")
+                    Text("Games")
                 } footer: {
                     Text("Enable or disable specific TCG games in search and analytics. A game can't be turned off while you still have its cards in a collection or wishlist.")
                 }
 
                 if isLocalMode {
                     Section {
+                        Toggle(isOn: $environmentStore.sealedProductsEnabled) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Sealed Products")
+                                Text("Download searchable boxes, packs, decks, and other sealed products")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
                         ForEach(TCGGame.catalogGames) { game in
-                            CatalogInstallRow(game: game, catalogStore: catalogStore)
+                            CatalogInstallRow(
+                                game: game,
+                                catalogStore: catalogStore,
+                                includeSealedProducts: environmentStore.sealedProductsEnabled
+                            )
                         }
                     } header: {
-                        Text("Card Catalogs")
+                        Text("Offline Catalogs")
                     } footer: {
-                        Text("Catalogs are already bundled with this build, so installing is quick. Removing one frees its in-memory catalog and never removes your saved cards.")
+                        Text(environmentStore.sealedProductsEnabled
+                            ? "Each game downloads separately. Turning off Sealed Products removes its optional product catalogs but keeps your sealed inventory."
+                            : "Only card catalogs are downloaded. Each game stays separate, and removing one never removes your saved cards.")
                     }
                 }
 
@@ -333,7 +367,7 @@ struct SettingsView: View {
                     }
                     .disabled(!canEditPreferences)
                 } header: {
-                    Text("Display Preferences")
+                    Text("Card Display")
                 }
 
                 if isLocalMode || (environmentStore.isAuthenticated && environmentStore.isCurrentUserAdmin) {
@@ -451,7 +485,7 @@ struct SettingsView: View {
                                 .foregroundColor(.red)
                         }
                     } header: {
-                        Text("Admin Access Policy")
+                        Text("Server Access")
                     } footer: {
                         Text("These settings mirror web access policy options.")
                     }
@@ -486,6 +520,7 @@ struct SettingsView: View {
                         } else {
                             Button {
                                 LocalStore.shared.loadSampleData()
+                                environmentStore.loadSampleSmartFolders()
                                 sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                             } label: {
                                 Label("Load Sample Collection", systemImage: "sparkles")
@@ -582,7 +617,7 @@ struct SettingsView: View {
                         showingClearCacheAlert = true
                     }
                 } header: {
-                    Text("Data & Sync")
+                    Text("Data & Storage")
                 } footer: {
                     Text(isLocalMode
                         ? "Your collection is stored locally on this phone. Clearing the image cache only frees up downloaded artwork."
@@ -626,6 +661,23 @@ struct SettingsView: View {
                     }
                 }
 
+                if isLocalMode {
+                    Section {
+                        LabeledContent("Recovery Points", value: "\(localBackupURLs.count)")
+
+                        Button {
+                            showingRestoreLocalBackupAlert = true
+                        } label: {
+                            Label("Restore Latest Recovery Point", systemImage: "clock.arrow.circlepath")
+                        }
+                        .disabled(localBackupURLs.isEmpty)
+                    } header: {
+                        Text("Local Data Recovery")
+                    } footer: {
+                        Text("TCGer keeps up to five automatic recovery points before replacing local data. Restoring validates the snapshot first and preserves your current data as another recovery point.")
+                    }
+                }
+
                 // Actions Section
                 Section {
                     if !isLocalMode {
@@ -644,14 +696,44 @@ struct SettingsView: View {
                             showingEraseLocalDataAlert = true
                         }
                     }
+                } header: {
+                    Text("Reset & Erase")
                 } footer: {
                     if isLocalMode {
                         Text("Reset All Settings only clears preferences. Erasing removes every card, binder, wishlist, and transaction stored on this phone.")
                     }
                 }
 
-                // Scanner Tools (Developer) Section — always in debug builds,
-                // unlocked via the About → Version row elsewhere.
+                // About stays immediately before Developer Tools so unlocking
+                // adds content below the Version row instead of moving it.
+                Section {
+                    Link(destination: Self.privacyPolicyURL) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
+
+                    Link(destination: Self.supportURL) {
+                        Label("Support", systemImage: "questionmark.circle")
+                    }
+
+                    Button(action: registerVersionTap) {
+                        HStack {
+                            Text("Version")
+                            Spacer()
+                            Text(appVersionString)
+                                .foregroundColor(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Version")
+                    .accessibilityValue(appVersionString)
+                    .accessibilityHint("Reveals developer tools after seven activations")
+                } header: {
+                    Text("About")
+                }
+
+                // Hidden in every build until the About → Version row is
+                // tapped seven times.
                 if showDeveloperTools {
                     Section {
                         NavigationLink {
@@ -680,47 +762,22 @@ struct SettingsView: View {
                         // Scanner Debug to enable, review, or export.
                         ScannerDevModeSection(presentation: .settingsRows)
 
-                        if developerToolsUnlocked {
-                            Button(role: .destructive) {
-                                developerToolsUnlocked = false
-                                showScannerTestingTools = false
-                                versionTapCount = 0
-                            } label: {
-                                Text("Hide Developer Tools")
-                            }
+                        Button(role: .destructive) {
+                            showingHideDeveloperToolsAlert = true
+                        } label: {
+                            Label("Hide Developer Tools", systemImage: "eye.slash")
                         }
                     } header: {
-                        Text("Scanner Tools")
+                        Text("Developer Tools")
                     } footer: {
-                        Text("Live Scanner Debug opens the camera and shows segmentation, identification, and a pipeline log in real time. Record a run to save every analyzed frame plus its results, then export them as a shareable bundle to re-analyze later.")
+                        Text("Scanner diagnostics and recording are intended for testing. Hiding this section also turns off scanner testing tools and dev-mode recording.")
                     }
-                }
-
-                // App Info Section
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text(appVersionString)
-                            .foregroundColor(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: registerVersionTap)
-
-                    Link(destination: Self.privacyPolicyURL) {
-                        Label("Privacy Policy", systemImage: "hand.raised")
-                    }
-
-                    Link(destination: Self.supportURL) {
-                        Label("Support", systemImage: "questionmark.circle")
-                    }
-                } header: {
-                    Text("About")
                 }
         }
         .navigationTitle("Settings")
             .task {
                 sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                refreshLocalBackups()
                 await refreshProfileIfNeeded()
                 await refreshPreferencesIfNeeded()
                 await refreshAppSettingsIfNeeded()
@@ -741,6 +798,7 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Remove", role: .destructive) {
                     LocalStore.shared.removeSampleData()
+                    environmentStore.removeSampleSmartFolders()
                     sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                 }
             } message: {
@@ -751,9 +809,29 @@ struct SettingsView: View {
                 Button("Erase", role: .destructive) {
                     LocalStore.shared.resetLocalData()
                     sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                    refreshLocalBackups()
                 }
             } message: {
-                Text("Every card, binder, wishlist, sealed item, and transaction stored on this phone is deleted. This cannot be undone.")
+                Text("Every card, binder, wishlist, sealed item, and transaction stored on this phone is deleted. TCGer keeps a bounded local recovery point so you can restore the previous state from Settings.")
+            }
+            .alert("Restore Latest Recovery Point?", isPresented: $showingRestoreLocalBackupAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Restore") {
+                    restoreLatestLocalBackup()
+                }
+            } message: {
+                Text("This replaces the current phone-only library after validating the recovery point. Your current state is saved as another recovery point first.")
+            }
+            .alert(
+                "Local Data",
+                isPresented: Binding(
+                    get: { localDataMessage != nil },
+                    set: { if !$0 { localDataMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { localDataMessage = nil }
+            } message: {
+                Text(localDataMessage ?? "")
             }
             .alert("Clear Cache?", isPresented: $showingClearCacheAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -762,6 +840,14 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("This will remove all cached data. You'll need to sync again for offline access.")
+            }
+            .alert("Hide Developer Tools?", isPresented: $showingHideDeveloperToolsAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Hide Tools", role: .destructive) {
+                    hideDeveloperTools()
+                }
+            } message: {
+                Text("Scanner testing tools and dev-mode recording will be turned off. Recorded sessions will remain saved.")
             }
             .alert(
                 "Remove \(gameDisableBlock?.displayName ?? "") cards first",
@@ -774,6 +860,17 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) { gameDisableBlock = nil }
             } message: { block in
                 Text(block.message)
+            }
+            .alert(
+                "Couldn’t Check Saved Cards",
+                isPresented: Binding(
+                    get: { gameDisableCheckError != nil },
+                    set: { if !$0 { gameDisableCheckError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { gameDisableCheckError = nil }
+            } message: {
+                Text(gameDisableCheckError ?? "The game stayed enabled. Please try again.")
             }
             .alert(
                 pendingCatalogInstall.map {
@@ -793,7 +890,9 @@ struct SettingsView: View {
                     installCatalog(game)
                 }
             } message: { game in
-                Text("The catalog is bundled with the app, so installation is quick and uses no network data.")
+                Text(environmentStore.sealedProductsEnabled
+                    ? "This installs the separate card and sealed-product catalogs for this game."
+                    : "This installs only the card catalog for this game.")
             }
             .alert(
                 "Catalog Installation Failed",
@@ -856,6 +955,32 @@ struct SettingsView: View {
         lastSyncDate = CacheManager.shared.getLastSyncDate()
     }
 
+    private func refreshLocalBackups() {
+        guard isLocalMode else {
+            localBackupURLs = []
+            return
+        }
+        do {
+            localBackupURLs = try LocalStore.shared.availableLocalBackups()
+        } catch {
+            localBackupURLs = []
+            localDataMessage = "TCGer couldn’t read local recovery points: \(error.localizedDescription)"
+        }
+    }
+
+    private func restoreLatestLocalBackup() {
+        guard let latest = localBackupURLs.first else { return }
+        do {
+            try LocalStore.shared.restoreLocalBackup(from: latest)
+            sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+            refreshLocalBackups()
+            localDataMessage = "The latest local recovery point was restored."
+        } catch {
+            refreshLocalBackups()
+            localDataMessage = "TCGer couldn’t restore that recovery point: \(error.localizedDescription)"
+        }
+    }
+
     private func clearCache() {
         do {
             try CacheManager.shared.clearAll()
@@ -893,6 +1018,17 @@ struct SettingsView: View {
 }
 
 extension SettingsView {
+    struct GameCardUsage {
+        let collectionCount: Int
+        let wishlistCount: Int
+        let loadedCollections: Bool
+        let loadedWishlists: Bool
+
+        var isVerified: Bool {
+            loadedCollections && loadedWishlists
+        }
+    }
+
     struct GameDisableBlock: Identifiable {
         let id = UUID()
         let game: String
@@ -917,56 +1053,68 @@ extension SettingsView {
 private extension SettingsView {
     /// Persist an enable, or block a disable that would orphan owned/wishlisted
     /// cards of that game.
-    func handleGameToggle(game: String, displayName: String, isOn: Bool) async {
+    func handleGameToggle(game: TCGGame, isOn: Bool) async {
         guard !isApplyingRemotePreferences else { return }
 
         // Enabling never needs a guard.
         if isOn {
-            await updatePreferences(
-                enabledYugioh: game == "yugioh" ? true : nil,
-                enabledMagic: game == "magic" ? true : nil,
-                enabledPokemon: game == "pokemon" ? true : nil,
-                enabledOnepiece: game == "onepiece" ? true : nil,
-                enabledLorcana: game == "lorcana" ? true : nil,
-                enabledDragonball: game == "dragonball" ? true : nil
-            )
+            if isLocalMode {
+                setGameEnabled(game, enabled: true)
+            } else {
+                await updatePreferences(
+                    enabledYugioh: game == .yugioh ? true : nil,
+                    enabledMagic: game == .magic ? true : nil,
+                    enabledPokemon: game == .pokemon ? true : nil,
+                    enabledOnepiece: game == .onepiece ? true : nil,
+                    enabledLorcana: game == .lorcana ? true : nil,
+                    enabledDragonball: game == .dragonball ? true : nil
+                )
+            }
             if isLocalMode,
-               let catalogGame = TCGGame(rawValue: game),
-               TCGGame.catalogGames.contains(catalogGame),
-               case .notInstalled = catalogStore.installState(for: catalogGame),
-               catalogStore.isAvailable(catalogGame) {
-                pendingCatalogInstall = catalogGame
+               TCGGame.catalogGames.contains(game),
+               case .notInstalled = catalogStore.installState(for: game),
+               catalogStore.isAvailable(game) {
+                pendingCatalogInstall = game
             }
             return
         }
 
         let usage = await gameCardUsage(for: game)
-        if usage.collections + usage.wishlists > 0 {
+        if usage.collectionCount + usage.wishlistCount > 0 {
             await MainActor.run {
-                // Revert the toggle without re-triggering a server update.
-                isApplyingRemotePreferences = true
-                setGameEnabled(game, enabled: true)
                 gameDisableBlock = GameDisableBlock(
-                    game: game,
-                    displayName: displayName,
-                    collectionCount: usage.collections,
-                    wishlistCount: usage.wishlists
+                    game: game.rawValue,
+                    displayName: game.displayName,
+                    collectionCount: usage.collectionCount,
+                    wishlistCount: usage.wishlistCount
                 )
-                DispatchQueue.main.async { isApplyingRemotePreferences = false }
             }
             return
         }
 
-        let disableSucceeded = await updatePreferences(
-            enabledYugioh: game == "yugioh" ? false : nil,
-            enabledMagic: game == "magic" ? false : nil,
-            enabledPokemon: game == "pokemon" ? false : nil,
-            enabledOnepiece: game == "onepiece" ? false : nil,
-            enabledLorcana: game == "lorcana" ? false : nil,
-            enabledDragonball: game == "dragonball" ? false : nil
-        )
+        guard usage.isVerified else {
+            await MainActor.run {
+                gameDisableCheckError = "TCGer couldn’t verify your collections and wishlists, so \(game.displayName) stayed enabled. Check your connection and try again."
+            }
+            return
+        }
 
-        if disableSucceeded && environmentStore.defaultGame == game {
+        let disableSucceeded: Bool
+        if isLocalMode {
+            setGameEnabled(game, enabled: false)
+            disableSucceeded = true
+        } else {
+            disableSucceeded = await updatePreferences(
+                enabledYugioh: game == .yugioh ? false : nil,
+                enabledMagic: game == .magic ? false : nil,
+                enabledPokemon: game == .pokemon ? false : nil,
+                enabledOnepiece: game == .onepiece ? false : nil,
+                enabledLorcana: game == .lorcana ? false : nil,
+                enabledDragonball: game == .dragonball ? false : nil
+            )
+        }
+
+        if disableSucceeded && environmentStore.defaultGame == game.rawValue {
             await clearDefaultGameAfterDisabling()
         }
     }
@@ -998,27 +1146,15 @@ private extension SettingsView {
         }
     }
 
-    func setGameEnabled(_ game: String, enabled: Bool) {
+    func setGameEnabled(_ game: TCGGame, enabled: Bool) {
         switch game {
-        case "yugioh": environmentStore.enabledYugioh = enabled
-        case "magic": environmentStore.enabledMagic = enabled
-        case "pokemon": environmentStore.enabledPokemon = enabled
-        case "onepiece": environmentStore.enabledOnepiece = enabled
-        case "lorcana": environmentStore.enabledLorcana = enabled
-        case "dragonball": environmentStore.enabledDragonball = enabled
-        default: break
-        }
-    }
-
-    func gameEnabledBinding(for game: TCGGame) -> Binding<Bool> {
-        switch game {
-        case .yugioh: return $environmentStore.enabledYugioh
-        case .magic: return $environmentStore.enabledMagic
-        case .pokemon: return $environmentStore.enabledPokemon
-        case .onepiece: return $environmentStore.enabledOnepiece
-        case .lorcana: return $environmentStore.enabledLorcana
-        case .dragonball: return $environmentStore.enabledDragonball
-        case .all: return .constant(false)
+        case .yugioh: environmentStore.enabledYugioh = enabled
+        case .magic: environmentStore.enabledMagic = enabled
+        case .pokemon: environmentStore.enabledPokemon = enabled
+        case .onepiece: environmentStore.enabledOnepiece = enabled
+        case .lorcana: environmentStore.enabledLorcana = enabled
+        case .dragonball: environmentStore.enabledDragonball = enabled
+        case .all: break
         }
     }
 
@@ -1042,13 +1178,21 @@ private extension SettingsView {
 
     func catalogPromptSize(for game: TCGGame) -> String {
         guard let metadata = catalogStore.metadata(for: game) else { return "size unavailable" }
-        return "~\(metadata.formattedCatalogSize)"
+        let cardBytes = metadata.compressedBytes ?? metadata.bytes
+        let sealedBytes = environmentStore.sealedProductsEnabled
+            ? catalogStore.sealedMetadata(for: game).map { $0.compressedBytes ?? $0.bytes } ?? 0
+            : 0
+        return "~\(ByteCountFormatter.string(fromByteCount: Int64(cardBytes + sealedBytes), countStyle: .file))"
     }
 
     func installCatalog(_ game: TCGGame) {
         Task {
             do {
                 try await catalogStore.install(game)
+                if environmentStore.sealedProductsEnabled,
+                   catalogStore.isSealedAvailable(game) {
+                    try await catalogStore.installSealed(game)
+                }
             } catch {
                 catalogInstallError = error.localizedDescription
             }
@@ -1056,11 +1200,13 @@ private extension SettingsView {
     }
 
     /// Count cards of a game across collections and wishlists.
-    func gameCardUsage(for game: String) async -> (collections: Int, wishlists: Int) {
+    func gameCardUsage(for game: TCGGame) async -> GameCardUsage {
         let api = APIService()
-        let target = game.lowercased()
+        let target = game.rawValue
         var collectionCount = 0
         var wishlistCount = 0
+        var loadedCollections = false
+        var loadedWishlists = false
 
         do {
             let collections = try await api.getCollections(
@@ -1069,8 +1215,11 @@ private extension SettingsView {
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
             collectionCount = collections.reduce(0) { total, collection in
-                total + collection.cards.filter { $0.tcg.lowercased() == target }.count
+                total + collection.cards
+                    .filter { $0.tcg.lowercased() == target }
+                    .reduce(0) { $0 + $1.quantity }
             }
+            loadedCollections = true
         } catch {
             print("Game usage: failed to load collections: \(error)")
         }
@@ -1083,11 +1232,17 @@ private extension SettingsView {
             wishlistCount = wishlists.reduce(0) { total, wishlist in
                 total + wishlist.cards.filter { $0.tcg.lowercased() == target }.count
             }
+            loadedWishlists = true
         } catch {
             print("Game usage: failed to load wishlists: \(error)")
         }
 
-        return (collectionCount, wishlistCount)
+        return GameCardUsage(
+            collectionCount: collectionCount,
+            wishlistCount: wishlistCount,
+            loadedCollections: loadedCollections,
+            loadedWishlists: loadedWishlists
+        )
     }
 
     enum ServerStatusState: Equatable {
@@ -1332,22 +1487,27 @@ private extension SettingsView {
 
 private struct TCGModuleToggleRow: View {
     let game: TCGGame
-    @Binding var isOn: Bool
+    let isOn: Bool
     let isEnabled: Bool
+    let isUpdating: Bool
     let onChange: (Bool) -> Void
 
     var body: some View {
-        Toggle(isOn: $isOn) {
+        Toggle(isOn: Binding(
+            get: { isOn },
+            set: onChange
+        )) {
             HStack(spacing: 8) {
                 TCGGameIcon(game: game, size: 20)
                     .foregroundStyle(game.brandColor)
                 Text(game.displayName)
+                if isUpdating {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
         }
-        .disabled(!isEnabled)
-        .onChange(of: isOn) {
-            onChange(isOn)
-        }
+        .disabled(!isEnabled || isUpdating)
     }
 }
 

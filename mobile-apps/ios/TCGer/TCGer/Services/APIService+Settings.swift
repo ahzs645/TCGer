@@ -235,12 +235,14 @@ extension APIService {
         appName: String? = nil
     ) async throws -> AppSettings {
         if config.isOnDevice {
-            return LocalStore.shared.updateSettings(
+            let settings = LocalStore.shared.updateSettings(
                 publicDashboard: publicDashboard,
                 publicCollections: publicCollections,
                 requireAuth: requireAuth,
                 appName: appName
             )
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return settings
         }
 
         let body = UpdateSettingsRequest(
@@ -437,7 +439,7 @@ extension APIService {
         setCompletionMode: String? = nil
     ) async throws -> UserPreferences {
         if config.isOnDevice {
-            return LocalStore.shared.updateUserPreferences(
+            let preferences = LocalStore.shared.updateUserPreferences(
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
@@ -450,6 +452,8 @@ extension APIService {
                 focusedSetOrder: focusedSetOrder,
                 setCompletionMode: setCompletionMode
             )
+            try LocalStore.shared.requireLatestMutationPersisted()
+            return preferences
         }
 
         let body = UpdatePreferencesRequest(

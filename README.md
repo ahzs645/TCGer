@@ -128,6 +128,7 @@ Frontend:
 - `NEXT_PUBLIC_API_BASE_URL` (public API base; typically `http://localhost:3003/api` with nginx).
 - `BACKEND_API_ORIGIN` (internal API origin for server-side Next.js fetches).
 - `NEXT_PUBLIC_CATALOG_BASE_URL` (production R2 catalog root; local development defaults to `/catalog`).
+- `NEXT_PUBLIC_PACK_ASSET_BASE_URL` (production R2 origin for projected pack-opening wrappers; local development uses bundled assets).
 - Collection requests use the authenticated Express API exclusively. Do not configure browser-to-Convex collection HTTP calls or send `X-TCGER-*` identity headers from browser code.
 
 Convex bridge:

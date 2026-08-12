@@ -516,6 +516,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TCGER_CATALOG_BASE_URL = "https://assets.tcger.ahmadjalil.com/catalogs";
+				TCGER_PACK_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
@@ -556,6 +557,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TCGER_CATALOG_BASE_URL = "https://assets.tcger.ahmadjalil.com/catalogs";
+				TCGER_PACK_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;

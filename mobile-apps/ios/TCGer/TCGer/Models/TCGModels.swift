@@ -556,6 +556,11 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     // Declared with a default so existing memberwise-init call sites keep
     // compiling; nil means copies added to this binder start "Unspecified".
     var defaultCondition: String? = nil
+    var containerType: String? = nil
+    var imageUrl: String? = nil
+    var associatedTcg: String? = nil
+    var associatedSetCode: String? = nil
+    var associatedSetName: String? = nil
 
     static let unsortedBinderId = "__library__"
 
@@ -1029,6 +1034,7 @@ struct SealedProduct: Identifiable, Codable, Hashable, Sendable {
     let imageUrl: String?
     let msrp: Double?
     let upc: String?
+    var marketPrice: Double? = nil
 }
 
 struct SealedInventoryItem: Identifiable, Codable, Hashable, Sendable {

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 enum BinderSortOption: String, CaseIterable, Identifiable {
@@ -25,19 +26,23 @@ struct CollectionsView: View {
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
-    @State private var collections: [Collection] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
+    @StateObject private var collectionStore: CollectionListStore
     @State private var showingCreateSheet = false
     @State private var selectedCollection: Collection?
     @State private var selectedCollectionStartsInEditMode = false
     @State private var selectedSmartFolder: SmartFolder?
+    @State private var lastHandledDeepLinkID: UUID?
+    @State private var pendingBinderID: String?
     @State private var showingSmartFolderEditor = false
     @State private var showingImportSheet = false
+    @State private var showingHistorySheet = false
     @State private var searchText = ""
     @AppStorage("binderSortOption") private var sortOptionRaw = BinderSortOption.lastOpened.rawValue
 
-    private let apiService = APIService()
+    private var collections: [Collection] { collectionStore.collections }
+    private var isLoading: Bool { collectionStore.isLoading }
+    private var errorMessage: String? { collectionStore.errorMessage }
+    private var hasLoadedCollections: Bool { collectionStore.hasLoaded }
 
     private var sortOption: BinderSortOption {
         BinderSortOption(rawValue: sortOptionRaw) ?? .lastOpened
@@ -85,8 +90,14 @@ struct CollectionsView: View {
         }
     }
 
-    init(parentProvidesNavigation: Bool = false) {
+    init(
+        parentProvidesNavigation: Bool = false,
+        repository: any CollectionRepository
+    ) {
         self.parentProvidesNavigation = parentProvidesNavigation
+        _collectionStore = StateObject(
+            wrappedValue: CollectionListStore(repository: repository)
+        )
     }
 
     var body: some View {
@@ -102,9 +113,11 @@ struct CollectionsView: View {
         .task {
             await loadCollections()
         }
-        .sheet(item: $selectedSmartFolder) { folder in
-            SmartFolderDetailView(folder: folder)
-                .environmentObject(environmentStore)
+        .onAppear {
+            handleDeepLink(environmentStore.pendingDeepLinkRequest)
+        }
+        .onReceive(environmentStore.$pendingDeepLinkRequest.dropFirst()) { request in
+            handleDeepLink(request)
         }
         .sheet(isPresented: $showingSmartFolderEditor) {
             SmartFolderEditorSheet { folder in
@@ -237,7 +250,12 @@ struct CollectionsView: View {
                         Button {
                             showingImportSheet = true
                         } label: {
-                            Label("Import CSV", systemImage: "square.and.arrow.down")
+                            Label("Import Collection", systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            showingHistorySheet = true
+                        } label: {
+                            Label("Collection History", systemImage: "clock.arrow.circlepath")
                         }
                     } label: {
                         Image(systemName: "plus")
@@ -260,20 +278,38 @@ struct CollectionsView: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                binderControlShelf
+                if !sortedCollections.isEmpty {
+                    binderControlShelf
+                }
             }
             .refreshable {
                 await loadCollections()
             }
+            .navigationDestination(isPresented: selectedCollectionIsPresented) {
+                if let collection = selectedCollection {
+                    CollectionDetailView(
+                        collection: collection,
+                        startsInEditMode: selectedCollectionStartsInEditMode,
+                        parentProvidesNavigation: true
+                    )
+                }
+            }
+            .navigationDestination(isPresented: selectedSmartFolderIsPresented) {
+                if let folder = selectedSmartFolder {
+                    SmartFolderDetailView(folder: folder, parentProvidesNavigation: true)
+                        .environmentObject(environmentStore)
+                }
+            }
             .sheet(isPresented: $showingCreateSheet) {
-                CreateBinderSheet { name, description, colorHex, defaultCondition in
+                CreateBinderSheet(onCreateWithPresentation: { name, description, colorHex, defaultCondition, presentation in
                     await createCollection(
                         name: name,
                         description: description,
                         colorHex: colorHex,
-                        defaultCondition: defaultCondition
+                        defaultCondition: defaultCondition,
+                        presentation: presentation
                     )
-                }
+                })
             }
             .sheet(isPresented: $showingImportSheet) {
                 CollectionImportSheet(collections: collections) {
@@ -281,24 +317,31 @@ struct CollectionsView: View {
                 }
                 .environmentObject(environmentStore)
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { selectedCollection != nil },
-                    set: { if !$0 { selectedCollection = nil } }
-                ),
-                onDismiss: {
-                    selectedCollectionStartsInEditMode = false
-                    Task { await loadCollections() }
-                },
-                content: {
-                    if let collection = selectedCollection {
-                        CollectionDetailView(
-                            collection: collection,
-                            startsInEditMode: selectedCollectionStartsInEditMode
-                        )
-                    }
+            .sheet(isPresented: $showingHistorySheet) {
+                CollectionHistorySheet {
+                    await loadCollections()
                 }
-            )
+                .environmentObject(environmentStore)
+            }
+    }
+
+    private var selectedCollectionIsPresented: Binding<Bool> {
+        Binding(
+            get: { selectedCollection != nil },
+            set: { isPresented in
+                guard !isPresented else { return }
+                selectedCollection = nil
+                selectedCollectionStartsInEditMode = false
+                Task { await loadCollections() }
+            }
+        )
+    }
+
+    private var selectedSmartFolderIsPresented: Binding<Bool> {
+        Binding(
+            get: { selectedSmartFolder != nil },
+            set: { if !$0 { selectedSmartFolder = nil } }
+        )
     }
 
     private func binderRow(for collection: Collection) -> some View {
@@ -343,39 +386,52 @@ struct CollectionsView: View {
                 Spacer(minLength: 12)
             }
         }
-        .padding(.leading, 22)
+        .padding(.leading, 16)
         .padding(.trailing, 16)
         .padding(.vertical, 8)
     }
 
     @MainActor
     private func loadCollections() async {
-        let shouldShowLoading = collections.isEmpty
-        if shouldShowLoading {
-            isLoading = true
-            errorMessage = nil
-        }
+        await collectionStore.load(
+            config: environmentStore.serverConfiguration,
+            token: environmentStore.authToken,
+            useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
+        )
 
-        do {
-            collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken,
-                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
-            )
+        if collectionStore.errorMessage == nil {
             environmentStore.updateWidgetData(collections: collections)
-            isLoading = false
-            errorMessage = nil
-        } catch {
-            if let apiError = error as? APIService.APIError, case .unauthorized = apiError {
-                errorMessage = "Sign in is required to view collections."
-            }
-            if shouldShowLoading {
-                if errorMessage == nil {
-                    errorMessage = error.localizedDescription
-                }
-            }
-            isLoading = false
+            resolvePendingBinder()
         }
+    }
+
+    private func handleDeepLink(_ request: AppDeepLinkRequest?) {
+        guard let request,
+              request.id != lastHandledDeepLinkID,
+              case .binder(let binderID) = request.destination else { return }
+        lastHandledDeepLinkID = request.id
+        pendingBinderID = binderID
+        resolvePendingBinder(request: request)
+    }
+
+    private func resolvePendingBinder(request: AppDeepLinkRequest? = nil) {
+        guard let pendingBinderID else { return }
+        let currentRequest = request ?? environmentStore.pendingDeepLinkRequest
+        guard let currentRequest,
+              case .binder = currentRequest.destination else { return }
+        guard let collection = collections.first(where: { $0.id == pendingBinderID }) else {
+            if hasLoadedCollections,
+               environmentStore.claimDeepLinkRequest(currentRequest, for: .collections) {
+                self.pendingBinderID = nil
+            }
+            return
+        }
+        guard environmentStore.claimDeepLinkRequest(currentRequest, for: .collections) else {
+            self.pendingBinderID = nil
+            return
+        }
+        self.pendingBinderID = nil
+        presentCollection(collection, editing: false)
     }
 
     @MainActor
@@ -383,26 +439,33 @@ struct CollectionsView: View {
         name: String,
         description: String?,
         colorHex: String?,
-        defaultCondition: String? = nil
+        defaultCondition: String?,
+        presentation: BinderPresentationInput
     ) async {
         guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
+            collectionStore.reportAuthenticationRequired()
             return
         }
 
         do {
-            let newCollection = try await apiService.createCollection(
+            _ = try await collectionStore.create(
                 config: environmentStore.serverConfiguration,
                 token: token,
-                name: name,
-                description: description,
-                colorHex: colorHex,
-                defaultCondition: defaultCondition
+                input: CreateCollectionInput(
+                    name: name,
+                    description: description,
+                    colorHex: colorHex,
+                    defaultCondition: defaultCondition,
+                    containerType: presentation.containerType,
+                    imageUrl: presentation.imageUrl,
+                    associatedTcg: presentation.associatedTcg,
+                    associatedSetCode: presentation.associatedSetCode,
+                    associatedSetName: presentation.associatedSetName
+                )
             )
-            collections.append(newCollection)
             showingCreateSheet = false
         } catch {
-            errorMessage = error.localizedDescription
+            // The store publishes the actionable message used by this screen.
         }
     }
 }
