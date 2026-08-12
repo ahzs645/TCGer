@@ -14,6 +14,7 @@ import {
   BarChart3,
   Repeat2,
   Package,
+  PackageOpen,
   MoreHorizontal,
   X,
   Camera,
@@ -61,6 +62,7 @@ import { UserMenu } from "../navigation/user-menu";
 
 const navigation: NavigationItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/packs", label: "Open Packs", icon: PackageOpen },
   { href: "/cards", label: "Card Search", icon: Search },
   { href: "/scan", label: "Scan", icon: Camera },
   { href: "/collections", label: "Collections", icon: Table },

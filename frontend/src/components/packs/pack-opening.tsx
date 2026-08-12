@@ -20,7 +20,7 @@ import {
 } from "./pack-scene";
 
 const PHASE_HINTS: Partial<Record<PackPhase, string>> = {
-  select: "Swipe to browse · drag a pack to spin it · tap to open",
+  select: "Swipe or drag to browse · spin a pack or use the button to open",
   tear: "Swipe across the dotted line to tear the pack open",
   reveal: "Tap the stack to reveal the next card",
 };
@@ -131,12 +131,17 @@ export function PackOpening() {
     phase === "reveal";
 
   return (
-    <div className="relative h-[72vh] min-h-[540px] w-full overflow-hidden">
+    <div className="relative isolate h-[calc(100dvh-15rem)] min-h-[30rem] w-full overflow-hidden rounded-2xl border bg-gradient-to-b from-muted/40 via-background to-primary/5 md:h-[72vh] md:min-h-[540px]">
       {canvasVisible && (
         <Canvas
+          className="touch-none"
           camera={{ position: [0, 0, 7], fov: 40 }}
-          dpr={[1, 2]}
-          gl={{ antialias: true, alpha: true }}
+          dpr={[1, 1.75]}
+          gl={{
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance",
+          }}
         >
           <Suspense fallback={null}>
             {phase === "select" ? (
@@ -189,7 +194,7 @@ export function PackOpening() {
           <button
             type="button"
             onClick={backToSelect}
-            className="absolute right-3 top-3 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold backdrop-blur transition hover:bg-muted"
+            className="absolute right-3 top-3 min-h-10 rounded-full border border-border bg-background/80 px-4 py-2 text-xs font-semibold backdrop-blur transition hover:bg-muted"
           >
             Back to packs
           </button>
@@ -197,7 +202,7 @@ export function PackOpening() {
 
       {/* phase hint */}
       {PHASE_HINTS[phase] && (
-        <p className="pointer-events-none absolute inset-x-0 bottom-20 text-center text-sm font-medium text-muted-foreground md:bottom-5">
+        <p className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-xs font-medium text-muted-foreground sm:text-sm">
           {phase === "tear" && packs.length > 1
             ? `Tear once to open all ${packs.length} packs`
             : PHASE_HINTS[phase]}
@@ -206,15 +211,15 @@ export function PackOpening() {
 
       {/* variant + pack count pickers on select screen */}
       {phase === "select" && (
-        <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-2 md:bottom-12">
-          <div className="flex justify-center gap-2">
+        <div className="absolute inset-x-3 bottom-14 flex flex-col items-center gap-2 sm:bottom-12">
+          <div className="flex flex-wrap justify-center gap-2">
             {PACK_VARIANTS.map((v) => (
               <button
                 key={v.id}
                 type="button"
                 onClick={() => setBrowseVariantId(v.id)}
                 className={cn(
-                  "rounded-full border border-border px-3 py-1 text-xs font-semibold transition hover:bg-muted",
+                  "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted",
                   browseVariantId === v.id && "text-background",
                 )}
                 style={
@@ -222,6 +227,7 @@ export function PackOpening() {
                     ? { background: v.palette.mid, borderColor: v.palette.mid }
                     : undefined
                 }
+                aria-pressed={browseVariantId === v.id}
               >
                 {v.name}
               </button>
@@ -234,15 +240,24 @@ export function PackOpening() {
                 type="button"
                 onClick={() => setPackCount(n)}
                 className={cn(
-                  "rounded-full border border-border px-4 py-1.5 text-sm font-semibold transition hover:bg-muted",
+                  "min-h-10 rounded-full border border-border px-4 py-2 text-sm font-semibold transition hover:bg-muted",
                   packCount === n &&
                     "border-primary bg-primary text-primary-foreground hover:bg-primary",
                 )}
+                aria-pressed={packCount === n}
+                aria-label={`Open ${n} ${n === 1 ? "pack" : "packs"}`}
               >
                 ×{n}
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => startPacks(browseVariantId)}
+            className="min-h-11 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:opacity-90"
+          >
+            Open {packCount === 1 ? "this pack" : `${packCount} packs`}
+          </button>
         </div>
       )}
 

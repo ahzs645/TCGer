@@ -7,6 +7,7 @@ import {
   Camera,
   Heart,
   LayoutDashboard,
+  PackageOpen,
   Search,
   Table,
 } from "lucide-react";
@@ -106,6 +107,14 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
               <LayoutDashboard className="mr-2 h-4 w-4" data-oid="i:qe8qx" />
               Dashboard
               <CommandShortcut data-oid="eit846e">G D</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => handleNavigate("/packs")}
+              data-oid="nav-open-packs"
+            >
+              <PackageOpen className="mr-2 h-4 w-4" />
+              Open Packs
+              <CommandShortcut>G O</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => handleNavigate("/cards")}

@@ -4,7 +4,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PackOpening } from "@/components/packs/pack-opening";
 
 export const metadata: Metadata = {
-  title: "Pack Opening · TCGer Demo",
+  title: "Pack Opening · TCGer",
+  description:
+    "Choose a booster, tear it open in 3D, and reveal your cards one by one.",
 };
 
 export default function PackOpeningPage() {
@@ -16,8 +18,8 @@ export default function PackOpeningPage() {
             Pack Opening
           </h1>
           <p className="text-sm text-muted-foreground">
-            Open a booster in 3D — browse the carousel, tear the wrapper and
-            reveal your pulls one card at a time.
+            Choose a booster, tear the wrapper, and reveal your pulls one card
+            at a time.
           </p>
         </div>
         <PackOpening />

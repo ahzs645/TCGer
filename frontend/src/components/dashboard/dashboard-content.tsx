@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Coins, Library, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Coins,
+  Library,
+  PackageOpen,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -295,6 +302,7 @@ export function DashboardContent() {
   return (
     <div className="space-y-6" data-oid="p0.l1lt">
       <DashboardHeading />
+      <PackOpeningSpotlight href={getAppRoute("/packs", pathname)} />
       {noGamesEnabled && (
         <div
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
@@ -426,6 +434,34 @@ function DashboardHeading() {
         activity.
       </p>
     </div>
+  );
+}
+
+function PackOpeningSpotlight({ href }: { href: string }) {
+  return (
+    <Card className="relative overflow-hidden border-primary/25 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
+      <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
+      <CardContent className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <PackageOpen className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-semibold">Open a pack</h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Pick a booster, tear the wrapper, and reveal your pulls in an
+              interactive 3D opening.
+            </p>
+          </div>
+        </div>
+        <Button asChild className="w-full shrink-0 sm:w-auto">
+          <Link href={href}>
+            Start opening
+            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
