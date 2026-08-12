@@ -2150,6 +2150,7 @@ function FilterDialog({
                 </span>
               </div>
               <Slider
+                thumbLabels={["Minimum price", "Maximum price"]}
                 value={pendingRange}
                 min={0}
                 max={maxPrice}

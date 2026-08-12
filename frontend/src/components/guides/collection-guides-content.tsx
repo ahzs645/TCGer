@@ -279,6 +279,7 @@ export function CollectionGuidesContent({
         <div className="relative min-w-0 flex-1 sm:max-w-xl">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            aria-label="Search collection guides"
             className="pl-9"
             value={guideSearch}
             onChange={(event) => setGuideSearch(event.target.value)}
@@ -304,7 +305,7 @@ export function CollectionGuidesContent({
         <section className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
             <Select value={globalGame} onValueChange={setGlobalGame}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by game"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All games</SelectItem>
                 <SelectItem value="pokemon">Pokémon</SelectItem>
@@ -316,7 +317,7 @@ export function CollectionGuidesContent({
               </SelectContent>
             </Select>
             <Select value={globalCategory} onValueChange={setGlobalCategory}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by theme"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All themes</SelectItem>
                 <SelectItem value="art-style">Art style</SelectItem>
@@ -331,7 +332,7 @@ export function CollectionGuidesContent({
               value={globalOwnership}
               onValueChange={(value) => setGlobalOwnership(value as OwnershipFilter)}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by ownership"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All cards</SelectItem>
                 <SelectItem value="owned">Owned</SelectItem>
@@ -429,12 +430,13 @@ export function CollectionGuidesContent({
 
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_160px]">
             <Input
+              aria-label="Filter cards in this guide"
               value={cardSearch}
               onChange={(event) => setCardSearch(event.target.value)}
               placeholder="Filter cards…"
             />
             <Select value={setFilter} onValueChange={setSetFilter}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by set">
                 <SelectValue placeholder="All sets" />
               </SelectTrigger>
               <SelectContent>
@@ -453,7 +455,7 @@ export function CollectionGuidesContent({
               }
               disabled={!followedWishlist}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by ownership">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

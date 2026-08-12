@@ -163,6 +163,7 @@ export function SetupWizard() {
           {error && (
             <div
               className="flex items-center gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+              role="alert"
               data-oid="xrk:mzs"
             >
               <AlertCircle className="h-4 w-4" data-oid="t-q35zo" />

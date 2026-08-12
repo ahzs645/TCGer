@@ -595,6 +595,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              aria-label="Search Yu-Gi-Oh card pool"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search Yu-Gi-Oh card pool"
@@ -602,7 +603,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
             />
           </div>
           <Select value={zone} onValueChange={(value) => setZone(value as YugiohDeckZone)}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28" aria-label="Deck zone for new cards"><SelectValue /></SelectTrigger>
             <SelectContent>
               {YUGIOH_ZONES.map((item) => (
                 <SelectItem key={item} value={item}>
@@ -615,7 +616,12 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
         {(poolQuery.data ?? []).slice(0, 8).map((card) => (
           <div key={card.id} className="flex items-center justify-between gap-2 text-sm">
             <span className="truncate">{card.name} <span className="text-xs text-muted-foreground">{card.setCode}</span></span>
-            <Button size="sm" variant="outline" onClick={() => addMutation.mutate(card)}>
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={`Add ${card.name} to ${zone} deck`}
+              onClick={() => addMutation.mutate(card)}
+            >
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -644,6 +650,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
                 <Button
                   size="icon"
                   variant="ghost"
+                  aria-label={`Decrease ${card.name} quantity`}
                   disabled={card.quantity <= 1}
                   onClick={() =>
                     updateMutation.mutate({ cardId: card.id, quantity: card.quantity - 1 })
@@ -651,10 +658,17 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </Button>
-                <span className="w-5 text-center">{card.quantity}</span>
+                <span
+                  className="w-5 text-center"
+                  aria-label={`${card.name} quantity`}
+                  aria-live="polite"
+                >
+                  {card.quantity}
+                </span>
                 <Button
                   size="icon"
                   variant="ghost"
+                  aria-label={`Increase ${card.name} quantity`}
                   onClick={() =>
                     updateMutation.mutate({ cardId: card.id, quantity: card.quantity + 1 })
                   }
@@ -670,14 +684,24 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
                     })
                   }
                 >
-                  <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                  <SelectTrigger
+                    className="h-8 w-24"
+                    aria-label={`Deck zone for ${card.name}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {YUGIOH_ZONES.map((item) => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="icon" variant="ghost" onClick={() => removeMutation.mutate(card.id)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={`Remove ${card.name} from deck`}
+                  onClick={() => removeMutation.mutate(card.id)}
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -693,7 +717,9 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
             value={validationMode}
             onValueChange={(value) => setValidationMode(value as "classical" | "genesys")}
           >
-            <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-32" aria-label="Banlist validation mode">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="classical">Classical</SelectItem>
               <SelectItem value="genesys">Genesys</SelectItem>
@@ -702,6 +728,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
         </div>
         {validationMode === "genesys" && (
           <Input
+            aria-label="Maximum Genesys points"
             type="number"
             min="0"
             value={maxPoints}
@@ -710,6 +737,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
           />
         )}
         <Textarea
+          aria-label="Banlist card map"
           value={banlistCards}
           onChange={(event) => setBanlistCards(event.target.value)}
           rows={3}
@@ -719,7 +747,7 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
         <Button size="sm" onClick={() => validationMutation.mutate()}>
           Validate deck
         </Button>
-        {validationError && <p className="text-sm text-destructive">{validationError}</p>}
+        {validationError && <p className="text-sm text-destructive" role="alert">{validationError}</p>}
         {validationMutation.data && (
           <div className="text-sm">
             <Badge
@@ -776,8 +804,14 @@ function YdkImportDialog({
           <DialogTitle>Import YDK deck</DialogTitle>
           <DialogDescription>Paste a YGOPro-compatible .ydk file.</DialogDescription>
         </DialogHeader>
-        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Deck name" />
+        <Input
+          aria-label="Deck name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Deck name"
+        />
         <Textarea
+          aria-label="YDK deck contents"
           value={content}
           onChange={(event) => setContent(event.target.value)}
           rows={12}
@@ -785,7 +819,7 @@ function YdkImportDialog({
           placeholder={"#main\n46986414\n#extra\n!side"}
         />
         {Boolean(mutation.error) && (
-          <p className="text-sm text-destructive">
+          <p className="text-sm text-destructive" role="alert">
             {(mutation.error as Error).message}
           </p>
         )}

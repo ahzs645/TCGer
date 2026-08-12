@@ -781,6 +781,7 @@ export function WishlistContent() {
           <div className="border-b px-4 py-3 sm:px-6" data-oid="rf4iju2">
             <div className="flex gap-2" data-oid="j3hjjed">
               <Input
+                aria-label="Search within wishlist"
                 value={collectionSearchTerm}
                 onChange={(e) => setCollectionSearchTerm(e.target.value)}
                 placeholder="Search within wishlist..."
@@ -797,6 +798,7 @@ export function WishlistContent() {
               >
                 <SelectTrigger
                   className="w-[110px] sm:w-[130px]"
+                  aria-label="Filter wishlist by ownership"
                   data-oid="w8gvxu4"
                 >
                   <SelectValue data-oid="khh:y5r" />

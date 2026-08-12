@@ -92,6 +92,7 @@ export function LoginDialog({
           {error && (
             <div
               className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+              role="alert"
               data-oid="pfr6:kg"
             >
               {error}

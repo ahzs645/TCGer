@@ -36,18 +36,16 @@ const PACK_COUNTS = [1, 5, 10] as const;
 
 /**
  * The HUD is a development aid, not part of the demo: it renders under
- * `next dev` and, against a built app, only for `?debug=1`. The demo ships as a
- * static export (`DEMO_EXPORT=true next build`), where NODE_ENV is "production"
- * and the flag is inlined as false, so it stays hidden there.
+ * only when a developer explicitly opts in with `?debug=1`, so ordinary local
+ * demos exercise the same interface as production.
  */
 function useDebugHud(): boolean {
-  const [enabled, setEnabled] = useState(process.env.NODE_ENV !== "production");
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (enabled) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("debug") === "1") setEnabled(true);
-  }, [enabled]);
+    setEnabled(params.get("debug") === "1");
+  }, []);
 
   return enabled;
 }
@@ -249,7 +247,12 @@ export function PackOpening() {
 
       {/* phase hint */}
       {PHASE_HINTS[phase] && (
-        <p className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-xs font-medium text-muted-foreground sm:text-sm">
+        <p
+          className={cn(
+            "pointer-events-none absolute inset-x-4 text-center text-xs font-medium text-muted-foreground sm:text-sm",
+            phase === "select" ? "bottom-64 sm:bottom-56" : "bottom-3",
+          )}
+        >
           {phase === "tear" && packs.length > 1
             ? `Tear once to open all ${packs.length} packs`
             : PHASE_HINTS[phase]}

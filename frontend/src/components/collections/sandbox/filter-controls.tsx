@@ -66,6 +66,7 @@ export function FilterControls({
           Estimated value focus
         </Label>
         <Slider
+          thumbLabels={["Minimum estimated value", "Maximum estimated value"]}
           min={0}
           max={3000}
           step={25}
@@ -81,6 +82,7 @@ export function FilterControls({
           data-oid="mlr-6bl"
         >
           <Input
+            aria-label="Minimum estimated value"
             type="number"
             value={priceRange[0]}
             onChange={(event) => handlePriceInputChange(0, event.target.value)}
@@ -90,6 +92,7 @@ export function FilterControls({
 
           <span data-oid="tfy1uf9">to</span>
           <Input
+            aria-label="Maximum estimated value"
             type="number"
             value={priceRange[1]}
             onChange={(event) => handlePriceInputChange(1, event.target.value)}

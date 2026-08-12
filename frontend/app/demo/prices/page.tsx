@@ -453,6 +453,7 @@ export default function PricesPage() {
             data-oid="sq5:9jv"
           />
           <Input
+            aria-label="Search cards by price"
             placeholder="Search cards..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

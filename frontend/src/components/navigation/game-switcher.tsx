@@ -33,6 +33,7 @@ export function GameSwitcher() {
   return (
     <ToggleGroup
       type="single"
+      aria-label="Filter by game"
       value={selectedGame}
       onValueChange={(value) => value && setGame(value as SupportedGame)}
       className="hidden shrink-0 items-center gap-1 rounded-lg bg-muted p-1 shadow-inner sm:flex"

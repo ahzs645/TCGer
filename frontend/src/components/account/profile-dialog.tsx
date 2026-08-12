@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   User,
   Mail,
@@ -42,6 +42,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const { user, token, setAuth } = useAuthStore();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [changePasswordMode, setChangePasswordMode] = useState(false);
 
@@ -59,19 +60,30 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  useEffect(() => {
-    if (open && token) {
-      setLoading(true);
-      getUserProfile(token)
-        .then((data) => {
-          setProfile(data);
-          setUsername(data.username || "");
-          setEmail(data.email);
-        })
-        .catch((error) => console.error("Failed to load profile:", error))
-        .finally(() => setLoading(false));
+  const loadProfile = useCallback(async () => {
+    if (!token) {
+      setLoadError("Your session is unavailable. Sign in again and retry.");
+      return;
     }
-  }, [open, token]);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await getUserProfile(token);
+      setProfile(data);
+      setUsername(data.username || "");
+      setEmail(data.email);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Failed to load profile.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (open) void loadProfile();
+  }, [loadProfile, open]);
 
   const handleProfileUpdate = async () => {
     if (!token || !profile) return;
@@ -197,11 +209,33 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
         </DialogHeader>
 
         {loading ? (
-          <div className="flex justify-center py-8" data-oid="qt2upp1">
+          <div
+            className="flex justify-center py-8"
+            role="status"
+            aria-live="polite"
+            data-oid="qt2upp1"
+          >
             <Loader2
               className="h-8 w-8 animate-spin text-muted-foreground"
+              aria-hidden="true"
               data-oid=":-fr1zw"
             />
+            <span className="sr-only">Loading profile…</span>
+          </div>
+        ) : loadError ? (
+          <div
+            className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4"
+            role="alert"
+          >
+            <div>
+              <p className="font-medium text-destructive">
+                Couldn&apos;t load your profile
+              </p>
+              <p className="text-sm text-muted-foreground">{loadError}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void loadProfile()}>
+              Try again
+            </Button>
           </div>
         ) : profile ? (
           <div className="space-y-6" data-oid="mv6gxoi">
@@ -230,6 +264,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
               {profileError && (
                 <div
                   className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                  role="alert"
                   data-oid="xrtcpdo"
                 >
                   {profileError}
@@ -402,6 +437,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                       {passwordError && (
                         <div
                           className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                          role="alert"
                           data-oid="pr9d1-r"
                         >
                           {passwordError}
@@ -411,6 +447,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                       {passwordSuccess && (
                         <div
                           className="rounded-md bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400"
+                          role="status"
                           data-oid="ikum24y"
                         >
                           Password changed successfully!
