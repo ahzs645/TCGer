@@ -269,12 +269,18 @@ export function PackOpening() {
                   type="button"
                   onClick={() => setBrowseSkin(s)}
                   className={cn(
-                    "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted",
+                    "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition",
+                    // Hovering must not repaint a selected chip: bg-muted under
+                    // text-primary-foreground is dark on dark, so the label
+                    // disappears under the cursor that just picked it.
+                    !active && "hover:bg-muted",
                     // A variant chip wears its own palette, so its label goes to
                     // the background colour to stay legible on it; anything else
                     // uses the primary fill and must not also take that class.
                     active && tint && "text-background",
-                    active && !tint && "border-primary bg-primary text-primary-foreground",
+                    active &&
+                      !tint &&
+                      "border-primary bg-primary text-primary-foreground hover:bg-primary",
                   )}
                   style={
                     active && tint ? { background: tint, borderColor: tint } : undefined

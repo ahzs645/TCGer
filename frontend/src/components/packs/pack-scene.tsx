@@ -246,25 +246,27 @@ const SHEEN_VERTEX = /* glsl */ `
 
 const SHEEN_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
-  uniform sampler2D uMap;
   uniform float uTime;
   uniform float uOpacity;
   void main() {
-    float a = texture2D(uMap, vUv).a;
+    // This used to be masked by the sheet's alpha, back when the wrapper was a
+    // canvas that punched out its own rounded corners and crimp serrations. Cover
+    // sheets are fully opaque — the silhouette is the mesh now, not the texture —
+    // so that term was always 1 and the band ran at full strength over the whole
+    // wrap. The mask is gone and the amplitude is set for an unmasked sweep.
     float d = vUv.x * 0.75 + vUv.y * 0.5;
     float p = fract(d * 0.8 - uTime * 0.1);
     float band = smoothstep(0.40, 0.5, p) * smoothstep(0.60, 0.5, p);
-    gl_FragColor = vec4(vec3(1.0) * band * 0.4 * a * uOpacity, 0.0);
+    gl_FragColor = vec4(vec3(1.0) * band * 0.12 * uOpacity, 0.0);
   }
 `;
 
 /** Soft light band that sweeps across the wrapper, TCG Pocket style. */
-function makeSheenMaterial(map: THREE.Texture): THREE.ShaderMaterial {
+function makeSheenMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: SHEEN_VERTEX,
     fragmentShader: SHEEN_FRAGMENT,
     uniforms: {
-      uMap: { value: map },
       uTime: { value: 0 },
       uOpacity: { value: 1 },
     },
@@ -347,13 +349,18 @@ function FoilMaterial({
       map={map}
       normalMap={normalMap}
       normalScale={new THREE.Vector2(0.06, 0.06)}
-      metalness={dim ? 0.4 : 0.45}
-      roughness={dim ? 0.3 : 0.24}
-      clearcoat={dim ? 0.5 : 0.9}
-      clearcoatRoughness={0.2}
-      iridescence={dim ? 0 : 0.25}
+      // Tuned for the slab, these blew out on the mesh: a flat plane shows one
+      // highlight lobe mostly off-axis, where the wrap's curved face puts a wide
+      // band at the mirror angle all at once and the sheet vanished under it.
+      // Roughly the studio's numbers for the same mesh, plus a little clearcoat
+      // for the plastic and a trace of iridescence for the foil.
+      metalness={dim ? 0.3 : 0.36}
+      roughness={dim ? 0.5 : 0.42}
+      clearcoat={dim ? 0.2 : 0.3}
+      clearcoatRoughness={0.35}
+      iridescence={dim ? 0 : 0.1}
       iridescenceIOR={1.3}
-      envMapIntensity={dim ? 0.6 : 0.9}
+      envMapIntensity={dim ? 0.4 : 0.55}
       transparent
       alphaTest={0.02}
     />
@@ -396,7 +403,7 @@ export function PackCarousel({ variant, sheet, onSelect }: PackCarouselProps) {
   const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
   const textures = useMemo(() => {
     const map = sheet ?? paintVariantSheet(variant, pack.layout);
-    return { sheet: map, sheen: makeSheenMaterial(map) };
+    return { sheet: map, sheen: makeSheenMaterial() };
   }, [variant, sheet, pack.layout]);
 
   const ring = useRef({
@@ -618,7 +625,7 @@ export function PackExperience({
   );
   const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
   const glowTex = useMemo(() => makeGlowTexture(), []);
-  const sheenMat = useMemo(() => makeSheenMaterial(sheetTex), [sheetTex]);
+  const sheenMat = useMemo(() => makeSheenMaterial(), []);
   const accentColor = useMemo(
     () => new THREE.Color(variant.palette.accent),
     [variant],
