@@ -25,6 +25,9 @@
       "@tcg/pack-core": [
         "../packages/pack-core/src/index.ts"
       ],
+      "@tcg/pack-core/experience": [
+        "../packages/pack-core/src/experience/index.ts"
+      ],
       "@tcg/api-types": [
         "../packages/api-types/dist/index"
       ],

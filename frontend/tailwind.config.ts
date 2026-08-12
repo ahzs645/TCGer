@@ -7,6 +7,7 @@ const config: Config = {
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "../packages/pack-core/src/experience/**/*.{ts,tsx}",
     "./pages/**/*.{ts,tsx}",
     "./node_modules/@shadcn/ui/components/**/*.{ts,tsx}",
     "./node_modules/@shadcn/ui/dist/**/*.{js,ts}",

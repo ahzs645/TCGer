@@ -14,6 +14,7 @@ const distDir = process.env.NEXT_DIST_DIR || '.next';
 // consumed as TypeScript source, so Next has to compile it rather than treat it
 // as a prebuilt dependency the way @tcg/api-types is.
 const packCore = path.join(__dirname, '..', 'packages', 'pack-core', 'src', 'index.ts');
+const packExperience = path.join(__dirname, '..', 'packages', 'pack-core', 'src', 'experience', 'index.ts');
 
 const nextConfig = {
   distDir,
@@ -33,7 +34,8 @@ const nextConfig = {
       'onnxruntime-node$': false,
       // Resolve the submodule straight to its source, so a fresh clone needs only
       // `git submodule update` rather than an npm install to link the workspace.
-      '@tcg/pack-core': packCore,
+      '@tcg/pack-core/experience$': packExperience,
+      '@tcg/pack-core$': packCore,
     };
     return config;
   },
@@ -43,6 +45,7 @@ const nextConfig = {
     resolveAlias: {
       sharp: './src/lib/empty-module.js',
       'onnxruntime-node': './src/lib/empty-module.js',
+      '@tcg/pack-core/experience': '../packages/pack-core/src/experience/index.ts',
       '@tcg/pack-core': '../packages/pack-core/src/index.ts',
     },
   },
