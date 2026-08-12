@@ -61,7 +61,11 @@ import {
 } from "./helpers";
 import { FilterDialog } from "./filter-dialog";
 import { BinderList } from "./binder-list";
-import { DetailPanel, MobileDetailDrawer } from "./detail-panel";
+import {
+  DetailPanel,
+  MobileDetailDrawer,
+  type CopyTrackingDraft,
+} from "./detail-panel";
 import { useCollectionsStore } from "@/stores/collections";
 import { useTagsStore } from "@/stores/tags";
 import { useAuthStore } from "@/stores/auth";
@@ -146,6 +150,18 @@ function summarizeTags(cards: CollectionCard[]) {
     .slice(0, 3);
 }
 
+function getCopyTrackingBadges(copy: CollectionCardCopy) {
+  const badges: string[] = [];
+  if (copy.gradingCompany || copy.gradingScore) {
+    badges.push(
+      [copy.gradingCompany, copy.gradingScore].filter(Boolean).join(" "),
+    );
+  }
+  if (copy.certNumber) badges.push(`Cert ${copy.certNumber}`);
+  if (copy.storageLocation) badges.push(copy.storageLocation);
+  return badges;
+}
+
 function formatPrintDetails(print: TcgCard) {
   const parts: string[] = [];
   if (print.collectorNumber) {
@@ -224,6 +240,12 @@ export function CollectionView() {
   const [draftIsSealedPromo, setDraftIsSealedPromo] = useState(false);
   const [draftIsOversized, setDraftIsOversized] = useState(false);
   const [draftIsPeelOff, setDraftIsPeelOff] = useState(false);
+  const [draftTracking, setDraftTracking] = useState<CopyTrackingDraft>({
+    gradingCompany: "",
+    gradingScore: "",
+    certNumber: "",
+    storageLocation: "",
+  });
   const [pendingBinderId, setPendingBinderId] = useState<string>(
     LIBRARY_COLLECTION_ID,
   );
@@ -482,6 +504,12 @@ export function CollectionView() {
       setDraftIsSealedPromo(selectedCopy.isSealedPromo ?? false);
       setDraftIsOversized(selectedCopy.isOversized ?? false);
       setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
+      setDraftTracking({
+        gradingCompany: selectedCopy.gradingCompany ?? "",
+        gradingScore: selectedCopy.gradingScore ?? "",
+        certNumber: selectedCopy.certNumber ?? "",
+        storageLocation: selectedCopy.storageLocation ?? "",
+      });
     } else {
       setDraftNotes("");
       setDraftCopyTags([]);
@@ -491,6 +519,12 @@ export function CollectionView() {
       setDraftIsSealedPromo(false);
       setDraftIsOversized(false);
       setDraftIsPeelOff(false);
+      setDraftTracking({
+        gradingCompany: "",
+        gradingScore: "",
+        certNumber: "",
+        storageLocation: "",
+      });
     }
     setStatus("idle");
     setErrorMessage(null);
@@ -630,10 +664,23 @@ export function CollectionView() {
     setExpandedRows((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
   };
 
-  /** Select a card via user tap — opens the mobile drawer */
-  const selectCard = (cardId: string) => {
+  /** Select a card or copy. Multi-copy rows expand before opening the editor. */
+  const selectCard = (cardId: string, copyId?: string) => {
+    const card = sortedCards.find((candidate) => candidate.id === cardId);
     setSelectedCardId(cardId);
-    setMobileDrawerOpen(true);
+    if (copyId) {
+      setSelectedCopyId(copyId);
+      setMobileDrawerOpen(true);
+      return;
+    }
+    if ((card?.copies?.length ?? 0) === 1) {
+      setSelectedCopyId(card?.copies?.[0]?.id ?? null);
+      setMobileDrawerOpen(true);
+      return;
+    }
+    setSelectedCopyId(null);
+    setExpandedRows((current) => ({ ...current, [cardId]: true }));
+    setMobileDrawerOpen(false);
   };
 
   const toggleTagFilter = (tagId: string) => {
@@ -734,11 +781,21 @@ export function CollectionView() {
     if (draftIsPeelOff !== (selectedCopy.isPeelOff ?? false)) {
       updates.isPeelOff = draftIsPeelOff;
     }
+    for (const field of [
+      "gradingCompany",
+      "gradingScore",
+      "certNumber",
+      "storageLocation",
+    ] as const) {
+      if (draftTracking[field] !== (selectedCopy[field] ?? "")) {
+        updates[field] = draftTracking[field].trim() || null;
+      }
+    }
     return Object.keys(updates).length ? updates : null;
   };
 
   const handleSave = async () => {
-    if (!token || !selectedCard || !selectedCopy) {
+    if (!token || !selectedCard || !selectedCopy || status === "saving") {
       return;
     }
     const payload = buildUpdatePayload();
@@ -779,6 +836,12 @@ export function CollectionView() {
     setDraftIsSealedPromo(selectedCopy.isSealedPromo ?? false);
     setDraftIsOversized(selectedCopy.isOversized ?? false);
     setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
+    setDraftTracking({
+      gradingCompany: selectedCopy.gradingCompany ?? "",
+      gradingScore: selectedCopy.gradingScore ?? "",
+      certNumber: selectedCopy.certNumber ?? "",
+      storageLocation: selectedCopy.storageLocation ?? "",
+    });
     setStatus("idle");
     setErrorMessage(null);
   };
@@ -1106,7 +1169,10 @@ export function CollectionView() {
   return (
     <div className="space-y-6" data-oid="bclo5-9">
       {error && (
-        <div className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div
+          className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          role="alert"
+        >
           <span>{error}</span>
           <button
             type="button"
@@ -1286,20 +1352,10 @@ export function CollectionView() {
                 return (
                   <div key={card.id} data-oid="19un-4y">
                     <div
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={isSelected}
                       className={cn(
-                        "w-full text-left px-4 py-3 transition-colors cursor-pointer",
+                        "w-full px-4 py-3 text-left transition-colors",
                         isSelected && "bg-primary/5",
                       )}
-                      onClick={() => selectCard(card.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          selectCard(card.id);
-                        }
-                      }}
                       data-oid="3wj3_y1"
                     >
                       <div
@@ -1324,7 +1380,14 @@ export function CollectionView() {
                         >
                           {expanded ? "−" : "+"}
                         </button>
-                        <div className="flex-1 min-w-0" data-oid="j38pt51">
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          aria-label={`Edit ${card.name}`}
+                          className="min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onClick={() => selectCard(card.id)}
+                          data-oid="j38pt51"
+                        >
                           <div
                             className="flex items-center gap-2"
                             data-oid="dtoc5b2"
@@ -1370,7 +1433,7 @@ export function CollectionView() {
                               </>
                             )}
                           </div>
-                        </div>
+                        </button>
                       </div>
                     </div>
                     {expanded && card.copies?.length ? (
@@ -1392,6 +1455,8 @@ export function CollectionView() {
                             <button
                               key={copy.id}
                               type="button"
+                              aria-pressed={selectedCopyId === copy.id}
+                              aria-label={`Edit ${card.name} copy ${index + 1}, ${copy.condition ?? "unknown condition"}`}
                               className={cn(
                                 "w-full text-left rounded-md border px-3 py-2 text-xs transition",
                                 selectedCopyId === copy.id
@@ -1399,8 +1464,7 @@ export function CollectionView() {
                                   : "hover:border-primary/40",
                               )}
                               onClick={() => {
-                                selectCard(card.id);
-                                setSelectedCopyId(copy.id);
+                                selectCard(card.id, copy.id);
                               }}
                               data-oid="1nq047e"
                             >
@@ -1424,6 +1488,19 @@ export function CollectionView() {
                                 >
                                   {copy.notes}
                                 </p>
+                              ) : null}
+                              {getCopyTrackingBadges(copy).length ? (
+                                <span className="mt-1 flex flex-wrap gap-1">
+                                  {getCopyTrackingBadges(copy).map((label) => (
+                                    <Badge
+                                      key={label}
+                                      variant="outline"
+                                      className="text-[10px]"
+                                    >
+                                      {label}
+                                    </Badge>
+                                  ))}
+                                </span>
                               ) : null}
                             </button>
                           ))}
@@ -1502,25 +1579,34 @@ export function CollectionView() {
                             >
                               {expanded ? "−" : "+"}
                             </Button>
-                            <div data-oid="iazhh8:">
-                              <p
-                                className="font-medium leading-tight"
+                            <button
+                              type="button"
+                              aria-pressed={selectedCardId === card.id}
+                              className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                selectCard(card.id);
+                              }}
+                              data-oid="iazhh8:"
+                            >
+                              <span
+                                className="block font-medium leading-tight"
                                 data-oid="4hzd59i"
                               >
                                 {card.name}
-                              </p>
+                              </span>
                               {showCardNumbers && (
-                                <p
-                                  className="text-xs text-muted-foreground"
+                                <span
+                                  className="block text-xs text-muted-foreground"
                                   data-oid="s-paji:"
                                 >
                                   {card.setName ??
                                     card.setCode ??
                                     "Unknown set"}
                                   {card.setCode ? ` · #${card.setCode}` : ""}
-                                </p>
+                                </span>
                               )}
-                            </div>
+                            </button>
                           </div>
                         </TableCell>
                         <TableCell data-oid="s7t42kw">
@@ -1591,16 +1677,18 @@ export function CollectionView() {
                               </div>
                               {card.copies?.map((copy, index) => {
                                 const handleClick = () => {
-                                  selectCard(card.id);
-                                  setSelectedCopyId(copy.id);
+                                  selectCard(card.id, copy.id);
                                 };
-                                const variantBadges =
-                                  getCopyVariantBadges(copy);
+                                const variantBadges = getCopyVariantBadges(
+                                  copy,
+                                ).concat(getCopyTrackingBadges(copy));
                                 return (
                                   <div
                                     key={copy.id}
                                     role="button"
                                     tabIndex={0}
+                                    aria-pressed={selectedCopyId === copy.id}
+                                    aria-label={`Edit ${card.name} copy ${index + 1}, ${copy.condition ?? "unknown condition"}`}
                                     onClick={handleClick}
                                     onKeyDown={(event) => {
                                       if (
@@ -1720,6 +1808,7 @@ export function CollectionView() {
           draftIsSealedPromo={draftIsSealedPromo}
           draftIsOversized={draftIsOversized}
           draftIsPeelOff={draftIsPeelOff}
+          draftTracking={draftTracking}
           onBinderChange={(value) => {
             setDraftBinderId(value);
             setPendingBinderId(value);
@@ -1732,6 +1821,9 @@ export function CollectionView() {
           onIsSealedPromoChange={setDraftIsSealedPromo}
           onIsOversizedChange={setDraftIsOversized}
           onIsPeelOffChange={setDraftIsPeelOff}
+          onTrackingChange={(field, value) =>
+            setDraftTracking((current) => ({ ...current, [field]: value }))
+          }
           onSave={handleSave}
           onReset={resetSelectedCopyDrafts}
           onMove={handleMove}
@@ -1765,6 +1857,7 @@ export function CollectionView() {
         draftIsSealedPromo={draftIsSealedPromo}
         draftIsOversized={draftIsOversized}
         draftIsPeelOff={draftIsPeelOff}
+        draftTracking={draftTracking}
         onBinderChange={(value) => {
           setDraftBinderId(value);
           setPendingBinderId(value);
@@ -1777,6 +1870,9 @@ export function CollectionView() {
         onIsSealedPromoChange={setDraftIsSealedPromo}
         onIsOversizedChange={setDraftIsOversized}
         onIsPeelOffChange={setDraftIsPeelOff}
+        onTrackingChange={(field, value) =>
+          setDraftTracking((current) => ({ ...current, [field]: value }))
+        }
         onSave={handleSave}
         onReset={resetSelectedCopyDrafts}
         onMove={handleMove}

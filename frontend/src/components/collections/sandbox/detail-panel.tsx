@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
@@ -81,6 +82,7 @@ export interface DetailPanelProps {
   draftIsSealedPromo: boolean;
   draftIsOversized: boolean;
   draftIsPeelOff: boolean;
+  draftTracking: CopyTrackingDraft;
   onBinderChange: (binderId: string) => void;
   onConditionChange: (condition: (typeof CONDITION_ORDER)[number]) => void;
   onNotesChange: (value: string) => void;
@@ -90,6 +92,7 @@ export interface DetailPanelProps {
   onIsSealedPromoChange: (value: boolean) => void;
   onIsOversizedChange: (value: boolean) => void;
   onIsPeelOffChange: (value: boolean) => void;
+  onTrackingChange: (field: keyof CopyTrackingDraft, value: string) => void;
   onSave: () => void;
   onReset: () => void;
   onMove: () => void;
@@ -102,6 +105,13 @@ export interface DetailPanelProps {
   printSelectionDisabled?: boolean;
   onClose?: () => void;
   open?: boolean;
+}
+
+export interface CopyTrackingDraft {
+  gradingCompany: string;
+  gradingScore: string;
+  certNumber: string;
+  storageLocation: string;
 }
 
 /** Compact card header for the mobile drawer */
@@ -335,9 +345,7 @@ function PrintSelection({
 }) {
   const supportsPrintSelection = ["magic", "pokemon"].includes(card.tcg);
   if (!supportsPrintSelection || !onSelectPrint) return null;
-  const variantBadges = selectedCopy
-    ? getCopyVariantBadges(selectedCopy)
-    : [];
+  const variantBadges = selectedCopy ? getCopyVariantBadges(selectedCopy) : [];
 
   return (
     <div className="space-y-1" data-oid="grqiyj0">
@@ -417,6 +425,9 @@ function VariantEditor({
 }) {
   if (card.tcg !== "pokemon") return null;
 
+  const fieldScope = compact ? "mobile" : "desktop";
+  const finishId = `variant-finish-${fieldScope}`;
+
   const choices = new Map(
     POKEMON_FINISH_CATALOG.map((option) => [option.code, option]),
   );
@@ -440,14 +451,16 @@ function VariantEditor({
       </div>
       <div className={compact ? "space-y-3" : "grid grid-cols-2 gap-3"}>
         <div className="space-y-1.5">
-          <Label className="text-xs">Finish</Label>
+          <Label className="text-xs" htmlFor={finishId}>
+            Finish
+          </Label>
           <Select
             value={finishCode || "__finish-empty__"}
             onValueChange={(value) =>
               onFinishCodeChange(value === "__finish-empty__" ? "" : value)
             }
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger id={finishId} className="h-9">
               <SelectValue placeholder="Not specified" />
             </SelectTrigger>
             <SelectContent>
@@ -524,6 +537,83 @@ function VariantEditor({
   );
 }
 
+function CopyTrackingEditor({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: CopyTrackingDraft;
+  onChange: (field: keyof CopyTrackingDraft, value: string) => void;
+  compact?: boolean;
+}) {
+  const fieldScope = compact ? "mobile" : "desktop";
+  const fieldId = (name: keyof CopyTrackingDraft) =>
+    `copy-${name}-${fieldScope}`;
+
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+      <div>
+        <p className="text-sm font-medium">Grading & storage</p>
+        <p className="text-xs text-muted-foreground">
+          Tracking details for this physical copy.
+        </p>
+      </div>
+      <div className={compact ? "space-y-3" : "grid grid-cols-2 gap-3"}>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("gradingCompany")}>
+            Grading company
+          </Label>
+          <Input
+            id={fieldId("gradingCompany")}
+            className="h-9"
+            value={value.gradingCompany}
+            onChange={(event) => onChange("gradingCompany", event.target.value)}
+            placeholder="e.g. PSA"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("gradingScore")}>
+            Grade
+          </Label>
+          <Input
+            id={fieldId("gradingScore")}
+            className="h-9"
+            value={value.gradingScore}
+            onChange={(event) => onChange("gradingScore", event.target.value)}
+            placeholder="e.g. 10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("certNumber")}>
+            Certificate number
+          </Label>
+          <Input
+            id={fieldId("certNumber")}
+            className="h-9"
+            value={value.certNumber}
+            onChange={(event) => onChange("certNumber", event.target.value)}
+            placeholder="Certification ID"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("storageLocation")}>
+            Storage location
+          </Label>
+          <Input
+            id={fieldId("storageLocation")}
+            className="h-9"
+            value={value.storageLocation}
+            onChange={(event) =>
+              onChange("storageLocation", event.target.value)
+            }
+            placeholder="e.g. Vault A"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Shared edit form for both desktop and mobile */
 function EditForm({
   card,
@@ -542,6 +632,7 @@ function EditForm({
   draftIsSealedPromo,
   draftIsOversized,
   draftIsPeelOff,
+  draftTracking,
   onBinderChange,
   onConditionChange,
   onNotesChange,
@@ -551,6 +642,7 @@ function EditForm({
   onIsSealedPromoChange,
   onIsOversizedChange,
   onIsPeelOffChange,
+  onTrackingChange,
   onSave,
   onReset,
   onMove,
@@ -576,6 +668,7 @@ function EditForm({
   draftIsSealedPromo: boolean;
   draftIsOversized: boolean;
   draftIsPeelOff: boolean;
+  draftTracking: CopyTrackingDraft;
   onBinderChange: (binderId: string) => void;
   onConditionChange: (condition: (typeof CONDITION_ORDER)[number]) => void;
   onNotesChange: (value: string) => void;
@@ -585,6 +678,7 @@ function EditForm({
   onIsSealedPromoChange: (value: boolean) => void;
   onIsOversizedChange: (value: boolean) => void;
   onIsPeelOffChange: (value: boolean) => void;
+  onTrackingChange: (field: keyof CopyTrackingDraft, value: string) => void;
   onSave: () => void;
   onReset: () => void;
   onMove: () => void;
@@ -594,6 +688,9 @@ function EditForm({
   errorMessage: string | null;
   compact?: boolean;
 }) {
+  const fieldScope = compact ? "mobile" : "desktop";
+  const fieldId = (name: string) => `copy-${name}-${fieldScope}`;
+
   if (!selectedCopy) {
     return (
       <div
@@ -612,7 +709,11 @@ function EditForm({
         <>
           <div className="grid grid-cols-2 gap-3" data-oid="w:box.q">
             <div className="space-y-1.5" data-oid="xd:.z4:">
-              <Label className="text-xs" data-oid="fz.5oaq">
+              <Label
+                className="text-xs"
+                htmlFor={fieldId("binder")}
+                data-oid="fz.5oaq"
+              >
                 Binder
               </Label>
               <Select
@@ -620,7 +721,11 @@ function EditForm({
                 onValueChange={onBinderChange}
                 data-oid="bdrkta_"
               >
-                <SelectTrigger className="h-9" data-oid="9-zy3lj">
+                <SelectTrigger
+                  id={fieldId("binder")}
+                  className="h-9"
+                  data-oid="9-zy3lj"
+                >
                   <SelectValue placeholder="Select binder" data-oid="7p:vkwr" />
                 </SelectTrigger>
                 <SelectContent data-oid="3cs8geb">
@@ -637,7 +742,11 @@ function EditForm({
               </Select>
             </div>
             <div className="space-y-1.5" data-oid="h8h76lj">
-              <Label className="text-xs" data-oid="wm0rjyu">
+              <Label
+                className="text-xs"
+                htmlFor={fieldId("condition")}
+                data-oid="wm0rjyu"
+              >
                 Condition
               </Label>
               <Select
@@ -647,7 +756,11 @@ function EditForm({
                 }
                 data-oid="4b6qmgy"
               >
-                <SelectTrigger className="h-9" data-oid="ci6vo6m">
+                <SelectTrigger
+                  id={fieldId("condition")}
+                  className="h-9"
+                  data-oid="ci6vo6m"
+                >
                   <SelectValue placeholder="Condition" data-oid="ydgz9o8" />
                 </SelectTrigger>
                 <SelectContent data-oid="gf-k95.">
@@ -680,6 +793,11 @@ function EditForm({
             onIsPeelOffChange={onIsPeelOffChange}
             compact
           />
+          <CopyTrackingEditor
+            value={draftTracking}
+            onChange={onTrackingChange}
+            compact
+          />
           <Button
             variant="secondary"
             size="sm"
@@ -691,20 +809,34 @@ function EditForm({
             {moveStatus === "pending" ? "Moving…" : "Move card"}
           </Button>
           {moveStatus === "success" && (
-            <p className="text-xs text-emerald-600" data-oid="4wbch7f">
+            <p
+              className="text-xs text-emerald-600"
+              role="status"
+              aria-live="polite"
+              data-oid="4wbch7f"
+            >
               Moved.
             </p>
           )}
           {moveStatus === "error" && (
-            <p className="text-xs text-destructive" data-oid="l2m7eqn">
+            <p
+              className="text-xs text-destructive"
+              role="alert"
+              data-oid="l2m7eqn"
+            >
               {moveError ?? "Unable to move."}
             </p>
           )}
           <div className="space-y-1.5" data-oid="yay6-h.">
-            <Label className="text-xs" data-oid="c7n8:03">
+            <Label
+              className="text-xs"
+              htmlFor={fieldId("notes")}
+              data-oid="c7n8:03"
+            >
               Notes
             </Label>
             <Textarea
+              id={fieldId("notes")}
               value={draftNotes}
               onChange={(event) => onNotesChange(event.target.value)}
               rows={2}
@@ -714,10 +846,15 @@ function EditForm({
             />
           </div>
           <div className="space-y-1.5" data-oid="vb8y6uw">
-            <Label className="text-xs" data-oid="vaoyyyk">
+            <Label
+              className="text-xs"
+              htmlFor={fieldId("tags")}
+              data-oid="vaoyyyk"
+            >
               Tags
             </Label>
             <TagCombobox
+              inputId={fieldId("tags")}
               availableTags={availableTags}
               selectedTags={draftCopyTags}
               onToggleTag={onToggleTag}
@@ -730,6 +867,7 @@ function EditForm({
               size="sm"
               className="flex-1"
               onClick={onSave}
+              disabled={status === "saving"}
               data-oid="4cgrtxt"
             >
               {status === "saving" ? "Saving…" : "Save"}
@@ -745,12 +883,21 @@ function EditForm({
             </Button>
           </div>
           {status === "success" && (
-            <p className="text-xs text-emerald-600" data-oid="pc66joe">
+            <p
+              className="text-xs text-emerald-600"
+              role="status"
+              aria-live="polite"
+              data-oid="pc66joe"
+            >
               Updated.
             </p>
           )}
           {status === "error" && (
-            <p className="text-xs text-destructive" data-oid="o1jzju_">
+            <p
+              className="text-xs text-destructive"
+              role="alert"
+              data-oid="o1jzju_"
+            >
               {errorMessage ?? "Failed."}
             </p>
           )}
@@ -759,13 +906,15 @@ function EditForm({
         /* Desktop: full layout */
         <>
           <div className="space-y-2" data-oid="oqpp:-n">
-            <Label data-oid="p.niri7">Binder assignment</Label>
+            <Label htmlFor={fieldId("binder")} data-oid="p.niri7">
+              Binder assignment
+            </Label>
             <Select
               value={draftBinderId}
               onValueChange={onBinderChange}
               data-oid=":pa0y.9"
             >
-              <SelectTrigger data-oid="92qjheg">
+              <SelectTrigger id={fieldId("binder")} data-oid="92qjheg">
                 <SelectValue placeholder="Select binder" data-oid="z3hrl2q" />
               </SelectTrigger>
               <SelectContent data-oid="0xz7kwq">
@@ -792,18 +941,29 @@ function EditForm({
               {moveStatus === "pending" ? "Moving…" : "Move card"}
             </Button>
             {moveStatus === "success" && (
-              <p className="text-xs text-emerald-600" data-oid="z57kld:">
+              <p
+                className="text-xs text-emerald-600"
+                role="status"
+                aria-live="polite"
+                data-oid="z57kld:"
+              >
                 Copy moved successfully.
               </p>
             )}
             {moveStatus === "error" && (
-              <p className="text-xs text-destructive" data-oid="9_vwicq">
+              <p
+                className="text-xs text-destructive"
+                role="alert"
+                data-oid="9_vwicq"
+              >
                 {moveError ?? "Unable to move copy."}
               </p>
             )}
           </div>
           <div className="space-y-2" data-oid="9c0ryt6">
-            <Label data-oid="tgzb3os">Condition</Label>
+            <Label htmlFor={fieldId("condition")} data-oid="tgzb3os">
+              Condition
+            </Label>
             <Select
               value={draftCondition}
               onValueChange={(value) =>
@@ -811,7 +971,7 @@ function EditForm({
               }
               data-oid="l54cpoc"
             >
-              <SelectTrigger data-oid="mvahvyi">
+              <SelectTrigger id={fieldId("condition")} data-oid="mvahvyi">
                 <SelectValue
                   placeholder="Select condition"
                   data-oid="gh-qtg:"
@@ -846,9 +1006,16 @@ function EditForm({
             onIsPeelOffChange={onIsPeelOffChange}
             compact={false}
           />
+          <CopyTrackingEditor
+            value={draftTracking}
+            onChange={onTrackingChange}
+          />
           <div className="space-y-2" data-oid="nhu.vox">
-            <Label data-oid="igsimji">Notes</Label>
+            <Label htmlFor={fieldId("notes")} data-oid="igsimji">
+              Notes
+            </Label>
             <Textarea
+              id={fieldId("notes")}
               value={draftNotes}
               onChange={(event) => onNotesChange(event.target.value)}
               rows={4}
@@ -857,8 +1024,11 @@ function EditForm({
             />
           </div>
           <div className="space-y-2" data-oid="01uopxy">
-            <Label data-oid="m3oneet">Tags</Label>
+            <Label htmlFor={fieldId("tags")} data-oid="m3oneet">
+              Tags
+            </Label>
             <TagCombobox
+              inputId={fieldId("tags")}
               availableTags={availableTags}
               selectedTags={draftCopyTags}
               onToggleTag={onToggleTag}
@@ -867,7 +1037,12 @@ function EditForm({
             />
           </div>
           <div className="flex gap-2" data-oid="px7x9kj">
-            <Button className="flex-1" onClick={onSave} data-oid="kb85y.v">
+            <Button
+              className="flex-1"
+              onClick={onSave}
+              disabled={status === "saving"}
+              data-oid="kb85y.v"
+            >
               {status === "saving" ? "Saving…" : "Save changes"}
             </Button>
             <Button
@@ -880,12 +1055,21 @@ function EditForm({
             </Button>
           </div>
           {status === "success" && (
-            <p className="text-xs text-emerald-600" data-oid="0-efsow">
+            <p
+              className="text-xs text-emerald-600"
+              role="status"
+              aria-live="polite"
+              data-oid="0-efsow"
+            >
               Copy updated successfully.
             </p>
           )}
           {status === "error" && (
-            <p className="text-xs text-destructive" data-oid="nx8qiaf">
+            <p
+              className="text-xs text-destructive"
+              role="alert"
+              data-oid="nx8qiaf"
+            >
               {errorMessage ?? "Failed to update copy."}
             </p>
           )}
@@ -914,6 +1098,7 @@ export function DetailPanel(props: DetailPanelProps) {
     draftIsSealedPromo,
     draftIsOversized,
     draftIsPeelOff,
+    draftTracking,
     onBinderChange,
     onConditionChange,
     onNotesChange,
@@ -923,6 +1108,7 @@ export function DetailPanel(props: DetailPanelProps) {
     onIsSealedPromoChange,
     onIsOversizedChange,
     onIsPeelOffChange,
+    onTrackingChange,
     onSave,
     onReset,
     onMove,
@@ -939,7 +1125,10 @@ export function DetailPanel(props: DetailPanelProps) {
 
   if (!card) {
     return (
-      <Card className="sticky top-4 h-fit hidden lg:block" data-oid="st0.bso">
+      <Card
+        className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain lg:block"
+        data-oid="st0.bso"
+      >
         <CardHeader data-oid="gc_4ffw">
           <CardTitle data-oid="nkhr4j-">Select a card</CardTitle>
           <CardDescription data-oid="l61::wi">
@@ -952,7 +1141,10 @@ export function DetailPanel(props: DetailPanelProps) {
   }
 
   return (
-    <Card className="sticky top-4 h-fit hidden lg:block" data-oid="p60mzkx">
+    <Card
+      className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain lg:block"
+      data-oid="p60mzkx"
+    >
       <CardHeader className="space-y-4" data-oid="irmhzf3">
         <FullCardHeader
           card={card}
@@ -986,6 +1178,7 @@ export function DetailPanel(props: DetailPanelProps) {
           draftIsSealedPromo={draftIsSealedPromo}
           draftIsOversized={draftIsOversized}
           draftIsPeelOff={draftIsPeelOff}
+          draftTracking={draftTracking}
           onBinderChange={onBinderChange}
           onConditionChange={onConditionChange}
           onNotesChange={onNotesChange}
@@ -995,6 +1188,7 @@ export function DetailPanel(props: DetailPanelProps) {
           onIsSealedPromoChange={onIsSealedPromoChange}
           onIsOversizedChange={onIsOversizedChange}
           onIsPeelOffChange={onIsPeelOffChange}
+          onTrackingChange={onTrackingChange}
           onSave={onSave}
           onReset={onReset}
           onMove={onMove}
@@ -1092,6 +1286,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     draftIsSealedPromo,
     draftIsOversized,
     draftIsPeelOff,
+    draftTracking,
     onBinderChange,
     onConditionChange,
     onNotesChange,
@@ -1101,6 +1296,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     onIsSealedPromoChange,
     onIsOversizedChange,
     onIsPeelOffChange,
+    onTrackingChange,
     onSave,
     onReset,
     onMove,
@@ -1126,7 +1322,19 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
       }}
       data-oid="78yndmb"
     >
-      <DrawerContent className="max-h-[85vh]" data-oid="8-yl.z:">
+      <DrawerContent
+        className="max-h-[85vh]"
+        onEscapeKeyDown={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (
+            target?.getAttribute("role") === "combobox" &&
+            target.getAttribute("aria-expanded") === "true"
+          ) {
+            event.preventDefault();
+          }
+        }}
+        data-oid="8-yl.z:"
+      >
         <VisuallyHidden data-oid="67mnufd">
           <DrawerTitle data-oid="s969-q:">
             {card?.name ?? "Card details"}
@@ -1140,7 +1348,22 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
             className="overflow-y-auto px-4 pb-6 pt-2 space-y-4"
             data-oid="p:gkjvo"
           >
-            <CompactCardHeader card={card} data-oid="-cwqbog" />
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <CompactCardHeader card={card} data-oid="-cwqbog" />
+              </div>
+              <DrawerClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 shrink-0"
+                  aria-label="Close card details"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              </DrawerClose>
+            </div>
             <PrintSelection
               card={card}
               selectedCopy={selectedCopy}
@@ -1167,6 +1390,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               draftIsSealedPromo={draftIsSealedPromo}
               draftIsOversized={draftIsOversized}
               draftIsPeelOff={draftIsPeelOff}
+              draftTracking={draftTracking}
               onBinderChange={onBinderChange}
               onConditionChange={onConditionChange}
               onNotesChange={onNotesChange}
@@ -1176,6 +1400,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               onIsSealedPromoChange={onIsSealedPromoChange}
               onIsOversizedChange={onIsOversizedChange}
               onIsPeelOffChange={onIsPeelOffChange}
+              onTrackingChange={onTrackingChange}
               onSave={onSave}
               onReset={onReset}
               onMove={onMove}

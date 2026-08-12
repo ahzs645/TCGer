@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 interface TagComboboxProps {
+  inputId?: string;
   availableTags: CollectionTag[];
   selectedTags: string[];
   onToggleTag: (tagId: string) => void;
@@ -21,6 +22,7 @@ interface TagComboboxProps {
 }
 
 export function TagCombobox({
+  inputId,
   availableTags,
   selectedTags,
   onToggleTag,
@@ -50,6 +52,13 @@ export function TagCombobox({
   const canCreate =
     normalizedQuery.length > 1 &&
     !availableTags.some((tag) => tag.label.toLowerCase() === normalizedLower);
+  const optionCount = filteredTags.length + (canCreate ? 1 : 0);
+  const activeOptionId =
+    activeIndex < filteredTags.length
+      ? `${listboxId}-${filteredTags[activeIndex]?.id}`
+      : canCreate
+        ? `${listboxId}-create`
+        : undefined;
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -98,24 +107,25 @@ export function TagCombobox({
       event.preventDefault();
       setOpen(true);
       setActiveIndex((current) =>
-        filteredTags.length ? (current + 1) % filteredTags.length : 0,
+        optionCount ? (current + 1) % optionCount : 0,
       );
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setOpen(true);
       setActiveIndex((current) =>
-        filteredTags.length
-          ? (current - 1 + filteredTags.length) % filteredTags.length
-          : 0,
+        optionCount ? (current - 1 + optionCount) % optionCount : 0,
       );
     } else if (event.key === "Enter") {
       event.preventDefault();
-      if (filteredTags.length) {
+      if (activeIndex < filteredTags.length) {
         handleSelectTag(filteredTags[activeIndex]?.id ?? filteredTags[0].id);
       } else if (canCreate) {
         void handleCreateTag();
       }
     } else if (event.key === "Escape") {
+      if (!open && !query) return;
+      event.preventDefault();
+      event.stopPropagation();
       setOpen(false);
       setQuery("");
       setActiveIndex(0);
@@ -152,18 +162,13 @@ export function TagCombobox({
       </div>
       <div className="relative" ref={containerRef} data-oid="59gn962">
         <Input
+          id={inputId}
           role="combobox"
           aria-label="Tags"
           aria-autocomplete="list"
           aria-expanded={showSuggestions}
-          aria-controls={
-            showSuggestions && filteredTags.length ? listboxId : undefined
-          }
-          aria-activedescendant={
-            showSuggestions && filteredTags[activeIndex]
-              ? `${listboxId}-${filteredTags[activeIndex].id}`
-              : undefined
-          }
+          aria-controls={showSuggestions ? listboxId : undefined}
+          aria-activedescendant={showSuggestions ? activeOptionId : undefined}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -181,6 +186,9 @@ export function TagCombobox({
 
         {showSuggestions ? (
           <div
+            id={listboxId}
+            role="listbox"
+            aria-label="Tag suggestions"
             className="absolute z-20 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-lg"
             data-oid="wx18719"
           >
@@ -195,18 +203,12 @@ export function TagCombobox({
               <>
                 {filteredTags.length ? (
                   <ul
-                    id={listboxId}
-                    role="listbox"
-                    aria-label="Matching tags"
+                    role="none"
                     className="max-h-48 overflow-y-auto py-1"
                     data-oid="c15t39y"
                   >
                     {filteredTags.map((tag, index) => (
-                      <li
-                        key={tag.id}
-                        role="none"
-                        data-oid="1avczxa"
-                      >
+                      <li key={tag.id} role="none" data-oid="1avczxa">
                         <button
                           id={`${listboxId}-${tag.id}`}
                           type="button"
@@ -244,12 +246,16 @@ export function TagCombobox({
                 {canCreate ? (
                   <div className="border-t px-2 py-2" data-oid="7xwczdv">
                     <Button
+                      id={`${listboxId}-create`}
                       type="button"
+                      role="option"
+                      aria-selected={activeIndex === filteredTags.length}
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start"
                       disabled={isCreating}
                       onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveIndex(filteredTags.length)}
                       onClick={() => void handleCreateTag()}
                       data-oid="opg5cvw"
                     >
