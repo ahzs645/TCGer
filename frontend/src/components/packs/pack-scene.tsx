@@ -113,10 +113,53 @@ function buildCutSet(geometry: THREE.BufferGeometry, cutFn: CutFn): SplitMesh {
   return splitGeometryByCut(geometry, cutFn);
 }
 
-/** The severed boundary as a drawable line. */
-function seamGeometry(seam: Float32Array): THREE.BufferGeometry {
+/**
+ * The severed boundary as a ribbon that hugs the torn edge.
+ *
+ * Not `lineSegments`: WebGL clamps `lineWidth` to 1px on essentially every
+ * platform, so the glow would be a hairline you cannot see against the artwork.
+ * Each seam segment becomes a quad instead, extended away from the cut — down for
+ * the half that stays, up for the strip — so both edges glow along the side they
+ * are about to part from.
+ *
+ * The ribbon is pushed slightly outward from the pack's axis rather than along
+ * +Z, because the seam runs around the wrap's sides as well as across its face,
+ * and a flat Z offset would bury it in the gussets.
+ */
+function seamRibbonGeometry(seam: Float32Array, side: 1 | -1): THREE.BufferGeometry {
+  const width = 0.06 * (PACK_H / 3.3);
+  const lift = 0.012;
+  const out: number[] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const n = new THREE.Vector3();
+
+  for (let i = 0; i < seam.length; i += 6) {
+    a.set(seam[i], seam[i + 1], seam[i + 2]);
+    b.set(seam[i + 3], seam[i + 4], seam[i + 5]);
+
+    // Outward from the pack's vertical axis; degenerate only dead-centre, where
+    // there is no surface anyway.
+    n.set((a.x + b.x) / 2, 0, (a.z + b.z) / 2);
+    if (n.lengthSq() < 1e-8) n.set(0, 0, 1);
+    n.normalize().multiplyScalar(lift);
+
+    const ax = a.x + n.x;
+    const az = a.z + n.z;
+    const bx = b.x + n.x;
+    const bz = b.z + n.z;
+    const ay = a.y;
+    const by = b.y;
+    const ay2 = a.y + side * width;
+    const by2 = b.y + side * width;
+
+    out.push(ax, ay, az, bx, by, bz, bx, by2, bz);
+    out.push(ax, ay, az, bx, by2, bz, ax, ay2, az);
+  }
+
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(seam, 3));
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(out, 3));
+  geo.computeBoundingSphere();
   return geo;
 }
 
@@ -637,8 +680,14 @@ export function PackExperience({
 
   // Sealed, the pack is whole: the factory perforation is printed on the sheet,
   // not cut into the mesh, so nothing is split until there is an actual tear.
-  const seamGeo = useMemo(
-    () => (cutGeos ? seamGeometry(cutGeos.seam) : null),
+  const seamGeos = useMemo(
+    () =>
+      cutGeos
+        ? {
+            below: seamRibbonGeometry(cutGeos.seam, -1),
+            above: seamRibbonGeometry(cutGeos.seam, 1),
+          }
+        : null,
     [cutGeos],
   );
 
@@ -691,8 +740,8 @@ export function PackExperience({
     return pts;
   }, [tearTrail, glowTex]);
   const chargeGlowRef = useRef<THREE.Sprite>(null);
-  const edgeBodyMatRef = useRef<THREE.LineBasicMaterial>(null);
-  const edgeStripMatRef = useRef<THREE.LineBasicMaterial>(null);
+  const edgeBodyMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const edgeStripMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   const wrapperMaterials = useRef<THREE.MeshPhysicalMaterial[]>([]);
 
@@ -1149,17 +1198,18 @@ export function PackExperience({
                     material={sheenMat}
                   />
                 )}
-                {i === 0 && seamGeo && (
-                  <lineSegments geometry={seamGeo} renderOrder={7}>
-                    <lineBasicMaterial
+                {i === 0 && seamGeos && (
+                  <mesh geometry={seamGeos.below} renderOrder={7}>
+                    <meshBasicMaterial
                       ref={edgeBodyMatRef}
                       color="#bffcff"
                       transparent
                       opacity={0}
                       blending={THREE.AdditiveBlending}
                       depthWrite={false}
+                      side={THREE.DoubleSide}
                     />
-                  </lineSegments>
+                  </mesh>
                 )}
               </group>
 
@@ -1188,17 +1238,18 @@ export function PackExperience({
                     material={sheenMat}
                   />
                 )}
-                {i === 0 && seamGeo && (
-                  <lineSegments geometry={seamGeo} renderOrder={7}>
-                    <lineBasicMaterial
+                {i === 0 && seamGeos && (
+                  <mesh geometry={seamGeos.above} renderOrder={7}>
+                    <meshBasicMaterial
                       ref={edgeStripMatRef}
                       color="#bffcff"
                       transparent
                       opacity={0}
                       blending={THREE.AdditiveBlending}
                       depthWrite={false}
+                      side={THREE.DoubleSide}
                     />
-                  </lineSegments>
+                  </mesh>
                 )}
                 </group>
               </group>

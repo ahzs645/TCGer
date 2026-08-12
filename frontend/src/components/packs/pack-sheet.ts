@@ -188,12 +188,16 @@ export function paintVariantSheet(
   const f = layout.front;
   const cx = f.x + f.w / 2;
   const emblemY = f.y + f.h * 0.46;
-  const emblemR = f.w * 0.4;
+  // Sized off the panel's width, at the same fraction the old 512-wide face used
+  // (150px of 512). Taking it off the width matters: the display panel is 367×468
+  // where the old canvas was 512×768, so a radius keyed to height would grow the
+  // emblem by half and swamp the wordmark.
+  const emblemR = f.w * 0.293;
 
   withAspect(ctx, layout, cx, emblemY, () => {
     const emblem = ctx.createRadialGradient(cx, emblemY, emblemR * 0.07, cx, emblemY, emblemR);
-    emblem.addColorStop(0, "rgba(255,255,255,0.85)");
-    emblem.addColorStop(0.35, `${palette.accent}66`);
+    emblem.addColorStop(0, "rgba(255,255,255,0.7)");
+    emblem.addColorStop(0.35, `${palette.accent}55`);
     emblem.addColorStop(1, `${palette.accent}00`);
     ctx.fillStyle = emblem;
     ctx.beginPath();
@@ -202,7 +206,7 @@ export function paintVariantSheet(
     ctx.strokeStyle = "rgba(255,255,255,0.35)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(cx, emblemY, emblemR * 0.64, 0, Math.PI * 2);
+    ctx.arc(cx, emblemY, f.w * 0.1875, 0, Math.PI * 2);
     ctx.stroke();
   });
 
