@@ -107,6 +107,7 @@ jobs:
 
       - name: Verify demo runtime files
         run: |
+          test -f marketing-site/dist/.well-known/apple-app-site-association
           test -f marketing-site/dist/privacy/index.html
           test -f marketing-site/dist/support/index.html
           test -f marketing-site/dist/manifest.webmanifest

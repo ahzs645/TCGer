@@ -6,6 +6,7 @@ struct PackOpeningView: View {
     @State private var phase = "Loading"
     @State private var errorMessage: String?
     @State private var reloadID = UUID()
+    @State private var pullSession: PackOpeningPullSession?
 
     var body: some View {
         NavigationStack {
@@ -49,6 +50,11 @@ struct PackOpeningView: View {
                 }
             }
         }
+        .sheet(item: $pullSession) { session in
+            PackOpeningReviewSheet(session: session) {
+                phase = "Saved to collection"
+            }
+        }
     }
 
     private func handle(_ event: PackOpeningBridgeEvent) {
@@ -65,6 +71,8 @@ struct PackOpeningView: View {
             case "success": HapticManager.notification(.success)
             default: HapticManager.impact(.medium)
             }
+        case .saveRequested(let session):
+            pullSession = session
         case .error(let message):
             errorMessage = message
         }
@@ -75,6 +83,7 @@ enum PackOpeningBridgeEvent: Equatable {
     case ready
     case phaseChanged(String)
     case haptic(String)
+    case saveRequested(PackOpeningPullSession)
     case error(String)
 }
 
@@ -144,6 +153,12 @@ struct PackOpeningWebView: UIViewRepresentable {
                 if let phase = payload["phase"] as? String { onEvent(.phaseChanged(phase)) }
             case "haptic":
                 if let style = payload["style"] as? String { onEvent(.haptic(style)) }
+            case "saveRequested":
+                if let session = PackOpeningBridgeDecoder.pullSession(from: payload) {
+                    onEvent(.saveRequested(session))
+                } else {
+                    onEvent(.error("The completed pack results could not be read."))
+                }
             case "error":
                 onEvent(.error(payload["message"] as? String ?? "The pack renderer reported an error."))
             default:
@@ -158,6 +173,20 @@ struct PackOpeningWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
             onEvent(.error(error.localizedDescription))
         }
+    }
+}
+
+enum PackOpeningBridgeDecoder {
+    private struct SaveMessage: Decodable {
+        let session: PackOpeningPullSession
+    }
+
+    static func pullSession(from body: Any) -> PackOpeningPullSession? {
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body),
+              let message = try? JSONDecoder().decode(SaveMessage.self, from: data)
+        else { return nil }
+        return message.session
     }
 }
 

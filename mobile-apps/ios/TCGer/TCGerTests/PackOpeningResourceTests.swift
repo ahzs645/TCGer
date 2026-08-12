@@ -65,4 +65,33 @@ final class PackOpeningResourceTests: XCTestCase {
             "manifest.json"
         )
     }
+
+    func testCompletedPullSessionDecodesFromTheJavaScriptBridge() {
+        let body: [String: Any] = [
+            "type": "saveRequested",
+            "session": [
+                "id": "opening-1",
+                "packLabel": "Aurora",
+                "openedAt": "2026-08-12T15:49:00.000Z",
+                "packs": [[[
+                    "cardId": "swsh7-44",
+                    "name": "Bergmite",
+                    "rarity": "Common",
+                    "tier": "common",
+                    "collectorNumber": "44",
+                    "tcg": "pokemon",
+                    "setCode": "swsh7",
+                    "setName": "Evolving Skies",
+                    "imageUrl": "https://example.com/high.webp",
+                    "imageUrlSmall": "https://example.com/low.webp"
+                ]]]
+            ]
+        ]
+
+        let session = PackOpeningBridgeDecoder.pullSession(from: body)
+        XCTAssertEqual(session?.id, "opening-1")
+        XCTAssertEqual(session?.packs.count, 1)
+        XCTAssertEqual(session?.pulls.first?.card.id, "swsh7-44")
+        XCTAssertEqual(session?.setCode, "swsh7")
+    }
 }

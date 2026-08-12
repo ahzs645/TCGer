@@ -588,9 +588,6 @@ video {
   left: 0.75rem;
   right: 0.75rem;
 }
-.bottom-12 {
-  bottom: 3rem;
-}
 .bottom-24 {
   bottom: 6rem;
 }
@@ -600,8 +597,11 @@ video {
 .bottom-5 {
   bottom: 1.25rem;
 }
-.bottom-64 {
-  bottom: 16rem;
+.bottom-\[9\.25rem\] {
+  bottom: 9.25rem;
+}
+.bottom-\[max\(0\.75rem\2c env\(safe-area-inset-bottom\)\)\] {
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 .left-1\/2 {
   left: 50%;
@@ -648,6 +648,9 @@ video {
 .min-h-11 {
   min-height: 2.75rem;
 }
+.min-h-9 {
+  min-height: 2.25rem;
+}
 .min-h-\[30rem\] {
   min-height: 30rem;
 }
@@ -667,6 +670,9 @@ video {
   width: -moz-max-content;
   width: max-content;
 }
+.min-w-0 {
+  min-width: 0px;
+}
 .max-w-4xl {
   max-width: 56rem;
 }
@@ -675,6 +681,9 @@ video {
 }
 .max-w-full {
   max-width: 100%;
+}
+.flex-1 {
+  flex: 1 1 0%;
 }
 .shrink {
   flex-shrink: 1;
@@ -806,6 +815,9 @@ video {
 .bg-amber-400\/15 {
   background-color: rgb(251 191 36 / 0.15);
 }
+.bg-background {
+  background-color: hsl(var(--background));
+}
 .bg-background\/80 {
   background-color: hsl(var(--background) / 0.8);
 }
@@ -861,10 +873,6 @@ video {
   padding-left: 1.25rem;
   padding-right: 1.25rem;
 }
-.px-6 {
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
-}
 .py-1 {
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
@@ -881,8 +889,8 @@ video {
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
 }
-.pb-1 {
-  padding-bottom: 0.25rem;
+.pb-0\.5 {
+  padding-bottom: 0.125rem;
 }
 .pb-16 {
   padding-bottom: 4rem;
@@ -1103,8 +1111,56 @@ label {
     bottom: 14rem;
   }
 
+  .sm\:min-h-10 {
+    min-height: 2.5rem;
+  }
+
+  .sm\:min-h-11 {
+    min-height: 2.75rem;
+  }
+
   .sm\:w-36 {
     width: 9rem;
+  }
+
+  .sm\:w-auto {
+    width: auto;
+  }
+
+  .sm\:flex-none {
+    flex: none;
+  }
+
+  .sm\:flex-col {
+    flex-direction: column;
+  }
+
+  .sm\:gap-2 {
+    gap: 0.5rem;
+  }
+
+  .sm\:px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .sm\:px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .sm\:py-2 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .sm\:py-2\.5 {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .sm\:pb-1 {
+    padding-bottom: 0.25rem;
   }
 
   .sm\:text-sm {

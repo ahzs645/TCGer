@@ -877,6 +877,17 @@ extension APIService {
         }
     }
 
+    private struct AddedCollectionCopyResponse: Decodable {
+        struct Copy: Decodable { let id: String }
+        let id: String?
+        let copies: [Copy]?
+
+        var createdCopyID: String? {
+            if let copies { return copies.count == 1 ? copies[0].id : nil }
+            return id
+        }
+    }
+
     struct CardOverride: Encodable {
         let cardId: String
         let cardData: CardData?
@@ -981,6 +992,7 @@ extension APIService {
         }
     }
 
+    @discardableResult
     func addCardToBinder(
         config: ServerConfiguration,
         token: String,
@@ -999,7 +1011,7 @@ extension APIService {
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         card: Card? = nil
-    ) async throws {
+    ) async throws -> String? {
         if config.isOnDevice {
             try LocalStore.shared.addCardToBinder(
                 binderId: binderId,
@@ -1018,7 +1030,7 @@ extension APIService {
                 card: card
             )
             NotificationCenter.default.post(name: .collectionDidChange, object: nil)
-            return
+            return nil
         }
 
         let cardData: AddCardToBinderRequest.CardData?
@@ -1084,7 +1096,7 @@ extension APIService {
 
         let path = binderId == "__library__" ? "collections/cards" : "collections/\(binderId)/cards"
 
-        let (_, response) = try await makeRequest(
+        let (data, response) = try await makeRequest(
             config: config,
             path: path,
             method: "POST",
@@ -1101,6 +1113,7 @@ extension APIService {
 
         try? CacheManager.shared.remove(forKey: CacheManager.CacheKey.collections)
         NotificationCenter.default.post(name: .collectionDidChange, object: nil)
+        return try? JSONDecoder().decode(AddedCollectionCopyResponse.self, from: data).createdCopyID
     }
 
     func updateCardInBinder(
@@ -1407,18 +1420,19 @@ nonisolated struct BinderCardAddDetails: Sendable {
 extension APIService {
     /// The one service-layer path for "add this card to a binder", used by
     /// search, set browsing, the scanner, and binder-scan review alike.
+    @discardableResult
     func addCardToBinder(
         config: ServerConfiguration,
         token: String?,
         binderId: String,
         card: Card,
         details: BinderCardAddDetails = BinderCardAddDetails()
-    ) async throws {
+    ) async throws -> String? {
         guard let token else {
             throw APIError.unauthorized
         }
 
-        try await addCardToBinder(
+        return try await addCardToBinder(
             config: config,
             token: token,
             binderId: binderId,
