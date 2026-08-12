@@ -1,40 +1,49 @@
 import { prisma } from '../../lib/prisma';
-import type { CollectionValueHistory, CollectionValueBreakdown, CollectionDistribution } from '@tcg/api-types';
+import type {
+  CollectionValueHistory,
+  CollectionValueBreakdown,
+  CollectionDistribution,
+} from '@tcg/api-types';
 import { isUsablePrice } from '../pricing/pricing.service';
 
 function storedCollectionValue(
   collectionPrice: unknown,
   finishCode: string | null,
-  history: Array<{ price: unknown; finishCode: string | null }>
+  history: Array<{ price: unknown; finishCode: string | null }>,
 ) {
   const manual = collectionPrice == null ? undefined : Number(collectionPrice);
   if (isUsablePrice(manual)) return manual;
-  const matching = history.find(
-    (entry) => (entry.finishCode ?? null) === (finishCode ?? null)
-  );
+  const matching = history.find((entry) => (entry.finishCode ?? null) === (finishCode ?? null));
   const matchingPrice = matching?.price == null ? undefined : Number(matching.price);
   if (isUsablePrice(matchingPrice)) return matchingPrice;
   const fallback = history.find((entry) => isUsablePrice(Number(entry.price)));
   return fallback?.price == null ? 0 : Number(fallback.price);
 }
 
-export async function getCollectionValueHistory(userId: string, periodDays = 30): Promise<CollectionValueHistory> {
+export async function getCollectionValueHistory(
+  userId: string,
+  periodDays = 30,
+  tcg?: string,
+): Promise<CollectionValueHistory> {
   const since = new Date();
   since.setDate(since.getDate() - periodDays);
 
   // Get all user's cards with price history
   const collections = await prisma.collection.findMany({
-    where: { userId },
+    where: {
+      userId,
+      card: tcg ? { tcgGame: { code: tcg } } : undefined,
+    },
     include: {
       card: {
         include: {
           priceHistory: {
             orderBy: { recordedAt: 'desc' },
-            take: 120
-          }
-        }
-      }
-    }
+            take: 120,
+          },
+        },
+      },
+    },
   });
 
   // Build daily value map
@@ -42,11 +51,7 @@ export async function getCollectionValueHistory(userId: string, periodDays = 30)
   let currentValue = 0;
 
   for (const col of collections) {
-    const price = storedCollectionValue(
-      col.price,
-      col.finishCode,
-      col.card.priceHistory
-    );
+    const price = storedCollectionValue(col.price, col.finishCode, col.card.priceHistory);
     currentValue += price * col.quantity;
 
     for (const ph of col.card.priceHistory.filter((entry) => entry.recordedAt >= since)) {
@@ -61,17 +66,20 @@ export async function getCollectionValueHistory(userId: string, periodDays = 30)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const firstValue = history.length > 0 ? history[0].value : currentValue;
-  const changePercent = firstValue > 0 ? Math.round(((currentValue - firstValue) / firstValue) * 10000) / 100 : 0;
+  const changePercent =
+    firstValue > 0 ? Math.round(((currentValue - firstValue) / firstValue) * 10000) / 100 : 0;
 
   return {
     history,
     currentValue: Math.round(currentValue * 100) / 100,
     changePercent,
-    changePeriod: `${periodDays}d`
+    changePeriod: `${periodDays}d`,
   };
 }
 
-export async function getCollectionValueBreakdown(userId: string): Promise<CollectionValueBreakdown> {
+export async function getCollectionValueBreakdown(
+  userId: string,
+): Promise<CollectionValueBreakdown> {
   const collections = await prisma.collection.findMany({
     where: { userId },
     include: {
@@ -80,24 +88,26 @@ export async function getCollectionValueBreakdown(userId: string): Promise<Colle
           tcgGame: true,
           priceHistory: {
             orderBy: { recordedAt: 'desc' },
-            take: 20
-          }
-        }
+            take: 20,
+          },
+        },
       },
-      binder: { select: { id: true, name: true } }
-    }
+      binder: { select: { id: true, name: true } },
+    },
   });
 
   const byTcg = new Map<string, { value: number; cardCount: number }>();
   const byBinder = new Map<string, { binderName: string; value: number; cardCount: number }>();
-  const cardValues: Array<{ externalId: string; tcg: string; name: string; value: number; imageUrl?: string }> = [];
+  const cardValues: Array<{
+    externalId: string;
+    tcg: string;
+    name: string;
+    value: number;
+    imageUrl?: string;
+  }> = [];
 
   for (const col of collections) {
-    const price = storedCollectionValue(
-      col.price,
-      col.finishCode,
-      col.card.priceHistory
-    );
+    const price = storedCollectionValue(col.price, col.finishCode, col.card.priceHistory);
     const totalPrice = price * col.quantity;
     const tcg = col.card.tcgGame.code;
 
@@ -122,7 +132,7 @@ export async function getCollectionValueBreakdown(userId: string): Promise<Colle
         tcg,
         name: col.card.name,
         value: totalPrice,
-        imageUrl: col.card.imageUrl || undefined
+        imageUrl: col.card.imageUrl || undefined,
       });
     }
   }
@@ -133,26 +143,33 @@ export async function getCollectionValueBreakdown(userId: string): Promise<Colle
     byTcg: Array.from(byTcg.entries()).map(([tcg, data]) => ({
       tcg,
       value: Math.round(data.value * 100) / 100,
-      cardCount: data.cardCount
+      cardCount: data.cardCount,
     })),
     byBinder: Array.from(byBinder.entries()).map(([binderId, data]) => ({
       binderId,
       binderName: data.binderName,
       value: Math.round(data.value * 100) / 100,
-      cardCount: data.cardCount
+      cardCount: data.cardCount,
     })),
-    topCards: cardValues.slice(0, 20)
+    topCards: cardValues.slice(0, 20),
   };
 }
 
-export async function getCollectionDistribution(userId: string, dimension: string): Promise<CollectionDistribution> {
+export async function getCollectionDistribution(
+  userId: string,
+  dimension: string,
+  tcg?: string,
+): Promise<CollectionDistribution> {
   const collections = await prisma.collection.findMany({
-    where: { userId },
+    where: {
+      userId,
+      card: tcg ? { tcgGame: { code: tcg } } : undefined,
+    },
     include: {
       card: {
-        include: { tcgGame: true, magicCard: true, yugiohCard: true, pokemonCard: true }
-      }
-    }
+        include: { tcgGame: true, magicCard: true, yugiohCard: true, pokemonCard: true },
+      },
+    },
   });
 
   const counts = new Map<string, number>();
@@ -177,7 +194,11 @@ export async function getCollectionDistribution(userId: string, dimension: strin
         label = col.card.pokemonCard?.pokemonType || col.card.yugiohCard?.attribute || 'Unknown';
         break;
       case 'type':
-        label = col.card.magicCard?.cardType || col.card.yugiohCard?.cardType || col.card.pokemonCard?.pokemonType || 'Unknown';
+        label =
+          col.card.magicCard?.cardType ||
+          col.card.yugiohCard?.cardType ||
+          col.card.pokemonCard?.pokemonType ||
+          'Unknown';
         break;
       case 'tcg':
         label = col.card.tcgGame.code;
@@ -193,7 +214,7 @@ export async function getCollectionDistribution(userId: string, dimension: strin
     .map(([label, count]) => ({
       label,
       count,
-      percentage: total > 0 ? Math.round((count / total) * 10000) / 100 : 0
+      percentage: total > 0 ? Math.round((count / total) * 10000) / 100 : 0,
     }))
     .sort((a, b) => b.count - a.count);
 

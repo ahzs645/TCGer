@@ -148,12 +148,11 @@ function demoCollectionCards() {
   );
 }
 
-function demoValueHistory(period: string) {
+function demoValueHistory(period: string, tcg?: string) {
   const days = Math.max(7, Math.min(365, Number.parseInt(period, 10) || 30));
-  const currentValue = demoCollectionCards().reduce(
-    (sum, { card }) => sum + card.price * card.quantity,
-    0,
-  );
+  const currentValue = demoCollectionCards()
+    .filter(({ card }) => !tcg || card.tcg === tcg)
+    .reduce((sum, { card }) => sum + card.price * card.quantity, 0);
   const pointCount = Math.min(13, days + 1);
   const startValue = currentValue * 0.91;
   const history = Array.from({ length: pointCount }, (_, index) => {
@@ -190,11 +189,11 @@ function demoValueBreakdown() {
         entries
           .reduce((sum, { card }) => sum + card.price * card.quantity, 0)
           .toFixed(2),
-      ),
-      cardCount: entries.reduce((sum, { card }) => sum + card.quantity, 0),
-    })).sort((left, right) => right.value - left.value);
-  const byBinder = store().binders
-    .map((binder) => ({
+    ),
+    cardCount: entries.reduce((sum, { card }) => sum + card.quantity, 0),
+  })).sort((left, right) => right.value - left.value);
+  const byBinder = store()
+    .binders.map((binder) => ({
       binderId: binder.id,
       binderName: binder.name,
       value: Number(
@@ -218,12 +217,18 @@ function demoValueBreakdown() {
   return { byTcg, byBinder, topCards };
 }
 
-function demoDistribution(dimension: string) {
-  const labels = demoCollectionCards().map(({ card }) => {
-    if (dimension === "rarity") return card.rarity || "Unknown";
-    if (dimension === "set") return card.setName || card.setCode || "Unknown";
-    return card.tcg;
-  });
+function demoDistribution(dimension: string, tcg?: string) {
+  const labels = demoCollectionCards()
+    .filter(({ card }) => !tcg || card.tcg === tcg)
+    .flatMap(({ card }) => {
+      const label =
+        dimension === "rarity"
+          ? card.rarity || "Unknown"
+          : dimension === "set"
+            ? card.setName || card.setCode || "Unknown"
+            : card.tcg;
+      return Array.from({ length: card.quantity }, () => label);
+    });
   const counts = new Map<string, number>();
   for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
   return {
@@ -241,10 +246,13 @@ function demoPriceMovers(tcg?: string) {
   const unique = new Map(
     demoCollectionCards()
       .filter(({ card }) => !tcg || card.tcg === tcg)
-      .map(({ card }) => [
-        `${card.tcg}:${card.cardData?.externalId ?? card.cardId}`,
-        card,
-      ] as const),
+      .map(
+        ({ card }) =>
+          [
+            `${card.tcg}:${card.cardData?.externalId ?? card.cardId}`,
+            card,
+          ] as const,
+      ),
   );
   const movers = Array.from(unique.values()).map((card, index) => {
     const direction = index % 3 === 1 ? -1 : 1;
@@ -710,8 +718,9 @@ export async function handleDemoRequest(
   if (segments[0] === "analytics") {
     store().init();
     if (segments[1] === "value" && segments.length === 2 && method === "GET") {
-      const period = new URLSearchParams(queryString || "").get("period") || "30d";
-      return json(demoValueHistory(period));
+      const params = new URLSearchParams(queryString || "");
+      const period = params.get("period") || "30d";
+      return json(demoValueHistory(period, params.get("tcg") || undefined));
     }
     if (
       segments[1] === "value" &&
@@ -721,9 +730,9 @@ export async function handleDemoRequest(
       return json(demoValueBreakdown());
     }
     if (segments[1] === "distribution" && method === "GET") {
-      const dimension =
-        new URLSearchParams(queryString || "").get("by") || "tcg";
-      return json(demoDistribution(dimension));
+      const params = new URLSearchParams(queryString || "");
+      const dimension = params.get("by") || "tcg";
+      return json(demoDistribution(dimension, params.get("tcg") || undefined));
     }
     return notFound();
   }
@@ -1018,7 +1027,8 @@ function handleFinance(
         totalSpent: 0,
         totalEarned: 0,
       };
-      if (transaction.type === "purchase") totals.totalSpent += transaction.amount;
+      if (transaction.type === "purchase")
+        totals.totalSpent += transaction.amount;
       if (transaction.type === "sale") totals.totalEarned += transaction.amount;
       byCurrency.set(currency, totals);
     }

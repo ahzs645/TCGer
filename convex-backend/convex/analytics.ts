@@ -247,11 +247,17 @@ export const scheduleDailySnapshots = internalMutation({
 });
 
 export const getValueHistory = internalQuery({
-  args: { subject: v.string(), periodDays: v.number() },
+  args: {
+    subject: v.string(),
+    periodDays: v.number(),
+    tcg: v.optional(v.string())
+  },
   returns: valueHistoryValidator,
   handler: async (ctx, args) => {
     const user = await requireUserBySubject(ctx, args.subject);
-    const rows = await loadAnalyticsRows(ctx, user._id);
+    const rows = (await loadAnalyticsRows(ctx, user._id)).filter(
+      ({ card }) => !args.tcg || card.tcg === args.tcg
+    );
     const periodDays = Math.min(365, Math.max(1, Math.trunc(args.periodDays)));
     const today = utcDayKey();
     const firstDay = utcDayKey(Date.now() - periodDays * 24 * 60 * 60 * 1_000);
@@ -266,7 +272,12 @@ export const getValueHistory = internalQuery({
     const historyByDay = new Map(
       snapshots.map((snapshot) => [
         snapshot.day,
-        { date: snapshot.day, value: snapshot.totalValue }
+        {
+          date: snapshot.day,
+          value: args.tcg
+            ? roundCurrency(snapshot.byTcg[args.tcg] ?? 0)
+            : snapshot.totalValue
+        }
       ])
     );
     // A stale same-day cron value must never override the live collection value.
@@ -388,11 +399,17 @@ function colorLabels(card: Doc<"cards">) {
 }
 
 export const getDistribution = internalQuery({
-  args: { subject: v.string(), dimension: v.string() },
+  args: {
+    subject: v.string(),
+    dimension: v.string(),
+    tcg: v.optional(v.string())
+  },
   returns: distributionValidator,
   handler: async (ctx, args) => {
     const user = await requireUserBySubject(ctx, args.subject);
-    const rows = await loadAnalyticsRows(ctx, user._id);
+    const rows = (await loadAnalyticsRows(ctx, user._id)).filter(
+      ({ card }) => !args.tcg || card.tcg === args.tcg
+    );
     const counts = new Map<string, number>();
     let total = 0;
 

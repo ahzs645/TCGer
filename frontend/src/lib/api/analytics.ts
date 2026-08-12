@@ -35,9 +35,12 @@ async function authFetch(url: string, token: string) {
 export async function getCollectionValueHistory(
   token: string,
   period: AnalyticsPeriod | number = "30d",
+  tcg?: string,
 ): Promise<CollectionValueHistory> {
+  const params = new URLSearchParams({ period: String(period) });
+  if (tcg) params.set("tcg", tcg);
   return authFetch(
-    `${API_BASE_URL}/analytics/value?period=${encodeURIComponent(period)}`,
+    `${API_BASE_URL}/analytics/value?${params.toString()}`,
     token,
   );
 }
@@ -51,9 +54,12 @@ export async function getCollectionValueBreakdown(
 export async function getCollectionDistribution(
   token: string,
   dimension: string,
+  tcg?: string,
 ): Promise<CollectionDistribution> {
+  const params = new URLSearchParams({ by: dimension });
+  if (tcg) params.set("tcg", tcg);
   return authFetch(
-    `${API_BASE_URL}/analytics/distribution?by=${dimension}`,
+    `${API_BASE_URL}/analytics/distribution?${params.toString()}`,
     token,
   );
 }

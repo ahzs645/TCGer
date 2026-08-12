@@ -81,10 +81,11 @@ export default function AnalyticsPage() {
   );
 
   const ready = mounted && isAuthenticated && !!token;
+  const selectedTcg = selectedGame === "all" ? undefined : selectedGame;
 
   const historyQuery = useQuery({
-    queryKey: ["analytics", "value", period],
-    queryFn: () => getCollectionValueHistory(token!, period),
+    queryKey: ["analytics", "value", period, selectedGame],
+    queryFn: () => getCollectionValueHistory(token!, period, selectedTcg),
     enabled: ready && showPricing,
     staleTime: 1000 * 60 * 5,
   });
@@ -95,8 +96,8 @@ export default function AnalyticsPage() {
     staleTime: 1000 * 60 * 5,
   });
   const rarityQuery = useQuery({
-    queryKey: ["analytics", "distribution", "rarity"],
-    queryFn: () => getCollectionDistribution(token!, "rarity"),
+    queryKey: ["analytics", "distribution", "rarity", selectedGame],
+    queryFn: () => getCollectionDistribution(token!, "rarity", selectedTcg),
     enabled: ready,
     staleTime: 1000 * 60 * 5,
   });
@@ -273,7 +274,7 @@ export default function AnalyticsPage() {
               sub="Estimated collection value"
             />
           )}
-          {showPricing && history && selectedGame === "all" && (
+          {showPricing && history && (
             <StatCard
               title={`${period.toUpperCase()} Change`}
               value={`${history.changePercent >= 0 ? "+" : ""}${history.changePercent.toFixed(1)}%`}
@@ -319,7 +320,7 @@ export default function AnalyticsPage() {
                   </h2>
                 </CardTitle>
                 <CardDescription>
-                  Estimated total value across the selected period.
+                  Estimated {selectedGame === "all" ? "total" : tcgLabel(selectedGame)} value across the selected period.
                 </CardDescription>
               </div>
               <div className="flex shrink-0 gap-1">
@@ -438,7 +439,7 @@ export default function AnalyticsPage() {
             <CardHeader>
               <CardTitle asChild><h2>Rarity Distribution</h2></CardTitle>
               <CardDescription>
-                Breakdown of your collection by rarity.
+                Breakdown of {selectedGame === "all" ? "your collection" : `your ${tcgLabel(selectedGame)} cards`} by rarity.
               </CardDescription>
             </CardHeader>
             <CardContent>

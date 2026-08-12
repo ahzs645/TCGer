@@ -120,11 +120,35 @@ test("seeds analytics, price movers, and the finance ledger", async () => {
     "/analytics/value/breakdown",
   );
   const breakdown = (await breakdownResponse.json()) as {
-    byTcg: Array<{ tcg: string }>;
+    byTcg: Array<{ tcg: string; value: number; cardCount: number }>;
     topCards: Array<{ name: string }>;
   };
   assert.ok(breakdown.byTcg.length >= 3);
   assert.ok(breakdown.topCards.length > 0);
+
+  const filteredGame = breakdown.byTcg[0]!.tcg;
+  const filteredHistoryResponse = await handleDemoRequest(
+    "GET",
+    `/analytics/value?period=30d&tcg=${filteredGame}`,
+  );
+  const filteredHistory = (await filteredHistoryResponse.json()) as {
+    currentValue: number;
+  };
+  assert.equal(filteredHistory.currentValue, breakdown.byTcg[0]!.value);
+
+  const filteredRarityResponse = await handleDemoRequest(
+    "GET",
+    `/analytics/distribution?by=rarity&tcg=${filteredGame}`,
+  );
+  const filteredRarity = (await filteredRarityResponse.json()) as {
+    entries: Array<{ count: number }>;
+    total: number;
+  };
+  assert.equal(filteredRarity.total, breakdown.byTcg[0]!.cardCount);
+  assert.equal(
+    filteredRarity.entries.reduce((sum, entry) => sum + entry.count, 0),
+    breakdown.byTcg[0]!.cardCount,
+  );
 
   const moversResponse = await handleDemoRequest(
     "GET",

@@ -32,14 +32,17 @@ export function registerAnalyticsRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       try {
         const identity = await requireBridgeIdentity(ctx, request);
-        const periodDays = parsePeriod(new URL(request.url).searchParams.get("period"));
+        const searchParams = new URL(request.url).searchParams;
+        const periodDays = parsePeriod(searchParams.get("period"));
+        const tcg = searchParams.get("tcg") || undefined;
         await ctx.runMutation(analyticsApi.captureCurrentValueSnapshot, {
           subject: identity.subject
         });
         return json(
           await ctx.runQuery(analyticsApi.getValueHistory, {
             subject: identity.subject,
-            periodDays
+            periodDays,
+            tcg
           })
         );
       } catch (error) {
@@ -71,11 +74,14 @@ export function registerAnalyticsRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       try {
         const identity = await requireBridgeIdentity(ctx, request);
-        const dimension = new URL(request.url).searchParams.get("by") || "tcg";
+        const searchParams = new URL(request.url).searchParams;
+        const dimension = searchParams.get("by") || "tcg";
+        const tcg = searchParams.get("tcg") || undefined;
         return json(
           await ctx.runQuery(analyticsApi.getDistribution, {
             subject: identity.subject,
-            dimension
+            dimension,
+            tcg
           })
         );
       } catch (error) {

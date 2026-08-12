@@ -96,6 +96,22 @@ describe("analytics and trades Convex HTTP routes", () => {
       ],
       total: 3
     });
+
+    const [magicValueResponse, pokemonRarityResponse] = await Promise.all([
+      t.fetch("/analytics/value?period=7d&tcg=magic", { headers }),
+      t.fetch("/analytics/distribution?by=rarity&tcg=pokemon", { headers })
+    ]);
+    expect(await magicValueResponse.json()).toEqual({
+      history: [{ date: utcDayOffset(0), value: 25 }],
+      currentValue: 25,
+      changePercent: 0,
+      changePeriod: "7d"
+    });
+    expect(await pokemonRarityResponse.json()).toEqual({
+      dimension: "rarity",
+      entries: [{ label: "Common", count: 1, percentage: 100 }],
+      total: 1
+    });
   });
 
   test("lazily creates and idempotently refreshes today's value snapshot", async () => {
