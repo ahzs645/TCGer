@@ -69,6 +69,43 @@ Validate generated scanner assets before testing:
 bash scripts/ios-assets.sh check
 ```
 
+### Long replay runs on a shared machine
+
+When multiple agent sessions build/test on this Mac concurrently, long test
+runs on the shared named simulator get killed from outside: another session's
+run on the same device (or a broad `simctl shutdown` / `killall`) SIGTERMs or
+SIGKILLs the test host mid-suite. xcodebuild then prints `Restarting after
+unexpected exit, crash, or test timeout`, relaunches, and reports the
+interrupted suite as **"passed / Executed 0 tests" — a false pass**; the
+xcresult records `Test crashed with signal term/kill.` and the overall run is
+`TEST FAILED`. Concurrent source edits in the shared checkout can also desync
+the app binary from the test bundle mid-run (dlopen "Symbol not found").
+
+For any replay run longer than a few minutes:
+
+1. Create a dedicated simulator so no other session targets it:
+
+   ```bash
+   xcrun simctl create "TCGer-Replay-$(whoami)" "iPhone 17 Pro"
+   ```
+
+2. Freeze the products once, then run each suite without rebuilding, using
+   `-destination 'platform=iOS Simulator,id=<udid>'`:
+
+   ```bash
+   xcodebuild build-for-testing ... -derivedDataPath <dd>
+   xcodebuild test-without-building -xctestrun <dd>/Build/Products/*.xctestrun \
+     -destination 'platform=iOS Simulator,id=<udid>' \
+     -only-testing:TCGerTests/<Suite>
+   ```
+
+3. Before trusting a suite-passed line, grep the log for
+   `Restarting after unexpected exit` and confirm the suite's summary says
+   `Executed 1 test` (not 0). Delete the simulator clone afterward.
+
+Note `test-without-building` prints `** TEST EXECUTE SUCCEEDED **` rather
+than `** TEST SUCCEEDED **`.
+
 ## Automated test coverage
 
 - Coordinator priority, fallback, clean no-match behavior, local/server engine
@@ -83,6 +120,14 @@ bash scripts/ios-assets.sh check
 - Device-recording replay comparisons.
 - Scanner payload size, artwork database load time/memory, ANN cold load, first
   scan latency, and sustained scan latency budgets.
+- Camera idle-throttle state machine (`ScannerCameraThrottleTests`), including
+  the invariant that the idle threshold clears `LiveScanConsensus`'s match
+  window.
+- Footer-OCR cache policy (`ScannerOCRCacheTests`): embedding-cosine reuse
+  bar, dissimilar/mismatched-length misses, capture-seeds-cache behavior.
+- Persistent staging tray (`ScannerStagingStoreTests`): cross-instance
+  round-trip, candidate-correction persistence, cap trimming with sidecar
+  cleanup, missing-sidecar and corrupt-manifest degradation.
 
 The fixture manifest is
 `TCGerTests/Fixtures/ScannerFixtures.json`. Its canonical card IDs intentionally
