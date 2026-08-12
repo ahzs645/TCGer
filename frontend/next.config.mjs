@@ -10,12 +10,18 @@ const localBackendProxyPath = process.env.LOCAL_BACKEND_PROXY_PATH
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = process.env.NEXT_DIST_DIR || '.next';
 
+// The shared booster pack lives in the packages/pack-core submodule and is
+// consumed as TypeScript source, so Next has to compile it rather than treat it
+// as a prebuilt dependency the way @tcg/api-types is.
+const packCore = path.join(__dirname, '..', 'packages', 'pack-core', 'src', 'index.ts');
+
 const nextConfig = {
   distDir,
   env: {
     NEXT_PUBLIC_DEMO_EXPORT: isDemoExport ? 'true' : 'false'
   },
   outputFileTracingRoot: path.join(__dirname, '..'),
+  transpilePackages: ['@tcg/pack-core'],
   // @huggingface/transformers (client-side embedding scanner) conditionally
   // requires Node-only packages. Exclude them from the browser bundle so the
   // ONNX Runtime Web (WASM/WebGPU) path is used instead.
@@ -25,6 +31,9 @@ const nextConfig = {
       ...config.resolve.alias,
       sharp$: false,
       'onnxruntime-node$': false,
+      // Resolve the submodule straight to its source, so a fresh clone needs only
+      // `git submodule update` rather than an npm install to link the workspace.
+      '@tcg/pack-core': packCore,
     };
     return config;
   },
@@ -34,6 +43,7 @@ const nextConfig = {
     resolveAlias: {
       sharp: './src/lib/empty-module.js',
       'onnxruntime-node': './src/lib/empty-module.js',
+      '@tcg/pack-core': '../packages/pack-core/src/index.ts',
     },
   },
   ...(isDemoExport

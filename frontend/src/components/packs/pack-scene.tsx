@@ -6,7 +6,8 @@ import {
   useThree,
   type ThreeEvent,
 } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { splitGeometryByCut, type CutFn, type SplitMesh } from "@tcg/pack-core";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
@@ -16,6 +17,8 @@ import {
   type PackVariant,
   type PulledCard,
 } from "./pack-data";
+import { PACK_H, PACK_W, packGeometry } from "./pack-mesh";
+import { paintVariantSheet } from "./pack-sheet";
 
 export type PackPhase =
   | "select"
@@ -32,6 +35,8 @@ export interface PackSceneControls {
 interface PackExperienceProps {
   cards: PulledCard[];
   variant: PackVariant;
+  /** Overrides the painted variant sheet — a studio cover, or a composed upload. */
+  sheet?: THREE.Texture | null;
   /** total packs being opened — bulk opens render the whole stack and one tear cuts all of them */
   packCount: number;
   phase: PackPhase;
@@ -43,8 +48,6 @@ interface PackExperienceProps {
   onFlash: () => void;
 }
 
-const PACK_W = 2.3;
-const PACK_H = 3.3;
 const TEAR_FRAC = 0.8;
 const TEAR_Y = PACK_H * (TEAR_FRAC - 0.5);
 const CARD_W = 2.02;
@@ -53,61 +56,10 @@ const GOLD = new THREE.Color("#ffd76a");
 
 /* ---------------------------------- helpers --------------------------------- */
 
-type CutFn = (x: number) => number;
-
-const PACK_T = 0.13; // half-thickness of the slab
-
-/**
- * Pocket-style slab profile: flat across the face, rounded at the left/right
- * edges (clamped so the slab keeps visible thickness), pinched at the crimps.
- */
-function faceZ(x: number, packFrac: number): number {
-  const crimp = Math.min(1, Math.min(packFrac, 1 - packFrac) / 0.07);
-  const plateau = Math.max(
-    0.5,
-    1 - Math.pow(Math.abs((2 * x) / PACK_W), 7) * 0.9,
-  );
-  return PACK_T * plateau * crimp + 0.01;
-}
-
-/** Straight factory perforation — used until the user actually tears. */
-const STRAIGHT_CUT: CutFn = () => TEAR_Y;
-
-/** The whole front face, for pack-select thumbnails. */
-const FULL_FACE_CUT: CutFn = () => PACK_H / 2;
-
-/**
- * Wrapper face split along an arbitrary cut line. Vertex positions are baked
- * in pack-local coordinates (mesh sits at the group origin). `mirrored`
- * builds the back face's copy of an asymmetric cut (back meshes are rotated
- * 180°, so their local x is the world's -x).
- */
-function makeWrapperGeometry(
-  cutFn: CutFn,
-  part: "body" | "strip",
-  mirrored = false,
-): THREE.PlaneGeometry {
-  const geo = new THREE.PlaneGeometry(PACK_W, 1, 24, 18);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const uv = geo.attributes.uv as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const cutFrac = cutFn(mirrored ? -x : x) / PACK_H + 0.5;
-    const rowFrac = pos.getY(i) + 0.5;
-    const packFrac =
-      part === "body" ? rowFrac * cutFrac : cutFrac + rowFrac * (1 - cutFrac);
-    pos.setY(i, PACK_H * (packFrac - 0.5));
-    pos.setZ(i, faceZ(x, packFrac));
-    uv.setY(i, packFrac);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-
 // how far the cut may wander from the perforation: generous downward into the
 // art, bounded above by the crimp
-const CUT_MIN = TEAR_Y - 0.55;
-const CUT_MAX = TEAR_Y + 0.34;
+const CUT_MIN = TEAR_Y - 0.55 * (PACK_H / 3.3);
+const CUT_MAX = TEAR_Y + 0.34 * (PACK_H / 3.3);
 
 /**
  * Piecewise-linear cut line through the user's actual drag path — lightly
@@ -147,328 +99,25 @@ function buildCutFnFromPath(path: { x: number; y: number }[]): CutFn {
 const DEFAULT_TORN_CUT: CutFn = (x) =>
   TEAR_Y + Math.sin(x * 23.7) * 0.012 + Math.sin(x * 57.3 + 2) * 0.009;
 
-/** Thin glowing ribbon that hugs the cut edge (Pocket's cyan tear glow). */
-function makeEdgeGeometry(cutFn: CutFn, side: "body" | "strip"): THREE.PlaneGeometry {
-  const geo = new THREE.PlaneGeometry(PACK_W, 1, 48, 1);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const cy = cutFn(x);
-    const isOuterRow = pos.getY(i) > 0;
-    const off =
-      side === "body" ? (isOuterRow ? 0 : -0.06) : isOuterRow ? 0.06 : 0;
-    const packFrac = (cy + off) / PACK_H + 0.5;
-    pos.setY(i, cy + off);
-    pos.setZ(i, faceZ(x, packFrac) + 0.025);
-  }
-  return geo;
-}
-
 /**
- * Side wall that follows the slab's edge profile — pinched at the crimps,
- * full thickness in the middle — so the pack silhouette is closed and
- * nothing pokes through or gapes at side viewing angles.
+ * The wrapper, severed along the tear.
+ *
+ * The pack used to be planes whose vertices were generated from the cut, so a new
+ * tear meant rebuilding them; it is now a fixed mesh, and the cut is applied to
+ * it. `splitGeometryByCut` refines the mesh as far as the curve needs and returns
+ * the two halves plus the severed boundary, which is what the glow traces —
+ * derived from the actual cut rather than drawn along a guess at it, so it stays
+ * on the edge around the pack's sides too.
  */
-// the face corners are rounded in texture alpha with a 26px radius — the wall
-// must follow that same (elliptical in world space) arc to close the corners
-const CORNER_RX = (26 / 512) * PACK_W;
-const CORNER_RY = (26 / 768) * PACK_H;
+function buildCutSet(geometry: THREE.BufferGeometry, cutFn: CutFn): SplitMesh {
+  return splitGeometryByCut(geometry, cutFn);
+}
 
-function makeSideWallGeometry(
-  side: 1 | -1,
-  fromY: number,
-  toY: number,
-): THREE.PlaneGeometry {
-  const geo = new THREE.PlaneGeometry(1, 1, 1, 36);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const normal = geo.attributes.normal as THREE.BufferAttribute;
-  const uv = geo.attributes.uv as THREE.BufferAttribute;
-  const effFrom = Math.max(fromY, -PACK_H / 2);
-  const effTo = Math.min(toY, PACK_H / 2);
-  const yTopC = PACK_H / 2 - CORNER_RY;
-  const yBotC = -PACK_H / 2 + CORNER_RY;
-  for (let i = 0; i < pos.count; i++) {
-    const rowFrac = pos.getY(i) + 0.5;
-    const y = effFrom + rowFrac * (effTo - effFrom);
-    const packFrac = y / PACK_H + 0.5;
-    // trace the visible face edge: straight along the sides, curving inward
-    // around the rounded corners
-    let xE = PACK_W / 2;
-    if (y > yTopC) {
-      const t = (y - yTopC) / CORNER_RY;
-      xE = PACK_W / 2 - CORNER_RX + CORNER_RX * Math.sqrt(Math.max(0, 1 - t * t));
-    } else if (y < yBotC) {
-      const t = (yBotC - y) / CORNER_RY;
-      xE = PACK_W / 2 - CORNER_RX + CORNER_RX * Math.sqrt(Math.max(0, 1 - t * t));
-    }
-    const zExtent = faceZ(xE * 0.99, packFrac);
-    const zSign = (pos.getX(i) > 0 ? 1 : -1) * side;
-    pos.setXYZ(i, side * xE * 0.998, y, zSign * zExtent);
-    normal.setXYZ(i, side, 0, 0);
-    // sample the art's edge column so the wrapper wraps around the rim
-    uv.setXY(i, side > 0 ? 0.99 : 0.01, packFrac);
-  }
+/** The severed boundary as a drawable line. */
+function seamGeometry(seam: Float32Array): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(seam, 3));
   return geo;
-}
-
-interface CutGeometrySet {
-  bodyF: THREE.PlaneGeometry;
-  bodyB: THREE.PlaneGeometry;
-  stripF: THREE.PlaneGeometry;
-  stripB: THREE.PlaneGeometry;
-  edgeBody: THREE.PlaneGeometry;
-  edgeStrip: THREE.PlaneGeometry;
-  walls: THREE.PlaneGeometry[];
-  stripWalls: THREE.PlaneGeometry[];
-}
-
-function buildCutSet(cutFn: CutFn): CutGeometrySet {
-  return {
-    bodyF: makeWrapperGeometry(cutFn, "body"),
-    bodyB: makeWrapperGeometry(cutFn, "body", true),
-    stripF: makeWrapperGeometry(cutFn, "strip"),
-    stripB: makeWrapperGeometry(cutFn, "strip", true),
-    edgeBody: makeEdgeGeometry(cutFn, "body"),
-    edgeStrip: makeEdgeGeometry(cutFn, "strip"),
-    walls: ([-1, 1] as const).map((s) =>
-      makeSideWallGeometry(s, -PACK_H / 2, cutFn(s * PACK_W * 0.4975)),
-    ),
-    stripWalls: ([-1, 1] as const).map((s) =>
-      makeSideWallGeometry(s, cutFn(s * PACK_W * 0.4975), PACK_H / 2),
-    ),
-  };
-}
-
-function drawMotif(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  variant: PackVariant,
-) {
-  const { motif, palette } = variant;
-  ctx.save();
-  if (motif === "aurora") {
-    for (let i = 0; i < 5; i++) {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, "rgba(64,224,208,0)");
-      g.addColorStop(0.5, `rgba(${80 + i * 30},${200 - i * 20},255,0.12)`);
-      g.addColorStop(1, "rgba(64,224,208,0)");
-      ctx.fillStyle = g;
-      ctx.save();
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(-0.5 + i * 0.22);
-      ctx.fillRect(-w, -40 - i * 26, w * 2, 60);
-      ctx.restore();
-    }
-  } else if (motif === "flame") {
-    for (let i = 0; i < 7; i++) {
-      const cx = (0.12 + i * 0.13) * w;
-      const base = h * (0.78 + (i % 2) * 0.05);
-      const fh = h * (0.22 + (i % 3) * 0.08);
-      const grad = ctx.createLinearGradient(0, base, 0, base - fh);
-      grad.addColorStop(0, "rgba(255,80,20,0.05)");
-      grad.addColorStop(0.6, "rgba(255,140,40,0.22)");
-      grad.addColorStop(1, "rgba(255,220,120,0.05)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(cx - 26, base);
-      ctx.bezierCurveTo(
-        cx - 30,
-        base - fh * 0.45,
-        cx + 18,
-        base - fh * 0.5,
-        cx,
-        base - fh,
-      );
-      ctx.bezierCurveTo(cx + 34, base - fh * 0.45, cx + 26, base, cx + 26, base);
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else if (motif === "wave") {
-    for (let i = 0; i < 4; i++) {
-      const yBase = h * (0.55 + i * 0.11);
-      ctx.strokeStyle = `rgba(140,220,255,${0.22 - i * 0.04})`;
-      ctx.lineWidth = 14 - i * 2;
-      ctx.beginPath();
-      for (let x = -20; x <= w + 20; x += 8) {
-        const y = yBase + Math.sin((x / w) * Math.PI * 3 + i * 1.4) * 16;
-        if (x === -20) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-  } else if (motif === "leaf") {
-    for (let i = 0; i < 14; i++) {
-      const cx = Math.random() * w;
-      const cy = h * 0.3 + Math.random() * h * 0.6;
-      const rot = Math.random() * Math.PI * 2;
-      const len = 26 + Math.random() * 30;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rot);
-      ctx.fillStyle = `rgba(150,255,160,${0.06 + Math.random() * 0.12})`;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, len, len * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(200,255,200,0.15)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-len, 0);
-      ctx.lineTo(len, 0);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-  // shared accent shimmer
-  const shimmer = ctx.createLinearGradient(0, 0, w, h * 0.6);
-  shimmer.addColorStop(0, "rgba(255,255,255,0)");
-  shimmer.addColorStop(0.5, `${palette.accent}22`);
-  shimmer.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = shimmer;
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
-}
-
-function paintWrapper(variant: PackVariant, front: boolean): THREE.CanvasTexture {
-  const w = 512;
-  const h = 768;
-  const { palette } = variant;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, palette.top);
-  sky.addColorStop(0.45, palette.mid);
-  sky.addColorStop(1, palette.bottom);
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, w, h);
-
-  drawMotif(ctx, w, h, variant);
-
-  // sparkles
-  for (let i = 0; i < 55; i++) {
-    const x = Math.random() * w;
-    const y = Math.random() * h;
-    const r = Math.random() * 1.4 + 0.3;
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.35 + 0.08})`;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (front) {
-    // emblem
-    const cy = h * 0.46;
-    const emblem = ctx.createRadialGradient(w / 2, cy, 10, w / 2, cy, 150);
-    emblem.addColorStop(0, "rgba(255,255,255,0.85)");
-    emblem.addColorStop(0.35, `${palette.accent}66`);
-    emblem.addColorStop(1, `${palette.accent}00`);
-    ctx.fillStyle = emblem;
-    ctx.beginPath();
-    ctx.arc(w / 2, cy, 150, 0, Math.PI * 2);
-    ctx.fill();
-    // foil ring
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(w / 2, cy, 96, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 92px system-ui, sans-serif";
-    ctx.shadowColor = palette.glow;
-    ctx.shadowBlur = 24;
-    ctx.fillText("TCGer", w / 2, h * 0.26);
-    ctx.shadowBlur = 0;
-    ctx.font = "700 34px system-ui, sans-serif";
-    ctx.fillStyle = palette.accent;
-    ctx.fillText(variant.name.toUpperCase(), w / 2, h * 0.325);
-    ctx.font = "600 28px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText("DEMO BOOSTER", w / 2, h * 0.64);
-    ctx.font = "500 21px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.fillText("5 CARDS · EVOLVING SKIES POOL", w / 2, h * 0.895);
-  } else {
-    ctx.textAlign = "center";
-    ctx.font = "600 26px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.fillText(`TCGer · ${variant.name.toUpperCase()}`, w / 2, h * 0.5);
-  }
-
-  // crimp bands top + bottom — subtle fine ridges, tinted toward the palette
-  for (const [y0, y1] of [
-    [0, h * 0.06],
-    [h * 0.94, h],
-  ] as const) {
-    for (let x = 0; x < w; x += 4) {
-      const lum = 150 + Math.sin(x * 1.1) * 22 + Math.random() * 12;
-      ctx.fillStyle = `rgb(${lum},${lum},${lum + 8})`;
-      ctx.fillRect(x, y0, 4, y1 - y0);
-    }
-    ctx.fillStyle = `${palette.mid}44`;
-    ctx.fillRect(0, y0, w, y1 - y0);
-    for (let yy = y0 + 3; yy < y1; yy += 6) {
-      ctx.fillStyle = "rgba(0,0,0,0.08)";
-      ctx.fillRect(0, yy, w, 1);
-    }
-  }
-
-  // perforated tear line
-  ctx.setLineDash([8, 8]);
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, h * (1 - TEAR_FRAC));
-  ctx.lineTo(w, h * (1 - TEAR_FRAC));
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // rounded face corners, like the reference pack
-  ctx.globalCompositeOperation = "destination-out";
-  const cr = 26;
-  for (const [cx2, cy2, sx, sy] of [
-    [0, 0, 1, 1],
-    [w, 0, -1, 1],
-    [0, h, 1, -1],
-    [w, h, -1, -1],
-  ] as const) {
-    const ccx = cx2 + sx * cr;
-    const ccy = cy2 + sy * cr;
-    const a1 = Math.atan2(-sy * cr, 0); // angle of the horizontal-edge point
-    const a2 = Math.atan2(0, -sx * cr); // angle of the vertical-edge point
-    ctx.beginPath();
-    ctx.moveTo(cx2, cy2);
-    ctx.lineTo(ccx, cy2);
-    ctx.arc(ccx, ccy, cr, a1, a2, sx * sy > 0);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // serrated crimp edges: notch triangles out of the very top/bottom
-  const tooth = 12;
-  const toothDepth = 5;
-  ctx.beginPath();
-  for (let x = 0; x < w; x += tooth) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + tooth / 2, toothDepth);
-    ctx.lineTo(x + tooth, 0);
-  }
-  for (let x = 0; x < w; x += tooth) {
-    ctx.moveTo(x, h);
-    ctx.lineTo(x + tooth / 2, h - toothDepth);
-    ctx.lineTo(x + tooth, h);
-  }
-  ctx.fill();
-  ctx.globalCompositeOperation = "source-over";
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
 }
 
 /** Procedural crinkle normal map so the foil catches light unevenly. */
@@ -716,6 +365,11 @@ function FoilMaterial({
 interface PackCarouselProps {
   /** the ring shows identical copies of this pack — you pick "your" pack */
   variant: PackVariant;
+  /**
+   * The sheet to wrap every copy in. A studio-built cover or a composed upload
+   * arrives here; without one the variant is painted into a sheet instead.
+   */
+  sheet?: THREE.Texture | null;
   onSelect: () => void;
 }
 
@@ -730,7 +384,7 @@ const TWO_PI = Math.PI * 2;
  * around (the rotation you leave it at is kept), tap a side pack to focus it,
  * tap the focused pack to open that one.
  */
-export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
+export function PackCarousel({ variant, sheet, onSelect }: PackCarouselProps) {
   const [hovered, setHovered] = useState(false);
   // The ring is sized to the frame it is rendered in: on a phone-shaped canvas
   // the full radius pushes the neighbouring packs past both edges, so shrink it
@@ -738,23 +392,12 @@ export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
   const viewWidth = useThree((s) => s.viewport.width);
   const radius = THREE.MathUtils.clamp(viewWidth * 0.5, 1.5, CAROUSEL_R);
   const groupRefs = useRef<(THREE.Group | null)[]>([]);
-  const fullGeo = useMemo(() => makeWrapperGeometry(FULL_FACE_CUT, "body"), []);
-  const wallGeos = useMemo(
-    () =>
-      ([-1, 1] as const).map((s) =>
-        makeSideWallGeometry(s, -PACK_H / 2, PACK_H / 2),
-      ),
-    [],
-  );
+  const pack = use(packGeometry());
   const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
   const textures = useMemo(() => {
-    const front = paintWrapper(variant, true);
-    return {
-      front,
-      back: paintWrapper(variant, false),
-      sheen: makeSheenMaterial(front),
-    };
-  }, [variant]);
+    const map = sheet ?? paintVariantSheet(variant, pack.layout);
+    return { sheet: map, sheen: makeSheenMaterial(map) };
+  }, [variant, sheet, pack.layout]);
 
   const ring = useRef({
     angle: 0,
@@ -909,31 +552,20 @@ export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
             };
           }}
         >
-          <mesh geometry={fullGeo}>
-            <FoilMaterial map={textures.front} normalMap={normalTex} />
+          {/* One mesh, one sheet: the wrap is a single continuous shell, so the
+              front, back and both side gussets come from the same draw. */}
+          <mesh geometry={pack.geometry}>
+            <FoilMaterial map={textures.sheet} normalMap={normalTex} />
           </mesh>
-          <mesh geometry={fullGeo} position={[0, 0, 0.004]} material={textures.sheen} />
-          <mesh geometry={fullGeo} rotation={[0, Math.PI, 0]}>
-            <FoilMaterial map={textures.back} normalMap={normalTex} />
-          </mesh>
-          {wallGeos.map((g, wi) => (
-            <mesh key={wi} geometry={g}>
-              <FoilMaterial
-                map={textures.front}
-                normalMap={normalTex}
-                dim
-                doubleSide
-              />
-            </mesh>
-          ))}
+          <mesh geometry={pack.geometry} scale={1.002} material={textures.sheen} />
           {/* floor reflection */}
           <mesh
-            geometry={fullGeo}
+            geometry={pack.geometry}
             scale={[1, -1, 1]}
             position={[0, -PACK_H * 1.02, 0]}
           >
             <meshBasicMaterial
-              map={textures.front}
+              map={textures.sheet}
               transparent
               opacity={0.13}
               depthWrite={false}
@@ -951,6 +583,7 @@ export function PackCarousel({ variant, onSelect }: PackCarouselProps) {
 export function PackExperience({
   cards,
   variant,
+  sheet,
   packCount,
   phase,
   controls,
@@ -963,8 +596,9 @@ export function PackExperience({
   const stackCount = Math.min(packCount, 10);
   // bulk stacks sit lower so the upward cascade stays in frame
   const packBaseY = stackCount > 1 ? -0.55 : 0;
-  const [cutGeos, setCutGeos] = useState<CutGeometrySet | null>(null);
+  const [cutGeos, setCutGeos] = useState<SplitMesh | null>(null);
   const cutBuiltRef = useRef(false);
+  const pack = use(packGeometry());
   const frontTextures = useLoader(
     THREE.TextureLoader,
     cards.map((c) => c.imageUrl),
@@ -978,14 +612,13 @@ export function PackExperience({
     }
   }, [frontTextures, backTexture]);
 
-  const wrapperFrontTex = useMemo(() => paintWrapper(variant, true), [variant]);
-  const wrapperBackTex = useMemo(() => paintWrapper(variant, false), [variant]);
+  const sheetTex = useMemo(
+    () => sheet ?? paintVariantSheet(variant, pack.layout),
+    [sheet, variant, pack.layout],
+  );
   const normalTex = useMemo(() => makeWrinkleNormalTexture(), []);
   const glowTex = useMemo(() => makeGlowTexture(), []);
-  const sheenMat = useMemo(
-    () => makeSheenMaterial(wrapperFrontTex),
-    [wrapperFrontTex],
-  );
+  const sheenMat = useMemo(() => makeSheenMaterial(sheetTex), [sheetTex]);
   const accentColor = useMemo(
     () => new THREE.Color(variant.palette.accent),
     [variant],
@@ -995,17 +628,11 @@ export function PackExperience({
     [variant],
   );
 
-  const bodyGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "body"), []);
-  const stripGeo = useMemo(() => makeWrapperGeometry(STRAIGHT_CUT, "strip"), []);
-  const bodyWallGeos = useMemo(
-    () =>
-      ([-1, 1] as const).map((s) => makeSideWallGeometry(s, -PACK_H / 2, TEAR_Y)),
-    [],
-  );
-  const stripWallGeos = useMemo(
-    () =>
-      ([-1, 1] as const).map((s) => makeSideWallGeometry(s, TEAR_Y, PACK_H / 2)),
-    [],
+  // Sealed, the pack is whole: the factory perforation is printed on the sheet,
+  // not cut into the mesh, so nothing is split until there is an actual tear.
+  const seamGeo = useMemo(
+    () => (cutGeos ? seamGeometry(cutGeos.seam) : null),
+    [cutGeos],
   );
 
   const holoMaterials = useMemo(
@@ -1057,8 +684,8 @@ export function PackExperience({
     return pts;
   }, [tearTrail, glowTex]);
   const chargeGlowRef = useRef<THREE.Sprite>(null);
-  const edgeBodyMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const edgeStripMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const edgeBodyMatRef = useRef<THREE.LineBasicMaterial>(null);
+  const edgeStripMatRef = useRef<THREE.LineBasicMaterial>(null);
 
   const wrapperMaterials = useRef<THREE.MeshPhysicalMaterial[]>([]);
 
@@ -1128,7 +755,7 @@ export function PackExperience({
       tear.active = false;
       // the cut follows the drag path, so every tear is a little different
       cutBuiltRef.current = true;
-      setCutGeos(buildCutSet(buildCutFnFromPath(tear.path)));
+      setCutGeos(buildCutSet(pack.geometry, buildCutFnFromPath(tear.path)));
       onTorn();
     }
   };
@@ -1168,7 +795,7 @@ export function PackExperience({
     // skip-tear / fallback opens still get a (jagged, centered) cut edge
     if (phase === "opening" && !cutGeos && !cutBuiltRef.current) {
       cutBuiltRef.current = true;
-      setCutGeos(buildCutSet(DEFAULT_TORN_CUT));
+      setCutGeos(buildCutSet(pack.geometry, DEFAULT_TORN_CUT));
     }
 
     // glowing cut edge, pulsing like the reference
@@ -1243,7 +870,7 @@ export function PackExperience({
           i,
           p.x,
           p.y,
-          faceZ(p.x, p.y / PACK_H + 0.5) + 0.05,
+          pack.faceZ + 0.05,
         );
       }
       posAttr.needsUpdate = true;
@@ -1258,7 +885,7 @@ export function PackExperience({
         tearHeadRef.current.position.set(
           last.x,
           last.y,
-          faceZ(last.x, last.y / PACK_H + 0.5) + 0.06,
+          pack.faceZ + 0.06,
         );
       }
       const s = 0.3 + tear.progress * 0.5 + Math.sin(t * 20) * 0.05;
@@ -1487,135 +1114,84 @@ export function PackExperience({
               ]}
             >
               <group position={[0, PACK_H / 2, 0]}>
+              {/* Below the tear: what stays in your hand. Until there is a cut
+                  the whole shell lives here, so a sealed pack is one mesh and
+                  there is no seam to see. */}
               <group
                 ref={(g) => {
                   bodyRefs.current[i] = g;
                 }}
               >
                 <mesh
-                  geometry={cutGeos ? cutGeos.bodyF : bodyGeo}
+                  geometry={cutGeos ? cutGeos.below : pack.geometry}
                   renderOrder={5}
                 >
                   <FoilMaterial
-                    map={wrapperFrontTex}
+                    map={sheetTex}
                     normalMap={normalTex}
                     materialRef={registerWrapperMaterial}
                     dim={i !== 0}
+                    doubleSide
                   />
                 </mesh>
-                <mesh
-                  geometry={cutGeos ? cutGeos.bodyB : bodyGeo}
-                  renderOrder={5}
-                  rotation={[0, Math.PI, 0]}
-                >
-                  <FoilMaterial
-                    map={wrapperBackTex}
-                    normalMap={normalTex}
-                    materialRef={registerWrapperMaterial}
-                    dim={i !== 0}
-                  />
-                </mesh>
-                {bodyWallGeos.map((g, wi) => (
-                  <mesh
-                    key={wi}
-                    geometry={cutGeos ? cutGeos.walls[wi] : g}
-                    renderOrder={4}
-                  >
-                    <FoilMaterial
-                      map={wrapperFrontTex}
-                      normalMap={normalTex}
-                      materialRef={registerWrapperMaterial}
-                      dim
-                      doubleSide
-                    />
-                  </mesh>
-                ))}
                 {i === 0 && (
                   <mesh
-                    geometry={cutGeos ? cutGeos.bodyF : bodyGeo}
+                    geometry={cutGeos ? cutGeos.below : pack.geometry}
                     renderOrder={6}
-                    position={[0, 0, 0.004]}
+                    scale={1.002}
                     material={sheenMat}
                   />
                 )}
-                {i === 0 && cutGeos && (
-                  <mesh geometry={cutGeos.edgeBody} renderOrder={7}>
-                    <meshBasicMaterial
+                {i === 0 && seamGeo && (
+                  <lineSegments geometry={seamGeo} renderOrder={7}>
+                    <lineBasicMaterial
                       ref={edgeBodyMatRef}
                       color="#bffcff"
                       transparent
                       opacity={0}
                       blending={THREE.AdditiveBlending}
                       depthWrite={false}
-                      side={THREE.DoubleSide}
                     />
-                  </mesh>
+                  </lineSegments>
                 )}
               </group>
 
+              {/* Above the tear: the strip that shears away. */}
               <group
                 ref={(g) => {
                   stripRefs.current[i] = g;
                 }}
               >
-                <mesh
-                  geometry={cutGeos ? cutGeos.stripF : stripGeo}
-                  renderOrder={5}
-                >
-                  <FoilMaterial
-                    map={wrapperFrontTex}
-                    normalMap={normalTex}
-                    materialRef={registerWrapperMaterial}
-                    dim={i !== 0}
-                  />
-                </mesh>
-                <mesh
-                  geometry={cutGeos ? cutGeos.stripB : stripGeo}
-                  renderOrder={5}
-                  rotation={[0, Math.PI, 0]}
-                >
-                  <FoilMaterial
-                    map={wrapperBackTex}
-                    normalMap={normalTex}
-                    materialRef={registerWrapperMaterial}
-                    dim={i !== 0}
-                  />
-                </mesh>
-                {stripWallGeos.map((g, wi) => (
-                  <mesh
-                    key={`w${wi}`}
-                    geometry={cutGeos ? cutGeos.stripWalls[wi] : g}
-                    renderOrder={4}
-                  >
+                {cutGeos && (
+                  <mesh geometry={cutGeos.above} renderOrder={5}>
                     <FoilMaterial
-                      map={wrapperFrontTex}
+                      map={sheetTex}
                       normalMap={normalTex}
                       materialRef={registerWrapperMaterial}
-                      dim
+                      dim={i !== 0}
                       doubleSide
                     />
                   </mesh>
-                ))}
-                {i === 0 && (
+                )}
+                {i === 0 && cutGeos && (
                   <mesh
-                    geometry={cutGeos ? cutGeos.stripF : stripGeo}
+                    geometry={cutGeos.above}
                     renderOrder={6}
-                    position={[0, 0, 0.004]}
+                    scale={1.002}
                     material={sheenMat}
                   />
                 )}
-                {i === 0 && cutGeos && (
-                  <mesh geometry={cutGeos.edgeStrip} renderOrder={7}>
-                    <meshBasicMaterial
+                {i === 0 && seamGeo && (
+                  <lineSegments geometry={seamGeo} renderOrder={7}>
+                    <lineBasicMaterial
                       ref={edgeStripMatRef}
                       color="#bffcff"
                       transparent
                       opacity={0}
                       blending={THREE.AdditiveBlending}
                       depthWrite={false}
-                      side={THREE.DoubleSide}
                     />
-                  </mesh>
+                  </lineSegments>
                 )}
                 </group>
               </group>

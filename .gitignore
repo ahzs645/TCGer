@@ -74,3 +74,8 @@ frontend/public/catalog/*
 !frontend/public/catalog/README.md
 mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/*
 !mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/README.md
+
+# Booster pack mesh and cover sheets, copied out of the packages/pack-core
+# submodule by its sync-assets script — neither bundler serves files from a
+# submodule, so the copy is generated, not tracked.
+frontend/public/pack/

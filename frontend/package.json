@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:host": "next dev --port 3003",
-    "prebuild": "npm --prefix ../packages/api-types run build",
+    "dev": "npm run sync-pack-assets && next dev",
+    "dev:host": "npm run sync-pack-assets && next dev --port 3003",
+    "prebuild": "npm run sync-pack-assets && npm --prefix ../packages/api-types run build",
     "build": "next build",
-    "prebuild:demo": "npm --prefix ../packages/api-types run build && rm -rf app/api",
+    "prebuild:demo": "npm run sync-pack-assets && npm --prefix ../packages/api-types run build && rm -rf app/api",
     "build:demo": "DEMO_EXPORT=true next build",
     "postbuild:demo": "git checkout -- app/api",
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --test src/lib/storage/portable-rules.test.ts src/lib/storage/legacy-collection-rows.test.ts src/lib/storage/legacy-portfolio-rows.test.ts src/lib/api/demo-adapter.test.ts src/lib/api/collection-semantics.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts src/stores/demo-store.test.ts",
-    "format": "prettier --write \"**/*.{ts,tsx,css,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,css,md}\"",
+    "sync-pack-assets": "node ../packages/pack-core/scripts/sync-assets.mjs public"
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.5",
@@ -37,6 +38,7 @@
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-query-devtools": "^5.101.4",
     "@tcg/api-types": "*",
+    "@tcg/pack-core": "*",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@tensorflow/tfjs-backend-webgpu": "^4.22.0",

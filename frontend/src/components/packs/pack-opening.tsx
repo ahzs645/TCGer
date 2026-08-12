@@ -2,22 +2,29 @@
 
 import { Canvas } from "@react-three/fiber";
 import Image from "next/image";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import {
-  generatePack,
-  packVariantById,
-  PACK_VARIANTS,
-  tierRank,
-  type PulledCard,
-} from "./pack-data";
+import type { SheetLayout } from "@tcg/pack-core";
+
+import { generatePack, tierRank, type PulledCard } from "./pack-data";
+import { packGeometry } from "./pack-mesh";
 import {
   PackExperience,
   PackCarousel,
   type PackPhase,
   type PackSceneControls,
 } from "./pack-scene";
+import {
+  VARIANT_SKINS,
+  composeSkinFromImage,
+  coverSkins,
+  readImageFile,
+  skinVariant,
+  usePackManifest,
+  useSkinTexture,
+  type PackSkin,
+} from "./pack-skins";
 
 const PHASE_HINTS: Partial<Record<PackPhase, string>> = {
   select: "Swipe or drag to browse · spin a pack or use the button to open",
@@ -56,8 +63,10 @@ const TIER_LABEL_CLASSES: Record<string, string> = {
 export function PackOpening() {
   const [phase, setPhase] = useState<PackPhase>("select");
   const [packCount, setPackCount] = useState<number>(1);
-  const [browseVariantId, setBrowseVariantId] = useState(PACK_VARIANTS[0].id);
-  const [variantId, setVariantId] = useState<string | null>(null);
+  const [browseSkin, setBrowseSkin] = useState<PackSkin>(VARIANT_SKINS[0]);
+  const [openedSkin, setOpenedSkin] = useState<PackSkin | null>(null);
+  const [uploads, setUploads] = useState<PackSkin[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [packs, setPacks] = useState<PulledCard[][]>([]);
   const [packIndex, setPackIndex] = useState(0);
   const [remountKey, setRemountKey] = useState(0);
@@ -73,8 +82,8 @@ export function PackOpening() {
   }, [slowMo]);
 
   const startPacks = useCallback(
-    (id: string) => {
-      setVariantId(id);
+    (skin: PackSkin) => {
+      setOpenedSkin(skin);
       setPacks(
         Array.from({ length: packCount }, () => generatePack(forceChase)),
       );
@@ -98,7 +107,7 @@ export function PackOpening() {
   const backToSelect = useCallback(() => {
     setPhase("select");
     setPacks([]);
-    setVariantId(null);
+    setOpenedSkin(null);
     setPackIndex(0);
     setRevealedCount(0);
   }, []);
@@ -121,7 +130,43 @@ export function PackOpening() {
   const handleAllRevealed = useCallback(() => setPhase("summary"), []);
   const handleFlash = useCallback(() => setFlashKey((k) => k + 1), []);
 
-  const variant = variantId ? packVariantById(variantId) : null;
+  // The skin decides the sheet; a variant still comes along for the accent
+  // colours the tear glow and charge-up are tinted with.
+  const skin = openedSkin ?? browseSkin;
+  const variant = openedSkin ? skinVariant(openedSkin) : null;
+  const manifest = usePackManifest();
+  const [layout, setLayout] = useState<SheetLayout | null>(null);
+  useEffect(() => {
+    let live = true;
+    packGeometry().then((p) => live && setLayout(p.layout));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const skins = useMemo(
+    () => [...VARIANT_SKINS, ...coverSkins(manifest), ...uploads],
+    [manifest, uploads],
+  );
+  const browseSheet = useSkinTexture(browseSkin, layout);
+  const openedSheet = useSkinTexture(skin, layout);
+
+  const handleUpload = useCallback(
+    async (files: FileList | null) => {
+      const file = files?.[0];
+      if (!file || !layout) return;
+      setUploadError(null);
+      try {
+        const image = await readImageFile(file);
+        const next = composeSkinFromImage(image, layout, file.name.replace(/\.[^.]+$/, ""));
+        setUploads((prev) => [...prev, next]);
+        setBrowseSkin(next);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "could not read that file");
+      }
+    },
+    [layout],
+  );
   const currentPack = packs[packIndex] ?? null;
   const revealed = currentPack ? currentPack.slice(0, revealedCount) : [];
   const canvasVisible =
@@ -146,14 +191,16 @@ export function PackOpening() {
           <Suspense fallback={null}>
             {phase === "select" ? (
               <PackCarousel
-                variant={packVariantById(browseVariantId)}
-                onSelect={() => startPacks(browseVariantId)}
+                variant={skinVariant(browseSkin)}
+                sheet={browseSheet}
+                onSelect={() => startPacks(browseSkin)}
               />
             ) : currentPack && variant ? (
               <PackExperience
                 key={`${packIndex}-${remountKey}`}
                 cards={currentPack}
                 variant={variant}
+                sheet={openedSheet}
                 packCount={packs.length}
                 phase={phase}
                 controls={controls}
@@ -209,30 +256,58 @@ export function PackOpening() {
         </p>
       )}
 
-      {/* variant + pack count pickers on select screen */}
+      {/* texture + pack count pickers on select screen */}
       {phase === "select" && (
         <div className="absolute inset-x-3 bottom-14 flex flex-col items-center gap-2 sm:bottom-12">
-          <div className="flex flex-wrap justify-center gap-2">
-            {PACK_VARIANTS.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => setBrowseVariantId(v.id)}
-                className={cn(
-                  "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted",
-                  browseVariantId === v.id && "text-background",
-                )}
-                style={
-                  browseVariantId === v.id
-                    ? { background: v.palette.mid, borderColor: v.palette.mid }
-                    : undefined
-                }
-                aria-pressed={browseVariantId === v.id}
-              >
-                {v.name}
-              </button>
-            ))}
+          <div className="flex max-w-full flex-wrap justify-center gap-2 overflow-x-auto">
+            {skins.map((s) => {
+              const active = browseSkin.id === s.id;
+              const tint = s.kind === "variant" ? skinVariant(s).palette.mid : null;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setBrowseSkin(s)}
+                  className={cn(
+                    "min-h-10 rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted",
+                    // A variant chip wears its own palette, so its label goes to
+                    // the background colour to stay legible on it; anything else
+                    // uses the primary fill and must not also take that class.
+                    active && tint && "text-background",
+                    active && !tint && "border-primary bg-primary text-primary-foreground",
+                  )}
+                  style={
+                    active && tint ? { background: tint, borderColor: tint } : undefined
+                  }
+                  aria-pressed={active}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+            {/* The studio's flow, minus the authoring panel: the same compositor
+                fits the image to the display panel and wraps it round the back. */}
+            <label
+              className={cn(
+                "min-h-10 cursor-pointer rounded-full border border-dashed border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted",
+                !layout && "pointer-events-none opacity-50",
+              )}
+            >
+              Upload image
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => {
+                  void handleUpload(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
           </div>
+          {uploadError && (
+            <p className="text-xs font-medium text-destructive">{uploadError}</p>
+          )}
           <div className="flex justify-center gap-2">
             {PACK_COUNTS.map((n) => (
               <button
@@ -253,7 +328,7 @@ export function PackOpening() {
           </div>
           <button
             type="button"
-            onClick={() => startPacks(browseVariantId)}
+            onClick={() => startPacks(browseSkin)}
             className="min-h-11 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:opacity-90"
           >
             Open {packCount === 1 ? "this pack" : `${packCount} packs`}
