@@ -18,7 +18,8 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.art.clay",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
-    "cardCountHint": 272
+    "cardCountHint": 272,
+    "coverImageUrl": "https://assets.tcgdex.net/en/neo/neo2/37/low.webp"
   },
   {
     "slug": "pokemon-crochet-art",
@@ -38,6 +39,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.art.crochet",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sm/sm1/30/low.webp",
     "cardCountHint": 42
   },
   {
@@ -57,6 +59,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "Ditto",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/base/base3/3/low.webp",
     "cardCountHint": 30
   },
   {
@@ -77,7 +80,8 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.delta-species",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
-    "cardCountHint": 194
+    "cardCountHint": 194,
+    "coverImageUrl": "https://assets.tcgdex.net/en/ecard/ecard3/136/low.webp"
   },
   {
     "slug": "pokemon-dark",
@@ -96,6 +100,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.dark",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/base/basep/17/low.webp",
     "cardCountHint": 131
   },
   {
@@ -115,6 +120,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.light",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/neo/neo4/12/low.webp",
     "cardCountHint": 22
   },
   {
@@ -134,6 +140,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.shining",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/neo/neo3/65/low.webp",
     "cardCountHint": 20
   },
   {
@@ -153,6 +160,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.gold-star",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/ex/ex7/107/low.webp",
     "cardCountHint": 32
   },
   {
@@ -171,6 +179,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.prism-star",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sm/sm5/58/low.webp",
     "cardCountHint": 35
   },
   {
@@ -189,6 +198,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.amazing",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swsh4/9/low.webp",
     "cardCountHint": 9
   },
   {
@@ -208,6 +218,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.radiant",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swshp/SWSH230/low.webp",
     "cardCountHint": 22
   },
   {
@@ -227,6 +238,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.prime",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/hgss/hgss1/105/low.webp",
     "cardCountHint": 27
   },
   {
@@ -246,6 +258,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.legend",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/hgss/hgss1/111/low.webp",
     "cardCountHint": 18
   },
   {
@@ -265,6 +278,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.lv-x",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/dp/dp1/120/low.webp",
     "cardCountHint": 92
   },
   {
@@ -283,6 +297,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.break",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/xy/xyp/XY134/low.webp",
     "cardCountHint": 38
   },
   {
@@ -302,6 +317,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.restored",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/bw/bw3/25/low.webp",
     "cardCountHint": 13
   },
   {
@@ -320,6 +336,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.mega",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/xy/xyp/XY104/low.webp",
     "cardCountHint": 94
   },
   {
@@ -338,6 +355,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.ex",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/ex/ex1/96/low.webp",
     "cardCountHint": 1437
   },
   {
@@ -356,6 +374,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.ex-uppercase",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/pop/pop1/16/low.webp",
     "cardCountHint": 954
   },
   {
@@ -374,6 +393,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.gx",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sm/smp/SM05/low.webp",
     "cardCountHint": 629
   },
   {
@@ -393,6 +413,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.tag-team",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sm/smp/SM166/low.webp",
     "cardCountHint": 107
   },
   {
@@ -411,6 +432,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.v",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/dp/dp6/79/low.webp",
     "cardCountHint": 745
   },
   {
@@ -429,6 +451,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.vmax",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swshp/SWSH005/low.webp",
     "cardCountHint": 214
   },
   {
@@ -447,6 +470,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.vstar",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swshp/SWSH195/low.webp",
     "cardCountHint": 102
   },
   {
@@ -466,6 +490,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.v-union",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swshp/SWSH139/low.webp",
     "cardCountHint": 20
   },
   {
@@ -484,6 +509,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.ace-spec",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sv/sv05/141/low.webp",
     "cardCountHint": 38
   },
   {
@@ -503,6 +529,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.illustration-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sv/sv01/199/low.webp",
     "cardCountHint": 493
   },
   {
@@ -522,6 +549,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.special-illustration-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/sv/sv01/243/low.webp",
     "cardCountHint": 222
   },
   {
@@ -540,6 +568,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.trainer-gallery",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/low.webp",
     "cardCountHint": 120
   },
   {
@@ -559,6 +588,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "pokemon.galarian-gallery",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://assets.tcgdex.net/en/swsh/swsh12.5gg/GG01/low.webp",
     "cardCountHint": 70
   },
   {
@@ -567,6 +597,7 @@ export const systemGuideDefinitions = [
     "description": "Nine Galarian Gallery cards by Kouki Saitou that assemble into one continuous scene.",
     "tcg": "pokemon",
     "category": "story",
+    "coverImageUrl": "https://images.pokemontcg.io/swsh12pt5gg/GG30.png",
     "curatorName": "TCGer",
     "tags": [
       "Connected Art",
@@ -598,6 +629,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "magic.showcase",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.scryfall.io/small/front/0/0/004a67ce-60ef-4cc2-9f4d-f30e3029d80a.jpg",
     "cardCountHint": 3099
   },
   {
@@ -616,6 +648,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "magic.borderless",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.scryfall.io/small/front/0/0/000225fc-9bc3-4eb3-905e-02c19c873b0b.jpg",
     "cardCountHint": 8775
   },
   {
@@ -634,6 +667,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "magic.full-art",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.scryfall.io/small/front/0/0/0000419b-0bba-4488-8f7a-6194544ce91e.jpg",
     "cardCountHint": 6308
   },
   {
@@ -652,6 +686,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "magic.extended-art",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.scryfall.io/small/front/0/0/00242e12-a957-4cb2-9d26-e1124e614e72.jpg",
     "cardCountHint": 4210
   },
   {
@@ -670,6 +705,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "magic.serialized",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.scryfall.io/small/front/0/0/008a3241-df86-4d80-88f9-912b0363d030.jpg",
     "cardCountHint": 299
   },
   {
@@ -688,6 +724,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "yugioh.ghost-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://images.ygoprodeck.com/images/cards_small/25862681.jpg",
     "cardCountHint": 54
   },
   {
@@ -706,6 +743,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "yugioh.ultimate-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://images.ygoprodeck.com/images/cards_small/49140998.jpg",
     "cardCountHint": 1173
   },
   {
@@ -724,6 +762,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "yugioh.starlight-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://images.ygoprodeck.com/images/cards_small/80181649.jpg",
     "cardCountHint": 559
   },
   {
@@ -742,6 +781,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "yugioh.quarter-century-secret-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://images.ygoprodeck.com/images/cards_small/98319530.jpg",
     "cardCountHint": 1045
   },
   {
@@ -761,6 +801,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "yugioh.lost-art",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://images.ygoprodeck.com/images/cards_small/92881099.jpg",
     "cardCountHint": 138
   },
   {
@@ -780,6 +821,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.enchanted",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_a9c86e6316084d76a03b32be95977091.avif?1709690747",
     "cardCountHint": 224
   },
   {
@@ -798,6 +840,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.epic",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_61593ca4abb44723ae95ab9228e27aee.avif?1755541452",
     "cardCountHint": 90
   },
   {
@@ -816,6 +859,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.iconic",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_77b92f4bb7d2460ea85b9d547cb8e72f.avif?1755541635",
     "cardCountHint": 10
   },
   {
@@ -834,6 +878,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.classification.floodborn",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_f8c86fca55d8453da9c1c6a39a5164dd.avif?1728609660",
     "cardCountHint": 296
   },
   {
@@ -852,6 +897,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.classification.princess",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_4ca99dff350049e6a2a72a72b595d33f.avif?1728609660",
     "cardCountHint": 234
   },
   {
@@ -870,6 +916,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "lorcana.classification.villain",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://cards.lorcast.io/card/digital/small/crd_09435d146f0844b3ac864e77a8ac746d.avif?1728609660",
     "cardCountHint": 387
   },
   {
@@ -889,6 +936,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "onepiece.treasure-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://optcgapi.com/media/static/Card_Images/OP08-052_p2.jpg",
     "cardCountHint": 8
   },
   {
@@ -908,6 +956,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "onepiece.special-rare",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://optcgapi.com/media/static/Card_Images/OP01-047_p2.jpg",
     "cardCountHint": 102
   },
   {
@@ -926,6 +975,7 @@ export const systemGuideDefinitions = [
     "ruleQuery": "onepiece.leader",
     "includeAllPrintings": true,
     "matchAnyPrinting": false,
+    "coverImageUrl": "https://optcgapi.com/media/static/Card_Images/OP01-001.jpg",
     "cardCountHint": 287
   }
 ] as const;

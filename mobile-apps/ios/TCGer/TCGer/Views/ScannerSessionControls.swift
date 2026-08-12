@@ -151,12 +151,8 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
 
             if cameraController.isTorchAvailable {
                 Button(action: cameraController.toggleTorch) {
-                    Image(systemName: cameraController.isTorchEnabled ? "flashlight.on.fill" : "flashlight.off.fill")
-                        .font(.headline)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
+                    torchButtonLabel
                 }
-                .foregroundStyle(cameraController.isTorchEnabled ? Color.yellow : Color.white)
                 .accessibilityLabel(cameraController.isTorchEnabled ? "Turn off flashlight" : "Turn on flashlight")
                 .accessibilityValue(cameraController.isTorchEnabled ? "On" : "Off")
             }
@@ -192,6 +188,24 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
         } else {
             Image(systemName: "ellipsis")
                 .font(.headline)
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+    }
+
+    @ViewBuilder
+    private var torchButtonLabel: some View {
+        if #available(iOS 26.0, *) {
+            Image(systemName: cameraController.isTorchEnabled ? "flashlight.on.fill" : "flashlight.off.fill")
+                .font(.headline)
+                .foregroundStyle(cameraController.isTorchEnabled ? Color.yellow : Color.primary)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            Image(systemName: cameraController.isTorchEnabled ? "flashlight.on.fill" : "flashlight.off.fill")
+                .font(.headline)
+                .foregroundStyle(cameraController.isTorchEnabled ? Color.yellow : Color.white)
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
         }

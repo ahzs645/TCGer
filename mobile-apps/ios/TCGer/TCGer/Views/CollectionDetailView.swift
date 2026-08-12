@@ -14,11 +14,12 @@ struct CollectionDetailView: View {
     @State private var isSaving = false
     @State private var cards: [CollectionCard]
     @State private var cardPendingDeletion: CollectionCard?
+    @State private var copyPendingDeletion: CardCopyContext?
     @State private var editContext: CardEditContext?
-    @State private var copySelectionCard: CollectionCard?
     @State private var editingCardId: String?
-    @State private var cardBeingMoved: CollectionCard?
+    @State private var moveContext: CardCopyContext?
     @State private var movingCardId: String?
+    @State private var expandedCardIds: Set<String> = []
     @State private var showingDeleteBinderConfirmation = false
     @State private var isDeletingBinder = false
     @State private var availableTags: [CollectionCardTag] = []
@@ -188,25 +189,26 @@ struct CollectionDetailView: View {
                             }
                         }
 
-                        Section {
-                            CollectionStatsCard(
-                                collection: workingCollectionSnapshot,
-                                showPricing: environmentStore.showPricing
-                            )
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color(.systemBackground))
-                        }
+                        if !isEditing {
+                            Section {
+                                CollectionStatsCard(
+                                    collection: workingCollectionSnapshot,
+                                    showPricing: environmentStore.showPricing
+                                )
+                                .padding(.horizontal)
+                                .padding(.vertical, 4)
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color(.systemBackground))
+                            }
 
-                        Section {
-                            if cards.isEmpty {
-                                emptyStateView
-                            } else if filteredCards.isEmpty {
-                                filteredEmptyStateView
-                            } else {
-                                ForEach(filteredCards) { card in
+                            Section {
+                                if cards.isEmpty {
+                                    emptyStateView
+                                } else if filteredCards.isEmpty {
+                                    filteredEmptyStateView
+                                } else {
+                                    ForEach(filteredCards) { card in
                                     if isSelectMode {
                                         HStack(spacing: 12) {
                                             Image(systemName: selectedCardIds.contains(card.id) ? "checkmark.circle.fill" : "circle")
@@ -240,6 +242,10 @@ struct CollectionDetailView: View {
                                             },
                                             onCancelDelete: {
                                                 cardPendingDeletion = nil
+                                            },
+                                            isCopiesExpanded: expandedCardIds.contains(card.id),
+                                            onToggleCopies: {
+                                                toggleCopies(for: card)
                                             }
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -249,14 +255,18 @@ struct CollectionDetailView: View {
                                             Button {
                                                 beginEditing(card)
                                             } label: {
-                                                Label("Edit", systemImage: "square.and.pencil")
+                                                if card.copies.count > 1 {
+                                                    Label("Copies", systemImage: "square.stack.3d.up")
+                                                } else {
+                                                    Label("Edit", systemImage: "square.and.pencil")
+                                                }
                                             }
                                             .tint(.blue)
 
                                             Button {
-                                                cardBeingMoved = card
+                                                moveContext = CardCopyContext(card: card)
                                             } label: {
-                                                Label("Move", systemImage: "arrowshape.turn.up.right")
+                                                Label(card.copies.count > 1 ? "Move Copies" : "Move", systemImage: "arrowshape.turn.up.right")
                                             }
                                             .tint(.purple)
                                         }
@@ -276,11 +286,70 @@ struct CollectionDetailView: View {
                                     } else {
                                         CollectionCardRow(
                                             card: card,
-                                            showPricing: environmentStore.showPricing
+                                            showPricing: environmentStore.showPricing,
+                                            isCopiesExpanded: expandedCardIds.contains(card.id),
+                                            onToggleCopies: {
+                                                toggleCopies(for: card)
+                                            }
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
                                         .listRowBackground(Color(.systemBackground))
+                                    }
+
+                                    if !isSelectMode,
+                                       expandedCardIds.contains(card.id),
+                                       card.copies.count > 1 {
+                                        ForEach(Array(card.copies.enumerated()), id: \.element.id) { index, copy in
+                                            if environmentStore.isAuthenticated {
+                                                Button {
+                                                    selectCopyForEditing(card: card, copy: copy)
+                                                } label: {
+                                                    CollectionCardCopyRow(
+                                                        copy: copy,
+                                                        index: index,
+                                                        total: card.copies.count
+                                                    )
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityHint("Double tap to edit this copy. Swipe for more actions.")
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 8, trailing: 16))
+                                                .listRowSeparator(.hidden)
+                                                .listRowBackground(Color(.systemBackground))
+                                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                                    Button {
+                                                        selectCopyForEditing(card: card, copy: copy)
+                                                    } label: {
+                                                        Label("Edit", systemImage: "square.and.pencil")
+                                                    }
+                                                    .tint(.blue)
+
+                                                    Button {
+                                                        moveContext = CardCopyContext(card: card, copy: copy)
+                                                    } label: {
+                                                        Label("Move", systemImage: "arrowshape.turn.up.right")
+                                                    }
+                                                    .tint(.purple)
+                                                }
+                                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                    Button(role: .destructive) {
+                                                        copyPendingDeletion = CardCopyContext(card: card, copy: copy)
+                                                    } label: {
+                                                        Label("Delete", systemImage: "trash")
+                                                    }
+                                                }
+                                            } else {
+                                                CollectionCardCopyRow(
+                                                    copy: copy,
+                                                    index: index,
+                                                    total: card.copies.count
+                                                )
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 8, trailing: 16))
+                                                .listRowSeparator(.hidden)
+                                                .listRowBackground(Color(.systemBackground))
+                                            }
+                                        }
+                                    }
                                     }
                                 }
                             }
@@ -303,18 +372,9 @@ struct CollectionDetailView: View {
                                 }
                                 .disabled(isDeletingBinder)
                             }
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color(.systemBackground))
                         }
                     }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .searchable(
-                            text: $searchText,
-                            placement: .navigationBarDrawer(displayMode: .always),
-                            prompt: "Search cards, sets, or codes"
-                        )
+                        .modifier(BinderListModeModifier(isEditing: isEditing, searchText: $searchText))
                         .safeAreaBar(edge: .top, spacing: 0) {
                             if !isEditing {
                                 CollectionFilterBar(
@@ -455,19 +515,15 @@ struct CollectionDetailView: View {
                     }
                     .environmentObject(environmentStore)
                 }
-                .sheet(item: $copySelectionCard) { card in
-                    CopySelectionSheet(card: card) { copy in
-                        selectCopyForEditing(card: card, copy: copy)
-                    }
-                }
-                .sheet(item: $cardBeingMoved) { card in
+                .sheet(item: $moveContext) { context in
                     MoveCardToBinderSheet(
-                        card: card,
+                        card: context.card,
+                        targetCopy: context.copy,
                         sourceBinderId: collection.id,
-                        isProcessing: movingCardId == card.id
+                        isProcessing: movingCardId == context.card.id
                     ) { binderId, copyIds in
                         await moveCard(
-                            card: card,
+                            card: context.card,
                             destinationBinderId: binderId,
                             selectedCopyIds: copyIds
                         )
@@ -485,6 +541,27 @@ struct CollectionDetailView: View {
                         Text(error)
                     }
                 }
+                .alert("Delete Copy?", isPresented: Binding(
+                    get: { copyPendingDeletion != nil },
+                    set: { if !$0 { copyPendingDeletion = nil } }
+                )) {
+                    Button("Delete", role: .destructive) {
+                        if let context = copyPendingDeletion {
+                            Task {
+                                await deleteCopy(context)
+                            }
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {
+                        copyPendingDeletion = nil
+                    }
+                } message: {
+                    if let context = copyPendingDeletion,
+                       let copy = context.copy {
+                        let index = context.card.copies.firstIndex(where: { $0.id == copy.id }) ?? 0
+                        Text("This permanently removes \(copy.displayTitle(index: index)) of \(context.card.name) from this binder.")
+                    }
+                }
                 .alert("Delete Binder?", isPresented: $showingDeleteBinderConfirmation) {
                     Button("Delete", role: .destructive) {
                         Task {
@@ -498,57 +575,57 @@ struct CollectionDetailView: View {
                     Text("This action permanently removes the binder and its cards.")
                 }
             }
-
-            // Bulk Action Bar
-            if isSelectMode && !selectedCardIds.isEmpty {
-                VStack(spacing: 0) {
-                    Divider()
-                    HStack(spacing: 24) {
-                        Button {
-                            if selectedCardIds.count == filteredCards.count {
-                                selectedCardIds.removeAll()
-                            } else {
-                                selectedCardIds = Set(filteredCards.map(\.id))
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                if isSelectMode && !selectedCardIds.isEmpty {
+                    VStack(spacing: 0) {
+                        Divider()
+                        HStack(spacing: 24) {
+                            Button {
+                                if selectedCardIds.count == filteredCards.count {
+                                    selectedCardIds.removeAll()
+                                } else {
+                                    selectedCardIds = Set(filteredCards.map(\.id))
+                                }
+                            } label: {
+                                Text(selectedCardIds.count == filteredCards.count ? "Deselect All" : "Select All")
+                                    .font(.caption)
                             }
-                        } label: {
-                            Text(selectedCardIds.count == filteredCards.count ? "Deselect All" : "Select All")
+
+                            Spacer()
+
+                            Button { showingBulkMoveSheet = true } label: {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "arrowshape.turn.up.right")
+                                    Text("Move").font(.caption2)
+                                }
+                            }
+                            .disabled(isBulkProcessing)
+
+                            Button { showingBulkConditionSheet = true } label: {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "pencil")
+                                    Text("Condition").font(.caption2)
+                                }
+                            }
+                            .disabled(isBulkProcessing)
+
+                            Button(role: .destructive) { showingBulkDeleteConfirmation = true } label: {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "trash")
+                                    Text("Delete").font(.caption2)
+                                }
+                            }
+                            .disabled(isBulkProcessing)
+
+                            Text("\(selectedCardIds.count)")
                                 .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.secondary)
                         }
-
-                        Spacer()
-
-                        Button { showingBulkMoveSheet = true } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "arrowshape.turn.up.right")
-                                Text("Move").font(.caption2)
-                            }
-                        }
-                        .disabled(isBulkProcessing)
-
-                        Button { showingBulkConditionSheet = true } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "pencil")
-                                Text("Condition").font(.caption2)
-                            }
-                        }
-                        .disabled(isBulkProcessing)
-
-                        Button(role: .destructive) { showingBulkDeleteConfirmation = true } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "trash")
-                                Text("Delete").font(.caption2)
-                            }
-                        }
-                        .disabled(isBulkProcessing)
-
-                        Text("\(selectedCardIds.count)")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial)
                 }
             }
         }
@@ -704,6 +781,36 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
+    private func deleteCopy(_ context: CardCopyContext) async {
+        guard let copy = context.copy else {
+            copyPendingDeletion = nil
+            return
+        }
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            copyPendingDeletion = nil
+            return
+        }
+
+        defer {
+            copyPendingDeletion = nil
+        }
+
+        do {
+            try await apiService.deleteCardFromBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: collection.id,
+                collectionCardId: copy.id
+            )
+            await reloadBinderCards()
+            HapticManager.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func updateCard(
         card: CollectionCard,
         collectionEntryId: String,
@@ -772,7 +879,7 @@ struct CollectionDetailView: View {
     private func beginEditing(_ card: CollectionCard) {
         let copies = card.copies
         if copies.count > 1 {
-            copySelectionCard = card
+            toggleCopies(for: card)
         } else {
             let copy = copies.first
             editContext = CardEditContext(
@@ -786,13 +893,23 @@ struct CollectionDetailView: View {
 
     @MainActor
     private func selectCopyForEditing(card: CollectionCard, copy: CollectionCardCopy) {
-        copySelectionCard = nil
         editContext = CardEditContext(
             card: card,
             collectionEntryId: copy.id,
             copy: copy,
             canEditQuantity: false
         )
+    }
+
+    @MainActor
+    private func toggleCopies(for card: CollectionCard) {
+        withAnimation(.snappy) {
+            if expandedCardIds.contains(card.id) {
+                expandedCardIds.remove(card.id)
+            } else {
+                expandedCardIds.insert(card.id)
+            }
+        }
     }
 
     @MainActor
@@ -865,7 +982,7 @@ struct CollectionDetailView: View {
     ) async {
         if destinationBinderId == collection.id {
             errorMessage = "Select a different destination binder."
-            cardBeingMoved = nil
+            moveContext = nil
             return
         }
 
@@ -893,7 +1010,7 @@ struct CollectionDetailView: View {
                 )
             }
             await reloadBinderCards()
-            cardBeingMoved = nil
+            moveContext = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1101,6 +1218,31 @@ struct CollectionDetailView: View {
     }
 }
 
+private struct BinderListModeModifier: ViewModifier {
+    let isEditing: Bool
+    @Binding var searchText: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEditing {
+            content
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(Color(.systemGroupedBackground))
+                .scrollDismissesKeyboard(.interactively)
+        } else {
+            content
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .searchable(
+                    text: $searchText,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search cards, sets, or codes"
+                )
+        }
+    }
+}
+
 private struct CardEditContext: Identifiable, Equatable {
     let id = UUID()
     let card: CollectionCard
@@ -1109,86 +1251,16 @@ private struct CardEditContext: Identifiable, Equatable {
     let canEditQuantity: Bool
 }
 
-private struct CopySelectionSheet: View {
+private struct CardCopyContext: Identifiable {
     let card: CollectionCard
-    let onSelect: (CollectionCardCopy) -> Void
-    @Environment(\.dismiss) private var dismiss
+    let copy: CollectionCardCopy?
 
-    private var copies: [CollectionCardCopy] {
-        card.copies
+    init(card: CollectionCard, copy: CollectionCardCopy? = nil) {
+        self.card = card
+        self.copy = copy
     }
 
-    var body: some View {
-        NavigationStack {
-            List {
-                if copies.isEmpty {
-                    Text("No individual copies available for editing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 12)
-                } else {
-                    ForEach(Array(copies.enumerated()), id: \.element.id) { index, copy in
-                        Button {
-                            onSelect(copy)
-                            dismiss()
-                        } label: {
-                            CopyRow(copy: copy, index: index)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle("Select Copy")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-
-    private struct CopyRow: View {
-        let copy: CollectionCardCopy
-        let index: Int
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(copy.displayTitle(index: index))
-                        .font(.headline)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if let detailLine = copy.detailLine {
-                    Text(detailLine)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if let notes = copy.normalizedNotes {
-                    Text(notes)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
-
-                if let tagsLine = copy.tagsLine {
-                    Text("Tags: \(tagsLine)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("No tags")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.vertical, 6)
-        }
+    var id: String {
+        "\(card.id):\(copy?.id ?? "all")"
     }
 }

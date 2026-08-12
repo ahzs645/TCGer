@@ -7,6 +7,23 @@ const sourcePath = resolve(repo, 'data/system-guides.json');
 const sourceText = await readFile(sourcePath, 'utf8');
 const source = JSON.parse(sourceText);
 
+function catalogImageUrl(game, pack, card) {
+  if (card.imageUrlSmall || card.imageUrl) return card.imageUrlSmall ?? card.imageUrl;
+  if (game === 'pokemon' && card.setCode && card.collectorNumber) {
+    const set = pack.sets.find((candidate) => candidate.code === card.setCode);
+    if (set?.serie) {
+      return `https://assets.tcgdex.net/en/${encodeURIComponent(set.serie)}/${encodeURIComponent(card.setCode)}/${encodeURIComponent(card.collectorNumber)}/low.webp`;
+    }
+  }
+  if (game === 'magic' && card.id?.length > 1) {
+    return `https://cards.scryfall.io/small/front/${card.id[0]}/${card.id[1]}/${card.id}.jpg`;
+  }
+  if (game === 'yugioh' && card.konamiId) {
+    return `https://images.ygoprodeck.com/images/cards_small/${card.konamiId}.jpg`;
+  }
+  return undefined;
+}
+
 async function withCatalogCounts(catalog) {
   try {
     const catalogDirectory = resolve(repo, 'data/catalog');
@@ -24,10 +41,12 @@ async function withCatalogCounts(catalog) {
           const pack = packs.get(guide.tcg);
           if (!pack || !['tag', 'name'].includes(guide.ruleType)) return guide;
           const query = guide.ruleQuery?.toLowerCase();
-          const cardCountHint = pack.cards.filter((card) => guide.ruleType === 'tag'
+          const matchingCards = pack.cards.filter((card) => guide.ruleType === 'tag'
             ? (card.collectionTags ?? []).some((tag) => tag.toLowerCase() === query)
-            : card.name.toLowerCase() === query).length;
-          return { ...guide, cardCountHint };
+            : card.name.toLowerCase() === query);
+          const coverImageUrl = guide.coverImageUrl
+            ?? matchingCards.map((card) => catalogImageUrl(guide.tcg, pack, card)).find(Boolean);
+          return { ...guide, coverImageUrl, cardCountHint: matchingCards.length };
         }),
     };
   } catch {

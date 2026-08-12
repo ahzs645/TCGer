@@ -6,21 +6,26 @@ struct CollectionCardRow: View {
     let showDeleteConfirmation: Bool
     let onConfirmDelete: (() -> Void)?
     let onCancelDelete: (() -> Void)?
+    let isCopiesExpanded: Bool
+    let onToggleCopies: (() -> Void)?
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isCopiesExpanded = false
 
     init(
         card: CollectionCard,
         showPricing: Bool,
         showDeleteConfirmation: Bool = false,
         onConfirmDelete: (() -> Void)? = nil,
-        onCancelDelete: (() -> Void)? = nil
+        onCancelDelete: (() -> Void)? = nil,
+        isCopiesExpanded: Bool = false,
+        onToggleCopies: (() -> Void)? = nil
     ) {
         self.card = card
         self.showPricing = showPricing
         self.showDeleteConfirmation = showDeleteConfirmation
         self.onConfirmDelete = onConfirmDelete
         self.onCancelDelete = onCancelDelete
+        self.isCopiesExpanded = isCopiesExpanded
+        self.onToggleCopies = onToggleCopies
     }
 
     private func normalized(_ value: String?) -> String? {
@@ -266,18 +271,6 @@ struct CollectionCardRow: View {
                 }
             }
 
-            if card.copies.count > 1, isCopiesExpanded {
-                Divider()
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(card.copies.enumerated()), id: \.element.id) { index, copy in
-                        CopyDetailRow(copy: copy, index: index)
-                        if index < card.copies.count - 1 {
-                            Divider()
-                        }
-                    }
-                }
-            }
-
             if showDeleteConfirmation {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
@@ -307,6 +300,25 @@ struct CollectionCardRow: View {
                 .background(Color.red.opacity(colorScheme == .dark ? 0.20 : 0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+
+            if card.copies.count > 1,
+               !showDeleteConfirmation,
+               let onToggleCopies {
+                Divider()
+                Button(action: onToggleCopies) {
+                    HStack {
+                        Text(isCopiesExpanded ? "Hide copies" : "View \(card.copies.count) copies")
+                            .fontWeight(.semibold)
+                        Spacer()
+                        Image(systemName: isCopiesExpanded ? "chevron.up" : "chevron.down")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(isCopiesExpanded ? "Expanded" : "Collapsed")
+            }
         }
         .padding()
         .background(cardBackgroundColor)
@@ -315,19 +327,6 @@ struct CollectionCardRow: View {
                 .stroke(cardBorderColor, lineWidth: 1)
         )
         .cornerRadius(8)
-        .overlay(alignment: .bottomTrailing) {
-            if card.copies.count > 1 && !showDeleteConfirmation {
-                Button {
-                    isCopiesExpanded.toggle()
-                } label: {
-                    Image(systemName: isCopiesExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(10)
-                }
-                .buttonStyle(.plain)
-            }
-        }
         .contentShape(Rectangle())
         // Foil is suppressed only when the copies have explicit finish data
         // and none of them are foil; unknown finishes keep the rarity default.
@@ -439,28 +438,45 @@ struct CollectionCardRow: View {
         }
     }
 
-    private struct CopyDetailRow: View {
-        let copy: CollectionCardCopy
-        let index: Int
-        @Environment(\.colorScheme) private var colorScheme
+}
 
-        private var attributeLabels: [String] {
-            var labels = copy.collectibleVariant.labels
-            if copy.isFoil == true && labels.isEmpty { labels.append("Foil") }
-            if copy.isSigned == true { labels.append("Signed") }
-            if copy.isAltered == true { labels.append("Altered") }
-            return labels
-        }
+struct CollectionCardCopyRow: View {
+    let copy: CollectionCardCopy
+    let index: Int
+    let total: Int
+    @Environment(\.colorScheme) private var colorScheme
 
-        var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(copy.displayTitle(index: index))
-                    .font(.caption)
-                    .fontWeight(.semibold)
+    private var attributeLabels: [String] {
+        var labels = copy.collectibleVariant.labels
+        if copy.isFoil == true && labels.isEmpty { labels.append("Foil") }
+        if copy.isSigned == true { labels.append("Signed") }
+        if copy.isAltered == true { labels.append("Altered") }
+        return labels
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "square.stack.3d.up")
+                .font(.body)
+                .foregroundColor(.accentColor)
+                .frame(width: 24, height: 24)
+                .background(Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(copy.displayTitle(index: index))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("\(index + 1) of \(total)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
 
                 if let detailLine = copy.detailLine {
                     Text(detailLine)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
@@ -481,7 +497,7 @@ struct CollectionCardRow: View {
 
                 if let notes = copy.normalizedNotes {
                     Text(notes)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                 }
@@ -490,13 +506,21 @@ struct CollectionCardRow: View {
                     Text("Tags: \(tagsLine)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                } else {
-                    Text("No tags")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
             }
-            .padding(.vertical, 4)
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 4)
         }
+        .padding(12)
+        .background(colorScheme == .dark ? Color(.tertiarySystemBackground) : Color(.secondarySystemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
     }
 }
