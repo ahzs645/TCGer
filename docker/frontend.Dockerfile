@@ -5,6 +5,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy monorepo root + workspace package files for dependency resolution
 COPY package*.json ./
 COPY packages/api-types/package*.json ./packages/api-types/
+COPY packages/pack-core/package*.json ./packages/pack-core/
 COPY frontend/package*.json ./frontend/
 
 # Install workspace dependencies
@@ -12,6 +13,7 @@ RUN npm install
 
 # Copy workspace sources
 COPY packages/api-types ./packages/api-types
+COPY packages/pack-core ./packages/pack-core
 COPY frontend ./frontend
 COPY tsconfig.base.json ./
 
