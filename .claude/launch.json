@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev:host"],
       "port": 3003
+    },
+    {
+      "name": "pack-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../booster-pack-studio", "run", "dev"],
+      "port": 5173
     }
   ]
 }

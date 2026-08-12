@@ -1,0 +1,3 @@
+[submodule "packages/pack-core"]
+	path = packages/pack-core
+	url = https://github.com/ahzs645/booster-pack-core.git
