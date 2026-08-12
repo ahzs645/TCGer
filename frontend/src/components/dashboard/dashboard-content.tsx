@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAppRoute } from "@/lib/app-routes";
-import { GAME_LABELS } from "@/lib/utils";
+import { cn, GAME_LABELS } from "@/lib/utils";
 import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
@@ -368,7 +368,10 @@ export function DashboardContent() {
           {showPricing ? (
             <StatCard
               title="Estimated Value"
-              value={`$${stats.totalValue.toFixed(2)}`}
+              value={new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+              }).format(stats.totalValue)}
               description="Based on collection pricing"
               icon={<Coins className="h-5 w-5" data-oid="bg_ukgc" />}
               data-oid="lmka4i."
@@ -549,6 +552,11 @@ function CompletionBar({
         <div
           className="h-full rounded-full bg-primary"
           style={{ width: `${percent}%` }}
+          role="progressbar"
+          aria-label={`${label} completion`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
         />
       </div>
     </div>

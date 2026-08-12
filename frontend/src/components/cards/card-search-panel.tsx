@@ -87,7 +87,7 @@ export function CardSearchPanel() {
         <CardHeader data-oid="exck2hn">
           <CardTitle data-oid="._71p80">Search Parameters</CardTitle>
           <CardDescription data-oid="arc981r">
-            Query any supported TCG via adapter search.
+            Find cards by name or set across your enabled games.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4" data-oid="z2vprw7">
@@ -97,11 +97,12 @@ export function CardSearchPanel() {
             data-oid="shvo8j:"
           >
             <div className="space-y-2" data-oid="99ow48f">
-              <label className="text-sm font-medium" data-oid="1bz10j7">
+              <label htmlFor="card-search-keyword" className="text-sm font-medium" data-oid="1bz10j7">
                 Keyword
               </label>
               <div className="flex gap-2" data-oid="3ihveu3">
                 <Input
+                  id="card-search-keyword"
                   className="min-w-0 flex-1"
                   value={inputValue}
                   onChange={(event) => setInputValue(event.target.value)}
@@ -112,7 +113,7 @@ export function CardSearchPanel() {
                 <Button
                   type="submit"
                   size="icon"
-                  className="shrink-0"
+                  className="h-11 w-11 shrink-0"
                   aria-label="Search cards"
                   disabled={isFetching}
                   data-oid="yh7r5y1"
@@ -130,7 +131,7 @@ export function CardSearchPanel() {
             </div>
 
             <div className="space-y-2" data-oid="zsrjmvw">
-              <label className="text-sm font-medium" data-oid="kdxgwae">
+              <label id="card-search-game-label" className="text-sm font-medium" data-oid="kdxgwae">
                 TCG Filter
               </label>
               <Select
@@ -138,7 +139,7 @@ export function CardSearchPanel() {
                 onValueChange={(value) => setGame(value as SupportedGame)}
                 data-oid="19wtplw"
               >
-                <SelectTrigger data-oid="1z40tmp">
+                <SelectTrigger aria-labelledby="card-search-game-label" data-oid="1z40tmp">
                   <SelectValue placeholder="All games" data-oid="jj51dke" />
                 </SelectTrigger>
                 <SelectContent data-oid="c-c_6mu">

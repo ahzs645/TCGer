@@ -1069,8 +1069,8 @@ export function CardPreview({ card }: CardPreviewProps) {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleQuantityChange(quantity - 1)}
-                        className="h-8 w-8 rounded-full"
-                        tabIndex={-1}
+                        className="h-11 w-11 rounded-full sm:h-8 sm:w-8"
+                        aria-label={`Decrease ${activeCard.name} quantity`}
                         disabled={quantityControlsDisabled || entrySyncing}
                         data-oid="wlspwyq"
                       >
@@ -1081,15 +1081,17 @@ export function CardPreview({ card }: CardPreviewProps) {
                         className="w-10 border-none bg-transparent text-center text-sm font-semibold"
                         type="text"
                         value={quantity}
+                        aria-label={`${activeCard.name} quantity`}
+                        aria-live="polite"
                         data-oid="zuoj2kr"
                       />
 
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full"
+                        className="h-11 w-11 rounded-full sm:h-8 sm:w-8"
                         onClick={() => handleQuantityChange(quantity + 1)}
-                        tabIndex={-1}
+                        aria-label={`Increase ${activeCard.name} quantity`}
                         disabled={
                           quantityControlsDisabled ||
                           entrySyncing ||

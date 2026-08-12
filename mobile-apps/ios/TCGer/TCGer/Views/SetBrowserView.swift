@@ -159,7 +159,7 @@ struct SetBrowserView: View {
                                     .listRowSeparator(.hidden)
                                     .listRowBackground(Color.clear)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        addToWishlistAction(for: set)
+                                        addToWishlistAction(for: set, iconOnly: true)
                                     }
                                     .contextMenu {
                                         addToWishlistAction(for: set)
@@ -276,13 +276,18 @@ struct SetBrowserView: View {
     }
 
     @ViewBuilder
-    private func addToWishlistAction(for set: TcgSet) -> some View {
+    private func addToWishlistAction(for set: TcgSet, iconOnly: Bool = false) -> some View {
         Button {
             addSetsRequest = AddSetsToWishlistRequest(initialSetIDs: [set.id])
         } label: {
-            Label("Add to Wishlist", systemImage: "heart.badge.plus")
+            if iconOnly {
+                Image(systemName: "heart.fill")
+            } else {
+                Label("Add to Wishlist", systemImage: "heart.badge.plus")
+            }
         }
         .tint(.pink)
+        .accessibilityLabel("Add to Wishlist")
     }
 
     private func validateSelectedGame() {

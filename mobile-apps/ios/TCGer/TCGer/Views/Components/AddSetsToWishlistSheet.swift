@@ -298,10 +298,12 @@ struct AddSetsToWishlistSheet: View {
                         )
                     }
                 } header: {
-                    if let game = TCGGame(rawValue: tcg) {
-                        GameLabel(game: game, text: game.displayName)
-                    } else {
-                        Text(tcg.uppercased())
+                    if environmentStore.shouldShowGamePicker {
+                        if let game = TCGGame(rawValue: tcg) {
+                            GameLabel(game: game, text: game.displayName)
+                        } else {
+                            Text(tcg.uppercased())
+                        }
                     }
                 }
             }

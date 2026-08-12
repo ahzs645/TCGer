@@ -718,14 +718,14 @@ struct CardScannerView: View {
             }
             .accessibilityLabel("Card game")
             .accessibilityValue(viewModel.selectedMode.displayName)
-        } else {
+        } else if !hasEnabledScanModes {
             ScannerOptionLabel(
-                title: hasEnabledScanModes ? viewModel.selectedMode.displayName : "No games",
+                title: "No games",
                 systemImage: "rectangle.stack",
                 isInteractive: false
             )
             .accessibilityLabel("Card game")
-            .accessibilityValue(hasEnabledScanModes ? viewModel.selectedMode.displayName : "No enabled games")
+            .accessibilityValue("No enabled games")
         }
     }
 

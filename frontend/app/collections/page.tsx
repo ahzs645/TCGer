@@ -7,6 +7,7 @@ import { CollectionView } from "@/components/collections/sandbox/collection-view
 import { CollectionImportDialog } from "@/components/collections/collection-import-dialog";
 import { CollectionHistoryDialog } from "@/components/collections/collection-history-dialog";
 import { BulkAddDialog } from "@/components/collections/bulk-add-dialog";
+import { CollectionExportMenu } from "@/components/collections/collection-export-menu";
 import { Badge } from "@/components/ui/badge";
 
 export default function CollectionsPage() {
@@ -19,16 +20,17 @@ export default function CollectionsPage() {
               className="text-3xl font-heading font-semibold"
               data-oid="atyfrma"
             >
-              Collection sandbox
+              Collections
             </h1>
             <div className="ml-auto flex items-center gap-2">
+              <CollectionExportMenu />
               <BulkAddDialog />
               <CollectionHistoryDialog />
               <CollectionImportDialog />
             </div>
           </div>
           <p className="text-sm text-muted-foreground" data-oid="sjfa4qn">
-            Per-copy inventory manager powered by your live binder data.
+            Manage every card and individual copy across your binders.
           </p>
         </div>
         <Suspense

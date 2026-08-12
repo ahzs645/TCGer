@@ -256,6 +256,24 @@ export function PackOpening() {
         </p>
       )}
 
+      {(phase === "tear" || phase === "reveal") && (
+        <div className="absolute inset-x-4 bottom-10 z-10 flex justify-center">
+          <button
+            type="button"
+            onClick={phase === "tear" ? handleTorn : handleAllRevealed}
+            className="min-h-11 rounded-full border border-border bg-background/90 px-5 py-2.5 text-sm font-semibold shadow-sm backdrop-blur transition hover:bg-muted"
+          >
+            {phase === "tear" ? "Skip tear animation" : "Show all pulls"}
+          </button>
+        </div>
+      )}
+
+      <p className="sr-only" role="status" aria-live="polite">
+        {phase === "reveal" && currentPack
+          ? `${revealedCount} of ${currentPack.length} cards revealed`
+          : PHASE_HINTS[phase] ?? `Pack opening phase: ${phase}`}
+      </p>
+
       {/* texture + pack count pickers on select screen */}
       {phase === "select" && (
         <div className="absolute inset-x-3 bottom-14 flex flex-col items-center gap-2 sm:bottom-12">

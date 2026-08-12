@@ -222,6 +222,32 @@ struct CollectionsView: View {
             )
             .scrollEdgeEffectStyle(.soft, for: .top)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button {
+                            showingCreateSheet = true
+                        } label: {
+                            Label("New Binder", systemImage: "folder.badge.plus")
+                        }
+                        Button {
+                            showingSmartFolderEditor = true
+                        } label: {
+                            Label("New Smart Folder", systemImage: "wand.and.stars")
+                        }
+                        Button {
+                            showingImportSheet = true
+                        } label: {
+                            Label("Import CSV", systemImage: "square.and.arrow.down")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!environmentStore.isAuthenticated)
+                    .accessibilityLabel("Add")
+                    .accessibilityHint("Shows options for adding content")
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     if environmentStore.isAuthenticated {
                         Button {
@@ -232,7 +258,6 @@ struct CollectionsView: View {
                         .accessibilityLabel("Search card catalog")
                     }
                 }
-
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 binderControlShelf
@@ -308,38 +333,18 @@ struct CollectionsView: View {
                         }
                     }
                 } label: {
-                    Label(sortOption.rawValue, systemImage: "arrow.up.arrow.down")
+                    Image(systemName: "arrow.up.arrow.down")
                 }
                 .buttonStyle(.glass)
-                .accessibilityLabel("Sort binders by \(sortOption.rawValue)")
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("Sort binders")
+                .accessibilityValue(sortOption.rawValue)
 
                 Spacer(minLength: 12)
-
-                Menu {
-                    Button {
-                        showingCreateSheet = true
-                    } label: {
-                        Label("New Binder", systemImage: "folder.badge.plus")
-                    }
-                    Button {
-                        showingSmartFolderEditor = true
-                    } label: {
-                        Label("New Smart Folder", systemImage: "wand.and.stars")
-                    }
-                    Button {
-                        showingImportSheet = true
-                    } label: {
-                        Label("Import CSV", systemImage: "square.and.arrow.down")
-                    }
-                } label: {
-                    Label("Add", systemImage: "plus")
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(!environmentStore.isAuthenticated)
-                .accessibilityHint("Shows options for adding content")
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 22)
+        .padding(.trailing, 16)
         .padding(.vertical, 8)
     }
 

@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent data-oid="pu8f.fm">
             <div
-              className="flex items-end gap-3 h-48"
+              className="flex h-48 min-w-0 items-end gap-1 sm:gap-3"
               role="img"
               aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${latestChartValue.toFixed(2)}`}
               data-oid="rtts-rv"
@@ -192,12 +192,12 @@ export default function AnalyticsPage() {
               {monthlyValues.map((m) => (
                 <div
                   key={m.month}
-                  className="flex h-full flex-1 flex-col items-center gap-1"
+                  className="flex h-full min-w-0 flex-1 flex-col items-center gap-1"
                   title={`${m.month}: $${m.value.toFixed(2)}`}
                   data-oid="4f:xh5c"
                 >
                   <span
-                    className="text-xs text-muted-foreground font-medium"
+                    className="hidden text-xs font-medium text-muted-foreground min-[360px]:inline"
                     data-oid="geq.yah"
                   >
                     ${Math.round(m.value)}

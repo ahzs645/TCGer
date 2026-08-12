@@ -202,10 +202,14 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
     return (
       <div
         className="flex min-h-screen items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading TCGer"
         data-oid="1h6.5jh"
       >
         <div
           className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
+          aria-hidden="true"
           data-oid=":::1ve0"
         />
       </div>

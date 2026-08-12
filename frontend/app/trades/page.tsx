@@ -430,7 +430,7 @@ function TradeSide({
   total: number;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
         {label}
       </p>
@@ -442,9 +442,9 @@ function TradeSide({
         cards.map((c) => (
           <div
             key={c.id}
-            className="flex items-center justify-between rounded border p-2 text-sm"
+            className="flex min-w-0 items-center justify-between gap-2 rounded border p-2 text-sm"
           >
-            <div>
+            <div className="min-w-0 truncate">
               <span className="font-medium">{c.name}</span>
               {c.quantity > 1 && (
                 <span className="ml-1 text-xs text-muted-foreground">
@@ -456,7 +456,7 @@ function TradeSide({
               </span>
             </div>
             {c.estimatedValue ? (
-              <span className="text-muted-foreground">
+              <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                 ${c.estimatedValue.toFixed(2)}
               </span>
             ) : null}

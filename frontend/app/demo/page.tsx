@@ -54,7 +54,7 @@ export default function DemoLoginPage() {
             alt="TCGer logo"
             width={56}
             height={56}
-            className="dark:invert"
+            className="h-14 w-14 dark:invert"
             data-oid="3-dxyq8"
           />
 
@@ -82,7 +82,7 @@ export default function DemoLoginPage() {
               Sign In
             </CardTitle>
             <CardDescription data-oid="vieydwy">
-              Enter your credentials to access your collection.
+              Use the demo account to explore a complete sample collection.
             </CardDescription>
           </CardHeader>
           <CardContent data-oid="aer7wwy">
@@ -118,15 +118,15 @@ export default function DemoLoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    className="pr-10"
+                    className="pr-12"
                     data-oid="umy_jjw"
                   />
 
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
+                    className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                     data-oid="wvtjc8-"
                   >
                     {showPassword ? (
@@ -144,18 +144,12 @@ export default function DemoLoginPage() {
                 className="w-full"
                 data-oid="-.2mf0g"
               >
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? "Opening demo..." : "Enter Demo"}
               </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled
-                data-oid="9c1g-_j"
-              >
-                Don&apos;t have an account? Sign up
-              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Any password works. Your changes stay in this browser.
+              </p>
             </form>
           </CardContent>
         </Card>

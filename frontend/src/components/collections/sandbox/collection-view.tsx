@@ -1288,6 +1288,7 @@ export function CollectionView() {
                     <div
                       role="button"
                       tabIndex={0}
+                      aria-pressed={isSelected}
                       className={cn(
                         "w-full text-left px-4 py-3 transition-colors cursor-pointer",
                         isSelected && "bg-primary/5",
@@ -1318,6 +1319,7 @@ export function CollectionView() {
                             e.stopPropagation();
                             toggleRowExpansion(card.id);
                           }}
+                          onKeyDown={(e) => e.stopPropagation()}
                           data-oid="jmv3egp"
                         >
                           {expanded ? "−" : "+"}

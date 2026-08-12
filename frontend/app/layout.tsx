@@ -17,7 +17,6 @@ const lexend = Lexend({ subsets: ["latin"], variable: "--font-heading" });
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   themeColor: "#0b0b0f"
 };
 

@@ -203,7 +203,8 @@ struct CardSearchFilterSheet: View {
                         NavigationLink {
                             CardSearchSetPicker(
                                 sets: availableSets,
-                                selection: $draftFilters.set
+                                selection: $draftFilters.set,
+                                showsGameSectionHeaders: environmentStore.shouldShowGamePicker
                             )
                         } label: {
                             LabeledContent("Set") {
@@ -358,6 +359,7 @@ private struct CardSearchSetPicker: View {
     @Environment(\.dismiss) private var dismiss
     let sets: [TcgSet]
     @Binding var selection: TcgSet?
+    let showsGameSectionHeaders: Bool
     @State private var searchText = ""
 
     private var filteredSets: [TcgSet] {
@@ -387,7 +389,7 @@ private struct CardSearchSetPicker: View {
             }
 
             ForEach(groupedSets, id: \.0) { tcg, gameSets in
-                Section(TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized) {
+                Section {
                     ForEach(gameSets) { set in
                         Button {
                             selection = set
@@ -402,6 +404,10 @@ private struct CardSearchSetPicker: View {
                                 isSelected: selection?.id == set.id
                             )
                         }
+                    }
+                } header: {
+                    if showsGameSectionHeaders {
+                        Text(TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized)
                     }
                 }
             }

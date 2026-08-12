@@ -354,7 +354,7 @@ export default function TradesPage() {
                     data-oid="olvqw13"
                   >
                     {/* Giving */}
-                    <div className="space-y-1.5 md:space-y-2" data-oid="p47-_v1">
+                    <div className="min-w-0 space-y-1.5 md:space-y-2" data-oid="p47-_v1">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="ibex:g_"
@@ -406,7 +406,7 @@ export default function TradesPage() {
                     </div>
 
                     {/* Receiving */}
-                    <div className="space-y-1.5 md:space-y-2" data-oid="8-keg4c">
+                    <div className="min-w-0 space-y-1.5 md:space-y-2" data-oid="8-keg4c">
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="t9d1::m"

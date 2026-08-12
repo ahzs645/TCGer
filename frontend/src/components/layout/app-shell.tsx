@@ -48,6 +48,14 @@ export const secondaryNavigation: NavigationItem[] = [
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
 import { getAppRoute } from "@/lib/app-routes";
 import { cn } from "@/lib/utils";
@@ -68,6 +76,10 @@ const navigation: NavigationItem[] = [
   { href: "/collections", label: "Collections", icon: Table },
   { href: "/wishlists", label: "Wishlists", icon: Heart },
 ];
+
+function isNavigationItemActive(pathname: string, href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+}
 
 /**
  * /scan needs the server-side hash store and upload API, so in demo mode it can
@@ -95,9 +107,15 @@ export function AppShell({ children }: AppShellProps) {
       demoMode || !item.feature || isFeatureAvailable(features, item.feature),
   );
   const primaryNavigation = primaryNavigationFor(demoMode);
-  const mobileNavPrimary = primaryNavigation.slice(0, 3);
+  const mobilePrimaryHrefs = ["/", "/collections", "/cards"];
+  const mobileNavPrimary = mobilePrimaryHrefs.flatMap((href) => {
+    const item = primaryNavigation.find((candidate) => candidate.href === href);
+    return item ? [item] : [];
+  });
   const mobileNavSecondary = [
-    ...primaryNavigation.slice(3),
+    ...primaryNavigation.filter(
+      (item) => !mobilePrimaryHrefs.includes(item.href),
+    ),
     // Scan still belongs somewhere in demo mode — it explains why it is off.
     ...(demoMode
       ? navigation.filter((item) => item.href === "/scan")
@@ -107,10 +125,16 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col" data-oid="zfaufj9">
+      <a
+        href="#main-content"
+        className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-transform focus:translate-y-0"
+      >
+        Skip to main content
+      </a>
       <PreferenceHydrator data-oid="b9x-5v1" />
       <CatalogDownloadPrompt />
       <header
-        className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 backdrop-blur"
+        className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur"
         data-oid="4h6rq90"
       >
         <div
@@ -145,11 +169,12 @@ export function AppShell({ children }: AppShellProps) {
             )}
             <nav
               className="hidden items-center gap-1 md:flex"
+              aria-label="Primary navigation"
               data-oid="bq6jx8."
             >
               {primaryNavigation.map((item) => {
                 const href = getAppRoute(item.href, pathname);
-                const isActive = pathname === href;
+                const isActive = isNavigationItemActive(pathname, href);
                 const Icon = item.icon;
                 return (
                   <Button
@@ -167,6 +192,7 @@ export function AppShell({ children }: AppShellProps) {
                       href={href}
                       className="flex items-center gap-2"
                       title={item.label}
+                      aria-current={isActive ? "page" : undefined}
                       data-oid="uqcdkap"
                     >
                       <Icon className="h-4 w-4" data-oid="-fddsij" />
@@ -193,10 +219,12 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </header>
       <main
-        className="flex-1 bg-muted/20 pt-20 pb-16 md:pb-0"
+        id="main-content"
+        className="flex-1 bg-muted/20 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] md:pb-0"
+        tabIndex={-1}
         data-oid="qz_1-v1"
       >
-        <div className="container space-y-6 py-8" data-oid="1zq._:c">
+        <div className="container space-y-6 py-6 md:py-8" data-oid="1zq._:c">
           {children}
         </div>
       </main>
@@ -223,33 +251,36 @@ function MobileBottomNav({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const isSecondaryActive = secondaryNavigation.some(
-    (item) => pathname === getAppRoute(item.href, pathname),
+    (item) =>
+      isNavigationItemActive(pathname, getAppRoute(item.href, pathname)),
   );
 
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        aria-label="Primary navigation"
         data-oid="t9mmwfu"
       >
         <div
-          className="flex h-14 items-center justify-around"
+          className="flex h-16 items-center justify-around"
           data-oid="gfppu0m"
         >
           {primaryNavigation.map((item) => {
             const href = getAppRoute(item.href, pathname);
-            const isActive = pathname === href;
+            const isActive = isNavigationItemActive(pathname, href);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
+                  "flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
                   isActive
                     ? "text-primary font-medium"
                     : "text-muted-foreground",
                 )}
+                aria-current={isActive ? "page" : undefined}
                 data-oid="hpx886w"
               >
                 <Icon
@@ -261,13 +292,16 @@ function MobileBottomNav({
             );
           })}
           <button
+            type="button"
             onClick={() => setMoreOpen(!moreOpen)}
             className={cn(
-              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors",
+              "flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               isSecondaryActive || moreOpen
                 ? "text-primary font-medium"
                 : "text-muted-foreground",
             )}
+            aria-expanded={moreOpen}
+            aria-controls="mobile-more-menu"
             data-oid="jcj-2s0"
           >
             <MoreHorizontal
@@ -282,46 +316,45 @@ function MobileBottomNav({
         </div>
       </nav>
 
-      {/* More menu overlay */}
-      {moreOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" data-oid="_ua63hb">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMoreOpen(false)}
-            data-oid="uop:n17"
-          />
-          <div
-            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-background pb-16 pt-4"
-            data-oid="02dsthq"
-          >
-            <div
-              className="flex items-center justify-between px-6 pb-3"
-              data-oid="qk4iwj2"
-            >
-              <span
-                className="text-sm font-medium text-muted-foreground"
-                data-oid=".4ob_ns"
-              >
-                More
-              </span>
+      <Drawer
+        open={moreOpen}
+        onOpenChange={setMoreOpen}
+        shouldScaleBackground={false}
+      >
+        <DrawerContent
+          id="mobile-more-menu"
+          className="pb-[calc(1rem+env(safe-area-inset-bottom))] md:hidden"
+          data-oid="02dsthq"
+        >
+          <DrawerHeader className="flex-row items-center justify-between px-6 pb-3 text-left">
+            <div>
+              <DrawerTitle>More</DrawerTitle>
+              <DrawerDescription className="sr-only">
+                Additional sections of TCGer
+              </DrawerDescription>
+            </div>
+            <DrawerClose asChild>
               <button
-                onClick={() => setMoreOpen(false)}
-                className="text-muted-foreground"
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Close more menu"
                 data-oid="0b788_p"
               >
-                <X className="h-5 w-5" data-oid="6adcdlh" />
+                <X className="h-5 w-5" aria-hidden="true" data-oid="6adcdlh" />
               </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 px-4" data-oid="0868z5k">
+            </DrawerClose>
+          </DrawerHeader>
+          <div className="grid grid-cols-3 gap-2 px-4" data-oid="0868z5k">
               {secondaryNavigation.map((item) => {
                 const href = getAppRoute(item.href, pathname);
-                const isActive = pathname === href;
+                const isActive = isNavigationItemActive(pathname, href);
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={href}
                     onClick={() => setMoreOpen(false)}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs transition-colors",
                       isActive
@@ -338,10 +371,9 @@ function MobileBottomNav({
                   </Link>
                 );
               })}
-            </div>
           </div>
-        </div>
-      )}
+        </DrawerContent>
+      </Drawer>
     </>
   );
 }

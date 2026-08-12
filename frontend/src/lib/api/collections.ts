@@ -399,6 +399,22 @@ export async function downloadCollectionImportTemplate(
   return response.blob();
 }
 
+export async function downloadCollectionExport(
+  token: string,
+  format: "csv" | "json",
+  viewer?: CollectionsViewerContext | null,
+): Promise<Blob> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/export?format=${format}`,
+    { headers: buildHeaders(token, viewer, false) },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `Failed to export collection as ${format.toUpperCase()}`);
+  }
+  return response.blob();
+}
+
 async function bulkRequest<T>(
   token: string,
   action: "preview" | "commit",

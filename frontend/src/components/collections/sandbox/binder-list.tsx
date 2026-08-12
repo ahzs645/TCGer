@@ -199,7 +199,7 @@ export function BinderList({
                   <div className="flex items-center gap-1" data-oid=".hc8le2">
                     {onEditBinder && (
                       <button
-                        className="h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted hidden group-focus/item:flex group-hover/item:flex"
+                        className="flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden sm:group-focus/item:flex sm:group-hover/item:flex"
                         onClick={(e) => {
                           e.stopPropagation();
                           onEditBinder(binder.id);
@@ -207,12 +207,12 @@ export function BinderList({
                         aria-label={`Edit binder ${binder.name}`}
                         data-oid="4l88yds"
                       >
-                        <Pencil className="h-3 w-3" data-oid="me3v8pd" />
+                        <Pencil className="h-4 w-4" data-oid="me3v8pd" />
                       </button>
                     )}
                     {onEditBinderColor && (
                       <button
-                        className="h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted hidden group-focus/item:flex group-hover/item:flex"
+                        className="flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden sm:group-focus/item:flex sm:group-hover/item:flex"
                         onClick={(e) => {
                           e.stopPropagation();
                           onEditBinderColor(binder.id);
@@ -220,23 +220,23 @@ export function BinderList({
                         aria-label={`Change color of binder ${binder.name}`}
                         data-oid=":em9fw4"
                       >
-                        <Palette className="h-3 w-3" data-oid="18-t3lp" />
+                        <Palette className="h-4 w-4" data-oid="18-t3lp" />
                       </button>
                     )}
                     {onDeleteBinder && (
                       <button
-                        className="h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted hidden group-focus/item:flex group-hover/item:flex"
+                        className="flex h-11 w-11 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive sm:hidden sm:group-focus/item:flex sm:group-hover/item:flex"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteBinder(binder.id);
                         }}
                         aria-label={`Delete binder ${binder.name}`}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                     <span
-                      className="text-xs text-muted-foreground tabular-nums"
+                      className="hidden text-xs tabular-nums text-muted-foreground sm:inline"
                       data-oid="-wb_tad"
                     >
                       {copies}

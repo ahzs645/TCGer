@@ -12,6 +12,7 @@ struct SetDetailView: View {
     @State private var ownershipLoaded = false
     @State private var collections: [Collection] = []
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @State private var cardFilter: SetCardFilter = .all
     @State private var cardSort: SetCardSort = .collectorNumber
     @State private var isSelecting = false
@@ -266,7 +267,7 @@ struct SetDetailView: View {
         }
         .searchable(
             text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
+            isPresented: $isSearchPresented,
             prompt: "Search this set"
         )
         .safeAreaBar(edge: .top, spacing: 0) {
@@ -277,6 +278,8 @@ struct SetDetailView: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            DefaultToolbarItem(kind: .search, placement: .topBarTrailing)
+
             ToolbarItem(placement: .primaryAction) {
                 Button(isSelecting ? "Done" : "Select") {
                     isSelecting.toggle()

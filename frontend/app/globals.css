@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  scrollbar-gutter: stable;
-}
-
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -64,16 +60,33 @@ html {
   font-feature-settings: "ss01" on, "ss02" on, "cv01" on;
 }
 
-::-webkit-scrollbar {
-  width: 12px;
+@media (min-width: 768px) {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--secondary));
+    border-radius: 999px;
+    border: 3px solid hsl(var(--muted));
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--secondary));
-  border-radius: 999px;
-  border: 3px solid hsl(var(--muted));
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -16,11 +16,11 @@ export default function CollectionsPage() {
               className="text-3xl font-heading font-semibold"
               data-oid="af_:qar"
             >
-              Collection sandbox
+              Collections
             </h1>
           </div>
           <p className="text-sm text-muted-foreground" data-oid="njr3h1:">
-            Per-copy inventory manager powered by your live binder data.
+            Manage every card and individual copy across your binders.
           </p>
         </div>
         <Suspense

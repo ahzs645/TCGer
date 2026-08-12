@@ -1440,11 +1440,11 @@ function WishlistCardItem({
       <button
         type="button"
         onClick={onRemove}
-        className="absolute right-2 top-2 rounded-full p-1 opacity-0 transition group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
         aria-label="Remove from wishlist"
         data-oid="fs83:gq"
       >
-        <X className="h-3.5 w-3.5" data-oid="w554f3_" />
+        <X className="h-4 w-4" data-oid="w554f3_" />
       </button>
 
       <div className="flex gap-3" data-oid="pifzu:z">
