@@ -132,6 +132,18 @@ struct CollectionDetailView: View {
         return CardCondition.sorted(normalized)
     }
 
+    private var visibleCardIDs: Set<String> {
+        Set(filteredCards.map(\.id))
+    }
+
+    private var allVisibleCardsSelected: Bool {
+        !visibleCardIDs.isEmpty && visibleCardIDs.isSubset(of: selectedCardIds)
+    }
+
+    private var selectionTitle: String {
+        "\(selectedCardIds.count) Selected"
+    }
+
     var body: some View {
         ZStack {
             NavigationStack {
@@ -210,23 +222,28 @@ struct CollectionDetailView: View {
                                 } else {
                                     ForEach(filteredCards) { card in
                                     if isSelectMode {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: selectedCardIds.contains(card.id) ? "checkmark.circle.fill" : "circle")
-                                                .foregroundColor(selectedCardIds.contains(card.id) ? .accentColor : .secondary)
-                                                .font(.title3)
-                                            CollectionCardRow(
-                                                card: card,
-                                                showPricing: environmentStore.showPricing
-                                            )
-                                        }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
+                                        Button {
                                             if selectedCardIds.contains(card.id) {
                                                 selectedCardIds.remove(card.id)
                                             } else {
                                                 selectedCardIds.insert(card.id)
                                             }
+                                        } label: {
+                                            HStack(spacing: 12) {
+                                                Image(systemName: selectedCardIds.contains(card.id) ? "checkmark.circle.fill" : "circle")
+                                                    .foregroundColor(selectedCardIds.contains(card.id) ? .accentColor : .secondary)
+                                                    .font(.title3)
+                                                CollectionCardRow(
+                                                    card: card,
+                                                    showPricing: environmentStore.showPricing
+                                                )
+                                            }
+                                            .contentShape(Rectangle())
                                         }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel(card.name)
+                                        .accessibilityValue(selectedCardIds.contains(card.id) ? "Selected" : "Not selected")
+                                        .accessibilityHint("Double tap to toggle selection")
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
                                         .listRowBackground(Color(.systemBackground))
@@ -255,11 +272,7 @@ struct CollectionDetailView: View {
                                             Button {
                                                 beginEditing(card)
                                             } label: {
-                                                if card.copies.count > 1 {
-                                                    Label("Copies", systemImage: "square.stack.3d.up")
-                                                } else {
-                                                    Label("Edit", systemImage: "square.and.pencil")
-                                                }
+                                                Label("Edit", systemImage: "square.and.pencil")
                                             }
                                             .tint(.blue)
 
@@ -313,7 +326,7 @@ struct CollectionDetailView: View {
                                                 }
                                                 .buttonStyle(.plain)
                                                 .accessibilityHint("Double tap to edit this copy. Swipe for more actions.")
-                                                .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 8, trailing: 16))
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                                                 .listRowSeparator(.hidden)
                                                 .listRowBackground(Color(.systemBackground))
                                                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -344,7 +357,7 @@ struct CollectionDetailView: View {
                                                     index: index,
                                                     total: card.copies.count
                                                 )
-                                                .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 8, trailing: 16))
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                                                 .listRowSeparator(.hidden)
                                                 .listRowBackground(Color(.systemBackground))
                                             }
@@ -393,6 +406,10 @@ struct CollectionDetailView: View {
                             }
                         }
                         .scrollEdgeEffectStyle(.soft, for: .top)
+                        .scrollEdgeEffectHidden(
+                            isSelectMode && !selectedCardIds.isEmpty,
+                            for: .bottom
+                        )
                     }
                 }
                 .navigationBarTitleDisplayMode(.inline)
@@ -404,8 +421,9 @@ struct CollectionDetailView: View {
                     }
 
                     ToolbarItem(placement: .principal) {
-                        Text(collection.name)
+                        Text(isSelectMode ? selectionTitle : collection.name)
                             .font(.headline)
+                            .contentTransition(.numericText())
                     }
 
                     ToolbarItem(placement: .primaryAction) {
@@ -452,6 +470,50 @@ struct CollectionDetailView: View {
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if isSelectMode && !selectedCardIds.isEmpty {
+                        ToolbarItem(placement: .bottomBar) {
+                            Button {
+                                toggleSelectAllVisibleCards()
+                            } label: {
+                                Label(
+                                    allVisibleCardsSelected ? "Deselect All" : "Select All",
+                                    systemImage: allVisibleCardsSelected
+                                        ? "checkmark.circle.fill"
+                                        : "checkmark.circle"
+                                )
+                            }
+                        }
+
+                        ToolbarSpacer(.flexible, placement: .bottomBar)
+
+                        ToolbarItemGroup(placement: .bottomBar) {
+                            Button {
+                                showingBulkMoveSheet = true
+                            } label: {
+                                Label("Move", systemImage: "arrowshape.turn.up.right")
+                            }
+                            .disabled(isBulkProcessing)
+
+                            Button {
+                                showingBulkConditionSheet = true
+                            } label: {
+                                Label("Condition", systemImage: "pencil")
+                            }
+                            .disabled(isBulkProcessing)
+                        }
+
+                        ToolbarSpacer(.fixed, placement: .bottomBar)
+
+                        ToolbarItem(placement: .bottomBar) {
+                            Button(role: .destructive) {
+                                showingBulkDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .disabled(isBulkProcessing)
                         }
                     }
                 }
@@ -575,59 +637,6 @@ struct CollectionDetailView: View {
                     Text("This action permanently removes the binder and its cards.")
                 }
             }
-            .safeAreaBar(edge: .bottom, spacing: 0) {
-                if isSelectMode && !selectedCardIds.isEmpty {
-                    VStack(spacing: 0) {
-                        Divider()
-                        HStack(spacing: 24) {
-                            Button {
-                                if selectedCardIds.count == filteredCards.count {
-                                    selectedCardIds.removeAll()
-                                } else {
-                                    selectedCardIds = Set(filteredCards.map(\.id))
-                                }
-                            } label: {
-                                Text(selectedCardIds.count == filteredCards.count ? "Deselect All" : "Select All")
-                                    .font(.caption)
-                            }
-
-                            Spacer()
-
-                            Button { showingBulkMoveSheet = true } label: {
-                                VStack(spacing: 2) {
-                                    Image(systemName: "arrowshape.turn.up.right")
-                                    Text("Move").font(.caption2)
-                                }
-                            }
-                            .disabled(isBulkProcessing)
-
-                            Button { showingBulkConditionSheet = true } label: {
-                                VStack(spacing: 2) {
-                                    Image(systemName: "pencil")
-                                    Text("Condition").font(.caption2)
-                                }
-                            }
-                            .disabled(isBulkProcessing)
-
-                            Button(role: .destructive) { showingBulkDeleteConfirmation = true } label: {
-                                VStack(spacing: 2) {
-                                    Image(systemName: "trash")
-                                    Text("Delete").font(.caption2)
-                                }
-                            }
-                            .disabled(isBulkProcessing)
-
-                            Text("\(selectedCardIds.count)")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial)
-                    }
-                }
-            }
         }
         .confirmationDialog("Delete \(selectedCardIds.count) cards?", isPresented: $showingBulkDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete \(selectedCardIds.count) cards", role: .destructive) {
@@ -710,6 +719,14 @@ struct CollectionDetailView: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color(.systemBackground))
+    }
+
+    private func toggleSelectAllVisibleCards() {
+        if allVisibleCardsSelected {
+            selectedCardIds.subtract(visibleCardIDs)
+        } else {
+            selectedCardIds.formUnion(visibleCardIDs)
+        }
     }
 
     @MainActor
@@ -879,7 +896,9 @@ struct CollectionDetailView: View {
     private func beginEditing(_ card: CollectionCard) {
         let copies = card.copies
         if copies.count > 1 {
-            toggleCopies(for: card)
+            withAnimation(.snappy) {
+                _ = expandedCardIds.insert(card.id)
+            }
         } else {
             let copy = copies.first
             editContext = CardEditContext(
