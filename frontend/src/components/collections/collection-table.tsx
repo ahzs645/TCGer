@@ -1845,6 +1845,16 @@ function CollectionRow({
         isActive && "bg-primary/5",
       )}
       onClick={onSelectCard}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          onSelectCard();
+        }
+      }}
       aria-selected={isActive}
       data-oid="9508df."
     >

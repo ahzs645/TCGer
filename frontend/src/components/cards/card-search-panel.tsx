@@ -85,7 +85,7 @@ export function CardSearchPanel() {
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]" data-oid="wsi0d3e">
       <Card className="h-fit border-dashed" data-oid="-_rj04n">
         <CardHeader data-oid="exck2hn">
-          <CardTitle data-oid="._71p80">Search Parameters</CardTitle>
+          <CardTitle asChild data-oid="._71p80"><h2>Search Parameters</h2></CardTitle>
           <CardDescription data-oid="arc981r">
             Find cards by name or set across your enabled games.
           </CardDescription>
@@ -170,7 +170,7 @@ export function CardSearchPanel() {
           data-oid="duv85c-"
         >
           <div data-oid="3.cdfwa">
-            <CardTitle data-oid="75.9olc">Results</CardTitle>
+            <CardTitle asChild data-oid="75.9olc"><h2>Results</h2></CardTitle>
             <CardDescription data-oid="_a9wnkx">
               {noGamesEnabled
                 ? "Enable at least one module to resume cross-game search."
@@ -183,12 +183,26 @@ export function CardSearchPanel() {
                     : "Enter a keyword and run a search to see results."}
             </CardDescription>
           </div>
-          {isFetching && (
-            <Loader2
-              className="h-5 w-5 animate-spin text-muted-foreground"
-              data-oid="8z1v9gr"
-            />
-          )}
+          <div aria-live="polite" aria-atomic="true">
+            {isFetching ? (
+              <span className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                <Loader2
+                  className="h-5 w-5 animate-spin"
+                  aria-hidden="true"
+                  data-oid="8z1v9gr"
+                />
+                <span className="sr-only">Searching for cards…</span>
+              </span>
+            ) : isError ? (
+              <span className="sr-only" role="alert">
+                Card search failed.
+              </span>
+            ) : searchQuery ? (
+              <span className="sr-only" role="status">
+                {cards.length} {cards.length === 1 ? "card" : "cards"} found.
+              </span>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="p-0" data-oid="bopkrlg">
           <ScrollArea
@@ -199,6 +213,7 @@ export function CardSearchPanel() {
               {!hasResults ? (
                 <div
                   className="flex h-40 items-center justify-center text-sm text-muted-foreground"
+                  role={isError ? "alert" : isFetching ? "status" : undefined}
                   data-oid="ft_4cz3"
                 >
                   {noGamesEnabled

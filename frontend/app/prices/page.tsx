@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -190,9 +191,9 @@ export default function PricesPage() {
         </div>
 
         {mounted && !isAuthenticated ? (
-          <Card>
+          <Card role="alert">
             <CardHeader>
-              <CardTitle>Sign in required</CardTitle>
+              <CardTitle asChild><h2>Sign in required</h2></CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               Sign in to track prices for cards in your collection.
@@ -204,9 +205,9 @@ export default function PricesPage() {
             account menu to use the price tracker.
           </div>
         ) : error ? (
-          <Card>
+          <Card role="alert">
             <CardHeader>
-              <CardTitle>Couldn&apos;t load your collection</CardTitle>
+              <CardTitle asChild><h2>Couldn&apos;t load your collection</h2></CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>{error}</p>
@@ -220,16 +221,23 @@ export default function PricesPage() {
             </CardContent>
           </Card>
         ) : loading ? (
-          <PricesSkeleton />
+          <div role="status" aria-label="Loading prices" aria-busy="true">
+            <PricesSkeleton />
+          </div>
         ) : owned.length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>No tracked cards yet</CardTitle>
+              <CardTitle asChild><h2>No tracked cards yet</h2></CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Add cards to a binder
-              {selectedGame !== "all" ? ` for ${tcgLabel(selectedGame)}` : ""} to
-              start tracking their prices here.
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Add cards to a binder
+                {selectedGame !== "all" ? ` for ${tcgLabel(selectedGame)}` : ""} to
+                start tracking their prices here.
+              </p>
+              <Button asChild size="sm">
+                <Link href="/collections">Add cards</Link>
+              </Button>
             </CardContent>
           </Card>
         ) : (

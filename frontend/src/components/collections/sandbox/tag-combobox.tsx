@@ -3,6 +3,7 @@
 import {
   type KeyboardEvent,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -28,6 +29,9 @@ export function TagCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const listboxId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const normalizedQuery = query.trim();
   const normalizedLower = normalizedQuery.toLowerCase();
@@ -65,6 +69,8 @@ export function TagCombobox({
     onToggleTag(tagId);
     setQuery("");
     setOpen(false);
+    setActiveIndex(0);
+    setCreateError(null);
   };
 
   const handleCreateTag = async () => {
@@ -73,26 +79,46 @@ export function TagCombobox({
     }
     try {
       setIsCreating(true);
+      setCreateError(null);
       const tag = await onCreateTag(normalizedQuery);
       onToggleTag(tag.id);
       setQuery("");
       setOpen(false);
+    } catch (error) {
+      setCreateError(
+        error instanceof Error ? error.message : "Could not create this tag.",
+      );
     } finally {
       setIsCreating(false);
     }
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) =>
+        filteredTags.length ? (current + 1) % filteredTags.length : 0,
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) =>
+        filteredTags.length
+          ? (current - 1 + filteredTags.length) % filteredTags.length
+          : 0,
+      );
+    } else if (event.key === "Enter") {
       event.preventDefault();
       if (filteredTags.length) {
-        handleSelectTag(filteredTags[0].id);
+        handleSelectTag(filteredTags[activeIndex]?.id ?? filteredTags[0].id);
       } else if (canCreate) {
         void handleCreateTag();
       }
     } else if (event.key === "Escape") {
       setOpen(false);
       setQuery("");
+      setActiveIndex(0);
     }
   };
 
@@ -105,15 +131,17 @@ export function TagCombobox({
             const tag = availableTags.find((entry) => entry.id === tagId);
             if (!tag) return null;
             return (
-              <Badge
+              <button
+                type="button"
                 key={tag.id}
-                className="cursor-pointer"
+                className="inline-flex min-h-8 items-center rounded-full border border-transparent px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 style={{ backgroundColor: tag.colorHex, color: "#0B1121" }}
                 onClick={() => onToggleTag(tag.id)}
+                aria-label={`Remove ${tag.label} tag`}
                 data-oid="igqmz.z"
               >
-                {tag.label}
-              </Badge>
+                {tag.label} <span aria-hidden="true">×</span>
+              </button>
             );
           })
         ) : (
@@ -124,10 +152,24 @@ export function TagCombobox({
       </div>
       <div className="relative" ref={containerRef} data-oid="59gn962">
         <Input
+          role="combobox"
+          aria-label="Tags"
+          aria-autocomplete="list"
+          aria-expanded={showSuggestions}
+          aria-controls={
+            showSuggestions && filteredTags.length ? listboxId : undefined
+          }
+          aria-activedescendant={
+            showSuggestions && filteredTags[activeIndex]
+              ? `${listboxId}-${filteredTags[activeIndex].id}`
+              : undefined
+          }
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
             setOpen(true);
+            setActiveIndex(0);
+            setCreateError(null);
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
@@ -153,18 +195,32 @@ export function TagCombobox({
               <>
                 {filteredTags.length ? (
                   <ul
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="Matching tags"
                     className="max-h-48 overflow-y-auto py-1"
                     data-oid="c15t39y"
                   >
-                    {filteredTags.map((tag) => (
-                      <li key={tag.id} data-oid="1avczxa">
+                    {filteredTags.map((tag, index) => (
+                      <li
+                        key={tag.id}
+                        role="none"
+                        data-oid="1avczxa"
+                      >
                         <button
+                          id={`${listboxId}-${tag.id}`}
                           type="button"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                          role="option"
+                          aria-selected={index === activeIndex}
+                          tabIndex={-1}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted ${
+                            index === activeIndex ? "bg-muted" : ""
+                          }`}
                           onMouseDown={(event) => {
                             event.preventDefault();
                             handleSelectTag(tag.id);
                           }}
+                          onMouseEnter={() => setActiveIndex(index)}
                           data-oid="uvvz-s9"
                         >
                           <span
@@ -206,6 +262,11 @@ export function TagCombobox({
               </>
             )}
           </div>
+        ) : null}
+        {createError ? (
+          <p className="mt-2 text-sm text-destructive" role="alert">
+            {createError}
+          </p>
         ) : null}
       </div>
     </div>

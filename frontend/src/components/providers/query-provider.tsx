@@ -2,13 +2,14 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface QueryProviderProps {
   children: React.ReactNode;
 }
 
 export function QueryProvider({ children }: QueryProviderProps) {
+  const [showDevtools, setShowDevtools] = useState(false);
   const [client] = useState(
     () =>
       new QueryClient({
@@ -22,10 +23,20 @@ export function QueryProvider({ children }: QueryProviderProps) {
       }),
   );
 
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const sync = () => setShowDevtools(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
   return (
     <QueryClientProvider client={client} data-oid="cr:39mx">
       {children}
-      <ReactQueryDevtools initialIsOpen={false} data-oid="0anjj6p" />
+      {showDevtools ? (
+        <ReactQueryDevtools initialIsOpen={false} data-oid="0anjj6p" />
+      ) : null}
     </QueryClientProvider>
   );
 }

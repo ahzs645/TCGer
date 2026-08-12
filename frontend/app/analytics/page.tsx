@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -127,7 +128,7 @@ export default function AnalyticsPage() {
         <PageHeader />
         <Card>
           <CardHeader>
-            <CardTitle>Sign in required</CardTitle>
+            <CardTitle asChild><h2>Sign in required</h2></CardTitle>
             <CardDescription>
               Sign in to view analytics for your collection.
             </CardDescription>
@@ -158,7 +159,9 @@ export default function AnalyticsPage() {
     return (
       <AppShell>
         <PageHeader />
-        <AnalyticsSkeleton />
+        <div role="status" aria-label="Loading analytics" aria-busy="true">
+          <AnalyticsSkeleton />
+        </div>
       </AppShell>
     );
   }
@@ -169,9 +172,9 @@ export default function AnalyticsPage() {
     return (
       <AppShell>
         <PageHeader />
-        <Card>
+        <Card role="alert">
           <CardHeader>
-            <CardTitle>Couldn&apos;t load analytics</CardTitle>
+            <CardTitle asChild><h2>Couldn&apos;t load analytics</h2></CardTitle>
             <CardDescription>
               {(loadError as Error).message ||
                 "Something went wrong while fetching your analytics."}
@@ -220,12 +223,17 @@ export default function AnalyticsPage() {
         <PageHeader />
         <Card>
           <CardHeader>
-            <CardTitle>No cards to analyze yet</CardTitle>
+            <CardTitle asChild><h2>No cards to analyze yet</h2></CardTitle>
             <CardDescription>
               Add cards to a binder and your value trends, price movers, and
               distribution breakdowns will appear here.
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button asChild size="sm">
+              <Link href="/collections">Add cards</Link>
+            </Button>
+          </CardContent>
         </Card>
       </AppShell>
     );
@@ -304,9 +312,11 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Collection Value Over Time
+                <CardTitle asChild className="flex items-center gap-2">
+                  <h2>
+                    <Calendar className="h-5 w-5" />
+                    Collection Value Over Time
+                  </h2>
                 </CardTitle>
                 <CardDescription>
                   Estimated total value across the selected period.
@@ -382,7 +392,7 @@ export default function AnalyticsPage() {
           {showPricing && (
             <Card>
               <CardHeader>
-                <CardTitle>Value by Game</CardTitle>
+                <CardTitle asChild><h2>Value by Game</h2></CardTitle>
                 <CardDescription>
                   How your collection value is distributed across TCGs.
                 </CardDescription>
@@ -426,7 +436,7 @@ export default function AnalyticsPage() {
           {/* Rarity distribution */}
           <Card>
             <CardHeader>
-              <CardTitle>Rarity Distribution</CardTitle>
+              <CardTitle asChild><h2>Rarity Distribution</h2></CardTitle>
               <CardDescription>
                 Breakdown of your collection by rarity.
               </CardDescription>

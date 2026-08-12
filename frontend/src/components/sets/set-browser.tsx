@@ -13,6 +13,7 @@ import {
 
 import { SetSymbol } from "@/components/cards/set-symbol";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -221,7 +222,7 @@ export function SetBrowser() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Sign in required</CardTitle>
+          <CardTitle asChild><h2>Sign in required</h2></CardTitle>
           <CardDescription>
             Sign in to browse set checklists and compare them with your
             collection.
@@ -239,7 +240,7 @@ export function SetBrowser() {
     <div className="space-y-6">
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Find a set</CardTitle>
+          <CardTitle asChild className="text-lg"><h2>Find a set</h2></CardTitle>
           <CardDescription>
             Completion is measured by unique printings in{" "}
             {collectionId === ALL_COLLECTION_ID
@@ -349,18 +350,26 @@ export function SetBrowser() {
       )}
 
       {!noGamesEnabled && setsQuery.isLoading && (
-        <div className="flex min-h-64 items-center justify-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
+        <div
+          className="flex min-h-64 items-center justify-center gap-2 text-muted-foreground"
+          role="status"
+        >
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
           Loading sets…
         </div>
       )}
 
       {!noGamesEnabled && setsQuery.isError && (
-        <Card className="border-destructive">
-          <CardContent className="py-8 text-center text-destructive">
-            {setsQuery.error instanceof Error
-              ? setsQuery.error.message
-              : "Unable to load sets."}
+        <Card className="border-destructive" role="alert">
+          <CardContent className="space-y-3 py-8 text-center text-destructive">
+            <p>
+              {setsQuery.error instanceof Error
+                ? setsQuery.error.message
+                : "Unable to load sets."}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void setsQuery.refetch()}>
+              Try again
+            </Button>
           </CardContent>
         </Card>
       )}

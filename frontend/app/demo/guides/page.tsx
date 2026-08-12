@@ -13,9 +13,8 @@ export default function DemoCollectionGuidesPage() {
             Explore reusable collecting themes and turn them into synchronized wishlists.
           </p>
         </div>
-        <CollectionGuidesContent autoSelectFirstGuide={false} />
+        <CollectionGuidesContent />
       </div>
     </AppShell>
   );
 }
-
