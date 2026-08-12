@@ -31,7 +31,7 @@ struct CollectionDetailView: View {
     @State private var showFilters = false
     @State private var sortOption: CardSortOption = .name
     @State private var isSelectMode = false
-    @State private var selectedCardIds: Set<String> = []
+    @State private var selectedEntryIds: Set<String> = []
     @State private var showingBulkMoveSheet = false
     @State private var showingBulkDeleteConfirmation = false
     @State private var showingBulkConditionSheet = false
@@ -132,16 +132,16 @@ struct CollectionDetailView: View {
         return CardCondition.sorted(normalized)
     }
 
-    private var visibleCardIDs: Set<String> {
-        Set(filteredCards.map(\.id))
+    private var visibleEntryIDs: Set<String> {
+        Set(filteredCards.flatMap { selectableEntryIDs(for: $0) })
     }
 
-    private var allVisibleCardsSelected: Bool {
-        !visibleCardIDs.isEmpty && visibleCardIDs.isSubset(of: selectedCardIds)
+    private var allVisibleEntriesSelected: Bool {
+        !visibleEntryIDs.isEmpty && visibleEntryIDs.isSubset(of: selectedEntryIds)
     }
 
     private var selectionTitle: String {
-        "\(selectedCardIds.count) Selected"
+        "\(selectedEntryIds.count) Selected"
     }
 
     var body: some View {
@@ -222,28 +222,27 @@ struct CollectionDetailView: View {
                                 } else {
                                     ForEach(filteredCards) { card in
                                     if isSelectMode {
-                                        Button {
-                                            if selectedCardIds.contains(card.id) {
-                                                selectedCardIds.remove(card.id)
-                                            } else {
-                                                selectedCardIds.insert(card.id)
-                                            }
-                                        } label: {
-                                            HStack(spacing: 12) {
-                                                Image(systemName: selectedCardIds.contains(card.id) ? "checkmark.circle.fill" : "circle")
-                                                    .foregroundColor(selectedCardIds.contains(card.id) ? .accentColor : .secondary)
+                                        HStack(spacing: 12) {
+                                            Button {
+                                                toggleSelection(for: card)
+                                            } label: {
+                                                Image(systemName: cardSelectionSymbol(for: card))
+                                                    .foregroundColor(cardHasSelection(card) ? .accentColor : .secondary)
                                                     .font(.title3)
-                                                CollectionCardRow(
-                                                    card: card,
-                                                    showPricing: environmentStore.showPricing
-                                                )
                                             }
-                                            .contentShape(Rectangle())
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel("Select all copies of \(card.name)")
+                                            .accessibilityValue(cardSelectionAccessibilityValue(for: card))
+
+                                            CollectionCardRow(
+                                                card: card,
+                                                showPricing: environmentStore.showPricing,
+                                                isCopiesExpanded: expandedCardIds.contains(card.id),
+                                                onToggleCopies: card.copies.count > 1 ? {
+                                                    toggleCopies(for: card)
+                                                } : nil
+                                            )
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityLabel(card.name)
-                                        .accessibilityValue(selectedCardIds.contains(card.id) ? "Selected" : "Not selected")
-                                        .accessibilityHint("Double tap to toggle selection")
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
                                         .listRowBackground(Color(.systemBackground))
@@ -310,11 +309,34 @@ struct CollectionDetailView: View {
                                         .listRowBackground(Color(.systemBackground))
                                     }
 
-                                    if !isSelectMode,
-                                       expandedCardIds.contains(card.id),
+                                    if expandedCardIds.contains(card.id),
                                        card.copies.count > 1 {
                                         ForEach(Array(card.copies.enumerated()), id: \.element.id) { index, copy in
-                                            if environmentStore.isAuthenticated {
+                                            if isSelectMode {
+                                                Button {
+                                                    toggleSelection(for: copy)
+                                                } label: {
+                                                    HStack(spacing: 12) {
+                                                        Image(systemName: selectedEntryIds.contains(copy.id) ? "checkmark.circle.fill" : "circle")
+                                                            .foregroundColor(selectedEntryIds.contains(copy.id) ? .accentColor : .secondary)
+                                                            .font(.title3)
+
+                                                        CollectionCardCopyRow(
+                                                            copy: copy,
+                                                            index: index,
+                                                            total: card.copies.count
+                                                        )
+                                                    }
+                                                    .contentShape(Rectangle())
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel(copy.displayTitle(index: index))
+                                                .accessibilityValue(selectedEntryIds.contains(copy.id) ? "Selected" : "Not selected")
+                                                .accessibilityHint("Double tap to toggle selection")
+                                                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                                                .listRowSeparator(.hidden)
+                                                .listRowBackground(Color(.systemBackground))
+                                            } else if environmentStore.isAuthenticated {
                                                 Button {
                                                     selectCopyForEditing(card: card, copy: copy)
                                                 } label: {
@@ -407,7 +429,7 @@ struct CollectionDetailView: View {
                         }
                         .scrollEdgeEffectStyle(.soft, for: .top)
                         .scrollEdgeEffectHidden(
-                            isSelectMode && !selectedCardIds.isEmpty,
+                            isSelectMode && !selectedEntryIds.isEmpty,
                             for: .bottom
                         )
                     }
@@ -432,7 +454,7 @@ struct CollectionDetailView: View {
                                 if isSelectMode {
                                     Button("Cancel") {
                                         isSelectMode = false
-                                        selectedCardIds.removeAll()
+                                        selectedEntryIds.removeAll()
                                     }
                                 } else if isEditing {
                                     Button(isSaving ? "Saving..." : "Save") {
@@ -453,7 +475,7 @@ struct CollectionDetailView: View {
 
                                     Button("Select") {
                                         isSelectMode = true
-                                        selectedCardIds.removeAll()
+                                        selectedEntryIds.removeAll()
                                     }
                                     .disabled(cards.isEmpty)
 
@@ -473,14 +495,14 @@ struct CollectionDetailView: View {
                         }
                     }
 
-                    if isSelectMode && !selectedCardIds.isEmpty {
+                    if isSelectMode && !selectedEntryIds.isEmpty {
                         ToolbarItem(placement: .bottomBar) {
                             Button {
                                 toggleSelectAllVisibleCards()
                             } label: {
                                 Label(
-                                    allVisibleCardsSelected ? "Deselect All" : "Select All",
-                                    systemImage: allVisibleCardsSelected
+                                    allVisibleEntriesSelected ? "Deselect All" : "Select All",
+                                    systemImage: allVisibleEntriesSelected
                                         ? "checkmark.circle.fill"
                                         : "checkmark.circle"
                                 )
@@ -638,15 +660,15 @@ struct CollectionDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Delete \(selectedCardIds.count) cards?", isPresented: $showingBulkDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete \(selectedCardIds.count) cards", role: .destructive) {
+        .confirmationDialog("Delete \(selectedEntryIds.count) cards?", isPresented: $showingBulkDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete \(selectedEntryIds.count) cards", role: .destructive) {
                 Task { await bulkDelete() }
             }
         }
         .sheet(isPresented: $showingBulkMoveSheet) {
             BulkMoveSheet(
                 sourceBinderId: collection.id,
-                selectedCount: selectedCardIds.count,
+                selectedCount: selectedEntryIds.count,
                 isProcessing: isBulkProcessing
             ) { destinationBinderId in
                 await bulkMove(to: destinationBinderId)
@@ -654,7 +676,7 @@ struct CollectionDetailView: View {
             .environmentObject(environmentStore)
         }
         .sheet(isPresented: $showingBulkConditionSheet) {
-            BulkConditionSheet(selectedCount: selectedCardIds.count) { condition in
+            BulkConditionSheet(selectedCount: selectedEntryIds.count) { condition in
                 Task { await bulkChangeCondition(condition) }
             }
         }
@@ -722,10 +744,54 @@ struct CollectionDetailView: View {
     }
 
     private func toggleSelectAllVisibleCards() {
-        if allVisibleCardsSelected {
-            selectedCardIds.subtract(visibleCardIDs)
+        if allVisibleEntriesSelected {
+            selectedEntryIds.subtract(visibleEntryIDs)
         } else {
-            selectedCardIds.formUnion(visibleCardIDs)
+            selectedEntryIds.formUnion(visibleEntryIDs)
+        }
+    }
+
+    private func selectableEntryIDs(for card: CollectionCard) -> Set<String> {
+        let copyIDs = Set(card.copies.map(\.id))
+        return copyIDs.isEmpty ? [card.id] : copyIDs
+    }
+
+    private func cardHasSelection(_ card: CollectionCard) -> Bool {
+        !selectableEntryIDs(for: card).isDisjoint(with: selectedEntryIds)
+    }
+
+    private func cardIsFullySelected(_ card: CollectionCard) -> Bool {
+        selectableEntryIDs(for: card).isSubset(of: selectedEntryIds)
+    }
+
+    private func cardSelectionSymbol(for card: CollectionCard) -> String {
+        if cardIsFullySelected(card) {
+            return "checkmark.circle.fill"
+        }
+        return cardHasSelection(card) ? "minus.circle.fill" : "circle"
+    }
+
+    private func cardSelectionAccessibilityValue(for card: CollectionCard) -> String {
+        if cardIsFullySelected(card) {
+            return "All copies selected"
+        }
+        return cardHasSelection(card) ? "Some copies selected" : "Not selected"
+    }
+
+    private func toggleSelection(for card: CollectionCard) {
+        let entryIDs = selectableEntryIDs(for: card)
+        if entryIDs.isSubset(of: selectedEntryIds) {
+            selectedEntryIds.subtract(entryIDs)
+        } else {
+            selectedEntryIds.formUnion(entryIDs)
+        }
+    }
+
+    private func toggleSelection(for copy: CollectionCardCopy) {
+        if selectedEntryIds.contains(copy.id) {
+            selectedEntryIds.remove(copy.id)
+        } else {
+            selectedEntryIds.insert(copy.id)
         }
     }
 
@@ -1098,15 +1164,14 @@ struct CollectionDetailView: View {
         isBulkProcessing = true
 
         var failCount = 0
-        for cardId in selectedCardIds {
+        for entryId in selectedEntryIds {
             do {
                 try await apiService.deleteCardFromBinder(
                     config: environmentStore.serverConfiguration,
                     token: token,
                     binderId: collection.id,
-                    collectionCardId: cardId
+                    collectionCardId: entryId
                 )
-                cards.removeAll { $0.id == cardId }
             } catch {
                 failCount += 1
             }
@@ -1116,7 +1181,8 @@ struct CollectionDetailView: View {
             errorMessage = "Failed to delete \(failCount) card(s)"
         }
 
-        selectedCardIds.removeAll()
+        await reloadBinderCards()
+        selectedEntryIds.removeAll()
         isSelectMode = false
         isBulkProcessing = false
         HapticManager.notification(.success)
@@ -1133,13 +1199,13 @@ struct CollectionDetailView: View {
         isBulkProcessing = true
 
         var failCount = 0
-        for cardId in selectedCardIds {
+        for entryId in selectedEntryIds {
             do {
                 _ = try await apiService.updateCardInBinder(
                     config: environmentStore.serverConfiguration,
                     token: token,
                     binderId: collection.id,
-                    collectionCardId: cardId,
+                    collectionCardId: entryId,
                     quantity: nil,
                     condition: nil,
                     language: nil,
@@ -1157,7 +1223,7 @@ struct CollectionDetailView: View {
         }
 
         await reloadBinderCards()
-        selectedCardIds.removeAll()
+        selectedEntryIds.removeAll()
         isSelectMode = false
         isBulkProcessing = false
         showingBulkMoveSheet = false
@@ -1170,13 +1236,13 @@ struct CollectionDetailView: View {
         isBulkProcessing = true
 
         var failCount = 0
-        for cardId in selectedCardIds {
+        for entryId in selectedEntryIds {
             do {
-                let updated = try await apiService.updateCardInBinder(
+                _ = try await apiService.updateCardInBinder(
                     config: environmentStore.serverConfiguration,
                     token: token,
                     binderId: collection.id,
-                    collectionCardId: cardId,
+                    collectionCardId: entryId,
                     quantity: nil,
                     condition: condition,
                     language: nil,
@@ -1184,9 +1250,6 @@ struct CollectionDetailView: View {
                     newPrint: nil,
                     targetBinderId: nil
                 )
-                if let index = cards.firstIndex(where: { $0.id == cardId }) {
-                    cards[index] = updated
-                }
             } catch {
                 failCount += 1
             }
@@ -1196,7 +1259,8 @@ struct CollectionDetailView: View {
             errorMessage = "Failed to update \(failCount) card(s)"
         }
 
-        selectedCardIds.removeAll()
+        await reloadBinderCards()
+        selectedEntryIds.removeAll()
         isSelectMode = false
         isBulkProcessing = false
         showingBulkConditionSheet = false
