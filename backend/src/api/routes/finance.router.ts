@@ -48,7 +48,7 @@ financeRouter.get(
 financeRouter.get(
   '/summary/by-currency',
   asyncHandler(async (req, res) => {
-    const userId = req.user!.id;
+    const { id: userId } = (req as AuthRequest).user!;
     const summary = await financeService.getFinanceSummaryByCurrency(userId);
     res.json(summary);
   }),
