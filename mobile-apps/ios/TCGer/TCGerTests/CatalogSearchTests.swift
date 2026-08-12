@@ -108,6 +108,7 @@ final class CatalogSearchTests: XCTestCase {
         let fixture = try await makeFixture()
         defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
 
+        XCTAssertTrue(fixture.store.hasCollectionTagMetadata(for: .pokemon))
         let entries = fixture.store.cards(tagged: "pokemon.art.clay", tcg: .pokemon)
         XCTAssertEqual(entries.map(\.card.id), ["lucario-v"])
         XCTAssertEqual(

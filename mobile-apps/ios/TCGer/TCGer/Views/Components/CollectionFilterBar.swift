@@ -15,14 +15,14 @@ enum CardSortOption: String, CaseIterable {
     }
 }
 
-/// The binder filter bar: a toggle header plus one scrollable row of uniform
-/// capsule chips (sort, tags, condition, price range). Owns filter selection
-/// state via bindings; the parent supplies the available options and the
-/// clear-all action (which may also reset state the bar doesn't own, e.g.
-/// search text).
+/// The binder search and filter bar: one compact row for search and the filter
+/// toggle, plus a scrollable row of uniform filter chips when expanded. Owns
+/// filter selection state via bindings; the parent supplies the available
+/// options and the clear-all action.
 struct CollectionFilterBar: View {
     private let filterChipHeight: CGFloat = 30
 
+    @Binding var searchText: String
     @Binding var showFilters: Bool
     @Binding var sortOption: CardSortOption
     @Binding var selectedTagFilters: Set<String>
@@ -53,6 +53,8 @@ struct CollectionFilterBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
+                searchField
+
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showFilters.toggle()
@@ -62,32 +64,39 @@ struct CollectionFilterBar: View {
                         ? "line.3.horizontal.decrease.circle.fill"
                         : "line.3.horizontal.decrease.circle")
                         .font(.title3)
+                        .overlay(alignment: .topTrailing) {
+                            if activeFilterCount > 0 {
+                                Text("\(activeFilterCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(Color.accentColor, in: Circle())
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
+                .frame(width: 38, height: 38)
+                .contentShape(Rectangle())
                 .accessibilityLabel(showFilters ? "Hide filters" : "Show filters")
-
-                if showFilters {
-                    Text("Filters")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                } else if activeFilterCount > 0 {
-                    Text("\(activeFilterCount)")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if showFilters, hasActiveFilters {
-                    Button("Clear All") {
-                        onClearAll()
-                    }
-                    .font(.caption.weight(.semibold))
-                }
+                .accessibilityValue(activeFilterCount > 0 ? "\(activeFilterCount) active" : "No active filters")
             }
 
             if showFilters {
+                HStack {
+                    Text("Filters")
+                        .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    if hasActiveFilters {
+                        Button("Clear All") {
+                            onClearAll()
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         sortMenu
@@ -99,6 +108,32 @@ struct CollectionFilterBar: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search cards, sets, or codes", text: $searchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 38)
+        .background(Color(.secondarySystemBackground), in: Capsule())
     }
 
     private var sortMenu: some View {

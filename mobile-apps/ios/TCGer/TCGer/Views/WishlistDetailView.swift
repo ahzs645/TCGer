@@ -32,9 +32,14 @@ struct WishlistDetailView: View {
 
     private let apiService = APIService()
 
-    init(wishlist: Wishlist, onUpdate: (() -> Void)? = nil) {
+    init(
+        wishlist: Wishlist,
+        startsInEditMode: Bool = false,
+        onUpdate: (() -> Void)? = nil
+    ) {
         self.wishlist = wishlist
         self.onUpdate = onUpdate
+        _isEditing = State(initialValue: startsInEditMode)
         _cards = State(initialValue: wishlist.cards)
         _rules = State(initialValue: wishlist.expansionRules)
         _editedName = State(initialValue: wishlist.name)
@@ -44,6 +49,10 @@ struct WishlistDetailView: View {
     }
 
     private var filteredCards: [WishlistCard] {
+        // Search and ownership controls are hidden while editing the wishlist's
+        // details, so don't leave an invisible filter applied to its cards.
+        guard !isEditing else { return cards }
+
         var result = cards
 
         if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -235,11 +244,7 @@ struct WishlistDetailView: View {
                 }
                 }
                 .listStyle(.insetGrouped)
-                .searchable(
-                    text: $searchText,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search cards"
-                )
+                .modifier(WishlistSearchModifier(isEditing: isEditing, searchText: $searchText))
                 .safeAreaBar(edge: .top, spacing: 0) {
                     if totalCount > 0 && !isEditing {
                         Picker("Filter", selection: $filterOwned) {
@@ -470,6 +475,24 @@ struct WishlistDetailView: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct WishlistSearchModifier: ViewModifier {
+    let isEditing: Bool
+    @Binding var searchText: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEditing {
+            content
+        } else {
+            content.searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search cards"
+            )
         }
     }
 }

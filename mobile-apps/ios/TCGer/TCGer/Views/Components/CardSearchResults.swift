@@ -35,11 +35,15 @@ struct CardSearchResultsList: View {
         }
     }
 
+    private var shouldShowGameSectionHeader: Bool {
+        showsGameSectionHeader && enabledGames.count > 1
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
                 ForEach(groupedCards, id: \.0) { tcg, tcgCards in
-                    if showsGameSectionHeader {
+                    if shouldShowGameSectionHeader {
                         Section {
                             cardsGrid(tcgCards)
                         } header: {
@@ -193,7 +197,7 @@ struct CardSearchResultCell: View {
                     Text(card.name)
                         .font(.caption)
                         .fontWeight(.medium)
-                        .lineLimit(2, reservesSpace: true)
+                        .lineLimit(2)
 
                     Spacer(minLength: 0)
 

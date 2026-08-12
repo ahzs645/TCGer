@@ -1,12 +1,29 @@
 import SwiftUI
 
+private enum CardSearchScope: String, CaseIterable, Identifiable {
+    case catalog = "All Cards"
+    case collection = "My Collection"
+
+    var id: String { rawValue }
+}
+
+private struct OwnedCardSearchResult: Identifiable {
+    let collection: Collection
+    let card: CollectionCard
+
+    var id: String { "\(collection.id):\(card.id)" }
+    var previewCard: Card { card.previewCard }
+}
+
 struct CardSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var searchText = ""
     @State private var isSearchPresented = false
+    @State private var searchScope = CardSearchScope.catalog
     @State private var selectedGame: TCGGame = .all
     @State private var searchResults: [Card] = []
+    @State private var ownedSearchResults: [OwnedCardSearchResult] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var hasSearched = false
@@ -19,6 +36,7 @@ struct CardSearchView: View {
     @State private var keepWishlistUpdated = true
     @State private var showingFilters = false
     @State private var searchFilters = CardSearchFilterState()
+    @State private var selectedOwnedResult: OwnedCardSearchResult?
 
     var addToWishlistId: String?
     var onCardAdded: (() -> Void)?
@@ -29,12 +47,29 @@ struct CardSearchView: View {
         searchResults.filter { searchFilters.matches($0, game: selectedGame) }
     }
 
+    private var filteredOwnedSearchResults: [OwnedCardSearchResult] {
+        ownedSearchResults.filter {
+            searchFilters.matches($0.previewCard, game: selectedGame)
+        }
+    }
+
+    private var rawResultsAreEmpty: Bool {
+        switch searchScope {
+        case .catalog: searchResults.isEmpty
+        case .collection: ownedSearchResults.isEmpty
+        }
+    }
+
+    private var filteredResultsAreEmpty: Bool {
+        switch searchScope {
+        case .catalog: filteredSearchResults.isEmpty
+        case .collection: filteredOwnedSearchResults.isEmpty
+        }
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                supplementalSearchControls
-
-                // Search Results
+            Group {
                 if isSearching {
                     ProgressView("Searching...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -42,14 +77,34 @@ struct CardSearchView: View {
                     ErrorView(title: "Search Failed", message: error) {
                         Task { await performSearch() }
                     }
-                } else if hasSearched && searchResults.isEmpty {
-                    EmptySearchView()
-                } else if hasSearched && filteredSearchResults.isEmpty {
+                } else if hasSearched && rawResultsAreEmpty {
+                    if searchScope == .collection {
+                        SearchPlaceholderView(
+                            icon: "rectangle.stack.badge.minus",
+                            title: "No Owned Cards Found",
+                            message: "No cards in your binders match this search."
+                        )
+                    } else {
+                        EmptySearchView()
+                    }
+                } else if hasSearched && filteredResultsAreEmpty {
                     FilteredSearchEmptyView {
                         clearSearchFilters()
                     }
                 } else if !hasSearched {
-                    InitialSearchView()
+                    InitialSearchView(scope: searchScope)
+                } else if searchScope == .collection {
+                    OwnedCardSearchResultsList(
+                        results: filteredOwnedSearchResults,
+                        showPricing: environmentStore.showPricing,
+                        showCardNumbers: environmentStore.showCardNumbers,
+                        onOpenBinder: { result in
+                            selectedOwnedResult = result
+                        },
+                        onShowDetails: { result in
+                            detailCard = result.previewCard
+                        }
+                    )
                 } else {
                     CardSearchResultsList(
                         cards: filteredSearchResults,
@@ -72,6 +127,9 @@ struct CardSearchView: View {
                         }
                     )
                 }
+            }
+            .safeAreaBar(edge: .top, spacing: 0) {
+                supplementalSearchControls
             }
             .navigationTitle("Search Cards")
             .navigationBarTitleDisplayMode(.inline)
@@ -128,6 +186,13 @@ struct CardSearchView: View {
                     showCardNumbers: environmentStore.showCardNumbers
                 )
             }
+            .sheet(item: $selectedOwnedResult) { result in
+                CollectionDetailView(
+                    collection: result.collection,
+                    initialSearchText: result.card.name
+                )
+                .environmentObject(environmentStore)
+            }
             .sheet(item: $addSheetCard, onDismiss: {
                 addSheetCard = nil
             }) { card in
@@ -162,6 +227,15 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
+            .onChange(of: searchScope) {
+                searchResults = []
+                ownedSearchResults = []
+                errorMessage = nil
+                hasSearched = false
+                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Task { await performSearch() }
+                }
+            }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
                    let game = TCGGame(rawValue: defaultGame),
@@ -177,6 +251,17 @@ struct CardSearchView: View {
     @ViewBuilder
     private var supplementalSearchControls: some View {
         VStack(spacing: 0) {
+            if addToWishlistId == nil {
+                Picker("Search Scope", selection: $searchScope) {
+                    ForEach(CardSearchScope.allCases) { scope in
+                        Text(scope.rawValue).tag(scope)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+
             if environmentStore.shouldShowGamePicker {
                 GamePickerPills(
                     selection: Binding(
@@ -191,42 +276,55 @@ struct CardSearchView: View {
             if let wishlistId = addToWishlistId,
                hasSearched,
                !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.title3)
+                            .foregroundStyle(.tint)
+                            .frame(width: 28)
+
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Add every match")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Not just the results shown below")
+                            Text("Add All Matches")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Includes cards beyond this preview")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
+
                         Spacer()
+
                         Button {
                             Task { await addAllMatches(to: wishlistId) }
                         } label: {
                             if isAddingAllMatches {
-                                ProgressView().scaleEffect(0.8)
+                                ProgressView()
+                                    .controlSize(.small)
                             } else {
-                                Text("Add all")
+                                Text("Add All")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                        .buttonStyle(.glassProminent)
                         .disabled(isAddingAllMatches)
                     }
 
-                    Toggle("Keep this wishlist updated", isOn: $keepWishlistUpdated)
-                        .font(.caption)
+                    Toggle(isOn: $keepWishlistUpdated) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Keep Wishlist Updated")
+                                .font(.subheadline)
+                            Text("Automatically add future matches")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     if let bulkWishlistStatus {
-                        Text(bulkWishlistStatus)
+                        Label(bulkWishlistStatus, systemImage: "info.circle")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
             }
         }
     }
@@ -348,6 +446,7 @@ struct CardSearchView: View {
         guard !query.isEmpty else {
             hasSearched = false
             searchResults = []
+            ownedSearchResults = []
             return
         }
 
@@ -361,7 +460,30 @@ struct CardSearchView: View {
         hasSearched = true
 
         do {
-            if let set = searchFilters.set {
+            if searchScope == .collection {
+                let collections = try await apiService.getCollections(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    useCache: environmentStore.offlineModeEnabled
+                )
+                ownedSearchResults = collections.flatMap { collection in
+                    collection.cards.compactMap { card in
+                        let preview = card.previewCard
+                        guard selectedGame == .all ||
+                                preview.tcg.caseInsensitiveCompare(selectedGame.rawValue) == .orderedSame,
+                              preview.matchesSearchText(query) else {
+                            return nil
+                        }
+                        return OwnedCardSearchResult(collection: collection, card: card)
+                    }
+                }
+                .sorted {
+                    let nameOrder = $0.card.name.localizedCaseInsensitiveCompare($1.card.name)
+                    if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+                    return $0.collection.name.localizedCaseInsensitiveCompare($1.collection.name) == .orderedAscending
+                }
+                searchResults = ownedSearchResults.map(\.previewCard)
+            } else if let set = searchFilters.set {
                 let cards = try await apiService.getSetCards(
                     config: environmentStore.serverConfiguration,
                     token: token,
@@ -449,8 +571,12 @@ private struct FilteredSearchEmptyView: View {
 // MARK: - Initial Search View
 private struct InitialSearchView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    let scope: CardSearchScope
 
     private var searchDescription: String {
+        if scope == .collection {
+            return "Search cards you own across every binder by name, set, number, or rarity."
+        }
         let gameNames = environmentStore.enabledGames.map(\.shortName)
         guard !gameNames.isEmpty else {
             return "Search cards by name, set, or code."
@@ -471,8 +597,65 @@ private struct InitialSearchView: View {
     var body: some View {
         SearchPlaceholderView(
             icon: "magnifyingglass",
-            title: "Search Your TCG Collection",
+            title: scope == .collection ? "Search My Collection" : "Search All Cards",
             message: searchDescription
         )
+    }
+}
+
+private struct OwnedCardSearchResultsList: View {
+    let results: [OwnedCardSearchResult]
+    let showPricing: Bool
+    let showCardNumbers: Bool
+    let onOpenBinder: (OwnedCardSearchResult) -> Void
+    let onShowDetails: (OwnedCardSearchResult) -> Void
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(results) { result in
+                    Button {
+                        onOpenBinder(result)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            CardSearchResultCell(
+                                card: result.previewCard,
+                                showPricing: showPricing,
+                                showCardNumbers: showCardNumbers
+                            )
+
+                            HStack(spacing: 6) {
+                                Image(systemName: result.collection.isUnsortedBinder ? "tray" : "folder")
+                                Text(result.collection.name)
+                                    .lineLimit(1)
+                                Spacer(minLength: 4)
+                                Text("×\(result.card.quantity)")
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens \(result.collection.name) filtered to this card")
+                    .contextMenu {
+                        Button {
+                            onOpenBinder(result)
+                        } label: {
+                            Label("Open Binder", systemImage: "folder")
+                        }
+                        Button {
+                            onShowDetails(result)
+                        } label: {
+                            Label("Card Details", systemImage: "info.circle")
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
     }
 }

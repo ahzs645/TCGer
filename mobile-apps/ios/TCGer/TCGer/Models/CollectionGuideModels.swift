@@ -108,6 +108,26 @@ struct CollectionGuide: Identifiable, Codable, Hashable, Sendable {
     let cardCountHint: Int?
     let followed: Bool
     let wishlistId: String?
+
+    func updatingFollowState(followed: Bool, wishlistId: String?) -> CollectionGuide {
+        CollectionGuide(
+            id: id,
+            slug: slug,
+            title: title,
+            description: description,
+            tcg: tcg,
+            category: category,
+            coverImageUrl: coverImageUrl,
+            curatorName: curatorName,
+            tags: tags,
+            version: version,
+            featured: featured,
+            rule: rule,
+            cardCountHint: cardCountHint,
+            followed: followed,
+            wishlistId: wishlistId
+        )
+    }
 }
 
 struct FollowCollectionGuideResponse: Codable, Sendable {

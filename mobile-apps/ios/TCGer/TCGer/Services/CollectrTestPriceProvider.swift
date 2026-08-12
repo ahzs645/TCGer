@@ -11,14 +11,7 @@ enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .justTCG: return "JustTCG"
-        case .collectrPrivateTest: return "Collectr Private Test"
-        }
-    }
-
-    var shortDescription: String {
-        switch self {
-        case .justTCG: return "Live commercial pricing"
-        case .collectrPrivateTest: return "Live private-build experiment"
+        case .collectrPrivateTest: return "Collectr"
         }
     }
 

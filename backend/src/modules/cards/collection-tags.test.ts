@@ -1,4 +1,5 @@
 import { deriveCollectionTags } from '@tcg/api-types';
+import { searchCatalogCardsByTag } from './catalog-tag-search';
 
 describe('collection tag derivation', () => {
   it('recognizes Pokémon art media and normalized delta reprints', () => {
@@ -45,5 +46,15 @@ describe('collection tag derivation', () => {
       'lorcana.classification.floodborn',
       'lorcana.classification.princess',
     ]));
+  });
+
+  it('expands the published Pokémon guide tags from the generated catalog', async () => {
+    const [clayCards, crochetCards] = await Promise.all([
+      searchCatalogCardsByTag('pokemon', 'pokemon.art.clay'),
+      searchCatalogCardsByTag('pokemon', 'pokemon.art.crochet'),
+    ]);
+
+    expect(clayCards).toHaveLength(272);
+    expect(crochetCards).toHaveLength(42);
   });
 });

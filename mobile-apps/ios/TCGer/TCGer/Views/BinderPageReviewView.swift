@@ -198,19 +198,17 @@ struct BinderPageReviewView: View {
                 ForEach(Array(record.detections.enumerated()), id: \.element.id) { index, detection in
                     let path = quadPath(for: detection.quad, in: fittedRect)
                     Button {
-                        handleDetectionTap(
+                        handlePageDetectionTap(
                             DetectionReference(pageID: record.id, detectionID: detection.id)
                         )
                     } label: {
                         path
                             .fill(
-                                detection.isIncluded
-                                    ? statusColor(detection.status).opacity(0.08)
-                                    : Color.black.opacity(0.38)
+                                pageDetectionFillColor(detection)
                             )
                             .overlay {
                                 path.stroke(
-                                    detection.isIncluded ? statusColor(detection.status) : Color.secondary,
+                                    pageDetectionOutlineColor(detection),
                                     style: StrokeStyle(
                                         lineWidth: 3,
                                         lineJoin: .round,
@@ -235,24 +233,25 @@ struct BinderPageReviewView: View {
                     .disabled(isAdding)
                     .accessibilityLabel(detectionAccessibilityLabel(index: index, detection: detection))
                     .accessibilityValue(detectionAccessibilityValue(detection))
-                    .accessibilityHint(
-                        detection.isIncluded
-                            ? "Double tap to exclude this detection."
-                            : detection.selectedCandidate == nil
-                                ? "This unmatched detection is excluded."
-                                : "Double tap to include this card in the binder."
-                    )
+                    .accessibilityHint(pageDetectionAccessibilityHint(detection))
 
-                    // Selection state on the page reads through the quad's
-                    // color, dash, and dimming; the ✕/✓ toggles live only in
-                    // the row list so small cards keep clean tap targets.
                     let points = detection.quad.points(in: fittedRect)
                     if let numberAnchor = points.first {
-                        Text("\(index + 1)")
-                            .font(.caption2.bold())
+                        Group {
+                            if detection.isIncluded {
+                                Text("\(index + 1)")
+                                    .font(.caption2.bold())
+                            } else {
+                                Image(systemName: pageDetectionBadgeSymbol(detection))
+                                    .font(.caption2.bold())
+                            }
+                        }
                             .foregroundStyle(.white)
                             .frame(width: 22, height: 22)
-                            .background(statusColor(detection.status), in: Circle())
+                            .background(
+                                pageDetectionBadgeColor(detection),
+                                in: Circle()
+                            )
                             .position(x: numberAnchor.x + 11, y: numberAnchor.y + 11)
                             .allowsHitTesting(false)
                     }
@@ -285,8 +284,8 @@ struct BinderPageReviewView: View {
                     .font(.subheadline.weight(.semibold))
                 Text(
                     ScannerDevModeStore.isEnabled
-                        ? "Tap to select or exclude. Hold to label why."
-                        : "Tap a detection to select or exclude it."
+                        ? "Matched: tap to skip, then tap for not a card. Hold for other reasons."
+                        : "Matched: tap to skip, then tap for not a card. Unmatched: tap once."
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -526,14 +525,17 @@ struct BinderPageReviewView: View {
 
             Toggle("Hide Unmatched Cards", isOn: $hidesUnmatchedCards)
         } label: {
-            Label(statusFilterName, systemImage: "line.3.horizontal.decrease.circle")
-                .font(.subheadline)
-                .lineLimit(1)
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 32, height: 32)
+                .foregroundStyle(
+                    statusFilter == nil && !hidesUnmatchedCards ? Color.secondary : Color.accentColor
+                )
+                .glassEffect(.regular.interactive(), in: .circle)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .fixedSize()
+        .buttonStyle(.plain)
         .accessibilityLabel("Status filter: \(statusFilterName)")
+        .accessibilityHint("Filters detected cards by match status")
     }
 
     private func statusFilterButton(
@@ -608,6 +610,10 @@ struct BinderPageReviewView: View {
                     .binderPickerFieldStyle()
                     .disabled(isAdding || isCreatingBinder)
                 }
+
+                Text("Save Layout stores card positions and the optional scan image. Adding cards saves the layout too.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -616,66 +622,68 @@ struct BinderPageReviewView: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    /// Pinned below the scroll view so Save/Add stay reachable while the
-    /// detection list scrolls. Save collapses to a short label; the full
-    /// intent stays on its accessibility label.
+    /// Pinned below the scroll view so layout and card actions stay reachable
+    /// while the detection list scrolls.
     private func stickyActionBar(record: BinderPageRecord) -> some View {
         let records = destinationRecords(for: record)
         let binderID = destinationBinderID(for: record)
 
-        return HStack(spacing: 10) {
-            Button {
-                guard let binderID else { return }
-                Task { await persistRecords(records, to: binderID) }
-            } label: {
-                HStack(spacing: 6) {
-                    if isSavingPage {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "square.and.arrow.down")
+        return GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    guard let binderID else { return }
+                    Task { await persistRecords(records, to: binderID) }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isSavingPage {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "rectangle.stack.badge.plus")
+                        }
+                        Text(compactSaveButtonTitle(for: record))
+                            .fontWeight(.semibold)
                     }
-                    Text(compactSaveButtonTitle(for: record))
-                        .fontWeight(.semibold)
                 }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .disabled(isSavingPage || isAdding || binderID == nil)
-            .accessibilityLabel(saveButtonTitle(for: record))
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .disabled(isSavingPage || isAdding || binderID == nil)
+                .accessibilityLabel(saveButtonTitle(for: record))
+                .accessibilityHint("Saves card positions and the optional scan image without adding cards")
 
-            Button {
-                guard let binderID else { return }
-                Task { await addIncludedCards(from: records, to: binderID) }
-            } label: {
-                HStack {
-                    if isAdding {
-                        ProgressView().tint(.white)
+                Button {
+                    guard let binderID else { return }
+                    Task { await addIncludedCards(from: records, to: binderID) }
+                } label: {
+                    HStack {
+                        if isAdding {
+                            ProgressView()
+                        }
+                        Text(addButtonTitle(for: record))
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
-                    Text(addButtonTitle(for: record))
-                        .fontWeight(.semibold)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.glassProminent)
+                .tint(.green)
+                .controlSize(.large)
+                .disabled(
+                    isAdding ||
+                        isCreatingBinder || isSavingPage ||
+                        binderID == nil ||
+                        remainingIncludedDetectionCount(in: records) == 0
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(
-                isAdding ||
-                    isCreatingBinder || isSavingPage ||
-                    binderID == nil ||
-                    remainingIncludedDetectionCount(in: records) == 0
-            )
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(.bar)
     }
 
     private func compactSaveButtonTitle(for record: BinderPageRecord) -> String {
         let records = destinationRecords(for: record)
-        if records.count > 1 { return "Save \(records.count)" }
-        return storedPage(for: record.pageNumber) == nil ? "Save" : "Update"
+        if records.count > 1 { return "Save \(records.count) Layouts" }
+        return storedPage(for: record.pageNumber) == nil ? "Save Layout" : "Update Layout"
     }
 
     private var currentRecord: BinderPageRecord? {
@@ -795,6 +803,47 @@ struct BinderPageReviewView: View {
         }
     }
 
+    /// Matched regions cycle through included, skipped while retaining their
+    /// match, and not-a-card. An unmatched region needs only one tap to be
+    /// classified as not-a-card.
+    private func handlePageDetectionTap(_ selection: DetectionReference) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
+              let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
+                  where: { $0.id == selection.detectionID }
+              )
+        else { return }
+
+        let detection = viewModel.binderPages[pageIndex].detections[detectionIndex]
+
+        guard detection.selectedCandidate != nil else {
+            if detection.exclusionReason == .notACard {
+                clearExclusionReason(for: selection)
+            } else {
+                excludeDetection(for: selection, reason: .notACard)
+            }
+            return
+        }
+
+        if detection.isIncluded {
+            excludeDetectionWithoutReason(for: selection)
+        } else if detection.exclusionReason == .notACard {
+            includeDetection(for: selection)
+        } else {
+            excludeDetection(for: selection, reason: .notACard)
+        }
+    }
+
+    private func clearExclusionReason(for selection: DetectionReference) {
+        guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
+              let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
+                  where: { $0.id == selection.detectionID }
+              )
+        else { return }
+
+        viewModel.binderPages[pageIndex].detections[detectionIndex].exclusionReason = nil
+        HapticManager.selection()
+    }
+
     private func excludeDetectionWithoutReason(for selection: DetectionReference) {
         guard let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == selection.pageID }),
               let detectionIndex = viewModel.binderPages[pageIndex].detections.firstIndex(
@@ -904,7 +953,42 @@ struct BinderPageReviewView: View {
     private func detectionAccessibilityValue(_ detection: BinderCardDetection) -> String {
         if detection.isIncluded { return "Selected" }
         if let reason = detection.exclusionReason { return "Excluded: \(reason.displayName)" }
-        return ScannerDevModeStore.isEnabled ? "Excluded, no reason" : "Excluded"
+        return detection.selectedCandidate == nil ? "Unmatched" : "Matched, skipped"
+    }
+
+    private func pageDetectionAccessibilityHint(_ detection: BinderCardDetection) -> String {
+        guard detection.selectedCandidate != nil else {
+            return detection.exclusionReason == .notACard
+                ? "Double tap to clear the not-a-card classification."
+                : "Double tap to mark this unmatched detection as not a card."
+        }
+        if detection.isIncluded {
+            return "Double tap to skip adding this card while keeping its match."
+        }
+        return detection.exclusionReason == .notACard
+            ? "Double tap to restore this matched card to the add batch."
+            : "Double tap to mark this skipped match as not a card."
+    }
+
+    private func pageDetectionFillColor(_ detection: BinderCardDetection) -> Color {
+        if detection.isIncluded { return statusColor(detection.status).opacity(0.08) }
+        return detection.exclusionReason == .notACard
+            ? Color.black.opacity(0.52)
+            : Color.orange.opacity(0.16)
+    }
+
+    private func pageDetectionOutlineColor(_ detection: BinderCardDetection) -> Color {
+        if detection.isIncluded { return statusColor(detection.status) }
+        return detection.exclusionReason == .notACard ? Color.secondary : Color.orange
+    }
+
+    private func pageDetectionBadgeColor(_ detection: BinderCardDetection) -> Color {
+        if detection.isIncluded { return statusColor(detection.status) }
+        return detection.exclusionReason == .notACard ? Color.secondary : Color.orange
+    }
+
+    private func pageDetectionBadgeSymbol(_ detection: BinderCardDetection) -> String {
+        detection.exclusionReason == .notACard ? "xmark" : "minus"
     }
 
     private func detectionAccessibilityLabel(
@@ -1093,6 +1177,26 @@ struct BinderPageReviewView: View {
         if addedThisAttempt > 0 {
             await persistRecords(records, to: binderID, reportsSuccess: false)
             HapticManager.notification(.success)
+            advanceOrDismissAfterAdding()
+        }
+    }
+
+    @MainActor
+    private func advanceOrDismissAfterAdding() {
+        let pendingPageIndices = viewModel.binderPages.indices.filter {
+            !remainingIncludedDetections(in: viewModel.binderPages[$0]).isEmpty
+        }
+
+        guard !pendingPageIndices.isEmpty else {
+            dismiss()
+            return
+        }
+
+        guard viewModel.binderDestinationMode == .pageByPage else { return }
+        let nextIndex = pendingPageIndices.first(where: { $0 > currentPageIndex })
+            ?? pendingPageIndices.first
+        if let nextIndex, nextIndex != currentPageIndex {
+            showPage(at: nextIndex)
         }
     }
 

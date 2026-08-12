@@ -166,7 +166,9 @@ struct SetBrowserView: View {
                                     }
                                 }
                             } header: {
-                                GameSectionHeader(tcg: tcg)
+                                if environmentStore.shouldShowGamePicker {
+                                    GameSectionHeader(tcg: tcg)
+                                }
                             }
                         }
                     }

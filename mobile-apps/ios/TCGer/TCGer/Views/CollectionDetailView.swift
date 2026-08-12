@@ -40,13 +40,19 @@ struct CollectionDetailView: View {
     @State private var showingBinderPages = false
 
     private let apiService = APIService()
-    init(collection: Collection) {
+    init(
+        collection: Collection,
+        startsInEditMode: Bool = false,
+        initialSearchText: String = ""
+    ) {
         self.collection = collection
+        _isEditing = State(initialValue: startsInEditMode)
         _editedName = State(initialValue: collection.name)
         _editedDescription = State(initialValue: collection.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(collection.colorHex))
         _editedDefaultCondition = State(initialValue: collection.defaultCondition ?? "")
         _cards = State(initialValue: collection.cards)
+        _searchText = State(initialValue: initialSearchText)
     }
 
     private var workingCollectionSnapshot: Collection {
@@ -172,9 +178,26 @@ struct CollectionDetailView: View {
                         } else {
                             Section {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text(collection.name)
-                                        .font(.title)
-                                        .fontWeight(.bold)
+                                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                        Text(collection.name)
+                                            .font(.title)
+                                            .fontWeight(.bold)
+                                            .layoutPriority(1)
+
+                                        Spacer(minLength: 8)
+
+                                        if environmentStore.isAuthenticated,
+                                           !collection.isUnsortedBinder {
+                                            Button {
+                                                showingBinderPages = true
+                                            } label: {
+                                                Label("Pages", systemImage: "rectangle.stack")
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
+                                            .accessibilityLabel("Binder pages")
+                                        }
+                                    }
                                     if let description = collection.description, !description.isEmpty {
                                         Text(description)
                                             .font(.body)
@@ -409,10 +432,11 @@ struct CollectionDetailView: View {
                             }
                         }
                     }
-                        .modifier(BinderListModeModifier(isEditing: isEditing, searchText: $searchText))
+                        .modifier(BinderListModeModifier(isEditing: isEditing))
                         .safeAreaBar(edge: .top, spacing: 0) {
                             if !isEditing {
                                 CollectionFilterBar(
+                                    searchText: $searchText,
                                     showFilters: $showFilters,
                                     sortOption: $sortOption,
                                     selectedTagFilters: $selectedTagFilters,
@@ -466,13 +490,6 @@ struct CollectionDetailView: View {
                                     .foregroundColor(.green)
                                     .fontWeight(.semibold)
                                 } else {
-                                    if !collection.isUnsortedBinder {
-                                        Button(action: { showingBinderPages = true }) {
-                                            Image(systemName: "rectangle.stack")
-                                        }
-                                        .accessibilityLabel("Binder pages")
-                                    }
-
                                     Button("Select") {
                                         isSelectMode = true
                                         selectedEntryIds.removeAll()
@@ -1303,7 +1320,6 @@ struct CollectionDetailView: View {
 
 private struct BinderListModeModifier: ViewModifier {
     let isEditing: Bool
-    @Binding var searchText: String
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -1317,11 +1333,7 @@ private struct BinderListModeModifier: ViewModifier {
             content
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .searchable(
-                    text: $searchText,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Search cards, sets, or codes"
-                )
+                .scrollDismissesKeyboard(.interactively)
         }
     }
 }

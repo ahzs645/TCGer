@@ -88,11 +88,8 @@ struct PricingSourceSettingsView: View {
         Section {
             Picker("Price Provider", selection: $environmentStore.pricingSource) {
                 ForEach(PricingSource.allCases) { source in
-                    VStack(alignment: .leading) {
-                        Text(source.displayName)
-                        Text(source.shortDescription)
-                    }
-                    .tag(source)
+                    Text(source.displayName)
+                        .tag(source)
                 }
             }
             .pickerStyle(.navigationLink)

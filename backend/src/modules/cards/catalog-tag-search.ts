@@ -124,7 +124,9 @@ export async function searchCatalogCardsByTag(
   limit = 2000,
 ): Promise<Card[]> {
   const pack = await loadPack(tcg);
-  if (!pack) return [];
+  if (!pack) {
+    throw new Error(`The ${tcg} catalog is unavailable for collection-tag search`);
+  }
   const normalized = tag.trim().toLowerCase();
   const sets = new Map(pack.sets.map((set) => [set.code, set] as const));
   return pack.cards

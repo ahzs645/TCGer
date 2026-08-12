@@ -30,6 +30,7 @@ struct CollectionsView: View {
     @State private var errorMessage: String?
     @State private var showingCreateSheet = false
     @State private var selectedCollection: Collection?
+    @State private var selectedCollectionStartsInEditMode = false
     @State private var selectedSmartFolder: SmartFolder?
     @State private var showingSmartFolderEditor = false
     @State private var showingImportSheet = false
@@ -141,13 +142,13 @@ struct CollectionsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
-                ScrollView {
-                    binderControlBar
-
+                List {
                     if displayCollections.isEmpty && displaySmartFolders.isEmpty {
                         ContentUnavailableView.search(text: searchText)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
 
                     if !displaySmartFolders.isEmpty {
@@ -186,26 +187,31 @@ struct CollectionsView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     }
 
-                    LazyVStack(spacing: 16) {
-                        ForEach(displayCollections) { collection in
-                            Button {
-                                selectedCollection = collection
-                            } label: {
-                                CollectionCardView(
-                                    collection: collection,
-                                    showPricing: environmentStore.showPricing,
-                                    showUpdatedDate: sortOption == .lastEdited
-                                )
-                            }
-                            .buttonStyle(.plain)
+                    ForEach(displayCollections) { collection in
+                        if environmentStore.isAuthenticated,
+                           !collection.isUnsortedBinder {
+                            binderRow(for: collection)
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    Button {
+                                        presentCollection(collection, editing: true)
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    .tint(.blue)
+                                }
+                        } else {
+                            binderRow(for: collection)
                         }
                     }
-                    .padding()
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 1)
             }
         }
             .navigationTitle("Binders")
@@ -226,6 +232,10 @@ struct CollectionsView: View {
                         .accessibilityLabel("Search card catalog")
                     }
                 }
+
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                binderControlShelf
             }
             .refreshable {
                 await loadCollections()
@@ -252,55 +262,84 @@ struct CollectionsView: View {
                     set: { if !$0 { selectedCollection = nil } }
                 ),
                 onDismiss: {
+                    selectedCollectionStartsInEditMode = false
                     Task { await loadCollections() }
                 },
                 content: {
                     if let collection = selectedCollection {
-                        CollectionDetailView(collection: collection)
+                        CollectionDetailView(
+                            collection: collection,
+                            startsInEditMode: selectedCollectionStartsInEditMode
+                        )
                     }
                 }
             )
     }
 
-    private var binderControlBar: some View {
-        HStack(spacing: 12) {
-            Menu {
-                Picker("Sort by", selection: $sortOptionRaw) {
-                    ForEach(BinderSortOption.allCases) { option in
-                        Label(option.rawValue, systemImage: option.systemImage)
-                            .tag(option.rawValue)
-                    }
-                }
-            } label: {
-                Label(sortOption.rawValue, systemImage: "arrow.up.arrow.down")
-            }
-            .buttonStyle(.bordered)
-
-            Spacer()
-
-            Menu {
-                Button {
-                    showingCreateSheet = true
-                } label: {
-                    Label("New Binder", systemImage: "folder.badge.plus")
-                }
-                Button {
-                    showingSmartFolderEditor = true
-                } label: {
-                    Label("New Smart Folder", systemImage: "wand.and.stars")
-                }
-                Button {
-                    showingImportSheet = true
-                } label: {
-                    Label("Import CSV", systemImage: "square.and.arrow.down")
-                }
-            } label: {
-                Label("Add", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!environmentStore.isAuthenticated)
+    private func binderRow(for collection: Collection) -> some View {
+        Button {
+            presentCollection(collection, editing: false)
+        } label: {
+            CollectionCardView(
+                collection: collection,
+                showPricing: environmentStore.showPricing,
+                showUpdatedDate: sortOption == .lastEdited
+            )
         }
-        .padding(.horizontal)
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+
+    private func presentCollection(_ collection: Collection, editing: Bool) {
+        selectedCollectionStartsInEditMode = editing
+        selectedCollection = collection
+    }
+
+    private var binderControlShelf: some View {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                Menu {
+                    Picker("Sort by", selection: $sortOptionRaw) {
+                        ForEach(BinderSortOption.allCases) { option in
+                            Label(option.rawValue, systemImage: option.systemImage)
+                                .tag(option.rawValue)
+                        }
+                    }
+                } label: {
+                    Label(sortOption.rawValue, systemImage: "arrow.up.arrow.down")
+                }
+                .buttonStyle(.glass)
+                .accessibilityLabel("Sort binders by \(sortOption.rawValue)")
+
+                Spacer(minLength: 12)
+
+                Menu {
+                    Button {
+                        showingCreateSheet = true
+                    } label: {
+                        Label("New Binder", systemImage: "folder.badge.plus")
+                    }
+                    Button {
+                        showingSmartFolderEditor = true
+                    } label: {
+                        Label("New Smart Folder", systemImage: "wand.and.stars")
+                    }
+                    Button {
+                        showingImportSheet = true
+                    } label: {
+                        Label("Import CSV", systemImage: "square.and.arrow.down")
+                    }
+                } label: {
+                    Label("Add", systemImage: "plus")
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(!environmentStore.isAuthenticated)
+                .accessibilityHint("Shows options for adding content")
+            }
+        }
+        .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
 

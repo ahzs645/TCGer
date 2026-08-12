@@ -6,7 +6,7 @@ struct WishlistsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @EnvironmentObject private var wishlistStore: WishlistStore
     @State private var showingCreateSheet = false
-    @State private var selectedWishlist: Wishlist?
+    @State private var wishlistPresentation: WishlistPresentation?
     @State private var newWishlistName = ""
     @State private var newWishlistDescription = ""
     @State private var newWishlistColor: Color = .blue
@@ -75,13 +75,27 @@ struct WishlistsView: View {
                 List {
                     ForEach(filteredWishlists) { wishlist in
                         Button {
-                            selectedWishlist = wishlist
+                            wishlistPresentation = WishlistPresentation(
+                                wishlist: wishlist,
+                                startsInEditMode: false
+                            )
                         } label: {
                             WishlistRow(wishlist: wishlist)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                wishlistPresentation = WishlistPresentation(
+                                    wishlist: wishlist,
+                                    startsInEditMode: true
+                                )
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 Task { await deleteWishlist(wishlist) }
@@ -122,10 +136,14 @@ struct WishlistsView: View {
         .sheet(isPresented: $showingCreateSheet) {
             createWishlistSheet
         }
-        .sheet(item: $selectedWishlist) { wishlist in
-            WishlistDetailView(wishlist: wishlist, onUpdate: {
-                Task { await loadWishlists(force: true) }
-            })
+        .sheet(item: $wishlistPresentation) { presentation in
+            WishlistDetailView(
+                wishlist: presentation.wishlist,
+                startsInEditMode: presentation.startsInEditMode,
+                onUpdate: {
+                    Task { await loadWishlists(force: true) }
+                }
+            )
             .environmentObject(environmentStore)
         }
         .alert("Wishlist Error", isPresented: actionErrorIsPresented) {
@@ -242,6 +260,13 @@ struct WishlistsView: View {
         newWishlistColor = .blue
         newWishlistMatchAnyPrinting = false
     }
+}
+
+private struct WishlistPresentation: Identifiable {
+    let wishlist: Wishlist
+    let startsInEditMode: Bool
+
+    var id: String { wishlist.id }
 }
 
 // MARK: - Wishlist Row

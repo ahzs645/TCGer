@@ -9,6 +9,7 @@ struct BinderPickerSheetButton: View {
     var onCreate: ((String, String?, String?, String?) async -> Void)? = nil
 
     @State private var presentedSheet: BinderPickerSheetDestination?
+    @State private var presentsCreationAfterSelection = false
 
     private var selectedBinder: Collection? {
         guard let selectedBinderId else { return nil }
@@ -39,14 +40,15 @@ struct BinderPickerSheetButton: View {
         .accessibilityLabel("Binder")
         .accessibilityValue(selectedBinder?.name ?? "None selected")
         .accessibilityHint(onCreate == nil ? "Shows binder choices" : "Shows binder choices and the new binder option")
-        .sheet(item: $presentedSheet) { destination in
+        .sheet(item: $presentedSheet, onDismiss: presentPendingCreation) { destination in
             switch destination {
             case .selection:
                 BinderSelectionSheet(
                     binders: binders,
                     selectedBinderId: $selectedBinderId,
                     onRequestCreate: onCreate == nil ? nil : {
-                        presentedSheet = .creation
+                        presentsCreationAfterSelection = true
+                        presentedSheet = nil
                     }
                 )
                 .presentationDetents([.medium, .large])
@@ -57,6 +59,12 @@ struct BinderPickerSheetButton: View {
                 }
             }
         }
+    }
+
+    private func presentPendingCreation() {
+        guard presentsCreationAfterSelection else { return }
+        presentsCreationAfterSelection = false
+        presentedSheet = .creation
     }
 }
 

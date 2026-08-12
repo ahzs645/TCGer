@@ -510,7 +510,7 @@ final class CatalogStore: ObservableObject {
         }
     }
 
-    func install(_ game: TCGGame) async throws {
+    func install(_ game: TCGGame, forceReload: Bool = false) async throws {
         guard game != .all,
               let metadata = metadata(for: game) else {
             throw StoreError.resourceUnavailable(metadata(for: game)?.file ?? game.rawValue)
@@ -520,6 +520,10 @@ final class CatalogStore: ObservableObject {
             while installingGames.contains(game) {
                 try? await Task.sleep(for: .milliseconds(25))
             }
+        }
+        if forceReload {
+            loadedPacks.removeValue(forKey: game)
+            await source.remove(metadata.file)
         }
         if loadedPacks[game]?.version != metadata.version {
             try await load(game, metadata: metadata)
@@ -704,6 +708,15 @@ final class CatalogStore: ObservableObject {
             }) == true else { return nil }
             return CatalogEntry(tcg: tcg, card: card)
         }
+    }
+
+    func hasCollectionTagMetadata(for game: TCGGame) -> Bool {
+        guard game != .all,
+              enabledGames.contains(game),
+              let pack = loadedPacks[game] else {
+            return false
+        }
+        return pack.cards.contains { $0.collectionTags?.isEmpty == false }
     }
 
     func entry(id: String) -> CatalogEntry? {

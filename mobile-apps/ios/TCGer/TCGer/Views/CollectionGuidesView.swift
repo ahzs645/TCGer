@@ -71,7 +71,12 @@ struct CollectionGuidesView: View {
                     LazyVStack(spacing: 16) {
                         ForEach(filteredGuides) { guide in
                             NavigationLink {
-                                CollectionGuideDetailView(guide: guide)
+                                CollectionGuideDetailView(guide: guide) { updatedGuide in
+                                    guard let index = guides.firstIndex(where: { $0.id == updatedGuide.id }) else {
+                                        return
+                                    }
+                                    guides[index] = updatedGuide
+                                }
                             } label: {
                                 CollectionGuideRow(guide: guide)
                             }
@@ -318,12 +323,16 @@ private struct CollectionGuideDetailView: View {
     @State private var selectedSet = "All sets"
     @State private var ownershipFilter = OwnershipFilter.all
     @State private var catalogInstallGame: TCGGame?
+    @State private var catalogRequiresRepair = false
+    @State private var showingUnfollowConfirmation = false
 
     private let apiService = APIService()
+    private let onGuideChange: (CollectionGuide) -> Void
     private let columns = [GridItem(.adaptive(minimum: 112, maximum: 170), spacing: 12)]
 
-    init(guide: CollectionGuide) {
+    init(guide: CollectionGuide, onGuideChange: @escaping (CollectionGuide) -> Void = { _ in }) {
         _guide = State(initialValue: guide)
+        self.onGuideChange = onGuideChange
     }
 
     private var setOptions: [String] {
@@ -362,7 +371,7 @@ private struct CollectionGuideDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if let errorMessage {
+                if let errorMessage, !cards.isEmpty {
                     Text(errorMessage).font(.subheadline).foregroundStyle(.red)
                 }
 
@@ -375,6 +384,15 @@ private struct CollectionGuideDetailView: View {
                 if isLoading && catalogInstallGame == nil {
                     ProgressView("Loading matching cards…")
                         .frame(maxWidth: .infinity, minHeight: 180)
+                } else if let errorMessage, catalogInstallGame == nil, cards.isEmpty {
+                    ContentUnavailableView {
+                        Label("Couldn’t Load Cards", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Try Again") { Task { await load() } }
+                    }
+                    .frame(minHeight: 220)
                 } else if catalogInstallGame == nil && filteredCards.isEmpty {
                     ContentUnavailableView(
                         "No Matching Cards",
@@ -396,6 +414,18 @@ private struct CollectionGuideDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search this collection")
         .task { await load() }
+        .confirmationDialog(
+            "Unfollow \(guide.title)?",
+            isPresented: $showingUnfollowConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Unfollow and Delete Wishlist", role: .destructive) {
+                Task { await unfollow() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes the guide’s generated wishlist and its saved wishlist cards. Cards in your collection are not affected.")
+        }
     }
 
     private var hero: some View {
@@ -416,16 +446,21 @@ private struct CollectionGuideDetailView: View {
                 Text("\(cards.isEmpty ? guide.cardCountHint ?? 0 : cards.count) cards")
                     .font(.caption.weight(.semibold))
                 Button {
-                    Task { await follow() }
+                    if guide.followed {
+                        showingUnfollowConfirmation = true
+                    } else {
+                        Task { await follow() }
+                    }
                 } label: {
                     Label(
-                        guide.followed ? "Following" : "Add to Wishlist",
-                        systemImage: guide.followed ? "checkmark.circle.fill" : "heart.badge.plus"
+                        guide.followed ? "Unfollow" : "Add to Wishlist",
+                        systemImage: guide.followed ? "heart.slash" : "heart.badge.plus"
                     )
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isFollowing || guide.followed || catalogInstallGame != nil)
+                .tint(guide.followed ? .red : .accentColor)
+                .disabled(isFollowing || (!guide.followed && catalogInstallGame != nil))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -449,13 +484,16 @@ private struct CollectionGuideDetailView: View {
     }
 
     private func catalogInstallPrompt(for game: TCGGame) -> some View {
-        VStack(spacing: 14) {
+        let isUpdate = catalogStore.isUpdateAvailable(game) || catalogRequiresRepair
+        return VStack(spacing: 14) {
             Image(systemName: "square.and.arrow.down")
                 .font(.system(size: 42))
                 .foregroundStyle(.secondary)
-            Text("Install the \(game.displayName) Catalog")
+            Text("\(isUpdate ? "Update" : "Install") the \(game.displayName) Catalog")
                 .font(.headline)
-            Text("This guide searches the bundled card catalog. Install it once to browse and filter every matching card offline.")
+            Text(isUpdate
+                 ? "This guide needs newer collection metadata. Update the catalog to load all matching cards."
+                 : "This guide searches the bundled card catalog. Install it once to browse and filter every matching card offline.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -466,7 +504,7 @@ private struct CollectionGuideDetailView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else {
-                    Label("Install Catalog", systemImage: "square.and.arrow.down")
+                    Label("\(isUpdate ? "Update" : "Install") Catalog", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -509,14 +547,33 @@ private struct CollectionGuideDetailView: View {
         isLoading = true
         defer { isLoading = false }
         do {
+            if let game = requiredLocalCatalogGame {
+                await catalogStore.refreshManifest()
+                if case .notInstalled = catalogStore.installState(for: game) {
+                    catalogRequiresRepair = false
+                    catalogInstallGame = game
+                    cards = []
+                    errorMessage = nil
+                    return
+                }
+                if catalogStore.isUpdateAvailable(game) {
+                    catalogRequiresRepair = false
+                    catalogInstallGame = game
+                    cards = []
+                    errorMessage = nil
+                    return
+                }
+            }
+            cards = try await expandGuide(token: token)
             if let game = requiredLocalCatalogGame,
-               case .notInstalled = catalogStore.installState(for: game) {
+               guide.rule.type == .tag,
+               !catalogStore.hasCollectionTagMetadata(for: game) {
+                catalogRequiresRepair = true
                 catalogInstallGame = game
                 cards = []
                 errorMessage = nil
                 return
             }
-            cards = try await expandGuide(token: token)
             if let game = requiredLocalCatalogGame,
                cards.isEmpty,
                !catalogStore.isLoaded(game) {
@@ -524,6 +581,7 @@ private struct CollectionGuideDetailView: View {
                 errorMessage = nil
                 return
             }
+            catalogRequiresRepair = false
             catalogInstallGame = nil
             if let wishlistId = guide.wishlistId {
                 wishlist = try? await apiService.getWishlist(
@@ -555,7 +613,7 @@ private struct CollectionGuideDetailView: View {
         defer { isLoading = false }
         do {
             await catalogStore.refreshManifest()
-            try await catalogStore.install(game)
+            try await catalogStore.install(game, forceReload: catalogRequiresRepair)
             await catalogStore.loadIfNeeded(game)
             guard let token = environmentStore.authToken else { return }
             cards = try await expandGuide(token: token)
@@ -565,6 +623,7 @@ private struct CollectionGuideDetailView: View {
                     message: "The \(game.displayName) catalog installed but could not be loaded. Make sure the game is enabled in Settings."
                 )
             }
+            catalogRequiresRepair = false
             catalogInstallGame = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -624,6 +683,7 @@ private struct CollectionGuideDetailView: View {
                 slug: guide.slug
             )
             guide = response.guide
+            onGuideChange(guide)
             var followedWishlist = try await apiService.getWishlist(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -653,6 +713,34 @@ private struct CollectionGuideDetailView: View {
             statusMessage = result.errors.isEmpty
                 ? "Added \(result.addedCards) cards to your wishlist."
                 : "Added \(result.addedCards) cards; \(result.errors.count) sync issue(s)."
+        } catch {
+            errorMessage = error.localizedDescription
+            statusMessage = nil
+        }
+    }
+
+    @MainActor
+    private func unfollow() async {
+        guard let token = environmentStore.authToken,
+              let wishlistId = guide.wishlistId else {
+            errorMessage = "This guide’s wishlist could not be found. Refresh the guides and try again."
+            return
+        }
+        isFollowing = true
+        statusMessage = "Removing guide wishlist…"
+        defer { isFollowing = false }
+        do {
+            try await apiService.deleteWishlist(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                id: wishlistId
+            )
+            wishlistStore.remove(id: wishlistId)
+            wishlist = nil
+            guide = guide.updatingFollowState(followed: false, wishlistId: nil)
+            onGuideChange(guide)
+            errorMessage = nil
+            statusMessage = "Guide unfollowed."
         } catch {
             errorMessage = error.localizedDescription
             statusMessage = nil
