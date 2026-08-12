@@ -68,6 +68,9 @@ export const AUTH_STORE_STORAGE_KEY = "tcg-auth-store";
  */
 export const DEMO_STORE_STORAGE_KEY = "tcg-demo-store";
 
+/** Demo transaction ledger, kept separate from the portable collection store. */
+export const DEMO_TRANSACTIONS_STORAGE_KEY = "tcger.demo.transactions.v1";
+
 /**
  * `next-themes` theme selection (`"light" | "dark" | "system"`).
  *
@@ -218,6 +221,7 @@ export const LOCAL_STORAGE_KEYS = [
   DEMO_MODE_STORAGE_KEY,
   AUTH_STORE_STORAGE_KEY,
   DEMO_STORE_STORAGE_KEY,
+  DEMO_TRANSACTIONS_STORAGE_KEY,
   THEME_STORAGE_KEY,
 ] as const;
 

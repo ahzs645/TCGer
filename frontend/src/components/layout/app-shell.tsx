@@ -19,6 +19,7 @@ import {
   X,
   Camera,
   Palette,
+  ReceiptText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ServerFeatures } from "@tcg/api-types";
@@ -44,6 +45,12 @@ export const secondaryNavigation: NavigationItem[] = [
     feature: "analytics",
   },
   { href: "/trades", label: "Trades", icon: Repeat2, feature: "trades" },
+  {
+    href: "/transactions",
+    label: "Transactions",
+    icon: ReceiptText,
+    feature: "finance",
+  },
   { href: "/sealed", label: "Sealed", icon: Package, feature: "sealed" },
 ];
 

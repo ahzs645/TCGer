@@ -67,6 +67,7 @@ export function registerFinanceRoutes(http: HttpRouter) {
             body.type !== "trade") ||
           typeof body.amount !== "number" ||
           !Number.isFinite(body.amount) ||
+          body.amount <= 0 ||
           (body.quantity !== undefined &&
             (!Number.isInteger(body.quantity) ||
               (body.quantity as number) < 1)) ||
@@ -79,7 +80,9 @@ export function registerFinanceRoutes(http: HttpRouter) {
             "currency",
             "platform",
             "notes",
-          ])
+          ]) ||
+          (body.currency !== undefined &&
+            !/^[A-Za-z]{3}$/.test(body.currency as string))
         ) {
           return errorJson(
             400,
@@ -148,6 +151,26 @@ export function registerFinanceRoutes(http: HttpRouter) {
         return json(summary);
       } catch (error) {
         return handleConvexError(error, "Failed to fetch finance summary");
+      }
+    }),
+  });
+
+  http.route({
+    path: "/finance/summary/by-currency",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const summary = await ctx.runQuery(
+          internal.finance.getSummaryByCurrency,
+          { subject: identity.subject },
+        );
+        return json(summary);
+      } catch (error) {
+        return handleConvexError(
+          error,
+          "Failed to fetch finance summary by currency",
+        );
       }
     }),
   });

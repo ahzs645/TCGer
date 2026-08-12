@@ -33,6 +33,18 @@ const financeSummaryValidator = v.object({
   transactionCount: v.number(),
 });
 
+const financeSummaryByCurrencyValidator = v.object({
+  byCurrency: v.array(
+    v.object({
+      currency: v.string(),
+      totalSpent: v.number(),
+      totalEarned: v.number(),
+      profitLoss: v.number(),
+    }),
+  ),
+  transactionCount: v.number(),
+});
+
 type ReaderCtx = QueryCtx | MutationCtx;
 
 async function requireViewerBySubject(ctx: ReaderCtx, subject: string) {
@@ -151,10 +163,17 @@ export const createTransaction = internalMutation({
         message: "quantity must be a positive integer",
       });
     }
-    if (!Number.isFinite(args.amount)) {
+    if (!Number.isFinite(args.amount) || args.amount <= 0) {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "amount must be a finite number",
+        message: "amount must be greater than zero",
+      });
+    }
+    const currency = (args.currency ?? "USD").trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "currency must be a three-letter ISO code",
       });
     }
 
@@ -168,7 +187,7 @@ export const createTransaction = internalMutation({
       cardName: args.cardName,
       quantity,
       amount: args.amount,
-      currency: args.currency ?? "USD",
+      currency,
       platform: args.platform,
       notes: args.notes,
       date:
@@ -227,6 +246,49 @@ export const getSummary = internalQuery({
       totalEarned: Math.round(totalEarned * 100) / 100,
       profitLoss: Math.round((totalEarned - totalSpent) * 100) / 100,
       transactionCount: summary?.transactionCount ?? 0,
+    };
+  },
+});
+
+export const getSummaryByCurrency = internalQuery({
+  args: {
+    subject: v.string(),
+  },
+  returns: financeSummaryByCurrencyValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const transactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_and_date", (q) => q.eq("userId", viewer._id))
+      .collect();
+    const byCurrency = new Map<
+      string,
+      { totalSpent: number; totalEarned: number }
+    >();
+    for (const transaction of transactions) {
+      const currency = transaction.currency.trim().toUpperCase();
+      const totals = byCurrency.get(currency) ?? {
+        totalSpent: 0,
+        totalEarned: 0,
+      };
+      if (transaction.type === "purchase") {
+        totals.totalSpent += transaction.amount;
+      } else if (transaction.type === "sale") {
+        totals.totalEarned += transaction.amount;
+      }
+      byCurrency.set(currency, totals);
+    }
+    return {
+      byCurrency: [...byCurrency.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([currency, totals]) => ({
+          currency,
+          totalSpent: Math.round(totals.totalSpent * 100) / 100,
+          totalEarned: Math.round(totals.totalEarned * 100) / 100,
+          profitLoss:
+            Math.round((totals.totalEarned - totals.totalSpent) * 100) / 100,
+        })),
+      transactionCount: transactions.length,
     };
   },
 });

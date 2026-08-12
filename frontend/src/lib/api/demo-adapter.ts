@@ -47,8 +47,12 @@ import type {
   UpdateCardInput,
   UpdateWishlistRuleInput,
   UserPreferences,
+  CreateTransactionInput,
+  TransactionResponse,
 } from "@tcg/api-types";
+import { createTransactionSchema } from "@tcg/api-types";
 import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
+import { DEMO_TRANSACTIONS_STORAGE_KEY } from "@/lib/storage/keys";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -80,6 +84,191 @@ function notFound(msg = "Not found"): Promise<Response> {
 }
 
 const DEMO_USER_ID = "demo-user-001";
+const DEMO_TRANSACTIONS: TransactionResponse[] = [
+  {
+    id: "demo-transaction-purchase",
+    type: "purchase",
+    cardName: "Charizard ex",
+    tcg: "pokemon",
+    quantity: 1,
+    amount: 28.5,
+    currency: "USD",
+    platform: "Local card shop",
+    notes: "Near Mint collection copy",
+    date: "2025-03-18T18:30:00.000Z",
+  },
+  {
+    id: "demo-transaction-sale",
+    type: "sale",
+    cardName: "Blue-Eyes White Dragon",
+    tcg: "yugioh",
+    quantity: 1,
+    amount: 24,
+    currency: "USD",
+    platform: "eBay",
+    notes: "Tracked shipping included",
+    date: "2025-03-12T16:00:00.000Z",
+  },
+  {
+    id: "demo-transaction-trade",
+    type: "trade",
+    cardName: "Modern staples exchange",
+    tcg: "magic",
+    quantity: 3,
+    amount: 42.75,
+    currency: "USD",
+    platform: "In person",
+    notes: "Estimated received value",
+    date: "2025-03-05T20:15:00.000Z",
+  },
+];
+
+function getDemoTransactions(): TransactionResponse[] {
+  if (typeof localStorage === "undefined") return DEMO_TRANSACTIONS;
+  try {
+    const raw = localStorage.getItem(DEMO_TRANSACTIONS_STORAGE_KEY);
+    if (raw === null) return DEMO_TRANSACTIONS;
+    const value = JSON.parse(raw);
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return DEMO_TRANSACTIONS;
+  }
+}
+
+function setDemoTransactions(transactions: TransactionResponse[]) {
+  localStorage.setItem(
+    DEMO_TRANSACTIONS_STORAGE_KEY,
+    JSON.stringify(transactions),
+  );
+}
+
+function demoCollectionCards() {
+  return store().binders.flatMap((binder) =>
+    binder.cards.map((card) => ({ binder, card })),
+  );
+}
+
+function demoValueHistory(period: string) {
+  const days = Math.max(7, Math.min(365, Number.parseInt(period, 10) || 30));
+  const currentValue = demoCollectionCards().reduce(
+    (sum, { card }) => sum + card.price * card.quantity,
+    0,
+  );
+  const pointCount = Math.min(13, days + 1);
+  const startValue = currentValue * 0.91;
+  const history = Array.from({ length: pointCount }, (_, index) => {
+    const progress = pointCount === 1 ? 1 : index / (pointCount - 1);
+    const date = new Date(Date.UTC(2025, 2, 18));
+    date.setUTCDate(date.getUTCDate() - Math.round(days * (1 - progress)));
+    return {
+      date: date.toISOString(),
+      value: Number(
+        (startValue + (currentValue - startValue) * progress).toFixed(2),
+      ),
+    };
+  });
+  return {
+    history,
+    currentValue: Number(currentValue.toFixed(2)),
+    changePercent: currentValue ? 9.89 : 0,
+    changePeriod: period,
+  };
+}
+
+function demoValueBreakdown() {
+  const rows = demoCollectionCards();
+  const groupedByTcg = new Map<string, typeof rows>();
+  for (const row of rows) {
+    groupedByTcg.set(row.card.tcg, [
+      ...(groupedByTcg.get(row.card.tcg) ?? []),
+      row,
+    ]);
+  }
+  const byTcg = Array.from(groupedByTcg, ([tcg, entries]) => ({
+      tcg,
+      value: Number(
+        entries
+          .reduce((sum, { card }) => sum + card.price * card.quantity, 0)
+          .toFixed(2),
+      ),
+      cardCount: entries.reduce((sum, { card }) => sum + card.quantity, 0),
+    })).sort((left, right) => right.value - left.value);
+  const byBinder = store().binders
+    .map((binder) => ({
+      binderId: binder.id,
+      binderName: binder.name,
+      value: Number(
+        binder.cards
+          .reduce((sum, card) => sum + card.price * card.quantity, 0)
+          .toFixed(2),
+      ),
+      cardCount: binder.cards.reduce((sum, card) => sum + card.quantity, 0),
+    }))
+    .sort((left, right) => right.value - left.value);
+  const topCards = rows
+    .map(({ card }) => ({
+      externalId: card.cardData?.externalId ?? card.cardId,
+      tcg: card.tcg,
+      name: card.name,
+      value: Number((card.price * card.quantity).toFixed(2)),
+      imageUrl: card.cardData?.imageUrlSmall ?? card.cardData?.imageUrl,
+    }))
+    .sort((left, right) => right.value - left.value)
+    .slice(0, 10);
+  return { byTcg, byBinder, topCards };
+}
+
+function demoDistribution(dimension: string) {
+  const labels = demoCollectionCards().map(({ card }) => {
+    if (dimension === "rarity") return card.rarity || "Unknown";
+    if (dimension === "set") return card.setName || card.setCode || "Unknown";
+    return card.tcg;
+  });
+  const counts = new Map<string, number>();
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
+  return {
+    dimension,
+    entries: Array.from(counts, ([label, count]) => ({
+      label,
+      count,
+      percentage: labels.length ? (count / labels.length) * 100 : 0,
+    })).sort((left, right) => right.count - left.count),
+    total: labels.length,
+  };
+}
+
+function demoPriceMovers(tcg?: string) {
+  const unique = new Map(
+    demoCollectionCards()
+      .filter(({ card }) => !tcg || card.tcg === tcg)
+      .map(({ card }) => [
+        `${card.tcg}:${card.cardData?.externalId ?? card.cardId}`,
+        card,
+      ] as const),
+  );
+  const movers = Array.from(unique.values()).map((card, index) => {
+    const direction = index % 3 === 1 ? -1 : 1;
+    const percentChange = direction * (2.4 + (index % 5) * 1.35);
+    return {
+      externalId: card.cardData?.externalId ?? card.cardId,
+      tcg: card.tcg,
+      name: card.name,
+      priceChange: Number((card.price * (percentChange / 100)).toFixed(2)),
+      percentChange: Number(percentChange.toFixed(2)),
+      currentPrice: card.price,
+    };
+  });
+  return {
+    gainers: movers
+      .filter((mover) => mover.percentChange > 0)
+      .sort((left, right) => right.percentChange - left.percentChange)
+      .slice(0, 10),
+    losers: movers
+      .filter((mover) => mover.percentChange < 0)
+      .sort((left, right) => left.percentChange - right.percentChange)
+      .slice(0, 10),
+  };
+}
 
 function demoAuthUser() {
   const { profile, getPreferences } = store();
@@ -492,7 +681,7 @@ export async function handleDemoRequest(
 
   // ── Collections / Binders ───────────────────────────────────────
   if (segments[0] === "collections") {
-    return handleCollections(method, segments.slice(1), body);
+    return handleCollections(method, segments.slice(1), body, queryString);
   }
 
   // ── Wishlists ───────────────────────────────────────────────────
@@ -512,6 +701,42 @@ export async function handleDemoRequest(
   // ── Settings ────────────────────────────────────────────────────
   if (segments[0] === "settings") {
     return handleSettings(method, segments.slice(1), body);
+  }
+
+  if (segments[0] === "finance") {
+    return handleFinance(method, segments.slice(1), body);
+  }
+
+  if (segments[0] === "analytics") {
+    store().init();
+    if (segments[1] === "value" && segments.length === 2 && method === "GET") {
+      const period = new URLSearchParams(queryString || "").get("period") || "30d";
+      return json(demoValueHistory(period));
+    }
+    if (
+      segments[1] === "value" &&
+      segments[2] === "breakdown" &&
+      method === "GET"
+    ) {
+      return json(demoValueBreakdown());
+    }
+    if (segments[1] === "distribution" && method === "GET") {
+      const dimension =
+        new URLSearchParams(queryString || "").get("by") || "tcg";
+      return json(demoDistribution(dimension));
+    }
+    return notFound();
+  }
+
+  if (
+    segments[0] === "prices" &&
+    segments[1] === "analytics" &&
+    segments[2] === "movers" &&
+    method === "GET"
+  ) {
+    store().init();
+    const tcg = new URLSearchParams(queryString || "").get("tcg") ?? undefined;
+    return json(demoPriceMovers(tcg));
   }
 
   // ── Setup ───────────────────────────────────────────────────────
@@ -757,11 +982,172 @@ function handleAuth(
 /*  Collections handlers                                                */
 /* ------------------------------------------------------------------ */
 
-async function handleCollections(
+function handleFinance(
   method: string,
   segments: string[],
   body?: unknown,
 ): Promise<Response> {
+  const transactions = getDemoTransactions();
+  if (segments[0] === "summary" && segments.length === 1 && method === "GET") {
+    const totalSpent = transactions
+      .filter((transaction) => transaction.type === "purchase")
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+    const totalEarned = transactions
+      .filter((transaction) => transaction.type === "sale")
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+    return json({
+      totalSpent,
+      totalEarned,
+      profitLoss: totalEarned - totalSpent,
+      transactionCount: transactions.length,
+    });
+  }
+  if (
+    segments[0] === "summary" &&
+    segments[1] === "by-currency" &&
+    segments.length === 2 &&
+    method === "GET"
+  ) {
+    const byCurrency = new Map<
+      string,
+      { totalSpent: number; totalEarned: number }
+    >();
+    for (const transaction of transactions) {
+      const currency = transaction.currency.toUpperCase();
+      const totals = byCurrency.get(currency) ?? {
+        totalSpent: 0,
+        totalEarned: 0,
+      };
+      if (transaction.type === "purchase") totals.totalSpent += transaction.amount;
+      if (transaction.type === "sale") totals.totalEarned += transaction.amount;
+      byCurrency.set(currency, totals);
+    }
+    return json({
+      byCurrency: [...byCurrency.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([currency, totals]) => ({
+          currency,
+          totalSpent: totals.totalSpent,
+          totalEarned: totals.totalEarned,
+          profitLoss: totals.totalEarned - totals.totalSpent,
+        })),
+      transactionCount: transactions.length,
+    });
+  }
+  if (segments[0] !== "transactions") return notFound();
+  if (segments.length === 1 && method === "GET") {
+    return json(
+      [...transactions].sort(
+        (left, right) =>
+          new Date(right.date).getTime() - new Date(left.date).getTime(),
+      ),
+    );
+  }
+  if (segments.length === 1 && method === "POST") {
+    const parsed = createTransactionSchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ message: "Payload validation failed" }, 400);
+    }
+    const input: CreateTransactionInput = parsed.data;
+    const transaction: TransactionResponse = {
+      id: `demo-transaction-${crypto.randomUUID()}`,
+      type: input.type,
+      cardName: input.cardName,
+      tcg: input.tcg,
+      quantity: input.quantity ?? 1,
+      amount: input.amount,
+      currency: input.currency ?? "USD",
+      platform: input.platform,
+      notes: input.notes,
+      date: input.date ?? new Date().toISOString(),
+    };
+    setDemoTransactions(
+      [transaction, ...transactions].sort(
+        (left, right) =>
+          new Date(right.date).getTime() - new Date(left.date).getTime(),
+      ),
+    );
+    return json(transaction, 201);
+  }
+  if (segments.length === 2 && method === "DELETE") {
+    if (!transactions.some((item) => item.id === segments[1])) {
+      return notFound("Transaction not found");
+    }
+    setDemoTransactions(transactions.filter((item) => item.id !== segments[1]));
+    return noContent();
+  }
+  return notFound();
+}
+
+async function handleCollections(
+  method: string,
+  segments: string[],
+  body?: unknown,
+  queryString?: string,
+): Promise<Response> {
+  if (segments[0] === "export" && method === "GET") {
+    store().init();
+    await store().enrichCardsFromCatalog();
+    const binders = store().binders.map(toBinder);
+    const rows = binders.flatMap((binder) =>
+      binder.cards.flatMap((card) =>
+        card.copies.map((copy) => ({
+          binder: binder.name,
+          tcg: card.tcg,
+          cardName: card.name,
+          setCode: card.setCode ?? "",
+          collectorNumber: card.collectorNumber ?? "",
+          condition: copy.condition ?? "",
+          gradingCompany: copy.gradingCompany ?? "",
+          gradingScore: copy.gradingScore ?? "",
+          certNumber: copy.certNumber ?? "",
+          storageLocation: copy.storageLocation ?? "",
+        })),
+      ),
+    );
+    const headers = Object.keys(
+      rows[0] ?? {
+        binder: "",
+        tcg: "",
+        cardName: "",
+        setCode: "",
+        collectorNumber: "",
+        condition: "",
+        gradingCompany: "",
+        gradingScore: "",
+        certNumber: "",
+        storageLocation: "",
+      },
+    );
+    const csv = [
+      headers,
+      ...rows.map((row) =>
+        headers.map((key) => String(row[key as keyof typeof row] ?? "")),
+      ),
+    ]
+      .map((fields) =>
+        fields.map((field) => `"${field.replaceAll('"', '""')}"`).join(","),
+      )
+      .join("\n");
+    const wantsCsv =
+      new URLSearchParams(queryString ?? "").get("format") === "csv";
+    return Promise.resolve(
+      new Response(
+        wantsCsv
+          ? csv
+          : JSON.stringify(
+              { exportedAt: new Date().toISOString(), binders },
+              null,
+              2,
+            ),
+        {
+          headers: {
+            "Content-Type": wantsCsv ? "text/csv" : "application/json",
+          },
+        },
+      ),
+    );
+  }
   // GET /collections
   if (segments.length === 0 && method === "GET") {
     store().init();

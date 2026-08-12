@@ -2,6 +2,7 @@ import type {
   PriceAlertResponse,
   TransactionResponse,
   FinanceSummary,
+  FinanceSummaryByCurrency,
   ShopConnectionResponse,
   CreatePriceAlertInput,
   UpdatePriceAlertInput,
@@ -16,6 +17,7 @@ export type {
   PriceAlertResponse,
   TransactionResponse,
   FinanceSummary,
+  FinanceSummaryByCurrency,
   ShopConnectionResponse,
   PriceResult,
   PriceAnalyticsMovers,
@@ -82,7 +84,7 @@ export async function getTransactions(
 export async function createTransaction(
   token: string,
   input: CreateTransactionInput,
-) {
+): Promise<TransactionResponse> {
   return authFetch(`${API_BASE_URL}/finance/transactions`, token, {
     method: "POST",
     body: JSON.stringify(input),
@@ -100,6 +102,11 @@ export async function getFinanceSummary(
   token: string,
 ): Promise<FinanceSummary> {
   return authFetch(`${API_BASE_URL}/finance/summary`, token);
+}
+export async function getFinanceSummaryByCurrency(
+  token: string,
+): Promise<FinanceSummaryByCurrency> {
+  return authFetch(`${API_BASE_URL}/finance/summary/by-currency`, token);
 }
 
 // Shop Connections

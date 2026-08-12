@@ -441,7 +441,11 @@ function seedBinders(): DemoBinder[] {
   // 1..max, drawn from the seeded stream instead of Math.random().
   const pickQuantity = (max: number) => 1 + Math.floor(random() * max);
 
-  const makeCard = (card: DemoCard, qty = 1): DemoBinderCard => {
+  const makeCard = (
+    card: DemoCard,
+    qty = 1,
+    copyOverrides: DemoCopyInput[] = [],
+  ): DemoBinderCard => {
     const condition = CONDITIONS[Math.floor(random() * CONDITIONS.length)];
     // Back-date each card so Recent Activity reads as a feed rather than as a
     // single bulk import stamped with today's date.
@@ -472,8 +476,12 @@ function seedBinders(): DemoBinder[] {
         rarity: card.rarity,
         collectorNumber: printing.collectorNumber,
       },
-      copies: Array.from({ length: qty }, () =>
-        makeDemoCopy({ condition, price: card.price }),
+      copies: Array.from({ length: qty }, (_, index) =>
+        makeDemoCopy({
+          condition,
+          price: card.price,
+          ...copyOverrides[index],
+        }),
       ),
     };
   };
@@ -498,7 +506,21 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Main Deck",
       color: "#3b82f6",
-      cards: ygoCards.slice(0, 6).map((c) => makeCard(c, pickQuantity(3))),
+      cards: ygoCards.slice(0, 6).map((c, index) =>
+        index === 0
+          ? makeCard(c, 1, [
+              {
+                condition: "Mint",
+                language: "English",
+                gradingCompany: "PSA",
+                gradingScore: "10",
+                certNumber: "TCGER-DEMO-0001",
+                storageLocation: "Display case · Shelf A",
+                notes: "Demo graded copy",
+              },
+            ])
+          : makeCard(c, pickQuantity(3)),
+      ),
       createdAt: now,
       updatedAt: now,
     },
@@ -506,7 +528,23 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Modern Staples",
       color: "#8b5cf6",
-      cards: mtgCards.slice(0, 8).map((c) => makeCard(c, pickQuantity(4))),
+      cards: mtgCards.slice(0, 8).map((c, index) =>
+        index === 0
+          ? makeCard(c, 2, [
+              {
+                isFoil: true,
+                finishCode: "foil",
+                finishLabel: "Foil",
+                storageLocation: "Modern deck box",
+                acquiredAt: "2025-02-14T12:00:00.000Z",
+              },
+              {
+                language: "Japanese",
+                storageLocation: "Trade binder · Page 2",
+              },
+            ])
+          : makeCard(c, pickQuantity(4)),
+      ),
       createdAt: now,
       updatedAt: now,
     },
@@ -514,7 +552,18 @@ function seedBinders(): DemoBinder[] {
       id: uid(),
       name: "Scarlet & Violet",
       color: "#ef4444",
-      cards: pkmCards.slice(0, 5).map((c) => makeCard(c, pickQuantity(2))),
+      cards: pkmCards.slice(0, 5).map((c, index) =>
+        index === 0
+          ? makeCard(c, 1, [
+              {
+                condition: "Near Mint",
+                acquisitionPrice: Math.max(1, c.price * 0.62),
+                storageLocation: "Toploader box · Row 1",
+                serialNumber: "DEMO-025",
+              },
+            ])
+          : makeCard(c, pickQuantity(2)),
+      ),
       createdAt: now,
       updatedAt: now,
     },

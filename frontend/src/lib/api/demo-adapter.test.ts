@@ -98,3 +98,75 @@ test("searches curated cards across every collection guide", async () => {
     "Crown Zenith nine-card scene",
   );
 });
+
+test("seeds analytics, price movers, and the finance ledger", async () => {
+  useDemoStore.setState({ initialized: false });
+  useDemoStore.getState().init();
+
+  const historyResponse = await handleDemoRequest(
+    "GET",
+    "/analytics/value?period=30d",
+  );
+  const history = (await historyResponse.json()) as {
+    history: Array<{ date: string; value: number }>;
+    currentValue: number;
+  };
+  assert.equal(historyResponse.status, 200);
+  assert.ok(history.history.length > 1);
+  assert.ok(history.currentValue > 0);
+
+  const breakdownResponse = await handleDemoRequest(
+    "GET",
+    "/analytics/value/breakdown",
+  );
+  const breakdown = (await breakdownResponse.json()) as {
+    byTcg: Array<{ tcg: string }>;
+    topCards: Array<{ name: string }>;
+  };
+  assert.ok(breakdown.byTcg.length >= 3);
+  assert.ok(breakdown.topCards.length > 0);
+
+  const moversResponse = await handleDemoRequest(
+    "GET",
+    "/prices/analytics/movers?period=30",
+  );
+  const movers = (await moversResponse.json()) as {
+    gainers: unknown[];
+    losers: unknown[];
+  };
+  assert.ok(movers.gainers.length > 0);
+  assert.ok(movers.losers.length > 0);
+
+  const transactionsResponse = await handleDemoRequest(
+    "GET",
+    "/finance/transactions",
+  );
+  const transactions = (await transactionsResponse.json()) as Array<{
+    type: string;
+  }>;
+  assert.deepEqual(
+    new Set(transactions.map((transaction) => transaction.type)),
+    new Set(["purchase", "sale", "trade"]),
+  );
+
+  const currencySummaryResponse = await handleDemoRequest(
+    "GET",
+    "/finance/summary/by-currency",
+  );
+  const currencySummary = (await currencySummaryResponse.json()) as {
+    byCurrency: Array<{ currency: string }>;
+    transactionCount: number;
+  };
+  assert.equal(currencySummary.transactionCount, transactions.length);
+  assert.deepEqual(
+    currencySummary.byCurrency.map((entry) => entry.currency),
+    ["USD"],
+  );
+
+  const invalidTransactionResponse = await handleDemoRequest(
+    "POST",
+    "/finance/transactions",
+    { type: "purchase", amount: 0 },
+  );
+  assert.equal(invalidTransactionResponse.status, 400);
+});

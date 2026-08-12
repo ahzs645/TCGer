@@ -77,6 +77,29 @@ describe("finance and sealed Convex HTTP routes", () => {
       transactionCount: 3,
     });
 
+    const currencySummaryResponse = await t.fetch(
+      "/finance/summary/by-currency",
+      { headers },
+    );
+    expect(currencySummaryResponse.status).toBe(200);
+    expect(await currencySummaryResponse.json()).toEqual({
+      byCurrency: [
+        {
+          currency: "CAD",
+          totalSpent: 10.1,
+          totalEarned: 0,
+          profitLoss: -10.1,
+        },
+        {
+          currency: "USD",
+          totalSpent: 0,
+          totalEarned: 4.25,
+          profitLoss: 4.25,
+        },
+      ],
+      transactionCount: 3,
+    });
+
     const deleteResponse = await t.fetch(
       `/finance/transactions/${created[2].id}`,
       {
@@ -133,6 +156,19 @@ describe("finance and sealed Convex HTTP routes", () => {
       ).json(),
     ).toHaveLength(1);
   });
+
+  test.each([0, -10])(
+    "rejects non-positive transaction amount %s",
+    async (amount) => {
+      const t = createTestConvex();
+      const response = await t.fetch("/finance/transactions", {
+        method: "POST",
+        headers: bridgeHeaders(`finance_invalid_${Math.abs(amount)}`),
+        body: JSON.stringify({ type: "purchase", amount }),
+      });
+      expect(response.status).toBe(400);
+    },
+  );
 
   test("seeds and filters the catalog, then adds, updates, and deletes inventory", async () => {
     const t = createTestConvex();

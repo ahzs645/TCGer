@@ -4,12 +4,13 @@ jest.mock('../../lib/prisma', () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),
-      delete: jest.fn()
-    }
-  }
+      delete: jest.fn(),
+    },
+  },
 }));
 
 import { Prisma } from '@prisma/client';
+import { createTransactionSchema } from '@tcg/api-types';
 import { prisma } from '../../lib/prisma';
 import { createTransaction } from './finance.service';
 
@@ -33,7 +34,7 @@ describe('finance transaction serialization', () => {
       notes: null,
       date,
       createdAt: date,
-      updatedAt: date
+      updatedAt: date,
     });
 
     const transaction = await createTransaction('user-1', {
@@ -42,14 +43,28 @@ describe('finance transaction serialization', () => {
       cardName: 'Pikachu',
       quantity: 1,
       amount: 12.34,
-      currency: 'USD'
+      currency: 'USD',
     });
 
     expect(transaction).toMatchObject({
       id: 'transaction-1',
       amount: 12.34,
-      date: '2026-07-15T12:34:56.000Z'
+      date: '2026-07-15T12:34:56.000Z',
     });
     expect(typeof transaction.amount).toBe('number');
+  });
+
+  test.each([0, -1])('rejects a non-positive transaction amount: %s', (amount) => {
+    expect(() => createTransactionSchema.parse({ type: 'purchase', amount })).toThrow();
+  });
+
+  test('normalizes a valid ISO currency code', () => {
+    expect(
+      createTransactionSchema.parse({
+        type: 'sale',
+        amount: 12.5,
+        currency: 'cad',
+      }).currency,
+    ).toBe('CAD');
   });
 });

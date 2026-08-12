@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Price Alerts
@@ -10,14 +10,14 @@ export const createPriceAlertSchema = z.object({
   cardName: z.string().min(1),
   imageUrl: z.string().optional(),
   targetPrice: z.number().positive(),
-  direction: z.enum(['below', 'above'])
+  direction: z.enum(["below", "above"]),
 });
 export type CreatePriceAlertInput = z.infer<typeof createPriceAlertSchema>;
 
 export const updatePriceAlertSchema = z.object({
   targetPrice: z.number().positive().optional(),
-  direction: z.enum(['below', 'above']).optional(),
-  isActive: z.boolean().optional()
+  direction: z.enum(["below", "above"]).optional(),
+  isActive: z.boolean().optional(),
 });
 export type UpdatePriceAlertInput = z.infer<typeof updatePriceAlertSchema>;
 
@@ -25,18 +25,25 @@ export type UpdatePriceAlertInput = z.infer<typeof updatePriceAlertSchema>;
 // Transactions / Finance
 // ---------------------------------------------------------------------------
 
+export const transactionTypeSchema = z.enum(["purchase", "sale", "trade"]);
+
 export const createTransactionSchema = z.object({
-  type: z.enum(['purchase', 'sale', 'trade']),
+  type: transactionTypeSchema,
   cardId: z.string().optional(),
   externalId: z.string().optional(),
   tcg: z.string().optional(),
   cardName: z.string().optional(),
   quantity: z.number().int().positive().default(1),
-  amount: z.number(),
-  currency: z.string().default('USD'),
+  amount: z.number().positive(),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((value) => value.toUpperCase())
+    .default("USD"),
   platform: z.string().optional(),
   notes: z.string().optional(),
-  date: z.string().datetime().optional()
+  date: z.string().datetime().optional(),
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 
@@ -45,12 +52,14 @@ export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 // ---------------------------------------------------------------------------
 
 export const createShopConnectionSchema = z.object({
-  platform: z.enum(['tcgplayer', 'cardmarket']),
+  platform: z.enum(["tcgplayer", "cardmarket"]),
   apiKey: z.string().min(1),
   apiSecret: z.string().optional(),
-  sellerId: z.string().optional()
+  sellerId: z.string().optional(),
 });
-export type CreateShopConnectionInput = z.infer<typeof createShopConnectionSchema>;
+export type CreateShopConnectionInput = z.infer<
+  typeof createShopConnectionSchema
+>;
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -71,7 +80,7 @@ export interface PriceAlertResponse {
 
 export interface TransactionResponse {
   id: string;
-  type: string;
+  type: z.infer<typeof transactionTypeSchema>;
   cardName?: string;
   tcg?: string;
   quantity: number;
@@ -82,10 +91,22 @@ export interface TransactionResponse {
   date: string;
 }
 
+export interface FinanceCurrencySummary {
+  currency: string;
+  totalSpent: number;
+  totalEarned: number;
+  profitLoss: number;
+}
+
 export interface FinanceSummary {
   totalSpent: number;
   totalEarned: number;
   profitLoss: number;
+  transactionCount: number;
+}
+
+export interface FinanceSummaryByCurrency {
+  byCurrency: FinanceCurrencySummary[];
   transactionCount: number;
 }
 
@@ -107,6 +128,20 @@ export interface PriceResult {
 }
 
 export interface PriceAnalyticsMovers {
-  gainers: Array<{ externalId: string; tcg: string; name: string; priceChange: number; percentChange: number; currentPrice: number }>;
-  losers: Array<{ externalId: string; tcg: string; name: string; priceChange: number; percentChange: number; currentPrice: number }>;
+  gainers: Array<{
+    externalId: string;
+    tcg: string;
+    name: string;
+    priceChange: number;
+    percentChange: number;
+    currentPrice: number;
+  }>;
+  losers: Array<{
+    externalId: string;
+    tcg: string;
+    name: string;
+    priceChange: number;
+    percentChange: number;
+    currentPrice: number;
+  }>;
 }

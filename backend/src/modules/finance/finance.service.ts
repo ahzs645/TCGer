@@ -2,11 +2,19 @@ import { prisma } from '../../lib/prisma';
 import type { Transaction } from '@prisma/client';
 import type {
   CreateTransactionInput,
+  FinanceSummaryByCurrency,
   FinanceSummary,
-  TransactionResponse
+  TransactionResponse,
 } from '@tcg/api-types';
 
 function serializeTransaction(transaction: Transaction): TransactionResponse {
+  if (
+    transaction.type !== 'purchase' &&
+    transaction.type !== 'sale' &&
+    transaction.type !== 'trade'
+  ) {
+    throw new Error(`Unsupported transaction type: ${transaction.type}`);
+  }
   return {
     id: transaction.id,
     type: transaction.type,
@@ -17,7 +25,7 @@ function serializeTransaction(transaction: Transaction): TransactionResponse {
     currency: transaction.currency,
     platform: transaction.platform ?? undefined,
     notes: transaction.notes ?? undefined,
-    date: transaction.date.toISOString()
+    date: transaction.date.toISOString(),
   };
 }
 
@@ -25,7 +33,7 @@ export async function getUserTransactions(userId: string, limit = 100) {
   const txns = await prisma.transaction.findMany({
     where: { userId },
     orderBy: { date: 'desc' },
-    take: limit
+    take: limit,
   });
   return txns.map(serializeTransaction);
 }
@@ -44,8 +52,8 @@ export async function createTransaction(userId: string, input: CreateTransaction
       currency: input.currency ?? 'USD',
       platform: input.platform,
       notes: input.notes,
-      date: input.date ? new Date(input.date) : new Date()
-    }
+      date: input.date ? new Date(input.date) : new Date(),
+    },
   });
   return serializeTransaction(transaction);
 }
@@ -75,6 +83,35 @@ export async function getFinanceSummary(userId: string): Promise<FinanceSummary>
     totalSpent: Math.round(totalSpent * 100) / 100,
     totalEarned: Math.round(totalEarned * 100) / 100,
     profitLoss: Math.round((totalEarned - totalSpent) * 100) / 100,
-    transactionCount: txns.length
+    transactionCount: txns.length,
+  };
+}
+
+export async function getFinanceSummaryByCurrency(
+  userId: string,
+): Promise<FinanceSummaryByCurrency> {
+  const txns = await prisma.transaction.findMany({ where: { userId } });
+  const byCurrency = new Map<string, { totalSpent: number; totalEarned: number }>();
+  for (const transaction of txns) {
+    const currency = transaction.currency.trim().toUpperCase();
+    const totals = byCurrency.get(currency) ?? {
+      totalSpent: 0,
+      totalEarned: 0,
+    };
+    const amount = Number(transaction.amount);
+    if (transaction.type === 'purchase') totals.totalSpent += amount;
+    else if (transaction.type === 'sale') totals.totalEarned += amount;
+    byCurrency.set(currency, totals);
+  }
+  return {
+    byCurrency: [...byCurrency.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([currency, totals]) => ({
+        currency,
+        totalSpent: Math.round(totals.totalSpent * 100) / 100,
+        totalEarned: Math.round(totals.totalEarned * 100) / 100,
+        profitLoss: Math.round((totals.totalEarned - totals.totalSpent) * 100) / 100,
+      })),
+    transactionCount: txns.length,
   };
 }
