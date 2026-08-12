@@ -204,7 +204,7 @@ export function CollectionGuidesContent({
   ]);
 
   async function handleFollow() {
-    if (!token || !selectedGuide) return;
+    if (!token || !selectedGuide || !cardsQuery.data?.length) return;
     setFollowing(true);
     setFollowStatus("Creating your guide wishlist…");
     try {
@@ -213,7 +213,7 @@ export function CollectionGuidesContent({
       if (selectedGuide.rule.type === "manual") {
         await guidesQuery.refetch();
         setFollowStatus(
-          `Guide followed with ${cardsQuery.data?.length ?? selectedGuide.cardCountHint ?? 0} curated cards added to your wishlist.`,
+          `Guide followed with ${cardsQuery.data.length} curated cards added to your wishlist.`,
         );
         return;
       }
@@ -417,6 +417,15 @@ export function CollectionGuidesContent({
           <GuideHero
             guide={selectedGuide}
             cardCount={cardsQuery.data?.length}
+            cardResolution={
+              cardsQuery.isLoading
+                ? "loading"
+                : cardsQuery.isError
+                  ? "error"
+                  : cardsQuery.data?.length
+                    ? "ready"
+                    : "empty"
+            }
             wishlist={followedWishlist}
             isFollowing={isFollowing}
             onFollow={handleFollow}
@@ -478,6 +487,22 @@ export function CollectionGuidesContent({
                     : "Card search failed."}
                 </CardDescription>
               </CardHeader>
+            </Card>
+          ) : cardsQuery.data?.length === 0 ? (
+            <Card className="border-amber-500/50">
+              <CardHeader>
+                <CardTitle>Guide cards aren&apos;t available</CardTitle>
+                <CardDescription>
+                  This guide resolved to zero cards in the current catalog.
+                  Install or refresh the {selectedGuide.tcg} catalog, then try
+                  again before following it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" onClick={() => cardsQuery.refetch()}>
+                  Try resolving again
+                </Button>
+              </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
@@ -543,12 +568,14 @@ function GuideListCard({
 function GuideHero({
   guide,
   cardCount,
+  cardResolution,
   wishlist,
   isFollowing,
   onFollow,
 }: {
   guide: CollectionGuideResponse;
   cardCount?: number;
+  cardResolution: "loading" | "ready" | "empty" | "error";
   wishlist?: {
     completionPercent: number;
     ownedCards: number;
@@ -584,7 +611,13 @@ function GuideHero({
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
             <span>
-              {cardCount ?? guide.cardCountHint ?? "—"} matching cards
+              {cardResolution === "ready"
+                ? `${cardCount} matching cards`
+                : cardResolution === "loading"
+                  ? "Resolving cards from the catalog…"
+                  : cardResolution === "empty"
+                    ? "No matching cards available"
+                    : "Card inventory unavailable"}
             </span>
             <span className="text-muted-foreground">
               Curated by {guide.curatorName}
@@ -606,13 +639,21 @@ function GuideHero({
               </Button>
             </div>
           ) : (
-            <Button className="mt-6" onClick={onFollow} disabled={isFollowing}>
-              {isFollowing ? (
+            <Button
+              className="mt-6"
+              onClick={onFollow}
+              disabled={isFollowing || cardResolution !== "ready"}
+            >
+              {isFollowing || cardResolution === "loading" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              Follow and add missing cards
+              {cardResolution === "ready"
+                ? "Follow and add missing cards"
+                : cardResolution === "loading"
+                  ? "Resolving guide cards…"
+                  : "Guide unavailable to follow"}
             </Button>
           )}
         </div>

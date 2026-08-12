@@ -17,7 +17,6 @@ import {
   CommandDialog,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
@@ -93,10 +92,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
         </kbd>
       </Button>
       <CommandDialog open={open} onOpenChange={setOpen} data-oid="kav-n7p">
-        <CommandInput
-          placeholder="Jump to page, change TCG, or trigger an action..."
-          data-oid="u0slqf8"
-        />
         <CommandList data-oid="zd2rt9:">
           <CommandEmpty data-oid="zsto0ak">No results found.</CommandEmpty>
           <CommandGroup heading="Navigation" data-oid="z6o4cws">

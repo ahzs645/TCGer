@@ -136,6 +136,9 @@ export function AppShell({ children }: AppShellProps) {
       : []),
     ...availableSecondaryNavigation,
   ];
+  const isDesktopSecondaryActive = availableSecondaryNavigation.some((item) =>
+    isNavigationItemActive(pathname, getAppRoute(item.href, pathname)),
+  );
 
   return (
     <div className="flex min-h-screen flex-col" data-oid="zfaufj9">
@@ -222,7 +225,16 @@ export function AppShell({ children }: AppShellProps) {
               })}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
+                  <Button
+                    variant={isDesktopSecondaryActive ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "gap-2",
+                      isDesktopSecondaryActive &&
+                        "bg-primary text-primary-foreground",
+                    )}
+                    aria-current={isDesktopSecondaryActive ? "page" : undefined}
+                  >
                     <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     <span className="hidden min-[1360px]:inline">More</span>
                     <span className="sr-only min-[1360px]:hidden">

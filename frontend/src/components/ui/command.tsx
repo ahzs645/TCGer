@@ -48,6 +48,7 @@ const CommandDialog = ({ children, ...props }: DialogProps) => {
           <div className="relative border-b" data-oid="u3iy89z">
             <CommandInput
               placeholder="Search for pages, actions, or games..."
+              aria-label="Search quick actions"
               className="pl-10"
               data-oid="2wvmc0j"
             />

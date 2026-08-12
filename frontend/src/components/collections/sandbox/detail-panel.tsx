@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,7 @@ export interface DetailPanelProps {
   printSelectionLabel?: string;
   printSelectionDisabled?: boolean;
   onClose?: () => void;
+  onRestoreFocus?: () => void;
   open?: boolean;
 }
 
@@ -1308,11 +1309,13 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     printSelectionLabel,
     printSelectionDisabled,
     onClose,
+    onRestoreFocus,
     open: openProp,
   } = props;
 
   const isMobile = useIsMobile();
   const isOpen = isMobile && (openProp ?? false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Drawer
@@ -1324,6 +1327,14 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
     >
       <DrawerContent
         className="max-h-[85vh]"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          closeButtonRef.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          onRestoreFocus?.();
+        }}
         onEscapeKeyDown={(event) => {
           const target = event.target as HTMLElement | null;
           if (
@@ -1354,6 +1365,7 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               </div>
               <DrawerClose asChild>
                 <Button
+                  ref={closeButtonRef}
                   type="button"
                   variant="ghost"
                   size="icon"

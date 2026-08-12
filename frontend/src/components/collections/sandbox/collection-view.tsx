@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Sparkles, X } from "lucide-react";
 
@@ -227,6 +234,7 @@ export function CollectionView() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCopyId, setSelectedCopyId] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const mobileEditorTriggerRef = useRef<HTMLElement | null>(null);
   const [draftBinderId, setDraftBinderId] = useState<string>(
     LIBRARY_COLLECTION_ID,
   );
@@ -665,15 +673,25 @@ export function CollectionView() {
   };
 
   /** Select a card or copy. Multi-copy rows expand before opening the editor. */
-  const selectCard = (cardId: string, copyId?: string) => {
+  const selectCard = (
+    cardId: string,
+    copyId?: string,
+    mobileEditorTrigger?: HTMLElement,
+  ) => {
     const card = sortedCards.find((candidate) => candidate.id === cardId);
     setSelectedCardId(cardId);
     if (copyId) {
+      if (mobileEditorTrigger) {
+        mobileEditorTriggerRef.current = mobileEditorTrigger;
+      }
       setSelectedCopyId(copyId);
       setMobileDrawerOpen(true);
       return;
     }
     if ((card?.copies?.length ?? 0) === 1) {
+      if (mobileEditorTrigger) {
+        mobileEditorTriggerRef.current = mobileEditorTrigger;
+      }
       setSelectedCopyId(card?.copies?.[0]?.id ?? null);
       setMobileDrawerOpen(true);
       return;
@@ -1385,7 +1403,9 @@ export function CollectionView() {
                           aria-pressed={isSelected}
                           aria-label={`Edit ${card.name}`}
                           className="min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={() => selectCard(card.id)}
+                          onClick={(event) =>
+                            selectCard(card.id, undefined, event.currentTarget)
+                          }
                           data-oid="j38pt51"
                         >
                           <div
@@ -1463,8 +1483,12 @@ export function CollectionView() {
                                   ? "border-primary/70 bg-muted/40"
                                   : "hover:border-primary/40",
                               )}
-                              onClick={() => {
-                                selectCard(card.id, copy.id);
+                              onClick={(event) => {
+                                selectCard(
+                                  card.id,
+                                  copy.id,
+                                  event.currentTarget,
+                                );
                               }}
                               data-oid="1nq047e"
                             >
@@ -1553,7 +1577,15 @@ export function CollectionView() {
                           "cursor-pointer transition-colors",
                           selectedCardId === card.id && "bg-primary/5",
                         )}
-                        onClick={() => selectCard(card.id)}
+                        onClick={(event) =>
+                          selectCard(
+                            card.id,
+                            undefined,
+                            event.currentTarget.querySelector<HTMLElement>(
+                              'button[aria-pressed]',
+                            ) ?? undefined,
+                          )
+                        }
                         data-oid="t3bkr-x"
                       >
                         <TableCell data-oid="wa7fcu3">
@@ -1585,7 +1617,11 @@ export function CollectionView() {
                               className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                selectCard(card.id);
+                                selectCard(
+                                  card.id,
+                                  undefined,
+                                  event.currentTarget,
+                                );
                               }}
                               data-oid="iazhh8:"
                             >
@@ -1676,8 +1712,8 @@ export function CollectionView() {
                                 Individual copies
                               </div>
                               {card.copies?.map((copy, index) => {
-                                const handleClick = () => {
-                                  selectCard(card.id, copy.id);
+                                const handleClick = (trigger: HTMLElement) => {
+                                  selectCard(card.id, copy.id, trigger);
                                 };
                                 const variantBadges = getCopyVariantBadges(
                                   copy,
@@ -1689,14 +1725,16 @@ export function CollectionView() {
                                     tabIndex={0}
                                     aria-pressed={selectedCopyId === copy.id}
                                     aria-label={`Edit ${card.name} copy ${index + 1}, ${copy.condition ?? "unknown condition"}`}
-                                    onClick={handleClick}
+                                    onClick={(event) =>
+                                      handleClick(event.currentTarget)
+                                    }
                                     onKeyDown={(event) => {
                                       if (
                                         event.key === "Enter" ||
                                         event.key === " "
                                       ) {
                                         event.preventDefault();
-                                        handleClick();
+                                        handleClick(event.currentTarget);
                                       }
                                     }}
                                     className={cn(
@@ -1889,6 +1927,7 @@ export function CollectionView() {
         onClose={() => {
           setMobileDrawerOpen(false);
         }}
+        onRestoreFocus={() => mobileEditorTriggerRef.current?.focus()}
         data-oid="92cpy1."
       />
 
