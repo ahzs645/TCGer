@@ -83,10 +83,15 @@ struct AnalyticsView: View {
         .navigationTitle("Analytics")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Picker("Period", selection: $period) {
-                    ForEach(AnalyticsPeriod.allCases) { Text($0.title).tag($0) }
+                Menu {
+                    Picker("Period", selection: $period) {
+                        ForEach(AnalyticsPeriod.allCases) { Text($0.title).tag($0) }
+                    }
+                } label: {
+                    Image(systemName: "calendar.badge.clock")
                 }
-                .pickerStyle(.menu)
+                .accessibilityLabel("Analytics period")
+                .accessibilityValue(period.title)
             }
         }
         .refreshable { await load() }

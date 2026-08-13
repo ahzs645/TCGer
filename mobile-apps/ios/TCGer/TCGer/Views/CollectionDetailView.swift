@@ -621,6 +621,10 @@ struct CollectionDetailView: View {
                         }
                     }
                 }
+                .toolbarVisibility(
+                    isSelectMode && !selectedEntryIds.isEmpty ? .hidden : .automatic,
+                    for: .tabBar
+                )
                 .task {
                     BinderAccessLog.recordOpen(collection.id)
                     await loadAvailableTags()

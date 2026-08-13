@@ -414,11 +414,7 @@ private struct CollectionGuideDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search this collection")
         .task { await load() }
-        .confirmationDialog(
-            "Unfollow \(guide.title)?",
-            isPresented: $showingUnfollowConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Unfollow \(guide.title)?", isPresented: $showingUnfollowConfirmation) {
             Button("Unfollow and Delete Wishlist", role: .destructive) {
                 Task { await unfollow() }
             }
@@ -701,7 +697,7 @@ private struct CollectionGuideDetailView: View {
                 enabledGames: environmentStore.enabledGames
             )
             let result = await syncService.sync(wishlist: followedWishlist) { progress in
-                Task { @MainActor in statusMessage = progress }
+                statusMessage = progress
             }
             followedWishlist = try await apiService.getWishlist(
                 config: environmentStore.serverConfiguration,

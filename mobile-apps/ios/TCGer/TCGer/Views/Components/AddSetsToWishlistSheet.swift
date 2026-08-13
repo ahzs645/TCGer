@@ -462,9 +462,7 @@ struct AddSetsToWishlistSheet: View {
                 )
 
                 try await service.addCards(cards, toWishlist: wishlist.id) { sent, total in
-                    Task { @MainActor in
-                        operationMessage = "\(set.name): adding \(sent) of \(total) cards…"
-                    }
+                    operationMessage = "\(set.name): adding \(sent) of \(total) cards…"
                 }
 
                 _ = try await apiService.addWishlistRule(

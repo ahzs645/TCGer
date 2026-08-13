@@ -88,7 +88,7 @@ struct WishlistSyncService {
     func addCards(
         _ cards: [Card],
         toWishlist wishlistId: String,
-        onProgress: ((Int, Int) -> Void)? = nil
+        onProgress: (@MainActor (Int, Int) -> Void)? = nil
     ) async throws {
         let batchSize = APIService.wishlistCardBatchSize
         var sent = 0
@@ -112,7 +112,7 @@ struct WishlistSyncService {
         rule: WishlistRule,
         to wishlist: Wishlist,
         recordSync: Bool = true,
-        onProgress: ((String) -> Void)? = nil
+        onProgress: (@MainActor (String) -> Void)? = nil
     ) async throws -> [Card] {
         onProgress?(
             rule.type == .set
@@ -147,7 +147,10 @@ struct WishlistSyncService {
 
     /// Re-runs every rule on a wishlist. Syncing only ever adds, so manually
     /// added cards are never removed.
-    func sync(wishlist: Wishlist, onProgress: ((String) -> Void)? = nil) async -> SyncResult {
+    func sync(
+        wishlist: Wishlist,
+        onProgress: (@MainActor (String) -> Void)? = nil
+    ) async -> SyncResult {
         var result = SyncResult()
         var known = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" })
 

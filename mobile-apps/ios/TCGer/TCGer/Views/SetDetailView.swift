@@ -486,9 +486,7 @@ struct SetDetailView: View {
 
         do {
             try await service.addCards(payload, toWishlist: wishlist.id) { sent, total in
-                Task { @MainActor in
-                    wishlistStatus = "Adding \(sent) of \(total) cards…"
-                }
+                wishlistStatus = "Adding \(sent) of \(total) cards…"
             }
 
             if target == .wholeSet {

@@ -99,6 +99,18 @@ struct PackOpeningWebView: UIViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.preferences.isTextInteractionEnabled = false
         configuration.userContentController.add(context.coordinator, name: Coordinator.bridgeName)
+        configuration.userContentController.addScriptMessageHandler(
+            context.coordinator.resourceBridge,
+            contentWorld: .page,
+            name: PackOpeningFetchBridge.bridgeName
+        )
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: PackOpeningFetchBridge.fetchShim,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
         configuration.setURLSchemeHandler(context.coordinator.resourceHandler, forURLScheme: PackOpeningResource.scheme)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -125,6 +137,10 @@ struct PackOpeningWebView: UIViewRepresentable {
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.bridgeName)
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: PackOpeningFetchBridge.bridgeName,
+            contentWorld: .page
+        )
         webView.evaluateJavaScript("window.tcgerPack?.destroy()")
         webView.stopLoading()
         webView.navigationDelegate = nil
@@ -133,6 +149,7 @@ struct PackOpeningWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         static let bridgeName = "packBridge"
         let resourceHandler = PackOpeningSchemeHandler()
+        let resourceBridge = PackOpeningFetchBridge()
         var onEvent: (PackOpeningBridgeEvent) -> Void
 
         init(onEvent: @escaping (PackOpeningBridgeEvent) -> Void) {
@@ -172,6 +189,145 @@ struct PackOpeningWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
             onEvent(.error(error.localizedDescription))
+        }
+    }
+}
+
+/// WebKit can render custom-scheme images and scripts through
+/// `WKURLSchemeHandler`, but `window.fetch` rejects those same URLs before the
+/// scheme handler receives them. The pack renderer fetches its JSON manifest
+/// and OBJ mesh, so bridge only those custom-scheme fetches to native code and
+/// return a normal JavaScript `Response`. HTTP(S) requests keep using the
+/// browser's native fetch implementation.
+final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
+    static let bridgeName = "packResource"
+
+    static let fetchShim = #"""
+    (() => {
+      const bridge = window.webkit?.messageHandlers?.packResource;
+      if (!bridge) return;
+
+      const browserFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const value = typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+        const url = new URL(value, window.location.href);
+        if (url.protocol !== "tcger-pack:") {
+          return browserFetch(input, init);
+        }
+
+        const resource = await bridge.postMessage(url.href);
+        const binary = atob(resource.base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        return new Response(bytes, {
+          status: 200,
+          headers: { "Content-Type": resource.mimeType || "application/octet-stream" },
+        });
+      };
+    })();
+    """#
+
+    private struct Resource {
+        let data: Data
+        let mimeType: String
+    }
+
+    private let remoteBaseURL: URL
+    private let session: URLSession
+
+    init(
+        remoteBaseURL: URL = PackOpeningResource.remoteBaseURL(),
+        session: URLSession = .shared
+    ) {
+        self.remoteBaseURL = remoteBaseURL
+        self.session = session
+    }
+
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage,
+        replyHandler: @escaping (Any?, String?) -> Void
+    ) {
+        guard
+            message.name == Self.bridgeName,
+            let value = message.body as? String,
+            let requestURL = URL(string: value),
+            requestURL.scheme == PackOpeningResource.scheme
+        else {
+            replyHandler(nil, "Invalid pack resource request.")
+            return
+        }
+
+        load(requestURL) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let resource):
+                    replyHandler([
+                        "base64": resource.data.base64EncodedString(),
+                        "mimeType": resource.mimeType,
+                    ], nil)
+                case .failure(let error):
+                    replyHandler(nil, error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func load(
+        _ requestURL: URL,
+        completion: @escaping (Result<Resource, Error>) -> Void
+    ) {
+        guard let remoteURL = PackOpeningResource.remoteURL(for: requestURL, baseURL: remoteBaseURL) else {
+            loadBundled(requestURL, completion: completion)
+            return
+        }
+
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = .returnCacheDataElseLoad
+        request.timeoutInterval = 20
+        session.dataTask(with: request) { [weak self] data, response, error in
+            if
+                error == nil,
+                let data,
+                let response,
+                (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
+            {
+                completion(.success(Resource(
+                    data: data,
+                    mimeType: response.mimeType
+                        ?? PackOpeningResource.mimeType(for: remoteURL.pathExtension)
+                )))
+                return
+            }
+            self?.loadBundled(requestURL, completion: completion)
+        }.resume()
+    }
+
+    private func loadBundled(
+        _ requestURL: URL,
+        completion: (Result<Resource, Error>) -> Void
+    ) {
+        guard
+            let root = PackOpeningResource.rootURL(),
+            let file = PackOpeningResource.fileURL(for: requestURL, root: root)
+        else {
+            completion(.failure(URLError(.fileDoesNotExist)))
+            return
+        }
+
+        do {
+            completion(.success(Resource(
+                data: try Data(contentsOf: file, options: .mappedIfSafe),
+                mimeType: PackOpeningResource.mimeType(for: file.pathExtension)
+            )))
+        } catch {
+            completion(.failure(error))
         }
     }
 }

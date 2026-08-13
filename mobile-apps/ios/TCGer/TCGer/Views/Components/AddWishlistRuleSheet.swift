@@ -268,7 +268,7 @@ struct AddWishlistRuleSheet: View {
                 to: wishlist,
                 recordSync: false,
                 onProgress: { message in
-                    Task { @MainActor in statusMessage = message }
+                    statusMessage = message
                 }
             )
 

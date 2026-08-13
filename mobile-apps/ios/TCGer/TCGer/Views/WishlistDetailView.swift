@@ -391,7 +391,7 @@ struct WishlistDetailView: View {
         )
 
         let result = await service.sync(wishlist: snapshot) { message in
-            Task { @MainActor in syncStatus = message }
+            syncStatus = message
         }
 
         await refreshWishlist()

@@ -470,9 +470,7 @@ struct CardSearchView: View {
             }
 
             try await service.addCards(enabledMatches, toWishlist: wishlistId) { sent, total in
-                Task { @MainActor in
-                    bulkWishlistStatus = "Adding \(sent) of \(total) cards…"
-                }
+                bulkWishlistStatus = "Adding \(sent) of \(total) cards…"
             }
 
             if keepWishlistUpdated && !searchFilters.isActive {

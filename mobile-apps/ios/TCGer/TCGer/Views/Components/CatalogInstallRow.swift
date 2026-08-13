@@ -7,6 +7,7 @@ struct CatalogInstallRow: View {
 
     @State private var errorMessage: String?
     @State private var showingRemoveConfirmation = false
+    @State private var showingDetails = false
 
     init(
         game: TCGGame,
@@ -27,26 +28,17 @@ struct CatalogInstallRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 10) {
             catalogImage
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(game.displayName)
                     .font(.subheadline.weight(.semibold))
 
-                Text(catalogSummary)
+                Label(statusSummary, systemImage: statusSystemImage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if let sealedCatalogSummary {
-                    Text(sealedCatalogSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(statusSummary)
-                    .font(.caption2)
                     .foregroundStyle(statusColor)
+                    .lineLimit(2)
 
                 if isInstalling {
                     ProgressView(value: currentProgress)
@@ -63,11 +55,26 @@ struct CatalogInstallRow: View {
 
             Spacer(minLength: 8)
 
-            actionButton
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            VStack(spacing: 8) {
+                Button {
+                    showingDetails = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("About \(game.displayName) catalog")
+
+                actionButton
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
+        .popover(isPresented: $showingDetails) {
+            catalogDetails
+                .presentationCompactAdaptation(.popover)
+        }
         .alert("Remove \(game.displayName) catalog?", isPresented: $showingRemoveConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
@@ -85,17 +92,33 @@ struct CatalogInstallRow: View {
             Image(cardBackAssetName)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 42, height: 60)
+                .frame(width: 34, height: 48)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         } else {
             RoundedRectangle(cornerRadius: 4)
                 .fill(.secondary.opacity(0.15))
-                .frame(width: 42, height: 60)
+                .frame(width: 34, height: 48)
                 .overlay {
                     Image(systemName: "photo")
                         .foregroundStyle(.secondary)
                 }
         }
+    }
+
+    private var catalogDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(game.displayName, systemImage: "internaldrive")
+                .font(.headline)
+            Text(catalogSummary)
+            if let sealedCatalogSummary {
+                Text(sealedCatalogSummary)
+            }
+            Text(statusSummary)
+                .foregroundStyle(statusColor)
+        }
+        .font(.subheadline)
+        .padding()
+        .frame(idealWidth: 300, alignment: .leading)
     }
 
     @ViewBuilder
@@ -165,6 +188,13 @@ struct CatalogInstallRow: View {
         if needsCatalogUpdate || needsSealedInstall { return .orange }
         if case .installed = catalogStore.installState(for: game) { return .green }
         return .secondary
+    }
+
+    private var statusSystemImage: String {
+        guard isAvailable else { return "exclamationmark.triangle" }
+        if needsCatalogUpdate || needsSealedInstall { return "arrow.down.circle" }
+        if case .installed = catalogStore.installState(for: game) { return "checkmark.circle.fill" }
+        return "circle.dashed"
     }
 
     private func install() {
