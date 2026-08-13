@@ -233,7 +233,7 @@ struct CardScanCandidate: Identifiable, Hashable, Sendable {
     let originatingStrategy: ScanStrategyKind
     let debugInfo: [String: String]
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         details: CardDetails,
         confidence: CardScanConfidence,
@@ -258,7 +258,7 @@ struct CardScanResult: Identifiable {
     let debugCapture: APIService.ScanDebugCaptureResponse?
     let debugCaptureError: String?
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         mode: ScanMode,
         capturedImage: CGImage,
