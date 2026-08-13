@@ -7,10 +7,12 @@ final class ScannerDevModeStoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         UserDefaults.standard.set(true, forKey: ScannerDevModeStore.enabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.enabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
         try? FileManager.default.removeItem(at: ScannerDevModeStore.rootDirectory())
         super.tearDown()
     }

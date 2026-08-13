@@ -49,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 import {
   LIBRARY_COLLECTION_ID,
@@ -304,6 +305,9 @@ export function CollectionView() {
   const [editBinderSetTcg, setEditBinderSetTcg] = useState<TcgCode | "">("");
   const [editBinderSetCode, setEditBinderSetCode] = useState("");
   const [editBinderSetName, setEditBinderSetName] = useState("");
+  const [editBinderIsPublic, setEditBinderIsPublic] = useState(false);
+  const [editBinderShareToken, setEditBinderShareToken] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -1096,6 +1100,9 @@ export function CollectionView() {
     setEditBinderSetTcg(binder.associatedTcg ?? "");
     setEditBinderSetCode(binder.associatedSetCode ?? "");
     setEditBinderSetName(binder.associatedSetName ?? "");
+    setEditBinderIsPublic(binder.isPublic ?? false);
+    setEditBinderShareToken(binder.shareToken ?? null);
+    setShareCopied(false);
     setEditBinderError(null);
     setIsEditBinderOpen(true);
   };
@@ -1147,6 +1154,9 @@ export function CollectionView() {
     setEditBinderSetTcg("");
     setEditBinderSetCode("");
     setEditBinderSetName("");
+    setEditBinderIsPublic(false);
+    setEditBinderShareToken(null);
+    setShareCopied(false);
     setIsEditingBinder(false);
     setEditBinderError(null);
   };
@@ -1169,6 +1179,7 @@ export function CollectionView() {
         associatedTcg: editBinderSetTcg || null,
         associatedSetCode: editBinderSetCode.trim() || null,
         associatedSetName: editBinderSetName.trim() || null,
+        isPublic: editBinderIsPublic,
       };
       if (trimmedDescription) {
         payload.description = trimmedDescription;
@@ -1178,6 +1189,40 @@ export function CollectionView() {
     } catch (error) {
       setEditBinderError(
         error instanceof Error ? error.message : "Failed to update binder.",
+      );
+    } finally {
+      setIsEditingBinder(false);
+    }
+  };
+
+  const shareUrl = editBinderShareToken && typeof window !== "undefined"
+    ? `${window.location.origin}/shared/${editBinderShareToken}`
+    : null;
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setShareCopied(true);
+  };
+
+  const handleRotateShareLink = async () => {
+    if (!token || !editBinderId) return;
+    setIsEditingBinder(true);
+    setEditBinderError(null);
+    try {
+      await updateCollection(token, editBinderId, {
+        isPublic: true,
+        rotateShareToken: true,
+      });
+      const refreshed = useCollectionsStore
+        .getState()
+        .collections.find((binder) => binder.id === editBinderId);
+      setEditBinderIsPublic(true);
+      setEditBinderShareToken(refreshed?.shareToken ?? null);
+      setShareCopied(false);
+    } catch (error) {
+      setEditBinderError(
+        error instanceof Error ? error.message : "Failed to rotate share link.",
       );
     } finally {
       setIsEditingBinder(false);
@@ -2412,6 +2457,37 @@ export function CollectionView() {
                   placeholder="Set name"
                 />
               </div>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="edit-binder-public">Public share link</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Anyone with the link can view this binder without signing in.
+                  </p>
+                </div>
+                <Switch
+                  id="edit-binder-public"
+                  checked={editBinderIsPublic}
+                  onCheckedChange={setEditBinderIsPublic}
+                />
+              </div>
+              {editBinderIsPublic && shareUrl && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input value={shareUrl} readOnly aria-label="Public binder link" />
+                  <Button type="button" variant="secondary" onClick={handleCopyShareLink}>
+                    {shareCopied ? "Copied" : "Copy link"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={handleRotateShareLink}>
+                    Reset link
+                  </Button>
+                </div>
+              )}
+              {editBinderIsPublic && !shareUrl && (
+                <p className="text-xs text-muted-foreground">
+                  Save changes to create the public link.
+                </p>
+              )}
             </div>
             <div className="space-y-3" data-oid="qbovcfx">
               <Label data-oid="lvv6t2-">Color accent</Label>

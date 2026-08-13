@@ -25,7 +25,9 @@ The pack picker does not keep an iOS-specific list. Its embedded web experience
 loads `pack/manifest.json` from the same R2 origin as the website, configured by
 the `TCGER_PACK_ASSET_BASE_URL` build setting. The native URL-scheme handler
 uses the system URL cache and falls back to the copy in `PackOpening.bundle`
-when the shared source is unavailable.
+when the shared source is unavailable. Published wrapper images themselves are
+R2-only; the embedded fallback contains the mesh and empty cover registry, so
+offline selection uses generated wrappers rather than bundled artwork.
 
 After changing the shared pack renderer or its offline assets, rebuild that
 bundle from the repository root:

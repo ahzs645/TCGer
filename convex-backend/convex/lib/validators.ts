@@ -117,6 +117,8 @@ export const binderSummaryValidator = v.object({
   associatedTcg: v.optional(tcgCodeValidator),
   associatedSetCode: v.optional(v.string()),
   associatedSetName: v.optional(v.string()),
+  shareToken: v.optional(v.string()),
+  isPublic: v.boolean(),
   entryCount: v.number(),
   createdAt: v.string(),
   updatedAt: v.string()
@@ -135,6 +137,8 @@ export const binderDetailValidator = v.object({
   associatedTcg: v.optional(tcgCodeValidator),
   associatedSetCode: v.optional(v.string()),
   associatedSetName: v.optional(v.string()),
+  shareToken: v.optional(v.string()),
+  isPublic: v.boolean(),
   entryCount: v.number(),
   entries: v.array(entryValidator),
   createdAt: v.string(),
@@ -215,6 +219,7 @@ export const wishlistCardValidator = v.object({
   externalId: v.string(),
   tcg: tcgCodeValidator,
   name: v.string(),
+  desiredQuantity: v.number(),
   baseExternalId: v.optional(v.string()),
   printingKey: v.optional(v.string()),
   artworkId: v.optional(v.string()),
@@ -229,6 +234,7 @@ export const wishlistCardValidator = v.object({
   notes: v.optional(v.string()),
   owned: v.boolean(),
   ownedQuantity: v.number(),
+  missingQuantity: v.number(),
   createdAt: v.string()
 });
 
@@ -262,6 +268,9 @@ export const wishlistValidator = v.object({
   rules: v.array(wishlistRuleValidator),
   totalCards: v.number(),
   ownedCards: v.number(),
+  totalDesiredQuantity: v.number(),
+  ownedDesiredQuantity: v.number(),
+  missingQuantity: v.number(),
   completionPercent: v.number(),
   createdAt: v.string(),
   updatedAt: v.string()

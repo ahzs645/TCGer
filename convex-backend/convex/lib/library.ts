@@ -383,6 +383,8 @@ export async function hydrateBinderSummary(ctx: ReaderCtx, binder: Doc<"binders"
     associatedTcg: binder.associatedTcg,
     associatedSetCode: binder.associatedSetCode,
     associatedSetName: binder.associatedSetName,
+    shareToken: binder.shareToken,
+    isPublic: binder.isPublic ?? false,
     entryCount: entries.length,
     createdAt: toIso(binder.createdAt),
     updatedAt: toIso(binder.updatedAt)

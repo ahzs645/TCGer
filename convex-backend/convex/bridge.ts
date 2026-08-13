@@ -36,6 +36,7 @@ import {
   richCardMetadataFields,
   type RichCardSnapshot
 } from "./lib/cardMetadata";
+import { createUniqueShareToken } from "./lib/sharing";
 import {
   appendCollectionAudit,
   snapshotAuditEntries,
@@ -58,6 +59,21 @@ import {
 } from "./lib/validators";
 
 type ReaderCtx = QueryCtx | MutationCtx;
+
+const MAX_WISHLISTS_PER_USER = 100;
+const MAX_WISHLIST_CARDS = 5_000;
+const MAX_WISHLIST_RULES = 200;
+const MAX_COLLECTION_ENTRIES_FOR_WISHLISTS = 5_000;
+
+function requireWithinLimit<T>(rows: T[], limit: number, label: string): T[] {
+  if (rows.length > limit) {
+    throw new ConvexError({
+      code: "LIMIT_EXCEEDED",
+      message: `${label} exceeds the supported limit of ${limit}`
+    });
+  }
+  return rows;
+}
 
 type BridgeIdentity = {
   subject: string;
@@ -180,6 +196,7 @@ const wishlistCardInput = v.object({
   externalId: v.string(),
   tcg: tcgCodeValidator,
   name: v.string(),
+  desiredQuantity: v.optional(v.number()),
   baseExternalId: v.optional(v.string()),
   printingKey: v.optional(v.string()),
   artworkId: v.optional(v.string()),
@@ -298,11 +315,28 @@ async function requireWishlistForUser(
  */
 type OwnershipMaps = { exact: Map<string, number>; base: Map<string, number> };
 
+function validateDesiredQuantity(value: number | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(value) || value < 1 || value > 99) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "desiredQuantity must be a whole number from 1 to 99"
+    });
+  }
+  return value;
+}
+
 async function buildOwnershipMaps(ctx: ReaderCtx, userId: Id<"users">): Promise<OwnershipMaps> {
-  const entries = await ctx.db
-    .query("collectionEntries")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
+  const entries = requireWithinLimit(
+    await ctx.db
+      .query("collectionEntries")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(MAX_COLLECTION_ENTRIES_FOR_WISHLISTS + 1),
+    MAX_COLLECTION_ENTRIES_FOR_WISHLISTS,
+    "Collection entries used for wishlist ownership"
+  );
 
   const ownedCards = await Promise.all(entries.map((entry) => ctx.db.get(entry.cardId)));
   const exact = new Map<string, number>();
@@ -326,15 +360,18 @@ function toWishlistCardResponse(
   ownership: OwnershipMaps,
   matchAnyPrinting: boolean
 ) {
+  const desiredQuantity = card.desiredQuantity ?? 1;
   const ownedQuantity = matchAnyPrinting
     ? ownership.base.get(`${card.tcg}:${card.baseExternalId ?? card.externalId}`) ?? 0
     : ownership.exact.get(`${card.tcg}:${card.externalId}`) ?? 0;
+  const missingQuantity = Math.max(desiredQuantity - ownedQuantity, 0);
 
   return {
     id: card._id,
     externalId: card.externalId,
     tcg: card.tcg,
     name: card.name,
+    desiredQuantity,
     baseExternalId: card.baseExternalId,
     printingKey: card.printingKey,
     artworkId: card.artworkId,
@@ -351,6 +388,7 @@ function toWishlistCardResponse(
     notes: card.notes,
     owned: ownedQuantity > 0,
     ownedQuantity,
+    missingQuantity,
     createdAt: toIso(card.createdAt)
   };
 }
@@ -378,14 +416,22 @@ async function hydrateWishlist(
   ownership?: OwnershipMaps
 ) {
   const ownershipMaps = ownership ?? (await buildOwnershipMaps(ctx, wishlist.userId));
-  const cards = await ctx.db
-    .query("wishlistCards")
-    .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
-    .collect();
-  const rules = await ctx.db
-    .query("wishlistRules")
-    .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
-    .collect();
+  const cards = requireWithinLimit(
+    await ctx.db
+      .query("wishlistCards")
+      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+      .take(MAX_WISHLIST_CARDS + 1),
+    MAX_WISHLIST_CARDS,
+    "Wishlist cards"
+  );
+  const rules = requireWithinLimit(
+    await ctx.db
+      .query("wishlistRules")
+      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+      .take(MAX_WISHLIST_RULES + 1),
+    MAX_WISHLIST_RULES,
+    "Wishlist rules"
+  );
 
   const hydratedCards = cards
     .map((card) =>
@@ -394,6 +440,15 @@ async function hydrateWishlist(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const ownedCards = hydratedCards.filter((card) => card.owned).length;
   const totalCards = hydratedCards.length;
+  const totalDesiredQuantity = hydratedCards.reduce(
+    (total, card) => total + card.desiredQuantity,
+    0
+  );
+  const ownedDesiredQuantity = hydratedCards.reduce(
+    (total, card) => total + Math.min(card.ownedQuantity, card.desiredQuantity),
+    0
+  );
+  const missingQuantity = totalDesiredQuantity - ownedDesiredQuantity;
 
   return {
     id: wishlist._id,
@@ -407,7 +462,13 @@ async function hydrateWishlist(
       .map(toWishlistRuleResponse),
     totalCards,
     ownedCards,
-    completionPercent: totalCards > 0 ? Math.round((ownedCards / totalCards) * 100) : 0,
+    totalDesiredQuantity,
+    ownedDesiredQuantity,
+    missingQuantity,
+    completionPercent:
+      totalDesiredQuantity > 0
+        ? Math.round((ownedDesiredQuantity / totalDesiredQuantity) * 100)
+        : 0,
     createdAt: toIso(wishlist.createdAt),
     updatedAt: toIso(wishlist.updatedAt)
   };
@@ -1024,7 +1085,9 @@ export const updateBinder = internalMutation({
     imageUrl: v.optional(v.union(v.string(), v.null())),
     associatedTcg: v.optional(v.union(tcgCodeValidator, v.null())),
     associatedSetCode: v.optional(v.union(v.string(), v.null())),
-    associatedSetName: v.optional(v.union(v.string(), v.null()))
+    associatedSetName: v.optional(v.union(v.string(), v.null())),
+    isPublic: v.optional(v.boolean()),
+    rotateShareToken: v.optional(v.boolean())
   },
   returns: binderDetailValidator,
   handler: async (ctx, args) => {
@@ -1039,6 +1102,10 @@ export const updateBinder = internalMutation({
       });
     }
     const timestamp = now();
+    const nextShareToken =
+      args.isPublic === true && (!binder.shareToken || args.rotateShareToken)
+        ? await createUniqueShareToken(ctx)
+        : binder.shareToken;
     await ctx.db.patch(binder._id, {
       name: args.name?.trim() || binder.name,
       description:
@@ -1065,6 +1132,8 @@ export const updateBinder = internalMutation({
         args.associatedSetName === undefined
           ? binder.associatedSetName
           : args.associatedSetName?.trim() || undefined,
+      isPublic: args.isPublic ?? binder.isPublic ?? false,
+      shareToken: nextShareToken,
       updatedAt: timestamp
     });
     const updated = await requireBinderForUser(ctx, binder._id, viewer._id);
@@ -1921,10 +1990,14 @@ export const listWishlists = internalQuery({
   returns: v.array(wishlistValidator),
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    const wishlists = await ctx.db
-      .query("wishlists")
-      .withIndex("by_user", (q) => q.eq("userId", viewer._id))
-      .collect();
+    const wishlists = requireWithinLimit(
+      await ctx.db
+        .query("wishlists")
+        .withIndex("by_user", (q) => q.eq("userId", viewer._id))
+        .take(MAX_WISHLISTS_PER_USER + 1),
+      MAX_WISHLISTS_PER_USER,
+      "Wishlists"
+    );
     const ownership = await buildOwnershipMaps(ctx, viewer._id);
     const hydrated = await Promise.all(
       wishlists.map((wishlist) => hydrateWishlist(ctx, wishlist, ownership))
@@ -1974,6 +2047,17 @@ export const createWishlist = internalMutation({
       .unique();
     if (existing) {
       throw conflict("Wishlist name is already in use");
+    }
+
+    const currentWishlists = await ctx.db
+      .query("wishlists")
+      .withIndex("by_user", (q) => q.eq("userId", viewer._id))
+      .take(MAX_WISHLISTS_PER_USER);
+    if (currentWishlists.length >= MAX_WISHLISTS_PER_USER) {
+      throw new ConvexError({
+        code: "LIMIT_EXCEEDED",
+        message: `Wishlists cannot exceed ${MAX_WISHLISTS_PER_USER}`
+      });
     }
 
     const timestamp = now();
@@ -2055,14 +2139,22 @@ export const deleteWishlist = internalMutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
-    const cards = await ctx.db
-      .query("wishlistCards")
-      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
-      .collect();
-    const rules = await ctx.db
-      .query("wishlistRules")
-      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
-      .collect();
+    const cards = requireWithinLimit(
+      await ctx.db
+        .query("wishlistCards")
+        .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+        .take(MAX_WISHLIST_CARDS + 1),
+      MAX_WISHLIST_CARDS,
+      "Wishlist cards"
+    );
+    const rules = requireWithinLimit(
+      await ctx.db
+        .query("wishlistRules")
+        .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+        .take(MAX_WISHLIST_RULES + 1),
+      MAX_WISHLIST_RULES,
+      "Wishlist rules"
+    );
     const guideFollow = await ctx.db
       .query("userGuideFollows")
       .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
@@ -2088,6 +2180,7 @@ export const addWishlistCard = internalMutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+    const desiredQuantity = validateDesiredQuantity(args.card.desiredQuantity);
     const existing = await ctx.db
       .query("wishlistCards")
       .withIndex("by_wishlist_external_tcg", (q) =>
@@ -2100,6 +2193,7 @@ export const addWishlistCard = internalMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         name: args.card.name,
+        desiredQuantity: desiredQuantity ?? existing.desiredQuantity ?? 1,
         baseExternalId:
           normalizeOptionalIdentifier(args.card.baseExternalId) ??
           normalizeOptionalIdentifier(existing.baseExternalId),
@@ -2122,11 +2216,22 @@ export const addWishlistCard = internalMutation({
       });
       cardId = existing._id;
     } else {
+      const currentCards = await ctx.db
+        .query("wishlistCards")
+        .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+        .take(MAX_WISHLIST_CARDS);
+      if (currentCards.length >= MAX_WISHLIST_CARDS) {
+        throw new ConvexError({
+          code: "LIMIT_EXCEEDED",
+          message: `Wishlist cards cannot exceed ${MAX_WISHLIST_CARDS}`
+        });
+      }
       cardId = await ctx.db.insert("wishlistCards", {
         wishlistId: wishlist._id,
         externalId: args.card.externalId,
         tcg: args.card.tcg,
         name: args.card.name,
+        desiredQuantity: desiredQuantity ?? 1,
         baseExternalId: normalizeOptionalIdentifier(args.card.baseExternalId),
         printingKey: normalizeOptionalIdentifier(args.card.printingKey),
         artworkId: normalizeOptionalIdentifier(args.card.artworkId),
@@ -2177,6 +2282,7 @@ export const addWishlistCards = internalMutation({
     const timestamp = now();
 
     for (const card of args.cards) {
+      const desiredQuantity = validateDesiredQuantity(card.desiredQuantity);
       const existing = await ctx.db
         .query("wishlistCards")
         .withIndex("by_wishlist_external_tcg", (q) =>
@@ -2187,6 +2293,7 @@ export const addWishlistCards = internalMutation({
       if (existing) {
         await ctx.db.patch(existing._id, {
           name: card.name,
+          desiredQuantity: desiredQuantity ?? existing.desiredQuantity ?? 1,
           baseExternalId:
             normalizeOptionalIdentifier(card.baseExternalId) ??
             normalizeOptionalIdentifier(existing.baseExternalId),
@@ -2215,6 +2322,7 @@ export const addWishlistCards = internalMutation({
         externalId: card.externalId,
         tcg: card.tcg,
         name: card.name,
+        desiredQuantity: desiredQuantity ?? 1,
         baseExternalId: normalizeOptionalIdentifier(card.baseExternalId),
         printingKey: normalizeOptionalIdentifier(card.printingKey),
         artworkId: normalizeOptionalIdentifier(card.artworkId),
@@ -2237,6 +2345,53 @@ export const addWishlistCards = internalMutation({
     await ctx.db.patch(wishlist._id, { updatedAt: timestamp });
     const refreshed = await requireWishlistForUser(ctx, wishlist._id, viewer._id);
     return await hydrateWishlist(ctx, refreshed);
+  }
+});
+
+export const updateWishlistCard = internalMutation({
+  args: {
+    subject: v.string(),
+    wishlistId: v.id("wishlists"),
+    cardId: v.id("wishlistCards"),
+    desiredQuantity: v.optional(v.number()),
+    notes: v.optional(nullableString)
+  },
+  returns: wishlistCardValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+    const card = await ctx.db.get(args.cardId);
+
+    if (!card || card.wishlistId !== wishlist._id) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Wishlist card not found"
+      });
+    }
+
+    const desiredQuantity = validateDesiredQuantity(args.desiredQuantity);
+    const timestamp = now();
+    await ctx.db.patch(card._id, {
+      desiredQuantity: desiredQuantity ?? card.desiredQuantity ?? 1,
+      notes:
+        args.notes === undefined ? card.notes : args.notes?.trim() || undefined,
+      updatedAt: timestamp
+    });
+    await ctx.db.patch(wishlist._id, { updatedAt: timestamp });
+
+    const updated = await ctx.db.get(card._id);
+    if (!updated) {
+      throw new ConvexError({
+        code: "INVARIANT",
+        message: "Wishlist card could not be updated"
+      });
+    }
+
+    return toWishlistCardResponse(
+      updated,
+      await buildOwnershipMaps(ctx, viewer._id),
+      wishlist.matchAnyPrinting ?? false
+    );
   }
 });
 
@@ -2304,10 +2459,14 @@ export const addWishlistRule = internalMutation({
     }
 
     const timestamp = now();
-    const rules = await ctx.db
-      .query("wishlistRules")
-      .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
-      .collect();
+    const rules = requireWithinLimit(
+      await ctx.db
+        .query("wishlistRules")
+        .withIndex("by_wishlist", (q) => q.eq("wishlistId", wishlist._id))
+        .take(MAX_WISHLIST_RULES + 1),
+      MAX_WISHLIST_RULES,
+      "Wishlist rules"
+    );
 
     // Re-adding the same rule refreshes it rather than duplicating it.
     const existing = rules.find(
@@ -2328,6 +2487,12 @@ export const addWishlistRule = internalMutation({
       });
       ruleId = existing._id;
     } else {
+      if (rules.length >= MAX_WISHLIST_RULES) {
+        throw new ConvexError({
+          code: "LIMIT_EXCEEDED",
+          message: `Wishlist rules cannot exceed ${MAX_WISHLIST_RULES}`
+        });
+      }
       ruleId = await ctx.db.insert("wishlistRules", {
         wishlistId: wishlist._id,
         type: args.type,

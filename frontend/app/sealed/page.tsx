@@ -50,12 +50,16 @@ import { getCollections } from "@/lib/api/collections";
 import {
   addSealedInventory,
   createSealedOpening,
+  createCustomSealedProduct,
+  deleteCustomSealedProduct,
   deleteSealedInventory,
   getSealedInventory,
   getSealedOpenings,
   getSealedProducts,
   recordOpenedCardSale,
   updateSealedInventory,
+  updateCustomSealedProduct,
+  type CustomSealedProductInput,
   type SealedInventoryResponse,
   type SealedLedgerCard,
   type SealedOpeningLedger,
@@ -664,6 +668,9 @@ function AddInventoryDialog({
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [customEditorOpen, setCustomEditorOpen] = useState(false);
+  const [editingCustom, setEditingCustom] = useState<SealedProductResponse | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open) {
@@ -761,6 +768,23 @@ function AddInventoryDialog({
             </div>
           </div>
 
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Can’t find a product? Add it to your private catalog.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingCustom(null);
+                setCustomEditorOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Custom product
+            </Button>
+          </div>
+
           <ScrollArea className="h-48 rounded-md border">
             {catalogQuery.isLoading ? (
               <div className="space-y-2 p-3">
@@ -775,17 +799,17 @@ function AddInventoryDialog({
             ) : (
               <div className="divide-y">
                 {products.map((product) => (
-                  <button
-                    type="button"
+                  <div
                     key={product.id}
-                    className={`flex w-full items-center justify-between gap-3 p-3 text-left transition hover:bg-muted/60 ${selected?.id === product.id ? "bg-muted" : ""}`}
-                    onClick={() => setSelected(product)}
+                    className={`flex w-full items-center gap-2 p-3 transition hover:bg-muted/60 ${selected?.id === product.id ? "bg-muted" : ""}`}
                   >
+                    <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left" onClick={() => setSelected(product)}>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{product.name}</span>
                       <span className="block text-xs text-muted-foreground">
                         {tcgLabel(product.tcg)} · {product.productType}
                         {product.setCode ? ` · ${product.setCode}` : ""}
+                        {product.isCustom ? " · Custom" : ""}
                       </span>
                     </span>
                     {product.msrp !== undefined && (
@@ -793,7 +817,27 @@ function AddInventoryDialog({
                         MSRP {currency(product.msrp)}
                       </span>
                     )}
-                  </button>
+                    </button>
+                    {product.isCustom && (
+                      <div className="flex shrink-0 gap-1">
+                        <Button type="button" size="icon" variant="ghost" aria-label={`Edit ${product.name}`} onClick={() => { setEditingCustom(product); setCustomEditorOpen(true); }}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" size="icon" variant="ghost" aria-label={`Delete ${product.name}`} onClick={async () => {
+                          if (!token || !window.confirm(`Delete “${product.name}” from your catalog?`)) return;
+                          try {
+                            await deleteCustomSealedProduct(token, product.id);
+                            if (selected?.id === product.id) setSelected(null);
+                            await queryClient.invalidateQueries({ queryKey: ["sealed-products"] });
+                          } catch (cause) {
+                            setError((cause as Error).message);
+                          }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -822,6 +866,130 @@ function AddInventoryDialog({
             <Button type="submit" disabled={mutation.isPending || !selected}>
               {mutation.isPending ? "Adding…" : "Add to inventory"}
             </Button>
+          </DialogFooter>
+        </form>
+        <CustomProductDialog
+          open={customEditorOpen}
+          onOpenChange={setCustomEditorOpen}
+          token={token}
+          product={editingCustom}
+          initialTcg={tcg === "all" ? (activeGames[0] ?? "pokemon") : tcg}
+          onSaved={async (product) => {
+            await queryClient.invalidateQueries({ queryKey: ["sealed-products"] });
+            setSelected(product);
+          }}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CustomProductDialog({
+  open,
+  onOpenChange,
+  token,
+  product,
+  initialTcg,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  token: string | null;
+  product: SealedProductResponse | null;
+  initialTcg: string;
+  onSaved: (product: SealedProductResponse) => void | Promise<void>;
+}) {
+  const [form, setForm] = useState({
+    tcg: initialTcg,
+    name: "",
+    productType: "box",
+    setCode: "",
+    cardsPerPack: "",
+    packsPerBox: "",
+    releaseDate: "",
+    imageUrl: "",
+    msrp: "",
+    upc: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      tcg: product?.tcg ?? initialTcg,
+      name: product?.name ?? "",
+      productType: product?.productType ?? "box",
+      setCode: product?.setCode ?? "",
+      cardsPerPack: product?.cardsPerPack?.toString() ?? "",
+      packsPerBox: product?.packsPerBox?.toString() ?? "",
+      releaseDate: dateInputValue(product?.releaseDate),
+      imageUrl: product?.imageUrl ?? "",
+      msrp: product?.msrp?.toString() ?? "",
+      upc: product?.upc ?? "",
+    });
+    setError(null);
+  }, [open, product, initialTcg]);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const positiveInteger = (value: string, label: string) => {
+        if (!value.trim()) return undefined;
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${label} must be a positive whole number.`);
+        return parsed;
+      };
+      const input: CustomSealedProductInput = {
+        tcg: form.tcg,
+        name: form.name.trim(),
+        productType: form.productType.trim(),
+        setCode: form.setCode.trim() || undefined,
+        cardsPerPack: positiveInteger(form.cardsPerPack, "Cards per pack"),
+        packsPerBox: positiveInteger(form.packsPerBox, "Packs per box"),
+        releaseDate: toIsoDate(form.releaseDate),
+        imageUrl: form.imageUrl.trim() || undefined,
+        msrp: optionalMoney(form.msrp),
+        upc: form.upc.trim() || undefined,
+      };
+      if (!input.name || !input.productType) throw new Error("Name and product type are required.");
+      if (form.msrp.trim() && input.msrp === undefined) throw new Error("MSRP must be zero or greater.");
+      return product
+        ? updateCustomSealedProduct(token!, product.id, input)
+        : createCustomSealedProduct(token!, input);
+    },
+    onSuccess: async (saved) => {
+      await onSaved(saved);
+      onOpenChange(false);
+    },
+    onError: (cause) => setError((cause as Error).message),
+  });
+
+  const set = (field: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((current) => ({ ...current, [field]: event.target.value }));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{product ? "Edit custom product" : "Create custom product"}</DialogTitle>
+          <DialogDescription>Custom catalog entries are private to your account.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); setError(null); mutation.mutate(); }}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2"><Label htmlFor="custom-name">Name</Label><Input id="custom-name" value={form.name} onChange={set("name")} required /></div>
+            <div className="space-y-2"><Label htmlFor="custom-type">Product type</Label><Input id="custom-type" value={form.productType} onChange={set("productType")} placeholder="box, tin, bundle…" required /></div>
+            <div className="space-y-2"><Label htmlFor="custom-tcg">Game code</Label><Input id="custom-tcg" value={form.tcg} onChange={set("tcg")} required /></div>
+            <div className="space-y-2"><Label htmlFor="custom-set">Set code</Label><Input id="custom-set" value={form.setCode} onChange={set("setCode")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-cards">Cards per pack</Label><Input id="custom-cards" type="number" min="1" step="1" value={form.cardsPerPack} onChange={set("cardsPerPack")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-packs">Packs per box</Label><Input id="custom-packs" type="number" min="1" step="1" value={form.packsPerBox} onChange={set("packsPerBox")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-release">Release date</Label><Input id="custom-release" type="date" value={form.releaseDate} onChange={set("releaseDate")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-msrp">MSRP</Label><Input id="custom-msrp" type="number" min="0" step="0.01" value={form.msrp} onChange={set("msrp")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-upc">UPC</Label><Input id="custom-upc" value={form.upc} onChange={set("upc")} /></div>
+            <div className="space-y-2"><Label htmlFor="custom-image">Image URL</Label><Input id="custom-image" type="url" value={form.imageUrl} onChange={set("imageUrl")} /></div>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Save product"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -8,6 +8,7 @@ import {
   binderSummaryValidator,
   tcgCodeValidator
 } from "./lib/validators";
+import { createUniqueShareToken } from "./lib/sharing";
 
 export const list = query({
   args: {},
@@ -73,5 +74,32 @@ export const create = mutation({
     });
     const binder = await requireBinderForUser(ctx, binderId, viewer._id);
     return await hydrateBinderSummary(ctx, binder);
+  }
+});
+
+export const setSharing = mutation({
+  args: {
+    binderId: v.id("binders"),
+    isPublic: v.boolean(),
+    rotateToken: v.optional(v.boolean())
+  },
+  returns: binderSummaryValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewer(ctx);
+    const binder = await requireBinderForUser(ctx, args.binderId, viewer._id);
+    if (binder.kind === "library") {
+      throw new Error("The Unsorted Library cannot be shared");
+    }
+    const shareToken =
+      args.isPublic && (!binder.shareToken || args.rotateToken)
+        ? await createUniqueShareToken(ctx)
+        : binder.shareToken;
+    await ctx.db.patch(binder._id, {
+      isPublic: args.isPublic,
+      shareToken,
+      updatedAt: now()
+    });
+    const updated = await requireBinderForUser(ctx, binder._id, viewer._id);
+    return await hydrateBinderSummary(ctx, updated);
   }
 });

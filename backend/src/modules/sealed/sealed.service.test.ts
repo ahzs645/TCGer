@@ -3,12 +3,16 @@ jest.mock('../../lib/prisma', () => ({
     sealedProduct: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
-      findFirst: jest.fn()
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
     },
     sealedInventory: {
       findMany: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),
+      count: jest.fn(),
       update: jest.fn(),
       delete: jest.fn()
     },
@@ -27,9 +31,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import {
   addSealedInventory,
+  createCustomSealedProduct,
+  deleteCustomSealedProduct,
   getSealedProductByBarcode,
   getSealedProducts,
   normalizeSealedProductBarcode,
+  updateCustomSealedProduct,
   updateSealedInventory
 } from './sealed.service';
 
@@ -49,6 +56,7 @@ const product = {
   imageUrl: null,
   msrp: new Prisma.Decimal('149.99'),
   upc: null,
+  ownerId: null,
   createdAt,
   updatedAt: createdAt
 };
@@ -72,7 +80,7 @@ describe('sealed response serialization', () => {
   test('normalizes product listing Decimal and date fields', async () => {
     jest.mocked(prisma.sealedProduct.findMany).mockResolvedValue([product]);
 
-    await expect(getSealedProducts()).resolves.toEqual([
+    await expect(getSealedProducts('user-1')).resolves.toEqual([
       {
         id: 'product-1',
         tcg: 'pokemon',
@@ -84,12 +92,14 @@ describe('sealed response serialization', () => {
         releaseDate: '2026-06-01T00:00:00.000Z',
         imageUrl: undefined,
         msrp: 149.99,
-        upc: undefined
+        upc: undefined,
+        isCustom: false
       }
     ]);
   });
 
   test('normalizes inventory creation and update responses', async () => {
+    jest.mocked(prisma.sealedProduct.findFirst).mockResolvedValue(product);
     jest.mocked(prisma.sealedInventory.create).mockResolvedValue(inventory);
     jest.mocked(prisma.sealedInventory.findFirst).mockResolvedValue(inventory);
     jest.mocked(prisma.sealedInventory.update).mockResolvedValue(inventory);
@@ -121,6 +131,34 @@ describe('sealed response serialization', () => {
     }
   });
 
+  test('keeps custom products private and owner-controlled', async () => {
+    const customProduct = { ...product, ownerId: 'user-1' };
+    jest.mocked(prisma.sealedProduct.create).mockResolvedValue(customProduct);
+    jest.mocked(prisma.sealedProduct.findFirst).mockResolvedValue(customProduct);
+    jest.mocked(prisma.sealedProduct.update).mockResolvedValue(customProduct);
+    jest.mocked(prisma.sealedInventory.count).mockResolvedValue(0);
+
+    const input = {
+      tcg: 'pokemon',
+      name: 'Private Box',
+      productType: 'box'
+    };
+    await expect(createCustomSealedProduct('user-1', input)).resolves.toMatchObject({
+      isCustom: true
+    });
+    await expect(
+      updateCustomSealedProduct('user-1', product.id, input)
+    ).resolves.toMatchObject({ isCustom: true });
+    await expect(deleteCustomSealedProduct('user-1', product.id)).resolves.toBeUndefined();
+
+    expect(prisma.sealedProduct.findFirst).toHaveBeenCalledWith({
+      where: { id: product.id, ownerId: 'user-1' }
+    });
+    expect(prisma.sealedProduct.delete).toHaveBeenCalledWith({
+      where: { id: product.id }
+    });
+  });
+
   test('normalizes UPC input and looks up UPC-A/EAN-13 equivalents', async () => {
     jest.mocked(prisma.sealedProduct.findFirst).mockResolvedValue({
       ...product,
@@ -129,12 +167,15 @@ describe('sealed response serialization', () => {
 
     expect(normalizeSealedProductBarcode('8206-5085 5221')).toBe('820650855221');
     expect(normalizeSealedProductBarcode('not-a-barcode')).toBeNull();
-    await expect(getSealedProductByBarcode('820650855221')).resolves.toMatchObject({
+    await expect(getSealedProductByBarcode('user-1', '820650855221')).resolves.toMatchObject({
       id: product.id,
       upc: '820650855221'
     });
     expect(prisma.sealedProduct.findFirst).toHaveBeenCalledWith({
-      where: { upc: { in: ['820650855221', '0820650855221'] } }
+      where: {
+        upc: { in: ['820650855221', '0820650855221'] },
+        OR: [{ ownerId: null }, { ownerId: 'user-1' }]
+      }
     });
   });
 });

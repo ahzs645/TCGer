@@ -19,7 +19,7 @@ export interface CollectionsState {
   updateCollection: (
     token: string,
     id: string,
-    input: { name?: string; description?: string; colorHex?: string },
+    input: collectionsApi.UpdateCollectionInput,
   ) => Promise<void>;
   addCardToBinder: (
     token: string,

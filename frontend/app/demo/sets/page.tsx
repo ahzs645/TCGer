@@ -8,8 +8,7 @@ export default function DemoSetsPage() {
         <div>
           <h1 className="text-3xl font-heading font-semibold">Set Explorer</h1>
           <p className="text-sm text-muted-foreground">
-            Browse every enabled game, track completion, and open a set
-            checklist.
+            Follow the sets you’ve started and find your next checklist.
           </p>
         </div>
         <SetBrowser />

@@ -55,7 +55,7 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
 
   useEffect(() => {
     // Demo pages bypass all auth/setup checks
-    if (pathname?.startsWith("/demo")) {
+    if (pathname?.startsWith("/demo") || pathname?.startsWith("/shared/")) {
       setLoading(false);
       setShouldBlock(false);
       setNeedsAuth(false);
@@ -195,7 +195,7 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
   // Demo paths bypass all blocking conditions — they never need a real
   // backend session, and Better Auth's useSession may hang on GitHub Pages
   // where no server exists.
-  const isDemo = pathname?.startsWith("/demo");
+  const isDemo = pathname?.startsWith("/demo") || pathname?.startsWith("/shared/");
 
   // Always render the same structure
   if (loading || shouldBlock || (!isDemo && !singleUserMode && sessionPending)) {

@@ -39,6 +39,7 @@ model User {
   shopConnections          ShopConnection[]
   sealedInventory          SealedInventory[]
   sealedOpenings           SealedOpening[]
+  customSealedProducts     SealedProduct[]
   tradesSent               Trade[]                   @relation("TradesSent")
   tradesReceived           Trade[]                   @relation("TradesReceived")
   automations              Automation[]
@@ -468,6 +469,7 @@ model WishlistCard {
   externalId      String
   tcg             String
   name            String
+  desiredQuantity Int      @default(1)
   setCode         String?
   setName         String?
   rarity          String?
@@ -574,10 +576,15 @@ model SealedProduct {
   imageUrl     String?
   msrp         Decimal?  @db.Decimal(10, 2)
   upc          String?
+  ownerId      String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  owner     User?             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   inventory SealedInventory[]
+
+  @@index([ownerId])
+  @@index([ownerId, tcg, releaseDate])
 }
 
 model SealedInventory {

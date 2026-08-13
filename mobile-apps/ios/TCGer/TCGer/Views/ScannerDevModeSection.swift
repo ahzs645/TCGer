@@ -12,6 +12,7 @@ struct ScannerDevModeSection: View {
     }
 
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeEnabled = false
+    @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var cropRescueEnabled = false
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
@@ -34,6 +35,10 @@ struct ScannerDevModeSection: View {
 
             recordingDescription
 
+            cropRescueToggle
+
+            cropRescueDescription
+
             if let errorMessage {
                 errorLabel(errorMessage)
             }
@@ -53,6 +58,10 @@ struct ScannerDevModeSection: View {
 
         recordingDescription
 
+        cropRescueToggle
+
+        cropRescueDescription
+
         if let errorMessage {
             errorLabel(errorMessage)
         }
@@ -71,6 +80,18 @@ struct ScannerDevModeSection: View {
 
     private var recordingDescription: some View {
         Text("Saves every scan with its crop attempts and decision evidence as reusable training data.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var cropRescueToggle: some View {
+        Toggle(isOn: $cropRescueEnabled) {
+            Label("Adjust Card Corners", systemImage: "viewfinder")
+        }
+    }
+
+    private var cropRescueDescription: some View {
+        Text("Shows the manual corner editor after a failed scan and in scan results. Off by default for normal scanning.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }

@@ -423,6 +423,9 @@ function toBinder(b: DemoBinder) {
 }
 
 function toWishlistCard(card: DemoWishlistCard) {
+  const desiredQuantity = card.desiredQuantity ?? card.cardData?.desiredQuantity ?? 1;
+  const ownedQuantity = store().getOwnedQuantity(card.cardId);
+  const missingQuantity = Math.max(desiredQuantity - ownedQuantity, 0);
   return {
     ...card.cardData,
     id: card.id,
@@ -441,8 +444,10 @@ function toWishlistCard(card: DemoWishlistCard) {
         : undefined),
     setName: card.cardData?.setName ?? card.setName,
     rarity: card.cardData?.rarity ?? card.rarity,
-    owned: store().isCardInCollection(card.cardId),
-    ownedQuantity: store().getOwnedQuantity(card.cardId),
+    desiredQuantity,
+    owned: ownedQuantity > 0,
+    ownedQuantity,
+    missingQuantity,
     createdAt: card.addedAt,
   };
 }
@@ -451,6 +456,15 @@ function toWishlist(w: DemoWishlist) {
   const cards = w.cards.map(toWishlistCard);
   const totalCards = cards.length;
   const ownedCards = cards.filter((c) => c.owned).length;
+  const totalDesiredQuantity = cards.reduce(
+    (total, card) => total + card.desiredQuantity,
+    0,
+  );
+  const ownedDesiredQuantity = cards.reduce(
+    (total, card) => total + Math.min(card.ownedQuantity, card.desiredQuantity),
+    0,
+  );
+  const missingQuantity = totalDesiredQuantity - ownedDesiredQuantity;
   return {
     id: w.id,
     name: w.name,
@@ -460,8 +474,13 @@ function toWishlist(w: DemoWishlist) {
     rules: w.rules ?? [],
     totalCards,
     ownedCards,
+    totalDesiredQuantity,
+    ownedDesiredQuantity,
+    missingQuantity,
     completionPercent:
-      totalCards > 0 ? Math.round((ownedCards / totalCards) * 100) : 0,
+      totalDesiredQuantity > 0
+        ? Math.round((ownedDesiredQuantity / totalDesiredQuantity) * 100)
+        : 0,
     createdAt: w.createdAt,
     updatedAt: w.createdAt,
   };
@@ -1428,6 +1447,23 @@ async function handleWishlists(
       (wl: DemoWishlist) => wl.id === wishlistId,
     );
     return w ? json(toWishlist(w)) : notFound("Wishlist not found");
+  }
+
+  // DELETE /wishlists/:id/cards/:cardId
+  if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
+    const data = body as { desiredQuantity?: number };
+    if (data.desiredQuantity !== undefined) {
+      await store().updateWishlistCard(
+        wishlistId,
+        segments[2],
+        data.desiredQuantity,
+      );
+    }
+    const w = store().wishlists.find(
+      (wl: DemoWishlist) => wl.id === wishlistId,
+    );
+    const card = w?.cards.find((entry) => entry.id === segments[2]);
+    return card ? json(toWishlistCard(card)) : notFound("Wishlist card not found");
   }
 
   // DELETE /wishlists/:id/cards/:cardId

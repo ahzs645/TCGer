@@ -37,6 +37,20 @@ export const recordOpenedCardSaleSchema = z.object({
 });
 export type RecordOpenedCardSaleInput = z.infer<typeof recordOpenedCardSaleSchema>;
 
+export const customSealedProductSchema = z.object({
+  tcg: z.string().trim().min(1).max(40),
+  name: z.string().trim().min(1).max(200),
+  productType: z.string().trim().min(1).max(80),
+  setCode: z.string().trim().min(1).max(80).optional(),
+  cardsPerPack: z.number().int().positive().optional(),
+  packsPerBox: z.number().int().positive().optional(),
+  releaseDate: z.string().datetime().optional(),
+  imageUrl: z.string().url().optional(),
+  msrp: z.number().finite().nonnegative().optional(),
+  upc: z.string().trim().min(1).max(80).optional(),
+});
+export type CustomSealedProductInput = z.infer<typeof customSealedProductSchema>;
+
 // ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
@@ -53,6 +67,7 @@ export interface SealedProductResponse {
   imageUrl?: string;
   msrp?: number;
   upc?: string;
+  isCustom: boolean;
 }
 
 export interface SealedInventoryResponse {

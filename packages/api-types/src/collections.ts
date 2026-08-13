@@ -150,6 +150,8 @@ export const updateBinderSchema = z.object({
   associatedTcg: tcgCodeSchema.nullable().optional(),
   associatedSetCode: z.string().trim().min(1).max(80).nullable().optional(),
   associatedSetName: z.string().trim().min(1).max(200).nullable().optional(),
+  isPublic: z.boolean().optional(),
+  rotateShareToken: z.boolean().optional(),
 });
 export type UpdateBinderInput = z.infer<typeof updateBinderSchema>;
 
@@ -718,6 +720,8 @@ export interface Binder {
   associatedTcg?: TcgCode;
   associatedSetCode?: string;
   associatedSetName?: string;
+  shareToken?: string;
+  isPublic?: boolean;
   cards: CollectionCard[];
   createdAt: string;
   updatedAt: string;

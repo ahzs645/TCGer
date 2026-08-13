@@ -4,6 +4,7 @@ import {
   updateWishlistSchema,
   addWishlistCardSchema,
   addWishlistCardsSchema,
+  updateWishlistCardSchema,
   createWishlistRuleSchema,
   updateWishlistRuleSchema
 } from '@tcg/api-types';
@@ -18,6 +19,7 @@ import {
   addCardToWishlist,
   addCardsToWishlist,
   removeCardFromWishlist,
+  updateWishlistCard,
   addWishlistRule,
   updateWishlistRule,
   removeWishlistRule
@@ -214,6 +216,30 @@ wishlistsRouter.delete(
       }
       if (error instanceof Error && error.message === 'Wishlist rule not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist rule not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+// Update a wanted card's quantity or notes
+wishlistsRouter.patch(
+  '/:wishlistId/cards/:cardId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const { wishlistId, cardId } = req.params;
+    const data = updateWishlistCardSchema.parse(req.body);
+
+    try {
+      const card = await updateWishlistCard(userId, wishlistId, cardId, data);
+      res.json(card);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Wishlist not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist not found' });
+      }
+      if (error instanceof Error && error.message === 'Wishlist card not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Wishlist card not found' });
       }
       throw error;
     }

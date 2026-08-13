@@ -2,6 +2,7 @@ import type {
   CollectionValueHistory,
   CollectionValueBreakdown,
   CollectionDistribution,
+  CollectionDuplicates,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -9,6 +10,7 @@ export type {
   CollectionValueHistory,
   CollectionValueBreakdown,
   CollectionDistribution,
+  CollectionDuplicates,
 };
 
 export const ANALYTICS_PERIODS = [
@@ -60,6 +62,19 @@ export async function getCollectionDistribution(
   if (tcg) params.set("tcg", tcg);
   return authFetch(
     `${API_BASE_URL}/analytics/distribution?${params.toString()}`,
+    token,
+  );
+}
+
+export async function getCollectionDuplicates(
+  token: string,
+  keepCount = 1,
+  tcg?: string,
+): Promise<CollectionDuplicates> {
+  const params = new URLSearchParams({ keep: String(keepCount) });
+  if (tcg) params.set("tcg", tcg);
+  return authFetch(
+    `${API_BASE_URL}/analytics/duplicates?${params.toString()}`,
     token,
   );
 }

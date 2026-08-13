@@ -3,6 +3,40 @@ import XCTest
 
 @MainActor
 final class CardScannerCoordinatorTests: XCTestCase {
+    func testManualCropRescueOnlyAppearsWhenDeveloperOptionEnabled() async {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
+        defer {
+            defaults.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
+        }
+
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .noMatch,
+                    recorder: ScanInvocationRecorder()
+                )
+            ],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment)
+
+        await viewModel.scan(image: ScannerTestImage.solid())
+
+        XCTAssertNil(viewModel.cropRescueRequest)
+        XCTAssertNotNil(viewModel.errorMessage)
+
+        defaults.set(true, forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
+        await viewModel.scan(image: ScannerTestImage.solid())
+
+        XCTAssertNotNil(viewModel.cropRescueRequest)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
     func testEnvironmentChoosesRecognitionEngineForRegularScans() {
         let viewModel = CardScannerViewModel(
             coordinator: CardScannerCoordinator(strategies: [], apiService: APIService())

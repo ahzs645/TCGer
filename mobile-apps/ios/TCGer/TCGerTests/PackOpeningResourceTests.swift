@@ -72,6 +72,19 @@ final class PackOpeningResourceTests: XCTestCase {
         )
     }
 
+    func testPublishedCoverArtworkDoesNotShipInTheEmbeddedPackBundle() throws {
+        let root = try XCTUnwrap(PackOpeningResource.rootURL())
+        let manifestURL = root.appendingPathComponent("pack/manifest.json")
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
+        )
+        let covers = try XCTUnwrap(object["covers"] as? [String: [String: Any]])
+        XCTAssertTrue(covers.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("pack/covers", isDirectory: true).path
+        ))
+    }
+
     func testCompletedPullSessionDecodesFromTheJavaScriptBridge() {
         let body: [String: Any] = [
             "type": "saveRequested",
@@ -110,7 +123,13 @@ final class PackOpeningResourceTests: XCTestCase {
                 "selectedPackID": "base-charizard",
                 "selectedPackLabel": "Base Charizard",
                 "packCount": 1,
-                "packOptions": [["id": "base-charizard", "label": "Base Charizard"]],
+                "packOptions": [[
+                    "id": "base-charizard",
+                    "label": "Base Charizard",
+                    "setID": "base1",
+                    "setLabel": "Base Set",
+                    "variationLabel": "Charizard"
+                ]],
                 "revealedCount": 3,
                 "totalCards": 10,
                 "currentPackNumber": 1,
@@ -129,8 +148,58 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(state?.phase, .reveal)
         XCTAssertEqual(state?.selectedPackLabel, "Base Charizard")
         XCTAssertEqual(state?.packOptions.first?.id, "base-charizard")
+        XCTAssertEqual(state?.packSets.first?.label, "Base Set")
+        XCTAssertEqual(state?.selectedVariationLabel, "Charizard")
         XCTAssertEqual(state?.revealedCount, 3)
         XCTAssertEqual(state?.session?.id, "opening-native-1")
+    }
+
+    func testPackArtworkChoicesAreFilteredByTheSelectedSet() {
+        let options = [
+            PackOpeningInterfaceState.PackOption(
+                id: "base-venusaur",
+                label: "Base · Venusaur",
+                setID: "base1",
+                setLabel: "Base Set",
+                variationLabel: "Venusaur"
+            ),
+            PackOpeningInterfaceState.PackOption(
+                id: "base-blastoise",
+                label: "Base · Blastoise",
+                setID: "base1",
+                setLabel: "Base Set",
+                variationLabel: "Blastoise"
+            ),
+            PackOpeningInterfaceState.PackOption(
+                id: "swsh7:aurora",
+                label: "Evolving Skies · Aurora",
+                setID: "swsh7",
+                setLabel: "Evolving Skies",
+                variationLabel: "Aurora wrapper"
+            )
+        ]
+        let state = PackOpeningInterfaceState(
+            phase: .select,
+            selectedPackID: "base-blastoise",
+            selectedPackLabel: "Base · Blastoise",
+            packCount: 1,
+            packOptions: options,
+            revealedCount: 0,
+            totalCards: 0,
+            currentPackNumber: 0,
+            totalPacks: 0,
+            canSave: false,
+            warning: nil,
+            session: nil
+        )
+
+        XCTAssertEqual(state.packSets.map(\.label), ["Base Set", "Evolving Skies"])
+        XCTAssertEqual(state.selectedSetLabel, "Base Set")
+        XCTAssertEqual(
+            state.selectedSetOptions.map(\.resolvedVariationLabel),
+            ["Venusaur", "Blastoise"]
+        )
+        XCTAssertFalse(state.selectedSetOptions.contains { $0.resolvedSetID == "swsh7" })
     }
 
     func testNativePackCommandUsesTheExpectedBridgeShape() {

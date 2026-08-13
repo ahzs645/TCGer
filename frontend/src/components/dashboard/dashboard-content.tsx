@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AchievementsSection } from "@/components/achievements/achievements-section";
 import {
   Card,
   CardContent,
@@ -27,8 +28,10 @@ import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
 import { useAuthStore } from "@/stores/auth";
+import { useWishlistsStore } from "@/stores/wishlists";
 import type { CollectionCard, TcgCode } from "@/types/card";
 import { getSetCards } from "@/lib/api/cards";
+import { deriveCollectionAchievements } from "@/lib/achievements/achievements";
 import {
   isCardInSet,
   summarizeIdentityProgress,
@@ -129,19 +132,36 @@ function buildDashboardStats(
 export function DashboardContent() {
   const pathname = usePathname();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
-    enabledGames: state.enabledGames,
-    showPricing: state.showPricing,
-  })));
+  const { enabledGames, showPricing } = useModuleStore(
+    useShallow((state) => ({
+      enabledGames: state.enabledGames,
+      showPricing: state.showPricing,
+    })),
+  );
   const { collections, fetchCollections, isLoading, hasFetched, error } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      fetchCollections: state.fetchCollections,
-      isLoading: state.isLoading,
-      hasFetched: state.hasFetched,
-      error: state.error,
-    })));
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        isLoading: state.isLoading,
+        hasFetched: state.hasFetched,
+        error: state.error,
+      })),
+    );
   const { token, isAuthenticated } = useAuthStore();
+  const {
+    wishlists,
+    fetchWishlists,
+    hasFetched: hasFetchedWishlists,
+    isLoading: isLoadingWishlists,
+  } = useWishlistsStore(
+    useShallow((state) => ({
+      wishlists: state.wishlists,
+      fetchWishlists: state.fetchWishlists,
+      hasFetched: state.hasFetched,
+      isLoading: state.isLoading,
+    })),
+  );
 
   // Defer auth-dependent rendering to avoid SSR/client hydration mismatch.
   const [mounted, setMounted] = useState(false);
@@ -162,6 +182,23 @@ export function DashboardContent() {
       void fetchCollections(token);
     }
   }, [fetchCollections, hasFetched, isAuthenticated, isLoading, token]);
+
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      token &&
+      !hasFetchedWishlists &&
+      !isLoadingWishlists
+    ) {
+      void fetchWishlists(token);
+    }
+  }, [
+    fetchWishlists,
+    hasFetchedWishlists,
+    isAuthenticated,
+    isLoadingWishlists,
+    token,
+  ]);
 
   const aggregatedCards = useMemo<DashboardCard[]>(
     () =>
@@ -265,6 +302,20 @@ export function DashboardContent() {
       cancelled = true;
     };
   }, [filteredCards, representedSets, token]);
+  const achievements = useMemo(
+    () =>
+      deriveCollectionAchievements({
+        cards: aggregatedCards,
+        binderCount: collections.filter((binder) => binder.cards.length > 0)
+          .length,
+        wishlistCount: wishlists.filter((wishlist) => wishlist.cards.length > 0)
+          .length,
+        setCompletionPercents: setCompletion.map(
+          (metric) => metric.identityPercent,
+        ),
+      }),
+    [aggregatedCards, collections, setCompletion, wishlists],
+  );
   const loading = mounted && isAuthenticated && !hasFetched;
   const loadFailed = mounted && isAuthenticated && hasFetched && !!error;
   const hasNoCards = !loading && !loadFailed && stats.totalCopies === 0;
@@ -343,59 +394,61 @@ export function DashboardContent() {
 
       {!loadFailed &&
         (hasNoCards && !noGamesEnabled ? (
-        <Card data-oid="kfwfwwg">
-          <CardHeader data-oid="-qmjorv">
-            <CardTitle data-oid=":-yd9fk">Welcome to your dashboard</CardTitle>
-            <CardDescription data-oid="2hq021j">
-              Start by adding cards to a binder. Your collection analytics will
-              appear here once cards are tracked.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div
-          className="grid grid-cols-2 gap-3 md:gap-6 md:grid-cols-2 xl:grid-cols-4"
-          data-oid="g1sgkm_"
-        >
-          <StatCard
-            title="Total Cards"
-            value={stats.totalCopies.toLocaleString()}
-            description="Across all tracked TCGs"
-            icon={<Library className="h-5 w-5" data-oid=":yiulgw" />}
-            data-oid="23ilwbn"
-          />
-
-          {showPricing ? (
+          <Card data-oid="kfwfwwg">
+            <CardHeader data-oid="-qmjorv">
+              <CardTitle data-oid=":-yd9fk">
+                Welcome to your dashboard
+              </CardTitle>
+              <CardDescription data-oid="2hq021j">
+                Start by adding cards to a binder. Your collection analytics
+                will appear here once cards are tracked.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div
+            className="grid grid-cols-2 gap-3 md:gap-6 md:grid-cols-2 xl:grid-cols-4"
+            data-oid="g1sgkm_"
+          >
             <StatCard
-              title="Estimated Value"
-              value={new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: "USD",
-              }).format(stats.totalValue)}
-              description="Based on collection pricing"
-              icon={<Coins className="h-5 w-5" data-oid="bg_ukgc" />}
-              data-oid="lmka4i."
+              title="Total Cards"
+              value={stats.totalCopies.toLocaleString()}
+              description="Across all tracked TCGs"
+              icon={<Library className="h-5 w-5" data-oid=":yiulgw" />}
+              data-oid="23ilwbn"
             />
-          ) : null}
-          <StatCard
-            title="Active Games"
-            value={
-              Object.values(stats.byGame).filter((info) => info.copies > 0)
-                .length
-            }
-            description="Games with cards in your library"
-            icon={<Sparkles className="h-5 w-5" data-oid="nv1sv83" />}
-            data-oid="4n71tpc"
-          />
 
-          <StatCard
-            title="Recent Additions"
-            value={`${stats.recentActivity.length} card${stats.recentActivity.length === 1 ? "" : "s"}`}
-            description="Latest cards you've logged"
-            icon={<ArrowUpRight className="h-5 w-5" data-oid="dj20-l6" />}
-            data-oid="1bq2zrz"
-          />
-        </div>
+            {showPricing ? (
+              <StatCard
+                title="Estimated Value"
+                value={new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                }).format(stats.totalValue)}
+                description="Based on collection pricing"
+                icon={<Coins className="h-5 w-5" data-oid="bg_ukgc" />}
+                data-oid="lmka4i."
+              />
+            ) : null}
+            <StatCard
+              title="Active Games"
+              value={
+                Object.values(stats.byGame).filter((info) => info.copies > 0)
+                  .length
+              }
+              description="Games with cards in your library"
+              icon={<Sparkles className="h-5 w-5" data-oid="nv1sv83" />}
+              data-oid="4n71tpc"
+            />
+
+            <StatCard
+              title="Recent Additions"
+              value={`${stats.recentActivity.length} card${stats.recentActivity.length === 1 ? "" : "s"}`}
+              description="Latest cards you've logged"
+              icon={<ArrowUpRight className="h-5 w-5" data-oid="dj20-l6" />}
+              data-oid="1bq2zrz"
+            />
+          </div>
         ))}
 
       {!loadFailed && !hasNoCards && (
@@ -420,6 +473,8 @@ export function DashboardContent() {
           loading={isLoadingCompletion}
         />
       )}
+
+      {!loadFailed && <AchievementsSection achievements={achievements} />}
 
       {!loadFailed && !hasNoCards && (
         <RecentActivity items={stats.recentActivity} data-oid="2rew8b1" />

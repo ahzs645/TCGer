@@ -19,6 +19,7 @@ const sealedProductResponseValidator = v.object({
   imageUrl: v.optional(v.string()),
   msrp: v.optional(v.number()),
   upc: v.optional(v.string()),
+  isCustom: v.boolean(),
 });
 
 const sealedInventoryResponseValidator = v.object({
@@ -213,7 +214,36 @@ function toSealedProductResponse(product: Doc<"sealedProducts">) {
     imageUrl: product.imageUrl,
     msrp: product.msrp,
     upc: product.upc,
+    isCustom: product.isCustom === true,
   };
+}
+
+function cleanRequiredText(value: string, fieldName: string, maxLength = 200): string {
+  const cleaned = value.trim();
+  if (!cleaned || cleaned.length > maxLength) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `${fieldName} is required and must be at most ${maxLength} characters`,
+    });
+  }
+  return cleaned;
+}
+
+function cleanOptionalText(value: string | undefined, maxLength = 200): string | undefined {
+  const cleaned = value?.trim();
+  if (!cleaned) return undefined;
+  if (cleaned.length > maxLength) {
+    throw new ConvexError({ code: "BAD_REQUEST", message: `Value must be at most ${maxLength} characters` });
+  }
+  return cleaned;
+}
+
+function optionalPositiveInteger(value: number | undefined, fieldName: string): number | undefined {
+  return value === undefined ? undefined : requirePositiveInteger(value, fieldName);
+}
+
+function optionalNonnegativeNumber(value: number | undefined, fieldName: string): number | undefined {
+  return value === undefined ? undefined : requireNonnegativeNumber(value, fieldName);
 }
 
 function toSealedInventoryResponse(
@@ -321,22 +351,132 @@ export const seedCatalog = internalMutation({
 
 export const listProducts = internalQuery({
   args: {
+    subject: v.string(),
     tcg: v.optional(v.string()),
   },
   returns: v.array(sealedProductResponseValidator),
   handler: async (ctx, args) => {
-    const products = args.tcg
-      ? await ctx.db
-          .query("sealedProducts")
-          .withIndex("by_tcg_and_release_date", (q) => q.eq("tcg", args.tcg!))
-          .order("desc")
-          .take(1_000)
-      : await ctx.db
-          .query("sealedProducts")
-          .withIndex("by_release_date")
-          .order("desc")
-          .take(1_000);
-    return products.map(toSealedProductResponse);
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const [globalProducts, customProducts] = await Promise.all([
+      args.tcg
+        ? ctx.db
+            .query("sealedProducts")
+            .withIndex("by_owner_tcg_and_release_date", (q) =>
+              q.eq("ownerId", undefined).eq("tcg", args.tcg!),
+            )
+            .order("desc")
+            .take(1_000)
+        : ctx.db
+            .query("sealedProducts")
+            .withIndex("by_owner_and_release_date", (q) => q.eq("ownerId", undefined))
+            .order("desc")
+            .take(1_000),
+      args.tcg
+        ? ctx.db
+            .query("sealedProducts")
+            .withIndex("by_owner_tcg_and_release_date", (q) =>
+              q.eq("ownerId", viewer._id).eq("tcg", args.tcg!),
+            )
+            .order("desc")
+            .take(1_000)
+        : ctx.db
+            .query("sealedProducts")
+            .withIndex("by_owner_and_release_date", (q) => q.eq("ownerId", viewer._id))
+            .order("desc")
+            .take(1_000),
+    ]);
+    return [...customProducts, ...globalProducts].map(toSealedProductResponse);
+  },
+});
+
+const customProductArgs = {
+  tcg: v.string(),
+  name: v.string(),
+  productType: v.string(),
+  setCode: v.optional(v.string()),
+  cardsPerPack: v.optional(v.number()),
+  packsPerBox: v.optional(v.number()),
+  releaseDate: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  msrp: v.optional(v.number()),
+  upc: v.optional(v.string()),
+};
+
+export const createCustomProduct = internalMutation({
+  args: { subject: v.string(), ...customProductArgs },
+  returns: sealedProductResponseValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const timestamp = Date.now();
+    const id = await ctx.db.insert("sealedProducts", {
+      catalogKey: `custom:${viewer._id}:${crypto.randomUUID()}`,
+      ownerId: viewer._id,
+      isCustom: true,
+      tcg: cleanRequiredText(args.tcg, "tcg", 40).toLowerCase(),
+      name: cleanRequiredText(args.name, "name"),
+      productType: cleanRequiredText(args.productType, "productType", 80),
+      setCode: cleanOptionalText(args.setCode, 80),
+      cardsPerPack: optionalPositiveInteger(args.cardsPerPack, "cardsPerPack"),
+      packsPerBox: optionalPositiveInteger(args.packsPerBox, "packsPerBox"),
+      releaseDate: args.releaseDate ? parseIsoDate(args.releaseDate, "releaseDate") : undefined,
+      imageUrl: cleanOptionalText(args.imageUrl, 2_000),
+      msrp: optionalNonnegativeNumber(args.msrp, "msrp"),
+      upc: cleanOptionalText(args.upc, 80),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    const product = await ctx.db.get(id);
+    if (!product) throw new ConvexError({ code: "INVARIANT", message: "Custom product was not created" });
+    return toSealedProductResponse(product);
+  },
+});
+
+export const updateCustomProduct = internalMutation({
+  args: { subject: v.string(), productId: v.id("sealedProducts"), ...customProductArgs },
+  returns: sealedProductResponseValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const product = await ctx.db.get(args.productId);
+    if (!product || product.ownerId !== viewer._id || product.isCustom !== true) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Custom sealed product not found" });
+    }
+    await ctx.db.patch(product._id, {
+      tcg: cleanRequiredText(args.tcg, "tcg", 40).toLowerCase(),
+      name: cleanRequiredText(args.name, "name"),
+      productType: cleanRequiredText(args.productType, "productType", 80),
+      setCode: cleanOptionalText(args.setCode, 80),
+      cardsPerPack: optionalPositiveInteger(args.cardsPerPack, "cardsPerPack"),
+      packsPerBox: optionalPositiveInteger(args.packsPerBox, "packsPerBox"),
+      releaseDate: args.releaseDate ? parseIsoDate(args.releaseDate, "releaseDate") : undefined,
+      imageUrl: cleanOptionalText(args.imageUrl, 2_000),
+      msrp: optionalNonnegativeNumber(args.msrp, "msrp"),
+      upc: cleanOptionalText(args.upc, 80),
+      updatedAt: Date.now(),
+    });
+    const updated = await ctx.db.get(product._id);
+    if (!updated) throw new ConvexError({ code: "INVARIANT", message: "Custom product was not updated" });
+    return toSealedProductResponse(updated);
+  },
+});
+
+export const deleteCustomProduct = internalMutation({
+  args: { subject: v.string(), productId: v.id("sealedProducts") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const product = await ctx.db.get(args.productId);
+    if (!product || product.ownerId !== viewer._id || product.isCustom !== true) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Custom sealed product not found" });
+    }
+    const inventory = await ctx.db
+      .query("sealedInventory")
+      .withIndex("by_product", (q) => q.eq("productId", product._id))
+      .first();
+    if (inventory) {
+      throw new ConvexError({ code: "CONFLICT", message: "Remove this product from inventory before deleting it" });
+    }
+    await ctx.db.delete(product._id);
+    return null;
   },
 });
 
@@ -380,7 +520,7 @@ export const addInventory = internalMutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const product = await ctx.db.get(args.productId);
-    if (!product) {
+    if (!product || (product.ownerId !== undefined && product.ownerId !== viewer._id)) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Sealed product not found",

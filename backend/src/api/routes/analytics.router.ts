@@ -41,3 +41,16 @@ analyticsRouter.get(
     res.json(distribution);
   }),
 );
+
+analyticsRouter.get(
+  '/duplicates',
+  asyncHandler(async (req, res) => {
+    const { id: userId } = (req as AuthRequest).user!;
+    const rawKeepCount = typeof req.query.keep === 'string' ? req.query.keep.trim() : '';
+    const parsedKeepCount = /^\d+$/.test(rawKeepCount) ? Number.parseInt(rawKeepCount, 10) : 1;
+    const keepCount = Math.min(100, Math.max(1, parsedKeepCount));
+    const tcg = typeof req.query.tcg === 'string' ? req.query.tcg : undefined;
+    const duplicates = await analyticsService.getCollectionDuplicates(userId, keepCount, tcg);
+    res.json(duplicates);
+  }),
+);

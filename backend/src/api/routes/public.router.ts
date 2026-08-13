@@ -12,6 +12,7 @@ publicRouter.get('/collections/:shareToken', asyncHandler(async (req, res) => {
     where: { shareToken },
     include: {
       collections: {
+        take: 5_001,
         include: {
           card: { include: { tcgGame: true } },
           tags: { include: { tag: true } }
@@ -23,6 +24,13 @@ publicRouter.get('/collections/:shareToken', asyncHandler(async (req, res) => {
 
   if (!binder || !binder.isPublic) {
     res.status(404).json({ error: 'NOT_FOUND', message: 'Collection not found or is private' });
+    return;
+  }
+  if (binder.collections.length > 5_000) {
+    res.status(422).json({
+      error: 'LIMIT_EXCEEDED',
+      message: 'Public binders support up to 5,000 collection entries'
+    });
     return;
   }
 

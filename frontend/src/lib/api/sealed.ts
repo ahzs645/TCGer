@@ -8,6 +8,7 @@ import type {
   SealedOpeningLedger,
   SealedProductResponse,
   UpdateSealedInventoryInput,
+  CustomSealedProductInput,
 } from "@tcg/api-types";
 
 import { API_BASE_URL } from "./base-url";
@@ -22,6 +23,7 @@ export type {
   SealedOpeningLedger,
   SealedProductResponse,
   UpdateSealedInventoryInput,
+  CustomSealedProductInput,
 };
 
 export interface SealedOpeningResponse {
@@ -78,6 +80,22 @@ export async function getSealedProducts(
 ): Promise<SealedProductResponse[]> {
   const query = tcg ? `?tcg=${encodeURIComponent(tcg)}` : "";
   return authFetch(`${API_BASE_URL}/sealed/products${query}`, token);
+}
+
+export async function createCustomSealedProduct(token: string, input: CustomSealedProductInput): Promise<SealedProductResponse> {
+  return authFetch(`${API_BASE_URL}/sealed/products`, token, { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function updateCustomSealedProduct(token: string, productId: string, input: CustomSealedProductInput): Promise<SealedProductResponse> {
+  return authFetch(`${API_BASE_URL}/sealed/products/${productId}`, token, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export async function deleteCustomSealedProduct(token: string, productId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/sealed/products/${productId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to delete custom sealed product");
+  }
 }
 
 export async function simulatePackOpening(

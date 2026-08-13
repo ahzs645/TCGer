@@ -25,6 +25,13 @@ function parsePeriod(value: string | null) {
   return Math.min(365, Math.max(1, parsed));
 }
 
+function parseKeepCount(value: string | null) {
+  const parsed = value && /^\d+$/.test(value.trim())
+    ? Number.parseInt(value, 10)
+    : 1;
+  return Math.min(100, Math.max(1, parsed));
+}
+
 export function registerAnalyticsRoutes(http: HttpRouter) {
   http.route({
     path: "/analytics/value",
@@ -86,6 +93,26 @@ export function registerAnalyticsRoutes(http: HttpRouter) {
         );
       } catch (error) {
         return handleConvexError(error, "Failed to fetch collection distribution");
+      }
+    })
+  });
+
+  http.route({
+    path: "/analytics/duplicates",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const searchParams = new URL(request.url).searchParams;
+        return json(
+          await ctx.runQuery(analyticsApi.getDuplicates, {
+            subject: identity.subject,
+            keepCount: parseKeepCount(searchParams.get("keep")),
+            tcg: searchParams.get("tcg") || undefined
+          })
+        );
+      } catch (error) {
+        return handleConvexError(error, "Failed to fetch collection duplicates");
       }
     })
   });

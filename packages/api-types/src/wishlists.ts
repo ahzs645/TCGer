@@ -23,6 +23,12 @@ import type { PokedexEntry, PokemonFormatLegality } from './pokemon';
 
 const hexColorRegex = /^([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
 
+export const wishlistDesiredQuantitySchema = z
+  .number()
+  .int('Desired quantity must be a whole number')
+  .min(1, 'Desired quantity must be at least 1')
+  .max(99, 'Desired quantity must be at most 99');
+
 export const createWishlistSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
@@ -50,6 +56,7 @@ export const addWishlistCardSchema = z.object({
   originalPrintingKey: z.string().trim().min(1).optional(),
   tcg: tcgCodeSchema,
   name: z.string().min(1, 'Card name is required'),
+  desiredQuantity: wishlistDesiredQuantitySchema.optional(),
   setCode: z.string().optional(),
   setName: z.string().optional(),
   rarity: z.string().optional(),
@@ -74,6 +81,12 @@ export const addWishlistCardSchema = z.object({
   notes: z.string().optional()
 });
 export type AddWishlistCardInput = z.infer<typeof addWishlistCardSchema>;
+
+export const updateWishlistCardSchema = z.object({
+  desiredQuantity: wishlistDesiredQuantitySchema.optional(),
+  notes: z.string().optional()
+});
+export type UpdateWishlistCardInput = z.infer<typeof updateWishlistCardSchema>;
 
 /**
  * Cards per batch request. Rule expansion can produce hundreds of cards, so
@@ -231,10 +244,14 @@ export interface WishlistCardResponse {
   evolution?: PokemonEvolution;
   functionalIdentity?: CardFunctionalIdentity;
   notes?: string;
+  /** Total copies wanted. Legacy rows default to one. */
+  desiredQuantity: number;
   /** Whether this card exists in any of the user's collection binders */
   owned: boolean;
   /** Total quantity owned across all binders */
   ownedQuantity: number;
+  /** Copies still needed to satisfy desiredQuantity. */
+  missingQuantity: number;
   createdAt: string;
 }
 
@@ -256,6 +273,12 @@ export interface WishlistResponse {
   totalCards: number;
   /** Number of unique cards that are owned */
   ownedCards: number;
+  /** Total copies wanted across every card on the wishlist. */
+  totalDesiredQuantity: number;
+  /** Wanted copies currently covered by the collection. */
+  ownedDesiredQuantity: number;
+  /** Total copies still needed. */
+  missingQuantity: number;
   /** Completion percentage (0-100) */
   completionPercent: number;
   createdAt: string;

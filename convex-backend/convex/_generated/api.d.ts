@@ -29,6 +29,7 @@ import type * as lib_collectionImport from "../lib/collectionImport.js";
 import type * as lib_domain from "../lib/domain.js";
 import type * as lib_httpBridge from "../lib/httpBridge.js";
 import type * as lib_library from "../lib/library.js";
+import type * as lib_sharing from "../lib/sharing.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as sealed from "../sealed.js";
 import type * as sealedHttp from "../sealedHttp.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   "lib/domain": typeof lib_domain;
   "lib/httpBridge": typeof lib_httpBridge;
   "lib/library": typeof lib_library;
+  "lib/sharing": typeof lib_sharing;
   "lib/validators": typeof lib_validators;
   sealed: typeof sealed;
   sealedHttp: typeof sealedHttp;

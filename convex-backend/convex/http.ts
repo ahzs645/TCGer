@@ -46,6 +46,19 @@ function isTcgCode(value: unknown): value is TcgCode {
   return typeof value === "string" && TCG_CODES.includes(value as TcgCode);
 }
 
+function parseOptionalDesiredQuantity(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 99) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "desiredQuantity must be a whole number from 1 to 99"
+    });
+  }
+  return value;
+}
+
 type NativeTag = {
   id: string;
   label: string;
@@ -115,6 +128,8 @@ type NativeBinderDetail = {
   associatedTcg?: TcgCode;
   associatedSetCode?: string;
   associatedSetName?: string;
+  shareToken?: string;
+  isPublic: boolean;
   entryCount: number;
   entries: NativeEntry[];
   createdAt: string;
@@ -129,6 +144,7 @@ type NativeWishlistCard = RichCardMetadata & {
   artworkId?: string;
   tcg: TcgCode;
   name: string;
+  desiredQuantity: number;
   setCode?: string;
   setName?: string;
   rarity?: string;
@@ -141,6 +157,7 @@ type NativeWishlistCard = RichCardMetadata & {
   notes?: string;
   owned: boolean;
   ownedQuantity: number;
+  missingQuantity: number;
   createdAt: string;
 };
 
@@ -169,6 +186,9 @@ type NativeWishlist = {
   rules: NativeWishlistRule[];
   totalCards: number;
   ownedCards: number;
+  totalDesiredQuantity: number;
+  ownedDesiredQuantity: number;
+  missingQuantity: number;
   completionPercent: number;
   createdAt: string;
   updatedAt: string;
@@ -296,6 +316,8 @@ function toLegacyBinder(binder: NativeBinderDetail) {
     associatedTcg: binder.associatedTcg,
     associatedSetCode: binder.associatedSetCode,
     associatedSetName: binder.associatedSetName,
+    shareToken: binder.shareToken,
+    isPublic: binder.isPublic,
     cards: Array.from(grouped.values()),
     createdAt: binder.createdAt,
     updatedAt: binder.updatedAt
@@ -1229,19 +1251,26 @@ http.route({
       const body = await parseJsonBody(request);
 
       if (segments.length === 2 && segments[1] === "cards") {
+        const desiredQuantity = parseOptionalDesiredQuantity(body.desiredQuantity);
         const card = await ctx.runMutation(internal.bridge.addWishlistCard, {
           subject: identity.subject,
           wishlistId: asWishlistId(segments[0]),
-          card: body
+          card: desiredQuantity === undefined ? body : { ...body, desiredQuantity }
         });
         return json(card, 201);
       }
 
       if (segments.length === 3 && segments[1] === "cards" && segments[2] === "batch") {
+        const cards = Array.isArray(body.cards)
+          ? body.cards.map((card: Record<string, unknown>) => {
+              const desiredQuantity = parseOptionalDesiredQuantity(card?.desiredQuantity);
+              return desiredQuantity === undefined ? card : { ...card, desiredQuantity };
+            })
+          : [];
         const wishlist = await ctx.runMutation(internal.bridge.addWishlistCards, {
           subject: identity.subject,
           wishlistId: asWishlistId(segments[0]),
-          cards: Array.isArray(body.cards) ? body.cards : []
+          cards
         });
         return json(wishlist, 201);
       }
@@ -1295,6 +1324,20 @@ http.route({
             typeof body.lastMatchCount === "number" ? body.lastMatchCount : undefined
         });
         return json(rule);
+      }
+
+      if (segments.length === 3 && segments[1] === "cards") {
+        const card = await ctx.runMutation(internal.bridge.updateWishlistCard, {
+          subject: identity.subject,
+          wishlistId: asWishlistId(segments[0]),
+          cardId: asWishlistCardId(segments[2]),
+          desiredQuantity: parseOptionalDesiredQuantity(body.desiredQuantity),
+          notes:
+            typeof body.notes === "string" || body.notes === null
+              ? body.notes
+              : undefined
+        });
+        return json(card);
       }
 
       if (segments.length !== 1) {
@@ -2040,7 +2083,10 @@ http.route({
           associatedSetName:
             body.associatedSetName === null || typeof body.associatedSetName === "string"
               ? body.associatedSetName
-              : undefined
+              : undefined,
+          isPublic: typeof body.isPublic === "boolean" ? body.isPublic : undefined,
+          rotateShareToken:
+            typeof body.rotateShareToken === "boolean" ? body.rotateShareToken : undefined
         })) as NativeBinderDetail;
         return json(toLegacyBinder(binder));
       }

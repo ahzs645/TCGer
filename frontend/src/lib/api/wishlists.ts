@@ -3,6 +3,7 @@ import type {
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  UpdateWishlistCardInput,
   CreateWishlistRuleInput,
   UpdateWishlistRuleInput,
   WishlistResponse,
@@ -19,6 +20,7 @@ export type {
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  UpdateWishlistCardInput,
   CreateWishlistRuleInput,
   UpdateWishlistRuleInput,
 };
@@ -163,6 +165,32 @@ export async function addCardsToWishlist(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || "Failed to add cards to wishlist");
+  }
+
+  return response.json();
+}
+
+export async function updateWishlistCard(
+  token: string,
+  wishlistId: string,
+  cardId: string,
+  data: UpdateWishlistCardInput,
+): Promise<WishlistCardResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}/cards/${cardId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to update wishlist card");
   }
 
   return response.json();

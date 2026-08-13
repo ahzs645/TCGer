@@ -105,6 +105,23 @@ function isOptionalStringArray(value: unknown): value is string[] | undefined {
   return value === undefined || isStringArray(value);
 }
 
+function isOptionalDexEntries(
+  value: unknown,
+): value is Array<{ number: number; name: string }> | undefined {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (entry) =>
+          isRecord(entry) &&
+          typeof entry.number === "number" &&
+          Number.isInteger(entry.number) &&
+          entry.number > 0 &&
+          isString(entry.name),
+      ))
+  );
+}
+
 function parseManifestGame(value: unknown): CatalogManifestGame | undefined {
   if (
     !isRecord(value) ||
@@ -209,6 +226,8 @@ function isCatalogCard(value: unknown): value is CatalogCard {
     isOptionalString(value.collectorNumber) &&
     isOptionalString(value.rarity) &&
     isOptionalString(value.type) &&
+    isOptionalString(value.category) &&
+    isOptionalDexEntries(value.dexEntries) &&
     isOptionalStringArray(value.types) &&
     isOptionalNumber(value.hp) &&
     isOptionalString(value.manaCost) &&

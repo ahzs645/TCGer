@@ -42,21 +42,132 @@ function isIsoDateTime(value: unknown): value is string {
   );
 }
 
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function validCustomProductBody(body: Record<string, unknown>): boolean {
+  return (
+    typeof body.tcg === "string" &&
+    typeof body.name === "string" &&
+    typeof body.productType === "string" &&
+    hasValidOptionalStrings(body, ["setCode", "releaseDate", "imageUrl", "upc"]) &&
+    (body.releaseDate === undefined || isIsoDateTime(body.releaseDate)) &&
+    (body.imageUrl === undefined || isHttpUrl(body.imageUrl)) &&
+    (body.cardsPerPack === undefined || isPositiveInteger(body.cardsPerPack)) &&
+    (body.packsPerBox === undefined || isPositiveInteger(body.packsPerBox)) &&
+    (body.msrp === undefined || isNonnegativeNumber(body.msrp))
+  );
+}
+
+function customProductInput(body: Record<string, unknown>) {
+  return {
+    tcg: body.tcg as string,
+    name: body.name as string,
+    productType: body.productType as string,
+    setCode: body.setCode as string | undefined,
+    cardsPerPack: body.cardsPerPack as number | undefined,
+    packsPerBox: body.packsPerBox as number | undefined,
+    releaseDate: body.releaseDate as string | undefined,
+    imageUrl: body.imageUrl as string | undefined,
+    msrp: body.msrp as number | undefined,
+    upc: body.upc as string | undefined,
+  };
+}
+
+function singleProductId(request: Request): string | null {
+  const segments = new URL(request.url).pathname
+    .replace(/^\/sealed\/products\//, "")
+    .split("/")
+    .filter(Boolean);
+  return segments.length === 1 ? decodeURIComponent(segments[0]!) : null;
+}
+
 export function registerSealedRoutes(http: HttpRouter) {
   http.route({
     path: "/sealed/products",
     method: "GET",
     handler: httpAction(async (ctx, request) => {
       try {
-        await requireBridgeIdentity(ctx, request);
+        const identity = await requireBridgeIdentity(ctx, request);
         await ctx.runMutation(internal.sealed.seedCatalog, {});
         const tcg = new URL(request.url).searchParams.get("tcg") ?? undefined;
         const products = await ctx.runQuery(internal.sealed.listProducts, {
+          subject: identity.subject,
           tcg,
         });
         return json(products);
       } catch (error) {
         return handleConvexError(error, "Failed to fetch sealed products");
+      }
+    }),
+  });
+
+  http.route({
+    path: "/sealed/products",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const body = asRecord(await parseJsonBody(request));
+        if (!validCustomProductBody(body)) {
+          return errorJson(400, "VALIDATION_ERROR", "Payload validation failed");
+        }
+        const product = await ctx.runMutation(internal.sealed.createCustomProduct, {
+          subject: identity.subject,
+          ...customProductInput(body),
+        });
+        return json(product, 201);
+      } catch (error) {
+        return handleConvexError(error, "Failed to create custom sealed product");
+      }
+    }),
+  });
+
+  http.route({
+    pathPrefix: "/sealed/products/",
+    method: "PATCH",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const productId = singleProductId(request);
+        if (!productId) return errorJson(404, "NOT_FOUND", "Route not found");
+        const body = asRecord(await parseJsonBody(request));
+        if (!validCustomProductBody(body)) {
+          return errorJson(400, "VALIDATION_ERROR", "Payload validation failed");
+        }
+        return json(await ctx.runMutation(internal.sealed.updateCustomProduct, {
+          subject: identity.subject,
+          productId: productId as Id<"sealedProducts">,
+          ...customProductInput(body),
+        }));
+      } catch (error) {
+        return handleConvexError(error, "Failed to update custom sealed product");
+      }
+    }),
+  });
+
+  http.route({
+    pathPrefix: "/sealed/products/",
+    method: "DELETE",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const productId = singleProductId(request);
+        if (!productId) return errorJson(404, "NOT_FOUND", "Route not found");
+        await ctx.runMutation(internal.sealed.deleteCustomProduct, {
+          subject: identity.subject,
+          productId: productId as Id<"sealedProducts">,
+        });
+        return noContent();
+      } catch (error) {
+        return handleConvexError(error, "Failed to delete custom sealed product");
       }
     }),
   });

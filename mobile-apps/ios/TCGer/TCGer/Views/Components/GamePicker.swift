@@ -77,26 +77,32 @@ struct GamePickerPills: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(games) { game in
-                    Button {
-                        selection = game
-                    } label: {
-                        HStack(spacing: 6) {
-                            TCGGameIcon(game: game)
-                            Text(game.shortName)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    ForEach(games) { game in
+                        Button {
+                            selection = game
+                        } label: {
+                            HStack(spacing: 6) {
+                                TCGGameIcon(game: game)
+                                Text(game.shortName)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .foregroundStyle(selection == game ? Color.white : Color.primary)
+                            .contentShape(Capsule())
+                            .glassEffect(
+                                selection == game
+                                    ? .regular.tint(selectedColor(for: game)).interactive()
+                                    : .regular.interactive(),
+                                in: .capsule
+                            )
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(selection == game ? selectedColor(for: game) : Color(.systemGray5))
-                        .foregroundStyle(selection == game ? Color.white : Color.primary)
-                        .clipShape(Capsule())
-                        .contentShape(Capsule())
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selection == game ? [.isSelected] : [])
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == game ? [.isSelected] : [])
                 }
             }
             .padding(.horizontal)

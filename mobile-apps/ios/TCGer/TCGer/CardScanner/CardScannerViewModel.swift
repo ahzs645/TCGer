@@ -435,7 +435,9 @@ final class CardScannerViewModel: ObservableObject {
         }
         apply(
             result,
-            rescueInput: allowsCropRescue && source != .livePreview
+            rescueInput: allowsCropRescue
+                && source != .livePreview
+                && ScannerDevModeStore.isCropRescueEnabled
                 ? await Self.makeCropRescueRequest(image: image, sourceResultID: nil)
                 : nil
         )
@@ -831,7 +833,9 @@ final class CardScannerViewModel: ObservableObject {
             case .noMatch, .rejectedInput: canRescue = true
             default: canRescue = false
             }
-            if let rescueInput, canRescue {
+            if let rescueInput,
+               canRescue,
+               ScannerDevModeStore.isCropRescueEnabled {
                 errorMessage = nil
                 cropRescueRequest = rescueInput
                 state = .ready
@@ -845,14 +849,15 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     func prepareCropRescue(for resultID: CardScanResult.ID) {
-        guard let request = rescueSources[resultID] else { return }
+        guard ScannerDevModeStore.isCropRescueEnabled,
+              let request = rescueSources[resultID] else { return }
         latestResult = nil
         state = .ready
         cropRescueRequest = request
     }
 
     func canRescueCrop(for resultID: CardScanResult.ID) -> Bool {
-        rescueSources[resultID] != nil
+        ScannerDevModeStore.isCropRescueEnabled && rescueSources[resultID] != nil
     }
 
     func cancelCropRescue() {

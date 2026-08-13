@@ -12,7 +12,9 @@
     "postbuild:demo": "git checkout -- app/api",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test src/lib/storage/portable-rules.test.ts src/lib/storage/legacy-collection-rows.test.ts src/lib/storage/legacy-portfolio-rows.test.ts src/lib/api/demo-adapter.test.ts src/lib/api/collection-semantics.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts src/stores/demo-store.test.ts",
+    "test": "tsx --test src/lib/storage/portable-rules.test.ts src/lib/storage/legacy-collection-rows.test.ts src/lib/storage/legacy-portfolio-rows.test.ts src/lib/api/demo-adapter.test.ts src/lib/api/collection-semantics.test.ts src/lib/catalog/catalog-search.test.ts src/lib/data/demo-cards.test.ts src/lib/achievements/achievements.test.ts src/lib/pokedex/pokedex.test.ts src/stores/demo-store.test.ts",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\"",
     "sync-pack-assets": "node ../packages/pack-core/scripts/sync-assets.mjs public"
   },
@@ -65,6 +67,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
+    "@playwright/test": "^1.62.1",
     "@types/classnames": "^2.3.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

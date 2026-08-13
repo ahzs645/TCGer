@@ -85,19 +85,6 @@ struct SetBrowserView: View {
 
     private var setBrowserContent: some View {
         VStack(spacing: 0) {
-                if environmentStore.shouldShowGamePicker {
-                    GamePickerPills(
-                        selection: $selectedGame,
-                        games: environmentStore.gamePickerGames
-                    )
-                    .background(Color(.systemBackground))
-                    Divider()
-                }
-
-                if !failedProviders.isEmpty {
-                    failedProvidersBanner
-                }
-
                 if isLoading {
                     ProgressView("Loading sets...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,72 +106,70 @@ struct SetBrowserView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredSets.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 50))
-                            .foregroundColor(.secondary)
-                        Text("No Sets Found")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text("Try a different search, game, or progress filter.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(groupedSets, id: \.0) { tcg, tcgSets in
-                            Section {
-                                ForEach(tcgSets) { set in
-                                    NavigationLink {
-                                        SetDetailView(set: set)
-                                            .environmentObject(environmentStore)
-                                    } label: {
-                                        SetRow(
-                                            set: set,
-                                            ownedCount: ownedCount(for: set),
-                                            progressTotal: progressTotal(for: set)
-                                        )
+                        if environmentStore.shouldShowGamePicker {
+                            GamePickerPills(
+                                selection: $selectedGame,
+                                games: environmentStore.gamePickerGames
+                            )
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+
+                        if !failedProviders.isEmpty {
+                            failedProvidersBanner
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                        }
+
+                        if filteredSets.isEmpty {
+                            ContentUnavailableView {
+                                Label("No Sets Found", systemImage: "tray")
+                            } description: {
+                                Text("Try a different search, game, or progress filter.")
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        } else {
+                            ForEach(groupedSets, id: \.0) { tcg, tcgSets in
+                                Section {
+                                    ForEach(tcgSets) { set in
+                                        NavigationLink {
+                                            SetDetailView(set: set)
+                                                .environmentObject(environmentStore)
+                                        } label: {
+                                            SetRow(
+                                                set: set,
+                                                ownedCount: ownedCount(for: set),
+                                                progressTotal: progressTotal(for: set)
+                                            )
+                                        }
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                            addToWishlistAction(for: set, iconOnly: true)
+                                        }
+                                        .contextMenu {
+                                            addToWishlistAction(for: set)
+                                        }
                                     }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        Color(.secondarySystemGroupedBackground),
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    )
-                                    .listRowInsets(
-                                        EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16)
-                                    )
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        addToWishlistAction(for: set, iconOnly: true)
+                                } header: {
+                                    if environmentStore.shouldShowGamePicker {
+                                        GameSectionHeader(tcg: tcg)
                                     }
-                                    .contextMenu {
-                                        addToWishlistAction(for: set)
-                                    }
-                                }
-                            } header: {
-                                if environmentStore.shouldShowGamePicker {
-                                    GameSectionHeader(tcg: tcg)
                                 }
                             }
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(Color(.systemGroupedBackground))
+                    .listStyle(.insetGrouped)
                 }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Sets")
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search sets..."
             )
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     setFilterMenu

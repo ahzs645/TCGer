@@ -114,6 +114,114 @@ describe("analytics and trades Convex HTTP routes", () => {
     });
   });
 
+  test("finds exact-printing duplicates with configurable keep count", async () => {
+    const t = createTestConvex();
+    const asAvery = t.withIdentity({ subject: "duplicates_avery", name: "Avery" });
+    const avery = await asAvery.mutation(api.users.ensureCurrent, {
+      username: "duplicates-avery"
+    });
+    const tradeBinder = await asAvery.mutation(api.binders.create, {
+      name: "Trade Binder"
+    });
+    const blackLotus = {
+      externalId: "lea-black-lotus",
+      tcg: "magic" as const,
+      name: "Black Lotus",
+      setCode: "LEA",
+      setName: "Limited Edition Alpha",
+      collectorNumber: "232"
+    };
+    await asAvery.mutation(api.collections.addToBinder, {
+      binderId: avery.libraryBinderId,
+      quantity: 2,
+      condition: "Near Mint",
+      price: 10,
+      card: blackLotus
+    });
+    await asAvery.mutation(api.collections.addToBinder, {
+      binderId: tradeBinder.id,
+      quantity: 2,
+      condition: "Played",
+      price: 4,
+      card: blackLotus
+    });
+    await asAvery.mutation(api.collections.addToBinder, {
+      binderId: avery.libraryBinderId,
+      price: 2,
+      card: { externalId: "unique-card", tcg: "magic", name: "Unique Card" }
+    });
+
+    const outsider = t.withIdentity({ subject: "duplicates_outsider", name: "Outsider" });
+    const outsiderUser = await outsider.mutation(api.users.ensureCurrent, {
+      username: "duplicates-outsider"
+    });
+    await outsider.mutation(api.collections.addToBinder, {
+      binderId: outsiderUser.libraryBinderId,
+      quantity: 8,
+      card: blackLotus
+    });
+
+    const headers = bridgeHeaders("duplicates_avery", "duplicates-avery");
+    const response = await t.fetch("/analytics/duplicates?keep=1", { headers });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      keepCount: 1,
+      totalPrintings: 1,
+      totalExcessCopies: 3,
+      totalStoredValue: 28,
+      totalExcessStoredValue: 18,
+      items: [
+        expect.objectContaining({
+          externalId: "lea-black-lotus",
+          tcg: "magic",
+          name: "Black Lotus",
+          quantity: 4,
+          excessCopies: 3,
+          storedValue: 28,
+          excessStoredValue: 18,
+          binders: expect.arrayContaining([
+            {
+              binderId: avery.libraryBinderId,
+              binderName: "Library",
+              quantity: 2
+            },
+            {
+              binderId: tradeBinder.id,
+              binderName: "Trade Binder",
+              quantity: 2
+            }
+          ]),
+          conditions: [
+            { condition: "Near Mint", quantity: 2 },
+            { condition: "Played", quantity: 2 }
+          ]
+        })
+      ]
+    });
+
+    const keepTwo = await t.fetch("/analytics/duplicates?keep=2", { headers });
+    expect(await keepTwo.json()).toMatchObject({
+      keepCount: 2,
+      totalPrintings: 1,
+      totalExcessCopies: 2,
+      totalExcessStoredValue: 8,
+      items: [{ quantity: 4, excessCopies: 2, excessStoredValue: 8 }]
+    });
+
+    const pokemonOnly = await t.fetch(
+      "/analytics/duplicates?keep=1&tcg=pokemon",
+      { headers }
+    );
+    expect(await pokemonOnly.json()).toEqual({
+      keepCount: 1,
+      totalPrintings: 0,
+      totalExcessCopies: 0,
+      totalStoredValue: 0,
+      totalExcessStoredValue: 0,
+      items: []
+    });
+  });
+
   test("lazily creates and idempotently refreshes today's value snapshot", async () => {
     const t = createTestConvex();
     const asAvery = t.withIdentity({ subject: "history_avery", name: "Avery" });
@@ -280,6 +388,43 @@ describe("analytics and trades Convex HTTP routes", () => {
     ]);
   });
 
+  test("enables, rotates, and disables an owned binder share link", async () => {
+    const t = createTestConvex();
+    const asOwner = t.withIdentity({ subject: "share_owner", name: "Owner" });
+    await asOwner.mutation(api.users.ensureCurrent, { username: "owner" });
+    const binder = await asOwner.mutation(api.binders.create, { name: "Shareable" });
+    const headers = bridgeHeaders("share_owner", "owner");
+
+    const enable = await t.fetch(`/collections/${binder.id}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublic: true }),
+    });
+    expect(enable.status).toBe(200);
+    const enabled = await enable.json();
+    expect(enabled).toMatchObject({ isPublic: true });
+    expect(enabled.shareToken).toMatch(/^[a-f0-9]{32}$/);
+
+    const rotate = await t.fetch(`/collections/${binder.id}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublic: true, rotateShareToken: true }),
+    });
+    const rotated = await rotate.json();
+    expect(rotated.shareToken).not.toBe(enabled.shareToken);
+
+    const disable = await t.fetch(`/collections/${binder.id}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublic: false }),
+    });
+    expect(disable.status).toBe(200);
+    expect(await disable.json()).toMatchObject({ isPublic: false });
+    expect((await t.fetch(`/public/collections/${rotated.shareToken}`, {
+      headers: { "x-tcger-bridge-key": TEST_BRIDGE_SECRET },
+    })).status).toBe(404);
+  });
+
   test("supports trade CRUD and role-owned accept, decline, and cancel transitions", async () => {
     const t = createTestConvex();
     for (const [subject, username] of [
@@ -442,11 +587,13 @@ describe("analytics and trades Convex HTTP routes", () => {
       Authorization: "Bearer forged-token",
       "x-tcger-user-id": "forged-user"
     };
-    const [analytics, trades] = await Promise.all([
+    const [analytics, duplicates, trades] = await Promise.all([
       t.fetch("/analytics/value", { headers: forgedHeaders }),
+      t.fetch("/analytics/duplicates", { headers: forgedHeaders }),
       t.fetch("/trades", { headers: forgedHeaders })
     ]);
     expect(analytics.status).toBe(401);
+    expect(duplicates.status).toBe(401);
     expect(trades.status).toBe(401);
   });
 });

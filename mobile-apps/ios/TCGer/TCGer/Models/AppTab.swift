@@ -7,6 +7,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
     case home
     case collections
     case sets
+    case pokedex
     case decks
     case wishlists
     case guides
@@ -25,6 +26,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .home: return "Home"
         case .collections: return "Collections"
         case .sets: return "Sets"
+        case .pokedex: return "Pokédex"
         case .decks: return "Decks"
         case .wishlists: return "Wishlists"
         case .guides: return "Guides"
@@ -43,6 +45,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .home: return "house.fill"
         case .collections: return "folder.fill"
         case .sets: return "square.stack.3d.up"
+        case .pokedex: return "square.grid.3x3.fill"
         case .decks: return "rectangle.stack.fill"
         case .wishlists: return "heart.fill"
         case .guides: return "sparkles.rectangle.stack.fill"
@@ -61,6 +64,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .home: return "Dashboard, stats, and recent cards"
         case .collections: return "Binders, smart folders, and CSV import"
         case .sets: return "Browse sets and track set completion"
+        case .pokedex: return "Track Pokémon species across your collection"
         case .decks: return "Build, validate, import, and export decks"
         case .wishlists: return "Cards you're hunting for"
         case .guides: return "Curated card collections to follow"

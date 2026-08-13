@@ -8,6 +8,7 @@ import type {
 import type {
   CreateSealedInventoryInput,
   CreateSealedOpeningInput,
+  CustomSealedProductInput,
   RecordOpenedCardSaleInput,
   SealedInventoryResponse,
   SealedOpeningLedger,
@@ -32,7 +33,8 @@ function serializeSealedProduct(product: SealedProduct): SealedProductResponse {
     releaseDate: product.releaseDate?.toISOString(),
     imageUrl: product.imageUrl ?? undefined,
     msrp: product.msrp == null ? undefined : Number(product.msrp),
-    upc: product.upc ?? undefined
+    upc: product.upc ?? undefined,
+    isCustom: product.ownerId !== null
   };
 }
 
@@ -75,16 +77,22 @@ function serializeSealedOpenedCard(card: SealedOpenedCard) {
 // Sealed Products Catalog
 // ---------------------------------------------------------------------------
 
-export async function getSealedProducts(tcg?: string) {
+export async function getSealedProducts(userId: string, tcg?: string) {
   const products = await prisma.sealedProduct.findMany({
-    where: tcg ? { tcg } : undefined,
-    orderBy: { releaseDate: 'desc' }
+    where: {
+      OR: [{ ownerId: null }, { ownerId: userId }],
+      ...(tcg ? { tcg } : {})
+    },
+    orderBy: { releaseDate: 'desc' },
+    take: 2_000
   });
   return products.map(serializeSealedProduct);
 }
 
-export async function getSealedProduct(productId: string) {
-  const product = await prisma.sealedProduct.findUnique({ where: { id: productId } });
+export async function getSealedProduct(userId: string, productId: string) {
+  const product = await prisma.sealedProduct.findFirst({
+    where: { id: productId, OR: [{ ownerId: null }, { ownerId: userId }] }
+  });
   return product ? serializeSealedProduct(product) : null;
 }
 
@@ -95,7 +103,7 @@ export function normalizeSealedProductBarcode(value: string): string | null {
   return digits.length >= 8 && digits.length <= 14 ? digits : null;
 }
 
-export async function getSealedProductByBarcode(barcode: string) {
+export async function getSealedProductByBarcode(userId: string, barcode: string) {
   const normalized = normalizeSealedProductBarcode(barcode);
   if (!normalized) return null;
 
@@ -107,9 +115,73 @@ export async function getSealedProductByBarcode(barcode: string) {
   }
 
   const product = await prisma.sealedProduct.findFirst({
-    where: { upc: { in: [...equivalents] } },
+    where: {
+      upc: { in: [...equivalents] },
+      OR: [{ ownerId: null }, { ownerId: userId }]
+    },
   });
   return product ? serializeSealedProduct(product) : null;
+}
+
+export async function createCustomSealedProduct(
+  userId: string,
+  input: CustomSealedProductInput
+) {
+  const product = await prisma.sealedProduct.create({
+    data: {
+      ...input,
+      ownerId: userId,
+      releaseDate: input.releaseDate ? new Date(input.releaseDate) : undefined
+    }
+  });
+  return serializeSealedProduct(product);
+}
+
+async function requireOwnedCustomProduct(userId: string, productId: string) {
+  const product = await prisma.sealedProduct.findFirst({
+    where: { id: productId, ownerId: userId }
+  });
+  if (!product) {
+    const error = new Error('Custom sealed product not found') as Error & { status: number };
+    error.status = 404;
+    throw error;
+  }
+  return product;
+}
+
+export async function updateCustomSealedProduct(
+  userId: string,
+  productId: string,
+  input: CustomSealedProductInput
+) {
+  await requireOwnedCustomProduct(userId, productId);
+  const product = await prisma.sealedProduct.update({
+    where: { id: productId },
+    data: {
+      ...input,
+      releaseDate: input.releaseDate ? new Date(input.releaseDate) : null,
+      setCode: input.setCode ?? null,
+      cardsPerPack: input.cardsPerPack ?? null,
+      packsPerBox: input.packsPerBox ?? null,
+      imageUrl: input.imageUrl ?? null,
+      msrp: input.msrp ?? null,
+      upc: input.upc ?? null
+    }
+  });
+  return serializeSealedProduct(product);
+}
+
+export async function deleteCustomSealedProduct(userId: string, productId: string) {
+  await requireOwnedCustomProduct(userId, productId);
+  const inventoryCount = await prisma.sealedInventory.count({ where: { productId } });
+  if (inventoryCount > 0) {
+    const error = new Error(
+      'Custom sealed product cannot be deleted while it is in inventory'
+    ) as Error & { status: number };
+    error.status = 409;
+    throw error;
+  }
+  await prisma.sealedProduct.delete({ where: { id: productId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +198,12 @@ export async function getUserSealedInventory(userId: string) {
 }
 
 export async function addSealedInventory(userId: string, input: CreateSealedInventoryInput) {
+  const product = await getSealedProduct(userId, input.productId);
+  if (!product) {
+    const error = new Error('Sealed product not found') as Error & { status: number };
+    error.status = 404;
+    throw error;
+  }
   const inventory = await prisma.sealedInventory.create({
     data: {
       userId,

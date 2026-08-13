@@ -104,6 +104,8 @@ struct ContentView: View {
             )
         case .sets:
             SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
+        case .pokedex:
+            PokedexView(parentProvidesNavigation: parentProvidesNavigation)
         case .decks:
             DecksView(parentProvidesNavigation: parentProvidesNavigation)
         case .wishlists:
@@ -137,7 +139,7 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
         case .sealed:
             return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
-        case .sets, .decks, .wishlists, .guides, .prices, .analytics, .trades, .activity, .scan:
+        case .sets, .pokedex, .decks, .wishlists, .guides, .prices, .analytics, .trades, .activity, .scan:
             return environmentStore.isAuthenticated
         }
     }

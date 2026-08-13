@@ -64,6 +64,7 @@ interface CatalogCard {
   rarity?: string;
   artist?: string;
   category?: string;
+  dexEntries?: Array<{ number: number; name: string }>;
   stage?: string;
   suffix?: string;
   archetype?: string;
@@ -191,6 +192,7 @@ interface TcgdexCardIndexResponse {
       rarity?: string;
       illustrator?: string;
       category?: string;
+      dexId?: number[];
       stage?: string;
       suffix?: string;
       types?: string[];
@@ -477,6 +479,7 @@ async function fetchPokemonCardIndex(): Promise<
     rarity?: string;
     artist?: string;
     category?: string;
+    dexEntries?: Array<{ number: number; name: string }>;
     stage?: string;
     suffix?: string;
     types?: string[];
@@ -489,7 +492,7 @@ async function fetchPokemonCardIndex(): Promise<
     {
       method: 'POST',
       body: JSON.stringify({
-        query: 'query CatalogCardMetadata { cards { id rarity illustrator category stage suffix types } }',
+        query: 'query CatalogCardMetadata { cards { id rarity illustrator category stage suffix types dexId } }',
       }),
     },
   );
@@ -512,6 +515,7 @@ async function fetchPokemonCardIndex(): Promise<
           rarity: card.rarity,
           artist: card.illustrator,
           category: card.category,
+          dexEntries: card.dexId?.map((number) => ({ number, name: "" })),
           stage: card.stage,
           suffix: card.suffix,
           types: card.types,
@@ -637,6 +641,10 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
             }),
             artist: pocket?.illustrator ?? metadata?.artist,
             category: pocket?.category ?? metadata?.category,
+            dexEntries: metadata?.dexEntries?.map((entry) => ({
+              number: entry.number,
+              name: card.name,
+            })),
             stage: pocket?.stage ?? metadata?.stage,
             suffix: metadata?.suffix,
             type: pocket?.category ?? metadata?.category,

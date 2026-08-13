@@ -228,6 +228,7 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     let setCode: String?
     let collectorNumber: String?
     let rarity: String?
+    var dexEntries: [PokedexEntry]? = nil
     var artist: String? = nil
     var archetype: String? = nil
     var classifications: [String]? = nil
@@ -1065,6 +1066,18 @@ final class CatalogStore: ObservableObject {
         }
         return pack.cards.compactMap { card in
             card.setCode == setCode ? CatalogEntry(tcg: tcg, card: card) : nil
+        }
+    }
+
+    /// Pokémon printings carrying normalized Pokédex metadata. This keeps the
+    /// completion screen on the same downloaded catalog used by search.
+    func pokedexCards() -> [CatalogEntry] {
+        guard enabledGames.contains(.pokemon), let pack = loadedPacks[.pokemon] else {
+            return []
+        }
+        return pack.cards.compactMap { card in
+            guard SearchTextNormalizer.key(card.type ?? "") == "pokemon" else { return nil }
+            return CatalogEntry(tcg: .pokemon, card: card)
         }
     }
 

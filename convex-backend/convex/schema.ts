@@ -169,6 +169,7 @@ export default defineSchema({
     externalId: v.string(),
     tcg: tcgCode,
     name: v.string(),
+    desiredQuantity: v.optional(v.number()),
     baseExternalId: v.optional(v.string()),
     printingKey: v.optional(v.string()),
     artworkId: v.optional(v.string()),
@@ -414,6 +415,8 @@ export default defineSchema({
 
   sealedProducts: defineTable({
     catalogKey: v.string(),
+    ownerId: v.optional(v.id("users")),
+    isCustom: v.optional(v.boolean()),
     tcg: v.string(),
     name: v.string(),
     productType: v.string(),
@@ -428,6 +431,9 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_catalog_key", ["catalogKey"])
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_and_release_date", ["ownerId", "releaseDate"])
+    .index("by_owner_tcg_and_release_date", ["ownerId", "tcg", "releaseDate"])
     .index("by_release_date", ["releaseDate"])
     .index("by_tcg_and_release_date", ["tcg", "releaseDate"]),
 

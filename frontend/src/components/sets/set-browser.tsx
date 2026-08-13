@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   CheckCircle2,
   Loader2,
+  Plus,
   Search,
 } from "lucide-react";
 
@@ -100,10 +101,12 @@ export function SetBrowser() {
       collectionsLoading: state.isLoading,
     })));
   const [query, setQuery] = useState("");
-  const [progress, setProgress] = useState<ProgressFilter>("all");
+  const [progress, setProgress] = useState<ProgressFilter>("started");
+  const [searchOverridesProgress, setSearchOverridesProgress] = useState(false);
   const [sort, setSort] = useState<SetSort>("release");
   const [year, setYear] = useState("all");
   const [collectionId, setCollectionId] = useState(ALL_COLLECTION_ID);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -162,6 +165,9 @@ export function SetBrowser() {
 
   const visibleSets = useMemo(() => {
     const needle = searchText(query.trim());
+    // Search the full catalog even though the default view is limited to sets
+    // represented in the collector's collection.
+    const effectiveProgress = searchOverridesProgress ? "all" : progress;
     return (setsQuery.data ?? [])
       .filter((set) => {
         if (!enabledGames[set.tcg]) return false;
@@ -179,11 +185,13 @@ export function SetBrowser() {
 
         const owned = ownedCounts.get(`${set.tcg}:${set.code}`) ?? 0;
         const total = set.totalCards ?? 0;
-        if (progress === "started") {
-          return owned > 0 && (!total || owned < total);
+        if (effectiveProgress === "started") {
+          return owned > 0;
         }
-        if (progress === "complete") return total > 0 && owned >= total;
-        if (progress === "not-started") return owned === 0;
+        if (effectiveProgress === "complete") {
+          return total > 0 && owned >= total;
+        }
+        if (effectiveProgress === "not-started") return owned === 0;
         return true;
       })
       .sort((left, right) => compareSets(left, right, sort));
@@ -193,6 +201,7 @@ export function SetBrowser() {
     ownedCounts,
     progress,
     query,
+    searchOverridesProgress,
     setsQuery.data,
     sort,
     year,
@@ -235,29 +244,63 @@ export function SetBrowser() {
   const noGamesEnabled = Object.values(enabledGames).every(
     (enabled) => !enabled,
   );
+  const isCatalogSearch = Boolean(query.trim());
+  const isDefaultStartedView = progress === "started" && !isCatalogSearch;
+
+  const browseAllSets = () => {
+    setProgress("all");
+    setSearchOverridesProgress(false);
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
+
+  const updateQuery = (value: string) => {
+    if (!query.trim() && value.trim() && progress === "started") {
+      setSearchOverridesProgress(true);
+    } else if (!value.trim()) {
+      setSearchOverridesProgress(false);
+    }
+    setQuery(value);
+  };
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-4">
-          <CardTitle asChild className="text-lg"><h2>Find a set</h2></CardTitle>
-          <CardDescription>
-            Completion is measured by unique printings in{" "}
-            {collectionId === ALL_COLLECTION_ID
-              ? "your entire collection"
-              : (collections.find((entry) => entry.id === collectionId)?.name ??
-                "the selected binder")}
-            .
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle asChild className="text-lg">
+              <h2>{isDefaultStartedView ? "Your sets" : "Find a set"}</h2>
+            </CardTitle>
+            <CardDescription>
+              {isDefaultStartedView
+                ? "Sets with cards in your collection appear here. Search always looks across the full catalog."
+                : `Completion is measured by unique printings in ${
+                    collectionId === ALL_COLLECTION_ID
+                      ? "your entire collection"
+                      : (collections.find((entry) => entry.id === collectionId)
+                          ?.name ?? "the selected binder")
+                  }.`}
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={browseAllSets}
+            className="shrink-0"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add a set
+          </Button>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
           <label className="relative sm:col-span-2">
             <span className="sr-only">Search sets</span>
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by set name or code"
+              onChange={(event) => updateQuery(event.target.value)}
+              placeholder="Search all sets by name or code"
               className="pl-9"
             />
           </label>
@@ -295,8 +338,11 @@ export function SetBrowser() {
             </SelectContent>
           </Select>
           <Select
-            value={progress}
-            onValueChange={(value) => setProgress(value as ProgressFilter)}
+            value={searchOverridesProgress ? "all" : progress}
+            onValueChange={(value) => {
+              setSearchOverridesProgress(false);
+              setProgress(value as ProgressFilter);
+            }}
           >
             <SelectTrigger aria-label="Completion status">
               <SelectValue placeholder="Any progress" />
@@ -304,7 +350,7 @@ export function SetBrowser() {
             <SelectContent>
               <SelectItem value="all">Any progress</SelectItem>
               <SelectItem value="not-started">Not started</SelectItem>
-              <SelectItem value="started">In progress</SelectItem>
+              <SelectItem value="started">Started</SelectItem>
               <SelectItem value="complete">Complete</SelectItem>
             </SelectContent>
           </Select>
@@ -379,8 +425,25 @@ export function SetBrowser() {
         !setsQuery.isError &&
         groupedSets.length === 0 && (
           <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No sets match these filters.
+            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+              <div className="space-y-1.5">
+                <p className="font-medium text-foreground">
+                  {isDefaultStartedView
+                    ? "You haven’t started any sets yet"
+                    : "No sets match these filters"}
+                </p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  {isDefaultStartedView
+                    ? "Choose a set, open its checklist, and add your first card. It will appear here automatically."
+                    : "Try a different search or clear one of the filters."}
+                </p>
+              </div>
+              {isDefaultStartedView && (
+                <Button type="button" onClick={browseAllSets}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Browse all sets
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -391,7 +454,9 @@ export function SetBrowser() {
             <h2 className="text-xl font-heading font-semibold">
               {GAME_LABELS[tcg]}
             </h2>
-            <Badge variant="secondary">{sets.length} sets</Badge>
+            <Badge variant="secondary">
+              {sets.length} {sets.length === 1 ? "set" : "sets"}
+            </Badge>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {sets.map((set) => {

@@ -26,6 +26,14 @@ pnpm-debug.log*
 # Coverage
 coverage/
 
+# Generated test runner artifacts
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/.playwright/
+**/.nyc_output/
+junit*.xml
+
 # Prisma
 backend/prisma/dev.db
 
@@ -49,6 +57,13 @@ tmp/
 # Xcode user-specific state
 **/xcuserdata/
 *.xcuserstate
+
+# Xcode build and test products
+**/DerivedData/
+**/*.xcresult/
+**/*.xccovarchive/
+*.profraw
+*.profdata
 
 # Local research artifacts
 research/
@@ -79,3 +94,9 @@ mobile-apps/ios/TCGer/TCGer/Resources/Catalogs/*
 # submodule by its sync-assets script — neither bundler serves files from a
 # submodule, so the copy is generated, not tracked.
 frontend/public/pack/
+
+# Published pack artwork is fetched from the R2 manifest. The embedded iOS
+# fallback may keep generic pack resources, but never projected cover images.
+mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle/pack/covers/
+mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle/pack/bases/
+mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle/pack/decals/

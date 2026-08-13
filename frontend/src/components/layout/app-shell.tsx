@@ -20,6 +20,7 @@ import {
   Camera,
   Palette,
   ReceiptText,
+  BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ServerFeatures } from "@tcg/api-types";
@@ -34,6 +35,7 @@ interface NavigationItem {
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
 export const secondaryNavigation: NavigationItem[] = [
+  { href: "/pokedex", label: "Pokédex", icon: BookOpen },
   { href: "/guides", label: "Guides", icon: Palette },
   { href: "/sets", label: "Sets", icon: LibraryBig },
   { href: "/decks", label: "Decks", icon: Layers, feature: "decks" },

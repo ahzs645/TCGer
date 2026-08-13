@@ -118,6 +118,7 @@ export interface DemoWishlistCard {
   setCode: string;
   setName: string;
   rarity: string;
+  desiredQuantity?: number;
   addedAt: string;
   cardData?: AddWishlistCardInput;
 }
@@ -1337,6 +1338,11 @@ interface DemoState {
     card: DemoOwnedCard,
     cardData?: AddWishlistCardInput,
   ) => Promise<void>;
+  updateWishlistCard: (
+    wishlistId: string,
+    cardInstanceId: string,
+    desiredQuantity: number,
+  ) => Promise<void>;
   removeCardFromWishlist: (
     wishlistId: string,
     cardInstanceId: string,
@@ -1835,6 +1841,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       // they differ for a seeded card and `legacy-portfolio-rows.ts` explains
       // why both are kept.
       name: card.name,
+      desiredQuantity: cardData?.desiredQuantity ?? 1,
       baseExternalId: cardData?.baseExternalId,
       printingKey: cardData?.printingKey,
       setCode: card.setCode,
@@ -1849,6 +1856,23 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       cardData: cardData as unknown as Record<string, unknown> | undefined,
       createdAt: now,
       updatedAt: now,
+    });
+    publishWishlists();
+  },
+
+  updateWishlistCard: async (
+    wishlistId,
+    cardInstanceId,
+    desiredQuantity,
+  ) => {
+    if (!Number.isInteger(desiredQuantity) || desiredQuantity < 1 || desiredQuantity > 99) {
+      throw new Error("desiredQuantity must be a whole number from 1 to 99");
+    }
+    const row = await localDb.get("wishlistCards", cardInstanceId);
+    if (!row || row.wishlistId !== wishlistId) return;
+    await localDb.patch("wishlistCards", cardInstanceId, {
+      desiredQuantity,
+      updatedAt: Date.now(),
     });
     publishWishlists();
   },

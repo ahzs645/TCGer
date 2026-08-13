@@ -166,6 +166,7 @@ function wishlistCardRow(
     externalId,
     tcg: card.tcg,
     name: card.name,
+    desiredQuantity: card.desiredQuantity,
     baseExternalId: data?.baseExternalId,
     printingKey: data?.printingKey,
     setCode: card.setCode,
@@ -258,6 +259,9 @@ export function toDemoWishlistCard(row: WishlistCardRow): DemoWishlistCard {
     rarity: row.rarity ?? "",
     addedAt: iso(row.createdAt),
   };
+  if (row.desiredQuantity !== undefined) {
+    card.desiredQuantity = row.desiredQuantity;
+  }
   // Absent, not empty: `catalogLookupForCard` and `toWishlistCard` both branch
   // on whether a payload was ever supplied.
   if (row.cardData) {

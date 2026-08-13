@@ -1,4 +1,5 @@
 import type { Collection as PrismaCollection, Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import type {
   CreateBinderInput,
   UpdateBinderInput,
@@ -726,6 +727,8 @@ export async function getUserBinders(userId: string) {
     associatedTcg: binder.associatedTcg ?? undefined,
     associatedSetCode: binder.associatedSetCode ?? undefined,
     associatedSetName: binder.associatedSetName ?? undefined,
+    shareToken: binder.shareToken ?? undefined,
+    isPublic: binder.isPublic,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(binder.collections)
@@ -748,6 +751,8 @@ export async function getUserBinders(userId: string) {
     associatedTcg: undefined,
     associatedSetCode: undefined,
     associatedSetName: undefined,
+    shareToken: undefined,
+    isPublic: false,
     createdAt: (looseCollections[0]?.createdAt ?? fallbackDate).toISOString(),
     updatedAt: latestUpdated.toISOString(),
     cards: aggregateCollectionEntries(looseCollections, {
@@ -798,6 +803,8 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     associatedTcg: binder.associatedTcg ?? undefined,
     associatedSetCode: binder.associatedSetCode ?? undefined,
     associatedSetName: binder.associatedSetName ?? undefined,
+    shareToken: binder.shareToken ?? undefined,
+    isPublic: binder.isPublic,
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: []
@@ -836,7 +843,12 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
       associatedSetName:
         input.associatedSetName === undefined
           ? binder.associatedSetName
-          : input.associatedSetName
+          : input.associatedSetName,
+      isPublic: input.isPublic ?? binder.isPublic,
+      shareToken:
+        input.isPublic === true && (!binder.shareToken || input.rotateShareToken)
+          ? randomBytes(24).toString('hex')
+          : binder.shareToken
     },
     include: {
       collections: {
@@ -856,6 +868,8 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     associatedTcg: updated.associatedTcg ?? undefined,
     associatedSetCode: updated.associatedSetCode ?? undefined,
     associatedSetName: updated.associatedSetName ?? undefined,
+    shareToken: updated.shareToken ?? undefined,
+    isPublic: updated.isPublic,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(updated.collections)

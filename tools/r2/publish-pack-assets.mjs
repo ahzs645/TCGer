@@ -14,7 +14,11 @@ import {
 } from "node:path";
 import { promisify } from "node:util";
 
-import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 
 import {
   REPO_ROOT,
@@ -37,10 +41,15 @@ const CONTENT_TYPES = new Map([
 function usage() {
   console.log(`Usage:
   npm run assets:r2:publish-pack-assets -- --projected-dir <Google Drive folder> [--dry-run] [--wrangler]
+  npm run assets:r2:publish-pack-assets -- --source-manifest <manifest.json> [--dry-run] [--wrangler]
 
 Options:
   --projected-dir  Folder containing the studio's projected cover exports.
                    PACK_PROJECTED_DIR may be used instead.
+  --source-manifest
+                   Migrate covers already described by a local pack manifest.
+                   The cover files are read only for upload and must be removed
+                   from Git after publication.
   --bucket         R2 bucket (default: R2_BUCKET or tcger-assets).
   --wrangler       Publish with the current Wrangler login instead of S3 keys.
   --dry-run        Validate and print the exact object plan without uploading.
@@ -115,6 +124,21 @@ function validateCover(id, cover, manifestPath) {
   ) {
     throw new Error(`${sourceName} has an invalid accent variant for ${id}`);
   }
+}
+
+function coverMetadata(cover) {
+  return {
+    label: cover.label.trim(),
+    ...(cover.packPool ? { packPool: cover.packPool.trim() } : {}),
+    ...(cover.setCode ? { setCode: cover.setCode.trim() } : {}),
+    ...(cover.setName ? { setName: cover.setName.trim() } : {}),
+    ...(cover.variationLabel
+      ? { variationLabel: cover.variationLabel.trim() }
+      : {}),
+    ...(cover.accentVariant
+      ? { accentVariant: cover.accentVariant.trim() }
+      : {}),
+  };
 }
 
 function objectIdentity(contents, sourcePath) {
@@ -195,13 +219,45 @@ async function wranglerPut(bucket, key, file, contentType, cacheControl) {
   console.log(JSON.stringify({ action: "upload", key }));
 }
 
+async function wranglerGet(bucket, key, file) {
+  const executable = resolve(
+    REPO_ROOT,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "wrangler.cmd" : "wrangler",
+  );
+  await execFileAsync(
+    executable,
+    ["r2", "object", "get", `${bucket}/${key}`, "--file", file, "--remote"],
+    { cwd: REPO_ROOT, maxBuffer: 4 * 1024 * 1024 },
+  );
+}
+
+async function existingManifest({ bucket, client, useWrangler, temporary }) {
+  const key = `${PACK_ROOT}/manifest.json`;
+  if (useWrangler) {
+    const file = resolve(temporary, "existing-manifest.json");
+    await wranglerGet(bucket, key, file);
+    return loadJson(file, "Existing R2 pack manifest");
+  }
+  try {
+    const result = await client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    return JSON.parse(await result.Body.transformToString());
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+}
+
 async function main() {
   const { values, flags } = parseCliArgs(process.argv.slice(2));
   if (flags.has("help") || flags.has("h")) {
     usage();
     return;
   }
-  const knownValues = new Set(["projected-dir", "bucket"]);
+  const knownValues = new Set(["projected-dir", "source-manifest", "bucket"]);
   for (const key of values.keys()) {
     if (!knownValues.has(key)) throw new Error(`Unknown option: --${key}`);
   }
@@ -215,10 +271,13 @@ async function main() {
   const useWrangler = flags.has("wrangler");
   const projectedValue =
     values.get("projected-dir") ?? process.env.PACK_PROJECTED_DIR;
-  if (!projectedValue?.trim()) {
-    throw new Error("Pass --projected-dir or set PACK_PROJECTED_DIR");
+  const sourceManifestValue = values.get("source-manifest");
+  if (!!projectedValue?.trim() === !!sourceManifestValue?.trim()) {
+    throw new Error(
+      "Pass exactly one of --projected-dir (or PACK_PROJECTED_DIR) and --source-manifest",
+    );
   }
-  const projectedDir = resolve(projectedValue);
+  const projectedDir = projectedValue?.trim() ? resolve(projectedValue) : null;
   const coreDir = resolve(REPO_ROOT, "packages/pack-core/assets/pack");
   const coreManifest = await loadJson(
     resolve(coreDir, "manifest.json"),
@@ -235,12 +294,20 @@ async function main() {
     },
   ];
   const covers = {};
-  const entryFiles = await findManifestEntries(projectedDir);
-  if (entryFiles.length === 0) {
+  const sourceManifestPath = sourceManifestValue?.trim()
+    ? resolve(sourceManifestValue)
+    : null;
+  const entryFiles = sourceManifestPath
+    ? [sourceManifestPath]
+    : await findManifestEntries(projectedDir);
+  if (entryFiles.length === 0)
     throw new Error(`No manifest.entry.json files found in ${projectedDir}`);
-  }
   for (const manifestPath of entryFiles) {
-    const entries = await loadJson(manifestPath, "Pack cover manifest entry");
+    const sourceManifest = await loadJson(
+      manifestPath,
+      sourceManifestPath ? "Pack source manifest" : "Pack cover manifest entry",
+    );
+    const entries = sourceManifestPath ? sourceManifest.covers : sourceManifest;
     if (!entries || Array.isArray(entries) || typeof entries !== "object") {
       throw new Error(`${manifestPath} must contain a cover object`);
     }
@@ -253,13 +320,7 @@ async function main() {
         `${id} file`,
       );
       sourceAssets.push({ kind: "cover", id, source });
-      covers[id] = {
-        label: cover.label.trim(),
-        ...(cover.packPool ? { packPool: cover.packPool.trim() } : {}),
-        ...(cover.accentVariant
-          ? { accentVariant: cover.accentVariant.trim() }
-          : {}),
-      };
+      covers[id] = coverMetadata(cover);
     }
   }
 
@@ -288,18 +349,33 @@ async function main() {
   }
 
   const meshAsset = assets.find((asset) => asset.kind === "mesh");
+  const manifestKey = `${PACK_ROOT}/manifest.json`;
+  const bucket = bucketName(values.get("bucket"), dryRun || useWrangler);
+  // A credential-free dry run can still validate and hash the incoming source.
+  // The existing manifest is read during every real publication (and Wrangler
+  // dry runs), immediately before the merged manifest is constructed.
+  const client = useWrangler ? undefined : createR2Client({ dryRun });
+  const temporary = await mkdtemp(resolve(tmpdir(), "tcger-pack-r2-"));
+  let previousManifest;
+  try {
+    previousManifest =
+      dryRun && !useWrangler
+        ? null
+        : await existingManifest({ bucket, client, useWrangler, temporary });
+  } catch (error) {
+    await rm(temporary, { recursive: true, force: true });
+    throw new Error(
+      `Could not preserve the existing R2 pack manifest: ${error instanceof Error ? error.message : error}`,
+    );
+  }
   const manifest = {
     mesh: `/${meshAsset.key}`,
     rim: coreManifest.rim,
-    covers,
-    bases: {},
-    decals: {},
+    covers: { ...(previousManifest?.covers ?? {}), ...covers },
+    bases: previousManifest?.bases ?? {},
+    decals: previousManifest?.decals ?? {},
   };
-  const manifestContents = Buffer.from(
-    `${JSON.stringify(manifest, null, 2)}\n`,
-  );
-  const manifestKey = `${PACK_ROOT}/manifest.json`;
-  const bucket = bucketName(values.get("bucket"), dryRun || useWrangler);
+  const manifestContents = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   console.log(
     JSON.stringify(
@@ -307,10 +383,17 @@ async function main() {
         dryRun,
         publisher: useWrangler ? "wrangler" : "s3",
         bucket,
-        projectedDir: basename(projectedDir),
-        discoveredManifests: entryFiles.map((path) => relative(projectedDir, path)),
+        source: sourceManifestPath
+          ? relative(REPO_ROOT, sourceManifestPath)
+          : basename(projectedDir),
+        discoveredManifests: entryFiles.map((path) =>
+          relative(projectedDir ?? dirname(sourceManifestPath), path),
+        ),
         manifestKey,
-        covers: Object.keys(covers),
+        publishedCovers: Object.keys(covers),
+        preservedCovers: Object.keys(previousManifest?.covers ?? {}).filter(
+          (id) => !covers[id],
+        ),
         objects: assets.map((asset) => ({
           key: asset.key,
           bytes: asset.contents.byteLength,
@@ -321,10 +404,12 @@ async function main() {
       2,
     ),
   );
-  if (dryRun) return;
+  if (dryRun) {
+    await rm(temporary, { recursive: true, force: true });
+    return;
+  }
 
   if (useWrangler) {
-    const temporary = await mkdtemp(resolve(tmpdir(), "tcger-pack-r2-"));
     try {
       for (const [index, asset] of assets.entries()) {
         const file = resolve(temporary, `${index}${asset.extension}`);
@@ -352,19 +437,22 @@ async function main() {
     return;
   }
 
-  const client = createR2Client({ dryRun: false });
-  for (const asset of assets) await uploadWithS3(client, bucket, asset);
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: manifestKey,
-      Body: manifestContents,
-      ContentType: "application/json; charset=utf-8",
-      CacheControl: MANIFEST_CACHE,
-      StorageClass: "STANDARD",
-    }),
-  );
-  console.log(JSON.stringify({ action: "upload", key: manifestKey }));
+  try {
+    for (const asset of assets) await uploadWithS3(client, bucket, asset);
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: manifestKey,
+        Body: manifestContents,
+        ContentType: "application/json; charset=utf-8",
+        CacheControl: MANIFEST_CACHE,
+        StorageClass: "STANDARD",
+      }),
+    );
+    console.log(JSON.stringify({ action: "upload", key: manifestKey }));
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 }
 
 main().catch((error) => {

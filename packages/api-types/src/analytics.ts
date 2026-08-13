@@ -31,3 +31,41 @@ export interface CollectionDistribution {
   entries: DistributionEntry[];
   total: number;
 }
+
+export interface DuplicateBinderSummary {
+  binderId: string;
+  binderName: string;
+  quantity: number;
+}
+
+export interface DuplicateConditionSummary {
+  condition: string;
+  quantity: number;
+}
+
+export interface DuplicatePrinting {
+  cardId: string;
+  externalId: string;
+  tcg: string;
+  name: string;
+  setCode?: string;
+  setName?: string;
+  collectorNumber?: string;
+  rarity?: string;
+  imageUrl?: string;
+  quantity: number;
+  excessCopies: number;
+  storedValue: number;
+  excessStoredValue: number;
+  binders: DuplicateBinderSummary[];
+  conditions: DuplicateConditionSummary[];
+}
+
+export interface CollectionDuplicates {
+  keepCount: number;
+  totalPrintings: number;
+  totalExcessCopies: number;
+  totalStoredValue: number;
+  totalExcessStoredValue: number;
+  items: DuplicatePrinting[];
+}

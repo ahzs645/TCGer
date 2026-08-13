@@ -3,6 +3,7 @@ import type {
   UpdateWishlistInput,
   AddWishlistCardInput,
   AddWishlistCardsInput,
+  UpdateWishlistCardInput,
   CreateWishlistRuleInput,
   UpdateWishlistRuleInput,
   WishlistResponse,
@@ -80,6 +81,8 @@ function mapWishlistCard(
   ownedQuantity: number
 ): WishlistCardResponse {
   const metadata = asJsonObject(card.tcgSpecific);
+  const desiredQuantity = card.desiredQuantity;
+  const missingQuantity = Math.max(desiredQuantity - ownedQuantity, 0);
   return {
     id: card.id,
     externalId: card.externalId,
@@ -91,6 +94,7 @@ function mapWishlistCard(
     originalPrintingKey: metadata.originalPrintingKey as string | undefined,
     tcg: card.tcg as TcgCode,
     name: card.name,
+    desiredQuantity,
     setCode: card.setCode ?? undefined,
     setName: card.setName ?? undefined,
     rarity: card.rarity ?? undefined,
@@ -116,6 +120,7 @@ function mapWishlistCard(
     notes: card.notes ?? undefined,
     owned: ownedQuantity > 0,
     ownedQuantity,
+    missingQuantity,
     createdAt: card.createdAt.toISOString()
   };
 }
@@ -198,7 +203,15 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
 
     const totalCards = cards.length;
     const ownedCards = cards.filter((c) => c.owned).length;
-    const completionPercent = totalCards > 0 ? Math.round((ownedCards / totalCards) * 100) : 0;
+    const totalDesiredQuantity = cards.reduce((sum, card) => sum + card.desiredQuantity, 0);
+    const ownedDesiredQuantity = cards.reduce(
+      (sum, card) => sum + Math.min(card.ownedQuantity, card.desiredQuantity),
+      0
+    );
+    const missingQuantity = totalDesiredQuantity - ownedDesiredQuantity;
+    const completionPercent = totalDesiredQuantity > 0
+      ? Math.round((ownedDesiredQuantity / totalDesiredQuantity) * 100)
+      : 0;
 
     return {
       id: wishlist.id,
@@ -210,6 +223,9 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
       rules: wishlist.rules.map(mapWishlistRule),
       totalCards,
       ownedCards,
+      totalDesiredQuantity,
+      ownedDesiredQuantity,
+      missingQuantity,
       completionPercent,
       createdAt: wishlist.createdAt.toISOString(),
       updatedAt: wishlist.updatedAt.toISOString()
@@ -235,7 +251,15 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
 
   const totalCards = cards.length;
   const ownedCount = cards.filter((c) => c.owned).length;
-  const completionPercent = totalCards > 0 ? Math.round((ownedCount / totalCards) * 100) : 0;
+  const totalDesiredQuantity = cards.reduce((sum, card) => sum + card.desiredQuantity, 0);
+  const ownedDesiredQuantity = cards.reduce(
+    (sum, card) => sum + Math.min(card.ownedQuantity, card.desiredQuantity),
+    0
+  );
+  const missingQuantity = totalDesiredQuantity - ownedDesiredQuantity;
+  const completionPercent = totalDesiredQuantity > 0
+    ? Math.round((ownedDesiredQuantity / totalDesiredQuantity) * 100)
+    : 0;
 
   return {
     id: wishlist.id,
@@ -247,6 +271,9 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
     rules: wishlist.rules.map(mapWishlistRule),
     totalCards,
     ownedCards: ownedCount,
+    totalDesiredQuantity,
+    ownedDesiredQuantity,
+    missingQuantity,
     completionPercent,
     createdAt: wishlist.createdAt.toISOString(),
     updatedAt: wishlist.updatedAt.toISOString()
@@ -278,6 +305,9 @@ export async function createWishlist(
     rules: [],
     totalCards: 0,
     ownedCards: 0,
+    totalDesiredQuantity: 0,
+    ownedDesiredQuantity: 0,
+    missingQuantity: 0,
     completionPercent: 0,
     createdAt: wishlist.createdAt.toISOString(),
     updatedAt: wishlist.updatedAt.toISOString()
@@ -343,7 +373,7 @@ export async function addCardToWishlist(
         tcg: input.tcg
       }
     },
-    select: { tcgSpecific: true }
+    select: { tcgSpecific: true, desiredQuantity: true }
   });
   const card = await prisma.wishlistCard.upsert({
     where: {
@@ -363,6 +393,7 @@ export async function addCardToWishlist(
       setSymbolUrl: input.setSymbolUrl,
       setLogoUrl: input.setLogoUrl,
       collectorNumber: input.collectorNumber,
+      desiredQuantity: input.desiredQuantity ?? existing?.desiredQuantity ?? 1,
       tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, input),
       notes: input.notes
     },
@@ -379,6 +410,7 @@ export async function addCardToWishlist(
       setSymbolUrl: input.setSymbolUrl,
       setLogoUrl: input.setLogoUrl,
       collectorNumber: input.collectorNumber,
+      desiredQuantity: input.desiredQuantity ?? 1,
       tcgSpecific: buildWishlistCardSpecificSnapshot(input),
       notes: input.notes
     }
@@ -435,6 +467,36 @@ export async function removeCardFromWishlist(
   await prisma.wishlistCard.delete({ where: { id: cardId } });
 }
 
+export async function updateWishlistCard(
+  userId: string,
+  wishlistId: string,
+  cardId: string,
+  input: UpdateWishlistCardInput
+): Promise<WishlistCardResponse> {
+  const wishlist = await prisma.wishlist.findFirst({
+    where: { id: wishlistId, userId }
+  });
+  if (!wishlist) throw new Error('Wishlist not found');
+
+  const existing = await prisma.wishlistCard.findFirst({
+    where: { id: cardId, wishlistId }
+  });
+  if (!existing) throw new Error('Wishlist card not found');
+
+  const card = await prisma.wishlistCard.update({
+    where: { id: cardId },
+    data: {
+      desiredQuantity: input.desiredQuantity,
+      notes: input.notes
+    }
+  });
+  const maps = await buildOwnershipMaps(userId);
+  return mapWishlistCard(
+    card,
+    ownedQuantityFor(card, wishlist.matchAnyPrinting, maps)
+  );
+}
+
 export async function addCardsToWishlist(
   userId: string,
   wishlistId: string,
@@ -459,7 +521,7 @@ export async function addCardsToWishlist(
       };
       const existing = await tx.wishlistCard.findUnique({
         where: { wishlistId_externalId_tcg: key },
-        select: { tcgSpecific: true }
+        select: { tcgSpecific: true, desiredQuantity: true }
       });
       await tx.wishlistCard.upsert({
         where: {
@@ -475,6 +537,7 @@ export async function addCardsToWishlist(
           setSymbolUrl: card.setSymbolUrl,
           setLogoUrl: card.setLogoUrl,
           collectorNumber: card.collectorNumber,
+          desiredQuantity: card.desiredQuantity ?? existing?.desiredQuantity ?? 1,
           tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, card),
           notes: card.notes
         },
@@ -491,6 +554,7 @@ export async function addCardsToWishlist(
           setSymbolUrl: card.setSymbolUrl,
           setLogoUrl: card.setLogoUrl,
           collectorNumber: card.collectorNumber,
+          desiredQuantity: card.desiredQuantity ?? 1,
           tcgSpecific: buildWishlistCardSpecificSnapshot(card),
           notes: card.notes
         }

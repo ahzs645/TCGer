@@ -10,6 +10,8 @@ import {
   DollarSign,
   Layers,
   Calendar,
+  Copy,
+  MapPin,
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -27,6 +29,7 @@ import {
   getCollectionValueHistory,
   getCollectionValueBreakdown,
   getCollectionDistribution,
+  getCollectionDuplicates,
   type AnalyticsPeriod,
 } from "@/lib/api/analytics";
 import { getPriceMovers } from "@/lib/api/pricing";
@@ -66,6 +69,7 @@ export default function AnalyticsPage() {
   useEffect(() => setMounted(true), []);
 
   const [period, setPeriod] = useState<AnalyticsPeriod>("30d");
+  const [keepCount, setKeepCount] = useState(1);
   const periodDays =
     ANALYTICS_PERIODS.find((p) => p.value === period)?.days ?? 30;
 
@@ -112,6 +116,12 @@ export default function AnalyticsPage() {
     enabled: ready && showPricing,
     staleTime: 1000 * 60 * 5,
   });
+  const duplicatesQuery = useQuery({
+    queryKey: ["analytics", "duplicates", keepCount, selectedGame],
+    queryFn: () => getCollectionDuplicates(token!, keepCount, selectedTcg),
+    enabled: ready,
+    staleTime: 1000 * 60 * 5,
+  });
 
   /* ---------------- gate states ---------------- */
 
@@ -154,6 +164,7 @@ export default function AnalyticsPage() {
   const isLoading =
     breakdownQuery.isLoading ||
     rarityQuery.isLoading ||
+    duplicatesQuery.isLoading ||
     (showPricing && historyQuery.isLoading);
 
   if (isLoading) {
@@ -168,7 +179,10 @@ export default function AnalyticsPage() {
   }
 
   const loadError =
-    breakdownQuery.error ?? rarityQuery.error ?? historyQuery.error;
+    breakdownQuery.error ??
+    rarityQuery.error ??
+    duplicatesQuery.error ??
+    historyQuery.error;
   if (loadError) {
     return (
       <AppShell>
@@ -190,6 +204,7 @@ export default function AnalyticsPage() {
                 void rarityQuery.refetch();
                 void historyQuery.refetch();
                 void moversQuery.refetch();
+                void duplicatesQuery.refetch();
               }}
             >
               Try again
@@ -206,6 +221,7 @@ export default function AnalyticsPage() {
   const history = historyQuery.data;
   const rarity = rarityQuery.data;
   const movers = moversQuery.data;
+  const duplicates = duplicatesQuery.data;
 
   const visibleTcg = (breakdown?.byTcg ?? []).filter((entry) => {
     if (enabledGames[entry.tcg as keyof typeof enabledGames] === false)
@@ -247,6 +263,17 @@ export default function AnalyticsPage() {
   );
   const losers = (movers?.losers ?? []).filter(
     (c) => enabledGames[c.tcg as keyof typeof enabledGames] !== false,
+  );
+  const visibleDuplicates = (duplicates?.items ?? []).filter(
+    (item) => enabledGames[item.tcg as keyof typeof enabledGames] !== false,
+  );
+  const duplicateCopies = visibleDuplicates.reduce(
+    (sum, item) => sum + item.excessCopies,
+    0,
+  );
+  const duplicateValue = visibleDuplicates.reduce(
+    (sum, item) => sum + item.excessStoredValue,
+    0,
   );
 
   return (
@@ -307,6 +334,127 @@ export default function AnalyticsPage() {
             them.
           </div>
         )}
+
+        <Card>
+          <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Copy className="h-5 w-5" />
+                Duplicate Finder
+              </CardTitle>
+              <CardDescription>
+                Exact printings with more copies than you plan to keep.
+              </CardDescription>
+            </div>
+            <div
+              className="flex items-center gap-1 rounded-lg border p-1"
+              role="group"
+              aria-label="Copies to keep per printing"
+            >
+              <span className="px-2 text-xs text-muted-foreground">Keep</span>
+              {[1, 2, 4].map((count) => (
+                <Button
+                  key={count}
+                  type="button"
+                  size="sm"
+                  variant={keepCount === count ? "default" : "ghost"}
+                  className="h-7 min-w-8 px-2"
+                  aria-pressed={keepCount === count}
+                  onClick={() => setKeepCount(count)}
+                >
+                  {count}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {visibleDuplicates.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center">
+                <p className="font-medium">No excess copies found</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Every exact printing is at or below your keep count of {keepCount}.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <DuplicateSummary
+                    label="Duplicate printings"
+                    value={visibleDuplicates.length.toLocaleString()}
+                  />
+                  <DuplicateSummary
+                    label="Excess copies"
+                    value={duplicateCopies.toLocaleString()}
+                  />
+                  {showPricing && (
+                    <DuplicateSummary
+                      label="Surplus stored value"
+                      value={currency(duplicateValue)}
+                    />
+                  )}
+                </div>
+                <div className="divide-y rounded-lg border">
+                  {visibleDuplicates.map((item) => (
+                    <div
+                      key={item.cardId}
+                      className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <p className="font-medium">{item.name}</p>
+                          <span className="text-xs text-muted-foreground">
+                            {tcgLabel(item.tcg)}
+                            {item.setName ? ` · ${item.setName}` : ""}
+                            {item.collectorNumber ? ` #${item.collectorNumber}` : ""}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {item.binders
+                              .map((binder) => `${binder.binderName} (${binder.quantity})`)
+                              .join(", ")}
+                          </span>
+                          <span>
+                            {item.conditions
+                              .map((condition) => `${condition.condition} (${condition.quantity})`)
+                              .join(", ")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-6 md:justify-end md:text-right">
+                        <div>
+                          <p className="text-lg font-semibold">
+                            {item.excessCopies} excess
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.quantity} owned · keep {keepCount}
+                          </p>
+                        </div>
+                        {showPricing && (
+                          <div className="min-w-24">
+                            <p className="font-medium">
+                              {currency(item.excessStoredValue)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {currency(item.storedValue)} stored
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {showPricing && (
+                  <p className="text-xs text-muted-foreground">
+                    Surplus value assumes you keep the highest-valued copies when
+                    stored prices differ.
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Value over time chart */}
         {showPricing && (
@@ -486,8 +634,17 @@ function PageHeader() {
     <div>
       <h1 className="text-3xl font-heading font-semibold">Analytics</h1>
       <p className="text-sm text-muted-foreground">
-        Collection value trends, price movers, and distribution breakdowns.
+        Collection value trends, duplicates, price movers, and distribution breakdowns.
       </p>
+    </div>
+  );
+}
+
+function DuplicateSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>
   );
 }

@@ -220,6 +220,7 @@ export function catalogCardToCard(
     setSymbolUrl: set?.iconUrl,
     setLogoUrl: set?.logoUrl,
     supertype: card.type,
+    dexEntries: card.dexEntries,
     pokemonPrint: card.pokemonWorldChampionship
       ? {
           finishes: ["normal"],

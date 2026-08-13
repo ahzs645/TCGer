@@ -49,6 +49,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        // This scanner captures video and still images only. Prevent
+        // AVCaptureSession from changing the app-wide audio session, which
+        // would otherwise interrupt music, podcasts, and other media when the
+        // camera starts running.
+        session.automaticallyConfiguresApplicationAudioSession = false
         session.sessionPreset = .photo
     }
 

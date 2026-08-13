@@ -135,6 +135,7 @@ export interface WishlistCardRow extends PortableRow {
   externalId: string;
   tcg: string;
   name: string;
+  desiredQuantity?: number;
   /**
    * The id a *local* catalog knows this printing by, when it differs from
    * `externalId`. The demo seeds cards as `ygo-7` and only learns the real

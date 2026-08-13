@@ -2,6 +2,27 @@ import SwiftUI
 import UIKit
 import Combine
 
+/// The shared physical silhouette for trading-card artwork. A standard card is
+/// 63 mm wide with approximately 3 mm corner radii, so the shape scales cleanly
+/// from compact thumbnails to full-screen previews.
+struct TradingCardShape: InsettableShape {
+    private static let cornerRadiusRatio: CGFloat = 3 / 63
+    private var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let insetRect = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        let radius = max(0, rect.width * Self.cornerRadiusRatio - insetAmount)
+        return RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .path(in: insetRect)
+    }
+
+    func inset(by amount: CGFloat) -> TradingCardShape {
+        var shape = self
+        shape.insetAmount += amount
+        return shape
+    }
+}
+
 struct CachedAsyncImage<Content: View>: View {
     private let url: URL?
     private let fallbackAssetName: String?

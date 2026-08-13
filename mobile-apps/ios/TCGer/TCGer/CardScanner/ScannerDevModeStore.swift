@@ -46,6 +46,7 @@ actor ScannerDevModeStore {
     static let shared = ScannerDevModeStore()
 
     static let enabledDefaultsKey = "scannerDevModeEnabled"
+    static let cropRescueEnabledDefaultsKey = "scannerCropRescueEnabled"
 
     /// Cheap main-thread check used by callers to avoid any recording work
     /// (including JPEG encoding) when dev mode is off.
@@ -55,6 +56,12 @@ actor ScannerDevModeStore {
 
     nonisolated static func setEnabled(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: enabledDefaultsKey)
+    }
+
+    /// Manual corner adjustment is a developer-only rescue tool. Keep it off
+    /// for normal scanning unless a tester explicitly enables it.
+    nonisolated static var isCropRescueEnabled: Bool {
+        UserDefaults.standard.bool(forKey: cropRescueEnabledDefaultsKey)
     }
 
     struct SessionInfo: Identifiable, Sendable {

@@ -141,11 +141,11 @@ struct PackOpeningReviewSheet: View {
             AsyncImage(url: URL(string: pull.imageUrlSmall)) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
-                RoundedRectangle(cornerRadius: 8).fill(.quaternary)
+                TradingCardShape().fill(.quaternary)
                     .overlay { ProgressView() }
             }
             .frame(width: 82, height: 114)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(TradingCardShape())
 
             Text(pull.name)
                 .font(.caption.weight(.semibold))

@@ -96,22 +96,12 @@ struct PackOpeningView: View {
 
     private var topOverlay: some View {
         GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(interfaceState.showsNativeResults ? "Pack Results" : "Open Packs")
-                        .font(.headline)
-                    if interfaceState.phase != .loading {
-                        Text(interfaceState.subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .contentTransition(.numericText())
-                    }
+            HStack(alignment: .center, spacing: 12) {
+                if interfaceState.showsNativeResults, let session = interfaceState.session {
+                    PackOpeningResultSummary(session: session)
+                } else {
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect(.regular, in: .capsule)
-
-                Spacer(minLength: 0)
 
                 Button {
                     dismiss()
@@ -160,14 +150,19 @@ struct PackOpeningView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     Menu {
-                        ForEach(interfaceState.packOptions) { option in
-                            Button(option.label) { send(.selectPack(option.id)) }
+                        ForEach(interfaceState.packSets) { set in
+                            Button(set.label) {
+                                guard let firstOption = set.options.first else { return }
+                                send(.selectPack(firstOption.id))
+                            }
                         }
                     } label: {
-                        Label(interfaceState.selectedPackLabel, systemImage: "shippingbox.fill")
+                        Label(interfaceState.selectedSetLabel, systemImage: "square.stack.3d.up.fill")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .lineLimit(1)
                     }
                     .buttonStyle(.glass)
+                    .accessibilityLabel("Pokémon set, \(interfaceState.selectedSetLabel)")
 
                     PhotosPicker(selection: $selectedArtwork, matching: .images) {
                         Image(systemName: "photo.badge.plus")
@@ -175,6 +170,25 @@ struct PackOpeningView: View {
                     }
                     .buttonStyle(.glass)
                     .accessibilityLabel("Use custom pack artwork")
+                }
+
+                if interfaceState.selectedSetOptions.count > 1 {
+                    Menu {
+                        ForEach(interfaceState.selectedSetOptions) { option in
+                            Button(option.resolvedVariationLabel) {
+                                send(.selectPack(option.id))
+                            }
+                        }
+                    } label: {
+                        Label(
+                            interfaceState.selectedVariationLabel,
+                            systemImage: "rectangle.portrait.on.rectangle.portrait"
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Pack artwork, \(interfaceState.selectedVariationLabel)")
                 }
 
                 HStack(spacing: 8) {
@@ -342,8 +356,6 @@ private struct PackOpeningNativeResultsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
-                resultSummary
-
                 if session.packs.count > 1, let bestPull {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Best Pull", systemImage: "sparkles")
@@ -376,7 +388,7 @@ private struct PackOpeningNativeResultsView: View {
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.top, 82)
+            .padding(.top, 118)
             .padding(.bottom, 94)
         }
         .scrollIndicators(.hidden)
@@ -384,7 +396,21 @@ private struct PackOpeningNativeResultsView: View {
         .accessibilityLabel("Pack results for \(session.packLabel)")
     }
 
-    private var resultSummary: some View {
+    private func tierRank(_ tier: String) -> Int {
+        switch tier.lowercased() {
+        case "chase": 5
+        case "ultra": 4
+        case "rare": 3
+        case "uncommon": 2
+        default: 1
+        }
+    }
+}
+
+private struct PackOpeningResultSummary: View {
+    let session: PackOpeningPullSession
+
+    var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.title2)
@@ -401,15 +427,9 @@ private struct PackOpeningNativeResultsView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 20))
-    }
-
-    private func tierRank(_ tier: String) -> Int {
-        switch tier.lowercased() {
-        case "chase": 5
-        case "ultra": 4
-        case "rare": 3
-        case "uncommon": 2
-        default: 1
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1)
         }
     }
 }
@@ -436,11 +456,7 @@ private struct PackOpeningNativeResultCard: View {
                 }
             }
             .aspectRatio(2.5 / 3.5, contentMode: .fit)
-            .clipShape(.rect(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(tierColor.opacity(0.7), lineWidth: 2)
-            }
+            .clipShape(TradingCardShape())
             .shadow(color: tierColor.opacity(0.16), radius: 10, y: 5)
 
             VStack(spacing: 2) {
@@ -477,6 +493,19 @@ struct PackOpeningInterfaceState: Codable, Equatable {
     struct PackOption: Codable, Equatable, Identifiable {
         let id: String
         let label: String
+        let setID: String?
+        let setLabel: String?
+        let variationLabel: String?
+
+        var resolvedSetID: String { setID ?? id }
+        var resolvedSetLabel: String { setLabel ?? label }
+        var resolvedVariationLabel: String { variationLabel ?? label }
+    }
+
+    struct PackSet: Equatable, Identifiable {
+        let id: String
+        let label: String
+        let options: [PackOption]
     }
 
     let phase: Phase
@@ -509,6 +538,40 @@ struct PackOpeningInterfaceState: Codable, Equatable {
 
     var showsNativeResults: Bool {
         (phase == .summary || phase == .final) && session != nil
+    }
+
+    var packSets: [PackSet] {
+        var order: [String] = []
+        var labels: [String: String] = [:]
+        var grouped: [String: [PackOption]] = [:]
+
+        for option in packOptions {
+            let setID = option.resolvedSetID
+            if grouped[setID] == nil { order.append(setID) }
+            labels[setID] = option.resolvedSetLabel
+            grouped[setID, default: []].append(option)
+        }
+
+        return order.map { id in
+            PackSet(id: id, label: labels[id] ?? id, options: grouped[id] ?? [])
+        }
+    }
+
+    var selectedPackOption: PackOption? {
+        packOptions.first { $0.id == selectedPackID }
+    }
+
+    var selectedSetLabel: String {
+        selectedPackOption?.resolvedSetLabel ?? selectedPackLabel
+    }
+
+    var selectedSetOptions: [PackOption] {
+        guard let selectedPackOption else { return [] }
+        return packOptions.filter { $0.resolvedSetID == selectedPackOption.resolvedSetID }
+    }
+
+    var selectedVariationLabel: String {
+        selectedPackOption?.resolvedVariationLabel ?? selectedPackLabel
     }
 
     var subtitle: String {

@@ -4,6 +4,7 @@ import { asyncHandler } from '../../utils/async-handler';
 import {
   createSealedInventorySchema,
   createSealedOpeningSchema,
+  customSealedProductSchema,
   recordOpenedCardSaleSchema,
   updateSealedInventorySchema
 } from '@tcg/api-types';
@@ -15,9 +16,17 @@ sealedRouter.use(requireAuth);
 
 // Products catalog
 sealedRouter.get('/products', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
   const tcg = req.query.tcg as string | undefined;
-  const products = await sealedService.getSealedProducts(tcg);
+  const products = await sealedService.getSealedProducts(userId, tcg);
   res.json(products);
+}));
+
+sealedRouter.post('/products', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  const input = customSealedProductSchema.parse(req.body);
+  const product = await sealedService.createCustomSealedProduct(userId, input);
+  res.status(201).json(product);
 }));
 
 sealedRouter.get('/products/barcode/:barcode', asyncHandler(async (req, res) => {
@@ -28,7 +37,8 @@ sealedRouter.get('/products/barcode/:barcode', asyncHandler(async (req, res) => 
       message: 'Barcode must contain 8 to 14 digits.'
     });
   }
-  const product = await sealedService.getSealedProductByBarcode(barcode);
+  const { id: userId } = (req as AuthRequest).user!;
+  const product = await sealedService.getSealedProductByBarcode(userId, barcode);
   if (!product) {
     return res.status(404).json({
       error: 'NOT_FOUND',
@@ -36,6 +46,23 @@ sealedRouter.get('/products/barcode/:barcode', asyncHandler(async (req, res) => 
     });
   }
   return res.json(product);
+}));
+
+sealedRouter.patch('/products/:productId', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  const input = customSealedProductSchema.parse(req.body);
+  const product = await sealedService.updateCustomSealedProduct(
+    userId,
+    req.params.productId,
+    input
+  );
+  res.json(product);
+}));
+
+sealedRouter.delete('/products/:productId', asyncHandler(async (req, res) => {
+  const { id: userId } = (req as AuthRequest).user!;
+  await sealedService.deleteCustomSealedProduct(userId, req.params.productId);
+  res.status(204).send();
 }));
 
 // Pack opening simulation

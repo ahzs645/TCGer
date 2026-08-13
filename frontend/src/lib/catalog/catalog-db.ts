@@ -125,6 +125,8 @@ export interface CatalogCard {
   treatments?: string[];
   collectionTags?: string[];
   type?: string;
+  category?: string;
+  dexEntries?: Array<{ number: number; name: string }>;
   types?: string[];
   hp?: number;
   manaCost?: string;

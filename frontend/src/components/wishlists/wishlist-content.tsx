@@ -9,6 +9,7 @@ import {
   Heart,
   Layers,
   Loader2,
+  Minus,
   Plus,
   RefreshCw,
   Search,
@@ -87,6 +88,7 @@ export function WishlistContent() {
     removeWishlist,
     addCardToWishlist,
     addCardsToWishlist,
+    updateWishlistCard,
     removeCardFromWishlist,
     addRule,
     removeRule,
@@ -176,9 +178,9 @@ export function WishlistContent() {
     }
 
     if (filterOwned === "owned") {
-      cards = cards.filter((c) => c.owned);
+      cards = cards.filter((c) => c.missingQuantity === 0);
     } else if (filterOwned === "missing") {
-      cards = cards.filter((c) => !c.owned);
+      cards = cards.filter((c) => c.missingQuantity > 0);
     }
 
     return cards;
@@ -519,6 +521,16 @@ export function WishlistContent() {
     }
   };
 
+  const handleDesiredQuantityChange = async (
+    cardId: string,
+    desiredQuantity: number,
+  ) => {
+    if (!token || !activeWishlistId) return;
+    await updateWishlistCard(token, activeWishlistId, cardId, {
+      desiredQuantity,
+    });
+  };
+
   if (!isAuthenticated) {
     return (
       <Card data-oid=":oyduh9">
@@ -619,7 +631,8 @@ export function WishlistContent() {
                   data-oid="3hu2u:k"
                 >
                   <span data-oid="p75yp8m">
-                    {wishlist.ownedCards} / {wishlist.totalCards} cards
+                    {wishlist.ownedDesiredQuantity} /{" "}
+                    {wishlist.totalDesiredQuantity} copies
                   </span>
                 </div>
                 <div
@@ -685,8 +698,8 @@ export function WishlistContent() {
                   className="whitespace-nowrap text-muted-foreground"
                   data-oid="ln2uro3"
                 >
-                  {activeWishlist.ownedCards} / {activeWishlist.totalCards}{" "}
-                  owned
+                  {activeWishlist.ownedDesiredQuantity} /{" "}
+                  {activeWishlist.totalDesiredQuantity} wanted copies owned
                 </span>
                 <Badge
                   variant={
@@ -848,6 +861,9 @@ export function WishlistContent() {
                         key={card.id}
                         card={card}
                         onRemove={() => handleRemoveCard(card.id)}
+                        onDesiredQuantityChange={(desiredQuantity) =>
+                          handleDesiredQuantityChange(card.id, desiredQuantity)
+                        }
                         data-oid="wlh:nsz"
                       />
                     ))}
@@ -1425,17 +1441,40 @@ function WishlistRuleChip({
 function WishlistCardItem({
   card,
   onRemove,
+  onDesiredQuantityChange,
 }: {
   card: WishlistCardResponse;
   onRemove: () => void;
+  onDesiredQuantityChange: (desiredQuantity: number) => Promise<void>;
 }) {
+  const [isUpdatingQuantity, setUpdatingQuantity] = useState(false);
+
+  const updateDesiredQuantity = async (desiredQuantity: number) => {
+    if (
+      isUpdatingQuantity ||
+      desiredQuantity < 1 ||
+      desiredQuantity > 99 ||
+      desiredQuantity === card.desiredQuantity
+    ) {
+      return;
+    }
+    setUpdatingQuantity(true);
+    try {
+      await onDesiredQuantityChange(desiredQuantity);
+    } finally {
+      setUpdatingQuantity(false);
+    }
+  };
+
   return (
     <div
       className={cn(
         "group relative rounded-lg border p-3 transition",
-        card.owned
+        card.missingQuantity === 0
           ? "border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30"
-          : "border-input bg-card",
+          : card.ownedQuantity > 0
+            ? "border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30"
+            : "border-input bg-card",
       )}
       data-oid="-0lre:h"
     >
@@ -1462,7 +1501,7 @@ function WishlistCardItem({
             fill
             className={cn(
               "object-cover",
-              !card.owned && "opacity-50 grayscale",
+              card.ownedQuantity === 0 && "opacity-50 grayscale",
             )}
             sizes="50px"
             onError={(e) => {
@@ -1472,7 +1511,7 @@ function WishlistCardItem({
             data-oid="sri8mjb"
           />
 
-          {card.owned && (
+          {card.missingQuantity === 0 && (
             <div
               className="absolute bottom-0 left-0 right-0 bg-emerald-500 py-0.5 text-center"
               data-oid="uxmogq4"
@@ -1518,22 +1557,53 @@ function WishlistCardItem({
               {card.rarity}
             </Badge>
           )}
-          <div className="mt-1" data-oid="-tqdcme">
-            {card.owned ? (
-              <span
-                className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
-                data-oid="mjw9hnr"
+          <div className="mt-1 space-y-1.5" data-oid="-tqdcme">
+            <span
+              className={cn(
+                "block text-[10px] font-medium",
+                card.missingQuantity === 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : card.ownedQuantity > 0
+                    ? "text-amber-700 dark:text-amber-400"
+                    : "text-muted-foreground",
+              )}
+              data-oid="mjw9hnr"
+            >
+              {card.missingQuantity === 0
+                ? `Goal met · ${card.ownedQuantity} owned`
+                : `${card.ownedQuantity} of ${card.desiredQuantity} owned · ${card.missingQuantity} missing`}
+            </span>
+            <div className="flex items-center gap-1" aria-label="Desired quantity">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                disabled={isUpdatingQuantity || card.desiredQuantity <= 1}
+                onClick={() => void updateDesiredQuantity(card.desiredQuantity - 1)}
+                aria-label={`Want one fewer ${card.name}`}
               >
-                Owned ({card.ownedQuantity}x)
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="min-w-12 text-center text-[10px] font-medium">
+                Want {card.desiredQuantity}
               </span>
-            ) : (
-              <span
-                className="text-[10px] font-medium text-muted-foreground"
-                data-oid="h_iwm71"
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                disabled={isUpdatingQuantity || card.desiredQuantity >= 99}
+                onClick={() => void updateDesiredQuantity(card.desiredQuantity + 1)}
+                aria-label={`Want one more ${card.name}`}
               >
-                Not owned
-              </span>
-            )}
+                {isUpdatingQuantity ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Plus className="h-3 w-3" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

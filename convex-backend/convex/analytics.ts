@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
@@ -44,6 +44,40 @@ const distributionValidator = v.object({
     v.object({ label: v.string(), count: v.number(), percentage: v.number() })
   ),
   total: v.number()
+});
+
+const duplicatesValidator = v.object({
+  keepCount: v.number(),
+  totalPrintings: v.number(),
+  totalExcessCopies: v.number(),
+  totalStoredValue: v.number(),
+  totalExcessStoredValue: v.number(),
+  items: v.array(
+    v.object({
+      cardId: v.string(),
+      externalId: v.string(),
+      tcg: v.string(),
+      name: v.string(),
+      setCode: v.optional(v.string()),
+      setName: v.optional(v.string()),
+      collectorNumber: v.optional(v.string()),
+      rarity: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      quantity: v.number(),
+      excessCopies: v.number(),
+      storedValue: v.number(),
+      excessStoredValue: v.number(),
+      binders: v.array(v.object({
+        binderId: v.string(),
+        binderName: v.string(),
+        quantity: v.number()
+      })),
+      conditions: v.array(v.object({
+        condition: v.string(),
+        quantity: v.number()
+      }))
+    })
+  )
 });
 
 const publicCollectionValidator = v.union(
@@ -106,7 +140,13 @@ async function loadAnalyticsRows(
   const entries = await ctx.db
     .query("collectionEntries")
     .withIndex("by_user", (q) => q.eq("userId", userId))
-    .take(5_000);
+    .take(5_001);
+  if (entries.length > 5_000) {
+    throw new ConvexError({
+      code: "LIMIT_EXCEEDED",
+      message: "Analytics supports up to 5,000 collection entries per account",
+    });
+  }
   const cardIds = [...new Set(entries.map((entry) => entry.cardId))];
   const binderIds = [...new Set(entries.map((entry) => entry.binderId))];
   const [cards, binders] = await Promise.all([
@@ -454,6 +494,126 @@ export const getDistribution = internalQuery({
   }
 });
 
+export const getDuplicates = internalQuery({
+  args: {
+    subject: v.string(),
+    keepCount: v.number(),
+    tcg: v.optional(v.string())
+  },
+  returns: duplicatesValidator,
+  handler: async (ctx, args) => {
+    const user = await requireUserBySubject(ctx, args.subject);
+    const keepCount = Math.min(100, Math.max(1, Math.trunc(args.keepCount)));
+    const rows = (await loadAnalyticsRows(ctx, user._id)).filter(
+      ({ card }) => !args.tcg || card.tcg === args.tcg
+    );
+    type GroupedDuplicate = {
+      card: Doc<"cards">;
+      quantity: number;
+      storedValue: number;
+      pricedCopies: Array<{ quantity: number; unitPrice: number }>;
+      binders: Map<string, { binderName: string; quantity: number }>;
+      conditions: Map<string, number>;
+    };
+    const grouped = new Map<string, GroupedDuplicate>();
+
+    for (const { entry, card, binder } of rows) {
+      const quantity = Math.max(0, Math.trunc(entry.quantity));
+      if (quantity === 0) continue;
+      const cardId = String(card._id);
+      const unitPrice = usableStoredPrice(entry.price);
+      const item: GroupedDuplicate = grouped.get(cardId) ?? {
+        card,
+        quantity: 0,
+        storedValue: 0,
+        pricedCopies: [],
+        binders: new Map(),
+        conditions: new Map()
+      };
+      item.quantity += quantity;
+      item.storedValue += unitPrice * quantity;
+      item.pricedCopies.push({ quantity, unitPrice });
+
+      const binderId = String(entry.binderId);
+      const binderSummary = item.binders.get(binderId) ?? {
+        binderName: binder?.name ?? "Unsorted",
+        quantity: 0
+      };
+      binderSummary.quantity += quantity;
+      item.binders.set(binderId, binderSummary);
+
+      const condition = entry.condition?.trim() || "Unspecified";
+      item.conditions.set(condition, (item.conditions.get(condition) ?? 0) + quantity);
+      grouped.set(cardId, item);
+    }
+
+    const items = [...grouped.entries()]
+      .flatMap(([cardId, item]) => {
+        if (item.quantity <= keepCount) return [];
+
+        // Retain the highest-valued copies so surplus value represents the
+        // lower-valued copies a collector is most likely to move first.
+        let copiesToKeep = keepCount;
+        let retainedValue = 0;
+        for (const priced of [...item.pricedCopies].sort(
+          (left, right) => right.unitPrice - left.unitPrice
+        )) {
+          const retainedCopies = Math.min(copiesToKeep, priced.quantity);
+          retainedValue += retainedCopies * priced.unitPrice;
+          copiesToKeep -= retainedCopies;
+          if (copiesToKeep === 0) break;
+        }
+
+        const storedValue = roundCurrency(item.storedValue);
+        return [{
+          cardId,
+          externalId: item.card.externalId,
+          tcg: item.card.tcg,
+          name: item.card.name,
+          setCode: item.card.setCode,
+          setName: item.card.setName,
+          collectorNumber: item.card.collectorNumber,
+          rarity: item.card.rarity,
+          imageUrl: item.card.imageUrlSmall ?? item.card.imageUrl,
+          quantity: item.quantity,
+          excessCopies: item.quantity - keepCount,
+          storedValue,
+          excessStoredValue: roundCurrency(storedValue - retainedValue),
+          binders: [...item.binders.entries()]
+            .map(([binderId, summary]) => ({ binderId, ...summary }))
+            .sort((left, right) =>
+              right.quantity - left.quantity ||
+              left.binderName.localeCompare(right.binderName)
+            ),
+          conditions: [...item.conditions.entries()]
+            .map(([condition, quantity]) => ({ condition, quantity }))
+            .sort((left, right) =>
+              right.quantity - left.quantity ||
+              left.condition.localeCompare(right.condition)
+            )
+        }];
+      })
+      .sort((left, right) =>
+        right.excessCopies - left.excessCopies ||
+        right.excessStoredValue - left.excessStoredValue ||
+        left.name.localeCompare(right.name)
+      );
+
+    return {
+      keepCount,
+      totalPrintings: items.length,
+      totalExcessCopies: items.reduce((sum, item) => sum + item.excessCopies, 0),
+      totalStoredValue: roundCurrency(
+        items.reduce((sum, item) => sum + item.storedValue, 0)
+      ),
+      totalExcessStoredValue: roundCurrency(
+        items.reduce((sum, item) => sum + item.excessStoredValue, 0)
+      ),
+      items
+    };
+  }
+});
+
 export const getPublicCollection = internalQuery({
   args: { shareToken: v.string() },
   returns: publicCollectionValidator,
@@ -469,8 +629,14 @@ export const getPublicCollection = internalQuery({
       ctx.db
         .query("collectionEntries")
         .withIndex("by_binder", (q) => q.eq("binderId", binder._id))
-        .take(5_000)
+        .take(5_001)
     ]);
+    if (entries.length > 5_000) {
+      throw new ConvexError({
+        code: "LIMIT_EXCEEDED",
+        message: "Public binders support up to 5,000 collection entries",
+      });
+    }
     const cards = await Promise.all(entries.map((entry) => ctx.db.get(entry.cardId)));
     const groupedCards = new Map<string, {
       name: string;

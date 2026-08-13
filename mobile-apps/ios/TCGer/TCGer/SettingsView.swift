@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("cardScannerShowTestingTools") private var showScannerTestingTools = false
     @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var scannerDevModeRecordingEnabled = false
+    @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var scannerCropRescueEnabled = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
     @State private var serverStatus: ServerStatusState = .checking
@@ -92,6 +93,7 @@ struct SettingsView: View {
         developerToolsUnlocked = false
         showScannerTestingTools = false
         scannerDevModeRecordingEnabled = false
+        scannerCropRescueEnabled = false
         versionTapCount = 0
         HapticManager.notification(.success)
     }
@@ -770,7 +772,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Developer Tools")
                     } footer: {
-                        Text("Scanner diagnostics and recording are intended for testing. Hiding this section also turns off scanner testing tools and dev-mode recording.")
+                        Text("Scanner diagnostics, manual corner adjustment, and recording are intended for testing. Hiding this section turns them off.")
                     }
                 }
         }
@@ -847,7 +849,7 @@ struct SettingsView: View {
                     hideDeveloperTools()
                 }
             } message: {
-                Text("Scanner testing tools and dev-mode recording will be turned off. Recorded sessions will remain saved.")
+                Text("Scanner testing tools, Adjust Card Corners, and dev-mode recording will be turned off. Recorded sessions will remain saved.")
             }
             .alert(
                 "Remove \(gameDisableBlock?.displayName ?? "") cards first",

@@ -427,6 +427,72 @@ describe("finance and sealed Convex HTTP routes", () => {
     expect(deleteWithHistory.status).toBe(409);
   });
 
+  test("keeps custom sealed products private and owner-managed", async () => {
+    const t = createTestConvex();
+    const ownerHeaders = bridgeHeaders("sealed_custom_owner");
+    const otherHeaders = bridgeHeaders("sealed_custom_other");
+
+    const createResponse = await t.fetch("/sealed/products", {
+      method: "POST",
+      headers: ownerHeaders,
+      body: JSON.stringify({
+        tcg: "pokemon",
+        name: "Local League Prize Box",
+        productType: "prize box",
+        setCode: "LOCAL",
+        packsPerBox: 6,
+        msrp: 35,
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const product = await createResponse.json();
+    expect(product).toMatchObject({ name: "Local League Prize Box", isCustom: true });
+
+    const ownerProducts = await (await t.fetch("/sealed/products", { headers: ownerHeaders })).json();
+    const otherProducts = await (await t.fetch("/sealed/products", { headers: otherHeaders })).json();
+    expect(ownerProducts.some((entry: { id: string }) => entry.id === product.id)).toBe(true);
+    expect(otherProducts.some((entry: { id: string }) => entry.id === product.id)).toBe(false);
+
+    const forbiddenInventory = await t.fetch("/sealed/inventory", {
+      method: "POST",
+      headers: otherHeaders,
+      body: JSON.stringify({ productId: product.id, quantity: 1 }),
+    });
+    expect(forbiddenInventory.status).toBe(404);
+
+    const forbiddenUpdate = await t.fetch(`/sealed/products/${product.id}`, {
+      method: "PATCH",
+      headers: otherHeaders,
+      body: JSON.stringify({ tcg: "pokemon", name: "Stolen", productType: "box" }),
+    });
+    expect(forbiddenUpdate.status).toBe(404);
+
+    const updateResponse = await t.fetch(`/sealed/products/${product.id}`, {
+      method: "PATCH",
+      headers: ownerHeaders,
+      body: JSON.stringify({ tcg: "pokemon", name: "Updated Prize Box", productType: "box" }),
+    });
+    expect(updateResponse.status).toBe(200);
+    expect(await updateResponse.json()).toMatchObject({ name: "Updated Prize Box", isCustom: true });
+
+    const inventoryResponse = await t.fetch("/sealed/inventory", {
+      method: "POST",
+      headers: ownerHeaders,
+      body: JSON.stringify({ productId: product.id, quantity: 1 }),
+    });
+    expect(inventoryResponse.status).toBe(201);
+    const inventory = await inventoryResponse.json();
+
+    const conflictDelete = await t.fetch(`/sealed/products/${product.id}`, {
+      method: "DELETE",
+      headers: ownerHeaders,
+    });
+    expect(conflictDelete.status).toBe(409);
+
+    expect((await t.fetch(`/sealed/inventory/${inventory.id}`, { method: "DELETE", headers: ownerHeaders })).status).toBe(204);
+    expect((await t.fetch(`/sealed/products/${product.id}`, { method: "DELETE", headers: ownerHeaders })).status).toBe(204);
+  });
+
   test("requires the bridge key for finance and sealed routes", async () => {
     const t = createTestConvex();
     const forgedHeaders = {

@@ -35,6 +35,12 @@ export interface WishlistsState {
     wishlistId: string,
     input: wishlistsApi.AddWishlistCardsInput,
   ) => Promise<void>;
+  updateWishlistCard: (
+    token: string,
+    wishlistId: string,
+    cardId: string,
+    input: wishlistsApi.UpdateWishlistCardInput,
+  ) => Promise<void>;
   removeCardFromWishlist: (
     token: string,
     wishlistId: string,
@@ -188,6 +194,30 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
         error instanceof Error
           ? error.message
           : "Failed to add cards to wishlist";
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  },
+
+  updateWishlistCard: async (
+    token: string,
+    wishlistId: string,
+    cardId: string,
+    input: wishlistsApi.UpdateWishlistCardInput,
+  ) => {
+    try {
+      await wishlistsApi.updateWishlistCard(
+        token,
+        wishlistId,
+        cardId,
+        input,
+      );
+      await get().fetchWishlists(token);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update wishlist card";
       set({ error: message });
       throw error instanceof Error ? error : new Error(message);
     }
