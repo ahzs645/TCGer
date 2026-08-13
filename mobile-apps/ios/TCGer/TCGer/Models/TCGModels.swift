@@ -1,6 +1,6 @@
 import Foundation
 
-enum JSONValue: Codable, Hashable, Sendable {
+nonisolated enum JSONValue: Codable, Hashable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -34,7 +34,7 @@ enum JSONValue: Codable, Hashable, Sendable {
 // MARK: - Pokemon TCG Enums
 
 /// Pokemon TCG tournament format legality
-enum PokemonCardFormat: String, Codable, CaseIterable, Sendable {
+nonisolated enum PokemonCardFormat: String, Codable, CaseIterable, Sendable {
     case standard = "Standard"
     case expanded = "Expanded"
     case unlimited = "Unlimited"
@@ -148,7 +148,7 @@ enum PokemonTcgRegion: String, Codable, CaseIterable, Sendable {
 }
 
 // MARK: - Pokemon Format Legality
-struct PokemonFormatLegality: Codable, Hashable, Sendable {
+nonisolated struct PokemonFormatLegality: Codable, Hashable, Sendable {
     let standard: Bool?
     let expanded: Bool?
 
@@ -161,7 +161,7 @@ struct PokemonFormatLegality: Codable, Hashable, Sendable {
 }
 
 // MARK: - Pokedex Entry
-struct PokedexEntry: Codable, Hashable, Sendable, Comparable {
+nonisolated struct PokedexEntry: Codable, Hashable, Sendable, Comparable {
     let number: Int
     let name: String
 
@@ -170,7 +170,7 @@ struct PokedexEntry: Codable, Hashable, Sendable, Comparable {
     }
 }
 
-struct PokemonVariantFlags: Codable, Hashable, Sendable {
+nonisolated struct PokemonVariantFlags: Codable, Hashable, Sendable {
     let normal: Bool?
     let reverse: Bool?
     let holo: Bool?
@@ -180,23 +180,23 @@ struct PokemonVariantFlags: Codable, Hashable, Sendable {
 /// Distinguishes the physical Pokémon TCG catalog from Pokémon TCG Pocket
 /// without introducing a new top-level game identifier that the server would
 /// also need to understand.
-enum PokemonCatalogFormat: String, Codable, Hashable, Sendable {
+nonisolated enum PokemonCatalogFormat: String, Codable, Hashable, Sendable {
     case tabletop
     case pocket
 }
 
-struct PokemonBooster: Codable, Hashable, Sendable, Identifiable {
+nonisolated struct PokemonBooster: Codable, Hashable, Sendable, Identifiable {
     let id: String
     let name: String
 }
 
-struct PokemonAbility: Codable, Hashable, Sendable {
+nonisolated struct PokemonAbility: Codable, Hashable, Sendable {
     let type: String?
     let name: String
     let effect: String
 }
 
-struct PokemonAttack: Codable, Hashable, Sendable {
+nonisolated struct PokemonAttack: Codable, Hashable, Sendable {
     let cost: [String]
     let name: String
     let effect: String?
@@ -205,12 +205,12 @@ struct PokemonAttack: Codable, Hashable, Sendable {
     let damage: String?
 }
 
-struct PokemonWeakness: Codable, Hashable, Sendable {
+nonisolated struct PokemonWeakness: Codable, Hashable, Sendable {
     let type: String
     let value: String
 }
 
-struct PokemonPocketMetadata: Codable, Hashable, Sendable {
+nonisolated struct PokemonPocketMetadata: Codable, Hashable, Sendable {
     let hp: Int?
     let effect: String?
     let cardDescription: String?
@@ -234,7 +234,7 @@ nonisolated struct PokemonWorldChampionshipPrint: Codable, Hashable, Sendable {
     let sourceUrl: String?
 }
 
-struct PokemonPrintMetadata: Codable, Hashable, Sendable {
+nonisolated struct PokemonPrintMetadata: Codable, Hashable, Sendable {
     let tcgdexId: String?
     let tcgdexImage: String?
     let variants: PokemonVariantFlags?
@@ -359,7 +359,7 @@ struct CardCopyVariant: Codable, Hashable, Sendable {
 }
 
 // MARK: - Card Number Parsing
-struct CardNumberInfo: Sendable {
+nonisolated struct CardNumberInfo: Sendable {
     let cardNumber: String
     let prefix: String?
     let number: Int?
@@ -435,7 +435,7 @@ struct CardNumberInfo: Sendable {
 }
 
 // MARK: - Card Models
-struct Card: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct Card: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
     let tcg: String // "yugioh", "magic", "pokemon"
@@ -863,7 +863,7 @@ struct SetStats: Codable, Identifiable, Sendable {
 }
 
 // MARK: - TCG Set
-struct TcgSet: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     let code: String
     let name: String
     let tcg: String

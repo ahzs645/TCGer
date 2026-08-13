@@ -111,7 +111,7 @@ final class NotificationAPITests: XCTestCase {
     }
 }
 
-private final class NotificationURLProtocol: URLProtocol, @unchecked Sendable {
+private final class NotificationURLProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
     override class func canInit(with request: URLRequest) -> Bool { true }

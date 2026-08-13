@@ -1208,13 +1208,60 @@ final class CardScannerViewModel: ObservableObject {
         let reference = calibration.intrinsicMatrixReferenceDimensions
         guard reference.width > 0, reference.height > 0 else { return nil }
         let matrix = calibration.intrinsicMatrix
-        let scaleX = imageSize.width / reference.width
-        let scaleY = imageSize.height / reference.height
+        let raw = ScannerCameraIntrinsics(
+            fx: CGFloat(matrix.columns.0.x),
+            fy: CGFloat(matrix.columns.1.y),
+            cx: CGFloat(matrix.columns.2.x),
+            cy: CGFloat(matrix.columns.2.y)
+        )
+        let orientationRaw = (photo.metadata[String(kCGImagePropertyOrientation)] as? NSNumber)?.uint32Value
+        let orientation = orientationRaw.flatMap(CGImagePropertyOrientation.init(rawValue:)) ?? .up
+        let oriented: (intrinsics: ScannerCameraIntrinsics, size: CGSize)
+        switch orientation {
+        case .up:
+            oriented = (raw, reference)
+        case .down:
+            oriented = (
+                ScannerCameraIntrinsics(
+                    fx: raw.fx,
+                    fy: raw.fy,
+                    cx: reference.width - raw.cx,
+                    cy: reference.height - raw.cy
+                ),
+                reference
+            )
+        case .right:
+            oriented = (
+                ScannerCameraIntrinsics(
+                    fx: raw.fy,
+                    fy: raw.fx,
+                    cx: reference.height - raw.cy,
+                    cy: raw.cx
+                ),
+                CGSize(width: reference.height, height: reference.width)
+            )
+        case .left:
+            oriented = (
+                ScannerCameraIntrinsics(
+                    fx: raw.fy,
+                    fy: raw.fx,
+                    cx: raw.cy,
+                    cy: reference.width - raw.cx
+                ),
+                CGSize(width: reference.height, height: reference.width)
+            )
+        default:
+            // Back-camera stills are not mirrored. Avoid applying an
+            // unverified mirrored calibration if a future capture route is.
+            return nil
+        }
+        let scaleX = imageSize.width / oriented.size.width
+        let scaleY = imageSize.height / oriented.size.height
         let intrinsics = ScannerCameraIntrinsics(
-            fx: CGFloat(matrix.columns.0.x) * scaleX,
-            fy: CGFloat(matrix.columns.1.y) * scaleY,
-            cx: CGFloat(matrix.columns.2.x) * scaleX,
-            cy: CGFloat(matrix.columns.2.y) * scaleY
+            fx: oriented.intrinsics.fx * scaleX,
+            fy: oriented.intrinsics.fy * scaleY,
+            cx: oriented.intrinsics.cx * scaleX,
+            cy: oriented.intrinsics.cy * scaleY
         )
         return intrinsics.isUsable ? intrinsics : nil
     }

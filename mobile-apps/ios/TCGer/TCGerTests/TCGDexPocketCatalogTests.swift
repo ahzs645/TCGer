@@ -184,7 +184,7 @@ final class TCGDexPocketCatalogTests: XCTestCase {
     """#
 }
 
-private final class PocketURLProtocol: URLProtocol, @unchecked Sendable {
+private final class PocketURLProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
