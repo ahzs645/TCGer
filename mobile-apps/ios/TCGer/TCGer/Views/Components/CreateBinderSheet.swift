@@ -10,9 +10,6 @@ struct CreateBinderSheet: View {
     @State private var defaultCondition = ""
     @State private var containerType = ""
     @State private var imageUrl = ""
-    @State private var associatedTcg = ""
-    @State private var associatedSetCode = ""
-    @State private var associatedSetName = ""
     let onCreate: (String, String?, String?, String?, BinderPresentationInput) async -> Void
     private let includesPresentationFields: Bool
 
@@ -62,10 +59,7 @@ struct CreateBinderSheet: View {
                 if includesPresentationFields {
                     BinderPresentationFields(
                         containerType: $containerType,
-                        imageUrl: $imageUrl,
-                        associatedTcg: $associatedTcg,
-                        associatedSetCode: $associatedSetCode,
-                        associatedSetName: $associatedSetName
+                        imageUrl: $imageUrl
                     )
 
                     if !coverURLIsValid {
@@ -94,10 +88,7 @@ struct CreateBinderSheet: View {
                                 defaultCondition.isEmpty ? nil : defaultCondition,
                                 .from(
                                     containerType: containerType,
-                                    imageUrl: imageUrl,
-                                    associatedTcg: associatedTcg,
-                                    associatedSetCode: associatedSetCode,
-                                    associatedSetName: associatedSetName
+                                    imageUrl: imageUrl
                                 )
                             )
                             dismiss()

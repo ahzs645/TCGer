@@ -11,9 +11,6 @@ struct BinderPresentationInput: Sendable {
 struct BinderPresentationFields: View {
     @Binding var containerType: String
     @Binding var imageUrl: String
-    @Binding var associatedTcg: String
-    @Binding var associatedSetCode: String
-    @Binding var associatedSetName: String
 
     var body: some View {
         Section {
@@ -24,22 +21,10 @@ struct BinderPresentationFields: View {
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-
-            Picker("Game", selection: $associatedTcg) {
-                Text("Any game").tag("")
-                ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
-                    Text(game.displayName).tag(game.rawValue)
-                }
-            }
-
-            TextField("Set code (optional)", text: $associatedSetCode)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-            TextField("Set name (optional)", text: $associatedSetName)
         } header: {
             Text("Binder details")
         } footer: {
-            Text("These details help distinguish binders, boxes, and set-specific collections.")
+            Text("These optional details help identify the physical binder and its cover.")
         }
     }
 }
@@ -47,10 +32,7 @@ struct BinderPresentationFields: View {
 extension BinderPresentationInput {
     static func from(
         containerType: String,
-        imageUrl: String,
-        associatedTcg: String,
-        associatedSetCode: String,
-        associatedSetName: String
+        imageUrl: String
     ) -> Self {
         func value(_ text: String) -> String? {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -60,9 +42,9 @@ extension BinderPresentationInput {
         return Self(
             containerType: value(containerType),
             imageUrl: value(imageUrl),
-            associatedTcg: value(associatedTcg),
-            associatedSetCode: value(associatedSetCode),
-            associatedSetName: value(associatedSetName)
+            associatedTcg: nil,
+            associatedSetCode: nil,
+            associatedSetName: nil
         )
     }
 }

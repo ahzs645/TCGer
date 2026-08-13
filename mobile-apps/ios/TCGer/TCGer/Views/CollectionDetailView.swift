@@ -20,9 +20,6 @@ struct CollectionDetailView: View {
     @State private var editedDefaultCondition: String
     @State private var editedContainerType: String
     @State private var editedImageUrl: String
-    @State private var editedAssociatedTcg: String
-    @State private var editedAssociatedSetCode: String
-    @State private var editedAssociatedSetName: String
     @State private var showingAddCard = false
     @State private var errorMessage: String?
     @State private var isSaving = false
@@ -52,6 +49,7 @@ struct CollectionDetailView: View {
     @State private var isBulkProcessing = false
     @State private var cardToSell: CollectionCard?
     @State private var showingBinderPages = false
+    @State private var hasSavedBinderPages = false
 
     private let apiService = APIService()
     init(
@@ -69,9 +67,6 @@ struct CollectionDetailView: View {
         _editedDefaultCondition = State(initialValue: collection.defaultCondition ?? "")
         _editedContainerType = State(initialValue: collection.containerType ?? "")
         _editedImageUrl = State(initialValue: collection.imageUrl ?? "")
-        _editedAssociatedTcg = State(initialValue: collection.associatedTcg ?? "")
-        _editedAssociatedSetCode = State(initialValue: collection.associatedSetCode ?? "")
-        _editedAssociatedSetName = State(initialValue: collection.associatedSetName ?? "")
         _cards = State(initialValue: collection.cards)
         _searchText = State(initialValue: initialSearchText)
     }
@@ -88,9 +83,9 @@ struct CollectionDetailView: View {
             defaultCondition: editedDefaultCondition.isEmpty ? nil : editedDefaultCondition,
             containerType: editedContainerType.binderMetadataValue,
             imageUrl: editedImageUrl.binderMetadataValue,
-            associatedTcg: editedAssociatedTcg.binderMetadataValue,
-            associatedSetCode: editedAssociatedSetCode.binderMetadataValue,
-            associatedSetName: editedAssociatedSetName.binderMetadataValue
+            associatedTcg: collection.associatedTcg,
+            associatedSetCode: collection.associatedSetCode,
+            associatedSetName: collection.associatedSetName
         )
     }
 
@@ -210,10 +205,7 @@ struct CollectionDetailView: View {
 
                             BinderPresentationFields(
                                 containerType: $editedContainerType,
-                                imageUrl: $editedImageUrl,
-                                associatedTcg: $editedAssociatedTcg,
-                                associatedSetCode: $editedAssociatedSetCode,
-                                associatedSetName: $editedAssociatedSetName
+                                imageUrl: $editedImageUrl
                             )
 
                             if !editedCoverURLIsValid {
@@ -234,7 +226,8 @@ struct CollectionDetailView: View {
                                         Spacer(minLength: 8)
 
                                         if environmentStore.isAuthenticated,
-                                           !collection.isUnsortedBinder {
+                                           !collection.isUnsortedBinder,
+                                           hasSavedBinderPages {
                                             Button {
                                                 showingBinderPages = true
                                             } label: {
@@ -254,22 +247,6 @@ struct CollectionDetailView: View {
                                         Text("Default condition: \(defaultCondition)")
                                             .font(.footnote)
                                             .foregroundColor(.secondary)
-                                    }
-                                    if let containerType = editedContainerType.binderMetadataValue {
-                                        Label(containerType, systemImage: "shippingbox")
-                                            .font(.footnote)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    if let game = TCGGame(rawValue: editedAssociatedTcg), game != .all {
-                                        Label(
-                                            [editedAssociatedSetName.binderMetadataValue, editedAssociatedSetCode.binderMetadataValue]
-                                                .compactMap { $0 }
-                                                .joined(separator: " · ")
-                                                .binderMetadataValue ?? game.displayName,
-                                            systemImage: game.systemIconName
-                                        )
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
                                     }
                                     if collection.isUnsortedBinder && !cards.isEmpty {
                                         Label(
@@ -516,7 +493,7 @@ struct CollectionDetailView: View {
                         }
                         .scrollEdgeEffectStyle(.soft, for: .top)
                         .scrollEdgeEffectHidden(
-                            isSelectMode && !selectedEntryIds.isEmpty,
+                            isSelectMode,
                             for: .bottom
                         )
                     }
@@ -577,7 +554,7 @@ struct CollectionDetailView: View {
                         }
                     }
 
-                    if isSelectMode && !selectedEntryIds.isEmpty {
+                    if isSelectMode {
                         ToolbarItem(placement: .bottomBar) {
                             Button {
                                 toggleSelectAllVisibleCards()
@@ -589,6 +566,7 @@ struct CollectionDetailView: View {
                                         : "checkmark.circle"
                                 )
                             }
+                            .disabled(visibleEntryIDs.isEmpty || isBulkProcessing)
                         }
 
                         ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -599,14 +577,14 @@ struct CollectionDetailView: View {
                             } label: {
                                 Label("Move", systemImage: "arrowshape.turn.up.right")
                             }
-                            .disabled(isBulkProcessing)
+                            .disabled(selectedEntryIds.isEmpty || isBulkProcessing)
 
                             Button {
                                 showingBulkConditionSheet = true
                             } label: {
                                 Label("Condition", systemImage: "pencil")
                             }
-                            .disabled(isBulkProcessing)
+                            .disabled(selectedEntryIds.isEmpty || isBulkProcessing)
                         }
 
                         ToolbarSpacer(.fixed, placement: .bottomBar)
@@ -617,17 +595,20 @@ struct CollectionDetailView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .disabled(isBulkProcessing)
+                            .disabled(selectedEntryIds.isEmpty || isBulkProcessing)
                         }
                     }
                 }
                 .toolbarVisibility(
-                    isSelectMode && !selectedEntryIds.isEmpty ? .hidden : .automatic,
+                    isSelectMode ? .hidden : .automatic,
                     for: .tabBar
                 )
                 .task {
                     BinderAccessLog.recordOpen(collection.id)
                     await loadAvailableTags()
+                }
+                .task(id: collection.id) {
+                    await refreshBinderPageAvailability()
                 }
                 .sheet(isPresented: $showingAddCard) {
                     AddCardToBinderFromSearchView(binderId: collection.id) { destinationBinderId in
@@ -635,7 +616,9 @@ struct CollectionDetailView: View {
                         await reloadBinderCards()
                     }
                 }
-                .sheet(isPresented: $showingBinderPages) {
+                .sheet(isPresented: $showingBinderPages, onDismiss: {
+                    Task { await refreshBinderPageAvailability() }
+                }) {
                     BinderPagesView(collection: workingCollectionSnapshot)
                         .environmentObject(environmentStore)
                 }
@@ -915,17 +898,14 @@ struct CollectionDetailView: View {
                     : editedDefaultCondition,
                 containerType: editedContainerType.binderMetadataValue,
                 imageUrl: editedImageUrl.binderMetadataValue,
-                associatedTcg: editedAssociatedTcg.binderMetadataValue,
-                associatedSetCode: editedAssociatedSetCode.binderMetadataValue,
-                associatedSetName: editedAssociatedSetName.binderMetadataValue
+                associatedTcg: collection.associatedTcg,
+                associatedSetCode: collection.associatedSetCode,
+                associatedSetName: collection.associatedSetName
             )
 
             cards = updated.cards
             editedContainerType = updated.containerType ?? ""
             editedImageUrl = updated.imageUrl ?? ""
-            editedAssociatedTcg = updated.associatedTcg ?? ""
-            editedAssociatedSetCode = updated.associatedSetCode ?? ""
-            editedAssociatedSetName = updated.associatedSetName ?? ""
             isEditing = false
             isSaving = false
         } catch {
@@ -1090,6 +1070,25 @@ struct CollectionDetailView: View {
             } else {
                 expandedCardIds.insert(card.id)
             }
+        }
+    }
+
+    @MainActor
+    private func refreshBinderPageAvailability() async {
+        guard environmentStore.isAuthenticated, !collection.isUnsortedBinder else {
+            hasSavedBinderPages = false
+            return
+        }
+
+        do {
+            let pages = try await apiService.getBinderPages(
+                config: environmentStore.serverConfiguration,
+                token: environmentStore.authToken,
+                binderId: collection.id
+            )
+            hasSavedBinderPages = !pages.isEmpty
+        } catch {
+            hasSavedBinderPages = false
         }
     }
 

@@ -76,6 +76,19 @@ extension APIService {
     ) async throws -> CollectionValueHistory {
         if config.isOnDevice {
             let value = LocalStore.shared.getCollections().reduce(0) { $0 + $1.totalValue }
+            if LocalStore.shared.isSampleDataLoaded, value > 0 {
+                let history = LocalSampleAnalytics.history(currentValue: value, period: period)
+                let startingValue = history.first?.value ?? value
+                let changePercent = startingValue == 0
+                    ? 0
+                    : ((value - startingValue) / startingValue) * 100
+                return CollectionValueHistory(
+                    history: history,
+                    currentValue: value,
+                    changePercent: changePercent,
+                    changePeriod: period
+                )
+            }
             return CollectionValueHistory(
                 // Phone-only mode does not yet record historical price
                 // snapshots. An empty series is honest and lets the UI show
@@ -182,6 +195,9 @@ extension APIService {
         period: Int = 30
     ) async throws -> PriceAnalyticsMovers {
         if config.isOnDevice {
+            if LocalStore.shared.isSampleDataLoaded {
+                return LocalSampleAnalytics.movers(period: period)
+            }
             // No local price-snapshot series means there is no defensible
             // change calculation. Never turn collection order into fabricated
             // market movement.
@@ -456,5 +472,114 @@ extension APIService {
             if response.statusCode == 401 { throw APIError.unauthorized }
             throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
         }
+    }
+}
+
+/// Deterministic analytics fixtures used only when the optional Sample Data
+/// collection is installed. Real phone-only collections continue to report no
+/// history until local price snapshots are implemented.
+private enum LocalSampleAnalytics {
+    static func history(currentValue: Double, period: String) -> [CollectionValuePoint] {
+        let days: Int
+        switch period.lowercased() {
+        case "7d": days = 7
+        case "90d": days = 90
+        case "1y": days = 365
+        default: days = 30
+        }
+
+        let pointCount = min(days + 1, 16)
+        let calendar = Calendar(identifier: .gregorian)
+        let startOfToday = calendar.startOfDay(for: Date())
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        let waves = [0.000, 0.006, -0.004, 0.009, -0.003, 0.007, -0.002, 0.005]
+        return (0..<pointCount).map { index in
+            let progress = pointCount == 1 ? 1 : Double(index) / Double(pointCount - 1)
+            let dayOffset = -days + Int((Double(days) * progress).rounded())
+            let date = calendar.date(byAdding: .day, value: dayOffset, to: startOfToday) ?? startOfToday
+            let trend = 0.91 + (0.09 * progress)
+            let wave = index == pointCount - 1 ? 0 : waves[index % waves.count]
+            return CollectionValuePoint(
+                date: formatter.string(from: date),
+                value: currentValue * (trend + wave)
+            )
+        }
+    }
+
+    static func movers(period: Int) -> PriceAnalyticsMovers {
+        let scale = min(max(Double(period) / 30, 0.35), 2.5)
+
+        func mover(
+            externalId: String,
+            tcg: String,
+            name: String,
+            currentPrice: Double,
+            thirtyDayPercent: Double
+        ) -> PriceMover {
+            let percent = thirtyDayPercent * scale
+            let previousPrice = currentPrice / (1 + (percent / 100))
+            return PriceMover(
+                externalId: externalId,
+                tcg: tcg,
+                name: name,
+                priceChange: currentPrice - previousPrice,
+                percentChange: percent,
+                currentPrice: currentPrice
+            )
+        }
+
+        return PriceAnalyticsMovers(
+            gainers: [
+                mover(
+                    externalId: "sample-pokemon-charizard",
+                    tcg: "pokemon",
+                    name: "Charizard ex",
+                    currentPrice: 33.40,
+                    thirtyDayPercent: 8.6
+                ),
+                mover(
+                    externalId: "sample-pokemon-pikachu-surging",
+                    tcg: "pokemon",
+                    name: "Pikachu",
+                    currentPrice: 19.25,
+                    thirtyDayPercent: 7.5
+                ),
+                mover(
+                    externalId: "sample-magic-black-lotus",
+                    tcg: "magic",
+                    name: "Black Lotus",
+                    currentPrice: 25_000,
+                    thirtyDayPercent: 1.7
+                )
+            ],
+            losers: [
+                mover(
+                    externalId: "sample-ygo-blue-eyes",
+                    tcg: "yugioh",
+                    name: "Blue-Eyes White Dragon",
+                    currentPrice: 18.50,
+                    thirtyDayPercent: -7.3
+                ),
+                mover(
+                    externalId: "sample-pokemon-pikachu-base",
+                    tcg: "pokemon",
+                    name: "Pikachu Promo",
+                    currentPrice: 6.75,
+                    thirtyDayPercent: -7.0
+                ),
+                mover(
+                    externalId: "sample-magic-lightning-bolt-2xm",
+                    tcg: "magic",
+                    name: "Lightning Bolt",
+                    currentPrice: 3.75,
+                    thirtyDayPercent: -5.5
+                )
+            ]
+        )
     }
 }

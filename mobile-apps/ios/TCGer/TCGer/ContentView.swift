@@ -58,6 +58,7 @@ struct ContentView: View {
                 }
             }
         }
+        .tabBarMinimizeBehavior(.onScrollDown)
         .environment(\.showingSearch, $showingSearch)
         .sheet(isPresented: $showingSearch, onDismiss: {
             searchQuery = nil

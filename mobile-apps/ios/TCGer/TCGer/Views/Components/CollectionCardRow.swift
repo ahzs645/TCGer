@@ -135,6 +135,7 @@ struct CollectionCardRow: View {
     }
 
     private var gradingSummary: (company: String, score: String)? {
+        guard card.copies.count == 1 else { return nil }
         for copy in card.copies {
             if let company = copy.gradingCompany, !company.isEmpty,
                let score = copy.gradingScore, !score.isEmpty {
@@ -145,6 +146,7 @@ struct CollectionCardRow: View {
     }
 
     private var storageLocationSummary: String? {
+        guard card.copies.count == 1 else { return nil }
         for copy in card.copies {
             if let loc = copy.storageLocation, !loc.isEmpty {
                 return loc
@@ -203,19 +205,26 @@ struct CollectionCardRow: View {
                         }
                     }
 
-                    HStack(spacing: 8) {
-                        Text("×\(card.quantity)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.accentColor)
+                    if card.quantity > 1 || card.rarity != nil {
+                        HStack(spacing: 8) {
+                            if card.quantity > 1 {
+                                Text("×\(card.quantity)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.accentColor)
+                            }
 
-                        if let rarity = card.rarity {
-                            Text("•")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(rarity)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            if card.quantity > 1, card.rarity != nil {
+                                Text("•")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            if let rarity = card.rarity {
+                                Text(rarity)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
 
@@ -454,6 +463,22 @@ struct CollectionCardCopyRow: View {
         return labels
     }
 
+    private var grading: (company: String, score: String)? {
+        guard let company = normalized(copy.gradingCompany),
+              let score = normalized(copy.gradingScore) else { return nil }
+        return (company, score)
+    }
+
+    private var storageLocation: String? {
+        normalized(copy.storageLocation)
+    }
+
+    private func normalized(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "square.stack.3d.up")
@@ -480,17 +505,24 @@ struct CollectionCardCopyRow: View {
                         .foregroundColor(.secondary)
                 }
 
-                if !attributeLabels.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(attributeLabels, id: \.self) { label in
-                            Text(label)
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12))
-                                .foregroundColor(.accentColor)
-                                .cornerRadius(4)
+                if !attributeLabels.isEmpty || grading != nil || storageLocation != nil {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(attributeLabels, id: \.self) { label in
+                                CopyAttributeBadge(label: label, color: .accentColor)
+                            }
+
+                            if let grading {
+                                GradingBadge(company: grading.company, score: grading.score)
+                            }
+
+                            if let storageLocation {
+                                CopyAttributeBadge(
+                                    icon: "mappin.and.ellipse",
+                                    label: storageLocation,
+                                    color: .teal
+                                )
+                            }
                         }
                     }
                 }
@@ -522,5 +554,36 @@ struct CollectionCardCopyRow: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
+    }
+
+    private struct CopyAttributeBadge: View {
+        let icon: String?
+        let label: String
+        let color: Color
+        @Environment(\.colorScheme) private var colorScheme
+
+        init(icon: String? = nil, label: String, color: Color) {
+            self.icon = icon
+            self.label = label
+            self.color = color
+        }
+
+        var body: some View {
+            HStack(spacing: 4) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption2)
+                }
+                Text(label)
+                    .lineLimit(1)
+            }
+            .font(.caption2)
+            .fontWeight(.medium)
+            .foregroundColor(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(color.opacity(colorScheme == .dark ? 0.22 : 0.12))
+            .clipShape(Capsule())
+        }
     }
 }

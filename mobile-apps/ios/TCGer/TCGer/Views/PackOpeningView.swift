@@ -14,6 +14,7 @@ struct PackOpeningView: View {
     @State private var interfaceState = PackOpeningInterfaceState.loading
     @State private var command: PackOpeningCommand?
     @State private var selectedArtwork: PhotosPickerItem?
+    @State private var inspectedPull: PackOpeningPull?
     @State private var rendererReady = false
     @State private var prefetchedSessionID: String?
     @StateObject private var webSession: PackOpeningWebSession
@@ -59,6 +60,12 @@ struct PackOpeningView: View {
         .sheet(item: $pullSession) { session in
             PackOpeningReviewSheet(session: session) {
                 phase = "Saved to collection"
+            }
+        }
+        .fullScreenCover(item: $inspectedPull) { pull in
+            PackOpeningCardInspector(pull: pull) {
+                inspectedPull = nil
+                send(.advance)
             }
         }
         .onChange(of: selectedArtwork) { _, item in
@@ -148,6 +155,16 @@ struct PackOpeningView: View {
 
         case .select:
             VStack(spacing: 10) {
+                Picker("Opening style", selection: Binding(
+                    get: { interfaceState.openingMode },
+                    set: { send(.setOpeningMode($0)) }
+                )) {
+                    Label("Open Normally", systemImage: "sparkles").tag(PackOpeningInterfaceState.OpeningMode.normal)
+                    Label("Quick Open", systemImage: "bolt.fill").tag(PackOpeningInterfaceState.OpeningMode.quick)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityHint("Normal reveals every pack. Quick Open skips directly to grouped results.")
+
                 HStack(spacing: 10) {
                     Menu {
                         ForEach(interfaceState.packSets) { set in
@@ -208,11 +225,30 @@ struct PackOpeningView: View {
 
         case .tear:
             VStack(spacing: 10) {
-                instruction("Swipe across the seal, or open it now", icon: "hand.draw.fill")
+                instruction(
+                    interfaceState.packBackwards
+                        ? "Back facing · swipe across the seal, or open it now"
+                        : "Swipe across the seal, or open it now",
+                    icon: "hand.draw.fill"
+                )
                 HStack(spacing: 10) {
                     backButton
+                    Button {
+                        send(.togglePackOrientation)
+                    } label: {
+                        Label(interfaceState.packBackwards ? "Face Front" : "Flip Pack", systemImage: "arrow.triangle.2.circlepath")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .buttonStyle(.glass)
+                    .layoutPriority(1)
                     Button("Open Pack") { send(.advance) }
                         .buttonStyle(.glassProminent)
+                }
+                if interfaceState.totalPacks > 1 {
+                    Button("Skip Animations · Keep Grouped Results") { send(.showAll) }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.glass)
                 }
             }
 
@@ -222,7 +258,13 @@ struct PackOpeningView: View {
                     interfaceState.totalPacks == 1 ? "Opening your pack…" : "Opening \(interfaceState.totalPacks) packs…",
                     icon: "sparkles"
                 )
-                backButton
+                HStack(spacing: 10) {
+                    backButton
+                    if interfaceState.totalPacks > 1 {
+                        Button("Skip to Results") { send(.showAll) }
+                            .buttonStyle(.glass)
+                    }
+                }
             }
 
         case .reveal:
@@ -237,7 +279,7 @@ struct PackOpeningView: View {
                         send(.advance)
                     }
                     .buttonStyle(.glassProminent)
-                    Button("Show All") { send(.showAll) }
+                    Button(interfaceState.totalPacks > 1 ? "Skip to Results" : "Show All") { send(.showAll) }
                         .buttonStyle(.glass)
                 }
             }
@@ -327,6 +369,8 @@ struct PackOpeningView: View {
                 ImageCache.shared.prefetch(urls: session.resultArtworkURLs)
             }
             interfaceState = state
+        case .inspectRequested(let pull):
+            inspectedPull = pull
         case .haptic(let style):
             switch style {
             case "selection": HapticManager.selection()
@@ -343,6 +387,7 @@ struct PackOpeningView: View {
 
 private struct PackOpeningNativeResultsView: View {
     let session: PackOpeningPullSession
+    @State private var inspectedPull: PackOpeningPull?
 
     private let columns = [
         GridItem(.flexible(minimum: 120), spacing: 14),
@@ -362,7 +407,9 @@ private struct PackOpeningNativeResultsView: View {
                             .font(.title3.bold())
                             .foregroundStyle(.orange)
 
-                        PackOpeningNativeResultCard(pull: bestPull)
+                        PackOpeningNativeResultCard(pull: bestPull) {
+                            inspectedPull = bestPull
+                        }
                             .frame(maxWidth: 190)
                             .frame(maxWidth: .infinity)
                     }
@@ -381,7 +428,9 @@ private struct PackOpeningNativeResultsView: View {
 
                         LazyVGrid(columns: columns, alignment: .center, spacing: 20) {
                             ForEach(Array(pack.enumerated()), id: \.offset) { _, pull in
-                                PackOpeningNativeResultCard(pull: pull)
+                                PackOpeningNativeResultCard(pull: pull) {
+                                    inspectedPull = pull
+                                }
                             }
                         }
                     }
@@ -394,6 +443,11 @@ private struct PackOpeningNativeResultsView: View {
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .accessibilityLabel("Pack results for \(session.packLabel)")
+        .fullScreenCover(item: $inspectedPull) { pull in
+            PackOpeningCardInspector(pull: pull) {
+                inspectedPull = nil
+            }
+        }
     }
 
     private func tierRank(_ tier: String) -> Int {
@@ -436,9 +490,11 @@ private struct PackOpeningResultSummary: View {
 
 private struct PackOpeningNativeResultCard: View {
     let pull: PackOpeningPull
+    let onInspect: () -> Void
 
     var body: some View {
-        VStack(spacing: 9) {
+        Button(action: onInspect) {
+            VStack(spacing: 9) {
             CachedAsyncImage(card: pull.card, thumbnail: true) { phase in
                 switch phase {
                 case .success(let image):
@@ -469,7 +525,9 @@ private struct PackOpeningNativeResultCard: View {
                     .foregroundStyle(tierColor)
                     .lineLimit(1)
             }
+            }
         }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(pull.name), \(pull.rarity)")
     }
@@ -485,9 +543,227 @@ private struct PackOpeningNativeResultCard: View {
     }
 }
 
+private struct PackOpeningCardInspector: View {
+    let pull: PackOpeningPull
+    let onAdvance: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @State private var isShowingBack = false
+    @State private var settledScale: CGFloat = 1
+    @GestureState private var liveScale: CGFloat = 1
+    @State private var wishlistCard: Card?
+    @State private var isSavingFavorite = false
+    @State private var favoriteMessage: String?
+    @State private var favoriteError: String?
+
+    private let apiService = APIService()
+
+    private var effectiveScale: CGFloat {
+        min(max(settledScale * liveScale, 1), 5)
+    }
+
+    private var shareText: String {
+        var text = "\(pull.name) — \(pull.setName) #\(pull.collectorNumber)"
+        if !pull.imageUrl.isEmpty { text += "\n\(pull.imageUrl)" }
+        return text
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(uiColor: .systemBackground).ignoresSafeArea()
+
+                VStack(spacing: 18) {
+                    Spacer(minLength: 4)
+
+                    cardFace
+                        .padding(.horizontal, 24)
+
+                    VStack(spacing: 3) {
+                        Text(pull.name)
+                            .font(.title2.bold())
+                        Text("\(pull.setName) · \(pull.rarity)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(effectiveScale > 1.01
+                         ? "Drag to explore · pinch inward to reset"
+                         : "Pinch to zoom · flip to see the back · swipe when finished")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    actionBar
+                }
+                .padding(.bottom, 14)
+            }
+            .navigationTitle("Inspect Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        withAnimation(.snappy) { isShowingBack.toggle() }
+                    } label: {
+                        Label("Flip", systemImage: "rectangle.on.rectangle.angled")
+                    }
+                }
+            }
+        }
+        .sheet(item: $wishlistCard) { card in
+            AddToWishlistSheet(card: card)
+        }
+        .alert("Favorites", isPresented: Binding(
+            get: { favoriteMessage != nil || favoriteError != nil },
+            set: { if !$0 { favoriteMessage = nil; favoriteError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(favoriteMessage ?? favoriteError ?? "")
+        }
+    }
+
+    private var cardFace: some View {
+        Group {
+            if isShowingBack,
+               let assetName = TCGGame(rawValue: pull.tcg)?.cardBackAssetName {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                CachedAsyncImage(card: pull.card, thumbnail: false) { phase in
+                    switch phase {
+                    case .success(let image): image.resizable().scaledToFit()
+                    case .failure:
+                        Image(systemName: "rectangle.portrait.slash")
+                            .font(.system(size: 52))
+                            .foregroundStyle(.secondary)
+                    default: ProgressView()
+                    }
+                }
+            }
+        }
+        .aspectRatio(2.5 / 3.5, contentMode: .fit)
+        .clipShape(TradingCardShape())
+        .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
+        .scaleEffect(effectiveScale)
+        .rotation3DEffect(.degrees(isShowingBack ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .contentShape(Rectangle())
+        .gesture(
+            MagnifyGesture()
+                .updating($liveScale) { value, state, _ in state = value.magnification }
+                .onEnded { value in
+                    settledScale = min(max(settledScale * value.magnification, 1), 5)
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard effectiveScale <= 1.02,
+                          abs(value.translation.width) > 90,
+                          abs(value.translation.width) > abs(value.translation.height)
+                    else { return }
+                    dismiss()
+                    onAdvance()
+                }
+        )
+        .onTapGesture(count: 2) {
+            withAnimation(.snappy) { isShowingBack.toggle() }
+        }
+        .accessibilityLabel(isShowingBack ? "Back of \(pull.name)" : "Front of \(pull.name)")
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                Task { await addToFavorites() }
+            } label: {
+                Label("Favorite", systemImage: "star.fill")
+            }
+            .buttonStyle(.glass)
+            .disabled(isSavingFavorite)
+
+            Button {
+                wishlistCard = pull.card
+            } label: {
+                Label("Wishlist", systemImage: "heart")
+            }
+            .buttonStyle(.glass)
+
+            ShareLink(item: shareText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.glass)
+
+            Button {
+                dismiss()
+                onAdvance()
+            } label: {
+                Label("Next", systemImage: "arrow.right")
+            }
+            .buttonStyle(.glassProminent)
+        }
+        .labelStyle(.iconOnly)
+    }
+
+    @MainActor
+    private func addToFavorites() async {
+        guard !isSavingFavorite else { return }
+        guard let token = environmentStore.authToken else {
+            favoriteError = "Sign in before adding favorites."
+            return
+        }
+        isSavingFavorite = true
+        defer { isSavingFavorite = false }
+
+        do {
+            let collections = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                useCache: false
+            )
+            let existingFavorite = collections.first {
+                $0.name.compare("Favorites", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }
+            let resolvedFavorite: Collection
+            if let existingFavorite {
+                resolvedFavorite = existingFavorite
+            } else {
+                resolvedFavorite = try await apiService.createCollection(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    name: "Favorites",
+                    description: "Favorite cards",
+                    colorHex: "#F59E0B"
+                )
+            }
+            _ = try await apiService.addCardToBinder(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: resolvedFavorite.id,
+                card: pull.card,
+                details: BinderCardAddDetails(quantity: 1, notes: "Favorited from Pack Opening")
+            )
+            NotificationCenter.default.post(name: .collectionDidChange, object: resolvedFavorite)
+            HapticManager.notification(.success)
+            favoriteMessage = "Added \(pull.name) to Favorites."
+        } catch {
+            favoriteError = error.localizedDescription
+        }
+    }
+}
+
 struct PackOpeningInterfaceState: Codable, Equatable {
     enum Phase: String, Codable {
         case loading, select, tear, opening, reveal, summary, final
+    }
+
+    enum OpeningMode: String, Codable {
+        case normal, quick
     }
 
     struct PackOption: Codable, Equatable, Identifiable {
@@ -512,6 +788,8 @@ struct PackOpeningInterfaceState: Codable, Equatable {
     let selectedPackID: String
     let selectedPackLabel: String
     let packCount: Int
+    let openingMode: OpeningMode
+    let packBackwards: Bool
     let packOptions: [PackOption]
     let revealedCount: Int
     let totalCards: Int
@@ -526,6 +804,8 @@ struct PackOpeningInterfaceState: Codable, Equatable {
         selectedPackID: "",
         selectedPackLabel: "Loading",
         packCount: 1,
+        openingMode: .normal,
+        packBackwards: false,
         packOptions: [],
         revealedCount: 0,
         totalCards: 0,
@@ -589,13 +869,14 @@ struct PackOpeningInterfaceState: Codable, Equatable {
 
 struct PackOpeningCommand: Equatable {
     enum Action: String {
-        case selectPack, setPackCount, openPack, backToPacks, advance, showAll, savePulls, uploadArtwork
+        case selectPack, setPackCount, setOpeningMode, togglePackOrientation, openPack, backToPacks, advance, showAll, savePulls, uploadArtwork
     }
 
     let id = UUID()
     let action: Action
     var optionID: String?
     var count: Int?
+    var mode: String?
     var dataURL: String?
     var label: String?
 
@@ -603,6 +884,7 @@ struct PackOpeningCommand: Equatable {
         var value: [String: Any] = ["type": action.rawValue]
         if let optionID { value["id"] = optionID }
         if let count { value["count"] = count }
+        if let mode { value["mode"] = mode }
         if let dataURL { value["dataURL"] = dataURL }
         if let label { value["label"] = label }
         return value
@@ -610,6 +892,10 @@ struct PackOpeningCommand: Equatable {
 
     static func selectPack(_ id: String) -> Self { .init(action: .selectPack, optionID: id) }
     static func setPackCount(_ count: Int) -> Self { .init(action: .setPackCount, count: count) }
+    static func setOpeningMode(_ mode: PackOpeningInterfaceState.OpeningMode) -> Self {
+        .init(action: .setOpeningMode, mode: mode.rawValue)
+    }
+    static var togglePackOrientation: Self { .init(action: .togglePackOrientation) }
     static var openPack: Self { .init(action: .openPack) }
     static var backToPacks: Self { .init(action: .backToPacks) }
     static var advance: Self { .init(action: .advance) }
@@ -626,6 +912,7 @@ enum PackOpeningBridgeEvent: Equatable {
     case interfaceState(PackOpeningInterfaceState)
     case haptic(String)
     case saveRequested(PackOpeningPullSession)
+    case inspectRequested(PackOpeningPull)
     case error(String)
 }
 
@@ -846,6 +1133,10 @@ final class PackOpeningWebCoordinator: NSObject, WKScriptMessageHandler, WKNavig
             } else {
                 emit(.error("The completed pack results could not be read."))
             }
+        case "inspectRequested":
+            if let pull = PackOpeningBridgeDecoder.pull(from: payload) {
+                emit(.inspectRequested(pull))
+            }
         case "error":
             emit(.error(payload["message"] as? String ?? "The pack renderer reported an error."))
         default:
@@ -1010,6 +1301,10 @@ enum PackOpeningBridgeDecoder {
         let state: PackOpeningInterfaceState
     }
 
+    private struct InspectMessage: Decodable {
+        let pull: PackOpeningPull
+    }
+
     static func pullSession(from body: Any) -> PackOpeningPullSession? {
         guard JSONSerialization.isValidJSONObject(body),
               let data = try? JSONSerialization.data(withJSONObject: body),
@@ -1024,6 +1319,14 @@ enum PackOpeningBridgeDecoder {
               let message = try? JSONDecoder().decode(StateMessage.self, from: data)
         else { return nil }
         return message.state
+    }
+
+    static func pull(from body: Any) -> PackOpeningPull? {
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body),
+              let message = try? JSONDecoder().decode(InspectMessage.self, from: data)
+        else { return nil }
+        return message.pull
     }
 }
 
