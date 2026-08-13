@@ -66,7 +66,7 @@ struct AnalyticsView: View {
                 }
             } else if let history, let breakdown, let distribution {
                 ScrollView {
-                    LazyVStack(spacing: 18) {
+                    LazyVStack(spacing: AppSpacing.large) {
                         summary(history)
                         valueHistory(history)
                         gameBreakdown(breakdown)
@@ -100,22 +100,25 @@ struct AnalyticsView: View {
 
     private func summary(_ value: CollectionValueHistory) -> some View {
         HStack(spacing: 0) {
-            AnalyticsMetric(title: "Value", value: value.currentValue.priceText, color: .primary)
+            StatBlock(title: "Value", value: value.currentValue.priceText)
+                .frame(maxWidth: .infinity)
             Divider().frame(height: 42)
-            AnalyticsMetric(
+            StatBlock(
                 title: period.title,
                 value: String(format: "%@%.1f%%", value.changePercent >= 0 ? "+" : "", value.changePercent),
                 color: value.changePercent >= 0 ? .green : .red
             )
+            .frame(maxWidth: .infinity)
             Divider().frame(height: 42)
-            AnalyticsMetric(
+            StatBlock(
                 title: "Cards",
                 value: "\(breakdown?.byTcg.reduce(0) { $0 + $1.cardCount } ?? 0)",
                 color: .primary
             )
+            .frame(maxWidth: .infinity)
         }
-        .padding()
-        .background(.regularMaterial, in: .rect(cornerRadius: 16))
+        .padding(AppSpacing.large)
+        .background(.regularMaterial, in: .rect(cornerRadius: AppRadius.card))
     }
 
     private func valueHistory(_ value: CollectionValueHistory) -> some View {
@@ -128,21 +131,8 @@ struct AnalyticsView: View {
                 )
                 .frame(height: 180)
             } else {
-                Chart(value.history) { point in
-                    AreaMark(
-                        x: .value("Date", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .foregroundStyle(.tint.opacity(0.18))
-                    LineMark(
-                        x: .value("Date", point.date),
-                        y: .value("Value", point.value)
-                    )
-                    .foregroundStyle(.tint)
-                    .interpolationMethod(.catmullRom)
-                }
-                .chartYAxis { AxisMarks(position: .leading) }
-                .frame(height: 210)
+                CollectionValueChart(points: value.history)
+                    .id(period)
             }
         }
     }
@@ -256,36 +246,15 @@ struct AnalyticsView: View {
     }
 }
 
-private struct AnalyticsMetric: View {
-    let title: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(value).font(.headline.monospacedDigit()).foregroundStyle(color).minimumScaleFactor(0.65)
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 private struct AnalyticsCard<Content: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
-            }
+        SurfaceCard(title: title, subtitle: subtitle) {
             content
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: .rect(cornerRadius: 16))
     }
 }
 

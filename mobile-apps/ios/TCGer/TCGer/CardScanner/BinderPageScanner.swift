@@ -269,7 +269,10 @@ actor BinderPageScanner {
         protectedRect: CGRect? = nil
     ) async throws -> BinderPageScanResult {
         let start = Date()
-        let observations = try detectCardQuads(in: image)
+        let observations = try detectCardQuads(
+            in: image,
+            intrinsics: context.cameraIntrinsics
+        )
         let croppedObservations = observations.compactMap { observation -> (VNRectangleObservation, CGImage)? in
             guard let crop = makeNormalizedCrop(from: image, observation: observation) else {
                 return nil
@@ -453,7 +456,10 @@ actor BinderPageScanner {
     /// detector asset is unavailable or fires on nothing.
     // Internal (not private) so the replay/fit experiment harnesses can score
     // localization and page-fit geometry without running recognition.
-    func detectCardQuads(in image: CGImage) throws -> [VNRectangleObservation] {
+    func detectCardQuads(
+        in image: CGImage,
+        intrinsics: ScannerCameraIntrinsics? = nil
+    ) throws -> [VNRectangleObservation] {
         if let detector = CardObjectDetector.shared {
             let boxes = ((try? detector.detections(in: image)) ?? [])
                 .map { $0.boundingBox.standardized }
@@ -465,7 +471,14 @@ actor BinderPageScanner {
             if !boxes.isEmpty {
                 let imageSize = CGSize(width: image.width, height: image.height)
                 let refinements = boxes.map { box in
-                    (box, cropper.refinedQuad(in: image, around: box))
+                    (
+                        box,
+                        cropper.refinedQuad(
+                            in: image,
+                            around: box,
+                            intrinsics: intrinsics
+                        )
+                    )
                 }
                 let refinedAngles = refinements.compactMap {
                     $0.1.flatMap { Self.refinedTopEdgeAngleDegrees($0, imageSize: imageSize) }

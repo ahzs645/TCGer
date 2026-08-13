@@ -14,6 +14,10 @@ struct CachedAsyncImage<Content: View>: View {
         fallbackAssetName: String? = nil,
         @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
     ) {
+        let url = url.flatMap { candidate -> URL? in
+            guard let scheme = candidate.scheme?.lowercased() else { return nil }
+            return ["http", "https", "file"].contains(scheme) ? candidate : nil
+        }
         self.url = url
         self.fallbackAssetName = fallbackAssetName
         self.content = content

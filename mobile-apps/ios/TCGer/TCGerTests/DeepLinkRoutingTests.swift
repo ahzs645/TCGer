@@ -83,6 +83,15 @@ final class DeepLinkRoutingTests: XCTestCase {
         XCTAssertEqual(layout.presentation(for: .settings), .primary(.settings))
     }
 
+    func testActivityTabFollowsNotificationFeatureCapability() {
+        XCTAssertTrue(AppTab.activity.isSupported(by: .allEnabled))
+        XCTAssertFalse(
+            AppTab.activity.isSupported(
+                by: ServerFeatures(notifications: false)
+            )
+        )
+    }
+
     @MainActor
     func testEachRoutingLayerClaimsARequestOnlyOnce() throws {
         let store = EnvironmentStore()

@@ -15,6 +15,7 @@ struct SealedInventoryView: View {
     @State private var barcodeError: String?
     @State private var searchText = ""
     @State private var actionSheet: SealedActionSheet?
+    @StateObject private var packOpeningWarmupSession = PackOpeningWebSession()
 
     private let apiService = APIService()
 
@@ -132,6 +133,25 @@ struct SealedInventoryView: View {
                 }
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        .background {
+            GeometryReader { proxy in
+                if !showingPackOpening {
+                    PackOpeningWebView(
+                        session: packOpeningWarmupSession,
+                        command: nil,
+                        onEvent: { _ in }
+                    )
+                    .frame(
+                        width: max(proxy.size.width, 320),
+                        height: max(proxy.size.height, 640)
+                    )
+                    .opacity(0.001)
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
+            }
+        }
         .navigationTitle("Sealed Products")
             .searchable(
                 text: $searchText,
@@ -177,7 +197,8 @@ struct SealedInventoryView: View {
                 }
             }
             .fullScreenCover(isPresented: $showingPackOpening) {
-                PackOpeningView()
+                PackOpeningView(webSession: packOpeningWarmupSession)
+                    .environmentObject(environmentStore)
             }
             .sheet(item: $scannedProduct) { product in
                 ScannedSealedProductSheet(product: product) { quantity, purchasePrice in

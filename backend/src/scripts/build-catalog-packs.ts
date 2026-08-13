@@ -36,6 +36,23 @@ interface CatalogSet {
   iconUrl?: string;
   iconFallbackUrl?: string;
   logoUrl?: string;
+  boosters?: PokemonBooster[];
+}
+
+interface PokemonBooster {
+  id: string;
+  name: string;
+}
+
+interface PokemonPocketMetadata {
+  hp?: number;
+  effect?: string;
+  cardDescription?: string;
+  abilities?: Array<{ type?: string; name: string; effect: string }>;
+  attacks?: Array<{ cost: string[]; name: string; effect?: string; damage?: string }>;
+  weaknesses?: Array<{ type: string; value: string }>;
+  retreatCost?: number;
+  boosters?: PokemonBooster[];
 }
 
 interface CatalogCard {
@@ -87,6 +104,7 @@ interface CatalogCard {
     sourceProductId?: string;
     sourceUrl?: string;
   };
+  pokemonPocket?: PokemonPocketMetadata;
 }
 
 interface CatalogPack {
@@ -133,11 +151,37 @@ interface TcgdexSetDetail extends TcgdexSetSummary {
   cardCount?: { total?: number; official?: number };
   logo?: string;
   symbol?: string;
+  boosters?: PokemonBooster[];
   cards?: Array<{
     id: string;
     localId?: string;
     name: string;
   }>;
+}
+
+interface TcgdexPocketCardDetail {
+  id: string;
+  category?: string;
+  illustrator?: string;
+  image?: string;
+  localId?: string;
+  name: string;
+  rarity?: string;
+  effect?: string;
+  hp?: number;
+  types?: string[];
+  description?: string;
+  stage?: string;
+  abilities?: Array<{ type?: string; name: string; effect: string }>;
+  attacks?: Array<{
+    cost?: string[];
+    name: string;
+    effect?: string;
+    damage?: string | number;
+  }>;
+  weaknesses?: Array<{ type: string; value: string }>;
+  retreat?: number;
+  boosters?: PokemonBooster[];
 }
 
 interface TcgdexCardIndexResponse {
@@ -492,6 +536,45 @@ async function fetchJson<T>(
   return (await response.json()) as T;
 }
 
+async function fetchPokemonPocketCardDetails(
+  cards: Array<{ id: string }>,
+): Promise<Map<string, TcgdexPocketCardDetail>> {
+  const details = new Map<string, TcgdexPocketCardDetail>();
+  for (let offset = 0; offset < cards.length; offset += POKEMON_CONCURRENCY) {
+    const batch = cards.slice(offset, offset + POKEMON_CONCURRENCY);
+    const values = await Promise.all(
+      batch.map((card) =>
+        fetchJson<TcgdexPocketCardDetail>(
+          `${POKEMON_API_ROOT}/cards/${encodeURIComponent(card.id)}`,
+          `TCGdex Pocket card ${card.id}`,
+        ),
+      ),
+    );
+    for (const value of values) {
+      details.set(value.id, value);
+    }
+  }
+  return details;
+}
+
+function pocketMetadata(detail: TcgdexPocketCardDetail): PokemonPocketMetadata {
+  return {
+    hp: detail.hp,
+    effect: detail.effect,
+    cardDescription: detail.description,
+    abilities: detail.abilities,
+    attacks: detail.attacks?.map((attack) => ({
+      cost: attack.cost ?? [],
+      name: attack.name,
+      effect: attack.effect,
+      damage: attack.damage === undefined ? undefined : String(attack.damage),
+    })),
+    weaknesses: detail.weaknesses,
+    retreatCost: detail.retreat,
+    boosters: detail.boosters,
+  };
+}
+
 async function buildPokemonPack(updatedAt: string, limit?: number): Promise<CatalogPack> {
   const [summaries, metadataByCardId, worldChampionshipCatalog] = await Promise.all([
     fetchJson<TcgdexSetSummary[]>(`${POKEMON_API_ROOT}/sets`, 'TCGdex set list'),
@@ -526,6 +609,10 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         continue;
       }
       const artwork = resolvePokemonSetArtwork(detail.id, detail.symbol, detail.logo);
+      const isPocket = detail.serie?.id?.toLowerCase() === 'tcgp';
+      const pocketDetails = isPocket
+        ? await fetchPokemonPocketCardDetails(setCards)
+        : new Map<string, TcgdexPocketCardDetail>();
       sets.push({
         code: detail.id,
         name: detail.name,
@@ -533,25 +620,30 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         releasedAt: detail.releaseDate,
         count: detail.cardCount?.total ?? detail.cards?.length ?? setCards.length,
         standardCount: detail.cardCount?.official,
+        boosters: isPocket ? detail.boosters : undefined,
         ...artwork,
       });
       cards.push(
         ...setCards.map((card) => {
           const metadata = metadataByCardId.get(card.id);
+          const pocket = pocketDetails.get(card.id);
           return taggedCard('pokemon', {
             id: card.id,
             name: card.name,
             setCode: detail.id,
             collectorNumber: card.localId ?? card.id.slice(detail.id.length + 1),
-            rarity: canonicalizePokemonRarity(metadata?.rarity, card.name, {
+            rarity: canonicalizePokemonRarity(pocket?.rarity ?? metadata?.rarity, card.name, {
               noneMeansPromo: true,
             }),
-            artist: metadata?.artist,
-            category: metadata?.category,
-            stage: metadata?.stage,
+            artist: pocket?.illustrator ?? metadata?.artist,
+            category: pocket?.category ?? metadata?.category,
+            stage: pocket?.stage ?? metadata?.stage,
             suffix: metadata?.suffix,
-            types: metadata?.types,
-            subtypes: [metadata?.stage, metadata?.suffix].filter((value): value is string => Boolean(value)),
+            type: pocket?.category ?? metadata?.category,
+            types: pocket?.types ?? metadata?.types,
+            subtypes: [pocket?.stage ?? metadata?.stage, metadata?.suffix]
+              .filter((value): value is string => Boolean(value)),
+            pokemonPocket: pocket ? pocketMetadata(pocket) : undefined,
           });
         }),
       );

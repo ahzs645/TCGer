@@ -118,6 +118,8 @@ struct ContentView: View {
             AnalyticsView(parentProvidesNavigation: parentProvidesNavigation)
         case .trades:
             TradesView(parentProvidesNavigation: parentProvidesNavigation)
+        case .activity:
+            ActivityView(parentProvidesNavigation: parentProvidesNavigation)
         case .scan:
             CardScannerView()
         case .settings:
@@ -135,7 +137,7 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
         case .sealed:
             return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
-        case .sets, .decks, .wishlists, .guides, .prices, .analytics, .trades, .scan:
+        case .sets, .decks, .wishlists, .guides, .prices, .analytics, .trades, .activity, .scan:
             return environmentStore.isAuthenticated
         }
     }

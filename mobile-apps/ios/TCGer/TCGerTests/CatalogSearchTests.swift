@@ -153,6 +153,33 @@ final class CatalogSearchTests: XCTestCase {
         )
     }
 
+    func testPocketMetadataParticipatesInOfflineSearchAndCardMapping() async throws {
+        let fixture = try await makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+
+        let attackResults = fixture.store.search(
+            query: "Aura Sphere",
+            tcg: .pokemon,
+            limit: 20
+        )
+        XCTAssertEqual(attackResults.map(\.card.id), ["lucario-v"])
+        XCTAssertTrue(
+            fixture.store.search(query: "Pokémon Pocket", tcg: .pokemon, limit: 20)
+                .contains { $0.card.id == "lucario-v" }
+        )
+
+        let entry = try XCTUnwrap(attackResults.first)
+        let mappedCard = fixture.store.card(from: entry)
+        XCTAssertEqual(mappedCard.pokemonPrint?.format, .pocket)
+        XCTAssertEqual(mappedCard.pokemonPrint?.pocket?.hp, 120)
+        XCTAssertEqual(mappedCard.pokemonPrint?.pocket?.attacks?.first?.damage, "70")
+
+        let set = try XCTUnwrap(fixture.store.sets(tcg: .pokemon).first)
+        let mappedSet = fixture.store.tcgSet(from: set, tcg: .pokemon)
+        XCTAssertEqual(mappedSet.pokemonFormat, .pocket)
+        XCTAssertEqual(mappedSet.boosters?.first?.name, "Lucario Pack")
+    }
+
     private func makeFixture() async throws -> Fixture {
         let pack = Data(
             #"""
@@ -165,14 +192,15 @@ final class CatalogSearchTests: XCTestCase {
                 {
                   "code": "tk-dp-l",
                   "name": "DP trainer Kit (Lucario)",
-                  "serie": "tk",
+                  "serie": "tcgp",
                   "count": 11,
-                  "standardCount": 11
+                  "standardCount": 11,
+                  "boosters": [{"id":"boo_lucario","name":"Lucario Pack"}]
                 }
               ],
               "cards": [
                 {"id":"mega-lucario","name":"Mega Lucario","setCode":"tk-dp-l","collectorNumber":"13"},
-                {"id":"lucario-v","name":"Lucario V","setCode":"tk-dp-l","collectorNumber":"4","collectionTags":["pokemon.art.clay"]},
+                {"id":"lucario-v","name":"Lucario V","setCode":"tk-dp-l","collectorNumber":"4","collectionTags":["pokemon.art.clay"],"type":"Pokémon","pokemonPocket":{"hp":120,"effect":"Charge your attack.","attacks":[{"cost":["Fighting"],"name":"Aura Sphere","damage":"70"}],"boosters":[{"id":"boo_lucario","name":"Lucario Pack"}]}},
                 {"id":"tk-dp-l-3","name":"Lucario","setCode":"tk-dp-l","collectorNumber":"3","rarity":"Promo"},
                 {"id":"lukario-trick","name":"Lukario's Trick","setCode":"tk-dp-l","collectorNumber":"7"}
               ]

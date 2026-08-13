@@ -51,6 +51,29 @@ extension CatalogStore {
             break
         }
 
+        let pokemonPrint: PokemonPrintMetadata? = {
+            let isPocket = set?.serie?.lowercased() == "tcgp"
+            guard entry.tcg == .pokemon,
+                  isPocket || entry.card.pokemonPocket != nil || entry.card.pokemonWorldChampionship != nil else {
+                return nil
+            }
+            return PokemonPrintMetadata(
+                tcgdexId: entry.card.id,
+                tcgdexImage: fullImageURL,
+                variants: nil,
+                finishes: entry.card.pokemonPocket == nil ? ["normal"] : nil,
+                category: entry.card.type,
+                regulationMark: nil,
+                language: "EN",
+                formatLegality: nil,
+                dexEntries: nil,
+                region: nil,
+                worldChampionship: entry.card.pokemonWorldChampionship,
+                format: isPocket ? .pocket : .tabletop,
+                pocket: entry.card.pokemonPocket
+            )
+        }()
+
         return Card(
             id: entry.card.id,
             name: entry.card.name,
@@ -68,21 +91,7 @@ extension CatalogStore {
             types: entry.tcg == .pokemon ? entry.card.types : nil,
             setSymbolUrl: set?.iconUrl,
             setLogoUrl: set?.logoUrl,
-            pokemonPrint: entry.card.pokemonWorldChampionship.map { worlds in
-                PokemonPrintMetadata(
-                    tcgdexId: nil,
-                    tcgdexImage: nil,
-                    variants: nil,
-                    finishes: ["normal"],
-                    category: entry.card.type,
-                    regulationMark: nil,
-                    language: nil,
-                    formatLegality: nil,
-                    dexEntries: nil,
-                    region: nil,
-                    worldChampionship: worlds
-                )
-            },
+            pokemonPrint: pokemonPrint,
             attributes: attributes.isEmpty ? nil : attributes,
             printingKey: entry.card.printingKey ?? (entry.tcg == .yugioh ? entry.card.id : nil),
             artworkId: entry.card.konamiId.map(String.init),
@@ -104,7 +113,9 @@ extension CatalogStore {
             iconFallbackUrl: set.iconFallbackUrl,
             logoUrl: set.logoUrl,
             setType: set.setType,
-            releaseYear: set.releaseYear
+            releaseYear: set.releaseYear,
+            series: set.serie,
+            boosters: set.boosters
         )
     }
 }

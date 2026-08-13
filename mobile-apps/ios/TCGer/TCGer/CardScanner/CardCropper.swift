@@ -44,16 +44,20 @@ nonisolated struct CardCropper {
         detectorSource = .explicit(detector)
     }
 
-    func bestCrop(from image: CGImage) throws -> CGImage? {
-        try preferredCrop(from: image)?.image
+    func bestCrop(
+        from image: CGImage,
+        intrinsics: ScannerCameraIntrinsics? = nil
+    ) throws -> CGImage? {
+        try preferredCrop(from: image, intrinsics: intrinsics)?.image
     }
 
     /// `bestCrop` plus the observation that produced it, so callers recording
     /// diagnostics can persist the chosen quad alongside the crop.
     func preferredCrop(
-        from image: CGImage
+        from image: CGImage,
+        intrinsics: ScannerCameraIntrinsics? = nil
     ) throws -> (image: CGImage, observation: VNRectangleObservation)? {
-        let rectangles = try detectRectangles(in: image)
+        let rectangles = try detectRectangles(in: image, intrinsics: intrinsics)
         guard let best = Self.preferredObservation(from: rectangles),
               let crop = makeNormalizedCrop(from: image, observation: best)
         else { return nil }
@@ -114,8 +118,11 @@ nonisolated struct CardCropper {
         )
     }
 
-    func detectRectangles(in image: CGImage) throws -> [VNRectangleObservation] {
-        try detectRectanglesDetailed(in: image).observations
+    func detectRectangles(
+        in image: CGImage,
+        intrinsics: ScannerCameraIntrinsics? = nil
+    ) throws -> [VNRectangleObservation] {
+        try detectRectanglesDetailed(in: image, intrinsics: intrinsics).observations
     }
 
     /// Like `detectRectangles`, but when the quad came from the sub-image
@@ -124,7 +131,8 @@ nonisolated struct CardCropper {
     /// from a right one geometrically — the strategy's gate-ordered retry
     /// arbitrates between the two crops instead.
     func detectRectanglesDetailed(
-        in image: CGImage
+        in image: CGImage,
+        intrinsics: ScannerCameraIntrinsics? = nil
     ) throws -> (observations: [VNRectangleObservation], alternateBox: VNRectangleObservation?) {
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
 
@@ -140,7 +148,18 @@ nonisolated struct CardCropper {
         // the card edge before trusting it exclusively.
         let documentRequest = VNDetectDocumentSegmentationRequest()
         try? handler.perform([documentRequest])
-        if let documents = documentRequest.results?.filter(Self.isPlausibleDocumentDetection),
+        if let documents = documentRequest.results?.filter({ observation in
+            guard intrinsics?.isUsable == true else {
+                // Preserve the replay-calibrated normalized-space behavior
+                // when no trustworthy calibration is available.
+                return Self.isPlausibleDocumentDetection(observation)
+            }
+            return Self.isPlausibleDocumentDetection(
+                observation,
+                imageSize: CGSize(width: image.width, height: image.height),
+                intrinsics: intrinsics
+            )
+        }),
            !documents.isEmpty {
             if let detectedCard {
                 let agreeing = documents.filter {
@@ -156,7 +175,12 @@ nonisolated struct CardCropper {
         let request = VNDetectRectanglesRequest()
         request.maximumObservations = Configuration.maximumObservations
         request.minimumConfidence = Configuration.minimumConfidence
-        request.minimumAspectRatio = Configuration.minimumAspectRatio
+        // Calibrated recovery can safely arbitrate steeper projections whose
+        // apparent edge ratio falls outside the legacy band. Without camera
+        // intrinsics, retain the measured-safe detector configuration.
+        request.minimumAspectRatio = intrinsics?.isUsable == true
+            ? 0.4
+            : Configuration.minimumAspectRatio
         request.maximumAspectRatio = Configuration.maximumAspectRatio
         request.minimumSize = Configuration.minimumSize
 
@@ -178,7 +202,11 @@ nonisolated struct CardCropper {
         // the alternate so a wrong refinement can never lose a card the box
         // crop would have matched.
         let fallbackBox = Self.rectangleObservation(for: detectedCard.boundingBox)
-        if let refined = refinedObservations(in: image, around: detectedCard.boundingBox),
+        if let refined = refinedObservations(
+            in: image,
+            around: detectedCard.boundingBox,
+            intrinsics: intrinsics
+        ),
            !refined.isEmpty {
             return (refined, fallbackBox)
         }
@@ -190,9 +218,10 @@ nonisolated struct CardCropper {
     /// inside the padded box and the largest card-shaped result wins.
     func refinedQuad(
         in image: CGImage,
-        around normalizedBox: CGRect
+        around normalizedBox: CGRect,
+        intrinsics: ScannerCameraIntrinsics? = nil
     ) -> VNRectangleObservation? {
-        refinedObservations(in: image, around: normalizedBox)
+        refinedObservations(in: image, around: normalizedBox, intrinsics: intrinsics)
             .flatMap(Self.preferredObservation(from:))
     }
 
@@ -201,7 +230,8 @@ nonisolated struct CardCropper {
     /// nothing card-shaped covering most of the box is found.
     private func refinedObservations(
         in image: CGImage,
-        around normalizedBox: CGRect
+        around normalizedBox: CGRect,
+        intrinsics: ScannerCameraIntrinsics?
     ) -> [VNRectangleObservation]? {
         let width = CGFloat(image.width)
         let height = CGFloat(image.height)
@@ -223,7 +253,9 @@ nonisolated struct CardCropper {
         let rectangleRequest = VNDetectRectanglesRequest()
         rectangleRequest.maximumObservations = Configuration.maximumObservations
         rectangleRequest.minimumConfidence = Configuration.minimumConfidence
-        rectangleRequest.minimumAspectRatio = Configuration.minimumAspectRatio
+        rectangleRequest.minimumAspectRatio = intrinsics?.isUsable == true
+            ? 0.4
+            : Configuration.minimumAspectRatio
         rectangleRequest.maximumAspectRatio = Configuration.maximumAspectRatio
         // The card should dominate the sub-image; a small minimum would
         // resurface the interior-panel problem this retry exists to avoid.
@@ -244,7 +276,8 @@ nonisolated struct CardCropper {
                 topRight: topRight,
                 bottomLeft: bottomLeft,
                 bottomRight: bottomRight,
-                imageSize: CGSize(width: width, height: height)
+                imageSize: CGSize(width: width, height: height),
+                intrinsics: intrinsics
             ) else { return nil }
             // The quad must be the card, not a panel printed on it (>= half
             // the detector box) and not a failed whole-sub-image segmentation
@@ -308,6 +341,25 @@ nonisolated struct CardCropper {
             )
     }
 
+    static func isPlausibleDocumentDetection(
+        _ observation: VNRectangleObservation,
+        imageSize: CGSize,
+        intrinsics: ScannerCameraIntrinsics?
+    ) -> Bool {
+        isPlausibleDocumentDetection(
+            confidence: observation.confidence,
+            bounds: observation.boundingBox
+        )
+            && isCardShaped(
+                topLeft: observation.topLeft,
+                topRight: observation.topRight,
+                bottomLeft: observation.bottomLeft,
+                bottomRight: observation.bottomRight,
+                imageSize: imageSize,
+                intrinsics: intrinsics
+            )
+    }
+
     static func isPlausibleDocumentDetection(confidence: Float, bounds: CGRect) -> Bool {
         let bounds = bounds.standardized
         let area = bounds.width * bounds.height
@@ -328,17 +380,31 @@ nonisolated struct CardCropper {
         topRight: CGPoint,
         bottomLeft: CGPoint,
         bottomRight: CGPoint,
-        imageSize: CGSize
+        imageSize: CGSize,
+        intrinsics: ScannerCameraIntrinsics? = nil
     ) -> Bool {
         func scaled(_ point: CGPoint) -> CGPoint {
             CGPoint(x: point.x * imageSize.width, y: point.y * imageSize.height)
         }
-        return isCardShaped(
+        if isCardShaped(
             topLeft: scaled(topLeft),
             topRight: scaled(topRight),
             bottomLeft: scaled(bottomLeft),
             bottomRight: scaled(bottomRight)
-        )
+        ) {
+            return true
+        }
+        guard let intrinsics,
+              let recovered = ScannerCardAspectRecovery.recover(
+                visionCorners: [topLeft, topRight, bottomRight, bottomLeft],
+                imageSize: imageSize,
+                intrinsics: intrinsics
+              )
+        else { return false }
+        // Standard trading cards span roughly 0.686 (Yu-Gi-Oh!) through
+        // 0.716 (Pokémon/Magic). The small margin admits corner noise without
+        // turning calibrated recovery into a general quadrilateral detector.
+        return (0.63 ... 0.78).contains(recovered)
     }
 
     /// Measures the four quad edges instead of `boundingBox.width / height`.

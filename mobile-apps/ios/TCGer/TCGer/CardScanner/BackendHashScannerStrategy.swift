@@ -43,7 +43,10 @@ final class BackendHashScannerStrategy: ScanStrategy {
         // The visible guide has already removed most background. Normalize the
         // card perspective before upload as well, so local and server matchers
         // see the same card-shaped input and no surrounding scene is uploaded.
-        let preparedImage = try cropper.bestCrop(from: image) ?? image
+        let preparedImage = try cropper.bestCrop(
+            from: image,
+            intrinsics: context.cameraIntrinsics
+        ) ?? image
 
         guard let imageData = UIImage(cgImage: preparedImage).jpegData(compressionQuality: 0.88) else {
             throw CardScannerError.underlying(

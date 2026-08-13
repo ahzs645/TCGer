@@ -14,6 +14,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
     case prices
     case analytics
     case trades
+    case activity
     case scan
     case settings
 
@@ -31,6 +32,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .prices: return "Prices"
         case .analytics: return "Analytics"
         case .trades: return "Trades"
+        case .activity: return "Activity"
         case .scan: return "Scan"
         case .settings: return "Settings"
         }
@@ -48,6 +50,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .prices: return "dollarsign.circle.fill"
         case .analytics: return "chart.xyaxis.line"
         case .trades: return "arrow.left.arrow.right"
+        case .activity: return "bell.fill"
         case .scan: return "camera.viewfinder"
         case .settings: return "gearshape.fill"
         }
@@ -65,6 +68,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .prices: return "Track collection value and card prices"
         case .analytics: return "Explore value history and collection trends"
         case .trades: return "Propose and manage collector trades"
+        case .activity: return "Trade requests, price alerts, and account updates"
         case .scan: return "Identify cards with the camera"
         case .settings: return "Preferences and app configuration"
         }
@@ -88,6 +92,8 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
             return features.analytics
         case .trades:
             return features.trades
+        case .activity:
+            return features.notifications
         default:
             return true
         }

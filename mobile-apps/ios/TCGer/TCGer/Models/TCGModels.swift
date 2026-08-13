@@ -177,6 +177,50 @@ struct PokemonVariantFlags: Codable, Hashable, Sendable {
     let firstEdition: Bool?
 }
 
+/// Distinguishes the physical Pokémon TCG catalog from Pokémon TCG Pocket
+/// without introducing a new top-level game identifier that the server would
+/// also need to understand.
+enum PokemonCatalogFormat: String, Codable, Hashable, Sendable {
+    case tabletop
+    case pocket
+}
+
+struct PokemonBooster: Codable, Hashable, Sendable, Identifiable {
+    let id: String
+    let name: String
+}
+
+struct PokemonAbility: Codable, Hashable, Sendable {
+    let type: String?
+    let name: String
+    let effect: String
+}
+
+struct PokemonAttack: Codable, Hashable, Sendable {
+    let cost: [String]
+    let name: String
+    let effect: String?
+    /// TCGdex represents damage as either a number or decorated text such as
+    /// `20+`; storing the normalized display value preserves both forms.
+    let damage: String?
+}
+
+struct PokemonWeakness: Codable, Hashable, Sendable {
+    let type: String
+    let value: String
+}
+
+struct PokemonPocketMetadata: Codable, Hashable, Sendable {
+    let hp: Int?
+    let effect: String?
+    let cardDescription: String?
+    let abilities: [PokemonAbility]?
+    let attacks: [PokemonAttack]?
+    let weaknesses: [PokemonWeakness]?
+    let retreatCost: Int?
+    let boosters: [PokemonBooster]?
+}
+
 nonisolated struct PokemonWorldChampionshipPrint: Codable, Hashable, Sendable {
     let year: Int
     let playerName: String
@@ -202,6 +246,8 @@ struct PokemonPrintMetadata: Codable, Hashable, Sendable {
     let dexEntries: [PokedexEntry]?
     let region: String?
     var worldChampionship: PokemonWorldChampionshipPrint? = nil
+    var format: PokemonCatalogFormat? = nil
+    var pocket: PokemonPocketMetadata? = nil
 }
 
 struct PokemonFinishOption: Identifiable, Hashable, Sendable {
@@ -830,11 +876,19 @@ struct TcgSet: Identifiable, Codable, Hashable, Sendable {
     let logoUrl: String?
     var setType: String? = nil
     var releaseYear: Int? = nil
+    /// TCGdex series identifier. Pokémon TCG Pocket uses `tcgp`.
+    var series: String? = nil
+    var boosters: [PokemonBooster]? = nil
 
     var id: String { "\(tcg)-\(code)" }
 
     /// A normalized identifier used for device-local set preferences.
     var focusID: String { "\(tcg.lowercased())::\(code.lowercased())" }
+
+    var pokemonFormat: PokemonCatalogFormat? {
+        guard tcg == TCGGame.pokemon.rawValue else { return nil }
+        return series?.lowercased() == "tcgp" ? .pocket : .tabletop
+    }
 
     var tcgDisplayName: String {
         TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized

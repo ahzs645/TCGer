@@ -199,6 +199,10 @@ struct CardScannerView: View {
                 onSelectCandidate: { candidate in
                     viewModel.selectCandidate(candidate, for: result.id)
                 },
+                canAdjustCrop: viewModel.canRescueCrop(for: result.id),
+                onAdjustCrop: {
+                    viewModel.prepareCropRescue(for: result.id)
+                },
                 onAddCard: { card, binderId, details in
                     try await APIService().addCardToBinder(
                         config: environmentStore.serverConfiguration,
@@ -232,6 +236,17 @@ struct CardScannerView: View {
                 color: accentColor(for: viewModel.selectedMode)
             )
             .environmentObject(environmentStore)
+        }
+        .sheet(item: $viewModel.cropRescueRequest, onDismiss: {
+            viewModel.cancelCropRescue()
+        }) { request in
+            ScannerCropAdjustView(
+                request: request,
+                color: accentColor(for: viewModel.selectedMode),
+                onRetry: { quad in
+                    await viewModel.retryCropRescue(request, quad: quad)
+                }
+            )
         }
         .alert(isPresented: Binding(
             get: { viewModel.errorMessage != nil },
@@ -481,12 +496,24 @@ struct CardScannerView: View {
     }
 
     private var framingInstructionContent: some View {
-        Text(framingInstruction)
+        Label(
+            viewModel.captureMode == .card
+                ? (viewModel.latestCaptureQuality?.primaryIssue?.hint ?? framingInstruction)
+                : framingInstruction,
+            systemImage: qualityInstructionIcon
+        )
             .font(.caption.weight(.semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
+    }
+
+    private var qualityInstructionIcon: String {
+        guard viewModel.captureMode == .card,
+              let quality = viewModel.latestCaptureQuality
+        else { return "viewfinder" }
+        return quality.allPass ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
     }
 
     private var bottomControls: some View {
@@ -1085,17 +1112,23 @@ private struct ScanResultSheet: View {
     let result: CardScanResult
     let color: Color
     let onSelectCandidate: (CardScanCandidate) -> Void
+    let canAdjustCrop: Bool
+    let onAdjustCrop: () -> Void
     let onAddCard: (Card, String, BinderCardAddDetails) async throws -> Void
 
     init(
         result: CardScanResult,
         color: Color,
         onSelectCandidate: @escaping (CardScanCandidate) -> Void,
+        canAdjustCrop: Bool,
+        onAdjustCrop: @escaping () -> Void,
         onAddCard: @escaping (Card, String, BinderCardAddDetails) async throws -> Void
     ) {
         self.result = result
         self.color = color
         self.onSelectCandidate = onSelectCandidate
+        self.canAdjustCrop = canAdjustCrop
+        self.onAdjustCrop = onAdjustCrop
         self.onAddCard = onAddCard
         _selectedCandidate = State(initialValue: result.primary)
         _debugCapture = State(initialValue: result.debugCapture)
@@ -1208,6 +1241,17 @@ private struct ScanResultSheet: View {
                 Label(price.priceText, systemImage: "dollarsign.circle")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+            }
+
+            if canAdjustCrop {
+                Button {
+                    dismiss()
+                    onAdjustCrop()
+                } label: {
+                    Label("Adjust Crop & Retry", systemImage: "crop")
+                }
+                .buttonStyle(.bordered)
+                .tint(color)
             }
         }
     }

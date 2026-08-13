@@ -111,7 +111,8 @@ actor ScannerDevModeStore {
         expectedCardId: String? = nil,
         expectedNoMatch: Bool? = nil,
         manualCorrection: ScannerManualCorrection? = nil,
-        binderExclusion: ScannerBinderDetectionExclusion? = nil
+        binderExclusion: ScannerBinderDetectionExclusion? = nil,
+        captureQuality: ScannerCaptureQualityReport? = nil
     ) -> Bool {
         guard Self.isEnabled else { return false }
         let directory: URL
@@ -229,6 +230,7 @@ actor ScannerDevModeStore {
             outcome: outcome,
             attempts: attempts,
             attemptImageFiles: attemptFiles,
+            captureQuality: captureQuality,
             binderExclusion: binderExclusion.map {
                 BinderDetectionExclusionEvidence(
                     reason: $0.reason,

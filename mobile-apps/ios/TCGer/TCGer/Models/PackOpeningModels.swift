@@ -7,6 +7,12 @@ struct PackOpeningPullSession: Identifiable, Codable, Hashable, Sendable {
     let packs: [[PackOpeningPull]]
 
     var pulls: [PackOpeningPull] { packs.flatMap { $0 } }
+    var resultArtworkURLs: [URL] {
+        pulls.compactMap { pull in
+            let value = pull.imageUrlSmall.isEmpty ? pull.imageUrl : pull.imageUrlSmall
+            return URL(string: value)
+        }
+    }
     var setCode: String? {
         let codes = Set(pulls.map(\.setCode))
         return codes.count == 1 ? codes.first : nil

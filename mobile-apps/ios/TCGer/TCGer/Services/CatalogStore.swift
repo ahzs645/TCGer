@@ -217,6 +217,7 @@ nonisolated struct CatalogSetEntry: Decodable, Hashable, Sendable {
     let logoUrl: String?
     var setType: String? = nil
     var releaseYear: Int? = nil
+    var boosters: [PokemonBooster]? = nil
 }
 
 /// The in-memory pack row intentionally contains only fields needed by offline
@@ -251,6 +252,7 @@ nonisolated struct CatalogCardEntry: Decodable, Hashable, Sendable {
     var sanctionedPlayLegal: Bool? = nil
     var originalPrintingKey: String? = nil
     var pokemonWorldChampionship: PokemonWorldChampionshipPrint? = nil
+    var pokemonPocket: PokemonPocketMetadata? = nil
 }
 
 nonisolated struct CatalogEntry: Hashable, Sendable {
@@ -364,10 +366,13 @@ final class CatalogStore: ObservableObject {
             self.pack = pack
             let setMetadata = Dictionary(
                 pack.sets.map { set in
-                    (
+                    let searchableName = set.serie?.lowercased() == "tcgp"
+                        ? "\(set.name) pokemon pocket tcg pocket tcgp"
+                        : set.name
+                    return (
                         set.code,
                         SetSearchMetadata(
-                            name: Self.normalize(set.name),
+                            name: Self.normalize(searchableName),
                             code: Self.normalize(set.code),
                             officialCardCount: set.standardCount ?? (set.count > 0 ? set.count : nil)
                         )
@@ -413,6 +418,22 @@ final class CatalogStore: ObservableObject {
                 if let specialTrait = card.specialTrait { searchableFields.append(Self.normalize(specialTrait)) }
                 searchableFields.append(contentsOf: (card.treatments ?? []).map(Self.normalize))
                 searchableFields.append(contentsOf: (card.collectionTags ?? []).map(Self.normalize))
+                if let pocket = card.pokemonPocket {
+                    searchableFields.append(contentsOf: ["pokemon pocket", "tcg pocket", "tcgp"])
+                    if let effect = pocket.effect { searchableFields.append(Self.normalize(effect)) }
+                    if let description = pocket.cardDescription {
+                        searchableFields.append(Self.normalize(description))
+                    }
+                    searchableFields.append(contentsOf: (pocket.abilities ?? []).flatMap {
+                        [Self.normalize($0.name), Self.normalize($0.effect)]
+                    })
+                    searchableFields.append(contentsOf: (pocket.attacks ?? []).flatMap {
+                        [Self.normalize($0.name), $0.effect.map(Self.normalize)].compactMap { $0 }
+                    })
+                    searchableFields.append(contentsOf: (pocket.boosters ?? []).map {
+                        Self.normalize($0.name)
+                    })
+                }
                 if let worlds {
                     searchableFields.append(String(worlds.year))
                     searchableFields.append(Self.normalize(worlds.playerName))

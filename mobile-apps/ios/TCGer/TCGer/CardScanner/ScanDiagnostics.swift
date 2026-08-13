@@ -28,6 +28,8 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         case wholeFrame
         /// Raw image embedded as-is because no candidate localization existed.
         case rawImage
+        /// User-adjusted perspective crop retried after a failed or poor crop.
+        case manualCrop
     }
 
     enum AttemptOutcome: String, Codable {
@@ -107,6 +109,9 @@ nonisolated struct ScanEvidenceRecord: Codable {
     let outcome: String
     let attempts: [ScanDiagnostics.Attempt]
     let attemptImageFiles: [String]
+    /// Objective capture conditions measured before recognition. Optional so
+    /// recordings made before this sidecar field remain replay-compatible.
+    let captureQuality: ScannerCaptureQualityReport?
     /// Human review applied to one binder detection after the page scan.
     /// Kept separate from `expectedNoMatch`: a back card is valid card input,
     /// but it does not belong to the currently reviewed binder page.

@@ -48,6 +48,8 @@ final class CardScannerViewModel: ObservableObject {
     @Published var captureMode: ScannerCaptureMode = .card {
         didSet {
             lastAnalysisDate = .distantPast
+            lastQualityAnalysisDate = .distantPast
+            latestCaptureQuality = nil
             liveConsensus.reset()
             resetLiveConfirmation()
         }
@@ -78,6 +80,10 @@ final class CardScannerViewModel: ObservableObject {
     @Published private(set) var liveConfirmationCount = 0
     @Published private(set) var liveConfirmationRequired = 2
     @Published private(set) var nextBinderPageNumber = 1
+    @Published private(set) var latestCaptureQuality: ScannerCaptureQualityReport?
+    @Published var cropRescueRequest: ScannerCropRescueRequest? {
+        didSet { syncCameraOverlayState() }
+    }
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -96,6 +102,8 @@ final class CardScannerViewModel: ObservableObject {
     private let isSimulator: Bool
     private var lastAnalysisDate: Date = .distantPast
     private let analysisInterval: TimeInterval = 1.0
+    private var lastQualityAnalysisDate: Date = .distantPast
+    private let qualityAnalysisInterval: TimeInterval = 0.45
     private var cameraThrottle = ScannerCameraThrottle()
     private var frameConsumerTask: Task<Void, Never>?
     private var previewFrame: CGRect?
@@ -104,6 +112,7 @@ final class CardScannerViewModel: ObservableObject {
     private var automaticallyPresentsResults = false
     private var isPhotoImportActive = false
     private var detectorPreparationStarted = false
+    private var rescueSources: [CardScanResult.ID: ScannerCropRescueRequest] = [:]
 
     var binderPagesScanned: Int { binderPages.count }
 
@@ -164,7 +173,7 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     private var isOverlayCoveringPreview: Bool {
-        latestResult != nil || binderReviewPresentation != nil
+        latestResult != nil || binderReviewPresentation != nil || cropRescueRequest != nil
     }
 
     /// Pushes the overlay state into the camera the moment it changes.
@@ -343,7 +352,10 @@ final class CardScannerViewModel: ObservableObject {
     func scan(
         image: CGImage,
         source: ScanInvocationKind = .importedPhoto,
-        originalImage: CGImage? = nil
+        originalImage: CGImage? = nil,
+        cameraIntrinsics: ScannerCameraIntrinsics? = nil,
+        allowsCropRescue: Bool = true,
+        manualCropQuad: ScannerCropQuad? = nil
     ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
@@ -358,11 +370,53 @@ final class CardScannerViewModel: ObservableObject {
         state = .processing
         defer { isProcessingPhoto = false }
 
+        let captureQuality = await Self.captureQuality(
+            image: image,
+            intrinsics: cameraIntrinsics
+        )
+        latestCaptureQuality = captureQuality
+
         var scanContext = context
         let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
         scanContext.diagnostics = diagnostics
+        scanContext.cameraIntrinsics = cameraIntrinsics
         let started = Date()
         let result = await coordinator.scan(image: image, context: scanContext, source: source)
+        if let diagnostics, let manualCropQuad {
+            let imageIndex = diagnostics.registerAttemptImage(image)
+            let candidates: [ScanDiagnostics.Candidate]
+            let outcome: ScanDiagnostics.AttemptOutcome
+            switch result {
+            case .success(let result):
+                candidates = ([result.primary] + result.alternatives).prefix(5).map {
+                    ScanDiagnostics.Candidate(
+                        cardID: $0.details.identity.id,
+                        name: $0.details.identity.name,
+                        similarity: $0.confidence.score
+                    )
+                }
+                outcome = .accepted
+            case .failure(.rejectedInput):
+                candidates = []
+                outcome = .rejectedInput
+            case .failure:
+                candidates = []
+                outcome = .noCandidates
+            }
+            diagnostics.record(ScanDiagnostics.Attempt(
+                kind: .manualCrop,
+                quad: manualCropQuad.visionObservationCorners,
+                gateScore: nil,
+                gateThreshold: nil,
+                topCandidates: candidates,
+                titleMatchedName: nil,
+                titlePrintingCount: nil,
+                footerPairNumbers: [],
+                ocrVerifiedCollectorNumber: nil,
+                outcome: outcome,
+                imageIndex: imageIndex
+            ))
+        }
         if diagnostics != nil {
             let elapsedMs = Date().timeIntervalSince(started) * 1_000
             let mode = scanContext.mode
@@ -374,11 +428,17 @@ final class CardScannerViewModel: ObservableObject {
                     elapsedMs: elapsedMs,
                     result: result,
                     diagnostics: diagnostics,
-                    originalImage: originalImage
+                    originalImage: originalImage,
+                    captureQuality: captureQuality
                 )
             }
         }
-        apply(result)
+        apply(
+            result,
+            rescueInput: allowsCropRescue && source != .livePreview
+                ? await Self.makeCropRescueRequest(image: image, sourceResultID: nil)
+                : nil
+        )
     }
 
     func scan(
@@ -410,7 +470,8 @@ final class CardScannerViewModel: ObservableObject {
         presentsReview: Bool = true,
         source: ScanInvocationKind = .importedPhoto,
         originalImage: CGImage? = nil,
-        protectedRect: CGRect? = nil
+        protectedRect: CGRect? = nil,
+        cameraIntrinsics: ScannerCameraIntrinsics? = nil
     ) async {
         guard let context else {
             state = .error("Scanner context unavailable.")
@@ -426,9 +487,11 @@ final class CardScannerViewModel: ObservableObject {
         defer { isProcessingPhoto = false }
 
         do {
+            var scanContext = context
+            scanContext.cameraIntrinsics = cameraIntrinsics
             let result = try await binderPageScanner.scan(
                 image: image,
-                context: context,
+                context: scanContext,
                 protectedRect: protectedRect
             )
             recordBinderPageForDevMode(
@@ -437,7 +500,7 @@ final class CardScannerViewModel: ObservableObject {
                 result: result,
                 error: nil,
                 source: source,
-                mode: context.mode
+                mode: scanContext.mode
             )
             let scannedPageNumber = nextBinderPageNumber
             let record = BinderPageRecord(result: result, pageNumber: scannedPageNumber)
@@ -617,6 +680,7 @@ final class CardScannerViewModel: ObservableObject {
     func removeSessionResult(id: CardScanResult.ID) {
         sessionResults.removeAll { $0.id == id }
         addedSessionResultIDs.remove(id)
+        rescueSources.removeValue(forKey: id)
         if latestResult?.id == id {
             clearResult()
         }
@@ -628,6 +692,7 @@ final class CardScannerViewModel: ObservableObject {
     func clearSession() {
         sessionResults.removeAll()
         addedSessionResultIDs.removeAll()
+        rescueSources.removeAll()
         liveConsensus.reset()
         resetLiveConfirmation()
         Task.detached(priority: .utility) {
@@ -695,6 +760,10 @@ final class CardScannerViewModel: ObservableObject {
             state = .error("Unable to process captured photo.")
             return
         }
+        let fullIntrinsics = Self.cameraIntrinsics(
+            from: photo,
+            imageSize: CGSize(width: cgImage.width, height: cgImage.height)
+        )
         if captureMode == .binder {
             // Crop to what the user could actually see, not just the guide:
             // pocket cards routinely peek past the guide edges and a hard
@@ -704,24 +773,48 @@ final class CardScannerViewModel: ObservableObject {
             // pixels stay excluded — the raw frame previously fed the
             // detector surroundings the user never framed. The uncropped
             // photo is still preserved for dev mode.
+            let cropped = croppedImageAndIntrinsics(
+                from: cgImage,
+                geometry: previewFrame.map {
+                    ScannerGuideGeometry(previewFrame: $0, guideFrame: $0)
+                },
+                intrinsics: fullIntrinsics
+            )
             await scanBinderPage(
-                image: viewportCroppedImage(from: cgImage),
+                image: cropped.image,
                 source: .photoCapture,
                 originalImage: cgImage,
-                protectedRect: guideRectInViewportNormalized
+                protectedRect: guideRectInViewportNormalized,
+                cameraIntrinsics: cropped.intrinsics
             )
         } else {
+            let cropped = croppedImageAndIntrinsics(
+                from: cgImage,
+                geometry: scannerGuideGeometry,
+                intrinsics: fullIntrinsics
+            )
             await scan(
-                image: guideCroppedImage(from: cgImage),
+                image: cropped.image,
                 source: .photoCapture,
-                originalImage: cgImage
+                originalImage: cgImage,
+                cameraIntrinsics: cropped.intrinsics
             )
         }
     }
 
-    private func apply(_ result: Result<CardScanResult, CardScannerError>) {
+    private func apply(
+        _ result: Result<CardScanResult, CardScannerError>,
+        rescueInput: ScannerCropRescueRequest? = nil
+    ) {
         switch result {
         case .success(let scanResult):
+            if let rescueInput {
+                rescueSources[scanResult.id] = ScannerCropRescueRequest(
+                    image: rescueInput.image,
+                    initialQuad: rescueInput.initialQuad,
+                    sourceResultID: scanResult.id
+                )
+            }
             appendToSession(scanResult)
             if automaticallyPresentsResults {
                 latestResult = scanResult
@@ -733,10 +826,61 @@ final class CardScannerViewModel: ObservableObject {
             }
             if !isSimulator { HapticManager.notification(.success) }
         case .failure(let error):
+            let canRescue: Bool
+            switch error {
+            case .noMatch, .rejectedInput: canRescue = true
+            default: canRescue = false
+            }
+            if let rescueInput, canRescue {
+                errorMessage = nil
+                cropRescueRequest = rescueInput
+                state = .ready
+                if !isSimulator { HapticManager.notification(.warning) }
+                return
+            }
             errorMessage = error.errorDescription ?? error.localizedDescription
             state = .ready
             if !isSimulator { HapticManager.notification(.error) }
         }
+    }
+
+    func prepareCropRescue(for resultID: CardScanResult.ID) {
+        guard let request = rescueSources[resultID] else { return }
+        latestResult = nil
+        state = .ready
+        cropRescueRequest = request
+    }
+
+    func canRescueCrop(for resultID: CardScanResult.ID) -> Bool {
+        rescueSources[resultID] != nil
+    }
+
+    func cancelCropRescue() {
+        cropRescueRequest = nil
+    }
+
+    func retryCropRescue(_ request: ScannerCropRescueRequest, quad: ScannerCropQuad) async {
+        guard quad.isValid,
+              let crop = CardCropper(detector: nil).makeNormalizedCrop(
+                from: request.image,
+                observation: quad.visionObservation
+              )
+        else {
+            errorMessage = "The adjusted corners overlap or do not enclose enough of the card."
+            return
+        }
+
+        cropRescueRequest = nil
+        if let sourceResultID = request.sourceResultID {
+            removeSessionResult(id: sourceResultID)
+        }
+        await scan(
+            image: crop,
+            source: .importedPhoto,
+            originalImage: request.image,
+            allowsCropRescue: false,
+            manualCropQuad: quad
+        )
     }
 
     private func handleCaptureFailure(_ error: Error) async {
@@ -767,15 +911,26 @@ final class CardScannerViewModel: ObservableObject {
 
         guard !isPhotoImportActive else { return }
         guard captureMode == .card else { return }
-        guard triggerMode == .automatic else { return }
         guard case .ready = state else { return }
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
+
+        let now = Date()
+        if now.timeIntervalSince(lastQualityAnalysisDate) >= qualityAnalysisInterval {
+            lastQualityAnalysisDate = now
+            if let quality = await Self.analyzeLiveQuality(
+                pixelBuffer,
+                guideGeometry: scannerGuideGeometry
+            ) {
+                latestCaptureQuality = quality
+            }
+        }
+
+        guard triggerMode == .automatic else { return }
         guard let context else { return }
         if !context.serverConfiguration.isOnDevice, context.authToken == nil { return }
         guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
 
-        let now = Date()
         guard now.timeIntervalSince(lastAnalysisDate) >= analysisInterval else { return }
 
         isAnalyzingFrame = true
@@ -796,6 +951,7 @@ final class CardScannerViewModel: ObservableObject {
             recordsDevMode: diagnostics != nil
         )
         guard let analysis else { return }
+        latestCaptureQuality = analysis.captureQuality
         guard captureMode == .card else { return }
 
         switch analysis.result {
@@ -818,6 +974,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private struct LiveFrameAnalysis {
         let result: Result<CardScanResult, CardScannerError>
+        let captureQuality: ScannerCaptureQualityReport
         /// Whether anything card-shaped was in the frame — a no-match on an
         /// unrecognized card must not idle the camera under the user's hands.
         let cardPresent: Bool
@@ -836,6 +993,7 @@ final class CardScannerViewModel: ObservableObject {
         let framedImage = guideGeometry.flatMap {
             ScannerGuideCropper().crop(cgImage, using: $0)
         } ?? cgImage
+        let captureQuality = ScannerCaptureQualityAnalyzer.analyze(image: framedImage)
         let scanStarted = Date()
         let result = await coordinator.scan(image: framedImage, context: context, source: .livePreview)
         if recordsDevMode {
@@ -846,7 +1004,8 @@ final class CardScannerViewModel: ObservableObject {
                 mode: context.mode,
                 elapsedMs: elapsedMs,
                 result: result,
-                diagnostics: context.diagnostics
+                diagnostics: context.diagnostics,
+                captureQuality: captureQuality
             )
         }
         let cardPresent: Bool
@@ -860,7 +1019,20 @@ final class CardScannerViewModel: ObservableObject {
             // them accumulate toward idling the camera.
             cardPresent = true
         }
-        return LiveFrameAnalysis(result: result, cardPresent: cardPresent)
+        return LiveFrameAnalysis(
+            result: result,
+            captureQuality: captureQuality,
+            cardPresent: cardPresent
+        )
+    }
+
+    nonisolated private static func analyzeLiveQuality(
+        _ pixelBuffer: CVPixelBuffer,
+        guideGeometry: ScannerGuideGeometry?
+    ) async -> ScannerCaptureQualityReport? {
+        guard let image = makeCGImage(from: pixelBuffer) else { return nil }
+        let framed = guideGeometry.flatMap { ScannerGuideCropper().crop(image, using: $0) } ?? image
+        return ScannerCaptureQualityAnalyzer.analyze(image: framed)
     }
 
     /// Cheap presence-only check (~5ms document segmentation): is anything
@@ -902,6 +1074,29 @@ final class CardScannerViewModel: ObservableObject {
     private func guideCroppedImage(from image: CGImage) -> CGImage {
         guard let scannerGuideGeometry else { return image }
         return ScannerGuideCropper().crop(image, using: scannerGuideGeometry) ?? image
+    }
+
+    private func croppedImageAndIntrinsics(
+        from image: CGImage,
+        geometry: ScannerGuideGeometry?,
+        intrinsics: ScannerCameraIntrinsics?
+    ) -> (image: CGImage, intrinsics: ScannerCameraIntrinsics?) {
+        guard let geometry,
+              let rect = ScannerGuideCropper().imageCropRect(
+                imageSize: CGSize(width: image.width, height: image.height),
+                geometry: geometry
+              ),
+              let cropped = image.cropping(to: rect)
+        else { return (image, intrinsics) }
+        let adjusted = intrinsics.map {
+            ScannerCameraIntrinsics(
+                fx: $0.fx,
+                fy: $0.fy,
+                cx: $0.cx - rect.minX,
+                cy: $0.cy - rect.minY
+            )
+        }
+        return (cropped, adjusted)
     }
 
     /// Crops the sensor image to the full visible preview instead of the
@@ -977,6 +1172,51 @@ final class CardScannerViewModel: ObservableObject {
             kCGImageSourceThumbnailMaxPixelSize: 2_048
         ]
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    }
+
+    nonisolated private static func captureQuality(
+        image: CGImage,
+        intrinsics: ScannerCameraIntrinsics?
+    ) async -> ScannerCaptureQualityReport {
+        ScannerCaptureQualityAnalyzer.analyze(image: image, intrinsics: intrinsics)
+    }
+
+    nonisolated private static func makeCropRescueRequest(
+        image: CGImage,
+        sourceResultID: CardScanResult.ID?
+    ) async -> ScannerCropRescueRequest {
+        let observations = try? CardCropper(detector: nil).detectRectangles(in: image)
+        let observation = observations.flatMap {
+            CardCropper.preferredObservation(from: $0)
+        }
+        let quad = observation.map(ScannerCropQuad.init(observation:))
+            ?? ScannerCropQuad.centered(
+                in: CGSize(width: image.width, height: image.height)
+            )
+        return ScannerCropRescueRequest(
+            image: image,
+            initialQuad: quad,
+            sourceResultID: sourceResultID
+        )
+    }
+
+    nonisolated private static func cameraIntrinsics(
+        from photo: AVCapturePhoto,
+        imageSize: CGSize
+    ) -> ScannerCameraIntrinsics? {
+        guard let calibration = photo.cameraCalibrationData else { return nil }
+        let reference = calibration.intrinsicMatrixReferenceDimensions
+        guard reference.width > 0, reference.height > 0 else { return nil }
+        let matrix = calibration.intrinsicMatrix
+        let scaleX = imageSize.width / reference.width
+        let scaleY = imageSize.height / reference.height
+        let intrinsics = ScannerCameraIntrinsics(
+            fx: CGFloat(matrix.columns.0.x) * scaleX,
+            fy: CGFloat(matrix.columns.1.y) * scaleY,
+            cx: CGFloat(matrix.columns.2.x) * scaleX,
+            cy: CGFloat(matrix.columns.2.y) * scaleY
+        )
+        return intrinsics.isUsable ? intrinsics : nil
     }
 
     nonisolated private static func makeCGImage(from sampleBuffer: CMSampleBuffer) -> CGImage? {

@@ -186,6 +186,9 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     func capturePhoto() {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
+        if photoOutput.isCameraCalibrationDataDeliverySupported {
+            settings.isCameraCalibrationDataDeliveryEnabled = true
+        }
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 

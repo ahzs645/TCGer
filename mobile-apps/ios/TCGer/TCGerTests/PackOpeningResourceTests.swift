@@ -1,4 +1,5 @@
 import XCTest
+import WebKit
 @testable import TCGer
 
 final class PackOpeningResourceTests: XCTestCase {
@@ -7,6 +8,11 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(PackOpeningResource.mimeType(for: "JS"), "text/javascript")
         XCTAssertEqual(PackOpeningResource.mimeType(for: "webp"), "image/webp")
         XCTAssertEqual(PackOpeningResource.mimeType(for: "obj"), "text/plain")
+    }
+
+    func testEntryDocumentSharesTheAssetOrigin() {
+        XCTAssertEqual(PackOpeningResource.entryURL.scheme, PackOpeningResource.scheme)
+        XCTAssertEqual(PackOpeningResource.entryURL.host, PackOpeningResource.assetHost)
     }
 
     func testResourceResolutionStaysInsideBundleRoot() throws {
@@ -93,5 +99,150 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(session?.packs.count, 1)
         XCTAssertEqual(session?.pulls.first?.card.id, "swsh7-44")
         XCTAssertEqual(session?.setCode, "swsh7")
+        XCTAssertEqual(session?.resultArtworkURLs.first?.absoluteString, "https://example.com/low.webp")
+    }
+
+    func testNativePackInterfaceStateDecodesFromTheJavaScriptBridge() {
+        let body: [String: Any] = [
+            "type": "nativeState",
+            "state": [
+                "phase": "reveal",
+                "selectedPackID": "base-charizard",
+                "selectedPackLabel": "Base Charizard",
+                "packCount": 1,
+                "packOptions": [["id": "base-charizard", "label": "Base Charizard"]],
+                "revealedCount": 3,
+                "totalCards": 10,
+                "currentPackNumber": 1,
+                "totalPacks": 1,
+                "canSave": true,
+                "session": [
+                    "id": "opening-native-1",
+                    "packLabel": "Base Charizard",
+                    "openedAt": "2026-08-12T23:36:00.000Z",
+                    "packs": []
+                ]
+            ]
+        ]
+
+        let state = PackOpeningBridgeDecoder.interfaceState(from: body)
+        XCTAssertEqual(state?.phase, .reveal)
+        XCTAssertEqual(state?.selectedPackLabel, "Base Charizard")
+        XCTAssertEqual(state?.packOptions.first?.id, "base-charizard")
+        XCTAssertEqual(state?.revealedCount, 3)
+        XCTAssertEqual(state?.session?.id, "opening-native-1")
+    }
+
+    func testNativePackCommandUsesTheExpectedBridgeShape() {
+        let command = PackOpeningCommand.setPackCount(5)
+        XCTAssertEqual(command.payload["type"] as? String, "setPackCount")
+        XCTAssertEqual(command.payload["count"] as? Int, 5)
+        XCTAssertNotEqual(PackOpeningCommand.advance.id, PackOpeningCommand.advance.id)
+    }
+
+    @MainActor
+    func testWarmRendererReplaysReadyStateWhenInteractiveHostAttaches() {
+        let coordinator = PackOpeningWebCoordinator()
+        coordinator.emit(.ready)
+        coordinator.emit(.interfaceState(.loading))
+
+        var replayed: [PackOpeningBridgeEvent] = []
+        coordinator.setEventHandler({ replayed.append($0) }, replay: true)
+
+        XCTAssertEqual(replayed, [.ready, .interfaceState(.loading)])
+    }
+
+    @MainActor
+    func testWarmWebViewMovesBetweenContainersWithoutBeingDetachedByTheOldHost() {
+        let webView = WKWebView()
+        let warmHost = PackOpeningWebContainerView()
+        let interactiveHost = PackOpeningWebContainerView()
+
+        warmHost.attach(webView)
+        XCTAssertTrue(webView.superview === warmHost)
+
+        interactiveHost.attach(webView)
+        warmHost.detachWebView()
+        XCTAssertTrue(webView.superview === interactiveHost)
+
+        interactiveHost.detachWebView()
+        XCTAssertNil(webView.superview)
+    }
+
+    @MainActor
+    func testRemoteSchemeCallbacksAreDeliveredOnTheMainThread() async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ImmediateResponseURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let handler = PackOpeningSchemeHandler(
+            remoteBaseURL: URL(string: "https://assets.example.com")!,
+            session: session
+        )
+        let finished = expectation(description: "Scheme task finished")
+        let schemeTask = RecordingURLSchemeTask(
+            request: URLRequest(url: URL(string: "tcger-pack://assets/pack/card-backs/pokemon.png")!),
+            onFinish: { finished.fulfill() }
+        )
+
+        handler.webView(WKWebView(), start: schemeTask)
+        await fulfillment(of: [finished], timeout: 2)
+
+        XCTAssertEqual(schemeTask.callbackCount, 3)
+        XCTAssertTrue(schemeTask.callbacksWereOnMainThread)
+    }
+}
+
+private final class ImmediateResponseURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "image/png"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data([0x89, 0x50, 0x4E, 0x47]))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class RecordingURLSchemeTask: NSObject, WKURLSchemeTask {
+    let request: URLRequest
+    private let onFinish: () -> Void
+    private(set) var callbackCount = 0
+    private(set) var callbacksWereOnMainThread = true
+
+    init(request: URLRequest, onFinish: @escaping () -> Void) {
+        self.request = request
+        self.onFinish = onFinish
+    }
+
+    func didReceive(_ response: URLResponse) {
+        recordCallback()
+    }
+
+    func didReceive(_ data: Data) {
+        recordCallback()
+    }
+
+    func didFinish() {
+        recordCallback()
+        onFinish()
+    }
+
+    func didFailWithError(_ error: any Error) {
+        recordCallback()
+        onFinish()
+    }
+
+    private func recordCallback() {
+        callbackCount += 1
+        callbacksWereOnMainThread = callbacksWereOnMainThread && Thread.isMainThread
     }
 }

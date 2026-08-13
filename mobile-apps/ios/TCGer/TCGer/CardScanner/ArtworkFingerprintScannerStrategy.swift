@@ -85,7 +85,10 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
         guard !database.isEmpty else { return nil }
 
         // Step 1: Detect and crop the card using Vision
-        let cropped = try cropper.bestCrop(from: image) ?? image
+        let cropped = try cropper.bestCrop(
+            from: image,
+            intrinsics: context.cameraIntrinsics
+        ) ?? image
 
         // Step 2: Compute artwork fingerprint + HSV histogram
         let tcg = context.mode.tcgGame.rawValue

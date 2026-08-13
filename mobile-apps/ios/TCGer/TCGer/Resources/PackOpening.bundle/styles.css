@@ -105,7 +105,7 @@
   --tw-contain-paint:  ;
   --tw-contain-style:  ;
 }/*
-! tailwindcss v3.4.19 | MIT License | https://tailwindcss.com
+! tailwindcss v3.4.18 | MIT License | https://tailwindcss.com
 *//*
 1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
 2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
@@ -601,13 +601,16 @@ video {
   bottom: 9.25rem;
 }
 .bottom-\[max\(0\.75rem\2c env\(safe-area-inset-bottom\)\)\] {
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  bottom: max(0.75rem,env(safe-area-inset-bottom));
 }
 .left-1\/2 {
   left: 50%;
 }
 .right-3 {
   right: 0.75rem;
+}
+.top-16 {
+  top: 4rem;
 }
 .top-3 {
   top: 0.75rem;
@@ -617,6 +620,9 @@ video {
 }
 .z-10 {
   z-index: 10;
+}
+.z-20 {
+  z-index: 20;
 }
 .mb-4 {
   margin-bottom: 1rem;
@@ -629,6 +635,9 @@ video {
 }
 .flex {
   display: flex;
+}
+.grid {
+  display: grid;
 }
 .hidden {
   display: none;
@@ -802,6 +811,9 @@ video {
 }
 .border-dashed {
   border-style: dashed;
+}
+.border-amber-500\/40 {
+  border-color: rgb(245 158 11 / 0.4);
 }
 .border-amber-500\/60 {
   border-color: rgb(245 158 11 / 0.6);

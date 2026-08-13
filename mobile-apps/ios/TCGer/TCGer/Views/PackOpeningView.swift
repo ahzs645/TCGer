@@ -1,60 +1,301 @@
 import SwiftUI
-import WebKit
+import PhotosUI
+import UniformTypeIdentifiers
+import Combine
+@preconcurrency import WebKit
 
 struct PackOpeningView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = "Loading"
     @State private var errorMessage: String?
     @State private var reloadID = UUID()
     @State private var pullSession: PackOpeningPullSession?
+    @State private var interfaceState = PackOpeningInterfaceState.loading
+    @State private var command: PackOpeningCommand?
+    @State private var selectedArtwork: PhotosPickerItem?
+    @State private var rendererReady = false
+    @State private var prefetchedSessionID: String?
+    @StateObject private var webSession: PackOpeningWebSession
+
+    @MainActor
+    init(webSession: PackOpeningWebSession? = nil) {
+        let resolvedSession = webSession ?? PackOpeningWebSession()
+        _webSession = StateObject(wrappedValue: resolvedSession)
+        _interfaceState = State(initialValue: resolvedSession.latestInterfaceState ?? .loading)
+        _rendererReady = State(initialValue: resolvedSession.isReady)
+    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                PackOpeningWebView { event in
-                    handle(event)
-                }
-                .id(reloadID)
-                .ignoresSafeArea(edges: .bottom)
+        ZStack {
+            packScenePlaceholder
 
+            PackOpeningWebView(session: webSession, command: command) { event in
+                handle(event)
+            }
+            .id(reloadID)
+            .opacity(interfaceState.showsNativeResults ? 0 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: interfaceState.showsNativeResults)
+            .ignoresSafeArea()
+
+            if interfaceState.showsNativeResults, let session = interfaceState.session {
+                PackOpeningNativeResultsView(session: session)
+                    .transition(.opacity)
+            }
+
+            VStack(spacing: 0) {
+                topOverlay
+                Spacer(minLength: 24)
                 if let errorMessage {
-                    ContentUnavailableView {
-                        Label("Pack Opening Unavailable", systemImage: "shippingbox")
-                    } description: {
-                        Text(errorMessage)
-                    } actions: {
-                        Button("Try Again") {
-                            self.errorMessage = nil
-                            reloadID = UUID()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                    .background(.background)
+                    errorOverlay(errorMessage)
+                } else if rendererReady {
+                    bottomOverlay
                 }
             }
-            .navigationTitle("Open Packs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
-                        Text("Open Packs")
-                            .font(.headline)
-                        Text(phase)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .padding(.horizontal, 16)
+            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.bottom, 12)
         }
         .sheet(item: $pullSession) { session in
             PackOpeningReviewSheet(session: session) {
                 phase = "Saved to collection"
             }
         }
+        .onChange(of: selectedArtwork) { _, item in
+            guard let item else { return }
+            Task {
+                defer { selectedArtwork = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+                let mimeType = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+                send(.uploadArtwork(
+                    dataURL: "data:\(mimeType);base64,\(data.base64EncodedString())",
+                    label: "Custom Artwork"
+                ))
+            }
+        }
+        .onDisappear {
+            webSession.send(.backToPacks)
+        }
+    }
+
+    private var packScenePlaceholder: some View {
+        Color(uiColor: .systemBackground)
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        Color(uiColor: .secondarySystemBackground).opacity(0.4),
+                        .clear,
+                        Color.primary.opacity(0.05),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .ignoresSafeArea()
+    }
+
+    private var topOverlay: some View {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(interfaceState.showsNativeResults ? "Pack Results" : "Open Packs")
+                        .font(.headline)
+                    if interfaceState.phase != .loading {
+                        Text(interfaceState.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .contentTransition(.numericText())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect(.regular, in: .capsule)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.headline)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.glass)
+                .accessibilityLabel("Done")
+            }
+        }
+    }
+
+    private var bottomOverlay: some View {
+        GlassEffectContainer(spacing: 12) {
+            VStack(spacing: 10) {
+                if let warning = interfaceState.warning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .glassEffect(.regular, in: .capsule)
+                }
+                phaseControls
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var phaseControls: some View {
+        switch interfaceState.phase {
+        case .loading:
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Preparing packs…")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .glassEffect(.regular, in: .capsule)
+
+        case .select:
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    Menu {
+                        ForEach(interfaceState.packOptions) { option in
+                            Button(option.label) { send(.selectPack(option.id)) }
+                        }
+                    } label: {
+                        Label(interfaceState.selectedPackLabel, systemImage: "shippingbox.fill")
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.glass)
+
+                    PhotosPicker(selection: $selectedArtwork, matching: .images) {
+                        Image(systemName: "photo.badge.plus")
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Use custom pack artwork")
+                }
+
+                HStack(spacing: 8) {
+                    ForEach([1, 5, 10], id: \.self) { count in
+                        packCountButton(count)
+                    }
+
+                    Button {
+                        send(.openPack)
+                    } label: {
+                        Text(interfaceState.packCount == 1 ? "Open Pack" : "Open \(interfaceState.packCount) Packs")
+                            .fontWeight(.semibold)
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+            }
+
+        case .tear:
+            VStack(spacing: 10) {
+                instruction("Swipe across the seal, or open it now", icon: "hand.draw.fill")
+                HStack(spacing: 10) {
+                    backButton
+                    Button("Open Pack") { send(.advance) }
+                        .buttonStyle(.glassProminent)
+                }
+            }
+
+        case .opening:
+            VStack(spacing: 10) {
+                instruction(
+                    interfaceState.totalPacks == 1 ? "Opening your pack…" : "Opening \(interfaceState.totalPacks) packs…",
+                    icon: "sparkles"
+                )
+                backButton
+            }
+
+        case .reveal:
+            VStack(spacing: 10) {
+                instruction(
+                    "\(interfaceState.revealedCount) of \(interfaceState.totalCards) cards revealed",
+                    icon: "rectangle.stack.fill"
+                )
+                HStack(spacing: 10) {
+                    backButton
+                    Button(interfaceState.revealedCount >= interfaceState.totalCards ? "Finish" : "Reveal Next") {
+                        send(.advance)
+                    }
+                    .buttonStyle(.glassProminent)
+                    Button("Show All") { send(.showAll) }
+                        .buttonStyle(.glass)
+                }
+            }
+
+        case .summary, .final:
+            HStack(spacing: 10) {
+                if interfaceState.canSave {
+                    Button("Save Pulls") { send(.savePulls) }
+                        .buttonStyle(.glassProminent)
+                    Button("Open More") { send(.backToPacks) }
+                        .buttonStyle(.glass)
+                } else {
+                    Button("Open More") { send(.backToPacks) }
+                        .buttonStyle(.glassProminent)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func packCountButton(_ count: Int) -> some View {
+        if interfaceState.packCount == count {
+            Button("×\(count)") { send(.setPackCount(count)) }
+                .buttonStyle(.glassProminent)
+                .accessibilityLabel("Open \(count) \(count == 1 ? "pack" : "packs")")
+        } else {
+            Button("×\(count)") { send(.setPackCount(count)) }
+                .buttonStyle(.glass)
+                .accessibilityLabel("Open \(count) \(count == 1 ? "pack" : "packs")")
+        }
+    }
+
+    private var backButton: some View {
+        Button {
+            send(.backToPacks)
+        } label: {
+            Label("Packs", systemImage: "chevron.backward")
+        }
+        .buttonStyle(.glass)
+    }
+
+    private func instruction(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .glassEffect(.regular, in: .capsule)
+    }
+
+    private func errorOverlay(_ message: String) -> some View {
+        ContentUnavailableView {
+            Label("Pack Opening Unavailable", systemImage: "shippingbox")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Try Again") {
+                errorMessage = nil
+                interfaceState = .loading
+                command = nil
+                rendererReady = false
+                prefetchedSessionID = nil
+                webSession.reload()
+                reloadID = UUID()
+            }
+            .buttonStyle(.glassProminent)
+        }
+        .padding(20)
+        .glassEffect(.regular, in: .rect(cornerRadius: 32))
+    }
+
+    private func send(_ command: PackOpeningCommand) {
+        self.command = command
     }
 
     private func handle(_ event: PackOpeningBridgeEvent) {
@@ -62,9 +303,16 @@ struct PackOpeningView: View {
         case .ready:
             phase = "Choose a pack"
             errorMessage = nil
+            rendererReady = true
         case .phaseChanged(let value):
             phase = value.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
                 .capitalized
+        case .interfaceState(let state):
+            if let session = state.session, prefetchedSessionID != session.id {
+                prefetchedSessionID = session.id
+                ImageCache.shared.prefetch(urls: session.resultArtworkURLs)
+            }
+            interfaceState = state
         case .haptic(let style):
             switch style {
             case "selection": HapticManager.selection()
@@ -79,28 +327,269 @@ struct PackOpeningView: View {
     }
 }
 
+private struct PackOpeningNativeResultsView: View {
+    let session: PackOpeningPullSession
+
+    private let columns = [
+        GridItem(.flexible(minimum: 120), spacing: 14),
+        GridItem(.flexible(minimum: 120), spacing: 14),
+    ]
+
+    private var bestPull: PackOpeningPull? {
+        session.pulls.max { tierRank($0.tier) < tierRank($1.tier) }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                resultSummary
+
+                if session.packs.count > 1, let bestPull {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Best Pull", systemImage: "sparkles")
+                            .font(.title3.bold())
+                            .foregroundStyle(.orange)
+
+                        PackOpeningNativeResultCard(pull: bestPull)
+                            .frame(maxWidth: 190)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                ForEach(Array(session.packs.enumerated()), id: \.offset) { packIndex, pack in
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(session.packs.count == 1 ? "Your Pulls" : "Pack \(packIndex + 1)")
+                                .font(.title3.bold())
+                            Spacer()
+                            Text("\(pack.count) cards")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        LazyVGrid(columns: columns, alignment: .center, spacing: 20) {
+                            ForEach(Array(pack.enumerated()), id: \.offset) { _, pull in
+                                PackOpeningNativeResultCard(pull: pull)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 82)
+            .padding(.bottom, 94)
+        }
+        .scrollIndicators(.hidden)
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .accessibilityLabel("Pack results for \(session.packLabel)")
+    }
+
+    private var resultSummary: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title2)
+                .foregroundStyle(.green)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.packLabel)
+                    .font(.headline)
+                Text("\(session.packs.count) \(session.packs.count == 1 ? "pack" : "packs") · \(session.pulls.count) cards")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 20))
+    }
+
+    private func tierRank(_ tier: String) -> Int {
+        switch tier.lowercased() {
+        case "chase": 5
+        case "ultra": 4
+        case "rare": 3
+        case "uncommon": 2
+        default: 1
+        }
+    }
+}
+
+private struct PackOpeningNativeResultCard: View {
+    let pull: PackOpeningPull
+
+    var body: some View {
+        VStack(spacing: 9) {
+            CachedAsyncImage(card: pull.card, thumbnail: true) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .failure:
+                    Image(systemName: "rectangle.portrait.slash")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                default:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .aspectRatio(2.5 / 3.5, contentMode: .fit)
+            .clipShape(.rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(tierColor.opacity(0.7), lineWidth: 2)
+            }
+            .shadow(color: tierColor.opacity(0.16), radius: 10, y: 5)
+
+            VStack(spacing: 2) {
+                Text(pull.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                Text(pull.rarity.uppercased())
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(tierColor)
+                    .lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(pull.name), \(pull.rarity)")
+    }
+
+    private var tierColor: Color {
+        switch pull.tier.lowercased() {
+        case "chase": .orange
+        case "ultra": .purple
+        case "rare": .blue
+        case "uncommon": .green
+        default: .secondary
+        }
+    }
+}
+
+struct PackOpeningInterfaceState: Codable, Equatable {
+    enum Phase: String, Codable {
+        case loading, select, tear, opening, reveal, summary, final
+    }
+
+    struct PackOption: Codable, Equatable, Identifiable {
+        let id: String
+        let label: String
+    }
+
+    let phase: Phase
+    let selectedPackID: String
+    let selectedPackLabel: String
+    let packCount: Int
+    let packOptions: [PackOption]
+    let revealedCount: Int
+    let totalCards: Int
+    let currentPackNumber: Int
+    let totalPacks: Int
+    let canSave: Bool
+    let warning: String?
+    let session: PackOpeningPullSession?
+
+    static let loading = Self(
+        phase: .loading,
+        selectedPackID: "",
+        selectedPackLabel: "Loading",
+        packCount: 1,
+        packOptions: [],
+        revealedCount: 0,
+        totalCards: 0,
+        currentPackNumber: 0,
+        totalPacks: 0,
+        canSave: false,
+        warning: nil,
+        session: nil
+    )
+
+    var showsNativeResults: Bool {
+        (phase == .summary || phase == .final) && session != nil
+    }
+
+    var subtitle: String {
+        switch phase {
+        case .loading: "Loading"
+        case .select: selectedPackLabel
+        case .tear: "Tear the seal"
+        case .opening: "Opening pack"
+        case .reveal: "Reveal \(revealedCount) of \(totalCards)"
+        case .summary: "Pack results"
+        case .final: "\(totalPacks) pack results"
+        }
+    }
+}
+
+struct PackOpeningCommand: Equatable {
+    enum Action: String {
+        case selectPack, setPackCount, openPack, backToPacks, advance, showAll, savePulls, uploadArtwork
+    }
+
+    let id = UUID()
+    let action: Action
+    var optionID: String?
+    var count: Int?
+    var dataURL: String?
+    var label: String?
+
+    var payload: [String: Any] {
+        var value: [String: Any] = ["type": action.rawValue]
+        if let optionID { value["id"] = optionID }
+        if let count { value["count"] = count }
+        if let dataURL { value["dataURL"] = dataURL }
+        if let label { value["label"] = label }
+        return value
+    }
+
+    static func selectPack(_ id: String) -> Self { .init(action: .selectPack, optionID: id) }
+    static func setPackCount(_ count: Int) -> Self { .init(action: .setPackCount, count: count) }
+    static var openPack: Self { .init(action: .openPack) }
+    static var backToPacks: Self { .init(action: .backToPacks) }
+    static var advance: Self { .init(action: .advance) }
+    static var showAll: Self { .init(action: .showAll) }
+    static var savePulls: Self { .init(action: .savePulls) }
+    static func uploadArtwork(dataURL: String, label: String) -> Self {
+        .init(action: .uploadArtwork, dataURL: dataURL, label: label)
+    }
+}
+
 enum PackOpeningBridgeEvent: Equatable {
     case ready
     case phaseChanged(String)
+    case interfaceState(PackOpeningInterfaceState)
     case haptic(String)
     case saveRequested(PackOpeningPullSession)
     case error(String)
 }
 
-struct PackOpeningWebView: UIViewRepresentable {
-    let onEvent: (PackOpeningBridgeEvent) -> Void
+@MainActor
+final class PackOpeningWebSession: ObservableObject {
+    let coordinator: PackOpeningWebCoordinator
+    let webView: WKWebView
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onEvent: onEvent)
+    var latestInterfaceState: PackOpeningInterfaceState? {
+        coordinator.latestState
     }
 
-    func makeUIView(context: Context) -> WKWebView {
+    var isReady: Bool {
+        coordinator.isReady
+    }
+
+    init() {
+        let coordinator = PackOpeningWebCoordinator()
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.preferences.isTextInteractionEnabled = false
-        configuration.userContentController.add(context.coordinator, name: Coordinator.bridgeName)
+        if #available(iOS 17.0, *) {
+            configuration.preferences.inactiveSchedulingPolicy = .none
+        }
+        configuration.userContentController.add(coordinator, name: PackOpeningWebCoordinator.bridgeName)
         configuration.userContentController.addScriptMessageHandler(
-            context.coordinator.resourceBridge,
+            coordinator.resourceBridge,
             contentWorld: .page,
             name: PackOpeningFetchBridge.bridgeName
         )
@@ -111,85 +600,202 @@ struct PackOpeningWebView: UIViewRepresentable {
                 forMainFrameOnly: true
             )
         )
-        configuration.setURLSchemeHandler(context.coordinator.resourceHandler, forURLScheme: PackOpeningResource.scheme)
+        configuration.setURLSchemeHandler(coordinator.resourceHandler, forURLScheme: PackOpeningResource.scheme)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.navigationDelegate = context.coordinator
+        webView.navigationDelegate = coordinator
         webView.isOpaque = false
         webView.backgroundColor = .clear
+        webView.underPageBackgroundColor = .systemBackground
         webView.scrollView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.allowsBackForwardNavigationGestures = false
 
+        self.coordinator = coordinator
+        self.webView = webView
+
         guard PackOpeningResource.rootURL() != nil else {
-            onEvent(.error("PackOpening.bundle is missing. Run `bash scripts/ios-assets.sh build`."))
-            return webView
+            coordinator.emit(.error("PackOpening.bundle is missing. Run `bash scripts/ios-assets.sh build`."))
+            return
         }
         webView.load(URLRequest(url: PackOpeningResource.entryURL))
-        return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.onEvent = onEvent
+    func setEventHandler(
+        _ onEvent: @escaping (PackOpeningBridgeEvent) -> Void,
+        replay: Bool
+    ) {
+        coordinator.setEventHandler(onEvent, replay: replay)
     }
 
-    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.bridgeName)
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: PackOpeningFetchBridge.bridgeName,
-            contentWorld: .page
-        )
-        webView.evaluateJavaScript("window.tcgerPack?.destroy()")
-        webView.stopLoading()
-        webView.navigationDelegate = nil
-    }
-
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
-        static let bridgeName = "packBridge"
-        let resourceHandler = PackOpeningSchemeHandler()
-        let resourceBridge = PackOpeningFetchBridge()
-        var onEvent: (PackOpeningBridgeEvent) -> Void
-
-        init(onEvent: @escaping (PackOpeningBridgeEvent) -> Void) {
-            self.onEvent = onEvent
-        }
-
-        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard
-                message.name == Self.bridgeName,
-                let payload = message.body as? [String: Any],
-                let type = payload["type"] as? String
-            else { return }
-
-            switch type {
-            case "ready":
-                onEvent(.ready)
-            case "phaseChanged":
-                if let phase = payload["phase"] as? String { onEvent(.phaseChanged(phase)) }
-            case "haptic":
-                if let style = payload["style"] as? String { onEvent(.haptic(style)) }
-            case "saveRequested":
-                if let session = PackOpeningBridgeDecoder.pullSession(from: payload) {
-                    onEvent(.saveRequested(session))
-                } else {
-                    onEvent(.error("The completed pack results could not be read."))
-                }
-            case "error":
-                onEvent(.error(payload["message"] as? String ?? "The pack renderer reported an error."))
-            default:
-                break
+    func send(_ command: PackOpeningCommand) {
+        guard coordinator.lastCommandID != command.id else { return }
+        coordinator.lastCommandID = command.id
+        Task { @MainActor in
+            do {
+                _ = try await webView.callAsyncJavaScript(
+                    "window.tcgerPack?.command(command)",
+                    arguments: ["command": command.payload],
+                    in: nil,
+                    contentWorld: .page
+                )
+            } catch {
+                coordinator.emit(.error(error.localizedDescription))
             }
         }
+    }
 
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-            onEvent(.error(error.localizedDescription))
-        }
+    func reload() {
+        coordinator.resetReplayState()
+        webView.stopLoading()
+        webView.load(URLRequest(url: PackOpeningResource.entryURL))
+    }
+}
 
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
-            onEvent(.error(error.localizedDescription))
+struct PackOpeningWebView: UIViewRepresentable {
+    let session: PackOpeningWebSession
+    let command: PackOpeningCommand?
+    let onEvent: (PackOpeningBridgeEvent) -> Void
+
+    func makeCoordinator() -> AttachmentCoordinator {
+        AttachmentCoordinator()
+    }
+
+    func makeUIView(context: Context) -> PackOpeningWebContainerView {
+        session.setEventHandler(onEvent, replay: true)
+        context.coordinator.didReplay = true
+        let container = PackOpeningWebContainerView()
+        container.attach(session.webView)
+        return container
+    }
+
+    func updateUIView(_ container: PackOpeningWebContainerView, context: Context) {
+        session.setEventHandler(onEvent, replay: !context.coordinator.didReplay)
+        context.coordinator.didReplay = true
+        container.attach(session.webView)
+        if let command { session.send(command) }
+    }
+
+    static func dismantleUIView(
+        _ container: PackOpeningWebContainerView,
+        coordinator: AttachmentCoordinator
+    ) {
+        container.detachWebView()
+    }
+
+    final class AttachmentCoordinator {
+        var didReplay = false
+    }
+}
+
+final class PackOpeningWebContainerView: UIView {
+    private weak var attachedWebView: WKWebView?
+
+    func attach(_ webView: WKWebView) {
+        guard webView.superview !== self else { return }
+
+        webView.removeFromSuperview()
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        attachedWebView = webView
+    }
+
+    func detachWebView() {
+        guard let attachedWebView, attachedWebView.superview === self else { return }
+        attachedWebView.removeFromSuperview()
+    }
+}
+
+@MainActor
+final class PackOpeningWebCoordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    static let bridgeName = "packBridge"
+    let resourceHandler = PackOpeningSchemeHandler()
+    let resourceBridge = PackOpeningFetchBridge()
+    var lastCommandID: UUID?
+
+    private var onEvent: (PackOpeningBridgeEvent) -> Void = { _ in }
+    private(set) var isReady = false
+    private(set) var latestState: PackOpeningInterfaceState?
+    private var latestError: String?
+
+    func setEventHandler(
+        _ handler: @escaping (PackOpeningBridgeEvent) -> Void,
+        replay: Bool
+    ) {
+        onEvent = handler
+        guard replay else { return }
+        if isReady { handler(.ready) }
+        if let latestState { handler(.interfaceState(latestState)) }
+        if let latestError { handler(.error(latestError)) }
+    }
+
+    func emit(_ event: PackOpeningBridgeEvent) {
+        switch event {
+        case .ready:
+            isReady = true
+            latestError = nil
+        case .interfaceState(let state):
+            latestState = state
+        case .error(let message):
+            latestError = message
+        default:
+            break
         }
+        onEvent(event)
+    }
+
+    func resetReplayState() {
+        isReady = false
+        latestState = nil
+        latestError = nil
+        lastCommandID = nil
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard
+            message.name == Self.bridgeName,
+            let payload = message.body as? [String: Any],
+            let type = payload["type"] as? String
+        else { return }
+
+        switch type {
+        case "ready":
+            emit(.ready)
+        case "phaseChanged":
+            if let phase = payload["phase"] as? String { emit(.phaseChanged(phase)) }
+        case "nativeState":
+            if let state = PackOpeningBridgeDecoder.interfaceState(from: payload) {
+                emit(.interfaceState(state))
+            }
+        case "haptic":
+            if let style = payload["style"] as? String { emit(.haptic(style)) }
+        case "saveRequested":
+            if let session = PackOpeningBridgeDecoder.pullSession(from: payload) {
+                emit(.saveRequested(session))
+            } else {
+                emit(.error("The completed pack results could not be read."))
+            }
+        case "error":
+            emit(.error(payload["message"] as? String ?? "The pack renderer reported an error."))
+        default:
+            break
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
+        emit(.error(error.localizedDescription))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
+        emit(.error(error.localizedDescription))
     }
 }
 
@@ -337,6 +943,10 @@ enum PackOpeningBridgeDecoder {
         let session: PackOpeningPullSession
     }
 
+    private struct StateMessage: Decodable {
+        let state: PackOpeningInterfaceState
+    }
+
     static func pullSession(from body: Any) -> PackOpeningPullSession? {
         guard JSONSerialization.isValidJSONObject(body),
               let data = try? JSONSerialization.data(withJSONObject: body),
@@ -344,13 +954,24 @@ enum PackOpeningBridgeDecoder {
         else { return nil }
         return message.session
     }
+
+    static func interfaceState(from body: Any) -> PackOpeningInterfaceState? {
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body),
+              let message = try? JSONDecoder().decode(StateMessage.self, from: data)
+        else { return nil }
+        return message.state
+    }
 }
 
 enum PackOpeningResource {
     static let scheme = "tcger-pack"
     static let bundleHost = "bundle"
     static let assetHost = "assets"
-    static let entryURL = URL(string: "\(scheme)://\(bundleHost)/index.html")!
+    // Keep the document and its textures on one custom-scheme origin. WebKit
+    // otherwise treats `bundle` and `assets` as different origins and rejects
+    // Three.js textures even though both hosts use this same scheme handler.
+    static let entryURL = URL(string: "\(scheme)://\(assetHost)/index.html")!
     static let defaultRemoteBaseURL = URL(string: "https://assets.tcger.ahmadjalil.com")!
 
     static func remoteBaseURL(in bundle: Bundle = .main) -> URL {
@@ -427,17 +1048,22 @@ enum PackOpeningResource {
     }
 }
 
+@MainActor
 final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
+    private struct RemoteTask {
+        let dataTask: URLSessionDataTask
+        let schemeTask: any WKURLSchemeTask
+    }
+
     private let remoteBaseURL: URL
     private let session: URLSession
-    private let taskLock = NSLock()
-    private var remoteTasks: [ObjectIdentifier: URLSessionDataTask] = [:]
+    private var remoteTasks: [ObjectIdentifier: RemoteTask] = [:]
 
     init(
-        remoteBaseURL: URL = PackOpeningResource.remoteBaseURL(),
+        remoteBaseURL: URL? = nil,
         session: URLSession = .shared
     ) {
-        self.remoteBaseURL = remoteBaseURL
+        self.remoteBaseURL = remoteBaseURL ?? PackOpeningResource.remoteBaseURL()
         self.session = session
     }
 
@@ -459,10 +1085,8 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
         let key = ObjectIdentifier(urlSchemeTask as AnyObject)
-        taskLock.lock()
         let task = remoteTasks.removeValue(forKey: key)
-        taskLock.unlock()
-        task?.cancel()
+        task?.dataTask.cancel()
     }
 
     private func loadRemote(
@@ -476,37 +1100,30 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         request.timeoutInterval = 20
 
         let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self, self.removeRemoteTask(for: key) else { return }
-            if
-                error == nil,
-                let data,
-                let response,
-                (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
-            {
-                let bridgedResponse = URLResponse(
-                    url: requestURL,
-                    mimeType: response.mimeType ?? PackOpeningResource.mimeType(for: remoteURL.pathExtension),
-                    expectedContentLength: data.count,
-                    textEncodingName: response.textEncodingName
-                )
-                schemeTask.didReceive(bridgedResponse)
-                schemeTask.didReceive(data)
-                schemeTask.didFinish()
-            } else {
-                self.loadBundled(requestURL, schemeTask: schemeTask)
+            Task { @MainActor [weak self] in
+                guard let self, let remoteTask = self.remoteTasks.removeValue(forKey: key) else { return }
+                if
+                    error == nil,
+                    let data,
+                    let response,
+                    (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
+                {
+                    let bridgedResponse = URLResponse(
+                        url: requestURL,
+                        mimeType: response.mimeType ?? PackOpeningResource.mimeType(for: remoteURL.pathExtension),
+                        expectedContentLength: data.count,
+                        textEncodingName: response.textEncodingName
+                    )
+                    remoteTask.schemeTask.didReceive(bridgedResponse)
+                    remoteTask.schemeTask.didReceive(data)
+                    remoteTask.schemeTask.didFinish()
+                } else {
+                    self.loadBundled(requestURL, schemeTask: remoteTask.schemeTask)
+                }
             }
         }
-        taskLock.lock()
-        remoteTasks[key] = task
-        taskLock.unlock()
+        remoteTasks[key] = RemoteTask(dataTask: task, schemeTask: schemeTask)
         task.resume()
-    }
-
-    @discardableResult
-    private func removeRemoteTask(for key: ObjectIdentifier) -> Bool {
-        taskLock.lock()
-        defer { taskLock.unlock() }
-        return remoteTasks.removeValue(forKey: key) != nil
     }
 
     private func loadBundled(_ requestURL: URL, schemeTask: any WKURLSchemeTask) {

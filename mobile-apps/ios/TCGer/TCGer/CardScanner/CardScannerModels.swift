@@ -321,6 +321,9 @@ struct CardScannerContext: Sendable {
     /// attempt evidence (gate scores, candidates, OCR readings, outcome) as
     /// they work; nil (the default) costs nothing on the normal path.
     var diagnostics: ScanDiagnostics? = nil
+    /// Per-capture camera calibration, scaled to the image passed into the
+    /// coordinator. Imports and live frames may not provide it.
+    var cameraIntrinsics: ScannerCameraIntrinsics? = nil
 }
 
 struct CardScanScope: Hashable, Sendable {

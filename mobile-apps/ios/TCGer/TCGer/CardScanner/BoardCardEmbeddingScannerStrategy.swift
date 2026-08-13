@@ -97,7 +97,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
-        let attempts = try await makeCropAttempts(from: image, source: source)
+        let attempts = try await makeCropAttempts(
+            from: image,
+            source: source,
+            intrinsics: context.cameraIntrinsics
+        )
 
         // Try the most card-like candidate first; on an abstention fall
         // through to the next. A retry can only recover an abstention — an
@@ -156,10 +160,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
     private func makeCropAttempts(
         from image: CGImage,
-        source: ScanInvocationKind
+        source: ScanInvocationKind,
+        intrinsics: ScannerCameraIntrinsics?
     ) async throws -> [CropAttempt] {
         var attempts: [CropAttempt] = []
-        let detailed = try cropper.detectRectanglesDetailed(in: image)
+        let detailed = try cropper.detectRectanglesDetailed(
+            in: image,
+            intrinsics: intrinsics
+        )
         var candidateObservations: [VNRectangleObservation] = []
         if let best = CardCropper.preferredObservation(from: detailed.observations) {
             candidateObservations.append(best)
