@@ -1,6 +1,7 @@
 import AVFoundation
 import Combine
 import CoreMedia
+import QuartzCore
 import SwiftUI
 
 final class CardScannerCameraController: NSObject, ObservableObject {
@@ -15,19 +16,32 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var isConfigured = false
     private var videoDevice: AVCaptureDevice?
 
-    /// While scanning we cap the camera at 15fps: the live pipeline analyzes at
-    /// most one frame a second, so 30fps only doubles the frames we throw away.
-    /// Idle drops to 2fps — an empty viewfinder doesn't need a hot sensor.
-    /// Only `activeVideoMinFrameDuration` is capped, never `max`: capping the
-    /// maximum duration would also cap exposure time, and a card under indoor
-    /// light needs the long exposures the camera chooses for itself.
-    private static let scanningFPS = 15.0
-    private static let idleFPS = 2.0
+    /// The preview layer renders straight from the capture device, so any
+    /// device-level frame-rate cap makes the on-screen viewfinder choppy.
+    /// The sensor therefore runs at its native rate whenever the preview is
+    /// visible, and "idle" throttles only what reaches the analysis stream —
+    /// frames are dropped on the video queue before they cost anything. The
+    /// device-level cap is reserved for a fully covered preview (result
+    /// sheet / binder review up), where smoothness is invisible and the
+    /// sensor can actually cool down. Only `activeVideoMinFrameDuration` is
+    /// ever capped, never `max`: capping the maximum duration would also cap
+    /// exposure time, and a card under indoor light needs the long exposures
+    /// the camera chooses for itself.
+    private static let occludedFPS = 2.0
+    /// Seconds between yields into the analysis stream. The consumer analyzes
+    /// at most once a second, so scanning delivery at 15/s already halves the
+    /// wake-ups a 30fps sensor would cause without adding meaningful latency,
+    /// and idle delivery at 2/s keeps card-appears wake-up latency low while
+    /// shedding the per-frame hops an empty viewfinder doesn't need.
+    private static let scanningYieldInterval: CFTimeInterval = 1.0 / 15.0
+    private static let idleYieldInterval: CFTimeInterval = 0.5
     // Touched only on videoOutputQueue (delegate callbacks) or via its .async.
     private var frameContinuation: AsyncStream<CVPixelBuffer>.Continuation?
+    private var minYieldInterval: CFTimeInterval = CardScannerCameraController.scanningYieldInterval
+    private var lastYieldAt: CFTimeInterval = 0
     private(set) var droppedFrameCount = 0
     // Touched only on sessionQueue.
-    private var isIdleRate = false
+    private var isPreviewOccluded = false
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
     var onPhotoCaptureError: ((Error) -> Void)?
@@ -63,20 +77,32 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         return stream
     }
 
-    /// Drop to the low idle frame rate, or return to the scanning rate.
-    /// Called per frame by the consumer; repeats of the current state are
-    /// ignored so only transitions pay for a device configuration lock.
+    /// Idle throttles the ANALYSIS STREAM only — the sensor (and therefore
+    /// the on-screen preview) keeps its native rate. Called per frame by the
+    /// consumer; repeat states are harmless (a single scalar write).
     func setIdle(_ idle: Bool) {
-        sessionQueue.async { [weak self] in
-            guard let self, idle != self.isIdleRate else { return }
-            self.isIdleRate = idle
-            self.applyFrameRateCapOnSessionQueue(idle ? Self.idleFPS : Self.scanningFPS)
+        videoOutputQueue.async { [weak self] in
+            self?.minYieldInterval = idle ? Self.idleYieldInterval : Self.scanningYieldInterval
         }
     }
 
-    private func applyFrameRateCapOnSessionQueue(_ fps: Double) {
+    /// A presented sheet fully covers the preview, so smoothness is invisible
+    /// and the sensor can drop to a trickle. Repeats of the current state are
+    /// ignored so only transitions pay for a device configuration lock.
+    func setPreviewOccluded(_ occluded: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self, occluded != self.isPreviewOccluded else { return }
+            self.isPreviewOccluded = occluded
+            self.applyPreviewOcclusionOnSessionQueue()
+        }
+    }
+
+    private func applyPreviewOcclusionOnSessionQueue() {
         guard let device = videoDevice, (try? device.lockForConfiguration()) != nil else { return }
-        device.activeVideoMinFrameDuration = Self.frameDuration(capping: fps, on: device)
+        // `.invalid` restores the format's default (uncapped) frame duration.
+        device.activeVideoMinFrameDuration = isPreviewOccluded
+            ? Self.frameDuration(capping: Self.occludedFPS, on: device)
+            : .invalid
         device.unlockForConfiguration()
     }
 
@@ -93,11 +119,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
             guard let self else { return }
             self.configureSession()
             // AFTER commitConfiguration, not inside it: setting a session
-            // preset resets the frame-duration properties, so capping the
-            // rate before the preset lands is a no-op.
-            self.applyFrameRateCapOnSessionQueue(
-                self.isIdleRate ? Self.idleFPS : Self.scanningFPS
-            )
+            // preset resets the frame-duration properties, so an occlusion
+            // cap applied before the preset lands would be a no-op.
+            if self.isPreviewOccluded {
+                self.applyPreviewOcclusionOnSessionQueue()
+            }
         }
         isConfigured = true
     }
@@ -256,8 +282,14 @@ extension CardScannerCameraController: AVCaptureVideoDataOutputSampleBufferDeleg
         // Yield the bare pixel buffer, not the sample buffer: the stream's
         // newest-1 slot may hold it across the consumer's analysis, and a
         // retained CMSampleBuffer would pin capture-pool metadata with it.
+        // While idle, drop frames right here — before they cost a consumer
+        // hop — so the preview keeps every frame the sensor produces.
         if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-            frameContinuation?.yield(pixelBuffer)
+            let now = CACurrentMediaTime()
+            if minYieldInterval == 0 || now - lastYieldAt >= minYieldInterval {
+                lastYieldAt = now
+                frameContinuation?.yield(pixelBuffer)
+            }
         }
     }
 

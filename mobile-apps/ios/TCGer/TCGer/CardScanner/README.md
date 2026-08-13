@@ -44,25 +44,35 @@ a main-actor hop. Dropped-frame telemetry is exposed via `droppedFrameCount`
 (`captureOutput(_:didDrop:)`). `ScannerDebugView` consumes the same stream;
 there is no `onSampleBuffer` callback anymore — do not reintroduce one.
 
-### Idle frame rate (`ScannerCameraThrottle.swift`, `CardScannerCamera.setIdle`)
+### Idle throttling (`ScannerCameraThrottle.swift`, `CardScannerCamera.setIdle` / `setPreviewOccluded`)
 
-Scanning runs at 15 fps (the live pipeline analyzes at most 1 frame/s, so
-30 fps only doubles the frames we throw away); an idle viewfinder drops to
-2 fps. Only `activeVideoMinFrameDuration` is capped — never `max`, which
-would also cap exposure time. The cap must be applied AFTER
-`commitConfiguration` because setting a session preset resets frame
+The preview layer renders straight from the capture device, so a device-level
+frame-rate cap makes the visible viewfinder choppy. The sensor therefore runs
+at its NATIVE rate whenever the preview is visible; throttling happens on the
+delivery side instead — `captureOutput` drops frames on the video queue
+before they reach the analysis stream (15 yields/s scanning, 2/s idle). The
+device itself is only capped (to 2 fps via `setPreviewOccluded`) when a
+result sheet or binder review fully covers the preview, where smoothness is
+invisible. Only `activeVideoMinFrameDuration` is ever capped — never `max`,
+which would also cap exposure time — and the occlusion cap must be applied
+AFTER `commitConfiguration` because setting a session preset resets frame
 durations. Policy lives in `ScannerCameraThrottle` (pure, unit-tested):
 
-- 8 consecutive card-free analyses (~8 s) → idle. Must stay above
+- 8 consecutive card-free analyses (~8 s) → idle delivery. Must stay above
   `LiveScanConsensus`'s 3 s match window so a mid-confirmation candidate can
-  never idle the camera (`ScannerCameraThrottleTests` pins the invariant).
+  never throttle analysis (`ScannerCameraThrottleTests` pins the invariant).
 - A presented result sheet / binder review idles immediately AND pins the
-  empty streak at zero, so dismissal returns to 15 fps on the very next frame.
+  empty streak at zero, so dismissal returns to full delivery on the very
+  next frame.
 - "Card-free" is decided by a ~5 ms `VNDetectDocumentSegmentationRequest`
   presence check when a live analysis returns no match — an unrecognized card
-  held by an actively trying user keeps the full rate.
-- Manual-trigger and binder framing keep 15 fps (the user is composing a
-  shot); their frames are discarded by cheap guards in the consumer loop.
+  held by an actively trying user keeps the full analysis rate.
+- Manual-trigger and binder framing modes process nothing (cheap guards in
+  the consumer loop) while the preview stays native-smooth for composing.
+- Restored staging-tray images are force-decoded as downsampled thumbnails on
+  the store actor (`kCGImageSourceShouldCacheImmediately`); a lazily
+  JPEG-backed `CGImage` would decode on the main thread at first draw and
+  stutter the scanner's first seconds on screen.
 
 ### Footer-OCR cache (`BoardCardEmbeddingScannerStrategy.swift`)
 

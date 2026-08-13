@@ -265,6 +265,16 @@ actor ScannerStagingStore {
     private func loadImage(named name: String) -> CGImage? {
         let url = directory.appendingPathComponent(name)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        // Force the decode HERE, on the actor: a plain CGImageSourceCreateImageAtIndex
+        // returns a lazily JPEG-backed image whose decode happens on the main
+        // thread at first draw — a restored tray then stutters the scanner for
+        // its first seconds on screen while thumbnails decode one by one.
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1_200,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 }

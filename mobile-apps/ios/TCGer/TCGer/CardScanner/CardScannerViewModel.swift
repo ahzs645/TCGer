@@ -733,10 +733,14 @@ final class CardScannerViewModel: ObservableObject {
     private func consumeLiveFrame(_ pixelBuffer: CVPixelBuffer) async {
         guard !isSimulator else { return }
 
-        // A presented result or binder review covers the preview — idle the
-        // camera immediately; the throttle pins its empty streak at zero so
-        // dismissal returns to the scanning rate on the very next frame.
+        // A presented result or binder review covers the preview — cap the
+        // sensor itself (nothing visible to keep smooth) and idle analysis
+        // delivery; the throttle pins its empty streak at zero so dismissal
+        // returns to full delivery on the very next frame. When the preview
+        // is visible the sensor always runs at native rate — idle only
+        // throttles what reaches the analysis stream.
         let overlayCovered = latestResult != nil || binderReviewPresentation != nil
+        cameraController.setPreviewOccluded(overlayCovered)
         cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
         if overlayCovered { return }
 
