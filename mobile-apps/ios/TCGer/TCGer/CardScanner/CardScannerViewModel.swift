@@ -59,9 +59,13 @@ final class CardScannerViewModel: ObservableObject {
             resetLiveConfirmation()
         }
     }
-    @Published var latestResult: CardScanResult?
+    @Published var latestResult: CardScanResult? {
+        didSet { syncCameraOverlayState() }
+    }
     @Published var binderPages: [BinderPageRecord] = []
-    @Published var binderReviewPresentation: BinderReviewPresentation?
+    @Published var binderReviewPresentation: BinderReviewPresentation? {
+        didSet { syncCameraOverlayState() }
+    }
     @Published var selectedBinderID: String?
     @Published var binderDestinationMode: BinderDestinationMode = .oneBinder
     @Published private(set) var binderPageDestinationIDs: [Int: String] = [:]
@@ -157,6 +161,21 @@ final class CardScannerViewModel: ObservableObject {
         }
         startFrameConsumer()
         restoreStagedSession()
+    }
+
+    private var isOverlayCoveringPreview: Bool {
+        latestResult != nil || binderReviewPresentation != nil
+    }
+
+    /// Pushes the overlay state into the camera the moment it changes.
+    /// Event-driven on purpose: while a sheet covers the preview the sensor
+    /// idles at 2fps, so waiting for the next delivered frame to notice the
+    /// dismissal would leave the viewfinder frozen for up to a second right
+    /// as the user starts framing the next shot.
+    private func syncCameraOverlayState() {
+        let overlayCovered = isOverlayCoveringPreview
+        cameraController.setPreviewOccluded(overlayCovered)
+        cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
     }
 
     /// The staging tray is persistent: the view model dies with the scanner
@@ -735,11 +754,13 @@ final class CardScannerViewModel: ObservableObject {
 
         // A presented result or binder review covers the preview — cap the
         // sensor itself (nothing visible to keep smooth) and idle analysis
-        // delivery; the throttle pins its empty streak at zero so dismissal
-        // returns to full delivery on the very next frame. When the preview
-        // is visible the sensor always runs at native rate — idle only
-        // throttles what reaches the analysis stream.
-        let overlayCovered = latestResult != nil || binderReviewPresentation != nil
+        // delivery. The camera state is ALSO synced event-driven from the
+        // overlay properties' didSet: while occluded the sensor runs at 2fps,
+        // so a frame-driven wake alone would leave the preview frozen for up
+        // to a second after the sheet dismisses — exactly when the user is
+        // lining up the next binder page. This per-frame call is the
+        // belt-and-braces path; the didSet is what makes dismissal instant.
+        let overlayCovered = isOverlayCoveringPreview
         cameraController.setPreviewOccluded(overlayCovered)
         cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
         if overlayCovered { return }
