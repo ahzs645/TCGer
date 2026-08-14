@@ -1,11 +1,12 @@
-# This workflow builds all TCGer container images and pushes them to GHCR
-# on every push to main. Flux CD watches GHCR for new tags and auto-deploys.
+# This workflow builds all TCGer container images for version releases.
+# Flux CD watches the immutable main-<timestamp>-<sha> tags and auto-deploys.
 
 name: Build and push container images
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -62,6 +63,16 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "version_tag=main-${TIMESTAMP}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release and deployment tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}
+          tags: |
+            type=raw,value=${{ steps.tags.outputs.version_tag }}
+            type=ref,event=tag
+            type=raw,value=main
+
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -71,8 +82,7 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.sha }}
             IMAGE_TAG=${{ steps.tags.outputs.version_tag }}
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ steps.tags.outputs.version_tag }}
-            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:main
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
