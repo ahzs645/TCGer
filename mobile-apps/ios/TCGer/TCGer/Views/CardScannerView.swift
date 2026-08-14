@@ -563,6 +563,35 @@ struct CardScannerView: View {
             .overlay(alignment: .leading) {
                 captureModeControl
             }
+            .overlay(alignment: .trailing) {
+                if viewModel.captureMode == .card {
+                    triggerModeControl
+                }
+            }
+    }
+
+    /// One-tap switch between the static shutter and automatic live
+    /// scanning. The same choice lives in the scanner-options menu, but
+    /// changing how you capture is a mid-session decision — it deserves a
+    /// visible control beside the shutter, mirroring the capture-mode
+    /// control on the other side.
+    private var triggerModeControl: some View {
+        Button {
+            viewModel.triggerMode = viewModel.triggerMode == .manual ? .automatic : .manual
+        } label: {
+            ScannerOptionLabel(
+                title: viewModel.triggerMode.displayName,
+                systemImage: viewModel.triggerMode == .manual ? "camera.aperture" : "viewfinder"
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isProcessingPhoto)
+        .animation(.snappy, value: viewModel.triggerMode)
+        .accessibilityLabel("Scan trigger")
+        .accessibilityValue(viewModel.triggerMode.displayName)
+        .accessibilityHint(viewModel.triggerMode == .manual
+            ? "Switches to automatic scanning"
+            : "Switches to the shutter button")
     }
 
     @ViewBuilder
