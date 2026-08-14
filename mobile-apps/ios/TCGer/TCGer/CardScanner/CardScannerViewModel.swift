@@ -176,15 +176,13 @@ final class CardScannerViewModel: ObservableObject {
         latestResult != nil || binderReviewPresentation != nil || cropRescueRequest != nil
     }
 
-    /// Pushes the overlay state into the camera the moment it changes.
-    /// Event-driven on purpose: while a sheet covers the preview the sensor
-    /// idles at 2fps, so waiting for the next delivered frame to notice the
-    /// dismissal would leave the viewfinder frozen for up to a second right
-    /// as the user starts framing the next shot.
+    /// Pushes the overlay state into the camera the moment it changes, so
+    /// analysis delivery idles for the whole time a sheet is up and resumes
+    /// the instant it dismisses. The sensor itself is never touched — a
+    /// device-level rate change shows up on screen as a freeze or exposure
+    /// ramp during the sheet transition itself.
     private func syncCameraOverlayState() {
-        let overlayCovered = isOverlayCoveringPreview
-        cameraController.setPreviewOccluded(overlayCovered)
-        cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
+        cameraController.setIdle(cameraThrottle.noteOverlay(isOverlayCoveringPreview))
     }
 
     /// The staging tray is persistent: the view model dies with the scanner
@@ -901,16 +899,11 @@ final class CardScannerViewModel: ObservableObject {
     private func consumeLiveFrame(_ pixelBuffer: CVPixelBuffer) async {
         guard !isSimulator else { return }
 
-        // A presented result or binder review covers the preview — cap the
-        // sensor itself (nothing visible to keep smooth) and idle analysis
-        // delivery. The camera state is ALSO synced event-driven from the
-        // overlay properties' didSet: while occluded the sensor runs at 2fps,
-        // so a frame-driven wake alone would leave the preview frozen for up
-        // to a second after the sheet dismisses — exactly when the user is
-        // lining up the next binder page. This per-frame call is the
-        // belt-and-braces path; the didSet is what makes dismissal instant.
+        // A presented result or binder review covers the preview — idle
+        // analysis delivery for its duration. The overlay properties' didSet
+        // also syncs this event-driven; the per-frame call here is the
+        // belt-and-braces path.
         let overlayCovered = isOverlayCoveringPreview
-        cameraController.setPreviewOccluded(overlayCovered)
         cameraController.setIdle(cameraThrottle.noteOverlay(overlayCovered))
         if overlayCovered { return }
 

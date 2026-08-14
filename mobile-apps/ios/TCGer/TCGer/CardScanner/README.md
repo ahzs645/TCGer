@@ -44,19 +44,18 @@ a main-actor hop. Dropped-frame telemetry is exposed via `droppedFrameCount`
 (`captureOutput(_:didDrop:)`). `ScannerDebugView` consumes the same stream;
 there is no `onSampleBuffer` callback anymore — do not reintroduce one.
 
-### Idle throttling (`ScannerCameraThrottle.swift`, `CardScannerCamera.setIdle` / `setPreviewOccluded`)
+### Idle throttling (`ScannerCameraThrottle.swift`, `CardScannerCamera.setIdle`)
 
 The preview layer renders straight from the capture device, so a device-level
-frame-rate cap makes the visible viewfinder choppy. The sensor therefore runs
-at its NATIVE rate whenever the preview is visible; throttling happens on the
-delivery side instead — `captureOutput` drops frames on the video queue
-before they reach the analysis stream (15 yields/s scanning, 2/s idle). The
-device itself is only capped (to 2 fps via `setPreviewOccluded`) when a
-result sheet or binder review fully covers the preview, where smoothness is
-invisible. Only `activeVideoMinFrameDuration` is ever capped — never `max`,
-which would also cap exposure time — and the occlusion cap must be applied
-AFTER `commitConfiguration` because setting a session preset resets frame
-durations. Policy lives in `ScannerCameraThrottle` (pure, unit-tested):
+frame-rate cap shows up on screen — as a choppy viewfinder while capped, and
+as a visible freeze/exposure-ramp during every sheet transition when toggled
+(both were shipped and reverted; don't reintroduce a device cap). The sensor
+always runs at its native rate; throttling happens on the delivery side —
+`captureOutput` drops frames on the video queue before they reach the
+analysis stream (15 yields/s scanning, 2/s idle or while a result sheet /
+binder review covers the preview). The overlay state is pushed event-driven
+from the view model's overlay `didSet`s so delivery resumes the instant a
+sheet dismisses. Policy lives in `ScannerCameraThrottle` (pure, unit-tested):
 
 - 8 consecutive card-free analyses (~8 s) → idle delivery. Must stay above
   `LiveScanConsensus`'s 3 s match window so a mid-confirmation candidate can

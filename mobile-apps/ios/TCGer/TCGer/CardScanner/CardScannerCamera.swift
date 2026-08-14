@@ -16,23 +16,20 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var isConfigured = false
     private var videoDevice: AVCaptureDevice?
 
-    /// The preview layer renders straight from the capture device, so any
-    /// device-level frame-rate cap makes the on-screen viewfinder choppy.
-    /// The sensor therefore runs at its native rate whenever the preview is
-    /// visible, and "idle" throttles only what reaches the analysis stream —
-    /// frames are dropped on the video queue before they cost anything. The
-    /// device-level cap is reserved for a fully covered preview (result
-    /// sheet / binder review up), where smoothness is invisible and the
-    /// sensor can actually cool down. Only `activeVideoMinFrameDuration` is
-    /// ever capped, never `max`: capping the maximum duration would also cap
-    /// exposure time, and a card under indoor light needs the long exposures
-    /// the camera chooses for itself.
-    private static let occludedFPS = 2.0
-    /// Seconds between yields into the analysis stream. The consumer analyzes
-    /// at most once a second, so scanning delivery at 15/s already halves the
-    /// wake-ups a 30fps sensor would cause without adding meaningful latency,
-    /// and idle delivery at 2/s keeps card-appears wake-up latency low while
-    /// shedding the per-frame hops an empty viewfinder doesn't need.
+    /// The preview layer renders straight from the capture device, so ANY
+    /// device-level frame-rate cap shows up on screen — as a choppy
+    /// viewfinder while capped, and as a visible freeze/exposure ramp during
+    /// every sheet transition when toggled. The sensor therefore always runs
+    /// at its native rate; "idle" throttles only what reaches the analysis
+    /// stream — frames are dropped on the video queue before they cost
+    /// anything, which is where the actual processing savings live.
+    ///
+    /// Seconds between yields into the analysis stream: the consumer
+    /// analyzes at most once a second, so scanning delivery at 15/s already
+    /// halves the wake-ups a 30fps sensor would cause without adding
+    /// meaningful latency, and idle delivery at 2/s keeps card-appears
+    /// wake-up latency low while shedding the per-frame hops an empty
+    /// viewfinder (or a covered preview) doesn't need.
     private static let scanningYieldInterval: CFTimeInterval = 1.0 / 15.0
     private static let idleYieldInterval: CFTimeInterval = 0.5
     // Touched only on videoOutputQueue (delegate callbacks) or via its .async.
@@ -40,8 +37,6 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var minYieldInterval: CFTimeInterval = CardScannerCameraController.scanningYieldInterval
     private var lastYieldAt: CFTimeInterval = 0
     private(set) var droppedFrameCount = 0
-    // Touched only on sessionQueue.
-    private var isPreviewOccluded = false
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
     var onPhotoCaptureError: ((Error) -> Void)?
@@ -91,44 +86,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         }
     }
 
-    /// A presented sheet fully covers the preview, so smoothness is invisible
-    /// and the sensor can drop to a trickle. Repeats of the current state are
-    /// ignored so only transitions pay for a device configuration lock.
-    func setPreviewOccluded(_ occluded: Bool) {
-        sessionQueue.async { [weak self] in
-            guard let self, occluded != self.isPreviewOccluded else { return }
-            self.isPreviewOccluded = occluded
-            self.applyPreviewOcclusionOnSessionQueue()
-        }
-    }
-
-    private func applyPreviewOcclusionOnSessionQueue() {
-        guard let device = videoDevice, (try? device.lockForConfiguration()) != nil else { return }
-        // `.invalid` restores the format's default (uncapped) frame duration.
-        device.activeVideoMinFrameDuration = isPreviewOccluded
-            ? Self.frameDuration(capping: Self.occludedFPS, on: device)
-            : .invalid
-        device.unlockForConfiguration()
-    }
-
-    private static func frameDuration(capping fps: Double, on device: AVCaptureDevice) -> CMTime {
-        let ranges = device.activeFormat.videoSupportedFrameRateRanges
-        let lo = ranges.map(\.minFrameRate).min() ?? fps
-        let hi = ranges.map(\.maxFrameRate).max() ?? fps
-        return CMTime(seconds: 1 / min(max(fps, lo), hi), preferredTimescale: 600)
-    }
 
     func configureIfNeeded() {
         guard !isConfigured else { return }
         sessionQueue.async { [weak self] in
-            guard let self else { return }
-            self.configureSession()
-            // AFTER commitConfiguration, not inside it: setting a session
-            // preset resets the frame-duration properties, so an occlusion
-            // cap applied before the preset lands would be a no-op.
-            if self.isPreviewOccluded {
-                self.applyPreviewOcclusionOnSessionQueue()
-            }
+            self?.configureSession()
         }
         isConfigured = true
     }
