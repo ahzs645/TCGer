@@ -611,7 +611,7 @@ struct BinderPageReviewView: View {
                     .disabled(isAdding || isCreatingBinder)
                 }
 
-                Text("Save Layout stores card positions and the optional scan image. Adding cards saves the layout too.")
+                Text("Adding cards also saves their positions and the optional scan image.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -622,68 +622,40 @@ struct BinderPageReviewView: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
     }
 
-    /// Pinned below the scroll view so layout and card actions stay reachable
-    /// while the detection list scrolls.
+    /// Pinned below the scroll view so the add action stays reachable while
+    /// the detection list scrolls.
     private func stickyActionBar(record: BinderPageRecord) -> some View {
         let records = destinationRecords(for: record)
         let binderID = destinationBinderID(for: record)
 
         return GlassEffectContainer(spacing: 10) {
-            HStack(spacing: 10) {
-                Button {
-                    guard let binderID else { return }
-                    Task { await persistRecords(records, to: binderID) }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isSavingPage {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "rectangle.stack.badge.plus")
-                        }
-                        Text(compactSaveButtonTitle(for: record))
-                            .fontWeight(.semibold)
+            Button {
+                guard let binderID else { return }
+                Task { await addIncludedCards(from: records, to: binderID) }
+            } label: {
+                HStack {
+                    if isAdding {
+                        ProgressView()
                     }
+                    Text(addButtonTitle(for: record))
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .disabled(isSavingPage || isAdding || binderID == nil)
-                .accessibilityLabel(saveButtonTitle(for: record))
-                .accessibilityHint("Saves card positions and the optional scan image without adding cards")
-
-                Button {
-                    guard let binderID else { return }
-                    Task { await addIncludedCards(from: records, to: binderID) }
-                } label: {
-                    HStack {
-                        if isAdding {
-                            ProgressView()
-                        }
-                        Text(addButtonTitle(for: record))
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .tint(.green)
-                .controlSize(.large)
-                .disabled(
-                    isAdding ||
-                        isCreatingBinder || isSavingPage ||
-                        binderID == nil ||
-                        remainingIncludedDetectionCount(in: records) == 0
-                )
+                .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.glassProminent)
+            .tint(.green)
+            .controlSize(.large)
+            .disabled(
+                isAdding ||
+                    isCreatingBinder || isSavingPage ||
+                    binderID == nil ||
+                    remainingIncludedDetectionCount(in: records) == 0
+            )
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
-    }
-
-    private func compactSaveButtonTitle(for record: BinderPageRecord) -> String {
-        let records = destinationRecords(for: record)
-        if records.count > 1 { return "Save \(records.count) Layouts" }
-        return storedPage(for: record.pageNumber) == nil ? "Save Layout" : "Update Layout"
     }
 
     private var currentRecord: BinderPageRecord? {
@@ -757,14 +729,6 @@ struct BinderPageReviewView: View {
             return "Cards Added"
         }
         return "Add \(remainingCount) Cards to Binder"
-    }
-
-    private func saveButtonTitle(for record: BinderPageRecord) -> String {
-        let records = destinationRecords(for: record)
-        if records.count > 1 { return "Save \(records.count) Page Layouts" }
-        return storedPage(for: record.pageNumber) == nil
-            ? "Save Binder Page \(record.pageNumber)"
-            : "Update Binder Page \(record.pageNumber)"
     }
 
     private func showPage(at index: Int) {

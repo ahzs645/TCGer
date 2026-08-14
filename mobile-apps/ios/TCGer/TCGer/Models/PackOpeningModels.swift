@@ -8,10 +8,12 @@ struct PackOpeningPullSession: Identifiable, Codable, Hashable, Sendable {
 
     var pulls: [PackOpeningPull] { packs.flatMap { $0 } }
     var resultArtworkURLs: [URL] {
-        pulls.compactMap { pull in
-            let value = pull.imageUrlSmall.isEmpty ? pull.imageUrl : pull.imageUrlSmall
-            return URL(string: value)
-        }
+        var seen = Set<URL>()
+        return pulls.flatMap { pull in
+            [pull.imageUrlSmall, pull.imageUrl]
+                .filter { !$0.isEmpty }
+                .compactMap(URL.init(string:))
+        }.filter { seen.insert($0).inserted }
     }
     var setCode: String? {
         let codes = Set(pulls.map(\.setCode))

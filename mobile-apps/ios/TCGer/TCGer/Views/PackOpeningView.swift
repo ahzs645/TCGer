@@ -56,16 +56,25 @@ struct PackOpeningView: View {
             .padding(.horizontal, 16)
             .safeAreaPadding(.top, 8)
             .safeAreaPadding(.bottom, 12)
+
+            if let inspectedPull {
+                PackOpeningInlineInspector(
+                    pull: inspectedPull,
+                    onClose: {
+                        withAnimation(.snappy) { self.inspectedPull = nil }
+                    },
+                    onSwipeAway: {
+                        withAnimation(.snappy) { self.inspectedPull = nil }
+                        send(.advance)
+                    }
+                )
+                .transition(.scale(scale: 0.78).combined(with: .opacity))
+                .zIndex(10)
+            }
         }
         .sheet(item: $pullSession) { session in
             PackOpeningReviewSheet(session: session) {
                 phase = "Saved to collection"
-            }
-        }
-        .fullScreenCover(item: $inspectedPull) { pull in
-            PackOpeningCardInspector(pull: pull) {
-                inspectedPull = nil
-                send(.advance)
             }
         }
         .onChange(of: selectedArtwork) { _, item in
@@ -370,7 +379,7 @@ struct PackOpeningView: View {
             }
             interfaceState = state
         case .inspectRequested(let pull):
-            inspectedPull = pull
+            withAnimation(.snappy) { inspectedPull = pull }
         case .haptic(let style):
             switch style {
             case "selection": HapticManager.selection()
@@ -408,7 +417,7 @@ private struct PackOpeningNativeResultsView: View {
                             .foregroundStyle(.orange)
 
                         PackOpeningNativeResultCard(pull: bestPull) {
-                            inspectedPull = bestPull
+                            withAnimation(.snappy) { inspectedPull = bestPull }
                         }
                             .frame(maxWidth: 190)
                             .frame(maxWidth: .infinity)
@@ -429,7 +438,7 @@ private struct PackOpeningNativeResultsView: View {
                         LazyVGrid(columns: columns, alignment: .center, spacing: 20) {
                             ForEach(Array(pack.enumerated()), id: \.offset) { _, pull in
                                 PackOpeningNativeResultCard(pull: pull) {
-                                    inspectedPull = pull
+                                    withAnimation(.snappy) { inspectedPull = pull }
                                 }
                             }
                         }
@@ -443,9 +452,18 @@ private struct PackOpeningNativeResultsView: View {
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .accessibilityLabel("Pack results for \(session.packLabel)")
-        .fullScreenCover(item: $inspectedPull) { pull in
-            PackOpeningCardInspector(pull: pull) {
-                inspectedPull = nil
+        .overlay {
+            if let inspectedPull {
+                PackOpeningInlineInspector(
+                    pull: inspectedPull,
+                    onClose: {
+                        withAnimation(.snappy) { self.inspectedPull = nil }
+                    },
+                    onSwipeAway: {
+                        withAnimation(.snappy) { self.inspectedPull = nil }
+                    }
+                )
+                .transition(.scale(scale: 0.78).combined(with: .opacity))
             }
         }
     }
@@ -543,15 +561,16 @@ private struct PackOpeningNativeResultCard: View {
     }
 }
 
-private struct PackOpeningCardInspector: View {
+private struct PackOpeningInlineInspector: View {
     let pull: PackOpeningPull
-    let onAdvance: () -> Void
+    let onClose: () -> Void
+    let onSwipeAway: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var isShowingBack = false
     @State private var settledScale: CGFloat = 1
     @GestureState private var liveScale: CGFloat = 1
+    @GestureState private var dragOffset: CGSize = .zero
     @State private var wishlistCard: Card?
     @State private var isSavingFavorite = false
     @State private var favoriteMessage: String?
@@ -570,49 +589,64 @@ private struct PackOpeningCardInspector: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(uiColor: .systemBackground).ignoresSafeArea()
+        ZStack {
+            Color.black.opacity(0.54)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
 
-                VStack(spacing: 18) {
-                    Spacer(minLength: 4)
-
-                    cardFace
-                        .padding(.horizontal, 24)
-
-                    VStack(spacing: 3) {
-                        Text(pull.name)
-                            .font(.title2.bold())
-                        Text("\(pull.setName) · \(pull.rarity)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 16) {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.headline)
+                            .frame(width: 28, height: 28)
                     }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Close inspection")
 
-                    Text(effectiveScale > 1.01
-                         ? "Drag to explore · pinch inward to reset"
-                         : "Pinch to zoom · flip to see the back · swipe when finished")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    Spacer()
 
-                    actionBar
-                }
-                .padding(.bottom, 14)
-            }
-            .navigationTitle("Inspect Card")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .primaryAction) {
+                    Text("Inspect Card")
+                        .font(.headline)
+
+                    Spacer()
+
                     Button {
                         withAnimation(.snappy) { isShowingBack.toggle() }
                     } label: {
-                        Label("Flip", systemImage: "rectangle.on.rectangle.angled")
+                        Image(systemName: "rectangle.on.rectangle.angled")
+                            .font(.headline)
+                            .frame(width: 28, height: 28)
                     }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Flip card")
                 }
+
+                cardFace
+                    .padding(.horizontal, 8)
+
+                VStack(spacing: 3) {
+                    Text(pull.name)
+                        .font(.title2.bold())
+                    Text("\(pull.setName) · \(pull.rarity)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(effectiveScale > 1.01
+                     ? "Pinch inward to reset"
+                     : "Pinch to inspect · flip for the back · swipe away when done")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                actionBar
             }
+            .padding(18)
+            .frame(maxWidth: 440)
+            .glassEffect(.regular, in: .rect(cornerRadius: 32))
+            .padding(.horizontal, 14)
+            .safeAreaPadding(.vertical, 12)
         }
         .sheet(item: $wishlistCard) { card in
             AddToWishlistSheet(card: card)
@@ -651,6 +685,9 @@ private struct PackOpeningCardInspector: View {
         .clipShape(TradingCardShape())
         .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
         .scaleEffect(effectiveScale)
+        .offset(x: dragOffset.width, y: dragOffset.height * 0.18)
+        .rotationEffect(.degrees(Double(dragOffset.width / 28)))
+        .opacity(max(0.35, 1 - abs(dragOffset.width) / 360))
         .rotation3DEffect(.degrees(isShowingBack ? 180 : 0), axis: (x: 0, y: 1, z: 0))
         .contentShape(Rectangle())
         .gesture(
@@ -662,13 +699,16 @@ private struct PackOpeningCardInspector: View {
         )
         .simultaneousGesture(
             DragGesture(minimumDistance: 24)
+                .updating($dragOffset) { value, state, _ in
+                    guard effectiveScale <= 1.02 else { return }
+                    state = value.translation
+                }
                 .onEnded { value in
                     guard effectiveScale <= 1.02,
                           abs(value.translation.width) > 90,
                           abs(value.translation.width) > abs(value.translation.height)
                     else { return }
-                    dismiss()
-                    onAdvance()
+                    onSwipeAway()
                 }
         )
         .onTapGesture(count: 2) {
@@ -700,10 +740,9 @@ private struct PackOpeningCardInspector: View {
             .buttonStyle(.glass)
 
             Button {
-                dismiss()
-                onAdvance()
+                onSwipeAway()
             } label: {
-                Label("Next", systemImage: "arrow.right")
+                Label("Done", systemImage: "arrow.right")
             }
             .buttonStyle(.glassProminent)
         }
@@ -1200,13 +1239,16 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
 
     private let remoteBaseURL: URL
     private let session: URLSession
+    private let assetCache: PackOpeningAssetCache
 
     init(
         remoteBaseURL: URL = PackOpeningResource.remoteBaseURL(),
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        assetCache: PackOpeningAssetCache = .shared
     ) {
         self.remoteBaseURL = remoteBaseURL
         self.session = session
+        self.assetCache = assetCache
     }
 
     func userContentController(
@@ -1248,6 +1290,22 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
             return
         }
 
+        if let cached = assetCache.data(for: remoteURL) {
+            completion(.success(Resource(
+                data: cached,
+                mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension)
+            )))
+            if remoteURL.path.hasSuffix("/manifest.json"), NetworkMonitor.shared.isConnected {
+                refresh(remoteURL)
+            }
+            return
+        }
+
+        guard NetworkMonitor.shared.isConnected else {
+            loadBundled(requestURL, completion: completion)
+            return
+        }
+
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = .returnCacheDataElseLoad
         request.timeoutInterval = 20
@@ -1258,6 +1316,7 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
                 let response,
                 (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
             {
+                self?.assetCache.store(data, for: remoteURL)
                 completion(.success(Resource(
                     data: data,
                     mimeType: response.mimeType
@@ -1265,7 +1324,29 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
                 )))
                 return
             }
-            self?.loadBundled(requestURL, completion: completion)
+            if let cached = self?.assetCache.data(for: remoteURL) {
+                completion(.success(Resource(
+                    data: cached,
+                    mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension)
+                )))
+            } else {
+                self?.loadBundled(requestURL, completion: completion)
+            }
+        }.resume()
+    }
+
+    private func refresh(_ remoteURL: URL) {
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = .reloadRevalidatingCacheData
+        request.timeoutInterval = 20
+        session.dataTask(with: request) { [assetCache] data, response, error in
+            guard
+                error == nil,
+                let data,
+                let response = response as? HTTPURLResponse,
+                200 ..< 300 ~= response.statusCode
+            else { return }
+            assetCache.store(data, for: remoteURL)
         }.resume()
     }
 
@@ -1334,6 +1415,7 @@ enum PackOpeningResource {
     static let scheme = "tcger-pack"
     static let bundleHost = "bundle"
     static let assetHost = "assets"
+    static let remoteTexturePath = "/remote-image"
     // Keep the document and its textures on one custom-scheme origin. WebKit
     // otherwise treats `bundle` and `assets` as different origins and rejects
     // Three.js textures even though both hosts use this same scheme handler.
@@ -1378,6 +1460,21 @@ enum PackOpeningResource {
     }
 
     static func remoteURL(for requestURL: URL, baseURL: URL) -> URL? {
+        if
+            requestURL.scheme == scheme,
+            requestURL.host == assetHost,
+            requestURL.path == remoteTexturePath
+        {
+            guard
+                let components = URLComponents(url: requestURL, resolvingAgainstBaseURL: false),
+                let value = components.queryItems?.first(where: { $0.name == "url" })?.value,
+                let url = URL(string: value),
+                url.scheme == "https",
+                url.host?.lowercased() == "assets.tcgdex.net"
+            else { return nil }
+            return url
+        }
+
         guard
             requestURL.scheme == scheme,
             requestURL.host == assetHost,
@@ -1423,14 +1520,17 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
 
     private let remoteBaseURL: URL
     private let session: URLSession
+    private let assetCache: PackOpeningAssetCache
     private var remoteTasks: [ObjectIdentifier: RemoteTask] = [:]
 
     init(
         remoteBaseURL: URL? = nil,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        assetCache: PackOpeningAssetCache? = nil
     ) {
         self.remoteBaseURL = remoteBaseURL ?? PackOpeningResource.remoteBaseURL()
         self.session = session
+        self.assetCache = assetCache ?? .shared
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
@@ -1460,6 +1560,24 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         requestURL: URL,
         schemeTask: any WKURLSchemeTask
     ) {
+        if let cached = assetCache.data(for: remoteURL) {
+            deliver(
+                cached,
+                remoteURL: remoteURL,
+                requestURL: requestURL,
+                schemeTask: schemeTask
+            )
+            if remoteURL.path.hasSuffix("/manifest.json"), NetworkMonitor.shared.isConnected {
+                refresh(remoteURL)
+            }
+            return
+        }
+
+        guard NetworkMonitor.shared.isConnected else {
+            loadBundled(requestURL, schemeTask: schemeTask)
+            return
+        }
+
         let key = ObjectIdentifier(schemeTask as AnyObject)
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = .returnCacheDataElseLoad
@@ -1474,22 +1592,63 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
                     let response,
                     (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
                 {
-                    let bridgedResponse = URLResponse(
-                        url: requestURL,
-                        mimeType: response.mimeType ?? PackOpeningResource.mimeType(for: remoteURL.pathExtension),
-                        expectedContentLength: data.count,
+                    self.assetCache.store(data, for: remoteURL)
+                    self.deliver(
+                        data,
+                        remoteURL: remoteURL,
+                        requestURL: requestURL,
+                        schemeTask: remoteTask.schemeTask,
                         textEncodingName: response.textEncodingName
                     )
-                    remoteTask.schemeTask.didReceive(bridgedResponse)
-                    remoteTask.schemeTask.didReceive(data)
-                    remoteTask.schemeTask.didFinish()
                 } else {
-                    self.loadBundled(requestURL, schemeTask: remoteTask.schemeTask)
+                    if let cached = self.assetCache.data(for: remoteURL) {
+                        self.deliver(
+                            cached,
+                            remoteURL: remoteURL,
+                            requestURL: requestURL,
+                            schemeTask: remoteTask.schemeTask
+                        )
+                    } else {
+                        self.loadBundled(requestURL, schemeTask: remoteTask.schemeTask)
+                    }
                 }
             }
         }
         remoteTasks[key] = RemoteTask(dataTask: task, schemeTask: schemeTask)
         task.resume()
+    }
+
+    private func deliver(
+        _ data: Data,
+        remoteURL: URL,
+        requestURL: URL,
+        schemeTask: any WKURLSchemeTask,
+        textEncodingName: String? = nil
+    ) {
+        let response = URLResponse(
+            url: requestURL,
+            mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension),
+            expectedContentLength: data.count,
+            textEncodingName: textEncodingName
+        )
+        schemeTask.didReceive(response)
+        schemeTask.didReceive(data)
+        schemeTask.didFinish()
+    }
+
+    private func refresh(_ remoteURL: URL) {
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = .reloadRevalidatingCacheData
+        request.timeoutInterval = 20
+        session.dataTask(with: request) { [assetCache] data, response, error in
+            guard
+                error == nil,
+                let data,
+                let response = response as? HTTPURLResponse,
+                200 ..< 300 ~= response.statusCode
+            else { return }
+            assetCache.store(data, for: remoteURL)
+        }.resume()
     }
 
     private func loadBundled(_ requestURL: URL, schemeTask: any WKURLSchemeTask) {

@@ -55,6 +55,47 @@ final class PackOpeningResourceTests: XCTestCase {
         ))
     }
 
+    func testRemoteCardTextureRequestsOnlyAllowTheTCGDexAssetHost() {
+        let tcgdex = URL(string: "https://assets.tcgdex.net/en/me/me05/001/high.webp")!
+        var allowed = URLComponents()
+        allowed.scheme = PackOpeningResource.scheme
+        allowed.host = PackOpeningResource.assetHost
+        allowed.path = PackOpeningResource.remoteTexturePath
+        allowed.queryItems = [URLQueryItem(name: "url", value: tcgdex.absoluteString)]
+
+        XCTAssertEqual(
+            PackOpeningResource.remoteURL(
+                for: allowed.url!,
+                baseURL: URL(string: "https://assets.example.com")!
+            ),
+            tcgdex
+        )
+
+        allowed.queryItems = [URLQueryItem(
+            name: "url",
+            value: "https://untrusted.example.com/card.png"
+        )]
+        XCTAssertNil(PackOpeningResource.remoteURL(
+            for: allowed.url!,
+            baseURL: URL(string: "https://assets.example.com")!
+        ))
+    }
+
+    func testPackOpeningAssetCachePersistsBytesByRemoteURL() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = PackOpeningAssetCache(directory: directory)
+        let wrapper = URL(string: "https://assets.example.com/pack/objects/wrapper.png")!
+        let manifest = URL(string: "https://assets.example.com/pack/manifest.json")!
+        cache.store(Data("wrapper".utf8), for: wrapper)
+        cache.store(Data("manifest".utf8), for: manifest)
+
+        XCTAssertEqual(cache.data(for: wrapper), Data("wrapper".utf8))
+        XCTAssertEqual(cache.data(for: manifest), Data("manifest".utf8))
+    }
+
     func testSharedAssetRequestsCanFallBackToTheEmbeddedPackDirectory() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -112,7 +153,10 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(session?.packs.count, 1)
         XCTAssertEqual(session?.pulls.first?.card.id, "swsh7-44")
         XCTAssertEqual(session?.setCode, "swsh7")
-        XCTAssertEqual(session?.resultArtworkURLs.first?.absoluteString, "https://example.com/low.webp")
+        XCTAssertEqual(
+            Set(session?.resultArtworkURLs.map(\.absoluteString) ?? []),
+            ["https://example.com/low.webp", "https://example.com/high.webp"]
+        )
     }
 
     func testNativePackInterfaceStateDecodesFromTheJavaScriptBridge() {
@@ -183,6 +227,8 @@ final class PackOpeningResourceTests: XCTestCase {
             selectedPackID: "base-blastoise",
             selectedPackLabel: "Base · Blastoise",
             packCount: 1,
+            openingMode: .normal,
+            packBackwards: false,
             packOptions: options,
             revealedCount: 0,
             totalCards: 0,
