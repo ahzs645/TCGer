@@ -39,6 +39,13 @@ enum ScannerTriggerMode: String, CaseIterable, Identifiable, Sendable {
         case .manual: return "Tap Shutter"
         }
     }
+
+    var systemImage: String {
+        switch self {
+        case .automatic: return "viewfinder"
+        case .manual: return "camera.aperture"
+        }
+    }
 }
 
 nonisolated struct BinderNormalizedQuad: Sendable {

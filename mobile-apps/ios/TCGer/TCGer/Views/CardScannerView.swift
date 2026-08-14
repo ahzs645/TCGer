@@ -570,28 +570,34 @@ struct CardScannerView: View {
             }
     }
 
-    /// One-tap switch between the static shutter and automatic live
-    /// scanning. The same choice lives in the scanner-options menu, but
-    /// changing how you capture is a mid-session decision — it deserves a
-    /// visible control beside the shutter, mirroring the capture-mode
-    /// control on the other side.
+    /// Selector for the capture trigger (shutter vs automatic live
+    /// scanning), mirroring the capture-mode selector on the leading side.
+    /// The same choice lives in the scanner-options menu, but changing how
+    /// you capture is a mid-session decision — it deserves a visible control
+    /// beside the shutter.
     private var triggerModeControl: some View {
-        Button {
-            viewModel.triggerMode = viewModel.triggerMode == .manual ? .automatic : .manual
+        Menu {
+            ForEach(ScannerTriggerMode.allCases) { mode in
+                Button {
+                    viewModel.triggerMode = mode
+                } label: {
+                    if viewModel.triggerMode == mode {
+                        Label(mode.displayName, systemImage: "checkmark")
+                    } else {
+                        Label(mode.displayName, systemImage: mode.systemImage)
+                    }
+                }
+            }
         } label: {
             ScannerOptionLabel(
                 title: viewModel.triggerMode.displayName,
-                systemImage: viewModel.triggerMode == .manual ? "camera.aperture" : "viewfinder"
+                systemImage: viewModel.triggerMode.systemImage
             )
         }
-        .buttonStyle(.plain)
         .disabled(isProcessingPhoto)
         .animation(.snappy, value: viewModel.triggerMode)
         .accessibilityLabel("Scan trigger")
         .accessibilityValue(viewModel.triggerMode.displayName)
-        .accessibilityHint(viewModel.triggerMode == .manual
-            ? "Switches to automatic scanning"
-            : "Switches to the shutter button")
     }
 
     @ViewBuilder
