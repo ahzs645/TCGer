@@ -1290,14 +1290,13 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
             return
         }
 
-        if let cached = assetCache.data(for: remoteURL) {
+        let isManifest = PackOpeningResource.isManifest(remoteURL)
+        if let cached = assetCache.data(for: remoteURL),
+           !isManifest || !NetworkMonitor.shared.isConnected {
             completion(.success(Resource(
                 data: cached,
                 mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension)
             )))
-            if remoteURL.path.hasSuffix("/manifest.json"), NetworkMonitor.shared.isConnected {
-                refresh(remoteURL)
-            }
             return
         }
 
@@ -1307,7 +1306,7 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
         }
 
         var request = URLRequest(url: remoteURL)
-        request.cachePolicy = .returnCacheDataElseLoad
+        request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
         request.timeoutInterval = 20
         session.dataTask(with: request) { [weak self] data, response, error in
             if
@@ -1332,21 +1331,6 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
             } else {
                 self?.loadBundled(requestURL, completion: completion)
             }
-        }.resume()
-    }
-
-    private func refresh(_ remoteURL: URL) {
-        var request = URLRequest(url: remoteURL)
-        request.cachePolicy = .reloadRevalidatingCacheData
-        request.timeoutInterval = 20
-        session.dataTask(with: request) { [assetCache] data, response, error in
-            guard
-                error == nil,
-                let data,
-                let response = response as? HTTPURLResponse,
-                200 ..< 300 ~= response.statusCode
-            else { return }
-            assetCache.store(data, for: remoteURL)
         }.resume()
     }
 
@@ -1509,6 +1493,18 @@ enum PackOpeningResource {
         default: "application/octet-stream"
         }
     }
+
+    static func isManifest(_ remoteURL: URL) -> Bool {
+        remoteURL.path.hasSuffix("/manifest.json")
+    }
+
+    /// Pack metadata changes independently of the content-addressed objects it
+    /// references. Reaching past WebKit's HTTP cache while online prevents an
+    /// older Base-only manifest from hiding newly published sets such as Pitch
+    /// Black. The durable byte cache remains the offline fallback.
+    static func cachePolicy(for remoteURL: URL) -> URLRequest.CachePolicy {
+        isManifest(remoteURL) ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
+    }
 }
 
 @MainActor
@@ -1560,16 +1556,15 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         requestURL: URL,
         schemeTask: any WKURLSchemeTask
     ) {
-        if let cached = assetCache.data(for: remoteURL) {
+        let isManifest = PackOpeningResource.isManifest(remoteURL)
+        if let cached = assetCache.data(for: remoteURL),
+           !isManifest || !NetworkMonitor.shared.isConnected {
             deliver(
                 cached,
                 remoteURL: remoteURL,
                 requestURL: requestURL,
                 schemeTask: schemeTask
             )
-            if remoteURL.path.hasSuffix("/manifest.json"), NetworkMonitor.shared.isConnected {
-                refresh(remoteURL)
-            }
             return
         }
 
@@ -1580,7 +1575,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
 
         let key = ObjectIdentifier(schemeTask as AnyObject)
         var request = URLRequest(url: remoteURL)
-        request.cachePolicy = .returnCacheDataElseLoad
+        request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
         request.timeoutInterval = 20
 
         let task = session.dataTask(with: request) { [weak self] data, response, error in
@@ -1634,21 +1629,6 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         schemeTask.didReceive(response)
         schemeTask.didReceive(data)
         schemeTask.didFinish()
-    }
-
-    private func refresh(_ remoteURL: URL) {
-        var request = URLRequest(url: remoteURL)
-        request.cachePolicy = .reloadRevalidatingCacheData
-        request.timeoutInterval = 20
-        session.dataTask(with: request) { [assetCache] data, response, error in
-            guard
-                error == nil,
-                let data,
-                let response = response as? HTTPURLResponse,
-                200 ..< 300 ~= response.statusCode
-            else { return }
-            assetCache.store(data, for: remoteURL)
-        }.resume()
     }
 
     private func loadBundled(_ requestURL: URL, schemeTask: any WKURLSchemeTask) {

@@ -81,6 +81,22 @@ final class PackOpeningResourceTests: XCTestCase {
         ))
     }
 
+    func testManifestBypassesWebKitCacheWhileContentAddressedAssetsRemainCacheFirst() {
+        let manifest = URL(string: "https://assets.example.com/pack/manifest.json")!
+        let wrapper = URL(string: "https://assets.example.com/pack/objects/wrapper.png")!
+
+        XCTAssertTrue(PackOpeningResource.isManifest(manifest))
+        XCTAssertFalse(PackOpeningResource.isManifest(wrapper))
+        XCTAssertEqual(
+            PackOpeningResource.cachePolicy(for: manifest),
+            .reloadIgnoringLocalCacheData
+        )
+        XCTAssertEqual(
+            PackOpeningResource.cachePolicy(for: wrapper),
+            .returnCacheDataElseLoad
+        )
+    }
+
     func testPackOpeningAssetCachePersistsBytesByRemoteURL() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
