@@ -10,7 +10,7 @@ struct PackOpeningView: View {
     @State private var phase = "Loading"
     @State private var errorMessage: String?
     @State private var reloadID = UUID()
-    @State private var pullSession: PackOpeningPullSession?
+    @State private var presentedSheet: SheetDestination?
     @State private var interfaceState = PackOpeningInterfaceState.loading
     @State private var command: PackOpeningCommand?
     @State private var selectedArtwork: PhotosPickerItem?
@@ -77,9 +77,14 @@ struct PackOpeningView: View {
                 .zIndex(10)
             }
         }
-        .sheet(item: $pullSession) { session in
-            PackOpeningReviewSheet(session: session) {
-                phase = "Saved to collection"
+        .sheet(item: $presentedSheet) { destination in
+            switch destination {
+            case .review(let session):
+                PackOpeningReviewSheet(session: session) {
+                    phase = "Saved to collection"
+                }
+            case .oddsReference(let reference):
+                PackOddsSourceSheet(reference: reference)
             }
         }
         .onChange(of: selectedArtwork) { _, item in
@@ -292,6 +297,17 @@ struct PackOpeningView: View {
                     .buttonStyle(.glass)
                     .accessibilityLabel("Pokémon set, \(interfaceState.selectedSetLabel)")
 
+                    if let reference = interfaceState.selectedOddsReference {
+                        Button {
+                            presentedSheet = .oddsReference(reference)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("About \(interfaceState.selectedSetLabel) pack odds")
+                    }
+
                     PhotosPicker(selection: $selectedArtwork, matching: .images) {
                         Image(systemName: "photo.badge.plus")
                             .frame(width: 24, height: 24)
@@ -304,10 +320,6 @@ struct PackOpeningView: View {
                     PackOfflineAvailabilityLabel(status: status)
                         .font(.caption.weight(.semibold))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if let reference = interfaceState.selectedOddsReference {
-                    PackOddsSourceAttribution(reference: reference)
                 }
 
                 if interfaceState.selectedSetOptions.count > 1 {
@@ -511,7 +523,7 @@ struct PackOpeningView: View {
             default: HapticManager.impact(.medium)
             }
         case .saveRequested(let session):
-            pullSession = session
+            presentedSheet = .review(session)
         case .error(let message):
             errorMessage = message
         }
@@ -907,30 +919,63 @@ private struct PackOpeningCardCloseUp: View {
     }
 }
 
-private struct PackOddsSourceAttribution: View {
+private extension PackOpeningView {
+    enum SheetDestination: Identifiable {
+        case review(PackOpeningPullSession)
+        case oddsReference(PackOpeningInterfaceState.PackOption.OddsReference)
+
+        var id: String {
+            switch self {
+            case .review(let session):
+                "review-\(session.id)"
+            case .oddsReference(let reference):
+                "odds-\(reference.url)"
+            }
+        }
+    }
+}
+
+private struct PackOddsSourceSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
     let reference: PackOpeningInterfaceState.PackOption.OddsReference
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if let destination = reference.destination {
-                Link(destination: destination) {
-                    Label(reference.title, systemImage: "arrow.up.right.square")
-                        .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("Pack odds source", systemImage: "chart.bar.doc.horizontal")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 20, height: 20)
                 }
-                .accessibilityLabel("Pull-rate source: \(reference.title)")
-            } else {
-                Text(reference.title)
-                    .fontWeight(.semibold)
+                .buttonStyle(.glass)
+                .accessibilityLabel("Close")
             }
 
-            Text("\(reference.sampleSize.formatted())-pack sample · \(reference.note)")
+            Text(reference.title)
+                .font(.title3.weight(.semibold))
+
+            Text("Based on a \(reference.sampleSize.formatted())-pack sample. \(reference.note)")
                 .foregroundStyle(.secondary)
+
+            if let destination = reference.destination {
+                Link(destination: destination) {
+                    Label("Open Source", systemImage: "arrow.up.right.square")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityLabel("Open pull-rate source: \(reference.title)")
+            }
         }
-        .font(.caption2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(20)
+        .presentationDetents([.height(280)])
+        .presentationDragIndicator(.visible)
     }
 }
 
