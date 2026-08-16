@@ -168,6 +168,16 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertTrue(script.contains("PokemonTCG/comments/paitho"))
     }
 
+    func testEmbeddedRendererKeepsRevealSwipesInsidePackScene() throws {
+        let root = try XCTUnwrap(PackOpeningResource.rootURL())
+        let script = try String(
+            contentsOf: root.appendingPathComponent("pack-opening.js"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(script.contains("inspectRequested"))
+    }
+
     func testCompletedPullSessionDecodesFromTheJavaScriptBridge() {
         let body: [String: Any] = [
             "type": "saveRequested",

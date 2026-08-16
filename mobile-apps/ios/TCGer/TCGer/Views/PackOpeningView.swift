@@ -14,7 +14,6 @@ struct PackOpeningView: View {
     @State private var interfaceState = PackOpeningInterfaceState.loading
     @State private var command: PackOpeningCommand?
     @State private var selectedArtwork: PhotosPickerItem?
-    @State private var revealInspectedCardIndex: Int?
     @State private var summaryInspectedPullIndex: Int?
     @State private var rendererReady = false
     @State private var prefetchedSessionID: String?
@@ -118,23 +117,6 @@ struct PackOpeningView: View {
         }
     }
 
-    private var inspectedRevealPull: PackOpeningPull? {
-        guard
-            let revealInspectedCardIndex,
-            interfaceState.phase == .reveal,
-            let session = interfaceState.session,
-            interfaceState.currentPackNumber > 0,
-            session.packs.indices.contains(interfaceState.currentPackNumber - 1)
-        else { return nil }
-
-        let pack = session.packs[interfaceState.currentPackNumber - 1]
-        guard
-            pack.indices.contains(revealInspectedCardIndex),
-            revealInspectedCardIndex < interfaceState.revealedCount
-        else { return nil }
-        return pack[revealInspectedCardIndex]
-    }
-
     private var inspectedSummaryPull: PackOpeningPull? {
         guard
             let summaryInspectedPullIndex,
@@ -145,37 +127,20 @@ struct PackOpeningView: View {
     }
 
     private var closeUpPull: PackOpeningPull? {
-        inspectedRevealPull ?? inspectedSummaryPull
+        inspectedSummaryPull
     }
 
     private var closeUpIdentity: String {
-        if let revealInspectedCardIndex {
-            return "reveal-\(interfaceState.currentPackNumber)-\(revealInspectedCardIndex)"
-        }
         return "summary-\(summaryInspectedPullIndex ?? -1)"
     }
 
     private func closeCardInspection() {
         withAnimation(.snappy) {
-            revealInspectedCardIndex = nil
             summaryInspectedPullIndex = nil
         }
     }
 
     private func swipeInspectedCard(direction: Int) {
-        if let revealInspectedCardIndex {
-            let nextIndex = revealInspectedCardIndex + direction
-            if nextIndex >= 0, nextIndex < interfaceState.revealedCount {
-                withAnimation(.snappy) { self.revealInspectedCardIndex = nextIndex }
-            } else if direction > 0,
-                      revealInspectedCardIndex == interfaceState.revealedCount - 1 {
-                send(.advance)
-            } else {
-                closeCardInspection()
-            }
-            return
-        }
-
         guard
             let summaryInspectedPullIndex,
             let pulls = interfaceState.session?.pulls
@@ -497,12 +462,6 @@ struct PackOpeningView: View {
             phase = value.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
                 .capitalized
         case .interfaceState(let state):
-            if state.phase != .reveal {
-                revealInspectedCardIndex = nil
-            } else if revealInspectedCardIndex != nil,
-                      state.revealedCount > interfaceState.revealedCount {
-                revealInspectedCardIndex = state.revealedCount - 1
-            }
             if state.phase != .summary && state.phase != .final {
                 summaryInspectedPullIndex = nil
             }
@@ -511,11 +470,10 @@ struct PackOpeningView: View {
                 ImageCache.shared.prefetch(urls: session.resultArtworkURLs)
             }
             interfaceState = state
-        case .inspectRequested(_):
-            guard interfaceState.phase == .reveal else { return }
-            withAnimation(.snappy) {
-                revealInspectedCardIndex = max(0, interfaceState.revealedCount - 1)
-            }
+        case .inspectRequested:
+            // Reveal cards stay inside the shared pack scene. Older cached
+            // renderers may still emit this event, so deliberately ignore it.
+            break
         case .haptic(let style):
             switch style {
             case "selection": HapticManager.selection()
