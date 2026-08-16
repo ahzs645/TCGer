@@ -843,7 +843,7 @@ export function CardPreview({ card }: CardPreviewProps) {
             >
               <CardImage
                 draggable={false}
-                loading="lazy"
+                loading="eager"
                 className="card-test"
                 alt={activeCard.name}
                 src={

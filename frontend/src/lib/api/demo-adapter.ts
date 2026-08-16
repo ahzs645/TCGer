@@ -29,6 +29,7 @@ import {
 import {
   getCardsInSet as getCatalogCardsInSet,
   getSets as getCatalogSets,
+  matchCatalogCards,
   normalizeCatalogText,
   searchCatalog,
   searchCatalogByArtist,
@@ -48,9 +49,25 @@ import type {
   UpdateWishlistRuleInput,
   UserPreferences,
   CreateTransactionInput,
+  CreateBinderInput,
+  CollectionImportIssue,
+  CollectionImportOptions,
+  CollectionImportPreview,
+  CollectionImportPreviewRow,
+  CollectionImportRequest,
+  CollectionImportResult,
+  CollectionMutationKind,
   TransactionResponse,
+  UpdateBinderInput,
 } from "@tcg/api-types";
-import { createTransactionSchema } from "@tcg/api-types";
+import {
+  createBinderSchema,
+  createTagSchema,
+  createTransactionSchema,
+  updateBinderSchema,
+  updateSettingsSchema,
+  collectionImportRequestSchema,
+} from "@tcg/api-types";
 import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
 import { DEMO_TRANSACTIONS_STORAGE_KEY } from "@/lib/storage/keys";
 
@@ -81,6 +98,423 @@ function noContent(): Promise<Response> {
 
 function notFound(msg = "Not found"): Promise<Response> {
   return json({ message: msg }, 404);
+}
+
+const DEMO_IMPORT_HEADERS = [
+  "tcg",
+  "external_id",
+  "card_name",
+  "base_external_id",
+  "printing_key",
+  "artwork_id",
+  "collector_number",
+  "set_code",
+  "set_name",
+  "rarity",
+  "binder_name",
+  "quantity",
+  "condition",
+  "language",
+  "notes",
+  "price",
+  "acquisition_price",
+  "serial_number",
+  "acquired_at",
+  "is_foil",
+  "finish_code",
+  "finish_label",
+  "edition",
+  "stamp",
+  "is_sealed_promo",
+  "is_oversized",
+  "is_peel_off",
+  "is_signed",
+  "is_altered",
+  "tags",
+] as const;
+
+const DEMO_IMPORT_HEADER_ALIASES: Record<string, string> = {
+  binder: "binder_name",
+  "card name": "card_name",
+  "external id": "external_id",
+  "set code": "set_code",
+  "set name": "set_name",
+  "collector number": "collector_number",
+  "acquisition price": "acquisition_price",
+  "serial number": "serial_number",
+  foil: "is_foil",
+};
+
+const DEMO_IMPORT_TCGS = new Set<TcgCode>([
+  "pokemon",
+  "magic",
+  "yugioh",
+  "onepiece",
+  "lorcana",
+  "dragonball",
+]);
+
+function parseDemoCsv(content: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (quoted) {
+      if (character === '"') {
+        if (content[index + 1] === '"') {
+          field += '"';
+          index += 1;
+        } else quoted = false;
+      } else field += character;
+      continue;
+    }
+    if (character === '"') quoted = true;
+    else if (character === ",") {
+      row.push(field);
+      field = "";
+    } else if (character === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (character !== "\r") field += character;
+  }
+  if (quoted) throw new Error("CSV contains an unterminated quoted field");
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseDemoBoolean(
+  value: string | undefined,
+  row: number,
+  field: string,
+  issues: CollectionImportIssue[],
+) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return false;
+  if (["yes", "true", "1", "y"].includes(normalized)) return true;
+  if (["no", "false", "0", "n"].includes(normalized)) return false;
+  issues.push({
+    row,
+    field,
+    message: "must be yes/no, true/false, or 1/0",
+  });
+  return false;
+}
+
+function previewDemoCollectionImport(
+  input: CollectionImportRequest,
+): CollectionImportPreview {
+  const requestedFormat = input.format ?? "auto";
+  const content = input.content ?? input.csv ?? "";
+  const detectedFormat =
+    requestedFormat === "auto"
+      ? content.trimStart().startsWith("[") ||
+        content.trimStart().startsWith("{")
+        ? "json"
+        : "csv"
+      : requestedFormat;
+  if (detectedFormat !== "csv") {
+    return {
+      valid: false,
+      rows: [],
+      issues: [
+        {
+          row: 1,
+          field: "format",
+          message:
+            "The offline demo imports TCGer CSV only; JSON and marketplace text require the connected app.",
+        },
+      ],
+      sourceRows: 0,
+      totalCopies: 0,
+      format: detectedFormat,
+    };
+  }
+
+  let parsed: string[][];
+  try {
+    parsed = parseDemoCsv(content);
+  } catch (error) {
+    return {
+      valid: false,
+      rows: [],
+      issues: [
+        {
+          row: 1,
+          message: error instanceof Error ? error.message : "Invalid CSV",
+        },
+      ],
+      sourceRows: 0,
+      totalCopies: 0,
+      format: "csv",
+    };
+  }
+  if (!parsed.length) {
+    return {
+      valid: false,
+      rows: [],
+      issues: [{ row: 1, message: "CSV is empty" }],
+      sourceRows: 0,
+      totalCopies: 0,
+      format: "csv",
+    };
+  }
+
+  const headers = parsed[0].map((header) => {
+    const normalized = header
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase();
+    return (
+      DEMO_IMPORT_HEADER_ALIASES[normalized] ?? normalized.replace(/\s+/g, "_")
+    );
+  });
+  const issues: CollectionImportIssue[] = [];
+  for (const required of ["tcg", "external_id", "card_name"]) {
+    if (!headers.includes(required)) {
+      issues.push({
+        row: 1,
+        field: required,
+        message: "required header is missing",
+      });
+    }
+  }
+  const dataRows = parsed
+    .slice(1)
+    .filter((values) => values.some((value) => value.trim()));
+  if (dataRows.length > 2_000) {
+    issues.push({ row: 2_002, message: "CSV is limited to 2,000 data rows" });
+  }
+
+  const rows: CollectionImportPreviewRow[] = [];
+  for (const [offset, values] of dataRows.slice(0, 2_000).entries()) {
+    const rowNumber = offset + 2;
+    const source = Object.fromEntries(
+      headers.map((header, index) => [header, values[index] ?? ""]),
+    );
+    const tcg = source.tcg?.trim().toLowerCase() as TcgCode;
+    const externalId = source.external_id?.trim();
+    const cardName = source.card_name?.trim();
+    const quantity = Number(source.quantity?.trim() || "1");
+    const before = issues.length;
+    if (!DEMO_IMPORT_TCGS.has(tcg))
+      issues.push({
+        row: rowNumber,
+        field: "tcg",
+        message: "is not supported",
+      });
+    if (!externalId)
+      issues.push({
+        row: rowNumber,
+        field: "external_id",
+        message: "is required",
+      });
+    if (!cardName)
+      issues.push({
+        row: rowNumber,
+        field: "card_name",
+        message: "is required",
+      });
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500)
+      issues.push({
+        row: rowNumber,
+        field: "quantity",
+        message: "must be a whole number between 1 and 500",
+      });
+    const money = (field: string) => {
+      const text = source[field]?.trim();
+      if (!text) return undefined;
+      const value = Number(text);
+      if (!Number.isFinite(value) || value < 0) {
+        issues.push({
+          row: rowNumber,
+          field,
+          message: "must be a non-negative number",
+        });
+        return undefined;
+      }
+      return value;
+    };
+    const tags = (source.tags ?? "")
+      .split(";")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    if (tags.length) {
+      issues.push({
+        row: rowNumber,
+        field: "tags",
+        message: "tag assignment is not available in the offline demo import",
+      });
+    }
+    const acquiredAt = source.acquired_at?.trim() || undefined;
+    if (acquiredAt && Number.isNaN(Date.parse(acquiredAt))) {
+      issues.push({
+        row: rowNumber,
+        field: "acquired_at",
+        message: "must be an ISO date or timestamp",
+      });
+    }
+    const isFoil = parseDemoBoolean(
+      source.is_foil,
+      rowNumber,
+      "is_foil",
+      issues,
+    );
+    const isSealedPromo = parseDemoBoolean(
+      source.is_sealed_promo,
+      rowNumber,
+      "is_sealed_promo",
+      issues,
+    );
+    const isOversized = parseDemoBoolean(
+      source.is_oversized,
+      rowNumber,
+      "is_oversized",
+      issues,
+    );
+    const isPeelOff = parseDemoBoolean(
+      source.is_peel_off,
+      rowNumber,
+      "is_peel_off",
+      issues,
+    );
+    const isSigned = parseDemoBoolean(
+      source.is_signed,
+      rowNumber,
+      "is_signed",
+      issues,
+    );
+    const isAltered = parseDemoBoolean(
+      source.is_altered,
+      rowNumber,
+      "is_altered",
+      issues,
+    );
+    const price = money("price");
+    const acquisitionPrice = money("acquisition_price");
+    if (issues.length !== before) continue;
+    const optional = (field: string) => source[field]?.trim() || undefined;
+    rows.push({
+      row: rowNumber,
+      tcg,
+      externalId,
+      baseExternalId: optional("base_external_id"),
+      printingKey: optional("printing_key"),
+      artworkId: optional("artwork_id"),
+      cardName,
+      collectorNumber: optional("collector_number"),
+      setCode: optional("set_code"),
+      setName: optional("set_name"),
+      rarity: optional("rarity"),
+      binderName: optional("binder_name"),
+      quantity,
+      condition: optional("condition"),
+      language: optional("language"),
+      notes: optional("notes"),
+      price,
+      acquisitionPrice,
+      serialNumber: optional("serial_number"),
+      acquiredAt,
+      isFoil,
+      finishCode: optional("finish_code"),
+      finishLabel: optional("finish_label"),
+      edition: optional("edition"),
+      stamp: optional("stamp"),
+      isSealedPromo,
+      isOversized,
+      isPeelOff,
+      isSigned,
+      isAltered,
+      tags,
+    });
+  }
+
+  const mergedRows = new Map<string, CollectionImportPreviewRow>();
+  for (const row of rows) {
+    const identity = JSON.stringify([
+      row.tcg,
+      row.externalId,
+      row.cardName,
+      row.baseExternalId ?? "",
+      row.printingKey ?? "",
+      row.artworkId ?? "",
+      row.collectorNumber ?? "",
+      row.setCode ?? "",
+      row.setName ?? "",
+      row.rarity ?? "",
+      row.binderName ?? "",
+      row.condition ?? "",
+      row.language ?? "",
+      row.notes ?? "",
+      row.price ?? null,
+      row.acquisitionPrice ?? null,
+      row.serialNumber ?? "",
+      row.acquiredAt ?? "",
+      row.isFoil,
+      row.finishCode ?? "",
+      row.finishLabel ?? "",
+      row.edition ?? "",
+      row.stamp ?? "",
+      row.isSealedPromo,
+      row.isOversized,
+      row.isPeelOff,
+      row.isSigned,
+      row.isAltered,
+    ]);
+    const existing = mergedRows.get(identity);
+    if (existing) existing.quantity += row.quantity;
+    else mergedRows.set(identity, { ...row });
+  }
+  const plannedRows = Array.from(mergedRows.values());
+  const totalCopies = plannedRows.reduce((sum, row) => sum + row.quantity, 0);
+  if (totalCopies > 500) {
+    issues.push({
+      row: 1,
+      field: "quantity",
+      message: "import is limited to 500 total copies",
+    });
+  }
+  const binderNames = new Set(
+    store().binders.map((binder) => binder.name.toLowerCase()),
+  );
+  const binderIds = new Set(store().binders.map((binder) => binder.id));
+  const options = input.options ?? { createMissingBinders: false };
+  if (options.defaultBinderId && !binderIds.has(options.defaultBinderId)) {
+    issues.push({
+      row: 1,
+      field: "defaultBinderId",
+      message: "default binder was not found",
+    });
+  }
+  if (!options.createMissingBinders) {
+    for (const row of plannedRows) {
+      if (
+        row.binderName &&
+        row.binderName.toLowerCase() !== "unsorted" &&
+        !binderNames.has(row.binderName.toLowerCase())
+      ) {
+        issues.push({
+          row: row.row,
+          field: "binder_name",
+          message: `binder "${row.binderName}" does not exist`,
+        });
+      }
+    }
+  }
+  return {
+    valid: issues.length === 0 && plannedRows.length > 0,
+    rows: plannedRows,
+    issues,
+    sourceRows: dataRows.length,
+    totalCopies,
+    format: "csv",
+  };
 }
 
 const DEMO_USER_ID = "demo-user-001";
@@ -184,11 +618,11 @@ function demoValueBreakdown() {
     ]);
   }
   const byTcg = Array.from(groupedByTcg, ([tcg, entries]) => ({
-      tcg,
-      value: Number(
-        entries
-          .reduce((sum, { card }) => sum + card.price * card.quantity, 0)
-          .toFixed(2),
+    tcg,
+    value: Number(
+      entries
+        .reduce((sum, { card }) => sum + card.price * card.quantity, 0)
+        .toFixed(2),
     ),
     cardCount: entries.reduce((sum, { card }) => sum + card.quantity, 0),
   })).sort((left, right) => right.value - left.value);
@@ -275,6 +709,112 @@ function demoPriceMovers(tcg?: string) {
       .filter((mover) => mover.percentChange < 0)
       .sort((left, right) => left.percentChange - right.percentChange)
       .slice(0, 10),
+  };
+}
+
+function collectionRowsSnapshot() {
+  return structuredClone(store().collectionRows);
+}
+
+function recordDemoCollectionMutation(input: {
+  operationKind: Exclude<CollectionMutationKind, "undo">;
+  affectedCopies: number;
+  binderId?: string;
+  cardName?: string;
+  summary: string;
+  before: ReturnType<typeof collectionRowsSnapshot>;
+}) {
+  const after = collectionRowsSnapshot();
+  if (JSON.stringify(input.before) === JSON.stringify(after)) return;
+  store().recordCollectionMutation({ ...input, after });
+}
+
+async function commitDemoCollectionImport(
+  preview: CollectionImportPreview,
+  options: CollectionImportOptions,
+): Promise<CollectionImportResult> {
+  const before = collectionRowsSnapshot();
+  const createdBinders: string[] = [];
+  const bindersByName = new Map(
+    store().binders.map((binder) => [binder.name.toLowerCase(), binder.id]),
+  );
+  let unsortedId = bindersByName.get("unsorted");
+
+  for (const row of preview.rows) {
+    let binderId = options.defaultBinderId;
+    const requestedName = row.binderName?.trim();
+    if (requestedName && requestedName.toLowerCase() !== "unsorted") {
+      binderId = bindersByName.get(requestedName.toLowerCase());
+      if (!binderId && options.createMissingBinders) {
+        binderId = await store().addBinder(requestedName);
+        bindersByName.set(requestedName.toLowerCase(), binderId);
+        createdBinders.push(requestedName);
+      }
+    }
+    if (!binderId) {
+      if (!unsortedId) {
+        unsortedId = await store().addBinder("Unsorted", "#64748b");
+        bindersByName.set("unsorted", unsortedId);
+        createdBinders.push("Unsorted");
+      }
+      binderId = unsortedId;
+    }
+
+    const card: DemoOwnedCard = {
+      id: row.externalId,
+      tcg: row.tcg,
+      name: row.cardName,
+      setCode: row.setCode ?? "",
+      setName: row.setName ?? "",
+      rarity: row.rarity ?? "Unknown",
+      price: row.price ?? 0,
+    };
+    await store().addCardToBinder(binderId, card, row.quantity, {
+      cardData: {
+        externalId: row.externalId,
+        name: row.cardName,
+        tcg: row.tcg,
+        baseExternalId: row.baseExternalId,
+        printingKey: row.printingKey,
+        artworkId: row.artworkId,
+        collectorNumber: row.collectorNumber,
+        setCode: row.setCode,
+        setName: row.setName,
+        rarity: row.rarity,
+      },
+      copy: {
+        condition: row.condition,
+        language: row.language,
+        notes: row.notes,
+        price: row.price,
+        acquisitionPrice: row.acquisitionPrice,
+        serialNumber: row.serialNumber,
+        acquiredAt: row.acquiredAt,
+        isFoil: row.isFoil,
+        finishCode: row.finishCode,
+        finishLabel: row.finishLabel,
+        edition: row.edition,
+        stamp: row.stamp,
+        isSealedPromo: row.isSealedPromo,
+        isOversized: row.isOversized,
+        isPeelOff: row.isPeelOff,
+        isSigned: row.isSigned,
+        isAltered: row.isAltered,
+      },
+    });
+  }
+
+  recordDemoCollectionMutation({
+    operationKind: "import",
+    affectedCopies: preview.totalCopies,
+    summary: `Imported ${preview.totalCopies} collection copies`,
+    before,
+  });
+  return {
+    ...preview,
+    importedRows: preview.rows.length,
+    importedCopies: preview.totalCopies,
+    createdBinders,
   };
 }
 
@@ -414,8 +954,16 @@ function toBinder(b: DemoBinder) {
   return {
     id: b.id,
     name: b.name,
-    description: "",
+    description: b.description,
     colorHex: stripHash(b.color),
+    defaultCondition: b.defaultCondition,
+    containerType: b.containerType,
+    imageUrl: b.imageUrl,
+    associatedTcg: b.associatedTcg,
+    associatedSetCode: b.associatedSetCode,
+    associatedSetName: b.associatedSetName,
+    shareToken: b.shareToken,
+    isPublic: b.isPublic,
     cards: b.cards.map((c) => toCollectionCard(c, b.id, b.name, b.color)),
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,
@@ -423,7 +971,8 @@ function toBinder(b: DemoBinder) {
 }
 
 function toWishlistCard(card: DemoWishlistCard) {
-  const desiredQuantity = card.desiredQuantity ?? card.cardData?.desiredQuantity ?? 1;
+  const desiredQuantity =
+    card.desiredQuantity ?? card.cardData?.desiredQuantity ?? 1;
   const ownedQuantity = store().getOwnedQuantity(card.cardId);
   const missingQuantity = Math.max(desiredQuantity - ownedQuantity, 0);
   return {
@@ -700,6 +1249,28 @@ export async function handleDemoRequest(
   // Strip query string for routing, but keep it for parsing params
   const [routePath, queryString] = path.split("?");
   const segments = routePath.replace(/^\//, "").split("/");
+
+  if (segments[0] === "health" && segments.length === 1 && method === "GET") {
+    return json({
+      status: "ok",
+      env: "production",
+      mode: "convex",
+      features: {
+        decks: true,
+        finance: true,
+        sealed: true,
+        analytics: true,
+        trades: true,
+        prices: true,
+        notifications: false,
+        alerts: false,
+        shops: false,
+        automations: false,
+        shipments: false,
+        public: false,
+      },
+    });
+  }
 
   // ── Auth ────────────────────────────────────────────────────────
   if (segments[0] === "auth") {
@@ -1114,6 +1685,90 @@ async function handleCollections(
   body?: unknown,
   queryString?: string,
 ): Promise<Response> {
+  if (
+    segments[0] === "import" &&
+    segments[1] === "template" &&
+    method === "GET"
+  ) {
+    return Promise.resolve(
+      new Response(`${DEMO_IMPORT_HEADERS.join(",")}\n`, {
+        headers: { "Content-Type": "text/csv" },
+      }),
+    );
+  }
+
+  if (
+    segments[0] === "import" &&
+    (segments[1] === "preview" || segments[1] === "commit") &&
+    method === "POST"
+  ) {
+    store().init();
+    const parsed = collectionImportRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ message: parsed.error.issues[0]?.message }, 400);
+    }
+    const preview = previewDemoCollectionImport(parsed.data);
+    if (segments[1] === "preview") {
+      return json(preview, preview.valid ? 200 : 422);
+    }
+    if (!preview.valid) {
+      return json(
+        {
+          ...preview,
+          importedRows: 0,
+          importedCopies: 0,
+          createdBinders: [],
+        } satisfies CollectionImportResult,
+        422,
+      );
+    }
+    return json(
+      await commitDemoCollectionImport(
+        preview,
+        parsed.data.options ?? { createMissingBinders: false },
+      ),
+    );
+  }
+
+  if (segments[0] === "history" && segments.length === 1 && method === "GET") {
+    store().init();
+    const limit = Math.min(
+      100,
+      Math.max(
+        1,
+        Number(new URLSearchParams(queryString ?? "").get("limit")) || 50,
+      ),
+    );
+    return json({
+      entries: store()
+        .collectionHistory.slice(0, limit)
+        .map(({ before: _before, after: _after, ...entry }) => entry),
+    });
+  }
+
+  if (
+    segments[0] === "history" &&
+    segments[2] === "undo" &&
+    segments.length === 3 &&
+    method === "POST"
+  ) {
+    const source = store().collectionHistory.find(
+      (entry) => entry.id === segments[1],
+    );
+    if (!source) return notFound("Collection history entry not found");
+    if (!source.canUndo) {
+      return json({ message: "This collection change cannot be undone." }, 409);
+    }
+    const audit = store().undoCollectionMutation(source.id);
+    if (!audit) {
+      return json(
+        { message: "The collection changed after this history entry." },
+        409,
+      );
+    }
+    return json({ audit });
+  }
+
   if (segments[0] === "export" && method === "GET") {
     store().init();
     await store().enrichCardsFromCatalog();
@@ -1186,32 +1841,48 @@ async function handleCollections(
 
   // POST /collections
   if (segments.length === 0 && method === "POST") {
-    const data = body as {
-      name: string;
-      description?: string;
-      colorHex?: string;
-    };
+    const parsed = createBinderSchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ message: parsed.error.issues[0]?.message }, 400);
+    }
+    const data: CreateBinderInput = parsed.data;
+    const before = collectionRowsSnapshot();
     const id = await store().addBinder(
-      data.name,
+      data.name.trim(),
       data.colorHex ? `#${data.colorHex}` : undefined,
     );
+    await store().updateBinder(id, {
+      description: data.description,
+      defaultCondition: data.defaultCondition,
+      containerType: data.containerType,
+      imageUrl: data.imageUrl,
+      associatedTcg: data.associatedTcg,
+      associatedSetCode: data.associatedSetCode,
+      associatedSetName: data.associatedSetName,
+    });
     const binder = store().binders.find((b: DemoBinder) => b.id === id)!;
+    recordDemoCollectionMutation({
+      operationKind: "add",
+      affectedCopies: 0,
+      binderId: id,
+      summary: `Created binder “${binder.name}”`,
+      before,
+    });
     return json(toBinder(binder));
   }
 
   // GET/POST /collections/tags
   if (segments[0] === "tags") {
-    if (method === "GET") return json([]);
+    if (method === "GET") return json(store().tags);
     if (method === "POST") {
-      const data = body as { label: string; colorHex?: string };
-      const now = new Date().toISOString();
-      return json({
-        id: `demo-tag-${Date.now()}`,
-        label: data.label,
-        colorHex: data.colorHex || "cccccc",
-        createdAt: now,
-        updatedAt: now,
-      });
+      const parsed = createTagSchema.safeParse(body);
+      if (!parsed.success) {
+        return json({ message: parsed.error.issues[0]?.message }, 400);
+      }
+      if (!parsed.data.label.trim()) {
+        return json({ message: "Label is required" }, 400);
+      }
+      return json(store().addTag(parsed.data), 201);
     }
     return notFound();
   }
@@ -1237,21 +1908,46 @@ async function handleCollections(
 
   // PATCH /collections/:id
   if (segments.length === 1 && method === "PATCH") {
-    const data = body as {
-      name?: string;
-      description?: string;
-      colorHex?: string;
-    };
-    if (data.name) await store().renameBinder(collectionId, data.name);
+    const parsed = updateBinderSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      return json({ message: parsed.error.issues[0]?.message }, 400);
+    }
+    const data: UpdateBinderInput = parsed.data;
+    const before = collectionRowsSnapshot();
+    const updated = await store().updateBinder(collectionId, data);
+    if (!updated) return notFound("Collection not found");
     const binder = store().binders.find(
       (b: DemoBinder) => b.id === collectionId,
     );
+    if (binder) {
+      recordDemoCollectionMutation({
+        operationKind: "update",
+        affectedCopies: 0,
+        binderId: collectionId,
+        summary: `Updated binder “${binder.name}”`,
+        before,
+      });
+    }
     return binder ? json(toBinder(binder)) : notFound("Collection not found");
   }
 
   // DELETE /collections/:id
   if (segments.length === 1 && method === "DELETE") {
+    const binder = store().binders.find((entry) => entry.id === collectionId);
+    if (!binder) return notFound("Collection not found");
+    const before = collectionRowsSnapshot();
+    const affectedCopies = binder.cards.reduce(
+      (sum, card) => sum + card.quantity,
+      0,
+    );
     await store().removeBinder(collectionId);
+    recordDemoCollectionMutation({
+      operationKind: "remove",
+      affectedCopies,
+      binderId: collectionId,
+      summary: `Deleted binder “${binder.name}”`,
+      before,
+    });
     return noContent();
   }
 
@@ -1264,6 +1960,14 @@ async function handleCollections(
   if (segments[1] === "cards" && segments.length === 3 && method === "PATCH") {
     const cardId = segments[2];
     const patch = body as UpdateCardInput;
+    const sourceBinder = store().binders.find(
+      (entry) => entry.id === collectionId,
+    );
+    const sourceCard = sourceBinder?.cards.find(
+      (card) =>
+        card.id === cardId || card.copies?.some((copy) => copy.id === cardId),
+    );
+    const before = collectionRowsSnapshot();
     const updated = await store().updateCardInBinder(
       collectionId,
       cardId,
@@ -1277,6 +1981,16 @@ async function handleCollections(
       (entry: DemoBinder) => entry.id === resultBinderId,
     );
     if (!binder || !updated) return notFound("Card not found");
+    recordDemoCollectionMutation({
+      operationKind: patch.targetBinderId ? "move" : "update",
+      affectedCopies: patch.scope === "card" ? (sourceCard?.quantity ?? 1) : 1,
+      binderId: binder.id,
+      cardName: updated.name,
+      summary: patch.targetBinderId
+        ? `Moved ${updated.name} to “${binder.name}”`
+        : `Updated ${updated.name}`,
+      before,
+    });
     return json(
       toCollectionCard(updated, binder.id, binder.name, binder.color),
     );
@@ -1285,7 +1999,22 @@ async function handleCollections(
   // DELETE /collections/:id/cards/:cardId
   if (segments[1] === "cards" && segments.length === 3 && method === "DELETE") {
     const cardId = segments[2];
+    const binder = store().binders.find((entry) => entry.id === collectionId);
+    const card = binder?.cards.find(
+      (entry) =>
+        entry.id === cardId || entry.copies?.some((copy) => copy.id === cardId),
+    );
+    if (!card) return notFound("Card not found");
+    const before = collectionRowsSnapshot();
     await store().removeCardFromBinder(collectionId, cardId);
+    recordDemoCollectionMutation({
+      operationKind: "remove",
+      affectedCopies: 1,
+      binderId: collectionId,
+      cardName: card.name,
+      summary: `Removed one copy of ${card.name}`,
+      before,
+    });
     return noContent();
   }
 
@@ -1317,6 +2046,7 @@ async function handleAddCard(
     collectionId === "__library__" ? store().binders[0]?.id : collectionId;
 
   if (targetBinder) {
+    const before = collectionRowsSnapshot();
     await store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
       cardData: data.cardData,
       copy: {
@@ -1340,6 +2070,14 @@ async function handleAddCard(
         certNumber: data.certNumber,
         storageLocation: data.storageLocation,
       },
+    });
+    recordDemoCollectionMutation({
+      operationKind: "add",
+      affectedCopies: data.quantity ?? 1,
+      binderId: targetBinder,
+      cardName: demoCard.name,
+      summary: `Added ${data.quantity ?? 1} ${(data.quantity ?? 1) === 1 ? "copy" : "copies"} of ${demoCard.name}`,
+      before,
     });
   }
 
@@ -1463,7 +2201,9 @@ async function handleWishlists(
       (wl: DemoWishlist) => wl.id === wishlistId,
     );
     const card = w?.cards.find((entry) => entry.id === segments[2]);
-    return card ? json(toWishlistCard(card)) : notFound("Wishlist card not found");
+    return card
+      ? json(toWishlistCard(card))
+      : notFound("Wishlist card not found");
   }
 
   // DELETE /wishlists/:id/cards/:cardId
@@ -1585,18 +2325,14 @@ function handleSettings(
   segments: string[],
   body?: unknown,
 ): Promise<Response> {
-  const defaults = {
-    id: 1,
-    publicDashboard: true,
-    publicCollections: true,
-    requireAuth: false,
-    appName: "TCGer Demo",
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (segments.length === 0 && method === "GET") return json(defaults);
-  if (segments.length === 0 && method === "PATCH")
-    return json({ ...defaults, ...(body as Record<string, unknown>) });
+  if (segments.length === 0 && method === "GET") return json(store().settings);
+  if (segments.length === 0 && method === "PATCH") {
+    const parsed = updateSettingsSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      return json({ message: parsed.error.issues[0]?.message }, 400);
+    }
+    return json(store().updateSettings(parsed.data));
+  }
 
   if (segments[0] === "source-defaults" && method === "GET") {
     return json({
@@ -1687,7 +2423,24 @@ async function handleCards(
 
   // GET /cards/:tcg/:cardId/prints
   if (segments.length === 3 && segments[2] === "prints" && method === "GET") {
-    return json({ type: "simple", prints: [] });
+    const tcg = segments[0] as TcgCode;
+    const cardId = decodeURIComponent(segments[1]);
+    let target =
+      demoOwnedCards(tcg).find((card) => card.id === cardId) ??
+      DEMO_CARDS.find((card) => card.tcg === tcg && card.id === cardId);
+    if (!target && isCatalogGame(tcg) && (await isCatalogInstalled(tcg))) {
+      target = (
+        await matchCatalogCards(tcg, [
+          { key: "target", externalId: cardId, name: "" },
+        ])
+      ).get("target");
+    }
+    if (!target) return notFound("Card not found");
+    const prints = (await demoSearchCards(target.name, tcg)).filter(
+      (card) =>
+        normalizeCatalogText(card.name) === normalizeCatalogText(target.name),
+    );
+    return json({ mode: "simple", prints, total: prints.length });
   }
 
   return notFound();

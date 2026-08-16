@@ -21,6 +21,7 @@ import {
   Palette,
   ReceiptText,
   BookOpen,
+  Bell,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ServerFeatures } from "@tcg/api-types";
@@ -54,6 +55,10 @@ export const secondaryNavigation: NavigationItem[] = [
     feature: "finance",
   },
   { href: "/sealed", label: "Sealed", icon: Package, feature: "sealed" },
+];
+
+const demoOnlySecondaryNavigation: NavigationItem[] = [
+  { href: "/activity", label: "Activity", icon: Bell },
 ];
 
 import { Badge } from "@/components/ui/badge";
@@ -136,7 +141,10 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
   // Stable during SSR and hydration; the persisted demo flag is client-only.
   const demoMode = pathname === "/demo" || pathname.startsWith("/demo/");
-  const availableSecondaryNavigation = secondaryNavigation.filter(
+  const availableSecondaryNavigation = [
+    ...secondaryNavigation,
+    ...(demoMode ? demoOnlySecondaryNavigation : []),
+  ].filter(
     (item) =>
       (item.href !== "/sealed" || sealedProductsEnabled) &&
       (demoMode || !item.feature || isFeatureAvailable(features, item.feature)),

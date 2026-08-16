@@ -70,12 +70,17 @@ import {
 } from "@/lib/storage/legacy-portfolio-rows";
 import type {
   AddWishlistCardInput,
+  AdminAppSettings,
   Card,
   CardDataPayload,
+  CollectionTagResponse,
   CollectionCardCopy,
+  CollectionMutationAuditEntry,
+  CollectionMutationKind,
   PortableTableName,
   UpdateCardInput,
   TcgCode,
+  UpdateBinderInput,
   UserPreferences,
 } from "@tcg/api-types";
 
@@ -104,7 +109,16 @@ export type DemoOwnedCard = Omit<DemoCard, "tcg"> & { tcg: TcgCode };
 export interface DemoBinder {
   id: string;
   name: string;
+  description?: string;
   color: string;
+  defaultCondition?: string;
+  containerType?: string;
+  imageUrl?: string;
+  associatedTcg?: TcgCode;
+  associatedSetCode?: string;
+  associatedSetName?: string;
+  shareToken?: string;
+  isPublic?: boolean;
   cards: DemoBinderCard[];
   createdAt: string;
   updatedAt: string;
@@ -182,6 +196,17 @@ export interface DemoProfile {
   email: string;
 }
 
+export type DemoTag = CollectionTagResponse;
+export type DemoAppSettings = AdminAppSettings;
+
+/** Persisted snapshots are private to the demo; API callers receive the
+ * standard audit fields only. Keeping both sides makes undo conflict-safe. */
+export interface DemoCollectionAuditRecord
+  extends CollectionMutationAuditEntry {
+  before: CollectionSnapshot;
+  after: CollectionSnapshot;
+}
+
 /**
  * The starting values for the persisted slices are module constants rather
  * than inline literals so the persistence diff below can compare them by
@@ -194,11 +219,13 @@ const DEFAULT_DEMO_PROFILE: DemoProfile = {
 };
 
 const EMPTY_BINDERS: DemoBinder[] = [];
+const EMPTY_COLLECTION_HISTORY: DemoCollectionAuditRecord[] = [];
 const EMPTY_ROWS: CollectionSnapshot = rowsOf(
   emptySnapshot(),
   COLLECTION_TABLES,
 );
 const EMPTY_WISHLISTS: DemoWishlist[] = [];
+const EMPTY_TAGS: DemoTag[] = [];
 const EMPTY_WISHLIST_ROWS: WishlistSnapshot = rowsOf(
   emptySnapshot(),
   WISHLIST_TABLES,
@@ -341,6 +368,21 @@ export const DEFAULT_DEMO_PREFERENCES: UserPreferences = {
   defaultGame: null,
   focusedSetOrder: [],
   setCompletionMode: "standard",
+};
+
+export const DEFAULT_DEMO_SETTINGS: DemoAppSettings = {
+  id: 1,
+  publicDashboard: true,
+  publicCollections: true,
+  requireAuth: false,
+  appName: "TCGer Demo",
+  scrydexApiKey: null,
+  scrydexTeamId: null,
+  scryfallApiBaseUrl: null,
+  ygoApiBaseUrl: null,
+  scrydexApiBaseUrl: null,
+  tcgdexApiBaseUrl: null,
+  updatedAt: "2025-03-18T00:00:00.000Z",
 };
 
 /* ------------------------------------------------------------------ */
@@ -841,9 +883,12 @@ function isPlausibleSlice(slice: DemoSlice, value: unknown): boolean {
     case "decks":
     case "trades":
     case "sealed":
+    case "tags":
+    case "collectionHistory":
       return Array.isArray(value);
     case "profile":
     case "preferences":
+    case "settings":
       return (
         typeof value === "object" && value !== null && !Array.isArray(value)
       );
@@ -975,6 +1020,9 @@ function initialPersistedState(): PersistedDemoState {
     initialized: false,
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
+    tags: EMPTY_TAGS,
+    settings: DEFAULT_DEMO_SETTINGS,
+    collectionHistory: EMPTY_COLLECTION_HISTORY,
     collectionRows: EMPTY_ROWS,
     wishlistRows: EMPTY_WISHLIST_ROWS,
     deckRows: portfolio.deckRows,
@@ -1069,6 +1117,11 @@ function applyHydratedSnapshot(): void {
           ...DEFAULT_DEMO_PREFERENCES,
           ...(stored as Partial<UserPreferences>),
         } as PersistedDemoState["preferences"];
+      } else if (slice === "settings") {
+        stored = {
+          ...DEFAULT_DEMO_SETTINGS,
+          ...(stored as Partial<DemoAppSettings>),
+        } as PersistedDemoState["settings"];
       }
       writeSlice(patch, slice, stored);
       writeSlice(persistBaseline, slice, stored);
@@ -1239,6 +1292,9 @@ function resetDemoState(): void {
     ...seededState(),
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
+    tags: EMPTY_TAGS,
+    settings: DEFAULT_DEMO_SETTINGS,
+    collectionHistory: EMPTY_COLLECTION_HISTORY,
   });
 
   const active = persistence;
@@ -1262,6 +1318,9 @@ interface DemoState {
   initialized: boolean;
   profile: DemoProfile;
   preferences: UserPreferences;
+  tags: DemoTag[];
+  settings: DemoAppSettings;
+  collectionHistory: DemoCollectionAuditRecord[];
   /* Rows are the truth; each nested array below it is derived from them after
    * every mutation and never edited. */
   collectionRows: CollectionSnapshot;
@@ -1284,6 +1343,18 @@ interface DemoState {
   updateProfile: (data: Partial<DemoProfile>) => void;
   updatePreferences: (data: Partial<UserPreferences>) => UserPreferences;
   getPreferences: () => UserPreferences;
+  addTag: (data: { label: string; colorHex?: string }) => DemoTag;
+  updateSettings: (data: Partial<DemoAppSettings>) => DemoAppSettings;
+  recordCollectionMutation: (input: {
+    operationKind: Exclude<CollectionMutationKind, "undo">;
+    affectedCopies: number;
+    binderId?: string;
+    cardName?: string;
+    summary: string;
+    before: CollectionSnapshot;
+    after: CollectionSnapshot;
+  }) => CollectionMutationAuditEntry;
+  undoCollectionMutation: (id: string) => CollectionMutationAuditEntry | null;
 
   // Decks, trades and sealed inventory
   addDeck: (input: {
@@ -1292,6 +1363,12 @@ interface DemoState {
     format: string;
     description?: string;
   }) => Promise<string>;
+  updateDeck: (
+    id: string,
+    input: Partial<
+      Pick<Deck, "name" | "description" | "format" | "isComplete" | "cards">
+    >,
+  ) => Promise<void>;
   removeDeck: (id: string) => Promise<void>;
   addTrade: (input: {
     partner: string;
@@ -1299,6 +1376,7 @@ interface DemoState {
     receiving: Trade["receiving"];
   }) => Promise<string>;
   setTradeStatus: (id: string, status: Trade["status"]) => Promise<void>;
+  removeTrade: (id: string) => Promise<void>;
   addSealedProduct: (input: {
     name: string;
     tcg: SealedProduct["tcg"];
@@ -1308,12 +1386,29 @@ interface DemoState {
     purchasePrice: number;
     currentValue: number;
   }) => Promise<string>;
+  updateSealedProduct: (
+    id: string,
+    input: Partial<
+      Pick<
+        SealedProduct,
+        | "name"
+        | "tcg"
+        | "type"
+        | "set"
+        | "quantity"
+        | "purchasePrice"
+        | "currentValue"
+        | "purchaseDate"
+      >
+    >,
+  ) => Promise<void>;
   removeSealedProduct: (id: string) => Promise<void>;
 
   // Binders
   addBinder: (name: string, color?: string) => Promise<string>;
   removeBinder: (id: string) => Promise<void>;
   renameBinder: (id: string, name: string) => Promise<void>;
+  updateBinder: (id: string, data: UpdateBinderInput) => Promise<boolean>;
   addCardToBinder: (
     binderId: string,
     card: DemoOwnedCard,
@@ -1376,6 +1471,9 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   initialized: false,
   profile: DEFAULT_DEMO_PROFILE,
   preferences: DEFAULT_DEMO_PREFERENCES,
+  tags: EMPTY_TAGS,
+  settings: DEFAULT_DEMO_SETTINGS,
+  collectionHistory: EMPTY_COLLECTION_HISTORY,
   collectionRows: EMPTY_ROWS,
   binders: EMPTY_BINDERS,
   wishlistRows: EMPTY_WISHLIST_ROWS,
@@ -1555,6 +1653,109 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     ...get().preferences,
   }),
 
+  addTag: (data) => {
+    const normalizedLabel = data.label.trim();
+    const existing = get().tags.find(
+      (tag) =>
+        tag.label.toLocaleLowerCase() === normalizedLabel.toLocaleLowerCase(),
+    );
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const tag: DemoTag = {
+      id: uid(),
+      label: normalizedLabel,
+      colorHex: (data.colorHex || "cccccc").replace(/^#/, ""),
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((state) => ({ tags: [...state.tags, tag] }));
+    return tag;
+  },
+
+  updateSettings: (data) => {
+    const settings = {
+      ...get().settings,
+      ...data,
+      id: get().settings.id,
+      updatedAt: new Date().toISOString(),
+    };
+    set({ settings });
+    return settings;
+  },
+
+  recordCollectionMutation: (input) => {
+    const record: DemoCollectionAuditRecord = {
+      id: uid(),
+      operationKind: input.operationKind,
+      actorId: LOCAL_USER_ID,
+      affectedCopies: input.affectedCopies,
+      binderId: input.binderId,
+      cardName: input.cardName,
+      summary: input.summary,
+      canUndo: true,
+      createdAt: new Date().toISOString(),
+      before: structuredClone(input.before),
+      after: structuredClone(input.after),
+    };
+    // A snapshot restores the whole local collection, so only the latest
+    // mutation can be safely undone. Older entries remain useful history but
+    // are explicitly non-undoable instead of failing after confirmation.
+    set((state) => ({
+      collectionHistory: [
+        record,
+        ...state.collectionHistory.map((entry) => ({
+          ...entry,
+          canUndo: false,
+        })),
+      ].slice(0, 25),
+    }));
+    const { before: _before, after: _after, ...audit } = record;
+    return audit;
+  },
+
+  undoCollectionMutation: (id) => {
+    const source = get().collectionHistory.find((entry) => entry.id === id);
+    if (!source?.canUndo) return null;
+    // Refuse to overwrite newer collection changes that were not part of this
+    // audit entry. This is the demo-local equivalent of the server conflict
+    // check on per-copy snapshots.
+    if (JSON.stringify(get().collectionRows) !== JSON.stringify(source.after)) {
+      return null;
+    }
+
+    localDb.load({
+      ...localDb.snapshot(),
+      ...structuredClone(source.before),
+    });
+    publishCollection();
+
+    const undoRecord: DemoCollectionAuditRecord = {
+      id: uid(),
+      operationKind: "undo",
+      actorId: LOCAL_USER_ID,
+      affectedCopies: source.affectedCopies,
+      binderId: source.binderId,
+      cardName: source.cardName,
+      summary: `Undid: ${source.summary}`,
+      sourceAuditId: source.id,
+      canUndo: false,
+      createdAt: new Date().toISOString(),
+      before: structuredClone(source.after),
+      after: structuredClone(source.before),
+    };
+    set((state) => ({
+      collectionHistory: [
+        undoRecord,
+        ...state.collectionHistory.map((entry) => ({
+          ...entry,
+          canUndo: false,
+        })),
+      ].slice(0, 25),
+    }));
+    const { before: _before, after: _after, ...audit } = undoRecord;
+    return audit;
+  },
+
   /* ---------- Decks, trades and sealed inventory ----------
    *
    * These four slices have no server-side counterpart that implements them a
@@ -1583,6 +1784,37 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     });
     publishDecks();
     return id;
+  },
+
+  updateDeck: async (id, input) => {
+    const { cards, ...deck } = input;
+    await localDb.transaction(DECK_TABLES, async () => {
+      const patch: Record<string, unknown> = { updatedAt: Date.now() };
+      if (deck.name !== undefined) patch.name = deck.name;
+      if (deck.description !== undefined) patch.description = deck.description;
+      if (deck.format !== undefined) patch.format = deck.format;
+      if (deck.isComplete !== undefined) patch.isComplete = deck.isComplete;
+      await localDb.patch("decks", id, patch);
+
+      if (cards !== undefined) {
+        const existing = await localDb.query("deckCards", "by_deck", {
+          deckId: id,
+        });
+        for (const card of existing) {
+          await localDb.delete("deckCards", card._id);
+        }
+        for (const card of cards) {
+          await localDb.insert("deckCards", {
+            deckId: id,
+            name: card.name,
+            quantity: card.quantity,
+            rarity: card.rarity,
+            cardType: card.type,
+          });
+        }
+      }
+    });
+    publishDecks();
   },
 
   removeDeck: async (id) => {
@@ -1633,6 +1865,17 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     publishTrades();
   },
 
+  removeTrade: async (id) => {
+    const cards = await localDb.query("tradeCards", "by_trade", {
+      tradeId: id,
+    });
+    await localDb.transaction(TRADE_TABLES, async () => {
+      for (const card of cards) await localDb.delete("tradeCards", card._id);
+      await localDb.delete("trades", id);
+    });
+    publishTrades();
+  },
+
   addSealedProduct: async ({
     name,
     tcg,
@@ -1658,6 +1901,23 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     });
     publishSealed();
     return id;
+  },
+
+  updateSealedProduct: async (id, input) => {
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.tcg !== undefined) patch.tcg = input.tcg;
+    if (input.type !== undefined) patch.productType = input.type;
+    if (input.set !== undefined) patch.setName = input.set;
+    if (input.quantity !== undefined) patch.quantity = input.quantity;
+    if (input.purchasePrice !== undefined)
+      patch.purchasePrice = input.purchasePrice;
+    if (input.currentValue !== undefined)
+      patch.currentValue = input.currentValue;
+    if (input.purchaseDate !== undefined)
+      patch.purchasedOn = input.purchaseDate;
+    await localDb.patch("sealedInventory", id, patch);
+    publishSealed();
   },
 
   removeSealedProduct: async (id) => {
@@ -1702,6 +1962,50 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   renameBinder: async (id, name) => {
     await localDb.patch("binders", id, { name, updatedAt: Date.now() });
     publishCollection();
+  },
+
+  updateBinder: async (id, data) => {
+    const binder = await localDb.get("binders", id);
+    if (!binder) return false;
+
+    const clearable = <T>(
+      value: T | null | undefined,
+      current: T | undefined,
+    ) => (value === undefined ? current : (value ?? undefined));
+    const shouldMintShareToken =
+      data.isPublic === true && (!binder.shareToken || data.rotateShareToken);
+    await localDb.patch("binders", id, {
+      name: data.name?.trim() || binder.name,
+      description:
+        data.description === undefined
+          ? binder.description
+          : data.description.trim() || undefined,
+      colorHex: data.colorHex ?? binder.colorHex,
+      defaultCondition: clearable(
+        data.defaultCondition,
+        binder.defaultCondition,
+      ),
+      containerType: clearable(data.containerType, binder.containerType),
+      imageUrl: clearable(data.imageUrl, binder.imageUrl),
+      associatedTcg: clearable(data.associatedTcg, binder.associatedTcg) as
+        | TcgCode
+        | undefined,
+      associatedSetCode: clearable(
+        data.associatedSetCode,
+        binder.associatedSetCode,
+      ),
+      associatedSetName: clearable(
+        data.associatedSetName,
+        binder.associatedSetName,
+      ),
+      isPublic: data.isPublic ?? binder.isPublic ?? false,
+      shareToken: shouldMintShareToken
+        ? `demo-share-${uid()}`
+        : binder.shareToken,
+      updatedAt: Date.now(),
+    });
+    publishCollection();
+    return true;
   },
 
   addCardToBinder: async (binderId, card, quantity = 1, details) => {
@@ -1860,12 +2164,12 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     publishWishlists();
   },
 
-  updateWishlistCard: async (
-    wishlistId,
-    cardInstanceId,
-    desiredQuantity,
-  ) => {
-    if (!Number.isInteger(desiredQuantity) || desiredQuantity < 1 || desiredQuantity > 99) {
+  updateWishlistCard: async (wishlistId, cardInstanceId, desiredQuantity) => {
+    if (
+      !Number.isInteger(desiredQuantity) ||
+      desiredQuantity < 1 ||
+      desiredQuantity > 99
+    ) {
       throw new Error("desiredQuantity must be a whole number from 1 to 99");
     }
     const row = await localDb.get("wishlistCards", cardInstanceId);

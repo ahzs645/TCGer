@@ -366,19 +366,6 @@ extension APIService {
             try? CacheManager.shared.save(collections, forKey: CacheManager.CacheKey.collections)
             CacheManager.shared.updateLastSyncDate()
 
-            var imageURLs: [String] = []
-            for collection in collections {
-                for card in collection.cards {
-                    if let small = card.imageUrlSmall {
-                        imageURLs.append(small)
-                    }
-                    if let large = card.imageUrl, large != card.imageUrlSmall {
-                        imageURLs.append(large)
-                    }
-                }
-            }
-            ImageCache.shared.prefetch(urlStrings: imageURLs)
-
             return collections
         } catch let error as APIError {
             if case .networkError(let underlyingError) = error,
@@ -1432,22 +1419,26 @@ extension APIService {
             throw APIError.unauthorized
         }
 
+        // Paid/private pricing is deliberately resolved only for the card the
+        // user chose to add, never for an entire search or catalog page.
+        let pricedCard = await applyingSelectedPricing(to: [card]).first ?? card
+
         return try await addCardToBinder(
             config: config,
             token: token,
             binderId: binderId,
-            cardId: card.id,
+            cardId: pricedCard.id,
             quantity: details.quantity,
             condition: details.condition,
             language: details.language,
             notes: details.notes,
-            price: card.price,
+            price: pricedCard.price,
             acquisitionPrice: nil,
             isFoil: details.isFoil,
             variant: details.variant,
             isSigned: details.isSigned,
             isAltered: details.isAltered,
-            card: card
+            card: pricedCard
         )
     }
 }

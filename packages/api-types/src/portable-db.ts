@@ -47,6 +47,8 @@ export interface BinderRow extends PortableRow {
   associatedTcg?: string;
   associatedSetCode?: string;
   associatedSetName?: string;
+  shareToken?: string;
+  isPublic?: boolean;
   createdAt: number;
   updatedAt: number;
 }

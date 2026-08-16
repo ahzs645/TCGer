@@ -391,3 +391,151 @@ test("a mutated portfolio slice is restored on the next visit", async () => {
   assert.equal(state.decks[0]?.name, "Persisted Brew");
   assert.equal(state.decks.length, DEMO_DECKS.length + 1);
 });
+
+test("tags, source settings, and binder metadata survive a fresh store hydration", async () => {
+  const first = createFakePersistence(null);
+  setDemoPersistence(first);
+  await whenDemoStoreHydrated();
+
+  const beforeBinder = structuredClone(useDemoStore.getState().collectionRows);
+  const id = await useDemoStore.getState().addBinder("Persistent Binder");
+  assert.equal(
+    await useDemoStore.getState().updateBinder(id, {
+      description: "Metadata that must not disappear",
+      colorHex: "AABBCC",
+      containerType: "zip-binder",
+      imageUrl: "https://example.com/binder.jpg",
+      associatedTcg: "pokemon",
+      associatedSetCode: "sv3pt5",
+      associatedSetName: "151",
+      isPublic: true,
+      rotateShareToken: true,
+    }),
+    true,
+  );
+  useDemoStore.getState().recordCollectionMutation({
+    operationKind: "add",
+    affectedCopies: 0,
+    binderId: id,
+    summary: "Created persistent binder",
+    before: beforeBinder,
+    after: structuredClone(useDemoStore.getState().collectionRows),
+  });
+  useDemoStore
+    .getState()
+    .addTag({ label: "Illustration Rare", colorHex: "f00baa" });
+  useDemoStore.getState().updateSettings({
+    appName: "My Demo",
+    scryfallApiBaseUrl: "https://catalog.example.test",
+    scrydexApiKey: "demo-secret",
+  });
+
+  const second = createFakePersistence(first.snapshot(), {
+    deferHydration: true,
+  });
+  setDemoPersistence(second);
+  second.release();
+  await whenDemoStoreHydrated();
+
+  const restored = useDemoStore.getState();
+  assert.equal(restored.tags[0]?.label, "Illustration Rare");
+  assert.equal(
+    restored.collectionHistory[0]?.summary,
+    "Created persistent binder",
+  );
+  assert.equal(restored.settings.appName, "My Demo");
+  assert.equal(
+    restored.settings.scryfallApiBaseUrl,
+    "https://catalog.example.test",
+  );
+  assert.equal(restored.settings.scrydexApiKey, "demo-secret");
+  const binder = restored.binders.find((entry) => entry.id === id);
+  assert.equal(binder?.description, "Metadata that must not disappear");
+  assert.equal(binder?.color, "#AABBCC");
+  assert.equal(binder?.containerType, "zip-binder");
+  assert.equal(binder?.associatedSetName, "151");
+  assert.equal(binder?.isPublic, true);
+  assert.match(binder?.shareToken ?? "", /^demo-share-/);
+});
+
+test("portfolio edit and lifecycle actions update row-backed read models", async () => {
+  const fake = createFakePersistence(null);
+  setDemoPersistence(fake);
+  await whenDemoStoreHydrated();
+  useDemoStore.getState().init();
+
+  const deckId = await useDemoStore.getState().addDeck({
+    name: "First name",
+    tcg: "Magic",
+    format: "Modern",
+  });
+  await useDemoStore.getState().updateDeck(deckId, {
+    name: "Updated brew",
+    description: "Ready for Friday.",
+    isComplete: true,
+    cards: [
+      {
+        name: "Lightning Bolt",
+        quantity: 4,
+        type: "Instant",
+        rarity: "Uncommon",
+      },
+    ],
+  });
+  const deck = useDemoStore.getState().decks.find((item) => item.id === deckId);
+  assert.equal(deck?.name, "Updated brew");
+  assert.equal(deck?.isComplete, true);
+  assert.deepEqual(deck?.cards, [
+    {
+      name: "Lightning Bolt",
+      quantity: 4,
+      type: "Instant",
+      rarity: "Uncommon",
+    },
+  ]);
+
+  const tradeId = await useDemoStore.getState().addTrade({
+    partner: "Lifecycle tester",
+    giving: [],
+    receiving: [],
+  });
+  await useDemoStore.getState().setTradeStatus(tradeId, "completed");
+  assert.equal(
+    useDemoStore.getState().trades.find((item) => item.id === tradeId)?.status,
+    "completed",
+  );
+  await useDemoStore.getState().removeTrade(tradeId);
+  assert.equal(
+    useDemoStore.getState().trades.some((item) => item.id === tradeId),
+    false,
+  );
+
+  const sealedId = await useDemoStore.getState().addSealedProduct({
+    name: "Test box",
+    tcg: "Pokemon",
+    type: "Booster Box",
+    set: "Test Set",
+    quantity: 1,
+    purchasePrice: 100,
+    currentValue: 100,
+  });
+  await useDemoStore.getState().updateSealedProduct(sealedId, {
+    quantity: 2,
+    purchasePrice: 90,
+    currentValue: 125,
+    purchaseDate: "2026-01-15",
+  });
+  const sealed = useDemoStore
+    .getState()
+    .sealed.find((item) => item.id === sealedId);
+  assert.equal(sealed?.quantity, 2);
+  assert.equal(sealed?.purchasePrice, 90);
+  assert.equal(sealed?.currentValue, 125);
+  assert.equal(sealed?.purchaseDate, "2026-01-15");
+
+  await useDemoStore.getState().removeSealedProduct(sealedId);
+  assert.equal(
+    useDemoStore.getState().sealed.some((item) => item.id === sealedId),
+    false,
+  );
+});

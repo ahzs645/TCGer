@@ -5,16 +5,32 @@ struct CardArtworkImage: View {
     let card: Card
     let useFullResolution: Bool
 
+    private var preferredImageValue: String? {
+        useFullResolution ? (card.imageUrl ?? card.imageUrlSmall) : (card.imageUrlSmall ?? card.imageUrl)
+    }
+
+    private var alternateImageValue: String? {
+        useFullResolution ? card.imageUrlSmall : card.imageUrl
+    }
+
     private var isLocalAsset: Bool {
-        // Check if the imageUrl is a local asset name (doesn't start with http/https)
-        guard let imageUrl = useFullResolution ? card.imageUrl : (card.imageUrlSmall ?? card.imageUrl) else {
+        guard let imageUrl = preferredImageValue else {
             return false
         }
         return !imageUrl.hasPrefix("http://") && !imageUrl.hasPrefix("https://")
     }
 
     private var localAssetName: String? {
-        return useFullResolution ? card.imageUrl : (card.imageUrlSmall ?? card.imageUrl)
+        preferredImageValue
+    }
+
+    private var remoteImageURL: URL? {
+        CardArtworkURLResolver.resolve(
+            preferred: preferredImageValue,
+            alternate: alternateImageValue,
+            isConnected: NetworkMonitor.shared.isConnected,
+            isCached: ImageCache.shared.hasImage(for:)
+        )
     }
 
     var body: some View {
@@ -25,8 +41,7 @@ struct CardArtworkImage: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                // Load from URL
-                CachedAsyncImage(card: card, thumbnail: !useFullResolution) { phase in
+                CachedAsyncImage(url: remoteImageURL, tcg: card.tcg) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -51,6 +66,41 @@ struct CardArtworkImage: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// Chooses between the large and thumbnail artwork URLs without requiring the
+/// caller to know which rendition was persisted. Grid rows normally warm the
+/// thumbnail, while a context-menu preview prefers the large image; offline,
+/// either cached rendition is better than replacing the real card with its
+/// generic back.
+nonisolated enum CardArtworkURLResolver {
+    static func resolve(
+        preferred: String?,
+        alternate: String?,
+        isConnected: Bool,
+        isCached: (URL) -> Bool
+    ) -> URL? {
+        let preferredURL = remoteURL(from: preferred)
+        guard !isConnected else { return preferredURL ?? remoteURL(from: alternate) }
+
+        if let preferredURL, isCached(preferredURL) {
+            return preferredURL
+        }
+        if let alternateURL = remoteURL(from: alternate), isCached(alternateURL) {
+            return alternateURL
+        }
+        return preferredURL ?? remoteURL(from: alternate)
+    }
+
+    private static func remoteURL(from value: String?) -> URL? {
+        guard
+            let value,
+            let url = URL(string: value),
+            let scheme = url.scheme?.lowercased(),
+            scheme == "http" || scheme == "https" || scheme == "file"
+        else { return nil }
+        return url
     }
 }
 

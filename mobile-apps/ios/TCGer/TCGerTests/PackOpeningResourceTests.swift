@@ -108,8 +108,22 @@ final class PackOpeningResourceTests: XCTestCase {
         cache.store(Data("wrapper".utf8), for: wrapper)
         cache.store(Data("manifest".utf8), for: manifest)
 
+        XCTAssertTrue(cache.contains(wrapper))
+        XCTAssertEqual(cache.byteCount(for: wrapper), Int64(Data("wrapper".utf8).count))
         XCTAssertEqual(cache.data(for: wrapper), Data("wrapper".utf8))
         XCTAssertEqual(cache.data(for: manifest), Data("manifest".utf8))
+
+        cache.remove(wrapper)
+        XCTAssertFalse(cache.contains(wrapper))
+        XCTAssertNil(cache.data(for: wrapper))
+        XCTAssertEqual(cache.data(for: manifest), Data("manifest".utf8))
+    }
+
+    func testOfflineSetDefinitionsMatchRendererAndMetadataIdentifiers() {
+        XCTAssertEqual(PackOfflineSetDefinition.matching("base1")?.metadataSetCode, "base1")
+        XCTAssertEqual(PackOfflineSetDefinition.matching("me5")?.metadataSetCode, "me05")
+        XCTAssertEqual(PackOfflineSetDefinition.matching("ME05")?.packPool, "me5")
+        XCTAssertNil(PackOfflineSetDefinition.matching("swsh7"))
     }
 
     func testSharedAssetRequestsCanFallBackToTheEmbeddedPackDirectory() throws {
@@ -140,6 +154,18 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: root.appendingPathComponent("pack/covers", isDirectory: true).path
         ))
+    }
+
+    func testEmbeddedRendererIncludesPullRateSourcesForEveryProbabilityModel() throws {
+        let root = try XCTUnwrap(PackOpeningResource.rootURL())
+        let script = try String(
+            contentsOf: root.appendingPathComponent("pack-opening.js"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(script.contains("tcgtalk.com/guides/pitch-black-pull-rates"))
+        XCTAssertTrue(script.contains("cs.sjsu.edu/~stamp/cv/papers/pokemon.pdf"))
+        XCTAssertTrue(script.contains("PokemonTCG/comments/paitho"))
     }
 
     func testCompletedPullSessionDecodesFromTheJavaScriptBridge() {
@@ -183,12 +209,20 @@ final class PackOpeningResourceTests: XCTestCase {
                 "selectedPackID": "base-charizard",
                 "selectedPackLabel": "Base Charizard",
                 "packCount": 1,
+                "openingMode": "normal",
+                "packBackwards": false,
                 "packOptions": [[
                     "id": "base-charizard",
                     "label": "Base Charizard",
                     "setID": "base1",
                     "setLabel": "Base Set",
-                    "variationLabel": "Charizard"
+                    "variationLabel": "Charizard",
+                    "oddsReference": [
+                        "title": "Pokémon Trading Card Sequences",
+                        "url": "https://www.cs.sjsu.edu/~stamp/cv/papers/pokemon.pdf",
+                        "sampleSize": 153,
+                        "note": "Historical sample; not official factory odds."
+                    ]
                 ]],
                 "revealedCount": 3,
                 "totalCards": 10,
@@ -210,32 +244,46 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(state?.packOptions.first?.id, "base-charizard")
         XCTAssertEqual(state?.packSets.first?.label, "Base Set")
         XCTAssertEqual(state?.selectedVariationLabel, "Charizard")
+        XCTAssertEqual(state?.selectedOddsReference?.sampleSize, 153)
+        XCTAssertEqual(
+            state?.selectedOddsReference?.destination?.host,
+            "www.cs.sjsu.edu"
+        )
         XCTAssertEqual(state?.revealedCount, 3)
         XCTAssertEqual(state?.session?.id, "opening-native-1")
     }
 
     func testPackArtworkChoicesAreFilteredByTheSelectedSet() {
+        let baseOdds = PackOpeningInterfaceState.PackOption.OddsReference(
+            title: "Pokémon Trading Card Sequences",
+            url: "https://www.cs.sjsu.edu/~stamp/cv/papers/pokemon.pdf",
+            sampleSize: 153,
+            note: "Historical sample; not official factory odds."
+        )
         let options = [
             PackOpeningInterfaceState.PackOption(
                 id: "base-venusaur",
                 label: "Base · Venusaur",
                 setID: "base1",
                 setLabel: "Base Set",
-                variationLabel: "Venusaur"
+                variationLabel: "Venusaur",
+                oddsReference: baseOdds
             ),
             PackOpeningInterfaceState.PackOption(
                 id: "base-blastoise",
                 label: "Base · Blastoise",
                 setID: "base1",
                 setLabel: "Base Set",
-                variationLabel: "Blastoise"
+                variationLabel: "Blastoise",
+                oddsReference: baseOdds
             ),
             PackOpeningInterfaceState.PackOption(
                 id: "swsh7:aurora",
                 label: "Evolving Skies · Aurora",
                 setID: "swsh7",
                 setLabel: "Evolving Skies",
-                variationLabel: "Aurora wrapper"
+                variationLabel: "Aurora wrapper",
+                oddsReference: nil
             )
         ]
         let state = PackOpeningInterfaceState(
@@ -262,6 +310,7 @@ final class PackOpeningResourceTests: XCTestCase {
             ["Venusaur", "Blastoise"]
         )
         XCTAssertFalse(state.selectedSetOptions.contains { $0.resolvedSetID == "swsh7" })
+        XCTAssertEqual(state.selectedOddsReference, baseOdds)
     }
 
     func testNativePackCommandUsesTheExpectedBridgeShape() {
@@ -298,6 +347,39 @@ final class PackOpeningResourceTests: XCTestCase {
 
         interactiveHost.detachWebView()
         XCTAssertNil(webView.superview)
+    }
+
+    @MainActor
+    func testBundledRendererBecomesReadyWithoutRemotePackResources() async {
+        let session = PackOpeningWebSession()
+        let ready = expectation(description: "Bundled pack renderer became ready")
+        var rendererError: String?
+        var didBecomeReady = false
+
+        session.setEventHandler({ event in
+            switch event {
+            case .ready where !didBecomeReady:
+                didBecomeReady = true
+                ready.fulfill()
+            case .error(let message):
+                rendererError = message
+            default:
+                break
+            }
+        }, replay: false)
+        session.setPrefersBundledResources(true)
+        session.reload()
+
+        await fulfillment(of: [ready], timeout: 10)
+        XCTAssertNil(rendererError)
+        XCTAssertTrue(session.isReady)
+        XCTAssertNotNil(session.latestInterfaceState)
+        XCTAssertFalse(session.latestInterfaceState?.packOptions.isEmpty ?? true)
+        XCTAssertTrue(
+            session.latestInterfaceState?.packOptions.allSatisfy {
+                $0.oddsReference?.destination != nil
+            } ?? false
+        )
     }
 
     @MainActor

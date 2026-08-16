@@ -64,6 +64,9 @@ import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { useDemoStore } from "@/stores/demo-store";
 
+const INITIAL_SPECIES_LIMIT = 120;
+const SPECIES_PAGE_SIZE = 120;
+
 function normalizeCatalogCard(
   card: CatalogCard,
   sets: Map<string, NonNullable<Awaited<ReturnType<typeof getInstalledCatalog>>>["sets"][number]>,
@@ -140,6 +143,7 @@ export function PokedexContent() {
     useState<PokedexOwnershipFilter>("all");
   const [selectedSpecies, setSelectedSpecies] =
     useState<PokedexSpecies | null>(null);
+  const [speciesLimit, setSpeciesLimit] = useState(INITIAL_SPECIES_LIMIT);
 
   useEffect(() => {
     if (demoMode) initDemo();
@@ -241,6 +245,13 @@ export function PokedexContent() {
     () => filterPokedex(species, { generation, ownership, query }),
     [generation, ownership, query, species],
   );
+  const renderedSpecies = visibleSpecies.slice(0, speciesLimit);
+  const remainingSpecies = Math.max(
+    0,
+    visibleSpecies.length - renderedSpecies.length,
+  );
+
+  const resetSpeciesLimit = () => setSpeciesLimit(INITIAL_SPECIES_LIMIT);
 
   const loading = catalog.isLoading || catalogReading;
   const installProgress = catalog.progress.pokemon;
@@ -384,7 +395,10 @@ export function PokedexContent() {
                 <Input
                   id="pokedex-search"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    resetSpeciesLimit();
+                  }}
                   placeholder="Pikachu or #0025"
                   className="pl-9"
                 />
@@ -396,9 +410,10 @@ export function PokedexContent() {
               </label>
               <Select
                 value={String(generation)}
-                onValueChange={(value) =>
-                  setGeneration(value === "all" ? "all" : Number(value))
-                }
+                onValueChange={(value) => {
+                  setGeneration(value === "all" ? "all" : Number(value));
+                  resetSpeciesLimit();
+                }}
               >
                 <SelectTrigger aria-labelledby="pokedex-generation-label">
                   <SelectValue />
@@ -420,9 +435,11 @@ export function PokedexContent() {
               <ToggleGroup
                 type="single"
                 value={ownership}
-                onValueChange={(value) =>
-                  value && setOwnership(value as PokedexOwnershipFilter)
-                }
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setOwnership(value as PokedexOwnershipFilter);
+                  resetSpeciesLimit();
+                }}
                 aria-labelledby="pokedex-status-label"
                 className="justify-start"
               >
@@ -446,13 +463,30 @@ export function PokedexContent() {
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
           aria-label="Pokédex species"
         >
-          {visibleSpecies.map((entry) => (
+          {renderedSpecies.map((entry) => (
             <SpeciesTile
               key={entry.number}
               species={entry}
               onSelect={() => setSelectedSpecies(entry)}
             />
           ))}
+          {remainingSpecies > 0 ? (
+            <div className="col-span-full flex flex-col items-center gap-2 py-5 text-center">
+              <p className="text-sm text-muted-foreground">
+                Showing {renderedSpecies.length.toLocaleString()} of{" "}
+                {visibleSpecies.length.toLocaleString()} matching species.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setSpeciesLimit((limit) => limit + SPECIES_PAGE_SIZE)
+                }
+              >
+                Load {Math.min(SPECIES_PAGE_SIZE, remainingSpecies)} more
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <Card>
@@ -471,6 +505,7 @@ export function PokedexContent() {
                 setQuery("");
                 setGeneration("all");
                 setOwnership("all");
+                resetSpeciesLimit();
               }}
             >
               Clear filters

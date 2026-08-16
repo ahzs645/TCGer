@@ -27,8 +27,11 @@
  */
 
 import type {
+  DemoCollectionAuditRecord,
   DemoBinder,
+  DemoAppSettings,
   DemoProfile,
+  DemoTag,
   DemoWishlist,
 } from "@/stores/demo-store";
 import type { Deck, SealedProduct, Trade } from "@/lib/data/demo-portfolio";
@@ -42,7 +45,7 @@ import type {
 } from "./local-portable-db";
 
 /** Bumped when the shape of a persisted slice changes incompatibly. */
-export const DEMO_SCHEMA_VERSION = 3;
+export const DEMO_SCHEMA_VERSION = 4;
 
 /**
  * The persisted projection of the demo store.
@@ -56,6 +59,10 @@ export const DEMO_SCHEMA_VERSION = 3;
 export interface PersistedDemoState {
   profile: DemoProfile;
   preferences: UserPreferences;
+  tags: DemoTag[];
+  settings: DemoAppSettings;
+  /** Bounded demo-local snapshots backing collection history and undo. */
+  collectionHistory: DemoCollectionAuditRecord[];
   /**
    * The collection, as portable rows. This is the persisted truth as of schema
    * 2; `binders` below is the derived read model and is no longer written.
@@ -87,6 +94,9 @@ export type DemoSlice = keyof PersistedDemoState;
 export const DEMO_SLICES: readonly DemoSlice[] = [
   "profile",
   "preferences",
+  "tags",
+  "settings",
+  "collectionHistory",
   "collectionRows",
   "wishlistRows",
   "deckRows",

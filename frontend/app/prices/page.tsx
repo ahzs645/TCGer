@@ -1,22 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  RefreshCw,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import type { TrackedPriceItem, TrackedPriceResult } from "@tcg/api-types";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getPriceMovers } from "@/lib/api/pricing";
+import { getPriceMovers, getTrackedCardPrices } from "@/lib/api/pricing";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
@@ -31,6 +33,7 @@ const TCG_COLORS: Record<string, string> = {
 };
 
 type SortKey = "price" | "30d" | "owned";
+const PRICE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 interface OwnedPrice {
   key: string;
@@ -39,12 +42,22 @@ interface OwnedPrice {
   setName?: string;
   rarity?: string;
   price: number;
+  currency: string;
+  source?: string;
   owned: number;
   change30d: number | null;
 }
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+}
+
+function formatMoney(value: number, currency: string): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 export default function PricesPage() {
@@ -54,22 +67,27 @@ export default function PricesPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("price");
   const [sortAsc, setSortAsc] = useState(false);
+  const forceNextRefresh = useRef(false);
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
-    enabledGames: state.enabledGames,
-    showPricing: state.showPricing,
-  })));
+  const { enabledGames, showPricing } = useModuleStore(
+    useShallow((state) => ({
+      enabledGames: state.enabledGames,
+      showPricing: state.showPricing,
+    })),
+  );
 
   const { collections, fetchCollections, isLoading, hasFetched, error } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      fetchCollections: state.fetchCollections,
-      isLoading: state.isLoading,
-      hasFetched: state.hasFetched,
-      error: state.error,
-    })));
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        isLoading: state.isLoading,
+        hasFetched: state.hasFetched,
+        error: state.error,
+      })),
+    );
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -87,6 +105,60 @@ export default function PricesPage() {
     enabled: mounted && isAuthenticated && !!token && showPricing,
     staleTime: 1000 * 60 * 5,
   });
+
+  const trackedItems = useMemo<TrackedPriceItem[]>(() => {
+    const byKey = new Map<string, TrackedPriceItem>();
+    for (const binder of collections) {
+      for (const card of binder.cards) {
+        if (enabledGames[card.tcg as keyof typeof enabledGames] === false)
+          continue;
+        if (selectedGame !== "all" && card.tcg !== selectedGame) continue;
+        const item = {
+          tcg: card.tcg,
+          externalId: card.externalId ?? card.cardId,
+        };
+        byKey.set(`${item.tcg}:${item.externalId}`, item);
+      }
+    }
+    return Array.from(byKey.values()).sort((left, right) =>
+      `${left.tcg}:${left.externalId}`.localeCompare(
+        `${right.tcg}:${right.externalId}`,
+      ),
+    );
+  }, [collections, enabledGames, selectedGame]);
+
+  const trackedPricesQuery = useQuery({
+    queryKey: ["prices", "tracked", trackedItems],
+    queryFn: async () => {
+      const force = forceNextRefresh.current;
+      forceNextRefresh.current = false;
+      return getTrackedCardPrices(token!, trackedItems, force);
+    },
+    enabled:
+      mounted &&
+      isAuthenticated &&
+      !!token &&
+      showPricing &&
+      trackedItems.length > 0,
+    staleTime: PRICE_REFRESH_INTERVAL_MS,
+    refetchInterval: (query) => {
+      const refreshAfter = query.state.data?.refreshAfter;
+      return refreshAfter
+        ? Math.max(60_000, new Date(refreshAfter).getTime() - Date.now())
+        : PRICE_REFRESH_INTERVAL_MS;
+    },
+    refetchIntervalInBackground: false,
+  });
+
+  const marketPriceByCard = useMemo(() => {
+    const map = new Map<string, TrackedPriceResult>();
+    for (const result of trackedPricesQuery.data?.prices ?? []) {
+      if (result.price !== undefined) {
+        map.set(`${result.tcg}:${result.externalId}`, result);
+      }
+    }
+    return map;
+  }, [trackedPricesQuery.data]);
 
   const changeByCard = useMemo(() => {
     const map = new Map<string, number>();
@@ -107,6 +179,7 @@ export default function PricesPage() {
         if (selectedGame !== "all" && card.tcg !== selectedGame) continue;
         const externalId = card.externalId ?? card.cardId;
         const key = `${card.tcg}:${externalId}`;
+        const market = marketPriceByCard.get(key);
         const existing = byKey.get(key);
         if (existing) {
           existing.owned += card.quantity ?? 0;
@@ -117,7 +190,9 @@ export default function PricesPage() {
             tcg: card.tcg,
             setName: card.setName,
             rarity: card.rarity,
-            price: card.price ?? 0,
+            price: market?.price ?? card.price ?? 0,
+            currency: market?.currency ?? "USD",
+            source: market?.source,
             owned: card.quantity ?? 0,
             change30d: changeByCard.get(key) ?? null,
           });
@@ -125,7 +200,13 @@ export default function PricesPage() {
       }
     }
     return Array.from(byKey.values());
-  }, [collections, enabledGames, selectedGame, changeByCard]);
+  }, [
+    collections,
+    enabledGames,
+    selectedGame,
+    changeByCard,
+    marketPriceByCard,
+  ]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -146,7 +227,18 @@ export default function PricesPage() {
     });
   }, [owned, search, sortBy, sortAsc]);
 
-  const portfolioValue = owned.reduce((s, p) => s + p.price * p.owned, 0);
+  const portfolioValues = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const card of owned) {
+      totals.set(
+        card.currency,
+        (totals.get(card.currency) ?? 0) + card.price * card.owned,
+      );
+    }
+    return Array.from(totals).sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+  }, [owned]);
   const changedCards = owned.filter((p) => p.change30d !== null);
   const avgChange =
     changedCards.length > 0
@@ -166,6 +258,11 @@ export default function PricesPage() {
     }
   };
 
+  const handleRefresh = async () => {
+    forceNextRefresh.current = true;
+    await trackedPricesQuery.refetch();
+  };
+
   const sortIndicator = (key: SortKey) => {
     if (sortBy !== key)
       return <ArrowUpDown className="h-3 w-3 opacity-50" aria-hidden />;
@@ -183,17 +280,58 @@ export default function PricesPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-heading font-semibold">Price Tracker</h1>
-          <p className="text-sm text-muted-foreground">
-            Market prices and trends for cards in your collection.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-heading font-semibold">
+              Price Tracker
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Collection cards are checked on the server&apos;s refresh schedule
+              while this page is open.
+            </p>
+            {trackedPricesQuery.data && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Last checked{" "}
+                {new Date(trackedPricesQuery.data.refreshedAt).toLocaleString()}
+                {" · "}next check after{" "}
+                {new Date(
+                  trackedPricesQuery.data.refreshAfter,
+                ).toLocaleString()}
+              </p>
+            )}
+          </div>
+          {mounted &&
+            isAuthenticated &&
+            showPricing &&
+            trackedItems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleRefresh()}
+                disabled={trackedPricesQuery.isFetching}
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${trackedPricesQuery.isFetching ? "animate-spin" : ""}`}
+                  aria-hidden
+                />
+                Refresh prices
+              </Button>
+            )}
         </div>
+
+        {trackedPricesQuery.error && (
+          <p role="alert" className="text-sm text-destructive">
+            Live prices could not be refreshed. Stored collection prices are
+            still shown.
+          </p>
+        )}
 
         {mounted && !isAuthenticated ? (
           <Card role="alert">
             <CardHeader>
-              <CardTitle asChild><h2>Sign in required</h2></CardTitle>
+              <CardTitle asChild>
+                <h2>Sign in required</h2>
+              </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               Sign in to track prices for cards in your collection.
@@ -207,7 +345,9 @@ export default function PricesPage() {
         ) : error ? (
           <Card role="alert">
             <CardHeader>
-              <CardTitle asChild><h2>Couldn&apos;t load your collection</h2></CardTitle>
+              <CardTitle asChild>
+                <h2>Couldn&apos;t load your collection</h2>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>{error}</p>
@@ -227,13 +367,17 @@ export default function PricesPage() {
         ) : owned.length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle asChild><h2>No tracked cards yet</h2></CardTitle>
+              <CardTitle asChild>
+                <h2>No tracked cards yet</h2>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
                 Add cards to a binder
-                {selectedGame !== "all" ? ` for ${tcgLabel(selectedGame)}` : ""} to
-                start tracking their prices here.
+                {selectedGame !== "all"
+                  ? ` for ${tcgLabel(selectedGame)}`
+                  : ""}{" "}
+                to start tracking their prices here.
               </p>
               <Button asChild size="sm">
                 <Link href="/collections">Add cards</Link>
@@ -245,8 +389,10 @@ export default function PricesPage() {
             {/* Summary */}
             <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
               <SummaryCard title="Portfolio Value">
-                <div className="text-xl md:text-3xl font-semibold">
-                  ${portfolioValue.toFixed(2)}
+                <div className="space-y-0.5 text-lg md:text-2xl font-semibold">
+                  {portfolioValues.map(([currency, value]) => (
+                    <div key={currency}>{formatMoney(value, currency)}</div>
+                  ))}
                 </div>
               </SummaryCard>
               <SummaryCard title="Tracked Cards">
@@ -275,7 +421,7 @@ export default function PricesPage() {
                 </div>
                 {mostValuable && (
                   <p className="text-xs text-muted-foreground">
-                    ${mostValuable.price.toFixed(2)}
+                    {formatMoney(mostValuable.price, mostValuable.currency)}
                   </p>
                 )}
               </SummaryCard>
@@ -363,7 +509,14 @@ export default function PricesPage() {
                             {p.owned}
                           </td>
                           <td className="p-3 text-right font-semibold">
-                            {p.price > 0 ? `$${p.price.toFixed(2)}` : "—"}
+                            {p.price > 0
+                              ? formatMoney(p.price, p.currency)
+                              : "—"}
+                            {p.source && (
+                              <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                                {p.source}
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-right">
                             {p.change30d === null ? (

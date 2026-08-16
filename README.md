@@ -117,6 +117,8 @@ Express backend (see `backend/src/config/env.ts`):
 - `TCGDEX_API_BASE_URL` (default `https://api.tcgdex.net/v2/en`).
 - `JUSTTCG_API_BASE_URL` (default `https://api.justtcg.com/v1`) and
   `JUSTTCG_API_KEY` (paid commercial pricing; server-side only).
+- `PRICE_REFRESH_INTERVAL_MS` controls the tracked-card quote cache and client refresh guidance (default 12 hours).
+- `PRICE_FORCE_REFRESH_COOLDOWN_MS` limits repeated manual refreshes (default 5 minutes).
 
 Convex backend:
 - `BETTER_AUTH_SECRET` signs Better Auth sessions. Non-local Convex deployments require it; use a random value of at least 32 characters.

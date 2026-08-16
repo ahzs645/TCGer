@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Layers, Plus, Trash2 } from "lucide-react";
+import { Layers, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -47,6 +49,7 @@ const TCG_COLORS: Record<string, string> = {
 export default function DecksPage() {
   const [selectedDeck, setSelectedDeck] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
 
   // The demo store is persisted, so its contents only match the server-rendered
@@ -56,6 +59,7 @@ export default function DecksPage() {
 
   const storeDecks = useDemoStore((state) => state.decks);
   const addDeck = useDemoStore((state) => state.addDeck);
+  const updateDeck = useDemoStore((state) => state.updateDeck);
   const removeDeck = useDemoStore((state) => state.removeDeck);
   const DECKS: Deck[] = mounted ? storeDecks : [];
 
@@ -94,6 +98,58 @@ export default function DecksPage() {
     tcg: "Yu-Gi-Oh!",
     format: "Advanced",
   });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    format: "",
+    isComplete: false,
+    cards: "",
+  });
+
+  const openEditor = (deck: Deck) => {
+    setEditForm({
+      name: deck.name,
+      description: deck.description,
+      format: deck.format,
+      isComplete: deck.isComplete,
+      cards: deck.cards
+        .map(
+          (card) =>
+            `${card.quantity} x ${card.name} | ${card.type} | ${card.rarity}`,
+        )
+        .join("\n"),
+    });
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!activeDeck || !editForm.name.trim()) return;
+    const cards = editForm.cards
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [head, type = "", rarity = ""] = line
+          .split("|")
+          .map((part) => part.trim());
+        const match = head.match(/^(\d+)\s*x\s+(.+)$/i);
+        return {
+          name: (match?.[2] ?? head).trim(),
+          quantity: Math.max(1, Number(match?.[1]) || 1),
+          type,
+          rarity,
+        };
+      })
+      .filter((card) => card.name);
+    await updateDeck(activeDeck.id, {
+      name: editForm.name.trim(),
+      description: editForm.description.trim(),
+      format: editForm.format.trim(),
+      isComplete: editForm.isComplete,
+      cards,
+    });
+    setEditOpen(false);
+  };
 
   const handleCreate = async () => {
     if (!form.name.trim()) return;
@@ -224,6 +280,13 @@ export default function DecksPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_1fr]" data-oid="1pzpcl0">
           {/* Deck list */}
           <div className="space-y-3" data-oid="t-_eku1">
+            {DECKS.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  No decks yet. Create one to start a card list.
+                </CardContent>
+              </Card>
+            ) : null}
             {DECKS.map((deck) => {
               const cardCount = deck.cards.reduce((s, c) => s + c.quantity, 0);
               const isSelected = selectedDeck === deck.id;
@@ -335,7 +398,17 @@ export default function DecksPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      className="ml-auto"
+                      onClick={() => openEditor(activeDeck)}
+                      aria-label={`Edit ${activeDeck.name}`}
+                      title="Edit deck"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => handleDelete(activeDeck)}
                       aria-label={`Delete ${activeDeck.name}`}
                       title="Delete deck"
@@ -508,6 +581,81 @@ export default function DecksPage() {
               disabled={!form.name.trim()}
             >
               Create deck
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit deck</DialogTitle>
+            <DialogDescription>
+              Update the deck details and card list. Enter one card per line as
+              “3 x Card name | Type | Rarity”.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-deck-name">Deck name</Label>
+              <Input
+                id="edit-deck-name"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-deck-description">Description</Label>
+              <Textarea
+                id="edit-deck-description"
+                value={editForm.description}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-deck-format">Format</Label>
+              <Input
+                id="edit-deck-format"
+                value={editForm.format}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, format: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-deck-cards">Card list</Label>
+              <Textarea
+                id="edit-deck-cards"
+                className="min-h-48 font-mono text-xs"
+                value={editForm.cards}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, cards: e.target.value })
+                }
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={editForm.isComplete}
+                onCheckedChange={(checked) =>
+                  setEditForm({ ...editForm, isComplete: checked === true })
+                }
+              />
+              Deck list is complete
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleUpdate()}
+              disabled={!editForm.name.trim()}
+            >
+              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>

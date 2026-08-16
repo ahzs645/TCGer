@@ -682,6 +682,9 @@ video {
 .min-w-0 {
   min-width: 0px;
 }
+.max-w-2xl {
+  max-width: 42rem;
+}
 .max-w-4xl {
   max-width: 56rem;
 }
@@ -949,6 +952,9 @@ video {
 .uppercase {
   text-transform: uppercase;
 }
+.leading-snug {
+  line-height: 1.375;
+}
 .tracking-wide {
   letter-spacing: 0.025em;
 }
@@ -989,6 +995,12 @@ video {
 .text-violet-600 {
   --tw-text-opacity: 1;
   color: rgb(124 58 237 / var(--tw-text-opacity, 1));
+}
+.underline {
+  text-decoration-line: underline;
+}
+.underline-offset-2 {
+  text-underline-offset: 2px;
 }
 .opacity-50 {
   opacity: 0.5;
@@ -1180,6 +1192,11 @@ label {
   .sm\:text-sm {
     font-size: 0.875rem;
     line-height: 1.25rem;
+  }
+
+  .sm\:text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
   }
 }
 

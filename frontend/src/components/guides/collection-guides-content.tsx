@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import type { Card as CardType, CollectionGuideResponse } from "@tcg/api-types";
 import {
@@ -39,6 +40,7 @@ import {
   followCollectionGuide,
   searchCollectionGuideCards,
 } from "@/lib/api/guides";
+import { getAppRoute } from "@/lib/app-routes";
 import { expandWishlistRule } from "@/lib/wishlists/sync";
 import { useAuthStore } from "@/stores/auth";
 import { useWishlistsStore } from "@/stores/wishlists";
@@ -51,6 +53,7 @@ export function CollectionGuidesContent({
 }: {
   autoSelectFirstGuide?: boolean;
 } = {}) {
+  const pathname = usePathname();
   const { token, isAuthenticated } = useAuthStore();
   const { wishlists, fetchWishlists, hasFetched, syncWishlist } =
     useWishlistsStore();
@@ -133,10 +136,7 @@ export function CollectionGuidesContent({
     queryFn: () =>
       searchCollectionGuideCards(token!, {
         query: deferredGuideSearch,
-        tcg:
-          globalGame === "all"
-            ? undefined
-            : (globalGame as CardType["tcg"]),
+        tcg: globalGame === "all" ? undefined : (globalGame as CardType["tcg"]),
         category:
           globalCategory === "all"
             ? undefined
@@ -305,7 +305,9 @@ export function CollectionGuidesContent({
         <section className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
             <Select value={globalGame} onValueChange={setGlobalGame}>
-              <SelectTrigger aria-label="Filter guide cards by game"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by game">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All games</SelectItem>
                 <SelectItem value="pokemon">Pokémon</SelectItem>
@@ -317,7 +319,9 @@ export function CollectionGuidesContent({
               </SelectContent>
             </Select>
             <Select value={globalCategory} onValueChange={setGlobalCategory}>
-              <SelectTrigger aria-label="Filter guide cards by theme"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by theme">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All themes</SelectItem>
                 <SelectItem value="art-style">Art style</SelectItem>
@@ -330,9 +334,13 @@ export function CollectionGuidesContent({
             </Select>
             <Select
               value={globalOwnership}
-              onValueChange={(value) => setGlobalOwnership(value as OwnershipFilter)}
+              onValueChange={(value) =>
+                setGlobalOwnership(value as OwnershipFilter)
+              }
             >
-              <SelectTrigger aria-label="Filter guide cards by ownership"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Filter guide cards by ownership">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All cards</SelectItem>
                 <SelectItem value="owned">Owned</SelectItem>
@@ -406,117 +414,122 @@ export function CollectionGuidesContent({
 
           {selectedGuide ? (
             <section className="min-w-0 space-y-5">
-          <Button
-            variant="ghost"
-            className="lg:hidden"
-            onClick={() => setSelectedSlug(null)}
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" /> All guides
-          </Button>
+              <Button
+                variant="ghost"
+                className="lg:hidden"
+                onClick={() => setSelectedSlug(null)}
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" /> All guides
+              </Button>
 
-          <GuideHero
-            guide={selectedGuide}
-            cardCount={cardsQuery.data?.length}
-            cardResolution={
-              cardsQuery.isLoading
-                ? "loading"
-                : cardsQuery.isError
-                  ? "error"
-                  : cardsQuery.data?.length
-                    ? "ready"
-                    : "empty"
-            }
-            wishlist={followedWishlist}
-            isFollowing={isFollowing}
-            onFollow={handleFollow}
-          />
+              <GuideHero
+                guide={selectedGuide}
+                cardCount={cardsQuery.data?.length}
+                cardResolution={
+                  cardsQuery.isLoading
+                    ? "loading"
+                    : cardsQuery.isError
+                      ? "error"
+                      : cardsQuery.data?.length
+                        ? "ready"
+                        : "empty"
+                }
+                wishlist={followedWishlist}
+                wishlistHref={getAppRoute("/wishlists", pathname)}
+                isFollowing={isFollowing}
+                onFollow={handleFollow}
+              />
 
-          {followStatus && (
-            <div className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
-              {followStatus}
-            </div>
-          )}
+              {followStatus && (
+                <div className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
+                  {followStatus}
+                </div>
+              )}
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_160px]">
-            <Input
-              aria-label="Filter cards in this guide"
-              value={cardSearch}
-              onChange={(event) => setCardSearch(event.target.value)}
-              placeholder="Filter cards…"
-            />
-            <Select value={setFilter} onValueChange={setSetFilter}>
-              <SelectTrigger aria-label="Filter guide cards by set">
-                <SelectValue placeholder="All sets" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All sets</SelectItem>
-                {setCodes.map((code) => (
-                  <SelectItem key={code} value={code}>
-                    {code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={ownershipFilter}
-              onValueChange={(value) =>
-                setOwnershipFilter(value as OwnershipFilter)
-              }
-              disabled={!followedWishlist}
-            >
-              <SelectTrigger aria-label="Filter guide cards by ownership">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All cards</SelectItem>
-                <SelectItem value="owned">Owned</SelectItem>
-                <SelectItem value="missing">Missing</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {cardsQuery.isLoading ? (
-            <CardGridSkeleton />
-          ) : cardsQuery.isError ? (
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle>Couldn&apos;t resolve this guide</CardTitle>
-                <CardDescription>
-                  {cardsQuery.error instanceof Error
-                    ? cardsQuery.error.message
-                    : "Card search failed."}
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ) : cardsQuery.data?.length === 0 ? (
-            <Card className="border-amber-500/50">
-              <CardHeader>
-                <CardTitle>Guide cards aren&apos;t available</CardTitle>
-                <CardDescription>
-                  This guide resolved to zero cards in the current catalog.
-                  Install or refresh the {selectedGuide.tcg} catalog, then try
-                  again before following it.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" onClick={() => cardsQuery.refetch()}>
-                  Try resolving again
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-              {filteredCards.map((card) => (
-                <GuideCard
-                  key={`${card.tcg}:${card.id}`}
-                  card={card}
-                  owned={
-                    wishlistCards.get(`${card.tcg}:${card.id}`)?.owned === true
-                  }
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_160px]">
+                <Input
+                  aria-label="Filter cards in this guide"
+                  value={cardSearch}
+                  onChange={(event) => setCardSearch(event.target.value)}
+                  placeholder="Filter cards…"
                 />
-              ))}
-            </div>
-          )}
+                <Select value={setFilter} onValueChange={setSetFilter}>
+                  <SelectTrigger aria-label="Filter guide cards by set">
+                    <SelectValue placeholder="All sets" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All sets</SelectItem>
+                    {setCodes.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={ownershipFilter}
+                  onValueChange={(value) =>
+                    setOwnershipFilter(value as OwnershipFilter)
+                  }
+                  disabled={!followedWishlist}
+                >
+                  <SelectTrigger aria-label="Filter guide cards by ownership">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All cards</SelectItem>
+                    <SelectItem value="owned">Owned</SelectItem>
+                    <SelectItem value="missing">Missing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {cardsQuery.isLoading ? (
+                <CardGridSkeleton />
+              ) : cardsQuery.isError ? (
+                <Card className="border-destructive/50">
+                  <CardHeader>
+                    <CardTitle>Couldn&apos;t resolve this guide</CardTitle>
+                    <CardDescription>
+                      {cardsQuery.error instanceof Error
+                        ? cardsQuery.error.message
+                        : "Card search failed."}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ) : cardsQuery.data?.length === 0 ? (
+                <Card className="border-amber-500/50">
+                  <CardHeader>
+                    <CardTitle>Guide cards aren&apos;t available</CardTitle>
+                    <CardDescription>
+                      This guide resolved to zero cards in the current catalog.
+                      Install or refresh the {selectedGuide.tcg} catalog, then
+                      try again before following it.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      variant="outline"
+                      onClick={() => cardsQuery.refetch()}
+                    >
+                      Try resolving again
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                  {filteredCards.map((card) => (
+                    <GuideCard
+                      key={`${card.tcg}:${card.id}`}
+                      card={card}
+                      owned={
+                        wishlistCards.get(`${card.tcg}:${card.id}`)?.owned ===
+                        true
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           ) : (
             <div className="hidden items-center justify-center rounded-xl border border-dashed p-12 text-muted-foreground lg:flex">
@@ -570,6 +583,7 @@ function GuideHero({
   cardCount,
   cardResolution,
   wishlist,
+  wishlistHref,
   isFollowing,
   onFollow,
 }: {
@@ -581,6 +595,7 @@ function GuideHero({
     ownedCards: number;
     totalCards: number;
   };
+  wishlistHref: string;
   isFollowing: boolean;
   onFollow: () => void;
 }) {
@@ -593,6 +608,7 @@ function GuideHero({
             alt={guide.title}
             tcg={guide.tcg}
             fill
+            loading="eager"
             sizes="220px"
             className="object-contain p-5"
           />
@@ -633,7 +649,7 @@ function GuideHero({
                 {wishlist.completionPercent}%
               </span>
               <Button asChild variant="outline" size="sm">
-                <Link href="/wishlists">
+                <Link href={wishlistHref}>
                   <Heart className="mr-2 h-4 w-4" /> Open wishlist
                 </Link>
               </Button>
@@ -693,7 +709,11 @@ function GuideCard({
         {guideLabels.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1">
             {guideLabels.slice(0, 2).map((label) => (
-              <Badge key={label} variant="secondary" className="max-w-full truncate text-[10px]">
+              <Badge
+                key={label}
+                variant="secondary"
+                className="max-w-full truncate text-[10px]"
+              >
                 {label}
               </Badge>
             ))}

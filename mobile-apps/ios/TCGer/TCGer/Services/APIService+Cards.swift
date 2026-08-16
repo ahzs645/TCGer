@@ -11,7 +11,7 @@ extension APIService {
             await prepareLocalCatalog(for: game)
             let response = await LocalStore.shared.searchCardsAsync(query: query, game: game)
             return CardSearchResponse(
-                cards: await applyingSelectedPricing(to: response.cards),
+                cards: response.cards,
                 total: response.total
             )
         }
@@ -41,7 +41,7 @@ extension APIService {
         }
 
         return CardSearchResponse(
-            cards: await applyingSelectedPricing(to: searchResponse.cards),
+            cards: searchResponse.cards,
             total: searchResponse.total
         )
     }
@@ -62,7 +62,7 @@ extension APIService {
             // search is exhaustive.
             await prepareLocalCatalog(for: game)
             let cards = await LocalStore.shared.searchCardsAsync(query: query, game: game).cards
-            return await applyingSelectedPricing(to: cards)
+            return cards
         }
 
         var queryItems = [
@@ -93,7 +93,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
-        return await applyingSelectedPricing(to: searchResponse.cards)
+        return searchResponse.cards
     }
 
     /// Exact illustrator lookup used by curated collection guides such as the
@@ -110,7 +110,7 @@ extension APIService {
             let cards = CatalogStore.shared.cards(byArtist: artist, tcg: game).prefix(limit).map {
                 CatalogStore.shared.card(from: $0)
             }
-            return await applyingSelectedPricing(to: cards)
+            return cards
         }
 
         let queryItems = [
@@ -133,7 +133,7 @@ extension APIService {
         guard let searchResponse = try? JSONDecoder.tcgCardDecoder.decode(CardSearchResponse.self, from: data) else {
             throw APIError.decodingError
         }
-        return await applyingSelectedPricing(to: searchResponse.cards)
+        return searchResponse.cards
     }
 
     func searchCardsByCollectionTag(
@@ -148,7 +148,7 @@ extension APIService {
             let cards = CatalogStore.shared.cards(tagged: tag, tcg: game).prefix(limit).map {
                 CatalogStore.shared.card(from: $0)
             }
-            return await applyingSelectedPricing(to: cards)
+            return cards
         }
 
         let queryItems = [
@@ -169,7 +169,7 @@ extension APIService {
         guard let searchResponse = try? JSONDecoder.tcgCardDecoder.decode(CardSearchResponse.self, from: data) else {
             throw APIError.decodingError
         }
-        return await applyingSelectedPricing(to: searchResponse.cards)
+        return searchResponse.cards
     }
 
     func getCardPrints(
@@ -183,7 +183,7 @@ extension APIService {
                 await prepareLocalCatalog(for: game)
             }
             let cards = LocalStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
-            return await applyingSelectedPricing(to: cards)
+            return cards
         }
 
         let path = "cards/\(tcg)/\(cardId)/prints"
@@ -206,7 +206,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
-        return await applyingSelectedPricing(to: printsResponse.prints)
+        return printsResponse.prints
     }
 
     /// Returns only World Championship replica printings for the same named
@@ -347,7 +347,7 @@ extension APIService {
                 await CatalogStore.shared.loadIfNeeded(game)
             }
             let cards = LocalStore.shared.getSetCards(tcg: tcg, setCode: setCode)
-            return await applyingSelectedPricing(to: cards)
+            return cards
         }
 
         let path = "cards/sets/\(tcg)/\(setCode)"
@@ -366,7 +366,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
-        return await applyingSelectedPricing(to: cardsResponse.cards)
+        return cardsResponse.cards
     }
 }
 

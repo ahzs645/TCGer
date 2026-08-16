@@ -1,5 +1,6 @@
 import { adapterRegistry } from '../adapters/adapter-registry';
 import {
+  JustTcgPriceProvider,
   LorcastPriceProvider,
   ScryfallPriceProvider,
   TcgDexPriceProvider,
@@ -60,6 +61,7 @@ class AdapterPriceProvider implements PriceProvider {
 }
 
 const providers: PriceProvider[] = [
+  new JustTcgPriceProvider(),
   new TcgDexPriceProvider(),
   new ScryfallPriceProvider(),
   new LorcastPriceProvider(),

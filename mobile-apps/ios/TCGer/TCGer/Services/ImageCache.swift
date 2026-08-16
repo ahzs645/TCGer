@@ -58,6 +58,19 @@ final class ImageCache {
         }
     }
 
+    /// Offline set downloads must not report completion while their native
+    /// thumbnails are still queued for disk writes. The normal scrolling path
+    /// remains asynchronous through `store(_:data:for:)`.
+    func storeForOffline(_ image: UIImage, data: Data, for url: URL) {
+        memoryCache.setObject(image, forKey: cacheKey(for: url))
+        queue.sync {
+            if !fileManager.fileExists(atPath: cacheDirectory.path) {
+                try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+            }
+            try? data.write(to: diskURL(for: url), options: [.atomic])
+        }
+    }
+
     func hasImage(for url: URL) -> Bool {
         if memoryCache.object(forKey: cacheKey(for: url)) != nil {
             return true
@@ -115,6 +128,15 @@ final class ImageCache {
                 try? fileManager.removeItem(at: cacheDirectory)
             }
             try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        }
+    }
+
+    func remove(for url: URL) {
+        memoryCache.removeObject(forKey: cacheKey(for: url))
+        queue.sync {
+            let fileURL = diskURL(for: url)
+            guard fileManager.fileExists(atPath: fileURL.path) else { return }
+            try? fileManager.removeItem(at: fileURL)
         }
     }
 

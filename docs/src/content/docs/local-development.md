@@ -67,6 +67,8 @@ Open `http://localhost:3003`. Browser-facing REST requests use Express. Never ca
 - `TCGDEX_API_BASE_URL` (default `https://api.tcgdex.net/v2/en`)
 - `JUSTTCG_API_BASE_URL` (default `https://api.justtcg.com/v1`)
 - `JUSTTCG_API_KEY` (paid commercial pricing; keep server-side and never bundle in a client)
+- `PRICE_REFRESH_INTERVAL_MS` (default `43200000`, or 12 hours)
+- `PRICE_FORCE_REFRESH_COOLDOWN_MS` (default `300000`, or 5 minutes)
 
 ### Convex
 

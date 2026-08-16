@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, Plus, DollarSign, TrendingUp, Calendar } from "lucide-react";
+import {
+  Package,
+  Plus,
+  DollarSign,
+  TrendingUp,
+  Calendar,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SealedProduct } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
 import { Button } from "@/components/ui/button";
@@ -37,7 +46,12 @@ const TCG_COLORS: Record<string, string> = {
 export default function SealedPage() {
   const [sortBy, setSortBy] = useState<"date" | "value" | "profit">("date");
   const [createOpen, setCreateOpen] = useState(false);
-  const [catalogProducts, setCatalogProducts] = useState<SealedCatalogProduct[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
+  const [catalogProducts, setCatalogProducts] = useState<
+    SealedCatalogProduct[]
+  >([]);
 
   // The demo store is persisted, so it only agrees with the server-rendered
   // markup once we are on the client.
@@ -45,12 +59,20 @@ export default function SealedPage() {
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     if (createOpen) {
-      void getInstalledSealedProducts().then(setCatalogProducts).catch(() => setCatalogProducts([]));
+      void getInstalledSealedProducts()
+        .then(setCatalogProducts)
+        .catch(() => setCatalogProducts([]));
     }
   }, [createOpen]);
 
   const storeSealed = useDemoStore((state) => state.sealed);
   const addSealedProduct = useDemoStore((state) => state.addSealedProduct);
+  const updateSealedProduct = useDemoStore(
+    (state) => state.updateSealedProduct,
+  );
+  const removeSealedProduct = useDemoStore(
+    (state) => state.removeSealedProduct,
+  );
   const SEALED_PRODUCTS: SealedProduct[] = mounted ? storeSealed : [];
 
   const [form, setForm] = useState({
@@ -61,6 +83,15 @@ export default function SealedPage() {
     quantity: "1",
     purchasePrice: "",
     currentValue: "",
+  });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    type: "",
+    set: "",
+    quantity: "1",
+    purchasePrice: "",
+    currentValue: "",
+    purchaseDate: "",
   });
 
   const canSubmit = form.name.trim() && Number(form.purchasePrice) > 0;
@@ -88,6 +119,52 @@ export default function SealedPage() {
       currentValue: "",
     });
     setCreateOpen(false);
+  };
+
+  const openEditor = (product: SealedProduct) => {
+    setEditingId(product.id);
+    setEditForm({
+      name: product.name,
+      type: product.type,
+      set: product.set,
+      quantity: String(product.quantity),
+      purchasePrice: String(product.purchasePrice),
+      currentValue: String(product.currentValue),
+      purchaseDate: product.purchaseDate,
+    });
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (
+      !editingId ||
+      !editForm.name.trim() ||
+      Number(editForm.quantity) < 1 ||
+      Number(editForm.purchasePrice) < 0 ||
+      Number(editForm.currentValue) < 0
+    )
+      return;
+    await updateSealedProduct(editingId, {
+      name: editForm.name.trim(),
+      type: editForm.type.trim() || "Sealed Product",
+      set: editForm.set.trim(),
+      quantity: Math.max(1, Math.floor(Number(editForm.quantity))),
+      purchasePrice: Number(editForm.purchasePrice),
+      currentValue: Number(editForm.currentValue),
+      purchaseDate: editForm.purchaseDate,
+    });
+    setEditOpen(false);
+    setEditingId(null);
+  };
+
+  const handleDelete = async (product: SealedProduct) => {
+    const ok = await confirm({
+      title: `Delete ${product.name}?`,
+      description: `This removes all ${product.quantity} tracked ${product.quantity === 1 ? "item" : "items"}.`,
+      confirmLabel: "Delete product",
+      destructive: true,
+    });
+    if (ok) await removeSealedProduct(product.id);
   };
 
   const totalInvested = SEALED_PRODUCTS.reduce(
@@ -239,7 +316,9 @@ export default function SealedPage() {
                 data-oid="ffkl02y"
               >
                 {totalProfit >= 0 ? "+" : ""}
-                {((totalProfit / totalInvested) * 100).toFixed(1)}% ROI
+                {totalInvested > 0
+                  ? `${((totalProfit / totalInvested) * 100).toFixed(1)}% ROI`
+                  : "— ROI"}
               </p>
             </CardContent>
           </Card>
@@ -293,10 +372,19 @@ export default function SealedPage() {
 
         {/* Product list */}
         <div className="space-y-3" data-oid="mh7-dbr">
+          {sorted.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No sealed products tracked yet.
+              </CardContent>
+            </Card>
+          ) : null}
           {sorted.map((p) => {
             const profit = (p.currentValue - p.purchasePrice) * p.quantity;
             const profitPct =
-              ((p.currentValue - p.purchasePrice) / p.purchasePrice) * 100;
+              p.purchasePrice > 0
+                ? ((p.currentValue - p.purchasePrice) / p.purchasePrice) * 100
+                : null;
             return (
               <Card key={p.id} data-oid="e05-m4k">
                 <CardContent
@@ -350,21 +438,45 @@ export default function SealedPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0" data-oid="cc8kecn">
-                    <p
-                      className="text-sm font-semibold whitespace-nowrap"
-                      data-oid="0wicg5e"
+                  <div
+                    className="flex shrink-0 items-center gap-1"
+                    data-oid="cc8kecn"
+                  >
+                    <div className="text-right">
+                      <p
+                        className="text-sm font-semibold whitespace-nowrap"
+                        data-oid="0wicg5e"
+                      >
+                        ${(p.currentValue * p.quantity).toFixed(2)}
+                      </p>
+                      <p
+                        className={`text-xs whitespace-nowrap ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
+                        data-oid="_hlp0de"
+                      >
+                        {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
+                        {profitPct === null
+                          ? "—"
+                          : `${profitPct >= 0 ? "+" : ""}${profitPct.toFixed(1)}%`}
+                        )
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openEditor(p)}
+                      aria-label={`Edit ${p.name}`}
                     >
-                      ${(p.currentValue * p.quantity).toFixed(2)}
-                    </p>
-                    <p
-                      className={`text-xs whitespace-nowrap ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
-                      data-oid="_hlp0de"
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => void handleDelete(p)}
+                      aria-label={`Delete ${p.name}`}
                     >
-                      {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
-                      {profitPct >= 0 ? "+" : ""}
-                      {profitPct.toFixed(1)}%)
-                    </p>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -392,19 +504,22 @@ export default function SealedPage() {
                 placeholder="e.g. Paldea Evolved Booster Box"
                 onChange={(e) => {
                   const name = e.target.value;
-                  const product = catalogProducts.find((entry) => entry.name === name);
+                  const product = catalogProducts.find(
+                    (entry) => entry.name === name,
+                  );
                   setForm({
                     ...form,
                     name,
                     ...(product
                       ? {
-                          tcg: product.tcg === "pokemon"
-                            ? "Pokemon"
-                            : product.tcg === "magic"
-                              ? "Magic"
-                              : product.tcg === "yugioh"
-                                ? "Yu-Gi-Oh!"
-                                : product.tcg,
+                          tcg:
+                            product.tcg === "pokemon"
+                              ? "Pokemon"
+                              : product.tcg === "magic"
+                                ? "Magic"
+                                : product.tcg === "yugioh"
+                                  ? "Yu-Gi-Oh!"
+                                  : product.tcg,
                           type: product.productType,
                           set: product.setCode ?? "",
                           currentValue: product.marketPrice?.toFixed(2) ?? "",
@@ -483,6 +598,114 @@ export default function SealedPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit sealed product</DialogTitle>
+            <DialogDescription>
+              Update the holding quantity, cost basis, and current estimate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-sealed-name">Product</Label>
+              <Input
+                id="edit-sealed-name"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-sealed-type">Type</Label>
+                <Input
+                  id="edit-sealed-type"
+                  value={editForm.type}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, type: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sealed-set">Set</Label>
+                <Input
+                  id="edit-sealed-set"
+                  value={editForm.set}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, set: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-sealed-qty">Quantity</Label>
+                <Input
+                  id="edit-sealed-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={editForm.quantity}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, quantity: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sealed-paid">Paid each</Label>
+                <Input
+                  id="edit-sealed-paid"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.purchasePrice}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, purchasePrice: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sealed-value">Market each</Label>
+                <Input
+                  id="edit-sealed-value"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.currentValue}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, currentValue: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-sealed-date">Purchase date</Label>
+              <Input
+                id="edit-sealed-date"
+                type="date"
+                value={editForm.purchaseDate}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, purchaseDate: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleUpdate()}
+              disabled={!editForm.name.trim() || Number(editForm.quantity) < 1}
+            >
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {confirmDialog}
     </AppShell>
   );
 }

@@ -187,6 +187,9 @@ function looksLikeDemoState(value: Record<string, unknown>): boolean {
 const SLICE_READERS: Record<DemoSlice, (value: unknown) => unknown> = {
   profile: readProfile,
   preferences: readPreferences,
+  tags: readArray,
+  settings: readObject,
+  collectionHistory: readArray,
   // The localStorage payload is schema 1 by definition: it predates rows
   // entirely, so it always carries the nested arrays and never a row slice.
   // The v1 -> v2 and v2 -> v3 migrations convert what this reader imports.
@@ -202,6 +205,14 @@ const SLICE_READERS: Record<DemoSlice, (value: unknown) => unknown> = {
   sealed: readSealed,
   initialized: readInitialized,
 };
+
+function readArray(value: unknown): unknown[] | undefined {
+  return Array.isArray(value) ? value : undefined;
+}
+
+function readObject(value: unknown): Record<string, unknown> | undefined {
+  return isPlainObject(value) ? value : undefined;
+}
 
 function readProfile(value: unknown): DemoProfile | undefined {
   if (!isPlainObject(value)) return undefined;

@@ -1174,6 +1174,7 @@ export function CollectionView() {
     try {
       const payload: UpdateCollectionInput = {
         name: trimmedName,
+        description: trimmedDescription,
         containerType: editContainerType,
         imageUrl: editBinderImageUrl.trim() || null,
         associatedTcg: editBinderSetTcg || null,
@@ -1181,9 +1182,6 @@ export function CollectionView() {
         associatedSetName: editBinderSetName.trim() || null,
         isPublic: editBinderIsPublic,
       };
-      if (trimmedDescription) {
-        payload.description = trimmedDescription;
-      }
       await updateCollection(token, editBinderId, payload);
       closeEditBinderDialog();
     } catch (error) {
@@ -1196,7 +1194,10 @@ export function CollectionView() {
   };
 
   const shareUrl = editBinderShareToken && typeof window !== "undefined"
-    ? `${window.location.origin}/shared/${editBinderShareToken}`
+    ? `${window.location.origin}${getAppRoute(
+        `/shared/${encodeURIComponent(editBinderShareToken)}`,
+        pathname,
+      )}`
     : null;
 
   const handleCopyShareLink = async () => {
@@ -2458,37 +2459,6 @@ export function CollectionView() {
                 />
               </div>
             </div>
-            <div className="space-y-3 rounded-md border p-3">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <Label htmlFor="edit-binder-public">Public share link</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Anyone with the link can view this binder without signing in.
-                  </p>
-                </div>
-                <Switch
-                  id="edit-binder-public"
-                  checked={editBinderIsPublic}
-                  onCheckedChange={setEditBinderIsPublic}
-                />
-              </div>
-              {editBinderIsPublic && shareUrl && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input value={shareUrl} readOnly aria-label="Public binder link" />
-                  <Button type="button" variant="secondary" onClick={handleCopyShareLink}>
-                    {shareCopied ? "Copied" : "Copy link"}
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={handleRotateShareLink}>
-                    Reset link
-                  </Button>
-                </div>
-              )}
-              {editBinderIsPublic && !shareUrl && (
-                <p className="text-xs text-muted-foreground">
-                  Save changes to create the public link.
-                </p>
-              )}
-            </div>
             <div className="space-y-3" data-oid="qbovcfx">
               <Label data-oid="lvv6t2-">Color accent</Label>
               <div className="grid grid-cols-8 gap-2" data-oid="un2:84d">
@@ -2672,6 +2642,49 @@ export function CollectionView() {
                   placeholder="Set name"
                 />
               </div>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="edit-binder-public">Public share link</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Anyone with the link can view this binder without signing in.
+                  </p>
+                </div>
+                <Switch
+                  id="edit-binder-public"
+                  checked={editBinderIsPublic}
+                  onCheckedChange={setEditBinderIsPublic}
+                />
+              </div>
+              {editBinderIsPublic && shareUrl && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={shareUrl}
+                    readOnly
+                    aria-label="Public binder link"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCopyShareLink}
+                  >
+                    {shareCopied ? "Copied" : "Copy link"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleRotateShareLink}
+                  >
+                    Reset link
+                  </Button>
+                </div>
+              )}
+              {editBinderIsPublic && !shareUrl && (
+                <p className="text-xs text-muted-foreground">
+                  Save changes to create the public link.
+                </p>
+              )}
             </div>
             {editBinderError && (
               <p className="text-sm text-destructive" data-oid="3qglhv.">

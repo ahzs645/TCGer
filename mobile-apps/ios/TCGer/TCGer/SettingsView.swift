@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var scannerCropRescueEnabled = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
+    @StateObject private var offlinePackDownloads = PackOfflineDownloadManager.shared
     @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
@@ -537,6 +538,8 @@ struct SettingsView: View {
                     }
                 }
 
+                OfflinePackDownloadsSection(manager: offlinePackDownloads)
+
                 // Data & Sync Section
                 Section {
                     if !isLocalMode {
@@ -608,22 +611,22 @@ struct SettingsView: View {
 
                     // Cache Info
                     HStack {
-                        Text("Image Cache")
+                        Text("Offline Cache")
                         Spacer()
                         Text(cacheSize)
                             .foregroundColor(.secondary)
                     }
 
                     // Clear Cache Button
-                    Button("Clear Image Cache", role: .destructive) {
+                    Button("Clear Offline Cache", role: .destructive) {
                         showingClearCacheAlert = true
                     }
                 } header: {
                     Text("Data & Storage")
                 } footer: {
                     Text(isLocalMode
-                        ? "Your collection is stored locally on this phone. Clearing the image cache only frees up downloaded artwork."
-                        : "Offline mode downloads your collections for viewing without internet. Clear cache to free up storage.")
+                        ? "Your collection is stored locally on this phone. Clearing this cache removes downloaded artwork and offline pack sets, but not your collection."
+                        : "Offline mode downloads your collections for viewing without internet. Clear cache to remove downloaded artwork and offline pack sets.")
                 }
 
                 // Export Section
@@ -841,7 +844,7 @@ struct SettingsView: View {
                     clearCache()
                 }
             } message: {
-                Text("This will remove all cached data. You'll need to sync again for offline access.")
+                Text("This removes cached artwork and downloaded offline pack sets. Your collection is not deleted.")
             }
             .alert("Hide Developer Tools?", isPresented: $showingHideDeveloperToolsAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -986,6 +989,7 @@ struct SettingsView: View {
     private func clearCache() {
         do {
             try CacheManager.shared.clearAll()
+            offlinePackDownloads.refresh()
             updateCacheInfo()
         } catch {
             print("Failed to clear cache: \(error)")

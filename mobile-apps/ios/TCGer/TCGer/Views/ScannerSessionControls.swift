@@ -20,6 +20,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     let demoTitle: String
     let onRunDemo: () -> Void
     @ViewBuilder let leadingContent: () -> LeadingContent
+    @State private var showingOptions = false
 
     var body: some View {
         if #available(iOS 26.0, *) {
@@ -54,88 +55,28 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
 
             Spacer()
 
-            Menu {
-                if !showsBinderOptions {
-                    Section("Single-card scan") {
-                        ForEach(ScannerTriggerMode.allCases) { mode in
-                            Button {
-                                triggerMode = mode
-                            } label: {
-                                if triggerMode == mode {
-                                    Label(mode.displayName, systemImage: "checkmark")
-                                } else {
-                                    Text(mode.displayName)
-                                }
-                            }
-                            .disabled(isProcessing)
-                        }
-                    }
-                }
-
-                Section("Photo library") {
-                    Button(action: onLoadPhoto) {
-                        Label("Load Photo", systemImage: "photo")
-                    }
-                    .disabled(isProcessing)
-
-                    Button(action: onLoadPhotos) {
-                        Label("Load Photos in Bulk", systemImage: "photo.stack")
-                    }
-                    .disabled(isProcessing)
-                }
-
-                if showsTestInputs {
-                    Section("Testing") {
-                        Button(action: onRunDemo) {
-                            Label(demoTitle, systemImage: "testtube.2")
-                        }
-                        .disabled(isProcessing)
-
-                        Menu {
-                            ForEach(availableScanEngines) { engine in
-                                Button {
-                                    selectedEngine = engine
-                                } label: {
-                                    if selectedEngine == engine {
-                                        Label(engine.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(engine.displayName)
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label("Recognition Engine", systemImage: "cpu")
-                        }
-                        .disabled(isProcessing || availableScanEngines.count < 2)
-                    }
-                }
-
-                if !showsBinderOptions {
-                    Section("Results") {
-                        Toggle(isOn: $automaticallyShowResults) {
-                            Label("Open Results Automatically", systemImage: "rectangle.portrait.and.arrow.forward")
-                        }
-                        .disabled(isProcessing)
-                    }
-                }
-
-                if showsBinderOptions {
-                    Section("Binder scans") {
-                        Toggle(isOn: $savesBinderPageImages) {
-                            Label("Save Page Photos", systemImage: "photo.on.rectangle.angled")
-                        }
-                        .disabled(isProcessing)
-
-                        if savesBinderPageImages {
-                            Toggle(isOn: $replacesBinderPageImages) {
-                                Label("Replace Photos on Retake", systemImage: "arrow.triangle.2.circlepath")
-                            }
-                            .disabled(isProcessing)
-                        }
-                    }
-                }
+            Button {
+                showingOptions = true
             } label: {
                 scannerOptionsLabel
+            }
+            .popover(isPresented: $showingOptions, arrowEdge: .top) {
+                ScannerOptionsPopover(
+                    triggerMode: $triggerMode,
+                    selectedEngine: $selectedEngine,
+                    automaticallyShowResults: $automaticallyShowResults,
+                    savesBinderPageImages: $savesBinderPageImages,
+                    replacesBinderPageImages: $replacesBinderPageImages,
+                    availableScanEngines: availableScanEngines,
+                    showsBinderOptions: showsBinderOptions,
+                    showsTestInputs: showsTestInputs,
+                    isProcessing: isProcessing,
+                    onLoadPhoto: onLoadPhoto,
+                    onLoadPhotos: onLoadPhotos,
+                    demoTitle: demoTitle,
+                    onRunDemo: onRunDemo
+                )
+                .presentationCompactAdaptation(.popover)
             }
             .foregroundStyle(.primary)
             .accessibilityLabel("Scanner options")
@@ -209,6 +150,124 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
         }
+    }
+}
+
+/// A stable, independently scrollable presentation for scanner settings.
+/// The system `Menu` rebuilt its tall menu whenever live scanner state changed,
+/// which reset an in-progress scroll to the first item.
+private struct ScannerOptionsPopover: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @Binding var triggerMode: ScannerTriggerMode
+    @Binding var selectedEngine: ScanEnginePreference
+    @Binding var automaticallyShowResults: Bool
+    @Binding var savesBinderPageImages: Bool
+    @Binding var replacesBinderPageImages: Bool
+    let availableScanEngines: [ScanEnginePreference]
+    let showsBinderOptions: Bool
+    let showsTestInputs: Bool
+    let isProcessing: Bool
+    let onLoadPhoto: () -> Void
+    let onLoadPhotos: () -> Void
+    let demoTitle: String
+    let onRunDemo: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if !showsBinderOptions {
+                    Section("Single-card scan") {
+                        Picker("Capture", selection: $triggerMode) {
+                            ForEach(ScannerTriggerMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                        .disabled(isProcessing)
+                    }
+                }
+
+                Section("Photo library") {
+                    Button {
+                        dismiss()
+                        onLoadPhoto()
+                    } label: {
+                        Label("Load Photo", systemImage: "photo")
+                    }
+                    .disabled(isProcessing)
+
+                    Button {
+                        dismiss()
+                        onLoadPhotos()
+                    } label: {
+                        Label("Load Photos in Bulk", systemImage: "photo.stack")
+                    }
+                    .disabled(isProcessing)
+                }
+
+                if showsTestInputs {
+                    Section("Testing") {
+                        Button {
+                            dismiss()
+                            onRunDemo()
+                        } label: {
+                            Label(demoTitle, systemImage: "testtube.2")
+                        }
+                        .disabled(isProcessing)
+
+                        Picker(selection: $selectedEngine) {
+                            ForEach(availableScanEngines) { engine in
+                                Text(engine.displayName).tag(engine)
+                            }
+                        } label: {
+                            Label("Recognition Engine", systemImage: "cpu")
+                        }
+                        .disabled(isProcessing || availableScanEngines.count < 2)
+                    }
+                }
+
+                if !showsBinderOptions {
+                    Section("Results") {
+                        Toggle(isOn: $automaticallyShowResults) {
+                            Label(
+                                "Open Results Automatically",
+                                systemImage: "rectangle.portrait.and.arrow.forward"
+                            )
+                        }
+                        .disabled(isProcessing)
+                    }
+                }
+
+                if showsBinderOptions {
+                    Section("Binder scans") {
+                        Toggle(isOn: $savesBinderPageImages) {
+                            Label("Save Page Photos", systemImage: "photo.on.rectangle.angled")
+                        }
+                        .disabled(isProcessing)
+
+                        if savesBinderPageImages {
+                            Toggle(isOn: $replacesBinderPageImages) {
+                                Label(
+                                    "Replace Photos on Retake",
+                                    systemImage: "arrow.triangle.2.circlepath"
+                                )
+                            }
+                            .disabled(isProcessing)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Scanner Options")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .frame(idealWidth: 360, idealHeight: 560)
     }
 }
 

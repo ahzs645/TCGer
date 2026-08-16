@@ -39,12 +39,19 @@ import { useCollectionsStore } from "@/stores/collections";
 import { useShallow } from "zustand/react/shallow";
 const NO_DEFAULT_BINDER = "__none__";
 
-export function CollectionImportDialog() {
+export function CollectionImportDialog({
+  offlineCsvOnly = false,
+}: {
+  offlineCsvOnly?: boolean;
+} = {}) {
   const { token, user } = useAuthStore();
-  const { collections, fetchCollections } = useCollectionsStore(useShallow((state) => ({
-    collections: state.collections,
-    fetchCollections: state.fetchCollections,
-  })));
+  const requestToken = token ?? (offlineCsvOnly ? "demo-token-static" : null);
+  const { collections, fetchCollections } = useCollectionsStore(
+    useShallow((state) => ({
+      collections: state.collections,
+      fetchCollections: state.fetchCollections,
+    })),
+  );
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");
@@ -87,7 +94,7 @@ export function CollectionImportDialog() {
   };
 
   const runPreview = async () => {
-    if (!token || !csv) return;
+    if (!requestToken || !csv) return;
     setBusy("preview");
     setStatus(null);
     try {
@@ -96,7 +103,7 @@ export function CollectionImportDialog() {
         CollectionImportResolution
       >;
       const result = await previewCollectionSource(
-        token,
+        requestToken,
         { content: csv, fileName, format, resolutions, options },
         user,
       );
@@ -114,7 +121,7 @@ export function CollectionImportDialog() {
   };
 
   const commit = async () => {
-    if (!token || !csv || !preview?.valid) return;
+    if (!requestToken || !csv || !preview?.valid) return;
     setBusy("commit");
     setStatus(null);
     try {
@@ -123,7 +130,7 @@ export function CollectionImportDialog() {
         CollectionImportResolution
       >;
       const result = await commitCollectionSource(
-        token,
+        requestToken,
         { content: csv, fileName, format, resolutions, options },
         user,
       );
@@ -132,7 +139,7 @@ export function CollectionImportDialog() {
         setStatus("The import changed during validation. Review the issues.");
         return;
       }
-      await fetchCollections(token);
+      await fetchCollections(requestToken);
       setStatus(
         `Imported ${result.importedCopies} copies across ${result.importedRows} rows.`,
       );
@@ -144,10 +151,10 @@ export function CollectionImportDialog() {
   };
 
   const downloadTemplate = async () => {
-    if (!token) return;
+    if (!requestToken) return;
     setBusy("template");
     try {
-      const blob = await downloadCollectionImportTemplate(token, user);
+      const blob = await downloadCollectionImportTemplate(requestToken, user);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -182,7 +189,9 @@ export function CollectionImportDialog() {
           <DialogTitle>Import collection</DialogTitle>
           <DialogDescription>
             Preview first. Nothing is written unless every row is valid.
-            Supports TCGer CSV, JSON, and Cardmarket Yu-Gi-Oh singles text.
+            {offlineCsvOnly
+              ? " The offline demo supports TCGer CSV."
+              : " Supports TCGer CSV, JSON, and Cardmarket Yu-Gi-Oh singles text."}{" "}
             Duplicate rows with identical copy attributes are merged.
           </DialogDescription>
         </DialogHeader>
@@ -198,7 +207,11 @@ export function CollectionImportDialog() {
             <input
               id="collection-import-file"
               type="file"
-              accept=".csv,.json,.txt,text/csv,text/plain,application/json"
+              accept={
+                offlineCsvOnly
+                  ? ".csv,text/csv"
+                  : ".csv,.json,.txt,text/csv,text/plain,application/json"
+              }
               className="sr-only"
               onChange={(event) => void readFile(event.target.files?.[0])}
             />
@@ -210,7 +223,7 @@ export function CollectionImportDialog() {
               variant="ghost"
               size="sm"
               onClick={downloadTemplate}
-              disabled={!token || busy !== null}
+              disabled={!requestToken || busy !== null}
             >
               {busy === "template" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -230,16 +243,24 @@ export function CollectionImportDialog() {
                 setPreview(null);
               }}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Auto-detect</SelectItem>
                 <SelectItem value="csv">TCGer CSV</SelectItem>
-                <SelectItem value="json">JSON</SelectItem>
-                <SelectItem value="cardmarket-text">Cardmarket Yu-Gi-Oh text</SelectItem>
+                {!offlineCsvOnly && <SelectItem value="json">JSON</SelectItem>}
+                {!offlineCsvOnly && (
+                  <SelectItem value="cardmarket-text">
+                    Cardmarket Yu-Gi-Oh text
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              PDF text extraction is not bundled; export or copy the order as text first.
+              {offlineCsvOnly
+                ? "Use the downloadable template for the accepted columns."
+                : "PDF text extraction is not bundled; export or copy the order as text first."}
             </p>
           </div>
 
@@ -324,7 +345,9 @@ export function CollectionImportDialog() {
                     }}
                     rows={5}
                     className="font-mono text-xs"
-                    placeholder={'{"3":{"externalId":"...","baseExternalId":"46986414","printingKey":"..."}}'}
+                    placeholder={
+                      '{"3":{"externalId":"...","baseExternalId":"46986414","printingKey":"..."}}'
+                    }
                   />
                 </div>
               )}

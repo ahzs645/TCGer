@@ -7,4 +7,8 @@ extension Double {
     var priceText: String {
         formatted(.currency(code: "USD"))
     }
+
+    func priceText(currency: String) -> String {
+        formatted(.currency(code: currency.uppercased()))
+    }
 }

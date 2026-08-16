@@ -1,8 +1,10 @@
 import {
+  JustTcgPriceProvider,
   LorcastPriceProvider,
   ScryfallPriceProvider,
   TcgDexPriceProvider,
 } from './market-price-providers';
+import { env } from '../../config/env';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -34,7 +36,9 @@ describe('market price providers', () => {
         jsonResponse({ pricing: { cardmarket: { unit: 'EUR', ...cardmarket } } }),
       );
 
-      await expect(new TcgDexPriceProvider().fetchPrice('pokemon', 'sv01-001')).resolves.toMatchObject({
+      await expect(
+        new TcgDexPriceProvider().fetchPrice('pokemon', 'sv01-001'),
+      ).resolves.toMatchObject({
         price: expected,
         currency: 'EUR',
       });
@@ -60,7 +64,9 @@ describe('market price providers', () => {
         jsonResponse({ prices: { usd: '3.25', usd_foil: '8.10', eur: '2.90' } }),
       );
 
-      await expect(new ScryfallPriceProvider().fetchPrice('magic', 'card-id')).resolves.toMatchObject({
+      await expect(
+        new ScryfallPriceProvider().fetchPrice('magic', 'card-id'),
+      ).resolves.toMatchObject({
         price: 3.25,
         currency: 'USD',
       });
@@ -71,7 +77,9 @@ describe('market price providers', () => {
         jsonResponse({ prices: { usd: null, usd_foil: '9.00', eur: '2.90', eur_foil: '7.50' } }),
       );
 
-      await expect(new ScryfallPriceProvider().fetchPrice('magic', 'card-id')).resolves.toMatchObject({
+      await expect(
+        new ScryfallPriceProvider().fetchPrice('magic', 'card-id'),
+      ).resolves.toMatchObject({
         price: 2.9,
         currency: 'EUR',
       });
@@ -80,11 +88,11 @@ describe('market price providers', () => {
 
   describe('Lorcast', () => {
     it('uses USD and falls back to USD foil for collection value', async () => {
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse({ prices: { usd: null, usd_foil: '12.40' } }),
-      );
+      fetchMock.mockResolvedValueOnce(jsonResponse({ prices: { usd: null, usd_foil: '12.40' } }));
 
-      await expect(new LorcastPriceProvider().fetchPrice('lorcana', 'crd_123')).resolves.toMatchObject({
+      await expect(
+        new LorcastPriceProvider().fetchPrice('lorcana', 'crd_123'),
+      ).resolves.toMatchObject({
         price: 12.4,
         currency: 'USD',
       });
@@ -102,6 +110,46 @@ describe('market price providers', () => {
         expect.stringMatching(/\/cards\/1\/42$/),
         expect.any(Object),
       );
+    });
+  });
+
+  describe('JustTCG', () => {
+    it('uses the Scryfall identifier and Near Mint variants for Magic', async () => {
+      const originalAPIKey = env.JUSTTCG_API_KEY;
+      env.JUSTTCG_API_KEY = 'test-key';
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            {
+              variants: [
+                { condition: 'Lightly Played', printing: 'Normal', price: 1.5 },
+                { condition: 'Near Mint', printing: 'Normal', price: 2.25 },
+                { condition: 'Near Mint', printing: 'Foil', price: 5.75 },
+              ],
+            },
+          ],
+        }),
+      );
+
+      try {
+        await expect(
+          new JustTcgPriceProvider().fetchPrice('magic', 'scryfall-uuid'),
+        ).resolves.toEqual({
+          price: 2.25,
+          foilPrice: 5.75,
+          reverseHoloPrice: undefined,
+          currency: 'USD',
+        });
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(String(url)).toContain('/cards?scryfallId=scryfall-uuid');
+        expect(options).toEqual(
+          expect.objectContaining({
+            headers: expect.objectContaining({ 'x-api-key': 'test-key' }),
+          }),
+        );
+      } finally {
+        env.JUSTTCG_API_KEY = originalAPIKey;
+      }
     });
   });
 

@@ -20,7 +20,7 @@ function isDemoPath(pathname: string | null | undefined): boolean {
   return pathname === "/demo" || pathname?.startsWith("/demo/") === true;
 }
 
-function shouldStubBetterAuth(): boolean {
+function shouldHandleDemoRequests(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
@@ -70,7 +70,7 @@ function maybeHandleDemoFetch(
         : (input as Request).url;
 
   // Only intercept requests to our API base URL
-  if (isDemoMode() && url.startsWith(DEMO_API_BASE_URL)) {
+  if (shouldHandleDemoRequests() && url.startsWith(DEMO_API_BASE_URL)) {
     const path = url.slice(DEMO_API_BASE_URL.length); // e.g. "/auth/login"
     const method = init?.method?.toUpperCase() ?? "GET";
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
@@ -79,7 +79,7 @@ function maybeHandleDemoFetch(
 
   // Intercept Better Auth session requests so they don't hang on GitHub Pages
   // where no backend server exists.  Better Auth uses /api/auth/* endpoints.
-  if (shouldStubBetterAuth()) {
+  if (shouldHandleDemoRequests()) {
     try {
       const parsed = new URL(url, window.location.origin);
       if (parsed.pathname.startsWith("/api/auth/")) {

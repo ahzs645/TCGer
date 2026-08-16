@@ -168,8 +168,29 @@ export function toPortableRows(
       userId: LOCAL_USER_ID,
       kind: "binder",
       name: binder.name,
+      ...(binder.description !== undefined && {
+        description: binder.description,
+      }),
       // Stored with a leading '#', but the REST contract carries it without.
       colorHex: binder.color?.replace(/^#/, ""),
+      ...(binder.defaultCondition !== undefined && {
+        defaultCondition: binder.defaultCondition,
+      }),
+      ...(binder.containerType !== undefined && {
+        containerType: binder.containerType,
+      }),
+      ...(binder.imageUrl !== undefined && { imageUrl: binder.imageUrl }),
+      ...(binder.associatedTcg !== undefined && {
+        associatedTcg: binder.associatedTcg,
+      }),
+      ...(binder.associatedSetCode !== undefined && {
+        associatedSetCode: binder.associatedSetCode,
+      }),
+      ...(binder.associatedSetName !== undefined && {
+        associatedSetName: binder.associatedSetName,
+      }),
+      ...(binder.shareToken !== undefined && { shareToken: binder.shareToken }),
+      ...(binder.isPublic !== undefined && { isPublic: binder.isPublic }),
       createdAt: created,
       updatedAt: epoch(binder.updatedAt, created),
     });
@@ -288,6 +309,27 @@ export function toDemoBinders(
       id: binder._id,
       name: binder.name,
       color: binder.colorHex ? `#${binder.colorHex}` : "#3b82f6",
+      ...(binder.description !== undefined && {
+        description: binder.description,
+      }),
+      ...(binder.defaultCondition !== undefined && {
+        defaultCondition: binder.defaultCondition,
+      }),
+      ...(binder.containerType !== undefined && {
+        containerType: binder.containerType,
+      }),
+      ...(binder.imageUrl !== undefined && { imageUrl: binder.imageUrl }),
+      ...(binder.associatedTcg !== undefined && {
+        associatedTcg: binder.associatedTcg as DemoBinder["associatedTcg"],
+      }),
+      ...(binder.associatedSetCode !== undefined && {
+        associatedSetCode: binder.associatedSetCode,
+      }),
+      ...(binder.associatedSetName !== undefined && {
+        associatedSetName: binder.associatedSetName,
+      }),
+      ...(binder.shareToken !== undefined && { shareToken: binder.shareToken }),
+      ...(binder.isPublic !== undefined && { isPublic: binder.isPublic }),
       cards: [...grouped.values()],
       createdAt: new Date(binder.createdAt).toISOString(),
       updatedAt: new Date(binder.updatedAt).toISOString(),

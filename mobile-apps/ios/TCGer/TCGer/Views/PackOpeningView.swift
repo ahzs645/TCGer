@@ -14,10 +14,12 @@ struct PackOpeningView: View {
     @State private var interfaceState = PackOpeningInterfaceState.loading
     @State private var command: PackOpeningCommand?
     @State private var selectedArtwork: PhotosPickerItem?
-    @State private var inspectedPull: PackOpeningPull?
+    @State private var revealInspectedCardIndex: Int?
+    @State private var summaryInspectedPullIndex: Int?
     @State private var rendererReady = false
     @State private var prefetchedSessionID: String?
     @StateObject private var webSession: PackOpeningWebSession
+    @StateObject private var offlinePackDownloads = PackOfflineDownloadManager.shared
 
     @MainActor
     init(webSession: PackOpeningWebSession? = nil) {
@@ -40,7 +42,10 @@ struct PackOpeningView: View {
             .ignoresSafeArea()
 
             if interfaceState.showsNativeResults, let session = interfaceState.session {
-                PackOpeningNativeResultsView(session: session)
+                PackOpeningNativeResultsView(
+                    session: session,
+                    inspectedPullIndex: $summaryInspectedPullIndex
+                )
                     .transition(.opacity)
             }
 
@@ -49,7 +54,7 @@ struct PackOpeningView: View {
                 Spacer(minLength: 24)
                 if let errorMessage {
                     errorOverlay(errorMessage)
-                } else if rendererReady {
+                } else if rendererReady && closeUpPull == nil {
                     bottomOverlay
                 }
             }
@@ -57,15 +62,15 @@ struct PackOpeningView: View {
             .safeAreaPadding(.top, 8)
             .safeAreaPadding(.bottom, 12)
 
-            if let inspectedPull {
-                PackOpeningInlineInspector(
+            if let inspectedPull = closeUpPull {
+                PackOpeningCardCloseUp(
                     pull: inspectedPull,
+                    identity: closeUpIdentity,
                     onClose: {
-                        withAnimation(.snappy) { self.inspectedPull = nil }
+                        closeCardInspection()
                     },
-                    onSwipeAway: {
-                        withAnimation(.snappy) { self.inspectedPull = nil }
-                        send(.advance)
+                    onSwipe: { direction in
+                        swipeInspectedCard(direction: direction)
                     }
                 )
                 .transition(.scale(scale: 0.78).combined(with: .opacity))
@@ -89,9 +94,93 @@ struct PackOpeningView: View {
                 ))
             }
         }
+        .onReceive(NetworkMonitor.shared.$isConnected.removeDuplicates()) { isConnected in
+            webSession.setPrefersBundledResources(!isConnected)
+            guard !isConnected, !webSession.isReady else { return }
+
+            // A warm-up request may have started while NWPathMonitor still
+            // held its optimistic initial value. Restart it against the
+            // bundled manifest and mesh instead of leaving a blank web view
+            // waiting for an HTTP timeout.
+            errorMessage = nil
+            interfaceState = .loading
+            rendererReady = false
+            webSession.reload()
+            reloadID = UUID()
+        }
         .onDisappear {
             webSession.send(.backToPacks)
         }
+    }
+
+    private var inspectedRevealPull: PackOpeningPull? {
+        guard
+            let revealInspectedCardIndex,
+            interfaceState.phase == .reveal,
+            let session = interfaceState.session,
+            interfaceState.currentPackNumber > 0,
+            session.packs.indices.contains(interfaceState.currentPackNumber - 1)
+        else { return nil }
+
+        let pack = session.packs[interfaceState.currentPackNumber - 1]
+        guard
+            pack.indices.contains(revealInspectedCardIndex),
+            revealInspectedCardIndex < interfaceState.revealedCount
+        else { return nil }
+        return pack[revealInspectedCardIndex]
+    }
+
+    private var inspectedSummaryPull: PackOpeningPull? {
+        guard
+            let summaryInspectedPullIndex,
+            let pulls = interfaceState.session?.pulls,
+            pulls.indices.contains(summaryInspectedPullIndex)
+        else { return nil }
+        return pulls[summaryInspectedPullIndex]
+    }
+
+    private var closeUpPull: PackOpeningPull? {
+        inspectedRevealPull ?? inspectedSummaryPull
+    }
+
+    private var closeUpIdentity: String {
+        if let revealInspectedCardIndex {
+            return "reveal-\(interfaceState.currentPackNumber)-\(revealInspectedCardIndex)"
+        }
+        return "summary-\(summaryInspectedPullIndex ?? -1)"
+    }
+
+    private func closeCardInspection() {
+        withAnimation(.snappy) {
+            revealInspectedCardIndex = nil
+            summaryInspectedPullIndex = nil
+        }
+    }
+
+    private func swipeInspectedCard(direction: Int) {
+        if let revealInspectedCardIndex {
+            let nextIndex = revealInspectedCardIndex + direction
+            if nextIndex >= 0, nextIndex < interfaceState.revealedCount {
+                withAnimation(.snappy) { self.revealInspectedCardIndex = nextIndex }
+            } else if direction > 0,
+                      revealInspectedCardIndex == interfaceState.revealedCount - 1 {
+                send(.advance)
+            } else {
+                closeCardInspection()
+            }
+            return
+        }
+
+        guard
+            let summaryInspectedPullIndex,
+            let pulls = interfaceState.session?.pulls
+        else { return }
+        let nextIndex = summaryInspectedPullIndex + direction
+        guard pulls.indices.contains(nextIndex) else {
+            closeCardInspection()
+            return
+        }
+        withAnimation(.snappy) { self.summaryInspectedPullIndex = nextIndex }
     }
 
     private var packScenePlaceholder: some View {
@@ -164,15 +253,28 @@ struct PackOpeningView: View {
 
         case .select:
             VStack(spacing: 10) {
-                Picker("Opening style", selection: Binding(
-                    get: { interfaceState.openingMode },
-                    set: { send(.setOpeningMode($0)) }
-                )) {
-                    Label("Open Normally", systemImage: "sparkles").tag(PackOpeningInterfaceState.OpeningMode.normal)
-                    Label("Quick Open", systemImage: "bolt.fill").tag(PackOpeningInterfaceState.OpeningMode.quick)
+                if interfaceState.packCount == 1 {
+                    Picker("Opening style", selection: Binding(
+                        get: { interfaceState.openingMode },
+                        set: { send(.setOpeningMode($0)) }
+                    )) {
+                        Label("Open Normally", systemImage: "sparkles").tag(PackOpeningInterfaceState.OpeningMode.normal)
+                        Label("Quick Open", systemImage: "bolt.fill").tag(PackOpeningInterfaceState.OpeningMode.quick)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityHint("Normal reveals the pack card by card. Quick Open goes directly to its results.")
+                } else {
+                    Label(
+                        "\(interfaceState.packCount)-Pack Summary",
+                        systemImage: "rectangle.grid.2x2.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .glassEffect(.regular, in: .capsule)
+                    .accessibilityHint("Multi-pack openings go directly to grouped results.")
                 }
-                .pickerStyle(.segmented)
-                .accessibilityHint("Normal reveals every pack. Quick Open skips directly to grouped results.")
 
                 HStack(spacing: 10) {
                     Menu {
@@ -196,6 +298,16 @@ struct PackOpeningView: View {
                     }
                     .buttonStyle(.glass)
                     .accessibilityLabel("Use custom pack artwork")
+                }
+
+                if let status = offlinePackDownloads.status(forSetID: interfaceState.selectedSetID) {
+                    PackOfflineAvailabilityLabel(status: status)
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let reference = interfaceState.selectedOddsReference {
+                    PackOddsSourceAttribution(reference: reference)
                 }
 
                 if interfaceState.selectedSetOptions.count > 1 {
@@ -373,13 +485,25 @@ struct PackOpeningView: View {
             phase = value.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
                 .capitalized
         case .interfaceState(let state):
+            if state.phase != .reveal {
+                revealInspectedCardIndex = nil
+            } else if revealInspectedCardIndex != nil,
+                      state.revealedCount > interfaceState.revealedCount {
+                revealInspectedCardIndex = state.revealedCount - 1
+            }
+            if state.phase != .summary && state.phase != .final {
+                summaryInspectedPullIndex = nil
+            }
             if let session = state.session, prefetchedSessionID != session.id {
                 prefetchedSessionID = session.id
                 ImageCache.shared.prefetch(urls: session.resultArtworkURLs)
             }
             interfaceState = state
-        case .inspectRequested(let pull):
-            withAnimation(.snappy) { inspectedPull = pull }
+        case .inspectRequested(_):
+            guard interfaceState.phase == .reveal else { return }
+            withAnimation(.snappy) {
+                revealInspectedCardIndex = max(0, interfaceState.revealedCount - 1)
+            }
         case .haptic(let style):
             switch style {
             case "selection": HapticManager.selection()
@@ -396,7 +520,7 @@ struct PackOpeningView: View {
 
 private struct PackOpeningNativeResultsView: View {
     let session: PackOpeningPullSession
-    @State private var inspectedPull: PackOpeningPull?
+    @Binding var inspectedPullIndex: Int?
 
     private let columns = [
         GridItem(.flexible(minimum: 120), spacing: 14),
@@ -417,7 +541,9 @@ private struct PackOpeningNativeResultsView: View {
                             .foregroundStyle(.orange)
 
                         PackOpeningNativeResultCard(pull: bestPull) {
-                            withAnimation(.snappy) { inspectedPull = bestPull }
+                            withAnimation(.snappy) {
+                                inspectedPullIndex = session.pulls.firstIndex(of: bestPull)
+                            }
                         }
                             .frame(maxWidth: 190)
                             .frame(maxWidth: .infinity)
@@ -436,9 +562,13 @@ private struct PackOpeningNativeResultsView: View {
                         }
 
                         LazyVGrid(columns: columns, alignment: .center, spacing: 20) {
-                            ForEach(Array(pack.enumerated()), id: \.offset) { _, pull in
+                            ForEach(Array(pack.enumerated()), id: \.offset) { cardIndex, pull in
                                 PackOpeningNativeResultCard(pull: pull) {
-                                    withAnimation(.snappy) { inspectedPull = pull }
+                                    withAnimation(.snappy) {
+                                        inspectedPullIndex = session.packs
+                                            .prefix(packIndex)
+                                            .reduce(0) { $0 + $1.count } + cardIndex
+                                    }
                                 }
                             }
                         }
@@ -452,20 +582,6 @@ private struct PackOpeningNativeResultsView: View {
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .accessibilityLabel("Pack results for \(session.packLabel)")
-        .overlay {
-            if let inspectedPull {
-                PackOpeningInlineInspector(
-                    pull: inspectedPull,
-                    onClose: {
-                        withAnimation(.snappy) { self.inspectedPull = nil }
-                    },
-                    onSwipeAway: {
-                        withAnimation(.snappy) { self.inspectedPull = nil }
-                    }
-                )
-                .transition(.scale(scale: 0.78).combined(with: .opacity))
-            }
-        }
     }
 
     private func tierRank(_ tier: String) -> Int {
@@ -561,10 +677,12 @@ private struct PackOpeningNativeResultCard: View {
     }
 }
 
-private struct PackOpeningInlineInspector: View {
+private struct PackOpeningCardCloseUp: View {
     let pull: PackOpeningPull
+    let identity: String
     let onClose: () -> Void
-    let onSwipeAway: () -> Void
+    /// Positive advances, negative moves backward or exits when unavailable.
+    let onSwipe: (Int) -> Void
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var isShowingBack = false
@@ -589,64 +707,54 @@ private struct PackOpeningInlineInspector: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.54)
-                .ignoresSafeArea()
-                .onTapGesture(perform: onClose)
-
-            VStack(spacing: 16) {
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.headline)
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityLabel("Close inspection")
-
-                    Spacer()
-
-                    Text("Inspect Card")
-                        .font(.headline)
-
-                    Spacer()
-
-                    Button {
-                        withAnimation(.snappy) { isShowingBack.toggle() }
-                    } label: {
-                        Image(systemName: "rectangle.on.rectangle.angled")
-                            .font(.headline)
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityLabel("Flip card")
-                }
+        GeometryReader { geometry in
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: onClose)
 
                 cardFace
-                    .padding(.horizontal, 8)
+                    .frame(maxWidth: min(geometry.size.width * 0.9, 430))
+                    .frame(maxHeight: geometry.size.height * 0.76)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 88)
 
-                VStack(spacing: 3) {
-                    Text(pull.name)
-                        .font(.title2.bold())
-                    Text("\(pull.setName) · \(pull.rarity)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack {
+                    HStack {
+                        Button(action: onClose) {
+                            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                .font(.headline)
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Return to card reveal")
+
+                        Spacer()
+
+                        Button {
+                            withAnimation(.snappy) { isShowingBack.toggle() }
+                        } label: {
+                            Image(systemName: "rectangle.on.rectangle.angled")
+                                .font(.headline)
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Flip card")
+                    }
+
+                    Spacer()
+                    actionBar
                 }
-
-                Text(effectiveScale > 1.01
-                     ? "Pinch inward to reset"
-                     : "Pinch to inspect · flip for the back · swipe away when done")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-
-                actionBar
+                .padding(.horizontal, 18)
+                .safeAreaPadding(.top, 12)
+                .safeAreaPadding(.bottom, 14)
             }
-            .padding(18)
-            .frame(maxWidth: 440)
-            .glassEffect(.regular, in: .rect(cornerRadius: 32))
-            .padding(.horizontal, 14)
-            .safeAreaPadding(.vertical, 12)
+        }
+        .background(.black.opacity(0.06))
+        .onChange(of: identity) { _, _ in
+            isShowingBack = false
+            settledScale = 1
         }
         .sheet(item: $wishlistCard) { card in
             AddToWishlistSheet(card: card)
@@ -704,11 +812,14 @@ private struct PackOpeningInlineInspector: View {
                     state = value.translation
                 }
                 .onEnded { value in
-                    guard effectiveScale <= 1.02,
-                          abs(value.translation.width) > 90,
-                          abs(value.translation.width) > abs(value.translation.height)
-                    else { return }
-                    onSwipeAway()
+                    guard effectiveScale <= 1.02 else { return }
+                    let horizontal = abs(value.translation.width)
+                    let vertical = abs(value.translation.height)
+                    if horizontal > 72, horizontal > vertical {
+                        onSwipe(value.translation.width < 0 ? 1 : -1)
+                    } else if vertical > 90, vertical > horizontal {
+                        onClose()
+                    }
                 }
         )
         .onTapGesture(count: 2) {
@@ -740,9 +851,9 @@ private struct PackOpeningInlineInspector: View {
             .buttonStyle(.glass)
 
             Button {
-                onSwipeAway()
+                onClose()
             } label: {
-                Label("Done", systemImage: "arrow.right")
+                Label("Done", systemImage: "arrow.down.right.and.arrow.up.left")
             }
             .buttonStyle(.glassProminent)
         }
@@ -796,6 +907,33 @@ private struct PackOpeningInlineInspector: View {
     }
 }
 
+private struct PackOddsSourceAttribution: View {
+    let reference: PackOpeningInterfaceState.PackOption.OddsReference
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let destination = reference.destination {
+                Link(destination: destination) {
+                    Label(reference.title, systemImage: "arrow.up.right.square")
+                        .fontWeight(.semibold)
+                }
+                .accessibilityLabel("Pull-rate source: \(reference.title)")
+            } else {
+                Text(reference.title)
+                    .fontWeight(.semibold)
+            }
+
+            Text("\(reference.sampleSize.formatted())-pack sample · \(reference.note)")
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
 struct PackOpeningInterfaceState: Codable, Equatable {
     enum Phase: String, Codable {
         case loading, select, tear, opening, reveal, summary, final
@@ -806,11 +944,21 @@ struct PackOpeningInterfaceState: Codable, Equatable {
     }
 
     struct PackOption: Codable, Equatable, Identifiable {
+        struct OddsReference: Codable, Equatable {
+            let title: String
+            let url: String
+            let sampleSize: Int
+            let note: String
+
+            var destination: URL? { URL(string: url) }
+        }
+
         let id: String
         let label: String
         let setID: String?
         let setLabel: String?
         let variationLabel: String?
+        let oddsReference: OddsReference?
 
         var resolvedSetID: String { setID ?? id }
         var resolvedSetLabel: String { setLabel ?? label }
@@ -884,9 +1032,17 @@ struct PackOpeningInterfaceState: Codable, Equatable {
         selectedPackOption?.resolvedSetLabel ?? selectedPackLabel
     }
 
+    var selectedSetID: String {
+        selectedPackOption?.resolvedSetID ?? selectedPackID
+    }
+
     var selectedSetOptions: [PackOption] {
         guard let selectedPackOption else { return [] }
         return packOptions.filter { $0.resolvedSetID == selectedPackOption.resolvedSetID }
+    }
+
+    var selectedOddsReference: PackOption.OddsReference? {
+        selectedPackOption?.oddsReference
     }
 
     var selectedVariationLabel: String {
@@ -1041,6 +1197,10 @@ final class PackOpeningWebSession: ObservableObject {
         webView.stopLoading()
         webView.load(URLRequest(url: PackOpeningResource.entryURL))
     }
+
+    func setPrefersBundledResources(_ prefersBundledResources: Bool) {
+        coordinator.setPrefersBundledResources(prefersBundledResources)
+    }
 }
 
 struct PackOpeningWebView: UIViewRepresentable {
@@ -1148,6 +1308,11 @@ final class PackOpeningWebCoordinator: NSObject, WKScriptMessageHandler, WKNavig
         lastCommandID = nil
     }
 
+    func setPrefersBundledResources(_ prefersBundledResources: Bool) {
+        resourceBridge.setPrefersBundledResources(prefersBundledResources)
+        resourceHandler.setPrefersBundledResources(prefersBundledResources)
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard
             message.name == Self.bridgeName,
@@ -1240,6 +1405,12 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
     private let remoteBaseURL: URL
     private let session: URLSession
     private let assetCache: PackOpeningAssetCache
+    private let resourceModeLock = NSLock()
+    private var _prefersBundledResources = false
+
+    private var prefersBundledResources: Bool {
+        resourceModeLock.withLock { _prefersBundledResources }
+    }
 
     init(
         remoteBaseURL: URL = PackOpeningResource.remoteBaseURL(),
@@ -1249,6 +1420,12 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
         self.remoteBaseURL = remoteBaseURL
         self.session = session
         self.assetCache = assetCache
+    }
+
+    func setPrefersBundledResources(_ prefersBundledResources: Bool) {
+        resourceModeLock.withLock {
+            _prefersBundledResources = prefersBundledResources
+        }
     }
 
     func userContentController(
@@ -1290,13 +1467,19 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
             return
         }
 
+        let prefersBundledResources = prefersBundledResources
         let isManifest = PackOpeningResource.isManifest(remoteURL)
         if let cached = assetCache.data(for: remoteURL),
-           !isManifest || !NetworkMonitor.shared.isConnected {
+           prefersBundledResources || !isManifest || !NetworkMonitor.shared.isConnected {
             completion(.success(Resource(
                 data: cached,
                 mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension)
             )))
+            return
+        }
+
+        if prefersBundledResources {
+            loadBundled(requestURL, completion: completion)
             return
         }
 
@@ -1518,6 +1701,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
     private let session: URLSession
     private let assetCache: PackOpeningAssetCache
     private var remoteTasks: [ObjectIdentifier: RemoteTask] = [:]
+    private var prefersBundledResources = false
 
     init(
         remoteBaseURL: URL? = nil,
@@ -1527,6 +1711,10 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         self.remoteBaseURL = remoteBaseURL ?? PackOpeningResource.remoteBaseURL()
         self.session = session
         self.assetCache = assetCache ?? .shared
+    }
+
+    func setPrefersBundledResources(_ prefersBundledResources: Bool) {
+        self.prefersBundledResources = prefersBundledResources
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
@@ -1558,13 +1746,18 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
     ) {
         let isManifest = PackOpeningResource.isManifest(remoteURL)
         if let cached = assetCache.data(for: remoteURL),
-           !isManifest || !NetworkMonitor.shared.isConnected {
+           prefersBundledResources || !isManifest || !NetworkMonitor.shared.isConnected {
             deliver(
                 cached,
                 remoteURL: remoteURL,
                 requestURL: requestURL,
                 schemeTask: schemeTask
             )
+            return
+        }
+
+        if prefersBundledResources {
+            loadBundled(requestURL, schemeTask: schemeTask)
             return
         }
 

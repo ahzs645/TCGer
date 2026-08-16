@@ -6,6 +6,11 @@ struct PricesView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var collections: [Collection] = []
     @State private var movers = PriceAnalyticsMovers(gainers: [], losers: [])
+    @State private var livePrices: [String: APIService.TrackedPriceResult] = [:]
+    @State private var lastPriceCheck: Date?
+    @State private var nextPriceRefresh: Date?
+    @State private var priceRefreshMessage: String?
+    @State private var isRefreshingPrices = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var searchText = ""
@@ -25,6 +30,8 @@ struct PricesView: View {
         let setName: String?
         let rarity: String?
         let price: Double
+        let currency: String
+        let source: String?
         var owned: Int
         let imageURL: String?
         var change: Double?
@@ -48,6 +55,7 @@ struct PricesView: View {
         var cards: [String: TrackedCard] = [:]
         for card in collections.flatMap(\.cards) {
             let key = "\(card.tcg):\(card.externalId ?? card.cardId)"
+            let market = livePrices[key.lowercased()]
             if var existing = cards[key] {
                 existing.owned += card.quantity
                 cards[key] = existing
@@ -58,7 +66,9 @@ struct PricesView: View {
                     tcg: card.tcg,
                     setName: card.setName,
                     rarity: card.rarity,
-                    price: card.price ?? 0,
+                    price: market?.price ?? card.price ?? 0,
+                    currency: market?.currency ?? "USD",
+                    source: market?.source,
                     owned: card.quantity,
                     imageURL: card.imageUrlSmall ?? card.imageUrl,
                     change: changes[key]
@@ -82,8 +92,13 @@ struct PricesView: View {
             }
     }
 
-    private var portfolioValue: Double {
-        trackedCards.reduce(0) { $0 + $1.price * Double($1.owned) }
+    private var portfolioValueText: String {
+        let totals = Dictionary(grouping: trackedCards, by: \.currency).mapValues { cards in
+            cards.reduce(0) { $0 + $1.price * Double($1.owned) }
+        }
+        return totals.keys.sorted().map { currency in
+            (totals[currency] ?? 0).priceText(currency: currency)
+        }.joined(separator: " · ")
     }
 
     var body: some View {
@@ -116,7 +131,7 @@ struct PricesView: View {
                 List {
                     Section {
                         HStack {
-                            PriceStat(title: "Portfolio", value: portfolioValue.priceText)
+                            PriceStat(title: "Portfolio", value: portfolioValueText)
                             Divider()
                             PriceStat(title: "Tracked", value: "\(trackedCards.count)")
                             Divider()
@@ -126,6 +141,23 @@ struct PricesView: View {
                             )
                         }
                         .padding(.vertical, 6)
+                    }
+
+                    if let lastPriceCheck {
+                        Section {
+                            LabeledContent("Market prices") {
+                                Text(lastPriceCheck, format: .dateTime.month().day().hour().minute())
+                            }
+                            if let priceRefreshMessage {
+                                Text(priceRefreshMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if let nextPriceRefresh {
+                                Text("Next automatic check after \(nextPriceRefresh.formatted(date: .abbreviated, time: .shortened)), while this screen is open.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
 
                     Section {
@@ -157,12 +189,40 @@ struct PricesView: View {
         }
         .navigationTitle("Prices")
         .searchable(text: $searchText, prompt: "Search tracked cards")
-        .refreshable { await load() }
-        .task { await load() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await refreshTrackedPrices(force: true) }
+                } label: {
+                    if isRefreshingPrices {
+                        ProgressView()
+                    } else {
+                        Label("Refresh prices", systemImage: "arrow.clockwise")
+                    }
+                }
+                .disabled(isRefreshingPrices || collections.flatMap(\.cards).isEmpty)
+            }
+        }
+        .refreshable { await load(forcePrices: true) }
+        .task {
+            await load()
+            while !Task.isCancelled {
+                let delay = max(
+                    60,
+                    nextPriceRefresh?.timeIntervalSinceNow ?? 12 * 60 * 60
+                )
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } catch {
+                    return
+                }
+                await refreshTrackedPrices(force: false)
+            }
+        }
     }
 
     @MainActor
-    private func load() async {
+    private func load(forcePrices: Bool = false) async {
         guard let token = environmentStore.authToken else {
             isLoading = false
             errorMessage = "Sign in is required to view prices."
@@ -184,12 +244,51 @@ struct PricesView: View {
             )
             collections = try await fetchedCollections
             movers = (try? await fetchedMovers) ?? PriceAnalyticsMovers(gainers: [], losers: [])
+            await refreshTrackedPrices(force: forcePrices)
         } catch is CancellationError {
             return
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    @MainActor
+    private func refreshTrackedPrices(force: Bool) async {
+        guard !isRefreshingPrices, let token = environmentStore.authToken else { return }
+        let items = collections.flatMap(\.cards).map {
+            APIService.TrackedPriceItem(
+                tcg: $0.tcg,
+                externalId: $0.externalId ?? $0.cardId
+            )
+        }
+        guard !items.isEmpty else { return }
+        isRefreshingPrices = true
+        defer { isRefreshingPrices = false }
+        do {
+            let response = try await apiService.getTrackedPrices(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                items: items,
+                force: force
+            )
+            livePrices = Dictionary(
+                uniqueKeysWithValues: response.prices.compactMap { result in
+                    guard result.price != nil else { return nil }
+                    return ("\(result.tcg):\(result.externalId)".lowercased(), result)
+                }
+            )
+            lastPriceCheck = ISO8601DateFormatter().date(from: response.refreshedAt) ?? Date()
+            nextPriceRefresh = ISO8601DateFormatter().date(from: response.refreshAfter)
+            let unavailable = response.prices.filter { $0.price == nil }.count
+            priceRefreshMessage = unavailable > 0
+                ? "Stored prices are shown for \(unavailable) card\(unavailable == 1 ? "" : "s") without a compatible live quote."
+                : nil
+        } catch is CancellationError {
+            return
+        } catch {
+            priceRefreshMessage = "Live prices could not be refreshed. Stored collection prices are still shown."
+        }
     }
 }
 
@@ -233,11 +332,16 @@ private struct TrackedCardRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text((card.price * Double(card.owned)).priceText)
+                Text((card.price * Double(card.owned)).priceText(currency: card.currency))
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                Text("\(card.price.priceText) × \(card.owned)")
+                Text("\(card.price.priceText(currency: card.currency)) × \(card.owned)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                if let source = card.source {
+                    Text(source)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
                 if let change = card.change {
                     Text("\(change >= 0 ? "+" : "")\(change, specifier: "%.1f")%")
                         .font(.caption2.monospacedDigit())

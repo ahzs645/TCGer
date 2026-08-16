@@ -1,6 +1,198 @@
 import Foundation
 
 extension APIService {
+    struct TrackedPriceItem: Codable, Hashable, Sendable {
+        let tcg: String
+        let externalId: String
+        let finishCode: String?
+
+        init(tcg: String, externalId: String, finishCode: String? = nil) {
+            self.tcg = tcg
+            self.externalId = externalId
+            self.finishCode = finishCode
+        }
+
+        var key: String {
+            "\(tcg.lowercased()):\(externalId):\(finishCode?.lowercased() ?? "")"
+        }
+    }
+
+    struct TrackedPriceResult: Codable, Sendable {
+        let key: String
+        let tcg: String
+        let externalId: String
+        let finishCode: String?
+        let price: Double?
+        let currency: String?
+        let source: String?
+        let updatedAt: String?
+        let cached: Bool
+        let error: String?
+    }
+
+    struct TrackedPricesResponse: Codable, Sendable {
+        let prices: [TrackedPriceResult]
+        let refreshedAt: String
+        let refreshAfter: String
+    }
+
+    private struct TrackedPricesRequest: Encodable {
+        let items: [TrackedPriceItem]
+        let force: Bool
+    }
+
+    func getTrackedPrices(
+        config: ServerConfiguration,
+        token: String,
+        items: [TrackedPriceItem],
+        force: Bool = false
+    ) async throws -> TrackedPricesResponse {
+        let uniqueItems = Array(Dictionary(uniqueKeysWithValues: items.map { ($0.key, $0) }).values)
+            .sorted { $0.key < $1.key }
+        guard !uniqueItems.isEmpty else {
+            let now = ISO8601DateFormatter().string(from: Date())
+            return TrackedPricesResponse(prices: [], refreshedAt: now, refreshAfter: now)
+        }
+        if config.isOnDevice {
+            return try await getOnDeviceTrackedPrices(items: uniqueItems, force: force)
+        }
+
+        var responses: [TrackedPricesResponse] = []
+        for start in stride(from: 0, to: uniqueItems.count, by: 100) {
+            let end = min(start + 100, uniqueItems.count)
+            let (data, response) = try await makeRequest(
+                config: config,
+                path: "prices/tracked",
+                method: "POST",
+                token: token,
+                body: TrackedPricesRequest(items: Array(uniqueItems[start..<end]), force: force)
+            )
+            guard response.statusCode == 200 else {
+                if response.statusCode == 401 { throw APIError.unauthorized }
+                throw APIError.serverError(
+                    status: response.statusCode,
+                    message: parseServerMessage(from: data)
+                )
+            }
+            guard let decoded = try? JSONDecoder().decode(TrackedPricesResponse.self, from: data) else {
+                throw APIError.decodingError
+            }
+            responses.append(decoded)
+        }
+        return TrackedPricesResponse(
+            prices: responses.flatMap(\.prices),
+            refreshedAt: responses.last?.refreshedAt ?? ISO8601DateFormatter().string(from: Date()),
+            refreshAfter: responses.map(\.refreshAfter).min() ?? ISO8601DateFormatter().string(from: Date())
+        )
+    }
+
+    private func getOnDeviceTrackedPrices(
+        items: [TrackedPriceItem],
+        force: Bool
+    ) async throws -> TrackedPricesResponse {
+        let now = Date()
+        var results: [TrackedPriceResult] = []
+        for item in items {
+            if let cached = await OnDeviceTrackedPriceCache.shared.result(for: item.key, force: force) {
+                results.append(cached.withCached(true))
+                continue
+            }
+            let quote = try await fetchOnDeviceTrackedPrice(item)
+            let result = TrackedPriceResult(
+                key: item.key,
+                tcg: item.tcg,
+                externalId: item.externalId,
+                finishCode: item.finishCode,
+                price: quote?.price,
+                currency: quote?.currency,
+                source: quote?.source,
+                updatedAt: quote == nil ? nil : ISO8601DateFormatter().string(from: now),
+                cached: false,
+                error: quote == nil ? "No compatible on-device market quote is available" : nil
+            )
+            if quote != nil {
+                await OnDeviceTrackedPriceCache.shared.save(result, for: item.key, forced: force)
+            }
+            results.append(result)
+        }
+        return TrackedPricesResponse(
+            prices: results,
+            refreshedAt: ISO8601DateFormatter().string(from: now),
+            refreshAfter: ISO8601DateFormatter().string(from: now.addingTimeInterval(12 * 60 * 60))
+        )
+    }
+
+    private func fetchOnDeviceTrackedPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
+        if PricingSource.selected() == .collectrPrivateTest,
+           let configuration = try CollectrPrivateCredentialStore.load() {
+            return try await CollectrTestPriceProvider(
+                configuration: configuration,
+                mappings: CollectrProductMappingStore().mappings
+            ).fetchPrice(tcg: item.tcg, externalID: item.externalId)
+        }
+        guard item.tcg.lowercased() == "magic",
+              let apiKey = try JustTCGCredentialStore.loadAPIKey(),
+              var components = URLComponents(string: "https://api.justtcg.com/v1/cards") else {
+            return nil
+        }
+        components.queryItems = [URLQueryItem(name: "scryfallId", value: item.externalId)]
+        guard let url = components.url else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        let (data, response) = try await execute(request)
+        guard response.statusCode == 200 else {
+            if response.statusCode == 404 { return nil }
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let payload = try? JSONDecoder().decode(JustTcgCardsResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        let variants = payload.cards.first?.variants ?? []
+        let nearMint = variants.filter {
+            let condition = $0.condition?.lowercased()
+            return condition == nil || condition == "near mint" || condition == "nm"
+        }
+        let candidates = nearMint.isEmpty ? variants : nearMint
+        let regular = candidates.first { !($0.printing?.lowercased().contains("foil") ?? false) }
+        let foil = candidates.first { $0.printing?.lowercased().contains("foil") ?? false }
+        let price: Double?
+        if item.finishCode?.lowercased().contains("foil") == true {
+            price = foil?.price ?? regular?.price
+        } else {
+            price = regular?.price ?? foil?.price
+        }
+        return price.map { CardPriceQuote(source: "justtcg", price: $0, currency: "USD") }
+    }
+
+    private struct JustTcgCardsResponse: Decodable {
+        let cards: [JustTcgCard]
+
+        private enum CodingKeys: String, CodingKey { case data }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let cards = try? container.decode([JustTcgCard].self, forKey: .data) {
+                self.cards = cards
+            } else {
+                self.cards = [try container.decode(JustTcgCard.self, forKey: .data)]
+            }
+        }
+    }
+
+    private struct JustTcgCard: Decodable {
+        let variants: [JustTcgVariant]
+    }
+
+    private struct JustTcgVariant: Decodable {
+        let condition: String?
+        let printing: String?
+        let price: Double?
+    }
+
     private struct CreateDeckRequest: Encodable {
         let name: String
         let description: String?
@@ -472,6 +664,59 @@ extension APIService {
             if response.statusCode == 401 { throw APIError.unauthorized }
             throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
         }
+    }
+}
+
+private extension APIService.TrackedPriceResult {
+    func withCached(_ cached: Bool) -> Self {
+        .init(
+            key: key,
+            tcg: tcg,
+            externalId: externalId,
+            finishCode: finishCode,
+            price: price,
+            currency: currency,
+            source: source,
+            updatedAt: updatedAt,
+            cached: cached,
+            error: error
+        )
+    }
+}
+
+private actor OnDeviceTrackedPriceCache {
+    struct Entry {
+        let result: APIService.TrackedPriceResult
+        let savedAt: Date
+        let lastForcedAt: Date?
+    }
+
+    static let shared = OnDeviceTrackedPriceCache()
+    private var entries: [String: Entry] = [:]
+
+    func result(for key: String, force: Bool) -> APIService.TrackedPriceResult? {
+        guard let entry = entries[key] else { return nil }
+        let now = Date()
+        if force {
+            if let lastForcedAt = entry.lastForcedAt,
+               now.timeIntervalSince(lastForcedAt) < 5 * 60 {
+                return entry.result
+            }
+            return nil
+        }
+        guard now.timeIntervalSince(entry.savedAt) < 12 * 60 * 60 else {
+            entries.removeValue(forKey: key)
+            return nil
+        }
+        return entry.result
+    }
+
+    func save(_ result: APIService.TrackedPriceResult, for key: String, forced: Bool) {
+        entries[key] = Entry(
+            result: result,
+            savedAt: Date(),
+            lastForcedAt: forced ? Date() : entries[key]?.lastForcedAt
+        )
     }
 }
 

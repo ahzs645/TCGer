@@ -94,7 +94,6 @@ struct AddCardToBinderFromSearchView: View {
                         details: details
                     )
                     await onCardAdded(binderId)
-                    dismiss()
                 }
             }
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }

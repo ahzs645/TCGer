@@ -279,6 +279,29 @@ test("nested → rows → nested is lossless for everything the UI reads", () =>
   }
 });
 
+test("binder presentation and sharing metadata survives the row round trip", () => {
+  const binder: DemoBinder = {
+    id: "metadata-binder",
+    name: "Display Binder",
+    description: "Trade night highlights",
+    color: "#AABBCC",
+    defaultCondition: "Near Mint",
+    containerType: "toploader-binder",
+    imageUrl: "https://example.com/cover.jpg",
+    associatedTcg: "pokemon",
+    associatedSetCode: "sv3pt5",
+    associatedSetName: "151",
+    shareToken: "share-demo-token",
+    isPublic: true,
+    cards: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+  };
+
+  const [rebuilt] = toDemoBinders(toPortableRows([binder]));
+  assert.deepEqual(rebuilt, binder);
+});
+
 test("round trip preserves the totals the dashboard shows", () => {
   const binders = seededBinders();
   const back = toDemoBinders(toPortableRows(binders), indexDemoCards(binders));

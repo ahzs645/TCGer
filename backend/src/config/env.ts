@@ -12,9 +12,8 @@ const booleanEnv = z
   .transform((value) => value === 'true');
 
 const optionalSecretEnv = z.preprocess(
-  (value) =>
-    typeof value === 'string' && value.trim().length === 0 ? undefined : value,
-  z.string().trim().min(1).optional()
+  (value) => (typeof value === 'string' && value.trim().length === 0 ? undefined : value),
+  z.string().trim().min(1).optional(),
 );
 
 const envSchema = z.object({
@@ -40,6 +39,16 @@ const envSchema = z.object({
   TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en'),
   JUSTTCG_API_BASE_URL: z.string().url().default('https://api.justtcg.com/v1'),
   JUSTTCG_API_KEY: optionalSecretEnv,
+  PRICE_REFRESH_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(12 * 60 * 60 * 1000),
+  PRICE_FORCE_REFRESH_COOLDOWN_MS: z.coerce
+    .number()
+    .int()
+    .min(10_000)
+    .default(5 * 60 * 1000),
   ONEPIECE_API_BASE_URL: z.string().url().default('https://optcgapi.com/api'),
   LORCANA_API_BASE_URL: z.string().url().default('https://api.lorcast.com/v0'),
   APITCG_API_BASE_URL: z.string().url().default('https://api.apitcg.com'),
@@ -47,7 +56,7 @@ const envSchema = z.object({
   SINGLE_USER_MODE: booleanEnv,
   SINGLE_USER_ID: z.string().default('single-user'),
   SINGLE_USER_EMAIL: z.string().email().default('local@tcger.test'),
-  SINGLE_USER_USERNAME: z.string().default('tcger-local')
+  SINGLE_USER_USERNAME: z.string().default('tcger-local'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -63,26 +72,26 @@ if (
   !parsed.data.DATABASE_URL
 ) {
   console.error('Invalid environment configuration:', {
-    DATABASE_URL: ['DATABASE_URL is required when NODE_ENV is not test']
+    DATABASE_URL: ['DATABASE_URL is required when NODE_ENV is not test'],
   });
   throw new Error('Failed to load environment variables');
 }
 
 if (parsed.data.NODE_ENV !== 'test' && !parsed.data.CONVEX_HTTP_ORIGIN) {
   console.error('Invalid environment configuration:', {
-    CONVEX_HTTP_ORIGIN: ['CONVEX_HTTP_ORIGIN is required for Convex-backed auth and bridge routes']
+    CONVEX_HTTP_ORIGIN: ['CONVEX_HTTP_ORIGIN is required for Convex-backed auth and bridge routes'],
   });
   throw new Error('Failed to load environment variables');
 }
 
 if (parsed.data.NODE_ENV === 'production' && !parsed.data.TCGER_BRIDGE_SECRET) {
   console.error('Invalid environment configuration:', {
-    TCGER_BRIDGE_SECRET: ['TCGER_BRIDGE_SECRET is required in production']
+    TCGER_BRIDGE_SECRET: ['TCGER_BRIDGE_SECRET is required in production'],
   });
   throw new Error('Failed to load environment variables');
 }
 
 export const env = {
   ...parsed.data,
-  TCGER_BRIDGE_SECRET: parsed.data.TCGER_BRIDGE_SECRET ?? DEVELOPMENT_BRIDGE_SECRET
+  TCGER_BRIDGE_SECRET: parsed.data.TCGER_BRIDGE_SECRET ?? DEVELOPMENT_BRIDGE_SECRET,
 };

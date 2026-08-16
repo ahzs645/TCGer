@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Repeat2, ArrowRight, Check, Clock, X, Plus } from "lucide-react";
+import {
+  Repeat2,
+  ArrowRight,
+  Check,
+  Clock,
+  X,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Trade } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
 
@@ -55,6 +65,7 @@ const STATUS_CONFIG = {
 export default function TradesPage() {
   const [tab, setTab] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
 
   // The demo store is persisted, so it only agrees with the server-rendered
   // markup once we are on the client.
@@ -63,6 +74,8 @@ export default function TradesPage() {
 
   const storeTrades = useDemoStore((state) => state.trades);
   const addTrade = useDemoStore((state) => state.addTrade);
+  const setTradeStatus = useDemoStore((state) => state.setTradeStatus);
+  const removeTrade = useDemoStore((state) => state.removeTrade);
   const TRADES: Trade[] = mounted ? storeTrades : [];
 
   const [form, setForm] = useState({
@@ -108,6 +121,16 @@ export default function TradesPage() {
 
   const filtered =
     tab === "all" ? TRADES : TRADES.filter((t) => t.status === tab);
+
+  const handleDelete = async (trade: Trade) => {
+    const ok = await confirm({
+      title: `Delete trade with ${trade.partner}?`,
+      description: "This removes the trade and both card lists.",
+      confirmLabel: "Delete trade",
+      destructive: true,
+    });
+    if (ok) await removeTrade(trade.id);
+  };
 
   const completedTrades = TRADES.filter((t) => t.status === "completed");
   const totalGiven = completedTrades.reduce(
@@ -267,6 +290,13 @@ export default function TradesPage() {
 
         {/* Trade list */}
         <div className="space-y-4" data-oid="frxt3ow">
+          {filtered.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No {tab === "all" ? "" : `${tab} `}trades yet.
+              </CardContent>
+            </Card>
+          ) : null}
           {filtered.map((trade) => {
             const givingTotal = trade.giving.reduce((s, c) => s + c.value, 0);
             const receivingTotal = trade.receiving.reduce(
@@ -326,9 +356,12 @@ export default function TradesPage() {
                       </Badge>
                       <span
                         className="whitespace-nowrap text-xs text-muted-foreground"
-                        title={new Date(trade.date).toLocaleDateString(undefined, {
-                          dateStyle: "long",
-                        })}
+                        title={new Date(trade.date).toLocaleDateString(
+                          undefined,
+                          {
+                            dateStyle: "long",
+                          },
+                        )}
                         data-oid="41iviaj"
                       >
                         <span className="sm:hidden">
@@ -354,7 +387,10 @@ export default function TradesPage() {
                     data-oid="olvqw13"
                   >
                     {/* Giving */}
-                    <div className="min-w-0 space-y-1.5 md:space-y-2" data-oid="p47-_v1">
+                    <div
+                      className="min-w-0 space-y-1.5 md:space-y-2"
+                      data-oid="p47-_v1"
+                    >
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="ibex:g_"
@@ -406,7 +442,10 @@ export default function TradesPage() {
                     </div>
 
                     {/* Receiving */}
-                    <div className="min-w-0 space-y-1.5 md:space-y-2" data-oid="8-keg4c">
+                    <div
+                      className="min-w-0 space-y-1.5 md:space-y-2"
+                      data-oid="8-keg4c"
+                    >
                       <p
                         className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
                         data-oid="t9d1::m"
@@ -445,6 +484,49 @@ export default function TradesPage() {
                         Total: ${receivingTotal.toFixed(2)}
                       </p>
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t pt-3">
+                    {trade.status === "pending" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void setTradeStatus(trade.id, "declined")
+                          }
+                        >
+                          <X className="mr-1.5 h-4 w-4" />
+                          Decline
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            void setTradeStatus(trade.id, "completed")
+                          }
+                        >
+                          <Check className="mr-1.5 h-4 w-4" />
+                          Complete
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void setTradeStatus(trade.id, "pending")}
+                      >
+                        <RotateCcw className="mr-1.5 h-4 w-4" />
+                        Reopen
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => void handleDelete(trade)}
+                      aria-label={`Delete trade with ${trade.partner}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -531,6 +613,7 @@ export default function TradesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </AppShell>
   );
 }

@@ -10,6 +10,8 @@ import type {
   CreateShopConnectionInput,
   PriceResult,
   PriceAnalyticsMovers,
+  TrackedPriceItem,
+  TrackedPricesResponse,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -21,6 +23,8 @@ export type {
   ShopConnectionResponse,
   PriceResult,
   PriceAnalyticsMovers,
+  TrackedPriceItem,
+  TrackedPricesResponse,
 };
 
 async function authFetch(
@@ -152,6 +156,34 @@ export async function getCardPrices(
     `${API_BASE_URL}/prices/${encodeURIComponent(tcg)}/${encodeURIComponent(cardId)}${query}`,
     token,
   );
+}
+export async function getTrackedCardPrices(
+  token: string,
+  items: TrackedPriceItem[],
+  force = false,
+): Promise<TrackedPricesResponse> {
+  const responses: TrackedPricesResponse[] = [];
+  for (let index = 0; index < items.length; index += 100) {
+    responses.push(
+      await authFetch(`${API_BASE_URL}/prices/tracked`, token, {
+        method: "POST",
+        body: JSON.stringify({ items: items.slice(index, index + 100), force }),
+      }),
+    );
+  }
+  if (responses.length === 0) {
+    const now = new Date().toISOString();
+    return { prices: [], refreshedAt: now, refreshAfter: now };
+  }
+  return {
+    prices: responses.flatMap((response) => response.prices),
+    refreshedAt: responses[responses.length - 1].refreshedAt,
+    refreshAfter: responses.reduce(
+      (earliest, response) =>
+        response.refreshAfter < earliest ? response.refreshAfter : earliest,
+      responses[0].refreshAfter,
+    ),
+  };
 }
 export async function getPriceMovers(
   token: string,

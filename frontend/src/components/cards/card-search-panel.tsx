@@ -44,14 +44,43 @@ export function CardSearchPanel() {
   })));
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [setFilter, setSetFilter] = useState("");
+  const [rarityFilter, setRarityFilter] = useState("");
+  const [collectorFilter, setCollectorFilter] = useState("");
 
   const { data, error, isError, isFetching, refetch } = useCardSearch(
     searchQuery,
     selectedGame === "all" ? undefined : selectedGame,
   );
-  const filteredCards = (data ?? []).filter(
-    (card) => enabledGames[card.tcg as keyof typeof enabledGames],
-  );
+  const normalizedSetFilter = setFilter.trim().toLowerCase();
+  const normalizedRarityFilter = rarityFilter.trim().toLowerCase();
+  const normalizedCollectorFilter = collectorFilter.trim().toLowerCase();
+  const filteredCards = (data ?? []).filter((card) => {
+    if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
+    if (
+      normalizedSetFilter &&
+      ![card.setCode, card.setName].some((value) =>
+        value?.toLowerCase().includes(normalizedSetFilter),
+      )
+    ) {
+      return false;
+    }
+    if (
+      normalizedRarityFilter &&
+      !card.rarity?.toLowerCase().includes(normalizedRarityFilter)
+    ) {
+      return false;
+    }
+    if (
+      normalizedCollectorFilter &&
+      !card.collectorNumber
+        ?.toLowerCase()
+        .includes(normalizedCollectorFilter)
+    ) {
+      return false;
+    }
+    return true;
+  });
   const cards = filteredCards;
   const hasResults = cards.length > 0;
   const selectedGameDisabled =
@@ -59,6 +88,9 @@ export function CardSearchPanel() {
     !enabledGames[selectedGame as keyof typeof enabledGames];
   const noGamesEnabled = Object.values(enabledGames).every(
     (enabled) => !enabled,
+  );
+  const hasFacetFilters = Boolean(
+    normalizedSetFilter || normalizedRarityFilter || normalizedCollectorFilter,
   );
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -161,6 +193,68 @@ export function CardSearchPanel() {
                 </SelectContent>
               </Select>
             </div>
+
+            <fieldset className="space-y-3 rounded-lg border p-3">
+              <legend className="px-1 text-sm font-medium">Refine results</legend>
+              <div className="space-y-2">
+                <label htmlFor="card-search-set" className="text-xs font-medium">
+                  Set name or code
+                </label>
+                <Input
+                  id="card-search-set"
+                  value={setFilter}
+                  onChange={(event) => setSetFilter(event.target.value)}
+                  placeholder="Modern Horizons 2 or MH2"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="card-search-rarity"
+                    className="text-xs font-medium"
+                  >
+                    Rarity
+                  </label>
+                  <Input
+                    id="card-search-rarity"
+                    value={rarityFilter}
+                    onChange={(event) => setRarityFilter(event.target.value)}
+                    placeholder="Rare"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="card-search-collector"
+                    className="text-xs font-medium"
+                  >
+                    Collector #
+                  </label>
+                  <Input
+                    id="card-search-collector"
+                    value={collectorFilter}
+                    onChange={(event) =>
+                      setCollectorFilter(event.target.value)
+                    }
+                    placeholder="138"
+                  />
+                </div>
+              </div>
+              {hasFacetFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setSetFilter("");
+                    setRarityFilter("");
+                    setCollectorFilter("");
+                  }}
+                >
+                  Clear result filters
+                </Button>
+              ) : null}
+            </fieldset>
           </form>
         </CardContent>
       </Card>

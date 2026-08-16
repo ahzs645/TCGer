@@ -90,6 +90,16 @@ actor CardIndexMetadataStore {
         }.map(\.annIndex))
     }
 
+    func entries(for game: TCGGame, setCode: String) -> [CardIndexMetadataEntry] {
+        loadIfNeeded()
+        return cache.values
+            .filter {
+                $0.resolvedGame == game &&
+                    $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+            }
+            .sorted { $0.annIndex < $1.annIndex }
+    }
+
     /// Returns the exact catalog name and printing rows confirmed by OCR.
     /// Matching is deliberately normalization-only (case, accents and
     /// punctuation); it does not use edit distance, so noisy text cannot pull

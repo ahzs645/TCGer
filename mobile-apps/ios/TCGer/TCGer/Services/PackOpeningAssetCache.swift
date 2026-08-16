@@ -50,6 +50,27 @@ final class PackOpeningAssetCache: @unchecked Sendable {
         }
     }
 
+    func contains(_ remoteURL: URL) -> Bool {
+        queue.sync {
+            fileManager.fileExists(atPath: fileURL(for: remoteURL).path)
+        }
+    }
+
+    func remove(_ remoteURL: URL) {
+        queue.sync {
+            let cachedFile = fileURL(for: remoteURL)
+            guard fileManager.fileExists(atPath: cachedFile.path) else { return }
+            try? fileManager.removeItem(at: cachedFile)
+        }
+    }
+
+    func byteCount(for remoteURL: URL) -> Int64 {
+        queue.sync {
+            let values = try? fileURL(for: remoteURL).resourceValues(forKeys: [.fileSizeKey])
+            return Int64(values?.fileSize ?? 0)
+        }
+    }
+
     private func ensureDirectory() throws {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     }

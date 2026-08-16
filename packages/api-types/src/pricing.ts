@@ -1,6 +1,39 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
+// Tracked collection pricing
+// ---------------------------------------------------------------------------
+
+export const trackedPriceItemSchema = z.object({
+  tcg: z.string().trim().min(1).max(40),
+  externalId: z.string().trim().min(1).max(240),
+  finishCode: z.string().trim().min(1).max(80).optional(),
+});
+export type TrackedPriceItem = z.infer<typeof trackedPriceItemSchema>;
+
+export const trackedPricesRequestSchema = z.object({
+  items: z.array(trackedPriceItemSchema).min(1).max(100),
+  force: z.boolean().optional().default(false),
+});
+export type TrackedPricesRequest = z.infer<typeof trackedPricesRequestSchema>;
+
+export interface TrackedPriceResult extends TrackedPriceItem {
+  key: string;
+  price?: number;
+  currency?: string;
+  source?: string;
+  updatedAt?: string;
+  cached: boolean;
+  error?: string;
+}
+
+export interface TrackedPricesResponse {
+  prices: TrackedPriceResult[];
+  refreshedAt: string;
+  refreshAfter: string;
+}
+
+// ---------------------------------------------------------------------------
 // Price Alerts
 // ---------------------------------------------------------------------------
 
