@@ -5,14 +5,49 @@ struct OfflinePackDownloadsSection: View {
 
     var body: some View {
         Section {
-            ForEach(manager.definitions) { definition in
-                OfflinePackSetRow(definition: definition, manager: manager)
+            NavigationLink {
+                OfflinePackDownloadsView(manager: manager)
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Offline Packs")
+                        Text(downloadSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "icloud.and.arrow.down")
+                        .foregroundStyle(.blue)
+                }
             }
-        } header: {
-            Text("Offline Packs")
-        } footer: {
-            Text("Downloads the set’s pack wrappers and card artwork so packs can be opened without an internet connection.")
         }
+    }
+
+    private var downloadSummary: String {
+        let downloadedCount = manager.definitions.reduce(into: 0) { count, definition in
+            if case .downloaded = manager.status(for: definition) {
+                count += 1
+            }
+        }
+        return "\(downloadedCount) of \(manager.definitions.count) sets downloaded"
+    }
+}
+
+struct OfflinePackDownloadsView: View {
+    @ObservedObject var manager: PackOfflineDownloadManager
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(manager.definitions) { definition in
+                    OfflinePackSetRow(definition: definition, manager: manager)
+                }
+            } footer: {
+                Text("Downloads each set’s pack wrappers and card artwork so its packs can be opened without an internet connection.")
+            }
+        }
+        .navigationTitle("Offline Packs")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
