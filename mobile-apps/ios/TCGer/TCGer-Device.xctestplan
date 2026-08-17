@@ -1,0 +1,32 @@
+{
+  "configurations" : [
+    {
+      "id" : "1B1F53EB-C811-4C8E-BF34-7AF8D12AE421",
+      "name" : "Physical Device",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:TCGer.xcodeproj",
+      "identifier" : "C3C831E22EA9F37F007FE5BA",
+      "name" : "TCGer"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "ScannerPerformanceTests"
+      ],
+      "target" : {
+        "containerPath" : "container:TCGer.xcodeproj",
+        "identifier" : "D10500000000000000000000",
+        "name" : "TCGerTests"
+      }
+    }
+  ],
+  "version" : 1
+}

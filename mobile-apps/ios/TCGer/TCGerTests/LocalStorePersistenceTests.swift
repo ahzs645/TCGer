@@ -221,6 +221,21 @@ final class LocalStorePersistenceTests: XCTestCase {
     }
 
     func testPhoneOnlyAnalyticsNeverFabricateHistoryOrMovers() async throws {
+        // The shared store can retain optional sample data in the simulator
+        // between test runs. Normalize that state so this test exercises the
+        // real phone-only analytics path regardless of run order or device
+        // contents, then put the sample data back for any later tests.
+        let store = LocalStore.shared
+        let wasSampleDataLoaded = store.isSampleDataLoaded
+        if wasSampleDataLoaded {
+            store.removeSampleData()
+        }
+        defer {
+            if wasSampleDataLoaded {
+                store.loadSampleData()
+            }
+        }
+
         let service = APIService()
         let configuration = ServerConfiguration(baseURL: ServerConfiguration.onDeviceBaseURL)
 

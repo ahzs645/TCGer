@@ -1,0 +1,40 @@
+{
+  "configurations" : [
+    {
+      "id" : "D60638B2-B55C-47D2-BACA-0F9DF9FA85F1",
+      "name" : "CI",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:TCGer.xcodeproj",
+      "identifier" : "C3C831E22EA9F37F007FE5BA",
+      "name" : "TCGer"
+    }
+  },
+  "testTargets" : [
+    {
+      "skippedTests" : [
+        "BinderSessionReplayTests",
+        "DevModeSessionReplayTests",
+        "FixtureCropDiagnosticTests",
+        "RoboflowArchiveDiagnosticTests",
+        "ScannerCorrectionReplayTests",
+        "ScannerLightingExperimentTests",
+        "ScannerOrientationExperimentTests",
+        "ScannerPerformanceTests",
+        "ScannerRecordingDiagnosticTests"
+      ],
+      "target" : {
+        "containerPath" : "container:TCGer.xcodeproj",
+        "identifier" : "D10500000000000000000000",
+        "name" : "TCGerTests"
+      }
+    }
+  ],
+  "version" : 1
+}
