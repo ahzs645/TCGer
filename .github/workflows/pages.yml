@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "marketing-site/**"
+      - "docs/**"
+      - "frontend/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".gitmodules"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

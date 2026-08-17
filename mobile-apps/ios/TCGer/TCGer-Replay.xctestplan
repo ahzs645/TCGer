@@ -1,0 +1,39 @@
+{
+  "configurations" : [
+    {
+      "id" : "414866B1-1547-4387-9DBF-E89D51BB3E95",
+      "name" : "Local Replay",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:TCGer.xcodeproj",
+      "identifier" : "C3C831E22EA9F37F007FE5BA",
+      "name" : "TCGer"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "BinderSessionReplayTests",
+        "DevModeSessionReplayTests",
+        "FixtureCropDiagnosticTests",
+        "RoboflowArchiveDiagnosticTests",
+        "ScannerCorrectionReplayTests",
+        "ScannerLightingExperimentTests",
+        "ScannerOrientationExperimentTests",
+        "ScannerRecordingDiagnosticTests"
+      ],
+      "target" : {
+        "containerPath" : "container:TCGer.xcodeproj",
+        "identifier" : "D10500000000000000000000",
+        "name" : "TCGerTests"
+      }
+    }
+  ],
+  "version" : 1
+}
