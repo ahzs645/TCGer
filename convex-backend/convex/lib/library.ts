@@ -13,6 +13,7 @@ import {
   appendCollectionAudit,
   snapshotAuditEntries
 } from "./collectionAudit";
+import { formatCollectionCopyCount } from "./copyLabels";
 
 type ReaderCtx = QueryCtx | MutationCtx;
 const nullableString = v.union(v.string(), v.null());
@@ -700,7 +701,7 @@ export async function bulkAddForViewer(
     userId,
     actorId: viewer?.authSubject ?? userId,
     operationKind: "bulk",
-    summary: `Added ${entryIds.length} collection copies`,
+    summary: `Added ${formatCollectionCopyCount(entryIds.length)}`,
     before: [],
     after
   });

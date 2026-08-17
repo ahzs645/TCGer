@@ -386,6 +386,16 @@ final class LocalStore {
         try persistenceRepository.availableBackups()
     }
 
+    /// Creates an explicit recovery point without changing the active library.
+    @discardableResult
+    func createLocalBackup() throws -> URL {
+        try persistenceRepository.createBackup(try encodedPersistedState(persistedState()))
+    }
+
+    func removeLocalBackup(at url: URL) throws {
+        try persistenceRepository.removeBackup(at: url)
+    }
+
     /// Validates the selected snapshot before atomically making it current.
     /// The pre-restore current state is rotated into the backup set by `save`.
     func restoreLocalBackup(from url: URL) throws {

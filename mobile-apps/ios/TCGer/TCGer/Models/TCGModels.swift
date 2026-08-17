@@ -765,11 +765,15 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
 }
 
 extension CollectionCardCopy {
-    /// Serial number when present, otherwise "Copy #n" for position `index`.
-    func displayTitle(index: Int) -> String {
+    /// A stable identifier for a copy when the UI needs to distinguish it.
+    ///
+    /// Serial numbers remain useful even for a single copy. An ordinal is only
+    /// useful when there are multiple otherwise indistinguishable copies.
+    func displayTitle(index: Int, totalCount: Int) -> String? {
         if let serial = serialNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !serial.isEmpty {
             return serial
         }
+        guard totalCount > 1 else { return nil }
         return "Copy #\(index + 1)"
     }
 
@@ -796,6 +800,16 @@ extension CollectionCardCopy {
             return nil
         }
         return trimmed
+    }
+}
+
+enum CollectionCopyText {
+    nonisolated static func count(_ count: Int) -> String {
+        "\(count) \(count == 1 ? "copy" : "copies")"
+    }
+
+    nonisolated static func total(_ count: Int) -> String {
+        "\(count) total \(count == 1 ? "copy" : "copies")"
     }
 }
 

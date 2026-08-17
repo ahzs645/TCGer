@@ -187,6 +187,30 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertEqual(backups.first, olderByName)
     }
 
+    func testManualRecoveryPointCanBeCreatedAndRemoved() throws {
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 2)
+        let payload = Data(#"{"revision":1}"#.utf8)
+
+        let recoveryPoint = try repository.createBackup(payload)
+
+        XCTAssertEqual(try repository.availableBackups(), [recoveryPoint])
+        XCTAssertEqual(try repository.loadBackup(at: recoveryPoint), payload)
+
+        try repository.removeBackup(at: recoveryPoint)
+        XCTAssertTrue(try repository.availableBackups().isEmpty)
+    }
+
+    func testRecoveryPointDeletionRejectsFilesOutsideBackupDirectory() throws {
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 2)
+        let outsideFile = root.appendingPathComponent("snapshot-outside.json")
+        try Data("keep".utf8).write(to: outsideFile)
+
+        XCTAssertThrowsError(try repository.removeBackup(at: outsideFile)) { error in
+            XCTAssertEqual(error as? LocalStorePersistenceError, .backupOutsideRepository)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outsideFile.path))
+    }
+
     func testPersistableCredentialsNeverContainThePassword() throws {
         let credentials = LoginCredentials(username: "collector", password: "secret")
         let data = try JSONEncoder().encode(credentials.withoutPassword)
@@ -227,7 +251,9 @@ private struct FailingPersistenceRepository: LocalStorePersistenceRepository {
     func save(_ payload: Data) throws { throw WriteFailure() }
     func remove() throws {}
     func availableBackups() throws -> [URL] { [] }
+    func createBackup(_ payload: Data) throws -> URL { throw WriteFailure() }
     func loadBackup(at url: URL) throws -> Data { throw WriteFailure() }
+    func removeBackup(at url: URL) throws { throw WriteFailure() }
 }
 
 private final class ToggleablePersistenceRepository: LocalStorePersistenceRepository {
@@ -247,7 +273,9 @@ private final class ToggleablePersistenceRepository: LocalStorePersistenceReposi
 
     func remove() throws { payload = nil }
     func availableBackups() throws -> [URL] { [] }
+    func createBackup(_ payload: Data) throws -> URL { throw WriteFailure() }
     func loadBackup(at url: URL) throws -> Data { throw WriteFailure() }
+    func removeBackup(at url: URL) throws { throw WriteFailure() }
 }
 
 private final class CountingPersistenceRepository: LocalStorePersistenceRepository {
@@ -269,5 +297,7 @@ private final class CountingPersistenceRepository: LocalStorePersistenceReposito
 
     func remove() throws { payload = nil }
     func availableBackups() throws -> [URL] { [] }
+    func createBackup(_ payload: Data) throws -> URL { throw WriteFailure() }
     func loadBackup(at url: URL) throws -> Data { throw WriteFailure() }
+    func removeBackup(at url: URL) throws { throw WriteFailure() }
 }

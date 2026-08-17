@@ -35,6 +35,7 @@ import type {
 } from "@tcg/api-types";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
+import { formatCopyCount } from "@/lib/copy-labels";
 
 import { useShallow } from "zustand/react/shallow";
 const NO_DEFAULT_BINDER = "__none__";
@@ -110,7 +111,7 @@ export function CollectionImportDialog({
       setPreview(result);
       setStatus(
         result.valid
-          ? `${result.sourceRows} source rows resolve to ${result.rows.length} inventory rows and ${result.totalCopies} copies.`
+          ? `${result.sourceRows} source rows resolve to ${result.rows.length} inventory rows and ${formatCopyCount(result.totalCopies)}.`
           : "Resolve the validation issues before importing.",
       );
     } catch (error) {
@@ -141,7 +142,7 @@ export function CollectionImportDialog({
       }
       await fetchCollections(requestToken);
       setStatus(
-        `Imported ${result.importedCopies} copies across ${result.importedRows} rows.`,
+        `Imported ${formatCopyCount(result.importedCopies)} across ${result.importedRows} rows.`,
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Import failed.");
@@ -304,7 +305,7 @@ export function CollectionImportDialog({
               <div className="flex flex-wrap gap-2 text-sm">
                 <span>{preview.rows.length} inventory rows</span>
                 <span>·</span>
-                <span>{preview.totalCopies} copies</span>
+                <span>{formatCopyCount(preview.totalCopies)}</span>
                 <span>·</span>
                 <span>{preview.issues.length} issues</span>
               </div>
@@ -399,7 +400,7 @@ export function CollectionImportDialog({
             {busy === "commit" && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Import {preview?.totalCopies ?? 0} copies
+            Import {formatCopyCount(preview?.totalCopies ?? 0)}
           </Button>
         </DialogFooter>
       </DialogContent>

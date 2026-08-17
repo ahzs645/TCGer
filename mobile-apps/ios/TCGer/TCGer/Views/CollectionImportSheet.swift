@@ -190,7 +190,7 @@ struct CollectionImportSheet: View {
                             Button {
                                 Task { await commitImport() }
                             } label: {
-                                Text("Import \(preview.totalCopies) copies")
+                                Text("Import \(CollectionCopyText.count(preview.totalCopies))")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
@@ -303,7 +303,7 @@ struct CollectionImportSheet: View {
                 options: options
             )
             if result.valid {
-                successMessage = "Imported \(result.importedCopies) copies."
+                successMessage = "Imported \(CollectionCopyText.count(result.importedCopies))."
                 await onImported()
             } else {
                 preview = APIService.CollectionImportPreview(

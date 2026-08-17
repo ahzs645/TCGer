@@ -5,13 +5,16 @@ protocol LocalStorePersistenceRepository {
     func save(_ payload: Data) throws
     func remove() throws
     func availableBackups() throws -> [URL]
+    func createBackup(_ payload: Data) throws -> URL
     func loadBackup(at url: URL) throws -> Data
+    func removeBackup(at url: URL) throws
 }
 
 enum LocalStorePersistenceError: LocalizedError, Equatable {
     case unsupportedSchemaVersion(Int)
     case invalidSnapshot
     case backupOutsideRepository
+    case recoveryPointsDisabled
     case saveFailed(String)
 
     var errorDescription: String? {
@@ -22,6 +25,8 @@ enum LocalStorePersistenceError: LocalizedError, Equatable {
             return "The local-data snapshot is damaged or incomplete."
         case .backupOutsideRepository:
             return "The selected backup is not managed by this local-data repository."
+        case .recoveryPointsDisabled:
+            return "Local recovery points are disabled."
         case .saveFailed(let message):
             return "The local change could not be saved: \(message)"
         }
@@ -72,9 +77,10 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
         maxBackups: Int = 5,
         fileManager: FileManager = .default
     ) {
+        let canonicalRoot = rootDirectory.standardizedFileURL.resolvingSymlinksInPath()
         self.fileManager = fileManager
-        self.storeURL = rootDirectory.appendingPathComponent(filename)
-        self.backupDirectory = rootDirectory.appendingPathComponent("TCGerLocalStoreBackups", isDirectory: true)
+        self.storeURL = canonicalRoot.appendingPathComponent(filename)
+        self.backupDirectory = canonicalRoot.appendingPathComponent("TCGerLocalStoreBackups", isDirectory: true)
         self.maxBackups = max(0, maxBackups)
     }
 
@@ -111,12 +117,28 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
         return urls.sorted(by: backupIsNewer)
     }
 
-    func loadBackup(at url: URL) throws -> Data {
-        let allowedRoot = backupDirectory.standardizedFileURL.path + "/"
-        guard url.standardizedFileURL.path.hasPrefix(allowedRoot) else {
-            throw LocalStorePersistenceError.backupOutsideRepository
+    func createBackup(_ payload: Data) throws -> URL {
+        guard maxBackups > 0 else {
+            throw LocalStorePersistenceError.recoveryPointsDisabled
         }
-        return try decodeSnapshot(Data(contentsOf: url), allowLegacyPayload: false)
+        try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        let url = nextArchiveURL(prefix: "snapshot")
+        try encodedEnvelope(for: payload).write(to: url, options: [.atomic])
+        try rotateBackupsIfNeeded()
+        return try availableBackups().first {
+            $0.lastPathComponent == url.lastPathComponent
+        } ?? url
+    }
+
+    func loadBackup(at url: URL) throws -> Data {
+        let managedURL = try managedBackupURL(for: url)
+        return try decodeSnapshot(Data(contentsOf: managedURL), allowLegacyPayload: false)
+    }
+
+    func removeBackup(at url: URL) throws {
+        let managedURL = try managedBackupURL(for: url)
+        guard fileManager.fileExists(atPath: managedURL.path) else { return }
+        try fileManager.removeItem(at: managedURL)
     }
 
     private func archiveCurrentSnapshot() throws {
@@ -134,12 +156,7 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
             prefix = "corrupt"
             archivedData = currentData
         }
-        // Wall-clock microseconds continue increasing across device reboots;
-        // uptime-based names could make a fresh backup look older than one
-        // written before the reboot.
-        let sequence = String(format: "%020lld", Int64(Date().timeIntervalSince1970 * 1_000_000))
-        let name = "\(prefix)-\(sequence)-\(UUID().uuidString).json"
-        try archivedData.write(to: backupDirectory.appendingPathComponent(name), options: [.atomic])
+        try archivedData.write(to: nextArchiveURL(prefix: prefix), options: [.atomic])
     }
 
     private func rotateBackupsIfNeeded() throws {
@@ -169,6 +186,33 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
             return (lhsDate ?? .distantPast) > (rhsDate ?? .distantPast)
         }
         return lhs.lastPathComponent > rhs.lastPathComponent
+    }
+
+    private func nextArchiveURL(prefix: String) -> URL {
+        // Wall-clock microseconds continue increasing across device reboots;
+        // uptime-based names could make a fresh backup look older than one
+        // written before the reboot.
+        let sequence = String(format: "%020lld", Int64(Date().timeIntervalSince1970 * 1_000_000))
+        let name = "\(prefix)-\(sequence)-\(UUID().uuidString).json"
+        return backupDirectory.appendingPathComponent(name)
+    }
+
+    private func managedBackupURL(for url: URL) throws -> URL {
+        let candidate = url.standardizedFileURL
+        let candidateDirectoryID = try? candidate.deletingLastPathComponent()
+            .resourceValues(forKeys: [.fileResourceIdentifierKey])
+            .fileResourceIdentifier as? AnyHashable
+        let managedDirectoryID = try? backupDirectory
+            .resourceValues(forKeys: [.fileResourceIdentifierKey])
+            .fileResourceIdentifier as? AnyHashable
+        guard let candidateDirectoryID,
+              let managedDirectoryID,
+              candidateDirectoryID == managedDirectoryID,
+              candidate.lastPathComponent.hasPrefix("snapshot-"),
+              candidate.pathExtension == "json" else {
+            throw LocalStorePersistenceError.backupOutsideRepository
+        }
+        return backupDirectory.appendingPathComponent(candidate.lastPathComponent)
     }
 
     private func encodedEnvelope(for payload: Data) throws -> Data {

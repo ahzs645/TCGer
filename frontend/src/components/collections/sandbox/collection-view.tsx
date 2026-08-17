@@ -98,6 +98,11 @@ import {
   getPokemonFinishOptions,
   isFoilFinish,
 } from "@/lib/pokemon-variants";
+import {
+  copyEditAriaLabel,
+  copyOrdinalLabel,
+  individualCopiesLabel,
+} from "@/lib/copy-labels";
 
 import { useShallow } from "zustand/react/shallow";
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
@@ -1563,14 +1568,20 @@ export function CollectionView() {
                             className="text-[10px] uppercase text-muted-foreground"
                             data-oid="89_2-7j"
                           >
-                            Copies
+                            {card.copies.length === 1 ? "Copy" : "Copies"}
                           </p>
                           {card.copies.map((copy, index) => (
                             <button
                               key={copy.id}
                               type="button"
                               aria-pressed={selectedCopyId === copy.id}
-                              aria-label={`Edit ${card.name} copy ${index + 1}, ${copy.condition ?? "unknown condition"}`}
+                              aria-label={copyEditAriaLabel({
+                                cardName: card.name,
+                                condition:
+                                  copy.condition ?? "unknown condition",
+                                copyIndex: index,
+                                copyCount: card.copies?.length ?? 0,
+                              })}
                               className={cn(
                                 "w-full text-left rounded-md border px-3 py-2 text-xs transition",
                                 selectedCopyId === copy.id
@@ -1592,13 +1603,21 @@ export function CollectionView() {
                               >
                                 {copy.condition ?? "Unknown"}
                               </span>
-                              <span
-                                className="text-muted-foreground"
-                                data-oid="bvdmpn:"
-                              >
-                                {" "}
-                                #{index + 1}
-                              </span>
+                              {copyOrdinalLabel(
+                                index,
+                                card.copies?.length ?? 0,
+                              ) ? (
+                                <span
+                                  className="text-muted-foreground"
+                                  data-oid="bvdmpn:"
+                                >
+                                  {" "}
+                                  {copyOrdinalLabel(
+                                    index,
+                                    card.copies?.length ?? 0,
+                                  )}
+                                </span>
+                              ) : null}
                               {copy.notes?.trim() ? (
                                 <p
                                   className="mt-0.5 text-muted-foreground truncate"
@@ -1803,7 +1822,9 @@ export function CollectionView() {
                                 className="text-xs uppercase text-muted-foreground"
                                 data-oid="mcxcbzc"
                               >
-                                Individual copies
+                                {individualCopiesLabel(
+                                  card.copies?.length ?? 0,
+                                )}
                               </div>
                               {card.copies?.map((copy, index) => {
                                 const handleClick = (trigger: HTMLElement) => {
@@ -1818,7 +1839,13 @@ export function CollectionView() {
                                     role="button"
                                     tabIndex={0}
                                     aria-pressed={selectedCopyId === copy.id}
-                                    aria-label={`Edit ${card.name} copy ${index + 1}, ${copy.condition ?? "unknown condition"}`}
+                                    aria-label={copyEditAriaLabel({
+                                      cardName: card.name,
+                                      condition:
+                                        copy.condition ?? "unknown condition",
+                                      copyIndex: index,
+                                      copyCount: card.copies?.length ?? 0,
+                                    })}
                                     onClick={(event) =>
                                       handleClick(event.currentTarget)
                                     }
@@ -1846,13 +1873,22 @@ export function CollectionView() {
                                         className="text-xs font-semibold text-foreground"
                                         data-oid="ms9.8yh"
                                       >
-                                        {copy.condition ?? "Unknown"}{" "}
-                                        <span
-                                          className="text-muted-foreground"
-                                          data-oid="4fgyn3t"
-                                        >
-                                          #{index + 1}
-                                        </span>
+                                        {copy.condition ?? "Unknown"}
+                                        {copyOrdinalLabel(
+                                          index,
+                                          card.copies?.length ?? 0,
+                                        ) ? (
+                                          <span
+                                            className="text-muted-foreground"
+                                            data-oid="4fgyn3t"
+                                          >
+                                            {" "}
+                                            {copyOrdinalLabel(
+                                              index,
+                                              card.copies?.length ?? 0,
+                                            )}
+                                          </span>
+                                        ) : null}
                                       </div>
                                       <div
                                         className="text-xs text-muted-foreground"

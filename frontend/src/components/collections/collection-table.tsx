@@ -90,6 +90,12 @@ import {
   isFoilFinish,
   POKEMON_FINISH_CATALOG,
 } from "@/lib/pokemon-variants";
+import {
+  copyEditAriaLabel,
+  copyOrdinalLabel,
+  formatCopyCount,
+  individualCopiesLabel,
+} from "@/lib/copy-labels";
 
 import { useShallow } from "zustand/react/shallow";
 type CardUpdateArgs = {
@@ -704,8 +710,8 @@ export function CollectionTable() {
                                 className="text-xs text-muted-foreground"
                                 data-oid="_:mxbv3"
                               >
-                                {cardsForGame.length} card(s), {gameQuantity}{" "}
-                                copies
+                                {cardsForGame.length} card(s),{" "}
+                                {formatCopyCount(gameQuantity)}
                                 {showPricing
                                   ? ` • $${gameValue.toFixed(2)}`
                                   : ""}
@@ -1367,7 +1373,7 @@ function CardDetailsPanel({
                   className="text-xs uppercase text-muted-foreground"
                   data-oid="jrchs6j"
                 >
-                  Individual copies
+                  {individualCopiesLabel(copies.length)}
                 </p>
                 <Badge variant="outline" data-oid="hn65xmm">
                   {copies.length}
@@ -1378,11 +1384,18 @@ function CardDetailsPanel({
                   {copies.map((copy, index) => {
                     const isSelected = copy.id === selectedCopyId;
                     const variantBadges = getCopyVariantBadges(copy);
+                    const ordinal = copyOrdinalLabel(index, copies.length);
                     return (
                       <button
                         key={copy.id}
                         type="button"
                         onClick={() => setSelectedCopyId(copy.id)}
+                        aria-label={copyEditAriaLabel({
+                          cardName: card.name,
+                          condition: copy.condition ?? "unknown condition",
+                          copyIndex: index,
+                          copyCount: copies.length,
+                        })}
                         className={cn(
                           "w-full rounded-lg border px-3 py-2 text-left text-sm transition hover:border-primary/40",
                           isSelected
@@ -1400,13 +1413,16 @@ function CardDetailsPanel({
                               className="font-medium text-foreground"
                               data-oid="qqu9q:9"
                             >
-                              {copy.condition ?? "Unknown"}{" "}
-                              <span
-                                className="text-muted-foreground"
-                                data-oid="lfk1848"
-                              >
-                                #{index + 1}
-                              </span>
+                              {copy.condition ?? "Unknown"}
+                              {ordinal ? (
+                                <span
+                                  className="text-muted-foreground"
+                                  data-oid="lfk1848"
+                                >
+                                  {" "}
+                                  {ordinal}
+                                </span>
+                              ) : null}
                             </p>
                             <p
                               className="text-xs text-muted-foreground line-clamp-2"
@@ -2407,7 +2423,7 @@ function CollectionSelector({
           stats={[
             `${aggregateStats.uniqueGames.size} game${aggregateStats.uniqueGames.size === 1 ? "" : "s"}`,
             `${aggregateStats.uniqueCardIds.size} unique`,
-            `${aggregateStats.totalCopies} copies`,
+            formatCopyCount(aggregateStats.totalCopies),
           ]}
           value={
             showPricing ? `$${aggregateStats.totalValue.toFixed(2)}` : undefined
@@ -2444,7 +2460,7 @@ function CollectionSelector({
                 (isLibrary ? "Cards not yet assigned to a binder" : undefined)
               }
               badgeText={`${uniqueGames} game${uniqueGames === 1 ? "" : "s"}`}
-              stats={[`${uniqueCards} unique`, `${totalCopies} copies`]}
+              stats={[`${uniqueCards} unique`, formatCopyCount(totalCopies)]}
               value={showPricing ? `$${totalValue.toFixed(2)}` : undefined}
               updatedLabel={new Date(collection.updatedAt).toLocaleDateString()}
               active={collection.id === activeId}

@@ -221,6 +221,7 @@ final class PackOpeningResourceTests: XCTestCase {
                 "packCount": 1,
                 "openingMode": "normal",
                 "packBackwards": false,
+                "currentCardFaceUp": true,
                 "packOptions": [[
                     "id": "base-charizard",
                     "label": "Base Charizard",
@@ -260,6 +261,7 @@ final class PackOpeningResourceTests: XCTestCase {
             "www.cs.sjsu.edu"
         )
         XCTAssertEqual(state?.revealedCount, 3)
+        XCTAssertEqual(state?.currentCardFaceUp, true)
         XCTAssertEqual(state?.session?.id, "opening-native-1")
     }
 
@@ -303,6 +305,7 @@ final class PackOpeningResourceTests: XCTestCase {
             packCount: 1,
             openingMode: .normal,
             packBackwards: false,
+            currentCardFaceUp: true,
             packOptions: options,
             revealedCount: 0,
             totalCards: 0,
@@ -315,6 +318,7 @@ final class PackOpeningResourceTests: XCTestCase {
 
         XCTAssertEqual(state.packSets.map(\.label), ["Base Set", "Evolving Skies"])
         XCTAssertEqual(state.selectedSetLabel, "Base Set")
+        XCTAssertEqual(state.selectedPackDisplayLabel, "Base Set · Blastoise")
         XCTAssertEqual(
             state.selectedSetOptions.map(\.resolvedVariationLabel),
             ["Venusaur", "Blastoise"]

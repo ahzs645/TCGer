@@ -100,7 +100,7 @@ struct BinderWidgetView: View {
             } else {
                 VStack(alignment: .leading, spacing: 5) {
                     Label("\(binder.uniqueCards) unique cards", systemImage: "rectangle.portrait.fill")
-                    Label("\(binder.totalCopies) total copies", systemImage: "square.stack.fill")
+                    Label(totalCopyText(binder.totalCopies), systemImage: "square.stack.fill")
                     if let totalValue = binder.totalValue {
                         Label("$\(String(format: "%.2f", totalValue))", systemImage: "dollarsign.circle.fill")
                     }
@@ -111,6 +111,10 @@ struct BinderWidgetView: View {
         }
         .containerBackground(.fill.tertiary, for: .widget)
     }
+}
+
+private func totalCopyText(_ count: Int) -> String {
+    "\(count) total \(count == 1 ? "copy" : "copies")"
 }
 
 private struct BinderStat: View {

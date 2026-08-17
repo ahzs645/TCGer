@@ -1,15 +1,8 @@
-name: iOS
+name: iOS (manual fallback)
 
 on:
-  pull_request:
-    paths:
-      - "mobile-apps/ios/**"
-      - ".github/workflows/ios.yml"
-  push:
-    branches: [main]
-    paths:
-      - "mobile-apps/ios/**"
-      - ".github/workflows/ios.yml"
+  # Xcode Cloud is the authoritative automatic build and test service for the
+  # iOS app. Keep GitHub's macOS runner only as an explicitly invoked fallback.
   workflow_dispatch:
 
 permissions:

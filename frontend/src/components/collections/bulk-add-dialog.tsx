@@ -52,6 +52,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { supportedGames } from "@/stores/game-filter";
+import { formatCopyCount } from "@/lib/copy-labels";
 
 const INHERIT = "__inherit__";
 
@@ -422,11 +423,12 @@ export function BulkAddDialog() {
               </div>
               <Badge variant="secondary">
                 {staged.length} rows ·{" "}
-                {staged.reduce(
-                  (sum, row) => sum + (row.quantity ?? defaultQuantity),
-                  0,
-                )}{" "}
-                copies
+                {formatCopyCount(
+                  staged.reduce(
+                    (sum, row) => sum + (row.quantity ?? defaultQuantity),
+                    0,
+                  ),
+                )}
               </Badge>
             </div>
 
@@ -663,7 +665,7 @@ export function BulkAddDialog() {
                     <XCircle className="h-4 w-4" />
                   )}
                   {preview.valid
-                    ? `${preview.totalCopies} copies are ready for one atomic commit.`
+                    ? `${formatCopyCount(preview.totalCopies)} ${preview.totalCopies === 1 ? "is" : "are"} ready for one atomic commit.`
                     : `${preview.issues.length} validation issue${
                         preview.issues.length === 1 ? "" : "s"
                       }`}

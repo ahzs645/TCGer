@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { useDemoStore } from "@/stores/demo-store";
+import { formatTotalCopyCount } from "@/lib/copy-labels";
 
 const INITIAL_SPECIES_LIMIT = 120;
 const SPECIES_PAGE_SIZE = 120;
@@ -623,7 +624,7 @@ function SpeciesDialog({
           <DialogTitle className="font-heading text-2xl">{species.name}</DialogTitle>
           <DialogDescription>
             {species.printings.length
-              ? `${species.ownedPrintings} of ${species.printings.length} card printings owned · ${species.ownedQuantity} total copies`
+              ? `${species.ownedPrintings} of ${species.printings.length} card printings owned · ${formatTotalCopyCount(species.ownedQuantity)}`
               : "No printings are available in the local catalog yet."}
           </DialogDescription>
         </DialogHeader>

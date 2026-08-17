@@ -79,7 +79,7 @@ struct EditCollectionCardSheet: View {
     private var copyTitle: String? {
         guard let copy = copyDetails else { return nil }
         let index = card.copies.firstIndex(where: { $0.id == copy.id }) ?? 0
-        return copy.displayTitle(index: index)
+        return copy.displayTitle(index: index, totalCount: card.copies.count)
     }
 
     private var copyDetailsLine: String? {

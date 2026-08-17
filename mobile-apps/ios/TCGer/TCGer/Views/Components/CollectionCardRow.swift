@@ -490,13 +490,17 @@ struct CollectionCardCopyRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(copy.displayTitle(index: index))
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                    if let title = copy.displayTitle(index: index, totalCount: total) {
+                        Text(title)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
                     Spacer()
-                    Text("\(index + 1) of \(total)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if total > 1 {
+                        Text("\(index + 1) of \(total)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 if let detailLine = copy.detailLine {

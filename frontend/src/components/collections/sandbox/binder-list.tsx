@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Collection } from "@/lib/api/collections";
+import { formatCopyCount } from "@/lib/copy-labels";
 
 interface BinderListProps {
   binders: Collection[];
@@ -64,9 +65,9 @@ export function BinderList({
       : normalizeColor(activeBinder?.colorHex);
   const activeCount =
     activeBinderId === "all"
-      ? `${totals.copies} copies · ${totals.rows} unique`
+      ? `${formatCopyCount(totals.copies)} · ${totals.rows} unique`
       : activeBinder
-        ? `${binderCopyCount(activeBinder)} copies · ${activeBinder.cards.length} unique`
+        ? `${formatCopyCount(binderCopyCount(activeBinder))} · ${activeBinder.cards.length} unique`
         : "";
   const activeContext =
     activeBinderId !== "all" && activeBinder

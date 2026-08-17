@@ -393,7 +393,9 @@ struct CollectionDetailView: View {
                                                     .contentShape(Rectangle())
                                                 }
                                                 .buttonStyle(.plain)
-                                                .accessibilityLabel(copy.displayTitle(index: index))
+                                                .accessibilityLabel(
+                                                    copy.displayTitle(index: index, totalCount: card.copies.count) ?? "This copy"
+                                                )
                                                 .accessibilityValue(selectedEntryIds.contains(copy.id) ? "Selected" : "Not selected")
                                                 .accessibilityHint("Double tap to toggle selection")
                                                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
@@ -712,7 +714,11 @@ struct CollectionDetailView: View {
                     if let context = copyPendingDeletion,
                        let copy = context.copy {
                         let index = context.card.copies.firstIndex(where: { $0.id == copy.id }) ?? 0
-                        Text("This permanently removes \(copy.displayTitle(index: index)) of \(context.card.name) from this binder.")
+                        let copyReference = copy.displayTitle(
+                            index: index,
+                            totalCount: context.card.copies.count
+                        ) ?? "this copy"
+                        Text("This permanently removes \(copyReference) of \(context.card.name) from this binder.")
                     }
                 }
                 .alert("Delete Binder?", isPresented: $showingDeleteBinderConfirmation) {

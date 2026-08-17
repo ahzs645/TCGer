@@ -70,6 +70,7 @@ import {
 } from "@tcg/api-types";
 import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
 import { DEMO_TRANSACTIONS_STORAGE_KEY } from "@/lib/storage/keys";
+import { formatCopyCount } from "@/lib/copy-labels";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -807,7 +808,7 @@ async function commitDemoCollectionImport(
   recordDemoCollectionMutation({
     operationKind: "import",
     affectedCopies: preview.totalCopies,
-    summary: `Imported ${preview.totalCopies} collection copies`,
+    summary: `Imported ${formatCopyCount(preview.totalCopies)} into the collection`,
     before,
   });
   return {

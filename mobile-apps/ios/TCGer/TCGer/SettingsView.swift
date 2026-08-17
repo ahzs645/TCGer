@@ -39,7 +39,6 @@ struct SettingsView: View {
     @State private var catalogInstallError: String?
     @State private var sampleDataLoaded = false
     @State private var localBackupURLs: [URL] = []
-    @State private var showingRestoreLocalBackupAlert = false
     @State private var localDataMessage: String?
     @State private var showingRemoveSampleAlert = false
     @State private var showingEraseLocalDataAlert = false
@@ -668,18 +667,18 @@ struct SettingsView: View {
 
                 if isLocalMode {
                     Section {
-                        LabeledContent("Recovery Points", value: "\(localBackupURLs.count)")
-
-                        Button {
-                            showingRestoreLocalBackupAlert = true
+                        NavigationLink {
+                            RecoveryPointsView {
+                                sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
+                                refreshLocalBackups()
+                            }
                         } label: {
-                            Label("Restore Latest Recovery Point", systemImage: "clock.arrow.circlepath")
+                            LabeledContent("Recovery Points", value: "\(localBackupURLs.count)")
                         }
-                        .disabled(localBackupURLs.isEmpty)
                     } header: {
                         Text("Local Data Recovery")
                     } footer: {
-                        Text("TCGer keeps up to five automatic recovery points before replacing local data. Restoring validates the snapshot first and preserves your current data as another recovery point.")
+                        Text("View, create, select, restore, export, or delete up to five local recovery points.")
                     }
                 }
 
@@ -818,14 +817,6 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Every card, binder, wishlist, sealed item, and transaction stored on this phone is deleted. TCGer keeps a bounded local recovery point so you can restore the previous state from Settings.")
-            }
-            .alert("Restore Latest Recovery Point?", isPresented: $showingRestoreLocalBackupAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Restore") {
-                    restoreLatestLocalBackup()
-                }
-            } message: {
-                Text("This replaces the current phone-only library after validating the recovery point. Your current state is saved as another recovery point first.")
             }
             .alert(
                 "Local Data",
@@ -970,19 +961,6 @@ struct SettingsView: View {
         } catch {
             localBackupURLs = []
             localDataMessage = "TCGer couldn’t read local recovery points: \(error.localizedDescription)"
-        }
-    }
-
-    private func restoreLatestLocalBackup() {
-        guard let latest = localBackupURLs.first else { return }
-        do {
-            try LocalStore.shared.restoreLocalBackup(from: latest)
-            sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
-            refreshLocalBackups()
-            localDataMessage = "The latest local recovery point was restored."
-        } catch {
-            refreshLocalBackups()
-            localDataMessage = "TCGer couldn’t restore that recovery point: \(error.localizedDescription)"
         }
     }
 

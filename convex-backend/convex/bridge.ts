@@ -43,6 +43,7 @@ import {
   undoAuditedCollectionMutation
 } from "./lib/collectionAudit";
 import { collectionMutationAuditEntryValidator } from "./lib/auditValidators";
+import { formatCollectionCopyCount } from "./lib/copyLabels";
 import {
   adminAppSettingsValidator,
   appSettingsValidator,
@@ -1482,7 +1483,7 @@ export const importCollectionRows = internalMutation({
       userId: viewer._id,
       actorId: args.subject,
       operationKind: "import",
-      summary: `Imported ${createdEntryIds.length} collection copies`,
+      summary: `Imported ${formatCollectionCopyCount(createdEntryIds.length)}`,
       before: [],
       after
     });

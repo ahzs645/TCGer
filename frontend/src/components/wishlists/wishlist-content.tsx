@@ -77,6 +77,7 @@ import type {
 } from "@/stores/wishlists";
 import { describeWishlistRule } from "@tcg/api-types";
 import type { Card as CardType, TcgCode } from "@/types/card";
+import { copyCountNoun } from "@/lib/copy-labels";
 
 export function WishlistContent() {
   const [confirm, confirmDialog] = useConfirm();
@@ -632,7 +633,8 @@ export function WishlistContent() {
                 >
                   <span data-oid="p75yp8m">
                     {wishlist.ownedDesiredQuantity} /{" "}
-                    {wishlist.totalDesiredQuantity} copies
+                    {wishlist.totalDesiredQuantity}{" "}
+                    {copyCountNoun(wishlist.totalDesiredQuantity)}
                   </span>
                 </div>
                 <div
@@ -699,7 +701,8 @@ export function WishlistContent() {
                   data-oid="ln2uro3"
                 >
                   {activeWishlist.ownedDesiredQuantity} /{" "}
-                  {activeWishlist.totalDesiredQuantity} wanted copies owned
+                  {activeWishlist.totalDesiredQuantity} wanted{" "}
+                  {copyCountNoun(activeWishlist.totalDesiredQuantity)} owned
                 </span>
                 <Badge
                   variant={

@@ -20,6 +20,7 @@ import {
   createCollectionAudit,
   snapshotCollectionEntries
 } from './collection-audit.service';
+import { formatCollectionCopyCount } from './collection-copy-summary';
 
 type ResolvedBulkAddRow = BulkAddCopyFields & {
   rowId: string;
@@ -202,7 +203,7 @@ export async function commitBulkAdd(
     await createCollectionAudit(tx, {
       userId,
       operationKind: 'bulk',
-      summary: `Added ${entryIds.length} collection copies`,
+      summary: `Added ${formatCollectionCopyCount(entryIds.length)}`,
       before: [],
       after,
       metadata: {

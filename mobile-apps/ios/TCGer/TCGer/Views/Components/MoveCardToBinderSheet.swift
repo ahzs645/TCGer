@@ -93,6 +93,7 @@ struct MoveCardToBinderSheet: View {
                             CopySelectionRow(
                                 copy: copy,
                                 index: index,
+                                totalCount: copies.count,
                                 isSelected: selectedCopyIds.contains(copy.id)
                             ) { isSelected in
                                 if isSelected {
@@ -237,6 +238,7 @@ struct MoveCardToBinderSheet: View {
 private struct CopySelectionRow: View {
     let copy: CollectionCardCopy
     let index: Int
+    let totalCount: Int
     let isSelected: Bool
     let onToggle: (Bool) -> Void
 
@@ -250,9 +252,11 @@ private struct CopySelectionRow: View {
                     .font(.title3)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(copy.displayTitle(index: index))
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                    if let title = copy.displayTitle(index: index, totalCount: totalCount) {
+                        Text(title)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
 
                     if let detailLine = copy.detailLine {
                         Text(detailLine)
@@ -303,7 +307,11 @@ private struct CardSummaryRow: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                Text(isTargetedCopy ? "Moving 1 of \(card.quantity) copies" : "Currently ×\(card.quantity)")
+                Text(
+                    isTargetedCopy
+                        ? "Moving 1 of \(CollectionCopyText.count(card.quantity))"
+                        : "Currently ×\(card.quantity)"
+                )
                     .font(.caption)
                     .foregroundColor(.secondary)
 

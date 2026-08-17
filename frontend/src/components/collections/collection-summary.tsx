@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { CollectionCard } from "@/types/card";
+import { formatCopyCount } from "@/lib/copy-labels";
 
 interface CollectionSummaryProps {
   items: CollectionCard[];
@@ -60,7 +61,7 @@ export function CollectionSummary({
       <SummaryCard
         title="Total inventory"
         description={`${uniqueCount} unique cards`}
-        value={`${totalQuantity} copies`}
+        value={formatCopyCount(totalQuantity)}
         icon={<Layers className="h-5 w-5" data-oid="qzo_4f." />}
         data-oid="0uq65e_"
       />
@@ -86,7 +87,7 @@ export function CollectionSummary({
 
           <SummaryCard
             title="Selected for export"
-            description={`${selectedCards.length} card(s), ${selectedQuantity} copies`}
+            description={`${selectedCards.length} card(s), ${formatCopyCount(selectedQuantity)}`}
             value={`$${selectedValue.toFixed(2)}`}
             icon={<ArrowUpRight className="h-5 w-5" data-oid="_p13n6r" />}
             variant="muted"
@@ -105,7 +106,7 @@ export function CollectionSummary({
 
           <SummaryCard
             title="Selected cards"
-            description={`You picked ${selectedQuantity} copies`}
+            description={`You picked ${formatCopyCount(selectedQuantity)}`}
             value={`${selectedCards.length} titles`}
             icon={<ArrowUpRight className="h-5 w-5" data-oid=".srp.4a" />}
             variant="muted"

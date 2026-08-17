@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Filter, Tag as TagIcon } from "lucide-react";
 import type { CollectionTag } from "@/lib/api/collections";
 import { CONDITION_COPY, CONDITION_ORDER, formatCurrency } from "./helpers";
+import { formatTotalCopyCount } from "@/lib/copy-labels";
 
 interface FilterControlsProps {
   priceRange: [number, number];
@@ -176,7 +177,7 @@ export function FilterControls({
           {summary.rows} card row{summary.rows === 1 ? "" : "s"}
         </Badge>
         <Badge variant="outline" data-oid="bx-vmze">
-          {summary.copies} total copies
+          {formatTotalCopyCount(summary.copies)}
         </Badge>
         <Badge variant="outline" data-oid="1tjam3k">
           Focus tags: {highlightedLabels || "—"}

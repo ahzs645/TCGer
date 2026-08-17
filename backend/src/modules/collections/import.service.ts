@@ -11,6 +11,7 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
 import { createCollectionAudit, snapshotCollectionEntries } from './collection-audit.service';
+import { formatCollectionCopyCount } from './collection-copy-summary';
 import { parseCollectionImportSource } from './collection-import-parser';
 
 const MAX_ROWS = 2_000;
@@ -717,7 +718,7 @@ export async function commitCollectionImport(
     await createCollectionAudit(tx, {
       userId,
       operationKind: 'import',
-      summary: `Imported ${createdEntryIds.length} collection copies`,
+      summary: `Imported ${formatCollectionCopyCount(createdEntryIds.length)}`,
       before: [],
       after,
       metadata: {

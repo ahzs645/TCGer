@@ -232,7 +232,7 @@ private struct RecentCollectionsSection: View {
     private func accessibilityValue(for collection: Collection) -> String {
         var parts = [
             "\(collection.uniqueCards) unique cards",
-            "\(collection.totalCopies) total copies",
+            CollectionCopyText.total(collection.totalCopies),
         ]
         if showPricing {
             parts.append("estimated value \(collection.totalValue.priceText)")
