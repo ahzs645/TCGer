@@ -117,6 +117,15 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
+            // AVCapturePhotoSettings otherwise defaults to the smallest
+            // supported still dimensions. Binder pockets need the native
+            // sensor pixels so title/footer OCR is not working from an
+            // upscaled ~5 px glyph band.
+            if let largestDimensions = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
+                Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height)
+            }) {
+                photoOutput.maxPhotoDimensions = largestDimensions
+            }
         }
 
         videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -153,6 +162,8 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     func capturePhoto() {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
+        settings.photoQualityPrioritization = .quality
+        settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
         if photoOutput.isCameraCalibrationDataDeliverySupported {
             settings.isCameraCalibrationDataDeliveryEnabled = true
         }

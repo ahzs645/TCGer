@@ -225,10 +225,22 @@ Recording** against future model builds, export via
 `scripts/export_scanner_recording_labels.py` for labeling, and can be added
 to the training corpus after review. The per-attempt evidence is a sidecar
 `evidence.json` keyed by frame file, so the shared schema is unchanged.
-Binder pages record the raw page image plus one evidence attempt per
-detected card — its quad, crop image, candidate list, and match status —
-whether the page came from the shutter or an import, and whether or not the
-scan produced any result.
+Binder pages record the raw page image and every real coordinator attempt for
+every detected pocket. Attempts are correlated with `pocketIndex` and retain
+the page quad separately from `coordinatorQuad`; they include the gate,
+candidate shortlist, title/footer OCR, coordinator outcome, final binder
+status, `binderIncludedByDefault`, and `binderPolicyReason`. The export also
+stores the 720x1000 recognition-crop dimensions, native perspective-corrected
+dimensions before resize, crop capture-quality metrics, applied geometric
+rotation, and `semanticOrientation`. The latter is currently `unverified`:
+pixel geometry cannot determine whether printed content is upright or upside
+down, and recording that uncertainty is intentional. Page and original-image
+pixel dimensions live in `imageMetadata` / `originalImageMetadata`.
+
+Fields added after the first dev-mode schema are optional. Older
+`evidence.json` recordings continue to decode; absent pocket/orientation fields
+mean the data was not recorded, not that the gate or OCR stage returned an
+empty value.
 
 Recording is unconditional while the toggle is on: no-match scans, gate
 rejections, and binder pages with zero detections are all kept, because the

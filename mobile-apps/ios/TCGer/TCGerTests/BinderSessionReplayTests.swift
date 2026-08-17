@@ -50,18 +50,10 @@ final class BinderSessionReplayTests: XCTestCase {
         "scan-session-20260810-220315/frame-0018.jpg": 3,
     ]
 
-    /// Labeled pockets the current baseline auto-includes with the WRONG card.
-    /// These are open defects held here so the assertion can catch new ones —
-    /// not accepted behavior. Each entry is a card that silently enters the
-    /// user's collection when they confirm a page without inspecting it.
-    private static let knownWrongAutoIncludes: Set<String> = [
-        // Absol (ex13-18) retrieved as Shiftry (ex2-22) at 0.77 with a top-2
-        // margin wide enough to clear `isReliableSuggestion`. Different card,
-        // different Pokemon, different set — a plain retrieval error that the
-        // margin gate cannot see, since the gate only measures separation, not
-        // correctness. Measured 2026-08-11 (Simulator, iPhone 17 Pro).
-        "scan-session-20260809-211223/frame-0008.jpg#0",
-    ]
+    /// Labeled pockets the current baseline auto-includes with the wrong card.
+    /// This should remain empty: only `.matched` detections enter the default
+    /// add batch, and any wrong high-confidence match is a precision defect.
+    private static let knownWrongAutoIncludes: Set<String> = []
 
     /// Pocket alignment threshold. Pockets in a 3x3 page are far apart, so
     /// anything sharing this much area with the recorded quad is the same

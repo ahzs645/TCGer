@@ -227,13 +227,6 @@ actor BinderPageScanner {
         static let maximumBoundingBoxArea: CGFloat = 0.45
         static let duplicateIntersectionThreshold: CGFloat = 0.55
         static let matchedScore = 0.82
-        /// ANN top-2 separation below which an uncertain suggestion is not
-        /// trustworthy enough to import on a blanket page confirm. Measured on
-        /// 67 strongly-accepted binder attempts (2026-08-10): every wrong
-        /// review candidate at >=0.72 had a top-2 margin <= 0.047 (median
-        /// 0.009), correct ones median 0.095. Gating at 0.05 suppressed all 15
-        /// wrong candidates and kept ~75% of correct ones.
-        static let reviewPreselectionMargin = 0.05
         static let targetSize = CGSize(width: 720, height: 1000)
         /// Breathing room kept around the detected cards when the page image
         /// is re-fitted to them, as a fraction of the frame per side.
@@ -251,11 +244,26 @@ actor BinderPageScanner {
         let index: Int
         let observation: VNRectangleObservation
         let crop: CGImage
+        let nativeCropPixelWidth: Int
+        let nativeCropPixelHeight: Int
+        let rotationDegreesApplied: Int
     }
 
     private struct Identification: Sendable {
         let primary: CardScanCandidate
         let alternatives: [CardScanCandidate]
+    }
+
+    private struct PocketRecognition: Sendable {
+        let identification: Identification?
+        let diagnostics: ScanDiagnostics?
+    }
+
+    private struct NormalizedCrop: @unchecked Sendable {
+        let image: CGImage
+        let nativePixelWidth: Int
+        let nativePixelHeight: Int
+        let rotationDegreesApplied: Int
     }
 
     private let coordinator: CardScannerCoordinator
@@ -280,36 +288,52 @@ actor BinderPageScanner {
             in: image,
             intrinsics: context.cameraIntrinsics
         )
-        let croppedObservations = observations.compactMap { observation -> (VNRectangleObservation, CGImage)? in
+        let croppedObservations = observations.compactMap { observation -> (VNRectangleObservation, NormalizedCrop)? in
             guard let crop = makeNormalizedCrop(from: image, observation: observation) else {
                 return nil
             }
             return (observation, crop)
         }
         let workItems = croppedObservations.enumerated().map { index, item in
-            CropWorkItem(index: index, observation: item.0, crop: item.1)
+            CropWorkItem(
+                index: index,
+                observation: item.0,
+                crop: item.1.image,
+                nativeCropPixelWidth: item.1.nativePixelWidth,
+                nativeCropPixelHeight: item.1.nativePixelHeight,
+                rotationDegreesApplied: item.1.rotationDegreesApplied
+            )
         }
 
-        var identifications = Array<Identification?>(repeating: nil, count: workItems.count)
-        await withTaskGroup(of: (Int, Identification?).self) { group in
+        var recognitions = Array<PocketRecognition?>(repeating: nil, count: workItems.count)
+        await withTaskGroup(of: (Int, PocketRecognition).self) { group in
             let initialCount = min(Configuration.maximumConcurrentIdentifications, workItems.count)
             for item in workItems.prefix(initialCount) {
                 let itemIndex = item.index
                 let crop = item.crop
                 group.addTask { [coordinator, context] in
+                    var pocketContext = context
+                    let pocketDiagnostics = context.diagnostics.map { _ in ScanDiagnostics() }
+                    pocketContext.diagnostics = pocketDiagnostics
                     let result = await coordinator.scan(
                         image: crop,
-                        context: context,
+                        context: pocketContext,
                         source: .photoCapture
                     )
                     guard case .success(let scanResult) = result else {
-                        return (itemIndex, nil)
+                        return (
+                            itemIndex,
+                            PocketRecognition(identification: nil, diagnostics: pocketDiagnostics)
+                        )
                     }
                     return (
                         itemIndex,
-                        Identification(
-                            primary: scanResult.primary,
-                            alternatives: scanResult.alternatives
+                        PocketRecognition(
+                            identification: Identification(
+                                primary: scanResult.primary,
+                                alternatives: scanResult.alternatives
+                            ),
+                            diagnostics: pocketDiagnostics
                         )
                     )
                 }
@@ -318,8 +342,8 @@ actor BinderPageScanner {
             var nextIndex = initialCount
 
             while let (index, result) = await group.next() {
-                if index < identifications.count {
-                    identifications[index] = result
+                if index < recognitions.count {
+                    recognitions[index] = result
                 }
                 if nextIndex < workItems.count {
                     let item = workItems[nextIndex]
@@ -327,19 +351,28 @@ actor BinderPageScanner {
                     let crop = item.crop
                     nextIndex += 1
                     group.addTask { [coordinator, context] in
+                        var pocketContext = context
+                        let pocketDiagnostics = context.diagnostics.map { _ in ScanDiagnostics() }
+                        pocketContext.diagnostics = pocketDiagnostics
                         let result = await coordinator.scan(
                             image: crop,
-                            context: context,
+                            context: pocketContext,
                             source: .photoCapture
                         )
                         guard case .success(let scanResult) = result else {
-                            return (itemIndex, nil)
+                            return (
+                                itemIndex,
+                                PocketRecognition(identification: nil, diagnostics: pocketDiagnostics)
+                            )
                         }
                         return (
                             itemIndex,
-                            Identification(
-                                primary: scanResult.primary,
-                                alternatives: scanResult.alternatives
+                            PocketRecognition(
+                                identification: Identification(
+                                    primary: scanResult.primary,
+                                    alternatives: scanResult.alternatives
+                                ),
+                                diagnostics: pocketDiagnostics
                             )
                         )
                     }
@@ -364,8 +397,24 @@ actor BinderPageScanner {
         let detections = workItems.map { item -> BinderCardDetection in
             let baseQuad = BinderNormalizedQuad(observation: item.observation)
             let quad = pageFitRect.map { baseQuad.remapped(into: $0) } ?? baseQuad
-            guard let result = identifications[item.index] else {
-                return BinderCardDetection(
+            let recognition = recognitions[item.index]
+            let result = recognition?.identification
+            let detection: BinderCardDetection
+            if let result {
+                let status: BinderCardDetectionStatus = result.primary.confidence.score >= Configuration.matchedScore
+                    ? .matched
+                    : .uncertain
+                detection = BinderCardDetection(
+                    quad: quad,
+                    crop: item.crop,
+                    rectangleConfidence: item.observation.confidence,
+                    selectedCandidate: result.primary,
+                    candidateOptions: [result.primary] + result.alternatives,
+                    status: status,
+                    isIncluded: Self.shouldIncludeByDefault(status: status)
+                )
+            } else {
+                detection = BinderCardDetection(
                     quad: quad,
                     crop: item.crop,
                     rectangleConfidence: item.observation.confidence,
@@ -376,22 +425,54 @@ actor BinderPageScanner {
                 )
             }
 
-            let status: BinderCardDetectionStatus = result.primary.confidence.score >= Configuration.matchedScore
-                ? .matched
-                : .uncertain
-            return BinderCardDetection(
-                quad: quad,
-                crop: item.crop,
-                rectangleConfidence: item.observation.confidence,
-                selectedCandidate: result.primary,
-                candidateOptions: [result.primary] + result.alternatives,
-                status: status,
-                isIncluded: Self.isReliableSuggestion(
-                    primary: result.primary,
-                    alternatives: result.alternatives,
-                    status: status
+            if let pageDiagnostics = context.diagnostics,
+               let pocketDiagnostics = recognition?.diagnostics {
+                let pageQuad = [
+                    quad.topLeft, quad.topRight, quad.bottomRight, quad.bottomLeft,
+                ].map { [Double($0.x), Double($0.y)] }
+                let captureQuality = ScannerCaptureQualityAnalyzer.analyze(image: item.crop)
+                let metadata = ScanDiagnostics.BinderMetadata(
+                    pocketIndex: item.index,
+                    status: detection.status,
+                    includedByDefault: detection.isIncluded,
+                    policyReason: Self.binderPolicyReason(status: detection.status),
+                    sourceCropPixelWidth: item.crop.width,
+                    sourceCropPixelHeight: item.crop.height,
+                    nativeCropPixelWidth: item.nativeCropPixelWidth,
+                    nativeCropPixelHeight: item.nativeCropPixelHeight,
+                    rotationDegreesApplied: item.rotationDegreesApplied,
+                    captureQuality: captureQuality,
+                    pageQuad: pageQuad
                 )
-            )
+                // Custom/test strategies may not emit diagnostics. Retain one
+                // explicit summary in that case; production strategies keep
+                // all of their real gate, shortlist, title, and footer data.
+                if pocketDiagnostics.attempts.isEmpty {
+                    let imageIndex = pocketDiagnostics.registerAttemptImage(item.crop)
+                    pocketDiagnostics.record(ScanDiagnostics.Attempt(
+                        kind: .detectedCrop,
+                        quad: nil,
+                        gateScore: nil,
+                        gateThreshold: nil,
+                        topCandidates: detection.candidateOptions.prefix(5).map {
+                            ScanDiagnostics.Candidate(
+                                cardID: $0.details.identity.id,
+                                name: $0.details.identity.name,
+                                similarity: $0.confidence.score
+                            )
+                        },
+                        titleMatchedName: nil,
+                        titlePrintingCount: nil,
+                        footerPairNumbers: [],
+                        ocrVerifiedCollectorNumber: nil,
+                        outcome: detection.status == .matched ? .accepted :
+                            (detection.status == .uncertain ? .printingAmbiguous : .noCandidates),
+                        imageIndex: imageIndex
+                    ))
+                }
+                pageDiagnostics.mergeBinderPocket(from: pocketDiagnostics, metadata: metadata)
+            }
+            return detection
         }
 
         return BinderPageScanResult(
@@ -511,24 +592,25 @@ actor BinderPageScanner {
         return try detectRectangles(in: image)
     }
 
-    /// An uncertain suggestion whose runner-up is nearly tied is wrong more
-    /// often than right (see `reviewPreselectionMargin`). Such a detection
-    /// keeps its suggestion visible in review, but is excluded from a blanket
-    /// page confirm until the user includes it explicitly. OCR-verified
-    /// primaries are exempt: a read collector number is stronger evidence
-    /// than ANN separation (and OCR promotion can invert the margin).
-    nonisolated static func isReliableSuggestion(
-        primary: CardScanCandidate,
-        alternatives: [CardScanCandidate],
+    /// Only high-confidence matches are selected for the add batch initially.
+    /// Uncertain suggestions remain attached to their detections so review can
+    /// show the proposed identity and alternatives, but require an explicit
+    /// user selection before import. Unmatched regions remain visible and
+    /// excluded as well.
+    nonisolated static func shouldIncludeByDefault(
         status: BinderCardDetectionStatus
     ) -> Bool {
-        if status == .matched { return true }
-        if primary.debugInfo["ocrVerified"] == "true" { return true }
-        let bestRivalScore = alternatives
-            .first { $0.details.identity.id != primary.details.identity.id }?
-            .confidence.score ?? 0
-        return primary.confidence.score - bestRivalScore
-            >= Configuration.reviewPreselectionMargin
+        status == .matched
+    }
+
+    nonisolated static func binderPolicyReason(
+        status: BinderCardDetectionStatus
+    ) -> ScanDiagnostics.BinderPolicyReason {
+        switch status {
+        case .matched: return .matchedThreshold
+        case .uncertain: return .uncertainReviewRequired
+        case .unmatched: return .noCoordinatorMatch
+        }
     }
 
     nonisolated static func shouldUseDetectorBox(
@@ -632,7 +714,7 @@ actor BinderPageScanner {
     private func makeNormalizedCrop(
         from image: CGImage,
         observation: VNRectangleObservation
-    ) -> CGImage? {
+    ) -> NormalizedCrop? {
         let imageSize = CGSize(width: image.width, height: image.height)
         let filter = CIFilter.perspectiveCorrection()
         filter.inputImage = CIImage(cgImage: image)
@@ -646,6 +728,9 @@ actor BinderPageScanner {
               corrected.extent.height > 0
         else { return nil }
 
+        let nativePixelWidth = Int(corrected.extent.width.rounded())
+        let nativePixelHeight = Int(corrected.extent.height.rounded())
+
         let scaleX = Configuration.targetSize.width / corrected.extent.width
         let scaleY = Configuration.targetSize.height / corrected.extent.height
         corrected = corrected
@@ -655,7 +740,15 @@ actor BinderPageScanner {
         // CardCropper output, and the reference indexes are built from
         // unmodified catalog images (parity — see docs/scanner-model-ai-handoff.md).
 
-        return Self.ciContext.createCGImage(corrected, from: corrected.extent)
+        guard let output = Self.ciContext.createCGImage(corrected, from: corrected.extent) else {
+            return nil
+        }
+        return NormalizedCrop(
+            image: output,
+            nativePixelWidth: nativePixelWidth,
+            nativePixelHeight: nativePixelHeight,
+            rotationDegreesApplied: 0
+        )
     }
 
     private func convert(_ point: CGPoint, in imageSize: CGSize) -> CGPoint {

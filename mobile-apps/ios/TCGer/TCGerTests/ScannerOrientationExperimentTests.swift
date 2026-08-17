@@ -281,6 +281,40 @@ final class ScannerOrientationExperimentTests: XCTestCase {
         ))
     }
 
+    /// Runs one explicitly labeled frame through the production coordinator,
+    /// including semantic-orientation arbitration. This stays environment-
+    /// gated because device dev-mode captures are intentionally not bundled
+    /// into the app's lightweight unit-test fixtures.
+    func testProductionSemantic180Regression() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let path = environment["ORIENTATION_PRODUCTION_SESSION_DIR"],
+              let frameFile = environment["ORIENTATION_PRODUCTION_FRAME"],
+              let expected = environment["ORIENTATION_PRODUCTION_EXPECTED"]
+        else {
+            throw XCTSkip(
+                "Set ORIENTATION_PRODUCTION_SESSION_DIR, _FRAME, and _EXPECTED."
+            )
+        }
+        let image = try loadImage(
+            URL(fileURLWithPath: path, isDirectory: true).appendingPathComponent(frameFile)
+        )
+        let result = await CardScannerCoordinator(
+            strategies: [BoardCardEmbeddingScannerStrategy()],
+            apiService: APIService()
+        ).scan(
+            image: image,
+            context: .test(engine: .localOnly),
+            source: .photoCapture
+        )
+
+        switch result {
+        case .success(let scan):
+            XCTAssertEqual(scan.primary.details.identity.id, expected)
+        case .failure(let error):
+            XCTFail("production semantic-orientation scan failed: \(error)")
+        }
+    }
+
     /// Places one or more real, human-labeled card crops into synthetic camera
     /// scenes at non-cardinal angles. Geometry is measured independently for
     /// upright and upside-down artwork because rectangle localization should

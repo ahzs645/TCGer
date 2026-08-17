@@ -486,9 +486,14 @@ final class CardScannerViewModel: ObservableObject {
         state = .processing
         defer { isProcessingPhoto = false }
 
+        var scanContext = context
+        let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
+        scanContext.diagnostics = diagnostics
+        scanContext.cameraIntrinsics = cameraIntrinsics
+        let captureQuality = diagnostics.map { _ in
+            ScannerCaptureQualityAnalyzer.analyze(image: image, intrinsics: cameraIntrinsics)
+        }
         do {
-            var scanContext = context
-            scanContext.cameraIntrinsics = cameraIntrinsics
             let result = try await binderPageScanner.scan(
                 image: image,
                 context: scanContext,
@@ -500,7 +505,9 @@ final class CardScannerViewModel: ObservableObject {
                 result: result,
                 error: nil,
                 source: source,
-                mode: scanContext.mode
+                mode: scanContext.mode,
+                diagnostics: diagnostics,
+                captureQuality: captureQuality
             )
             let scannedPageNumber = nextBinderPageNumber
             let record = BinderPageRecord(result: result, pageNumber: scannedPageNumber)
@@ -533,7 +540,9 @@ final class CardScannerViewModel: ObservableObject {
                 result: nil,
                 error: error,
                 source: source,
-                mode: context.mode
+                mode: context.mode,
+                diagnostics: diagnostics,
+                captureQuality: captureQuality
             )
             errorMessage = error.localizedDescription
             state = .ready
@@ -541,52 +550,20 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    /// Dev-mode capture of a binder page: the raw page image plus one
-    /// evidence attempt per detected card — its quad, crop image, and
-    /// candidate list — so binder pages are full multi-card training data,
-    /// not just an unlabeled photo.
+    /// Dev-mode capture of a binder page. `BinderPageScanner` has already
+    /// merged each pocket's isolated coordinator collector into `diagnostics`,
+    /// retaining the real gate, retrieval, OCR, and final inclusion evidence.
     private func recordBinderPageForDevMode(
         page: CGImage,
         original: CGImage?,
         result: BinderPageScanResult?,
         error: Error?,
         source: ScanInvocationKind,
-        mode: ScanMode
+        mode: ScanMode,
+        diagnostics: ScanDiagnostics?,
+        captureQuality: ScannerCaptureQualityReport?
     ) {
         guard ScannerDevModeStore.isEnabled else { return }
-        let diagnostics = ScanDiagnostics()
-        for detection in result?.detections ?? [] {
-            let imageIndex = diagnostics.registerAttemptImage(detection.crop)
-            let quad = [
-                detection.quad.topLeft, detection.quad.topRight,
-                detection.quad.bottomRight, detection.quad.bottomLeft,
-            ].map { [Double($0.x), Double($0.y)] }
-            let outcome: ScanDiagnostics.AttemptOutcome
-            switch detection.status {
-            case .matched: outcome = .accepted
-            case .uncertain: outcome = .printingAmbiguous
-            case .unmatched: outcome = .noCandidates
-            }
-            diagnostics.record(ScanDiagnostics.Attempt(
-                kind: .detectedCrop,
-                quad: quad,
-                gateScore: nil,
-                gateThreshold: nil,
-                topCandidates: detection.candidateOptions.prefix(5).map {
-                    ScanDiagnostics.Candidate(
-                        cardID: $0.details.identity.id,
-                        name: $0.details.identity.name,
-                        similarity: $0.confidence.score
-                    )
-                },
-                titleMatchedName: nil,
-                titlePrintingCount: nil,
-                footerPairNumbers: [],
-                ocrVerifiedCollectorNumber: nil,
-                outcome: outcome,
-                imageIndex: imageIndex
-            ))
-        }
         let label: String
         if let result {
             let matched = result.detections.filter { $0.status == .matched }.count
@@ -604,7 +581,8 @@ final class CardScannerViewModel: ObservableObject {
                 result: nil,
                 diagnostics: diagnostics,
                 originalImage: original,
-                outcomeLabel: label
+                outcomeLabel: label,
+                captureQuality: captureQuality
             )
         }
     }

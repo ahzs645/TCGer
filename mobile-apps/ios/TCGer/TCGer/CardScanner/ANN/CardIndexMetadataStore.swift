@@ -5,11 +5,39 @@ struct CardIndexMetadataEntry: Codable {
     let cardId: String
     let name: String
     let game: String?
+    /// `pocket` identifies digital-only Pokémon TCG Pocket artwork. Older
+    /// generated indices omit this field, so `isPhysicalScanEligible` also
+    /// recognizes the stable TCGdex `/tcgp/` asset path.
+    let format: String?
     let setCode: String?
     let setName: String?
     let rarity: String?
     let imageURL: String?
     let price: Double?
+
+    init(
+        annIndex: Int,
+        cardId: String,
+        name: String,
+        game: String?,
+        format: String? = nil,
+        setCode: String?,
+        setName: String?,
+        rarity: String?,
+        imageURL: String?,
+        price: Double?
+    ) {
+        self.annIndex = annIndex
+        self.cardId = cardId
+        self.name = name
+        self.game = game
+        self.format = format
+        self.setCode = setCode
+        self.setName = setName
+        self.rarity = rarity
+        self.imageURL = imageURL
+        self.price = price
+    }
 
     nonisolated var resolvedGame: TCGGame {
         guard let game else { return .pokemon }
@@ -19,6 +47,13 @@ struct CardIndexMetadataEntry: Codable {
         case "yugioh", "yu-gi-oh", "yu_gi_oh": return .yugioh
         default: return .all
         }
+    }
+
+    nonisolated var isPhysicalScanEligible: Bool {
+        if format?.caseInsensitiveCompare("pocket") == .orderedSame {
+            return false
+        }
+        return imageURL?.localizedCaseInsensitiveContains("/tcgp/") != true
     }
 }
 
@@ -90,6 +125,19 @@ actor CardIndexMetadataStore {
         }.map(\.annIndex))
     }
 
+    /// Candidate rows suitable for a camera scan of a physical card. Pokémon
+    /// TCG Pocket cards are digital-only and otherwise share `.pokemon`, which
+    /// allowed unrelated Pocket art to become high-confidence physical-card
+    /// matches.
+    func physicalCardIndices(for game: TCGGame, setCode: String?) -> Set<Int> {
+        loadIfNeeded()
+        return Set(cache.values.lazy.filter {
+            guard $0.resolvedGame == game, $0.isPhysicalScanEligible else { return false }
+            guard let setCode else { return true }
+            return $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+        }.map(\.annIndex))
+    }
+
     func entries(for game: TCGGame, setCode: String) -> [CardIndexMetadataEntry] {
         loadIfNeeded()
         return cache.values
@@ -107,7 +155,8 @@ actor CardIndexMetadataStore {
     func exactNameMatch(
         for candidates: [CardTitleOCR.Candidate],
         game: TCGGame,
-        setCode: String?
+        setCode: String?,
+        physicalCardsOnly: Bool = false
     ) -> (name: String, indices: Set<Int>)? {
         loadIfNeeded()
         let names = indicesByGameAndName[game] ?? [:]
@@ -115,6 +164,9 @@ actor CardIndexMetadataStore {
             guard candidate.confidence >= 0.25 else { return nil }
             let key = CardTitleOCR.normalizedName(candidate.text)
             guard key.count >= 4, var indices = names[key], !indices.isEmpty else { return nil }
+            if physicalCardsOnly {
+                indices = indices.filter { cache[$0]?.isPhysicalScanEligible == true }
+            }
             if let setCode {
                 indices = indices.filter { cache[$0]?.setCode?.caseInsensitiveCompare(setCode) == .orderedSame }
             }

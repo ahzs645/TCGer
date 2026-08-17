@@ -15,13 +15,13 @@ import Foundation
 /// through the strategy chain, and the collector must accumulate across it.
 /// Access is serialized with a lock.
 nonisolated final class ScanDiagnostics: @unchecked Sendable {
-    struct Candidate: Codable {
+    struct Candidate: Codable, Sendable {
         let cardID: String
         let name: String
         let similarity: Double
     }
 
-    enum AttemptKind: String, Codable {
+    enum AttemptKind: String, Codable, Sendable {
         /// Perspective-corrected crop of the detector/rectangle localization.
         case detectedCrop
         /// The full frame normalized like a crop (importedPhoto fallback).
@@ -32,7 +32,7 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         case manualCrop
     }
 
-    enum AttemptOutcome: String, Codable {
+    enum AttemptOutcome: String, Codable, Sendable {
         case accepted
         /// Open-set rejection: gate said non-card and OCR could not override.
         case rejectedInput
@@ -43,7 +43,40 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         case indexUnavailable
     }
 
-    struct Attempt: Codable {
+    /// Semantic orientation is deliberately separate from pixel orientation.
+    /// All scanner `CGImage` inputs are in an upright pixel coordinate space,
+    /// but geometry alone cannot tell whether the printed card is upside down.
+    enum SemanticOrientation: String, Codable, Sendable {
+        case unverified
+        case upright
+        case upsideDown
+        case sideways
+    }
+
+    enum BinderPolicyReason: String, Codable, Sendable {
+        case matchedThreshold
+        case uncertainOCRVerified
+        case uncertainSeparatedCandidates
+        case uncertainNearTieExcluded
+        case uncertainReviewRequired
+        case noCoordinatorMatch
+    }
+
+    struct BinderMetadata: Sendable {
+        let pocketIndex: Int
+        let status: BinderCardDetectionStatus
+        let includedByDefault: Bool
+        let policyReason: BinderPolicyReason
+        let sourceCropPixelWidth: Int
+        let sourceCropPixelHeight: Int
+        let nativeCropPixelWidth: Int
+        let nativeCropPixelHeight: Int
+        let rotationDegreesApplied: Int
+        let captureQuality: ScannerCaptureQualityReport?
+        let pageQuad: [[Double]]
+    }
+
+    struct Attempt: Codable, Sendable {
         let kind: AttemptKind
         /// Detected quad in normalized image coordinates (Vision space,
         /// origin bottom-left), when the attempt came from a localization.
@@ -59,6 +92,105 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         /// Index into the recorded attempt images (`imageFile` naming is the
         /// recorder's concern; the collector only numbers them).
         let imageIndex: Int
+
+        /// Binder-only correlation and final review-policy evidence. Optional
+        /// so pre-schema recordings and single-card attempts decode unchanged.
+        let pocketIndex: Int?
+        let binderStatus: String?
+        let binderIncludedByDefault: Bool?
+        let binderPolicyReason: BinderPolicyReason?
+
+        /// Pixel and semantic-orientation evidence for diagnosing resize and
+        /// upside-down failures. `nativeCrop*` is the perspective-corrected
+        /// binder crop before its 720x1000 recognition resize.
+        let sourceCropPixelWidth: Int?
+        let sourceCropPixelHeight: Int?
+        let nativeCropPixelWidth: Int?
+        let nativeCropPixelHeight: Int?
+        let rotationDegreesApplied: Int?
+        let semanticOrientation: SemanticOrientation?
+        let captureQuality: ScannerCaptureQualityReport?
+        /// Binder attempts keep `quad` in page coordinates for compatibility;
+        /// this preserves the coordinator's localization inside the pocket.
+        let coordinatorQuad: [[Double]]?
+
+        init(
+            kind: AttemptKind,
+            quad: [[Double]]?,
+            gateScore: Double?,
+            gateThreshold: Double?,
+            topCandidates: [Candidate],
+            titleMatchedName: String?,
+            titlePrintingCount: Int?,
+            footerPairNumbers: [String],
+            ocrVerifiedCollectorNumber: String?,
+            outcome: AttemptOutcome,
+            imageIndex: Int,
+            pocketIndex: Int? = nil,
+            binderStatus: String? = nil,
+            binderIncludedByDefault: Bool? = nil,
+            binderPolicyReason: BinderPolicyReason? = nil,
+            sourceCropPixelWidth: Int? = nil,
+            sourceCropPixelHeight: Int? = nil,
+            nativeCropPixelWidth: Int? = nil,
+            nativeCropPixelHeight: Int? = nil,
+            rotationDegreesApplied: Int? = nil,
+            semanticOrientation: SemanticOrientation? = nil,
+            captureQuality: ScannerCaptureQualityReport? = nil,
+            coordinatorQuad: [[Double]]? = nil
+        ) {
+            self.kind = kind
+            self.quad = quad
+            self.gateScore = gateScore
+            self.gateThreshold = gateThreshold
+            self.topCandidates = topCandidates
+            self.titleMatchedName = titleMatchedName
+            self.titlePrintingCount = titlePrintingCount
+            self.footerPairNumbers = footerPairNumbers
+            self.ocrVerifiedCollectorNumber = ocrVerifiedCollectorNumber
+            self.outcome = outcome
+            self.imageIndex = imageIndex
+            self.pocketIndex = pocketIndex
+            self.binderStatus = binderStatus
+            self.binderIncludedByDefault = binderIncludedByDefault
+            self.binderPolicyReason = binderPolicyReason
+            self.sourceCropPixelWidth = sourceCropPixelWidth
+            self.sourceCropPixelHeight = sourceCropPixelHeight
+            self.nativeCropPixelWidth = nativeCropPixelWidth
+            self.nativeCropPixelHeight = nativeCropPixelHeight
+            self.rotationDegreesApplied = rotationDegreesApplied
+            self.semanticOrientation = semanticOrientation
+            self.captureQuality = captureQuality
+            self.coordinatorQuad = coordinatorQuad
+        }
+
+        func taggedForBinder(_ metadata: BinderMetadata, imageIndex: Int) -> Attempt {
+            Attempt(
+                kind: kind,
+                quad: metadata.pageQuad,
+                gateScore: gateScore,
+                gateThreshold: gateThreshold,
+                topCandidates: topCandidates,
+                titleMatchedName: titleMatchedName,
+                titlePrintingCount: titlePrintingCount,
+                footerPairNumbers: footerPairNumbers,
+                ocrVerifiedCollectorNumber: ocrVerifiedCollectorNumber,
+                outcome: outcome,
+                imageIndex: imageIndex,
+                pocketIndex: metadata.pocketIndex,
+                binderStatus: metadata.status.rawValue,
+                binderIncludedByDefault: metadata.includedByDefault,
+                binderPolicyReason: metadata.policyReason,
+                sourceCropPixelWidth: metadata.sourceCropPixelWidth,
+                sourceCropPixelHeight: metadata.sourceCropPixelHeight,
+                nativeCropPixelWidth: metadata.nativeCropPixelWidth,
+                nativeCropPixelHeight: metadata.nativeCropPixelHeight,
+                rotationDegreesApplied: metadata.rotationDegreesApplied,
+                semanticOrientation: .unverified,
+                captureQuality: metadata.captureQuality,
+                coordinatorQuad: quad
+            )
+        }
     }
 
     private let lock = NSLock()
@@ -78,6 +210,29 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         storedAttempts.append(attempt)
+    }
+
+    /// Merges one pocket's isolated coordinator collector into the page
+    /// collector while remapping its image indices. Pocket collectors avoid
+    /// interleaving evidence when binder recognitions run concurrently.
+    func mergeBinderPocket(from pocket: ScanDiagnostics, metadata: BinderMetadata) {
+        let snapshot = pocket.snapshot()
+        lock.lock()
+        defer { lock.unlock() }
+        let imageOffset = storedImages.count
+        storedImages.append(contentsOf: snapshot.images)
+        storedAttempts.append(contentsOf: snapshot.attempts.map { attempt in
+            let remappedIndex = attempt.imageIndex >= 0 && attempt.imageIndex < snapshot.images.count
+                ? imageOffset + attempt.imageIndex
+                : -1
+            return attempt.taggedForBinder(metadata, imageIndex: remappedIndex)
+        })
+    }
+
+    private func snapshot() -> (attempts: [Attempt], images: [CGImage]) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (storedAttempts, storedImages)
     }
 
     var attempts: [Attempt] {
@@ -116,6 +271,20 @@ nonisolated struct ScanEvidenceRecord: Codable {
     /// Kept separate from `expectedNoMatch`: a back card is valid card input,
     /// but it does not belong to the currently reviewed binder page.
     let binderExclusion: BinderDetectionExclusionEvidence?
+    /// Pixel dimensions and orientation contract for the saved page/frame.
+    /// Optional for backward compatibility with older exports.
+    let imageMetadata: ScanImageMetadata?
+    let originalImageMetadata: ScanImageMetadata?
+}
+
+nonisolated struct ScanImageMetadata: Codable, Equatable, Sendable {
+    let pixelWidth: Int
+    let pixelHeight: Int
+    /// `CGImage` has no EXIF orientation. Scanner inputs are decoded with the
+    /// Image I/O transform baked into their pixels and are then treated as up.
+    let pixelOrientation: String
+    /// Content orientation remains unknown until a semantic verifier exists.
+    let semanticOrientation: ScanDiagnostics.SemanticOrientation
 }
 
 nonisolated struct BinderDetectionExclusionEvidence: Codable, Equatable {

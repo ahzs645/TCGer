@@ -113,6 +113,42 @@ def summary_fields(session_dir: Path) -> dict:
     }
 
 
+def normalize_manifest_metadata(manifest: dict, by_id: dict) -> None:
+    """Keep aggregate and per-session deduplication metadata in sync."""
+    entries = sorted(by_id.values(), key=lambda item: item["session_id"])
+    for entry in entries:
+        sources = entry.get("source_copies_found", [])
+        entry["duplicate_copies_omitted"] = max(0, len(sources) - 1)
+        if "selected_original_source" not in entry:
+            entry["selected_original_source"] = sources[0] if sources else entry["canonical_source"]
+    manifest["sessions"] = entries
+    total_sightings = sum(len(entry.get("source_copies_found", [])) for entry in entries)
+    manifest["deduplication"]["source_session_copies"] = total_sightings
+    manifest["deduplication"]["unique_sessions"] = len(entries)
+    manifest["deduplication"]["duplicate_session_copies_omitted"] = (
+        total_sightings - len(entries)
+    )
+
+
+def write_provenance(path: Path, entries: list) -> None:
+    """Rewrite provenance from the canonical manifest instead of appending stale rows."""
+    with open(path, "w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow([
+            "session_id", "captured_at", "frame_count", "file_count", "total_bytes",
+            "session_sha256", "canonical_source", "selected_original_source",
+            "source_copy_count", "duplicate_copies_omitted", "historical_sources",
+        ])
+        for entry in entries:
+            sources = entry.get("source_copies_found", [])
+            writer.writerow([
+                entry["session_id"], entry["captured_at"], entry["frame_count"],
+                entry["file_count"], entry["total_bytes"], entry["session_sha256"],
+                entry["canonical_source"], entry.get("selected_original_source", ""),
+                len(sources), max(0, len(sources) - 1), " | ".join(sources),
+            ])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("sources", nargs="+", type=Path)
@@ -195,6 +231,8 @@ def main() -> None:
                 "session_digest_recipe": DIGEST_RECIPE_V2,
                 "canonical_source": str(destination),
                 "source_copies_found": [str(source)],
+                "selected_original_source": str(source),
+                "duplicate_copies_omitted": 0,
             }
             by_id[session_id] = entry
             manifest["sessions"] = sorted(
@@ -205,19 +243,13 @@ def main() -> None:
                 for rel in sorted(new_hashes):
                     handle.write(f"{new_hashes[rel]}  sessions/{session_id}/{rel}\n")
 
-            with open(provenance_path, "a", newline="") as handle:
-                csv.writer(handle).writerow([
-                    session_id, entry["captured_at"], entry["frame_count"],
-                    entry["file_count"], entry["total_bytes"],
-                    entry["session_sha256"], entry["canonical_source"],
-                    str(source), 1, 0, str(source),
-                ])
             ingested.append(session_id)
 
         if not args.dry_run and (ingested or duplicates):
-            manifest["deduplication"]["unique_sessions"] = len(by_id)
+            normalize_manifest_metadata(manifest, by_id)
             manifest["last_ingest_at"] = datetime.now(timezone.utc).isoformat()
             manifest_path.write_text(json.dumps(manifest, indent=1) + "\n")
+            write_provenance(provenance_path, manifest["sessions"])
 
     print(
         f"\ndone: {len(ingested)} ingested, {len(duplicates)} duplicates, "

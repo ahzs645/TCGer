@@ -205,6 +205,8 @@ actor ScannerDevModeStore {
         // attempt that had one, so the browser can always draw the crop.
         let quad = attempts.first { $0.outcome == .accepted }?.quad
             ?? attempts.first { $0.quad != nil }?.quad
+        let pocketIndices = Set(attempts.compactMap(\.pocketIndex))
+        let detectedCount = pocketIndices.isEmpty ? attempts.count : pocketIndices.count
 
         frames.append(RecordedScanFrame(
             index: index,
@@ -212,7 +214,7 @@ actor ScannerDevModeStore {
             mode: mode.rawValue,
             pipeline: "dev-mode \(sourceLabel(source))",
             elapsedMs: elapsedMs,
-            detectedCount: manualCorrection == nil && binderExclusion == nil ? attempts.count : 1,
+            detectedCount: manualCorrection == nil && binderExclusion == nil ? detectedCount : 1,
             segmentationConfidence: nil,
             quad: quad,
             identified: identified,
@@ -246,7 +248,9 @@ actor ScannerDevModeStore {
                     predictedCardID: $0.predictedCardId,
                     predictedCardName: $0.predictedCardName
                 )
-            }
+            },
+            imageMetadata: Self.imageMetadata(for: image),
+            originalImageMetadata: originalImage.map(Self.imageMetadata(for:))
         ))
 
         trimSessionIfNeeded(directory: directory)
@@ -436,6 +440,15 @@ actor ScannerDevModeStore {
             kCGImageDestinationLossyCompressionQuality: Limits.jpegQuality,
         ] as CFDictionary)
         return CGImageDestinationFinalize(destination)
+    }
+
+    private nonisolated static func imageMetadata(for image: CGImage) -> ScanImageMetadata {
+        ScanImageMetadata(
+            pixelWidth: image.width,
+            pixelHeight: image.height,
+            pixelOrientation: "up",
+            semanticOrientation: .unverified
+        )
     }
 
     private nonisolated static func frameCount(in url: URL) -> Int {

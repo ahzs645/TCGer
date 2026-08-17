@@ -284,8 +284,8 @@ struct BinderPageReviewView: View {
                     .font(.subheadline.weight(.semibold))
                 Text(
                     ScannerDevModeStore.isEnabled
-                        ? "Matched: tap to skip, then tap for not a card. Hold for other reasons."
-                        : "Matched: tap to skip, then tap for not a card. Unmatched: tap once."
+                        ? "Matches start selected. Uncertain and unmatched cards stay visible for review. Hold to label exclusions."
+                        : "Matches start selected. Uncertain and unmatched cards stay visible until you choose them."
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -476,6 +476,17 @@ struct BinderPageReviewView: View {
                         .opacity(detection.isIncluded ? 1 : 0.58)
 
                         Spacer(minLength: 0)
+
+                        Text(reviewStatusLabel(for: detection.status))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(statusColor(detection.status))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(
+                                statusColor(detection.status).opacity(0.12),
+                                in: Capsule()
+                            )
+                            .accessibilityHidden(true)
                     }
                     .contentShape(Rectangle())
                 }
@@ -979,7 +990,15 @@ struct BinderPageReviewView: View {
         let inclusion = detection.isIncluded
             ? "Selected"
             : detection.exclusionReason.map { "Excluded: \($0.displayName)" } ?? "Excluded"
-        return "\(page)Card \(cardIndex + 1) · \(set) · \(status) · \(inclusion)"
+        return "\(page)\(status) · \(inclusion) · Card \(cardIndex + 1) · \(set)"
+    }
+
+    private func reviewStatusLabel(for status: BinderCardDetectionStatus) -> String {
+        switch status {
+        case .matched: return "Matched"
+        case .uncertain: return "Review"
+        case .unmatched: return "Unmatched"
+        }
     }
 
     private func destinationBinderID(for record: BinderPageRecord) -> String? {

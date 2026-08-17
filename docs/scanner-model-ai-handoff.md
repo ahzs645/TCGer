@@ -1,6 +1,6 @@
 # Scanner Model AI Handoff
 
-Last updated: 2026-08-11 (22:03 binder session analysis, recovered binder labels)
+Last updated: 2026-08-16 (per-pocket dev-mode coordinator evidence)
 
 ## Session Results 2026-08-11 (22:03 device binder export)
 
@@ -17,18 +17,18 @@ precision guards hold; recall is the gap.
 
 Findings:
 
-- **Binder dev-mode evidence is synthesized, not real diagnostics.**
-  `CardScannerViewModel.recordBinderPageForDevMode` builds a fresh
-  `ScanDiagnostics` and fabricates one attempt per detection from the final
-  `BinderCardDetection.status`; `context.diagnostics` is never set on the
-  binder path. `gateScore`, `footerPairNumbers`, `titleMatchedName`, and
-  `ocrVerifiedCollectorNumber` are therefore hardcoded nil/`[]` on every
-  binder attempt — an empty `footerPairNumbers` in a binder archive is NOT
-  evidence that OCR failed. `kind` is always `detectedCrop` even though the
-  strategy runs up to three attempts, and `noCandidates` only means "no
-  strategy returned success", conflating gate rejection, below-threshold,
-  ambiguity, and titlePrintingUnresolved. Fix this before drawing further
-  conclusions from binder dumps.
+- **Binder dev-mode exports now contain real per-pocket diagnostics.** Before
+  2026-08-16, `CardScannerViewModel.recordBinderPageForDevMode` synthesized one
+  blank-evidence attempt from each final detection; archives recorded before
+  that date still have that limitation. New scans isolate one
+  `ScanDiagnostics` collector per concurrently processed pocket and merge all
+  actual coordinator attempts into the page export. Each attempt carries its
+  pocket index, page quad, coordinator-local quad, gate/shortlist/title/footer
+  evidence, final binder status, default-inclusion decision and policy reason,
+  normalized and native perspective-crop dimensions, crop-quality report,
+  applied geometric rotation, and explicit `semanticOrientation: unverified`.
+  Frame and original-image pixel dimensions are also persisted. Upside-down
+  recognition is not inferred or changed by this instrumentation.
 - **Failures cluster on foil.** All 14 corrected cards are holo,
   reverse-holo, or glare-washed; the 12 clean accepts are matte. One all-foil
   Platinum/HGSS page scored 0/8 on both of its captures with crisp,

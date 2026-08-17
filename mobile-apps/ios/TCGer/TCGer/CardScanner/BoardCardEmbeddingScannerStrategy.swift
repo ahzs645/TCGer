@@ -97,36 +97,112 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
-        let attempts = try await makeCropAttempts(
+        let hypotheses = try await makeCropHypotheses(
             from: image,
             source: source,
             intrinsics: context.cameraIntrinsics
         )
 
-        // Try the most card-like candidate first; on an abstention fall
-        // through to the next. A retry can only recover an abstention — an
-        // accepted result returns immediately, and every attempt faces the
-        // same gate, OCR, and threshold policy — so extra candidates add
-        // recall without loosening precision.
+        // Geometry can normalize a card to portrait, but it cannot determine
+        // which short edge is the semantic top. Evaluate the 0- and 180-degree
+        // versions as one hypothesis and choose only after both have passed
+        // the normal gate, OCR, threshold, and ambiguity policy. Returning the
+        // first accepted orientation would preserve a confident wrong result
+        // from an upside-down crop even when its semantic counterpart is a much
+        // stronger match.
         var sawRejection = false
-        for attempt in attempts {
-            do {
-                if let result = try await recognize(
-                    attempt: attempt,
-                    context: context,
-                    source: source
-                ) {
-                    return result
+        for hypothesis in hypotheses {
+            var uprightResult: CardScanResult?
+            var semantic180Result: CardScanResult?
+            for attempt in hypothesis.orientations {
+                do {
+                    let result = try await recognize(
+                        attempt: attempt,
+                        context: context,
+                        source: source
+                    )
+                    if attempt.isSemantic180 {
+                        semantic180Result = result
+                    } else {
+                        uprightResult = result
+                    }
+                } catch CardScannerError.rejectedInput {
+                    sawRejection = true
                 }
-            } catch CardScannerError.rejectedInput {
-                sawRejection = true
             }
+            if Self.shouldPreferSemantic180(
+                uprightScore: uprightResult?.primary.confidence.score,
+                semantic180Score: semantic180Result?.primary.confidence.score
+            ) {
+                return semantic180Result
+            }
+            if let uprightResult { return uprightResult }
+            if let semantic180Result { return semantic180Result }
         }
-        // Every attempt abstained. Preserve the explicit open-set rejection if
-        // any attempt positively identified a non-card, so the coordinator
-        // does not let a looser fallback strategy answer instead.
+        // Every geometry/orientation attempt abstained. Preserve the explicit
+        // open-set rejection if any attempt positively identified a non-card,
+        // so the coordinator does not let a looser fallback strategy answer.
         if sawRejection { throw CardScannerError.rejectedInput }
         return nil
+    }
+
+    /// A missing result represents an abstention, never a zero-confidence
+    /// acceptance. Exact ties deliberately keep the original orientation.
+    /// Internal so the semantic arbitration policy can be regression-tested
+    /// without loading Core ML assets.
+    static func shouldPreferSemantic180(
+        uprightScore: Double?,
+        semantic180Score: Double?
+    ) -> Bool {
+        guard let semantic180Score else { return false }
+        guard let uprightScore else { return true }
+        return semantic180Score > uprightScore
+    }
+
+    /// The two semantic orientations of one geometry-preserving crop. Crop
+    /// hypotheses are ordered by card-face score, but orientations remain
+    /// paired so a weaker wrong result can never short-circuit a stronger one.
+    private struct CropHypothesis {
+        let orientations: [CropAttempt]
+
+        var bestGateScore: Double {
+            orientations.compactMap(\.gateScore).max() ?? -.greatestFiniteMagnitude
+        }
+    }
+
+    private func makeHypothesis(
+        for image: CGImage,
+        kind: ScanDiagnostics.AttemptKind,
+        quad: [[Double]]? = nil,
+        isBaseline: Bool
+    ) async throws -> CropHypothesis? {
+        guard var upright = try await makeAttempt(for: image, kind: kind, quad: quad) else {
+            return nil
+        }
+        upright.isBaseline = isBaseline
+        var orientations = [upright]
+        if let rotated = cropper.rotated180(image),
+           var semantic180 = try await makeAttempt(for: rotated, kind: kind, quad: quad) {
+            // The extra orientation is another open-set retrieval draw, so it
+            // uses the existing retry margin for unverified ANN acceptance.
+            semantic180.isSemantic180 = true
+            orientations.append(semantic180)
+        }
+        return CropHypothesis(orientations: orientations)
+    }
+
+    private func makeFallbackHypothesis(for image: CGImage) async throws -> CropHypothesis? {
+        try await makeHypothesis(
+            for: image,
+            kind: .rawImage,
+            isBaseline: true
+        )
+    }
+
+    private func sortByGateScore(_ hypotheses: inout [CropHypothesis]) {
+        if hypotheses.count > 1 {
+            hypotheses.sort { $0.bestGateScore > $1.bestGateScore }
+        }
     }
 
     /// One crop hypothesis for a frame, with its embedding and card-face
@@ -140,6 +216,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// True for the crop the pre-retry pipeline would have used (the best
         /// detected crop, or the raw frame when nothing was detected).
         var isBaseline: Bool = false
+        /// The geometry-preserving crop turned by 180 degrees to test the
+        /// otherwise unknowable semantic top edge.
+        var isSemantic180: Bool = false
     }
 
     private func makeAttempt(
@@ -158,12 +237,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         )
     }
 
-    private func makeCropAttempts(
+    private func makeCropHypotheses(
         from image: CGImage,
         source: ScanInvocationKind,
         intrinsics: ScannerCameraIntrinsics?
-    ) async throws -> [CropAttempt] {
-        var attempts: [CropAttempt] = []
+    ) async throws -> [CropHypothesis] {
+        var hypotheses: [CropHypothesis] = []
         let detailed = try cropper.detectRectanglesDetailed(
             in: image,
             intrinsics: intrinsics
@@ -185,9 +264,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 observation.topLeft, observation.topRight,
                 observation.bottomRight, observation.bottomLeft,
             ].map { [Double($0.x), Double($0.y)] }
-            if var attempt = try await makeAttempt(for: crop, kind: .detectedCrop, quad: quad) {
-                attempt.isBaseline = offset == 0
-                attempts.append(attempt)
+            if let hypothesis = try await makeHypothesis(
+                for: crop,
+                kind: .detectedCrop,
+                quad: quad,
+                isBaseline: offset == 0
+            ) {
+                hypotheses.append(hypothesis)
             }
         }
 
@@ -200,23 +283,21 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // later clear frame recovers naturally.
         if source != .livePreview,
            let wholeFrame = cropper.normalizedWholeImage(from: image),
-           let attempt = try await makeAttempt(for: wholeFrame, kind: .wholeFrame) {
-            attempts.append(attempt)
+           let hypothesis = try await makeHypothesis(
+               for: wholeFrame,
+               kind: .wholeFrame,
+               isBaseline: false
+           ) {
+            hypotheses.append(hypothesis)
         }
-        if attempts.count > 1 {
-            attempts.sort {
-                ($0.gateScore ?? -.greatestFiniteMagnitude) >
-                    ($1.gateScore ?? -.greatestFiniteMagnitude)
-            }
-        }
+        sortByGateScore(&hypotheses)
 
         // No detection and no usable whole-frame candidate: embed the raw
         // frame, preserving the historical `bestCrop ?? image` behavior.
-        if attempts.isEmpty, var fallback = try await makeAttempt(for: image, kind: .rawImage) {
-            fallback.isBaseline = true
-            attempts.append(fallback)
+        if hypotheses.isEmpty, let fallback = try await makeFallbackHypothesis(for: image) {
+            hypotheses.append(fallback)
         }
-        return attempts
+        return hypotheses
     }
 
     private func recognize(
@@ -253,7 +334,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 footerPairNumbers: evidenceFooterPairs,
                 ocrVerifiedCollectorNumber: evidenceOCRNumber,
                 outcome: outcome,
-                imageIndex: attemptImageIndex
+                imageIndex: attemptImageIndex,
+                sourceCropPixelWidth: cropped.width,
+                sourceCropPixelHeight: cropped.height,
+                semanticOrientation: attempt.isSemantic180 ? .upsideDown : .upright
             ))
         }
 
@@ -265,7 +349,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.rejectedInput
         }
 
-        let allowedIndices = await metadataStore.indices(
+        let allowedIndices = await metadataStore.physicalCardIndices(
             for: context.mode.tcgGame,
             setCode: context.setCode
         )
@@ -335,7 +419,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             if let titleMatch = await metadataStore.exactNameMatch(
                 for: titleCandidates,
                 game: context.mode.tcgGame,
-                setCode: context.setCode
+                setCode: context.setCode,
+                physicalCardsOnly: true
             ) {
                 let titleMatches = try await indexStore.nearestNeighbors(
                     for: embedding,

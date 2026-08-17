@@ -206,6 +206,64 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(CGSize(width: landscape.width, height: landscape.height), CGSize(width: 720, height: 1000))
     }
 
+    func testSemantic180RotationPreservesDimensionsAndReversesPixels() throws {
+        let colors: [UInt8] = [
+            255, 0, 0, 255, 0, 255, 0, 255,
+            0, 0, 255, 255, 255, 255, 255, 255,
+        ]
+        let provider = try XCTUnwrap(CGDataProvider(data: Data(colors) as CFData))
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let image = try XCTUnwrap(CGImage(
+            width: 2,
+            height: 2,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: 8,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ))
+
+        let rotated = try XCTUnwrap(CardCropper(detector: nil).rotated180(image))
+        XCTAssertEqual(rotated.width, image.width)
+        XCTAssertEqual(rotated.height, image.height)
+
+        let bytes = try XCTUnwrap(rotated.dataProvider?.data)
+        let output = [UInt8](bytes as Data)
+        XCTAssertEqual(Array(output[0 ..< 4]), [255, 255, 255, 255])
+        let finalPixelOffset = rotated.bytesPerRow + 4
+        XCTAssertEqual(Array(output[finalPixelOffset ..< finalPixelOffset + 4]), [255, 0, 0, 255])
+    }
+
+    func testSemanticOrientationArbitrationPrefersOnlyStrongerAcceptedResult() {
+        // Regression values from scan-session-20260816-165452/frame-0003:
+        // upside-down physical Fomantis falsely ranked B2-004 at 0.737, while
+        // the semantically upright crop ranks me05-003 substantially higher.
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.shouldPreferSemantic180(
+            uprightScore: 0.737,
+            semantic180Score: 0.822
+        ))
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.shouldPreferSemantic180(
+            uprightScore: nil,
+            semantic180Score: 0.75
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.shouldPreferSemantic180(
+            uprightScore: 0.85,
+            semantic180Score: 0.75
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.shouldPreferSemantic180(
+            uprightScore: 0.8,
+            semantic180Score: 0.8
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.shouldPreferSemantic180(
+            uprightScore: 0.8,
+            semantic180Score: nil
+        ))
+    }
+
     func testBinderUsesDetectorBoxOnlyForStronglySkewedRefinement() {
         let imageSize = CGSize(width: 1_000, height: 1_000)
         let axisAligned = CardCropper.rectangleObservation(

@@ -1,6 +1,6 @@
 /**
  * Generate the iOS embedding index from a web index artifact:
- *   - CardsIndexMetadata.json  [{annIndex,cardId,name,game,setCode,setName,rarity,imageURL,price}]
+ *   - CardsIndexMetadata.json  [{annIndex,cardId,name,game,format,setCode,setName,rarity,imageURL,price}]
  *   - CardsIndexVectors.bin    header[Int32 count, Int32 dim] + int8 rows (scale 127)
  * Drop both into the iOS app bundle. The packed int8 binary (~8MB) replaces the
  * impractical ~80MB [[Float]] JSON; AnnoyIndexStore dequantizes on load.
@@ -24,6 +24,7 @@ mkdirSync(outDir, { recursive: true });
 // metadata
 const meta = entries.map((e, i) => ({
   annIndex: i, cardId: e.externalId, name: e.name, game,
+  format: e.format ?? (e.imageUrl?.includes("/tcgp/") ? "pocket" : "tabletop"),
   setCode: e.setCode ?? null, setName: e.setName ?? null,
   rarity: e.rarity ?? null, imageURL: e.imageUrl ?? null, price: null,
 }));

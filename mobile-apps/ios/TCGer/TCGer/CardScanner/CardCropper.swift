@@ -118,6 +118,20 @@ nonisolated struct CardCropper {
         )
     }
 
+    /// Returns the same normalized crop with only its semantic orientation
+    /// reversed. Rectangle detection and perspective correction can make a
+    /// card portrait, but card geometry cannot distinguish its top edge from
+    /// its bottom edge. Recognition therefore evaluates this 180-degree
+    /// counterpart alongside the geometry-preserving crop.
+    func rotated180(_ image: CGImage) -> CGImage? {
+        var rotated = CIImage(cgImage: image).oriented(.down)
+        rotated = rotated.transformed(by: CGAffineTransform(
+            translationX: -rotated.extent.minX,
+            y: -rotated.extent.minY
+        ))
+        return Self.ciContext.createCGImage(rotated, from: rotated.extent)
+    }
+
     func detectRectangles(
         in image: CGImage,
         intrinsics: ScannerCameraIntrinsics? = nil

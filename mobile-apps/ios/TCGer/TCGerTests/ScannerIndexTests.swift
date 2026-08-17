@@ -27,6 +27,32 @@ final class ScannerIndexTests: XCTestCase {
         XCTAssertEqual(magicDetails?.identity.id, "m1")
     }
 
+    func testPhysicalCardIndicesExcludePocketRowsIncludingLegacyMetadata() async {
+        let store = CardIndexMetadataStore(entries: [
+            metadata(index: 0, id: "me05-003", game: "pokemon", setCode: "me05"),
+            metadata(
+                index: 1,
+                id: "B2-004",
+                game: "pokemon",
+                setCode: "B2",
+                imageURL: "https://assets.tcgdex.net/en/tcgp/B2/004/high.webp"
+            ),
+            metadata(
+                index: 2,
+                id: "A2-105",
+                game: "pokemon",
+                setCode: "A2",
+                format: "pocket"
+            ),
+        ])
+
+        let allPokemon = await store.indices(for: .pokemon)
+        let physicalPokemon = await store.physicalCardIndices(for: .pokemon, setCode: nil)
+
+        XCTAssertEqual(allPokemon, [0, 1, 2])
+        XCTAssertEqual(physicalPokemon, [0])
+    }
+
     func testANNRanksByCosineDistanceAndHonorsAllowedIndices() async throws {
         let store = AnnoyIndexStore(vectors: [
             [1, 0],
@@ -54,17 +80,20 @@ final class ScannerIndexTests: XCTestCase {
         index: Int,
         id: String,
         game: String,
-        setCode: String
+        setCode: String,
+        imageURL: String? = nil,
+        format: String? = nil
     ) -> CardIndexMetadataEntry {
         CardIndexMetadataEntry(
             annIndex: index,
             cardId: id,
             name: id,
             game: game,
+            format: format,
             setCode: setCode,
             setName: nil,
             rarity: nil,
-            imageURL: nil,
+            imageURL: imageURL,
             price: nil
         )
     }

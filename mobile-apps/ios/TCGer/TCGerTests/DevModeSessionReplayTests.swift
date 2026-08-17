@@ -138,9 +138,8 @@ final class DevModeSessionReplayTests: XCTestCase {
         // Basic Energy: Water (dp1-125) retrieved as Grass (dp1-123) at 0.77.
         // The two printings differ only in the energy symbol, which the
         // center-crop preprocessing keeps but the global embedding averages
-        // away; the recorded top-2 margin was 0.050, exactly at
-        // `BinderPageScanner.reviewPreselectionMargin`, so it also auto-
-        // includes on a blanket page confirm.
+        // away. Binder review now leaves this uncertain result unselected,
+        // though it remains a wrong single-card acceptance here.
         "scan-session-20260810-220315/frame-0009.jpg",
         // Absol (ex13-18) retrieved as Medicham (ex5-42) at 0.72. A separate
         // capture of the same card in the 21:12 session retrieves Shiftry

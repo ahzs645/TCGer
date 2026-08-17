@@ -79,6 +79,12 @@ final class ScannerDevModeStoreTests: XCTestCase {
         XCTAssertEqual(record.attempts.count, 1)
         XCTAssertEqual(record.attempts[0].outcome, .accepted)
         XCTAssertEqual(record.attempts[0].footerPairNumbers, ["132/172"])
+        XCTAssertEqual(record.imageMetadata?.pixelWidth, 90)
+        XCTAssertEqual(record.imageMetadata?.pixelHeight, 120)
+        XCTAssertEqual(record.imageMetadata?.pixelOrientation, "up")
+        XCTAssertEqual(record.imageMetadata?.semanticOrientation, .unverified)
+        XCTAssertEqual(record.originalImageMetadata?.pixelWidth, 120)
+        XCTAssertEqual(record.originalImageMetadata?.pixelHeight, 160)
         XCTAssertEqual(record.attemptImageFiles.count, 1)
         XCTAssertTrue(
             FileManager.default.fileExists(
@@ -86,6 +92,88 @@ final class ScannerDevModeStoreTests: XCTestCase {
             ),
             "attempt crop image must exist next to evidence.json"
         )
+    }
+
+    func testLegacyAttemptDecodesWithoutBinderOrOrientationMetadata() throws {
+        let legacy = #"""
+        {
+          "kind": "detectedCrop",
+          "quad": [[0.1, 0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]],
+          "gateScore": 0.62,
+          "gateThreshold": 0.45,
+          "topCandidates": [],
+          "titleMatchedName": null,
+          "titlePrintingCount": null,
+          "footerPairNumbers": [],
+          "ocrVerifiedCollectorNumber": null,
+          "outcome": "accepted",
+          "imageIndex": 0
+        }
+        """#.data(using: .utf8)!
+
+        let attempt = try JSONDecoder().decode(ScanDiagnostics.Attempt.self, from: legacy)
+
+        XCTAssertEqual(attempt.outcome, .accepted)
+        XCTAssertNil(attempt.pocketIndex)
+        XCTAssertNil(attempt.binderPolicyReason)
+        XCTAssertNil(attempt.nativeCropPixelWidth)
+        XCTAssertNil(attempt.semanticOrientation)
+        XCTAssertNil(attempt.coordinatorQuad)
+    }
+
+    func testBinderPocketMergePreservesRealEvidenceAndTagsPolicy() throws {
+        let pocket = ScanDiagnostics()
+        let crop = ScannerTestImage.solid(width: 72, height: 100)
+        let imageIndex = pocket.registerAttemptImage(crop)
+        pocket.record(ScanDiagnostics.Attempt(
+            kind: .detectedCrop,
+            quad: [[0.2, 0.8], [0.8, 0.8], [0.8, 0.2], [0.2, 0.2]],
+            gateScore: 0.61,
+            gateThreshold: 0.45,
+            topCandidates: [
+                .init(cardID: "sv1-1", name: "Test Card", similarity: 0.83),
+            ],
+            titleMatchedName: "Test Card",
+            titlePrintingCount: 2,
+            footerPairNumbers: ["001/198"],
+            ocrVerifiedCollectorNumber: "001",
+            outcome: .accepted,
+            imageIndex: imageIndex
+        ))
+        let pageQuad = [[0.1, 0.9], [0.4, 0.9], [0.4, 0.5], [0.1, 0.5]]
+        let page = ScanDiagnostics()
+
+        page.mergeBinderPocket(
+            from: pocket,
+            metadata: .init(
+                pocketIndex: 3,
+                status: .matched,
+                includedByDefault: true,
+                policyReason: .matchedThreshold,
+                sourceCropPixelWidth: 720,
+                sourceCropPixelHeight: 1000,
+                nativeCropPixelWidth: 236,
+                nativeCropPixelHeight: 452,
+                rotationDegreesApplied: 0,
+                captureQuality: nil,
+                pageQuad: pageQuad
+            )
+        )
+
+        let merged = try XCTUnwrap(page.attempts.first)
+        XCTAssertEqual(merged.pocketIndex, 3)
+        XCTAssertEqual(merged.quad ?? [], pageQuad)
+        XCTAssertEqual(merged.coordinatorQuad, pocket.attempts.first?.quad)
+        XCTAssertEqual(merged.gateScore, 0.61)
+        XCTAssertEqual(merged.footerPairNumbers, ["001/198"])
+        XCTAssertEqual(merged.binderPolicyReason, .matchedThreshold)
+        XCTAssertEqual(merged.binderStatus, BinderCardDetectionStatus.matched.rawValue)
+        XCTAssertEqual(merged.binderIncludedByDefault, true)
+        XCTAssertEqual(merged.nativeCropPixelWidth, 236)
+        XCTAssertEqual(merged.nativeCropPixelHeight, 452)
+        XCTAssertEqual(merged.semanticOrientation, .unverified)
+        XCTAssertEqual(merged.imageIndex, 0)
+        XCTAssertEqual(page.attemptImages.count, 1)
     }
 
     func testSessionDeletionRemovesOnlyRecordingDirectories() throws {
