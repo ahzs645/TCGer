@@ -117,6 +117,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
+            // Per-capture photo quality may not exceed the output's maximum.
+            // The output defaults to `.balanced`, so requesting `.quality`
+            // below without opting in here makes AVFoundation raise an
+            // NSInvalidArgumentException at capture time.
+            photoOutput.maxPhotoQualityPrioritization = .quality
             // AVCapturePhotoSettings otherwise defaults to the smallest
             // supported still dimensions. Binder pockets need the native
             // sensor pixels so title/footer OCR is not working from an
