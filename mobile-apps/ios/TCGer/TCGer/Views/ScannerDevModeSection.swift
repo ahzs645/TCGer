@@ -232,6 +232,10 @@ struct ScannerDevModeSessionsView: View {
         .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
         .navigationTitle("Recorded Sessions")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(
+            isSelecting ? .hidden : .automatic,
+            for: .tabBar
+        )
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(isSelecting ? "Done" : "Select") {
