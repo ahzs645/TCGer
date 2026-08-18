@@ -6,8 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPublicCollection } from "@/lib/api/public-collections";
 
+const STATIC_EXPORT_SHARE_TOKEN = "__static-export-placeholder__";
+
 export function generateStaticParams() {
-  return [];
+  return process.env.DEMO_EXPORT === "true"
+    ? [{ shareToken: STATIC_EXPORT_SHARE_TOKEN }]
+    : [];
 }
 
 export default async function SharedCollectionPage({
@@ -16,6 +20,13 @@ export default async function SharedCollectionPage({
   params: Promise<{ shareToken: string }>;
 }) {
   const { shareToken } = await params;
+  if (
+    process.env.DEMO_EXPORT === "true" &&
+    shareToken === STATIC_EXPORT_SHARE_TOKEN
+  ) {
+    notFound();
+  }
+
   const collection = await getPublicCollection(shareToken).catch(() => null);
   if (!collection) notFound();
 
