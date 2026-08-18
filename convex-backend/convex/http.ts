@@ -28,6 +28,8 @@ import { registerFinanceRoutes } from "./financeHttp";
 import { registerSealedRoutes } from "./sealedHttp";
 import { registerAnalyticsRoutes } from "./analyticsHttp";
 import { registerTradesRoutes } from "./tradesHttp";
+import { registerOnlineCodesRoutes } from "./onlineCodesHttp";
+import { registerScanSessionRoutes } from "./scanSessionsHttp";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -2261,4 +2263,6 @@ registerFinanceRoutes(http);
 registerSealedRoutes(http);
 registerAnalyticsRoutes(http);
 registerTradesRoutes(http);
+registerOnlineCodesRoutes(http);
+registerScanSessionRoutes(http);
 export default http;

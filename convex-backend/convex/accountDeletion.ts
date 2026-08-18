@@ -11,6 +11,9 @@ const phaseValidator = v.union(
   v.literal("wishlists"),
   v.literal("follows"),
   v.literal("decks"),
+  v.literal("onlineCodes"),
+  v.literal("scanSessionItems"),
+  v.literal("scanSessions"),
   v.literal("sealedCards"),
   v.literal("sealedOpenings"),
   v.literal("sealedInventory"),
@@ -29,6 +32,9 @@ type DeletionPhase =
   | "wishlists"
   | "follows"
   | "decks"
+  | "onlineCodes"
+  | "scanSessionItems"
+  | "scanSessions"
   | "sealedCards"
   | "sealedOpenings"
   | "sealedInventory"
@@ -45,7 +51,10 @@ const nextPhase: Record<DeletionPhase, DeletionPhase | null> = {
   tags: "wishlists",
   wishlists: "follows",
   follows: "decks",
-  decks: "sealedCards",
+  decks: "onlineCodes",
+  onlineCodes: "scanSessionItems",
+  scanSessionItems: "scanSessions",
+  scanSessions: "sealedCards",
   sealedCards: "sealedOpenings",
   sealedOpenings: "sealedInventory",
   sealedInventory: "transactions",
@@ -264,6 +273,48 @@ export const deleteBatch = internalMutation({
         await ctx.db.delete(deck._id);
       }
       await schedule(args.phase);
+      return null;
+    }
+
+    if (args.phase === "onlineCodes") {
+      const docs = await ctx.db
+        .query("onlineCodes")
+        .withIndex("by_user", (query) => query.eq("userId", args.userId))
+        .take(batchSize);
+      if (docs.length > 0) {
+        await Promise.all(docs.map((doc) => ctx.db.delete(doc._id)));
+        await schedule(args.phase);
+      } else {
+        await advance();
+      }
+      return null;
+    }
+
+    if (args.phase === "scanSessionItems") {
+      const docs = await ctx.db
+        .query("scanSessionItems")
+        .withIndex("by_user", (query) => query.eq("userId", args.userId))
+        .take(batchSize);
+      if (docs.length > 0) {
+        await Promise.all(docs.map((doc) => ctx.db.delete(doc._id)));
+        await schedule(args.phase);
+      } else {
+        await advance();
+      }
+      return null;
+    }
+
+    if (args.phase === "scanSessions") {
+      const docs = await ctx.db
+        .query("scanSessions")
+        .withIndex("by_user", (query) => query.eq("userId", args.userId))
+        .take(batchSize);
+      if (docs.length > 0) {
+        await Promise.all(docs.map((doc) => ctx.db.delete(doc._id)));
+        await schedule(args.phase);
+      } else {
+        await advance();
+      }
       return null;
     }
 

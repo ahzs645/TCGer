@@ -11,6 +11,7 @@ export * from './pricing';
 export * from './trading';
 export * from './analytics';
 export * from './sealed';
+export * from './online-codes';
 export * from './automations';
 export * from './shipping';
 export * from './health';

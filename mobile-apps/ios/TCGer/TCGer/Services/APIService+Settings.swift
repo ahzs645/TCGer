@@ -7,6 +7,19 @@ extension APIService {
         let configured: Bool
     }
 
+    struct PriceSourceOption: Codable, Identifiable, Sendable {
+        let id: PricingSource
+        let label: String
+        let description: String
+        let games: [String]
+        let requiresServer: Bool
+    }
+
+    struct PriceSourcesResponse: Codable, Sendable {
+        let sources: [PriceSourceOption]
+        let defaultSource: PricingSource
+    }
+
     struct TestSourceResult: Codable, Sendable {
         let ok: Bool
         let latencyMs: Int
@@ -21,6 +34,39 @@ extension APIService {
         let justtcg: PricingSourceConfiguration
     }
 
+    func getAvailablePriceSources(
+        config: ServerConfiguration,
+        token: String?
+    ) async throws -> PriceSourcesResponse {
+        if config.isOnDevice {
+            return PriceSourcesResponse(
+                sources: [PriceSourceOption(
+                    id: .justTCG,
+                    label: "JustTCG (Personal Key)",
+                    description: "Direct pricing using a personal key stored only on this iPhone.",
+                    games: ["magic"],
+                    requiresServer: false
+                )],
+                defaultSource: .justTCG
+            )
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "prices/sources",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let decoded = try? JSONDecoder().decode(PriceSourcesResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return decoded
+    }
+
     func getPricingSourceConfiguration(
         config: ServerConfiguration,
         token: String?,
@@ -33,6 +79,22 @@ extension APIService {
                 url: collectrConfiguration?.baseURL ?? CollectrPrivateAPIConfiguration.defaultBaseURL,
                 label: "Collectr Private Test",
                 configured: collectrConfiguration != nil && mappingCount > 0
+            )
+        }
+
+        if !config.isOnDevice && source != .justTCG {
+            let catalog = try await getAvailablePriceSources(config: config, token: token)
+            guard let option = catalog.sources.first(where: { $0.id == source }) else {
+                return PricingSourceConfiguration(
+                    url: config.baseURL,
+                    label: source.displayName,
+                    configured: false
+                )
+            }
+            return PricingSourceConfiguration(
+                url: config.baseURL,
+                label: option.label,
+                configured: true
             )
         }
 

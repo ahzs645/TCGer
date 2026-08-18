@@ -130,6 +130,24 @@ test("returns only supported data sources for the demo settings screen", async (
   ]);
 });
 
+test("hides server-only price sources when the demo has no server", async () => {
+  const response = await handleDemoRequest("GET", "/prices/sources");
+  const catalog = (await response.json()) as {
+    sources: Array<{ id: string; requiresServer: boolean }>;
+  };
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(catalog.sources, [
+    {
+      id: "automatic",
+      label: "Saved catalog prices",
+      description: "Use the prices included with the offline demo catalog.",
+      games: [],
+      requiresServer: false,
+    },
+  ]);
+});
+
 test("keeps general settings separate from source defaults", async () => {
   const response = await handleDemoRequest("GET", "/settings");
   const settings = (await response.json()) as Record<string, unknown>;

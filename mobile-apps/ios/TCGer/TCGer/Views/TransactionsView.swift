@@ -4,10 +4,12 @@ struct TransactionsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var transactions: [Transaction] = []
     @State private var summary: FinanceSummary?
+    @State private var performance: RealizedPerformance?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var filterType: String = "all"
     @State private var showingCreateSheet = false
+    @State private var selectedTransaction: Transaction?
 
     private let apiService = APIService()
 
@@ -31,6 +33,20 @@ struct TransactionsView: View {
                         )
                     }
                     .padding(.vertical, 4)
+                }
+            }
+
+            if let performance, let realized = performance.byCurrency.first {
+                Section("Sales Performance") {
+                    LabeledContent("Realized profit", value: realized.realizedProfit.priceText)
+                    LabeledContent("Net proceeds", value: realized.netProceeds.priceText)
+                    LabeledContent("Fees + shipping", value: (realized.fees + realized.shippingCost).priceText)
+                    if let days = realized.averageHoldingDays {
+                        LabeledContent("Average hold", value: "\(days) days")
+                    }
+                    Text("\(realized.costedSaleCount) of \(realized.saleCount) sales include acquisition cost")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -65,6 +81,8 @@ struct TransactionsView: View {
                 Section {
                     ForEach(filteredTransactions) { txn in
                         TransactionRow(transaction: txn)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedTransaction = txn }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     Task { await deleteTransaction(txn) }
@@ -90,11 +108,14 @@ struct TransactionsView: View {
         .refreshable { await loadData() }
         .task { await loadData() }
         .sheet(isPresented: $showingCreateSheet) {
-            CreateTransactionSheet { type, cardName, tcg, qty, amount, platform, notes in
+            CreateTransactionSheet { draft in
                 Task {
-                    await createTransaction(type: type, cardName: cardName, tcg: tcg, quantity: qty, amount: amount, platform: platform, notes: notes)
+                    await createTransaction(draft)
                 }
             }
+        }
+        .sheet(item: $selectedTransaction) { transaction in
+            TransactionDetailSheet(transaction: transaction)
         }
     }
 
@@ -108,8 +129,10 @@ struct TransactionsView: View {
         do {
             async let txns = apiService.getTransactions(config: environmentStore.serverConfiguration, token: token)
             async let sum = apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
+            async let realized = apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
             transactions = try await txns
             summary = try await sum
+            performance = try await realized
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -118,16 +141,20 @@ struct TransactionsView: View {
     }
 
     @MainActor
-    private func createTransaction(type: String, cardName: String?, tcg: String?, quantity: Int, amount: Double, platform: String?, notes: String?) async {
+    private func createTransaction(_ draft: NewTransactionDetails) async {
         guard let token = environmentStore.authToken else { return }
         do {
             let txn = try await apiService.createTransaction(
                 config: environmentStore.serverConfiguration, token: token,
-                type: type, cardName: cardName, tcg: tcg, quantity: quantity,
-                amount: amount, platform: platform, notes: notes
+                type: draft.type, cardName: draft.cardName, tcg: draft.tcg,
+                quantity: draft.quantity, amount: draft.amount, platform: draft.platform,
+                costBasis: draft.costBasis, fees: draft.fees,
+                shippingCost: draft.shippingCost, acquiredAt: draft.acquiredAt,
+                notes: draft.notes
             )
             transactions.insert(txn, at: 0)
             summary = try? await apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
+            performance = try? await apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
             HapticManager.notification(.success)
             showingCreateSheet = false
         } catch {
@@ -144,9 +171,56 @@ struct TransactionsView: View {
             )
             transactions.removeAll { $0.id == txn.id }
             summary = try? await apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
+            performance = try? await apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct TransactionDetailSheet: View {
+    let transaction: Transaction
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Transaction") {
+                    LabeledContent("Type", value: transaction.type.capitalized)
+                    LabeledContent("Amount", value: transaction.amount.priceText)
+                    LabeledContent("Quantity", value: "\(transaction.quantity)")
+                    if let platform = transaction.platform { LabeledContent("Platform", value: platform) }
+                    LabeledContent("Date", value: transaction.date)
+                }
+                if transaction.type == "sale" {
+                    Section("Realized Sale") {
+                        if let cost = transaction.costBasis { LabeledContent("Acquisition cost", value: cost.priceText) }
+                        LabeledContent("Fees", value: (transaction.fees ?? 0).priceText)
+                        LabeledContent("Shipping", value: (transaction.shippingCost ?? 0).priceText)
+                        if let net = transaction.netProceeds { LabeledContent("Net proceeds", value: net.priceText) }
+                        if let profit = transaction.realizedProfit {
+                            LabeledContent("Realized profit", value: profit.priceText)
+                        } else {
+                            Text("Add acquisition cost to calculate realized profit.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let days = transaction.holdingDays { LabeledContent("Holding time", value: "\(days) days") }
+                    }
+                }
+                if let notes = transaction.notes, !notes.isEmpty {
+                    Section("Notes") { Text(notes) }
+                }
+            }
+            .navigationTitle(transaction.cardName ?? "Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -218,6 +292,11 @@ private struct TransactionRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                if let profit = transaction.realizedProfit {
+                    Text("\(profit >= 0 ? "+" : "−")\(abs(profit).priceText) realized")
+                        .font(.caption)
+                        .foregroundStyle(profit >= 0 ? Color.green : Color.red)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -226,8 +305,22 @@ private struct TransactionRow: View {
 
 // MARK: - Create Transaction Sheet
 
+private struct NewTransactionDetails {
+    let type: String
+    let cardName: String?
+    let tcg: String?
+    let quantity: Int
+    let amount: Double
+    let platform: String?
+    let costBasis: Double?
+    let fees: Double?
+    let shippingCost: Double?
+    let acquiredAt: String?
+    let notes: String?
+}
+
 private struct CreateTransactionSheet: View {
-    let onCreate: (String, String?, String?, Int, Double, String?, String?) -> Void
+    let onCreate: (NewTransactionDetails) -> Void
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var type = "purchase"
@@ -236,6 +329,11 @@ private struct CreateTransactionSheet: View {
     @State private var quantity = 1
     @State private var amountText = ""
     @State private var platform = ""
+    @State private var costBasisText = ""
+    @State private var feesText = ""
+    @State private var shippingText = ""
+    @State private var hasAcquiredDate = false
+    @State private var acquiredDate = Date()
     @State private var notes = ""
 
     private let platforms = ["", "TCGPlayer", "CardMarket", "eBay", "Local", "Other"]
@@ -278,6 +376,21 @@ private struct CreateTransactionSheet: View {
                     Text("Payment")
                 }
 
+                if type == "sale" {
+                    Section("Realized Sale") {
+                        TextField("Acquisition Cost ($)", text: $costBasisText)
+                            .keyboardType(.decimalPad)
+                        TextField("Marketplace Fees ($)", text: $feesText)
+                            .keyboardType(.decimalPad)
+                        TextField("Shipping Cost ($)", text: $shippingText)
+                            .keyboardType(.decimalPad)
+                        Toggle("Include acquisition date", isOn: $hasAcquiredDate)
+                        if hasAcquiredDate {
+                            DatePicker("Acquired", selection: $acquiredDate, displayedComponents: .date)
+                        }
+                    }
+                }
+
                 Section {
                     TextField("Notes (optional)", text: $notes, axis: .vertical)
                         .lineLimit(3...5)
@@ -294,15 +407,19 @@ private struct CreateTransactionSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         guard let amount = Double(amountText), amount > 0 else { return }
-                        onCreate(
-                            type,
-                            cardName.isEmpty ? nil : cardName,
-                            tcg.isEmpty ? nil : tcg,
-                            quantity,
-                            amount,
-                            platform.isEmpty ? nil : platform,
-                            notes.isEmpty ? nil : notes
-                        )
+                        onCreate(NewTransactionDetails(
+                            type: type,
+                            cardName: cardName.isEmpty ? nil : cardName,
+                            tcg: tcg.isEmpty ? nil : tcg,
+                            quantity: quantity,
+                            amount: amount,
+                            platform: platform.isEmpty ? nil : platform,
+                            costBasis: Double(costBasisText),
+                            fees: Double(feesText),
+                            shippingCost: Double(shippingText),
+                            acquiredAt: hasAcquiredDate ? ISO8601DateFormatter().string(from: acquiredDate) : nil,
+                            notes: notes.isEmpty ? nil : notes
+                        ))
                         dismiss()
                     }
                     .disabled(amountText.isEmpty || Double(amountText) == nil)

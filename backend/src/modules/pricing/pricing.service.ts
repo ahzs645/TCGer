@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { fetchLiveCardPrices } from './live-pricing.service';
 import { isUsablePrice } from './pricing.types';
+import type { PriceSource } from '@tcg/api-types';
 
 export * from './live-pricing.service';
 
@@ -24,7 +25,12 @@ async function recordPriceIfFresh(
   await recordPrice(cardId, price, source, currency, finishCode);
 }
 
-export async function fetchCardPrices(tcg: string, externalId: string, finishCode?: string) {
+export async function fetchCardPrices(
+  tcg: string,
+  externalId: string,
+  finishCode?: string,
+  source: PriceSource = 'automatic',
+) {
   const card = await prisma.card.findFirst({
     where: { externalId, tcgGame: { code: tcg } },
     select: { id: true },
@@ -41,7 +47,7 @@ export async function fetchCardPrices(tcg: string, externalId: string, finishCod
     isFallback?: boolean;
   }> = [];
 
-  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode);
+  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode, source);
   for (const result of liveResults) {
     results.push(result);
     if (card) {
@@ -54,6 +60,7 @@ export async function fetchCardPrices(tcg: string, externalId: string, finishCod
       where: {
         cardId: card.id,
         finishCode: finishCode ?? null,
+        source: source === 'automatic' ? undefined : source,
         price: { gt: 0 },
       },
       orderBy: { recordedAt: 'desc' },

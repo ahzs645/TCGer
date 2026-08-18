@@ -6,6 +6,7 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
     let sealed: Bool
     let analytics: Bool
     let trades: Bool
+    let onlineCodes: Bool
     let prices: Bool
     let notifications: Bool
     let alerts: Bool
@@ -22,6 +23,7 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
         sealed: Bool = true,
         analytics: Bool = true,
         trades: Bool = true,
+        onlineCodes: Bool = true,
         prices: Bool = true,
         notifications: Bool = true,
         alerts: Bool = true,
@@ -35,6 +37,7 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
         self.sealed = sealed
         self.analytics = analytics
         self.trades = trades
+        self.onlineCodes = onlineCodes
         self.prices = prices
         self.notifications = notifications
         self.alerts = alerts
@@ -45,7 +48,7 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case decks, finance, sealed, analytics, trades, prices
+        case decks, finance, sealed, analytics, trades, onlineCodes, prices
         case notifications, alerts, shops, automations, shipments
         case publicFeature = "public"
     }
@@ -57,6 +60,7 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
         sealed = try container.decodeIfPresent(Bool.self, forKey: .sealed) ?? true
         analytics = try container.decodeIfPresent(Bool.self, forKey: .analytics) ?? true
         trades = try container.decodeIfPresent(Bool.self, forKey: .trades) ?? true
+        onlineCodes = try container.decodeIfPresent(Bool.self, forKey: .onlineCodes) ?? false
         prices = try container.decodeIfPresent(Bool.self, forKey: .prices) ?? true
         notifications = try container.decodeIfPresent(Bool.self, forKey: .notifications) ?? true
         alerts = try container.decodeIfPresent(Bool.self, forKey: .alerts) ?? true

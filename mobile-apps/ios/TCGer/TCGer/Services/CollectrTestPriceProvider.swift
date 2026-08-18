@@ -1,7 +1,16 @@
 import Foundation
 
 enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
+    case automatic
     case justTCG = "justtcg"
+    case tcgDexCardmarket = "tcgdex-cardmarket"
+    case scryfall
+    case lorcast
+    case cardSource = "card-source"
+    case pokeWalletCardmarket = "pokewallet-cardmarket"
+    case pokeWalletTCGPlayer = "pokewallet-tcgplayer"
+    case pokeWalletBlended = "pokewallet-blended"
+    case ebayActive = "ebay-active"
     case collectrPrivateTest = "collectr-private-test"
 
     static let storageKey = "tcg.pricing.selectedSource"
@@ -10,9 +19,26 @@ enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
+        case .automatic: return "Best Available"
         case .justTCG: return "JustTCG"
+        case .tcgDexCardmarket: return "Cardmarket via TCGdex"
+        case .scryfall: return "Scryfall"
+        case .lorcast: return "Lorcast"
+        case .cardSource: return "Catalog Market Price"
+        case .pokeWalletCardmarket: return "PokéWallet · Cardmarket"
+        case .pokeWalletTCGPlayer: return "PokéWallet · TCGPlayer"
+        case .pokeWalletBlended: return "PokéWallet · Blended"
+        case .ebayActive: return "eBay Active Listings"
         case .collectrPrivateTest: return "Collectr"
         }
+    }
+
+    var isAvailableOnDevice: Bool {
+        self == .justTCG
+    }
+
+    var isServerSelectable: Bool {
+        self != .collectrPrivateTest
     }
 
     static func selected(in defaults: UserDefaults = .standard) -> PricingSource {

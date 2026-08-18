@@ -4,6 +4,18 @@ import Foundation
 /// shown on card row chips. Lives here so every screen renders the same code
 /// for the same stored value.
 enum CardLanguage {
+    static let supportedNames = [
+        "English",
+        "Japanese",
+        "German",
+        "French",
+        "Italian",
+        "Spanish",
+        "Portuguese",
+        "Korean",
+        "Chinese"
+    ]
+
     private static let codes: [String: String] = [
         "english": "EN",
         "japanese": "JP",

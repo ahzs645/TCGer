@@ -39,6 +39,14 @@ const envSchema = z.object({
   TCGDEX_API_BASE_URL: z.string().url().default('https://api.tcgdex.net/v2/en'),
   JUSTTCG_API_BASE_URL: z.string().url().default('https://api.justtcg.com/v1'),
   JUSTTCG_API_KEY: optionalSecretEnv,
+  POKEWALLET_API_BASE_URL: z.string().url().default('https://api.pokewallet.io'),
+  POKEWALLET_API_KEY: optionalSecretEnv,
+  POKEWALLET_PROXY_SECRET: optionalSecretEnv,
+  PRICE_USD_TO_EUR: z.coerce.number().positive().default(0.92),
+  EBAY_CLIENT_ID: optionalSecretEnv,
+  EBAY_CLIENT_SECRET: optionalSecretEnv,
+  EBAY_MARKETPLACE_ID: z.string().trim().min(1).default('EBAY_US'),
+  EBAY_USE_SANDBOX: booleanEnv,
   PRICE_REFRESH_INTERVAL_MS: z.coerce
     .number()
     .int()

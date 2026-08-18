@@ -12,6 +12,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
     case wishlists
     case guides
     case sealed
+    case onlineCodes
     case prices
     case analytics
     case trades
@@ -31,6 +32,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .wishlists: return "Wishlists"
         case .guides: return "Guides"
         case .sealed: return "Sealed"
+        case .onlineCodes: return "Code Vault"
         case .prices: return "Prices"
         case .analytics: return "Analytics"
         case .trades: return "Trades"
@@ -50,6 +52,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .wishlists: return "heart.fill"
         case .guides: return "sparkles.rectangle.stack.fill"
         case .sealed: return "shippingbox.fill"
+        case .onlineCodes: return "qrcode.viewfinder"
         case .prices: return "dollarsign.circle.fill"
         case .analytics: return "chart.xyaxis.line"
         case .trades: return "arrow.left.arrow.right"
@@ -69,6 +72,7 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         case .wishlists: return "Cards you're hunting for"
         case .guides: return "Curated card collections to follow"
         case .sealed: return "Sealed boxes, packs, and openings"
+        case .onlineCodes: return "Scan and track online redemption codes"
         case .prices: return "Track collection value and card prices"
         case .analytics: return "Explore value history and collection trends"
         case .trades: return "Propose and manage collector trades"
@@ -90,6 +94,8 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
             return features.decks
         case .sealed:
             return features.sealed
+        case .onlineCodes:
+            return features.onlineCodes
         case .prices:
             return features.prices
         case .analytics:

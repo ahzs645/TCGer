@@ -6,6 +6,7 @@ export const serverFeaturesSchema = z.object({
   sealed: z.boolean(),
   analytics: z.boolean(),
   trades: z.boolean(),
+  onlineCodes: z.boolean(),
   prices: z.boolean(),
   notifications: z.boolean(),
   alerts: z.boolean(),

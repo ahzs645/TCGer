@@ -32,6 +32,10 @@ describe("finance and sealed Convex HTTP routes", () => {
         type: "sale",
         cardName: "Charizard",
         amount: 4.25,
+        costBasis: 2,
+        fees: 0.25,
+        shippingCost: 0.5,
+        acquiredAt: "2026-07-01T12:34:56.000Z",
         date: "2026-07-16T12:34:56.000Z",
       },
       {
@@ -98,6 +102,31 @@ describe("finance and sealed Convex HTTP routes", () => {
         },
       ],
       transactionCount: 3,
+    });
+
+    const realizedResponse = await t.fetch("/finance/realized-performance", {
+      headers,
+    });
+    expect(realizedResponse.status).toBe(200);
+    expect(await realizedResponse.json()).toMatchObject({
+      byCurrency: [
+        {
+          currency: "USD",
+          revenue: 4.25,
+          costBasis: 2,
+          fees: 0.25,
+          shippingCost: 0.5,
+          netProceeds: 3.5,
+          realizedProfit: 1.5,
+          saleCount: 1,
+          costedSaleCount: 1,
+          averageHoldingDays: 15,
+        },
+      ],
+      recentSales: [{ cardName: "Charizard", realizedProfit: 1.5, holdingDays: 15 }],
+      inventoryCost: 0,
+      inventoryMarketValue: 0,
+      truncated: false,
     });
 
     const deleteResponse = await t.fetch(

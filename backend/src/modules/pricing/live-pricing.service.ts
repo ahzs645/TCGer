@@ -12,6 +12,8 @@ import {
   parsePrice,
   selectPriceForFinish,
 } from './pricing.types';
+import type { PriceSource } from '@tcg/api-types';
+import { EbayActivePriceProvider, PokeWalletPriceProvider } from './server-market-price-providers';
 
 export * from './pricing.types';
 export * from './collectr-test-price-provider';
@@ -66,6 +68,12 @@ const providers: PriceProvider[] = [
   new ScryfallPriceProvider(),
   new LorcastPriceProvider(),
   new AdapterPriceProvider(),
+  new PokeWalletPriceProvider('cardmarket'),
+  new PokeWalletPriceProvider('tcgplayer'),
+  new PokeWalletPriceProvider('blended'),
+  new EbayActivePriceProvider((tcg, externalId) =>
+    adapterRegistry.get(tcg).fetchCardById(externalId),
+  ),
 ];
 
 export function registerPriceProvider(provider: PriceProvider): void {
@@ -78,9 +86,13 @@ export async function fetchLiveCardPrices(
   tcg: string,
   externalId: string,
   finishCode?: string,
+  source: PriceSource = 'automatic',
 ): Promise<LivePriceResult[]> {
   const results: LivePriceResult[] = [];
-  for (const provider of providers) {
+  const selectedProviders = providers.filter((provider) =>
+    source === 'automatic' ? provider.includeInAutomatic !== false : provider.name === source,
+  );
+  for (const provider of selectedProviders) {
     try {
       const quote = normalizePriceQuote(await provider.fetchPrice(tcg, externalId));
       if (!quote) continue;

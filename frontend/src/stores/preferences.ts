@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { priceSourceSchema, type PriceSource } from "@tcg/api-types";
 
 import type { SupportedGame } from "@/lib/utils";
 
@@ -12,7 +13,12 @@ interface ModuleState {
   setShowCardNumbers: (show: boolean) => void;
   showPricing: boolean;
   setShowPricing: (show: boolean) => void;
+  priceSource: PriceSource;
+  hydratePriceSource: () => void;
+  setPriceSource: (source: PriceSource) => void;
 }
+
+export const PRICE_SOURCE_STORAGE_KEY = "tcger.pricing.source";
 
 const initialState: Record<ManageableGame, boolean> = {
   yugioh: true,
@@ -40,6 +46,20 @@ export const useModuleStore = create<ModuleState>((set) => ({
   setShowCardNumbers: (show) => set({ showCardNumbers: show }),
   showPricing: true,
   setShowPricing: (show) => set({ showPricing: show }),
+  priceSource: "automatic",
+  hydratePriceSource: () => {
+    if (typeof window === "undefined") return;
+    const parsed = priceSourceSchema.safeParse(
+      window.localStorage.getItem(PRICE_SOURCE_STORAGE_KEY),
+    );
+    set({ priceSource: parsed.success ? parsed.data : "automatic" });
+  },
+  setPriceSource: (source) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PRICE_SOURCE_STORAGE_KEY, source);
+    }
+    set({ priceSource: source });
+  },
 }));
 
 export function getActiveGames(

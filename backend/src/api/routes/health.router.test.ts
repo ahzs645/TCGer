@@ -20,6 +20,7 @@ describe('getHealthResponse', () => {
       mode: 'convex',
       features: {
         decks: true,
+        onlineCodes: true,
         finance: true,
         sealed: true,
         analytics: true,
@@ -44,6 +45,7 @@ describe('getHealthResponse', () => {
       mode: 'hybrid',
       features: {
         decks: true,
+        onlineCodes: true,
         finance: true,
         sealed: true,
         analytics: true,

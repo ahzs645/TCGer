@@ -145,6 +145,7 @@ struct PricesView: View {
 
                     if let lastPriceCheck {
                         Section {
+                            LabeledContent("Source", value: environmentStore.pricingSource.displayName)
                             LabeledContent("Market prices") {
                                 Text(lastPriceCheck, format: .dateTime.month().day().hour().minute())
                             }
@@ -204,6 +205,10 @@ struct PricesView: View {
             }
         }
         .refreshable { await load(forcePrices: true) }
+        .onChange(of: environmentStore.pricingSource) {
+            livePrices = [:]
+            Task { await refreshTrackedPrices(force: true) }
+        }
         .task {
             await load()
             while !Task.isCancelled {

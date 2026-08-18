@@ -1,0 +1,259 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "What the downloaded scanner projects add to TCGer",
+    "description": "Decision report covering four scanner projects, their reusable ideas, licensing boundaries, and dataset disposition.",
+    "generatedAt": "2026-08-18T15:30:00Z",
+    "charts": [
+      {
+        "id": "dataset_images",
+        "title": "Detector dataset image counts",
+        "subtitle": "Six archived Roboflow exports; 2,683 images after adding pokemon card outliner v1",
+        "type": "bar",
+        "dataset": "dataset_inventory",
+        "sourceId": "dataset_inventory_sql",
+        "encodings": {
+          "x": { "field": "dataset", "type": "nominal", "label": "Dataset" },
+          "y": { "field": "images", "type": "quantitative", "label": "Images", "format": "number" }
+        },
+        "yAxisTitle": "Images",
+        "valueFormat": "number"
+      }
+    ],
+    "sources": [
+      {
+        "id": "local_audit",
+        "label": "TCGer open-source scanner project audit",
+        "path": "scanner-open-source-project-audit-2026-08-18.md"
+      },
+      {
+        "id": "shrey_repo",
+        "label": "Pokemon Card Scanning Webapp",
+        "href": "https://github.com/ShreyShingala/Pokemon-Card-Scanning-Webapp"
+      },
+      {
+        "id": "pocket_repo",
+        "label": "Pokemon TCGP Card Scanner",
+        "href": "https://github.com/1vcian/Pokemon-TCGP-Card-Scanner"
+      },
+      {
+        "id": "poke_scan_repo",
+        "label": "Poke-Scan V2",
+        "href": "https://github.com/celtechstarter/poke-scan-v2"
+      },
+      {
+        "id": "ocr_repo",
+        "label": "pokemon-card-recognizer",
+        "href": "https://github.com/prateekt/pokemon-card-recognizer"
+      },
+      {
+        "id": "outliner_dataset",
+        "label": "pokemon card outliner dataset",
+        "href": "https://universe.roboflow.com/shrey-gw0qz/pokemon-card-outliner-st28n"
+      },
+      {
+        "id": "dataset_inventory_sql",
+        "label": "Reference detector dataset inventory",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "description": "Reproducible projection of the six reviewed manifest rows used by the chart.",
+          "sql": "WITH reference_dataset_manifest(dataset, images, annotations, newly_added, license) AS (VALUES ('TCGX v7',1058,1157,0,'CC BY 4.0'),('Detector v1',757,1001,0,'CC BY 4.0'),('Outliner v1',347,523,1,'CC BY 4.0'),('pokefolio v1',300,499,0,'CC BY 4.0'),('pk-detect v3',128,673,0,'CC BY 4.0'),('LabelYOLO v4',93,99,0,'CC BY 4.0')) SELECT dataset, images, annotations, newly_added, license FROM reference_dataset_manifest ORDER BY images DESC;",
+          "tables_used": ["reference_dataset_manifest"],
+          "filters": ["Six archived Roboflow exports in the Reference detector manifest as of August 18, 2026"]
+        }
+      },
+      {
+        "id": "project_decisions_sql",
+        "label": "Reviewed project decision table",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "description": "Reviewed decisions transcribed from the source audit after inspecting each downloaded repository.",
+          "sql": "WITH projects(priority, project, best_idea, decision, reason) AS (VALUES (1,'poke-scan-v2','Set-code whitelist and collector denominator validation','Reimplement locally','Directly targets exact-print ambiguity; keep cloud vision out of the default scan path.'),(2,'pokemon-card-recognizer','Temporal runs and confidence-weighted best frame','Reimplement independently','Strong systems pattern, but GPL source and OCR-only identity are not suitable drop-ins.'),(3,'Pokemon Card Scanning Webapp','Top-K visual retrieval plus title OCR','Adapt narrowly','TCGer already has the safer form; reject the loose top-1000 fallback and unlicensed/LFS artifacts.'),(4,'Pokemon TCGP Card Scanner','Synthetic OBB grids and cheap aligned pHash','Offline stress experiment','Digital Pocket screenshot domain does not represent physical foil, sleeve, blur, and glare conditions.')) SELECT priority, project, best_idea, decision, reason FROM projects ORDER BY priority;",
+          "tables_used": ["projects"],
+          "filters": ["Four repositories found in the user-provided download folder"]
+        }
+      },
+      {
+        "id": "dataset_disposition_sql",
+        "label": "Reviewed dataset disposition table",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "description": "Dataset archival decisions after hash deduplication and provenance review.",
+          "sql": "WITH datasets(dataset, images, status, use_case) AS (VALUES ('pokemon card outliner v1','347 images / 523 boxes / 7 negatives','Added; CC BY 4.0; unique','Frozen detector and booster-pack negative stress set'),('Pocket synthetic OBB 10k','10k synthetic scenes (metadata archive)','Already present; not duplicated','Synthetic localization reference only; not physical-card validation')) SELECT dataset, images, status, use_case AS use FROM datasets ORDER BY dataset;",
+          "tables_used": ["datasets"],
+          "filters": ["Datasets referenced by the four reviewed repositories"]
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# What the downloaded scanner projects add to TCGer"
+      },
+      {
+        "id": "summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n- **Two ideas are worth implementing next:** constrain exact-print acceptance with footer set code/denominator evidence, and accumulate best-of-frame evidence across a short temporal window.\n- **None of the four projects should replace TCGer's recognizer.** Their strongest techniques are either already present, aimed at digital Pocket screenshots, dependent on cloud vision, or too weak for exact-print physical-card recognition.\n- **One dataset was worth adding.** The CC BY 4.0 `pokemon card outliner v1` export adds 347 unique images, 523 boxes, and seven booster-pack negatives; the existing library now totals 2,683 images and 3,952 annotations.\n- **No unlicensed or incomplete artifacts were copied.** The Pocket 10k set was already archived, two repositories lack a license, one only states MIT in its README, and the GPL project plus multiple Git LFS pointer artifacts are not production-safe drop-ins."
+      },
+      {
+        "id": "finding_projects",
+        "type": "markdown",
+        "body": "## The projects contribute tactics, not a replacement pipeline\n\nThe visual-plus-OCR projects reinforce a useful direction: let visual retrieval propose a small candidate set, then use exact catalog text to verify or rerank it. The safe version is deliberately narrow. Loose word overlap across a top-1000 list can turn OCR noise into a confident false match, while a cloud VLM introduces privacy, latency, cost, and hallucination risks. The screenshot-oriented Pocket project is useful for synthetic localization ideas but does not model sleeves, foil glare, blur, or physical perspective.\n\n- **poke-scan-v2:** reimplement its set-code and collector-denominator validation locally; keep cloud vision out of the default scan.\n- **pokemon-card-recognizer:** independently implement temporal runs and best-frame selection; do not integrate GPL source.\n- **Pokemon Card Scanning Webapp:** retain the top-K plus title-OCR concept, but reject the loose top-1000 fallback and incomplete artifacts.\n- **Pokemon TCGP Card Scanner:** use synthetic OBB grids and pHash only in offline stress experiments."
+      },
+      {
+        "id": "finding_dataset",
+        "type": "markdown",
+        "body": "## The new dataset expands detector stress coverage, not identity training\n\nThe new raw export is internally unique and has no byte-identical overlap with the five prior detector datasets. The chart shows that its 347 images are a meaningful but not dominant addition to the 2,683-image library. Its binder scenes and explicit booster-pack negatives are useful for localization and false-positive testing. It is axis-aligned box data rather than an exact-card identity corpus, so it should not be used to judge or train printing recognition. Three boxes have sub-pixel boundary overhangs; clamp them only in derived data and preserve the source archive unchanged."
+      },
+      { "id": "dataset_chart", "type": "chart", "chartId": "dataset_images" },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## Recommended next steps\n\n1. **Add an exact-print footer guard.** Set code plus collector numerator/denominator should be able to restrict the ANN shortlist. Generic-name families such as Basic Energy should stay in Review unless footer evidence agrees or a second calibrated signal confirms the printing.\n2. **Add temporal best-of evidence.** Keep the strongest crop and candidate union for each pocket across a short window; require stability or footer agreement before auto-selection, and never overwrite a stronger prior result with a worse frame.\n3. **Constrain OCR vocabulary.** Feed Apple Vision plausible top-K names, set codes, and collector forms. Exact catalog agreement can rerank; partial words alone cannot create an acceptance.\n4. **Use the new dataset as a frozen detector/negative stress set first.** Do not retrain merely because more data exists; TCGer's latest real binder localization was already excellent, while identity precision remains the binding problem.\n5. **Keep synthetic OBB and RGB pHash work offline.** Rebuild any generator with physical-card conditions, and test pHash first as a temporal cache key rather than an identity decision."
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "body": "## Further questions\n\n- How often do exact-print false accepts concentrate in Basic Energy, reprints, and same-art families?\n- What footer fields are readable at the native pocket pixel size on each supported iPhone?\n- Does temporal evidence improve exact-print recall at the same false-accept budget on independently held-out sessions?\n- Do the new booster-pack negatives expose detector false positives in the current Core ML model?"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "body": "## Caveats and assumptions\n\nThis review validates project structure, data integrity, provenance, and reuse boundaries; it does not validate the projects' reported accuracy on TCGer's camera domain. Several downloaded model/reference files are Git LFS pointers, and the Pocket system solves a different screenshot problem. Any promoted idea still requires paired evaluation on frozen real iPhone sessions with exact-print labels, hard negatives, and session/identity-disjoint splits."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-18T15:30:00Z",
+    "status": "ready",
+    "datasets": {
+      "projects": [
+        {
+          "priority": 1,
+          "project": "poke-scan-v2",
+          "best_idea": "Set-code whitelist and collector denominator validation",
+          "decision": "Reimplement locally",
+          "reason": "Directly targets exact-print ambiguity; keep cloud vision out of the default scan path."
+        },
+        {
+          "priority": 2,
+          "project": "pokemon-card-recognizer",
+          "best_idea": "Temporal runs and confidence-weighted best frame",
+          "decision": "Reimplement independently",
+          "reason": "Strong systems pattern, but GPL source and OCR-only identity are not suitable drop-ins."
+        },
+        {
+          "priority": 3,
+          "project": "Pokemon Card Scanning Webapp",
+          "best_idea": "Top-K visual retrieval plus title OCR",
+          "decision": "Adapt narrowly",
+          "reason": "TCGer already has the safer form; reject the loose top-1000 fallback and unlicensed/LFS artifacts."
+        },
+        {
+          "priority": 4,
+          "project": "Pokemon TCGP Card Scanner",
+          "best_idea": "Synthetic OBB grids and cheap aligned pHash",
+          "decision": "Offline stress experiment",
+          "reason": "Digital Pocket screenshot domain does not represent physical foil, sleeve, blur, and glare conditions."
+        }
+      ],
+      "datasets": [
+        {
+          "dataset": "pokemon card outliner v1",
+          "images": "347 images / 523 boxes / 7 negatives",
+          "status": "Added; CC BY 4.0; unique",
+          "use": "Frozen detector and booster-pack negative stress set"
+        },
+        {
+          "dataset": "Pocket synthetic OBB 10k",
+          "images": "10k synthetic scenes (metadata archive)",
+          "status": "Already present; not duplicated",
+          "use": "Synthetic localization reference only; not physical-card validation"
+        }
+      ],
+      "dataset_inventory": [
+        { "dataset": "TCGX v7", "images": 1058, "annotations": 1157, "newly_added": false, "license": "CC BY 4.0" },
+        { "dataset": "Detector v1", "images": 757, "annotations": 1001, "newly_added": false, "license": "CC BY 4.0" },
+        { "dataset": "Outliner v1", "images": 347, "annotations": 523, "newly_added": true, "license": "CC BY 4.0" },
+        { "dataset": "pokefolio v1", "images": 300, "annotations": 499, "newly_added": false, "license": "CC BY 4.0" },
+        { "dataset": "pk-detect v3", "images": 128, "annotations": 673, "newly_added": false, "license": "CC BY 4.0" },
+        { "dataset": "LabelYOLO v4", "images": 93, "annotations": 99, "newly_added": false, "license": "CC BY 4.0" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "local_audit",
+      "label": "TCGer open-source scanner project audit",
+      "path": "scanner-open-source-project-audit-2026-08-18.md"
+    },
+    {
+      "id": "shrey_repo",
+      "label": "Pokemon Card Scanning Webapp",
+      "href": "https://github.com/ShreyShingala/Pokemon-Card-Scanning-Webapp"
+    },
+    {
+      "id": "pocket_repo",
+      "label": "Pokemon TCGP Card Scanner",
+      "href": "https://github.com/1vcian/Pokemon-TCGP-Card-Scanner"
+    },
+    {
+      "id": "poke_scan_repo",
+      "label": "Poke-Scan V2",
+      "href": "https://github.com/celtechstarter/poke-scan-v2"
+    },
+    {
+      "id": "ocr_repo",
+      "label": "pokemon-card-recognizer",
+      "href": "https://github.com/prateekt/pokemon-card-recognizer"
+    },
+    {
+      "id": "outliner_dataset",
+      "label": "pokemon card outliner dataset",
+      "href": "https://universe.roboflow.com/shrey-gw0qz/pokemon-card-outliner-st28n"
+    },
+    {
+      "id": "dataset_inventory_sql",
+      "label": "Reference detector dataset inventory",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "description": "Reproducible projection of the six reviewed manifest rows used by the chart.",
+        "sql": "WITH reference_dataset_manifest(dataset, images, annotations, newly_added, license) AS (VALUES ('TCGX v7',1058,1157,0,'CC BY 4.0'),('Detector v1',757,1001,0,'CC BY 4.0'),('Outliner v1',347,523,1,'CC BY 4.0'),('pokefolio v1',300,499,0,'CC BY 4.0'),('pk-detect v3',128,673,0,'CC BY 4.0'),('LabelYOLO v4',93,99,0,'CC BY 4.0')) SELECT dataset, images, annotations, newly_added, license FROM reference_dataset_manifest ORDER BY images DESC;",
+        "tables_used": ["reference_dataset_manifest"],
+        "filters": ["Six archived Roboflow exports in the Reference detector manifest as of August 18, 2026"]
+      }
+    },
+    {
+      "id": "project_decisions_sql",
+      "label": "Reviewed project decision table",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "description": "Reviewed decisions transcribed from the source audit after inspecting each downloaded repository.",
+        "sql": "WITH projects(priority, project, best_idea, decision, reason) AS (VALUES (1,'poke-scan-v2','Set-code whitelist and collector denominator validation','Reimplement locally','Directly targets exact-print ambiguity; keep cloud vision out of the default scan path.'),(2,'pokemon-card-recognizer','Temporal runs and confidence-weighted best frame','Reimplement independently','Strong systems pattern, but GPL source and OCR-only identity are not suitable drop-ins.'),(3,'Pokemon Card Scanning Webapp','Top-K visual retrieval plus title OCR','Adapt narrowly','TCGer already has the safer form; reject the loose top-1000 fallback and unlicensed/LFS artifacts.'),(4,'Pokemon TCGP Card Scanner','Synthetic OBB grids and cheap aligned pHash','Offline stress experiment','Digital Pocket screenshot domain does not represent physical foil, sleeve, blur, and glare conditions.')) SELECT priority, project, best_idea, decision, reason FROM projects ORDER BY priority;",
+        "tables_used": ["projects"],
+        "filters": ["Four repositories found in the user-provided download folder"]
+      }
+    },
+    {
+      "id": "dataset_disposition_sql",
+      "label": "Reviewed dataset disposition table",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "description": "Dataset archival decisions after hash deduplication and provenance review.",
+        "sql": "WITH datasets(dataset, images, status, use_case) AS (VALUES ('pokemon card outliner v1','347 images / 523 boxes / 7 negatives','Added; CC BY 4.0; unique','Frozen detector and booster-pack negative stress set'),('Pocket synthetic OBB 10k','10k synthetic scenes (metadata archive)','Already present; not duplicated','Synthetic localization reference only; not physical-card validation')) SELECT dataset, images, status, use_case AS use FROM datasets ORDER BY dataset;",
+        "tables_used": ["datasets"],
+        "filters": ["Datasets referenced by the four reviewed repositories"]
+      }
+    }
+  ]
+}

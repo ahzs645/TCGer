@@ -1,4 +1,9 @@
-import type { TrackedPriceItem, TrackedPriceResult, TrackedPricesResponse } from '@tcg/api-types';
+import type {
+  PriceSource,
+  TrackedPriceItem,
+  TrackedPriceResult,
+  TrackedPricesResponse,
+} from '@tcg/api-types';
 import { env } from '../../config/env';
 import { fetchLiveCardPrices } from './live-pricing.service';
 import type { LivePriceResult } from './pricing.types';
@@ -7,6 +12,7 @@ type PriceFetcher = (
   tcg: string,
   externalId: string,
   finishCode?: string,
+  source?: PriceSource,
 ) => Promise<LivePriceResult[]>;
 
 interface CacheEntry {
@@ -22,8 +28,9 @@ interface TrackedPricingOptions {
   now?: () => number;
 }
 
-export function trackedPriceKey(item: TrackedPriceItem): string {
-  return `${item.tcg.trim().toLowerCase()}:${item.externalId.trim()}:${item.finishCode?.trim().toLowerCase() ?? ''}`;
+export function trackedPriceKey(item: TrackedPriceItem, source: PriceSource = 'automatic'): string {
+  const itemKey = `${item.tcg.trim().toLowerCase()}:${item.externalId.trim()}:${item.finishCode?.trim().toLowerCase() ?? ''}`;
+  return source === 'automatic' ? itemKey : `${source}:${itemKey}`;
 }
 
 export function createTrackedPricingService(fetcher: PriceFetcher, options: TrackedPricingOptions) {
@@ -32,8 +39,12 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
   const now = options.now ?? Date.now;
   const concurrency = Math.max(1, options.concurrency ?? 6);
 
-  async function fetchOne(item: TrackedPriceItem, force: boolean): Promise<TrackedPriceResult> {
-    const key = trackedPriceKey(item);
+  async function fetchOne(
+    item: TrackedPriceItem,
+    force: boolean,
+    source: PriceSource,
+  ): Promise<TrackedPriceResult> {
+    const key = trackedPriceKey(item, source);
     const timestamp = now();
     const cached = cache.get(key);
     const canForce =
@@ -48,7 +59,7 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
 
     const request = (async () => {
       try {
-        const [quote] = await fetcher(item.tcg, item.externalId, item.finishCode);
+        const [quote] = await fetcher(item.tcg, item.externalId, item.finishCode, source);
         const result: TrackedPriceResult = quote
           ? {
               ...item,
@@ -90,13 +101,16 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
   async function getTrackedPrices(
     items: TrackedPriceItem[],
     force = false,
+    source: PriceSource = 'automatic',
   ): Promise<TrackedPricesResponse> {
-    const unique = Array.from(new Map(items.map((item) => [trackedPriceKey(item), item])).values());
+    const unique = Array.from(
+      new Map(items.map((item) => [trackedPriceKey(item, source), item])).values(),
+    );
     const prices: TrackedPriceResult[] = [];
     for (let index = 0; index < unique.length; index += concurrency) {
       prices.push(
         ...(await Promise.all(
-          unique.slice(index, index + concurrency).map((item) => fetchOne(item, force)),
+          unique.slice(index, index + concurrency).map((item) => fetchOne(item, force, source)),
         )),
       );
     }
@@ -111,11 +125,16 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
   return { getTrackedPrices };
 }
 
-async function fetchTrackedPrice(tcg: string, externalId: string, finishCode?: string) {
+async function fetchTrackedPrice(
+  tcg: string,
+  externalId: string,
+  finishCode?: string,
+  source: PriceSource = 'automatic',
+) {
   if (env.BACKEND_MODE === 'convex') {
-    return fetchLiveCardPrices(tcg, externalId, finishCode);
+    return fetchLiveCardPrices(tcg, externalId, finishCode, source);
   }
-  return (await import('./pricing.service')).fetchCardPrices(tcg, externalId, finishCode);
+  return (await import('./pricing.service')).fetchCardPrices(tcg, externalId, finishCode, source);
 }
 
 export const trackedPricingService = createTrackedPricingService(fetchTrackedPrice, {

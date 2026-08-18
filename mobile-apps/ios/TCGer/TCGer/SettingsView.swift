@@ -383,11 +383,9 @@ struct SettingsView: View {
                                     .foregroundColor(.green)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Pricing Source")
-                                    Text(environmentStore.pricingSource == .collectrPrivateTest
-                                        ? "Collectr live private test"
-                                        : (isLocalMode
-                                            ? "Personal JustTCG key on this phone"
-                                            : "Configure and test JustTCG"))
+                                    Text(isLocalMode
+                                        ? "Personal JustTCG key on this phone"
+                                        : environmentStore.pricingSource.displayName)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -396,11 +394,9 @@ struct SettingsView: View {
                     } header: {
                         Text("Pricing")
                     } footer: {
-                        Text(environmentStore.pricingSource == .collectrPrivateTest
-                            ? "The private test uses your Keychain-stored Collectr session and explicit product mappings."
-                            : (isLocalMode
-                                ? "Phone-only mode can use a separate personal JustTCG key stored in this iPhone's Keychain. A server-held key remains safer."
-                                : "JustTCG is the primary commercial pricing provider. Its API key is configured on the server, never stored in the mobile app."))
+                        Text(isLocalMode
+                            ? "Phone-only mode shows only providers that can run safely on this iPhone."
+                            : "Only pricing providers configured and advertised by this server appear here.")
                     }
                 }
 

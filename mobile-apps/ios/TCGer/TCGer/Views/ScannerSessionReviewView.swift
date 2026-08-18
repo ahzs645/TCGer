@@ -14,6 +14,11 @@ struct ScannerSessionReviewView: View {
     @State private var reviewedResult: ResultReference?
     @State private var collections: [Collection] = []
     @State private var selectedBinderID: String?
+    @AppStorage("scanner.defaultLanguage") private var defaultLanguage = "English"
+    @State private var languageOverrides: [CardScanResult.ID: String] = [:]
+    @State private var finishOverrides: [CardScanResult.ID: String] = [:]
+    @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
+    @State private var isSendingToWeb = false
     @State private var isLoadingCollections = true
     @State private var isAdding = false
     @State private var isCreatingBinder = false
@@ -44,6 +49,40 @@ struct ScannerSessionReviewView: View {
                     List {
                         Section {
                             summary
+                        }
+
+                        Section("Copy Details") {
+                            Picker("Session language", selection: $defaultLanguage) {
+                                ForEach(CardLanguage.supportedNames, id: \.self) { language in
+                                    Text(language).tag(language)
+                                }
+                            }
+
+                            Text("This language is applied to every selected scan unless you override it on that card below.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Section("Shared Web Session") {
+                            TextField("Session code", text: $sharedSessionCode)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .fontDesign(.monospaced)
+                            Button {
+                                Task { await sendSelectedToWeb() }
+                            } label: {
+                                if isSendingToWeb {
+                                    ProgressView()
+                                } else {
+                                    Label("Send Selected to Web", systemImage: "iphone.and.arrow.forward")
+                                }
+                            }
+                            .disabled(selectedResultIDs.isEmpty || sharedSessionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSendingToWeb)
+                            Text(environmentStore.serverConfiguration.isOnDevice
+                                ? "Connect the app to your TCGer server to use shared sessions."
+                                : "The web Scan page will receive these cards and can edit and commit them together.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
 
                         Section("Scanned Cards") {
@@ -138,7 +177,8 @@ struct ScannerSessionReviewView: View {
         let wasAdded = viewModel.addedSessionResultIDs.contains(result.id)
         let isSelected = selectedResultIDs.contains(result.id)
 
-        return HStack(spacing: 12) {
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
             Button {
                 toggleSelection(for: result.id)
             } label: {
@@ -197,6 +237,61 @@ struct ScannerSessionReviewView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Review match for \(result.primary.details.identity.name)")
             .accessibilityHint("Shows up to five best card matches")
+            }
+
+            HStack(spacing: 8) {
+                Menu {
+                    ForEach(CardLanguage.supportedNames, id: \.self) { optionLanguage in
+                        Button {
+                            languageOverrides[result.id] = optionLanguage
+                        } label: {
+                            if optionLanguage == language(for: result) {
+                                Label(optionLanguage, systemImage: "checkmark")
+                            } else {
+                                Text(optionLanguage)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(language(for: result), systemImage: "character.book.closed")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(wasAdded || isAdding)
+
+                if !finishOptions(for: result).isEmpty {
+                    Menu {
+                        Button {
+                            finishOverrides[result.id] = ""
+                        } label: {
+                            if finishCode(for: result) == nil {
+                                Label("Unspecified", systemImage: "checkmark")
+                            } else {
+                                Text("Unspecified")
+                            }
+                        }
+                        ForEach(finishOptions(for: result), id: \.code) { option in
+                            Button {
+                                finishOverrides[result.id] = option.code
+                            } label: {
+                                if finishCode(for: result) == option.code {
+                                    Label(option.label, systemImage: "checkmark")
+                                } else {
+                                    Text(option.label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(finishLabel(for: result), systemImage: "sparkles")
+                            .font(.caption.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(wasAdded || isAdding)
+                }
+            }
+            .padding(.leading, 44)
         }
     }
 
@@ -272,6 +367,50 @@ struct ScannerSessionReviewView: View {
         } else {
             selectedResultIDs = availableResultIDs
         }
+    }
+
+    @MainActor
+    private func sendSelectedToWeb() async {
+        let code = sharedSessionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        isSendingToWeb = true
+        defer { isSendingToWeb = false }
+        var sent = 0
+        do {
+            for result in viewModel.sessionResults where selectedResultIDs.contains(result.id) {
+                try await apiService.sendToSharedScanSession(
+                    config: environmentStore.serverConfiguration,
+                    token: environmentStore.authToken,
+                    code: code,
+                    result: result,
+                    language: language(for: result),
+                    finishCode: finishCode(for: result)
+                )
+                sent += 1
+            }
+            HapticManager.notification(.success)
+        } catch {
+            errorMessage = "Sent \(sent) card\(sent == 1 ? "" : "s") to the web. \(error.localizedDescription)"
+        }
+    }
+
+    private func language(for result: CardScanResult) -> String {
+        languageOverrides[result.id] ?? defaultLanguage
+    }
+
+    private func finishOptions(for result: CardScanResult) -> [PokemonFinishOption] {
+        guard let card = makeCard(from: result.primary) else { return [] }
+        return PokemonFinishOption.options(for: card)
+    }
+
+    private func finishCode(for result: CardScanResult) -> String? {
+        guard let value = finishOverrides[result.id], !value.isEmpty else { return nil }
+        return value
+    }
+
+    private func finishLabel(for result: CardScanResult) -> String {
+        guard let code = finishCode(for: result) else { return "Finish" }
+        return PokemonFinishOption.label(for: code)
     }
 
     @MainActor
@@ -356,7 +495,17 @@ struct ScannerSessionReviewView: View {
                     card: card,
                     details: BinderCardAddDetails(
                         condition: selectedBinder?.defaultCondition ?? CardCondition.nearMint.rawValue,
-                        language: "English"
+                        language: language(for: result),
+                        isFoil: PokemonFinishOption.isFoil(finishCode(for: result)),
+                        variant: CardCopyVariant(
+                            finishCode: finishCode(for: result),
+                            finishLabel: finishCode(for: result).map(PokemonFinishOption.label(for:)),
+                            edition: nil,
+                            stamp: nil,
+                            isSealedPromo: false,
+                            isOversized: false,
+                            isPeelOff: false
+                        )
                     )
                 )
                 addedIDs.insert(result.id)

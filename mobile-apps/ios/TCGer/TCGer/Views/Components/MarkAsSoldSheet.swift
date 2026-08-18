@@ -1,14 +1,47 @@
 import SwiftUI
 
+struct SaleDetails {
+    let amount: Double
+    let platform: String?
+    let costBasis: Double?
+    let fees: Double?
+    let shippingCost: Double?
+    let acquiredAt: String?
+    let removeFromBinder: Bool
+}
+
 struct MarkAsSoldSheet: View {
     let card: CollectionCard
-    let onSell: (Double, String?, Bool) -> Void
+    let onSell: (SaleDetails) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var amountText = ""
     @State private var platform = ""
+    @State private var costBasisText: String
+    @State private var feesText = ""
+    @State private var shippingText = ""
     @State private var removeFromBinder = true
 
     private let platforms = ["", "TCGPlayer", "CardMarket", "eBay", "Local", "Other"]
+
+    private var earliestAcquiredAt: String? {
+        guard let value = card.copies.compactMap(\.acquiredAt).min() else { return nil }
+        if ISO8601DateFormatter().date(from: value) != nil { return value }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: value) else { return nil }
+        return ISO8601DateFormatter().string(from: date)
+    }
+
+    init(card: CollectionCard, onSell: @escaping (SaleDetails) -> Void) {
+        self.card = card
+        self.onSell = onSell
+        let hasCompleteCost = !card.copies.isEmpty && card.copies.allSatisfy { $0.acquisitionPrice != nil }
+        let suggestedCost = hasCompleteCost
+            ? card.copies.reduce(0.0) { $0 + ($1.acquisitionPrice ?? 0) }
+            : nil
+        _costBasisText = State(initialValue: suggestedCost.map { String(format: "%.2f", $0) } ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,8 +77,16 @@ struct MarkAsSoldSheet: View {
                             Text(p.isEmpty ? "None" : p).tag(p)
                         }
                     }
+                    TextField("Marketplace Fees ($)", text: $feesText)
+                        .keyboardType(.decimalPad)
+                    TextField("Shipping Cost ($)", text: $shippingText)
+                        .keyboardType(.decimalPad)
+                    TextField("Acquisition Cost ($)", text: $costBasisText)
+                        .keyboardType(.decimalPad)
                 } header: {
                     Text("Sale Details")
+                } footer: {
+                    Text("Profit is sale amount minus fees, shipping, and acquisition cost. Leave acquisition cost blank when it is unknown.")
                 }
 
                 Section {
@@ -64,7 +105,15 @@ struct MarkAsSoldSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Sell") {
                         guard let amount = Double(amountText), amount > 0 else { return }
-                        onSell(amount, platform.isEmpty ? nil : platform, removeFromBinder)
+                        onSell(SaleDetails(
+                            amount: amount,
+                            platform: platform.isEmpty ? nil : platform,
+                            costBasis: Double(costBasisText),
+                            fees: Double(feesText),
+                            shippingCost: Double(shippingText),
+                            acquiredAt: earliestAcquiredAt,
+                            removeFromBinder: removeFromBinder
+                        ))
                         dismiss()
                     }
                     .disabled(amountText.isEmpty || Double(amountText) == nil)

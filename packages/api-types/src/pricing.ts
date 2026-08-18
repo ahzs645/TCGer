@@ -11,9 +11,24 @@ export const trackedPriceItemSchema = z.object({
 });
 export type TrackedPriceItem = z.infer<typeof trackedPriceItemSchema>;
 
+export const priceSourceSchema = z.enum([
+  "automatic",
+  "justtcg",
+  "tcgdex-cardmarket",
+  "scryfall",
+  "lorcast",
+  "card-source",
+  "pokewallet-cardmarket",
+  "pokewallet-tcgplayer",
+  "pokewallet-blended",
+  "ebay-active",
+]);
+export type PriceSource = z.infer<typeof priceSourceSchema>;
+
 export const trackedPricesRequestSchema = z.object({
   items: z.array(trackedPriceItemSchema).min(1).max(100),
   force: z.boolean().optional().default(false),
+  source: priceSourceSchema.optional().default("automatic"),
 });
 export type TrackedPricesRequest = z.infer<typeof trackedPricesRequestSchema>;
 
@@ -31,6 +46,19 @@ export interface TrackedPricesResponse {
   prices: TrackedPriceResult[];
   refreshedAt: string;
   refreshAfter: string;
+}
+
+export interface PriceSourceOption {
+  id: PriceSource;
+  label: string;
+  description: string;
+  games: string[];
+  requiresServer: boolean;
+}
+
+export interface PriceSourcesResponse {
+  sources: PriceSourceOption[];
+  defaultSource: PriceSource;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +103,10 @@ export const createTransactionSchema = z.object({
     .transform((value) => value.toUpperCase())
     .default("USD"),
   platform: z.string().optional(),
+  costBasis: z.number().nonnegative().optional(),
+  fees: z.number().nonnegative().optional(),
+  shippingCost: z.number().nonnegative().optional(),
+  acquiredAt: z.string().datetime().optional(),
   notes: z.string().optional(),
   date: z.string().datetime().optional(),
 });
@@ -120,6 +152,13 @@ export interface TransactionResponse {
   amount: number;
   currency: string;
   platform?: string;
+  costBasis?: number;
+  fees?: number;
+  shippingCost?: number;
+  acquiredAt?: string;
+  netProceeds?: number;
+  realizedProfit?: number;
+  holdingDays?: number;
   notes?: string;
   date: string;
 }
@@ -141,6 +180,58 @@ export interface FinanceSummary {
 export interface FinanceSummaryByCurrency {
   byCurrency: FinanceCurrencySummary[];
   transactionCount: number;
+}
+
+export interface RealizedSaleMetric {
+  id: string;
+  cardName?: string;
+  tcg?: string;
+  platform?: string;
+  currency: string;
+  quantity: number;
+  date: string;
+  revenue: number;
+  costBasis?: number;
+  fees: number;
+  shippingCost: number;
+  netProceeds: number;
+  realizedProfit?: number;
+  holdingDays?: number;
+}
+
+export interface RealizedPerformanceCurrency {
+  currency: string;
+  revenue: number;
+  costBasis: number;
+  fees: number;
+  shippingCost: number;
+  netProceeds: number;
+  realizedProfit: number;
+  saleCount: number;
+  costedSaleCount: number;
+  averageHoldingDays?: number;
+}
+
+export interface RealizedPerformanceBreakdown {
+  key: string;
+  currency: string;
+  revenue: number;
+  realizedProfit: number;
+  saleCount: number;
+}
+
+export interface RealizedPerformance {
+  byCurrency: RealizedPerformanceCurrency[];
+  byPlatform: RealizedPerformanceBreakdown[];
+  byGame: RealizedPerformanceBreakdown[];
+  recentSales: RealizedSaleMetric[];
+  bestReturns: RealizedSaleMetric[];
+  worstReturns: RealizedSaleMetric[];
+  fastestSales: RealizedSaleMetric[];
+  inventoryCost: number;
+  inventoryMarketValue: number;
+  inventoryCurrency: string;
+  truncated: boolean;
 }
 
 export interface ShopConnectionResponse {

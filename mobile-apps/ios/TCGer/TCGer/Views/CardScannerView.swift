@@ -102,6 +102,8 @@ struct CardScannerView: View {
     @AppStorage("cardScannerAutomaticallyShowResults") private var automaticallyShowResults = false
     @AppStorage("binderScanner.savePageImages") private var savesBinderPageImages = true
     @AppStorage("binderScanner.replacePageImages") private var replacesBinderPageImages = true
+    @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
+    @AppStorage("scanner.defaultLanguage") private var sharedSessionLanguage = "English"
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
     @State private var photoPickerMode: ScannerPhotoPickerMode?
@@ -111,6 +113,7 @@ struct CardScannerView: View {
     @State private var showingSessionReview = false
     @State private var didApplyBinderStart = false
     @State private var pendingCaptureMode: ScannerCaptureMode?
+    @State private var sharedSessionSyncedIDs: Set<CardScanResult.ID> = []
     let scope: CardScanScope?
     let startingBinderID: String?
     let startingBinderPageNumber: Int?
@@ -180,6 +183,9 @@ struct CardScannerView: View {
         .onChange(of: selectedPhotoItems, initial: false) { _, items in
             guard !items.isEmpty else { return }
             Task { await scanSelectedPhotos(items) }
+        }
+        .onChange(of: viewModel.sessionResults.map(\.id), initial: false) { _, _ in
+            Task { await syncNewResultsToSharedSession() }
         }
         .photosPicker(
             isPresented: photoPickerIsPresented,
@@ -270,6 +276,29 @@ struct CardScannerView: View {
         viewModel.captureMode = .binder
         viewModel.selectedBinderID = startingBinderID
         viewModel.setNextBinderPageNumber(startingBinderPageNumber)
+    }
+
+    @MainActor
+    private func syncNewResultsToSharedSession() async {
+        let code = sharedSessionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty,
+              !environmentStore.serverConfiguration.isOnDevice,
+              environmentStore.authToken != nil else { return }
+        for result in viewModel.sessionResults where !sharedSessionSyncedIDs.contains(result.id) {
+            do {
+                try await APIService().sendToSharedScanSession(
+                    config: environmentStore.serverConfiguration,
+                    token: environmentStore.authToken,
+                    code: code,
+                    result: result,
+                    language: sharedSessionLanguage
+                )
+                sharedSessionSyncedIDs.insert(result.id)
+            } catch {
+                // Keep the item unsynced so the next scan or manual review can retry it.
+                return
+            }
+        }
     }
 
     @ViewBuilder

@@ -81,6 +81,14 @@ export function registerFinanceRoutes(http: HttpRouter) {
             "platform",
             "notes",
           ]) ||
+          ["costBasis", "fees", "shippingCost"].some(
+            (field) =>
+              body[field] !== undefined &&
+              (typeof body[field] !== "number" ||
+                !Number.isFinite(body[field]) ||
+                (body[field] as number) < 0),
+          ) ||
+          (body.acquiredAt !== undefined && !isIsoDateTime(body.acquiredAt)) ||
           (body.currency !== undefined &&
             !/^[A-Za-z]{3}$/.test(body.currency as string))
         ) {
@@ -103,6 +111,10 @@ export function registerFinanceRoutes(http: HttpRouter) {
             amount: body.amount,
             currency: body.currency as string | undefined,
             platform: body.platform as string | undefined,
+            costBasis: body.costBasis as number | undefined,
+            fees: body.fees as number | undefined,
+            shippingCost: body.shippingCost as number | undefined,
+            acquiredAt: body.acquiredAt as string | undefined,
             notes: body.notes as string | undefined,
             date: body.date as string | undefined,
           },
@@ -135,6 +147,31 @@ export function registerFinanceRoutes(http: HttpRouter) {
         return noContent();
       } catch (error) {
         return handleConvexError(error, "Failed to delete transaction");
+      }
+    }),
+  });
+
+  http.route({
+    path: "/finance/realized-performance",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const rawPeriod = new URL(request.url).searchParams.get("periodDays");
+        const periodDays = rawPeriod === null ? undefined : Number(rawPeriod);
+        if (
+          periodDays !== undefined &&
+          (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 3_650)
+        ) {
+          return errorJson(400, "VALIDATION_ERROR", "periodDays must be a whole number from 1 to 3650");
+        }
+        const performance = await ctx.runQuery(
+          internal.finance.getRealizedPerformance,
+          { subject: identity.subject, periodDays },
+        );
+        return json(performance);
+      } catch (error) {
+        return handleConvexError(error, "Failed to fetch realized performance");
       }
     }),
   });

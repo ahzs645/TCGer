@@ -22,6 +22,7 @@ import {
   ReceiptText,
   BookOpen,
   Bell,
+  QrCode,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ServerFeatures } from "@tcg/api-types";
@@ -36,6 +37,12 @@ interface NavigationItem {
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
 export const secondaryNavigation: NavigationItem[] = [
+  {
+    href: "/online-codes",
+    label: "Code Vault",
+    icon: QrCode,
+    feature: "onlineCodes",
+  },
   { href: "/pokedex", label: "Pokédex", icon: BookOpen },
   { href: "/guides", label: "Guides", icon: Palette },
   { href: "/sets", label: "Sets", icon: LibraryBig },
@@ -152,6 +159,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
     ...(demoMode ? demoOnlySecondaryNavigation : []),
   ].filter(
     (item) =>
+      (item.href !== "/online-codes" || !demoMode) &&
       (item.href !== "/sealed" || sealedProductsEnabled) &&
       (demoMode || !item.feature || isFeatureAvailable(features, item.feature)),
   );

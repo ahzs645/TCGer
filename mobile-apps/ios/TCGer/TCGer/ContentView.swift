@@ -115,6 +115,8 @@ struct ContentView: View {
             CollectionGuidesView(parentProvidesNavigation: parentProvidesNavigation)
         case .sealed:
             SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
+        case .onlineCodes:
+            OnlineCodesView(parentProvidesNavigation: parentProvidesNavigation)
         case .prices:
             PricesView(parentProvidesNavigation: parentProvidesNavigation)
         case .analytics:
@@ -140,6 +142,8 @@ struct ContentView: View {
             return environmentStore.isAuthenticated || canViewCollectionsWithoutAuth
         case .sealed:
             return environmentStore.serverFeatures.sealed && environmentStore.isAuthenticated
+        case .onlineCodes:
+            return environmentStore.serverFeatures.onlineCodes && environmentStore.isAuthenticated
         case .sets, .pokedex, .decks, .wishlists, .guides, .prices, .analytics, .trades, .activity, .scan:
             return environmentStore.isAuthenticated
         }

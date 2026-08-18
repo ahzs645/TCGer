@@ -39,6 +39,7 @@ extension APIService {
     private struct TrackedPricesRequest: Encodable {
         let items: [TrackedPriceItem]
         let force: Bool
+        let source: String
     }
 
     func getTrackedPrices(
@@ -57,6 +58,9 @@ extension APIService {
             return try await getOnDeviceTrackedPrices(items: uniqueItems, force: force)
         }
 
+        let selectedSource = PricingSource.selected()
+        let serverSource = selectedSource.isServerSelectable ? selectedSource : .automatic
+
         var responses: [TrackedPricesResponse] = []
         for start in stride(from: 0, to: uniqueItems.count, by: 100) {
             let end = min(start + 100, uniqueItems.count)
@@ -65,7 +69,11 @@ extension APIService {
                 path: "prices/tracked",
                 method: "POST",
                 token: token,
-                body: TrackedPricesRequest(items: Array(uniqueItems[start..<end]), force: force)
+                body: TrackedPricesRequest(
+                    items: Array(uniqueItems[start..<end]),
+                    force: force,
+                    source: serverSource.rawValue
+                )
             )
             guard response.statusCode == 200 else {
                 if response.statusCode == 401 { throw APIError.unauthorized }
@@ -91,9 +99,11 @@ extension APIService {
         force: Bool
     ) async throws -> TrackedPricesResponse {
         let now = Date()
+        let source = PricingSource.selected()
         var results: [TrackedPriceResult] = []
         for item in items {
-            if let cached = await OnDeviceTrackedPriceCache.shared.result(for: item.key, force: force) {
+            let cacheKey = "\(source.rawValue):\(item.key)"
+            if let cached = await OnDeviceTrackedPriceCache.shared.result(for: cacheKey, force: force) {
                 results.append(cached.withCached(true))
                 continue
             }
@@ -111,7 +121,7 @@ extension APIService {
                 error: quote == nil ? "No compatible on-device market quote is available" : nil
             )
             if quote != nil {
-                await OnDeviceTrackedPriceCache.shared.save(result, for: item.key, forced: force)
+                await OnDeviceTrackedPriceCache.shared.save(result, for: cacheKey, forced: force)
             }
             results.append(result)
         }

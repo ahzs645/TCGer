@@ -756,9 +756,9 @@ struct CollectionDetailView: View {
             }
         }
         .sheet(item: $cardToSell) { card in
-            MarkAsSoldSheet(card: card) { amount, platform, removeFromBinder in
+            MarkAsSoldSheet(card: card) { sale in
                 Task {
-                    await markCardAsSold(card: card, amount: amount, platform: platform, removeFromBinder: removeFromBinder)
+                    await markCardAsSold(card: card, sale: sale)
                 }
             }
         }
@@ -1369,7 +1369,7 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
-    private func markCardAsSold(card: CollectionCard, amount: Double, platform: String?, removeFromBinder: Bool) async {
+    private func markCardAsSold(card: CollectionCard, sale: SaleDetails) async {
         guard let token = environmentStore.authToken else { return }
 
         do {
@@ -1380,11 +1380,15 @@ struct CollectionDetailView: View {
                 cardName: card.name,
                 tcg: card.tcg,
                 quantity: card.quantity,
-                amount: amount,
-                platform: platform
+                amount: sale.amount,
+                platform: sale.platform,
+                costBasis: sale.costBasis,
+                fees: sale.fees,
+                shippingCost: sale.shippingCost,
+                acquiredAt: sale.acquiredAt
             )
 
-            if removeFromBinder {
+            if sale.removeFromBinder {
                 try await apiService.deleteCardFromBinder(
                     config: environmentStore.serverConfiguration,
                     token: token,

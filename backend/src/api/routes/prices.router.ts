@@ -3,12 +3,17 @@ import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
 import { fetchLiveCardPrices } from '../../modules/pricing/live-pricing.service';
 import { env } from '../../config/env';
-import { trackedPricesRequestSchema } from '@tcg/api-types';
+import { priceSourceSchema, trackedPricesRequestSchema } from '@tcg/api-types';
 import { trackedPricingService } from '../../modules/pricing/tracked-pricing.service';
+import { getPriceSourceCatalog } from '../../modules/pricing/price-source-catalog';
 
 export const pricesRouter = Router();
 
 pricesRouter.use(requireAuth);
+
+pricesRouter.get('/sources', (_req, res) => {
+  res.json(getPriceSourceCatalog());
+});
 
 // Get price movers
 pricesRouter.get(
@@ -34,7 +39,7 @@ pricesRouter.post(
   '/tracked',
   asyncHandler(async (req, res) => {
     const input = trackedPricesRequestSchema.parse(req.body);
-    res.json(await trackedPricingService.getTrackedPrices(input.items, input.force));
+    res.json(await trackedPricingService.getTrackedPrices(input.items, input.force, input.source));
   }),
 );
 
@@ -44,12 +49,16 @@ pricesRouter.get(
   asyncHandler(async (req, res) => {
     const { tcg, cardId } = req.params;
     const finishCode = typeof req.query.finish === 'string' ? req.query.finish : undefined;
+    const parsedSource = priceSourceSchema.safeParse(req.query.source ?? 'automatic');
+    if (!parsedSource.success) {
+      return res.status(400).json({ message: 'Unsupported price source' });
+    }
     const prices =
       env.BACKEND_MODE === 'convex'
-        ? await fetchLiveCardPrices(tcg, cardId, finishCode)
+        ? await fetchLiveCardPrices(tcg, cardId, finishCode, parsedSource.data)
         : await (
             await import('../../modules/pricing/pricing.service')
-          ).fetchCardPrices(tcg, cardId, finishCode);
+          ).fetchCardPrices(tcg, cardId, finishCode, parsedSource.data);
     res.json(prices);
   }),
 );

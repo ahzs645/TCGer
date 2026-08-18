@@ -148,10 +148,12 @@ final class LocalStore {
     private var wishlists: [Wishlist]
     private var sealedProducts: [SealedProduct]
     private var sealedInventory: [SealedInventoryItem]
+    private var onlineCodes: [OnlineCode]
     private var transactions: [Transaction]
     private var nextWishlistId: Int
     private var nextWishlistRuleId: Int
     private var nextTransactionId: Int
+    private var nextOnlineCodeId: Int
 
     /// True once the user has explicitly asked for the sample collection.
     /// Phone-only mode is a real, empty collection until they do.
@@ -216,9 +218,11 @@ final class LocalStore {
         self.nextWishlistId = 1
         self.nextWishlistRuleId = 1
         self.nextTransactionId = 1
+        self.nextOnlineCodeId = 1
         self.wishlists = []
         self.sealedProducts = []
         self.sealedInventory = []
+        self.onlineCodes = []
         self.transactions = []
         self.sampleDataLoaded = false
         seedBaseline()
@@ -239,6 +243,8 @@ final class LocalStore {
         var tags: [CollectionCardTag]
         var wishlists: [Wishlist]
         var sealedInventory: [SealedInventoryItem]
+        /// Absent in stores written before online-code tracking shipped.
+        var onlineCodes: [OnlineCode]?
         var transactions: [Transaction]
         var nextBinderId: Int
         var nextCollectionCardId: Int
@@ -248,6 +254,7 @@ final class LocalStore {
         /// Absent in stores written before smart wishlists shipped.
         var nextWishlistRuleId: Int?
         var nextTransactionId: Int
+        var nextOnlineCodeId: Int?
         var user: User?
         var preferences: APIService.UserPreferences?
         var appSettings: AppSettings?
@@ -274,6 +281,7 @@ final class LocalStore {
         tags = state.tags
         wishlists = state.wishlists
         sealedInventory = state.sealedInventory
+        onlineCodes = state.onlineCodes ?? []
         transactions = state.transactions
         nextBinderId = state.nextBinderId
         nextCollectionCardId = state.nextCollectionCardId
@@ -282,6 +290,7 @@ final class LocalStore {
         nextWishlistId = state.nextWishlistId
         nextWishlistRuleId = state.nextWishlistRuleId ?? 1
         nextTransactionId = state.nextTransactionId
+        nextOnlineCodeId = state.nextOnlineCodeId ?? 1
         sampleDataLoaded = state.sampleDataLoaded ?? true
         if let preferences = state.preferences { self.preferences = preferences }
 
@@ -312,6 +321,7 @@ final class LocalStore {
             tags: tags,
             wishlists: wishlists,
             sealedInventory: sealedInventory,
+            onlineCodes: onlineCodes,
             transactions: transactions,
             nextBinderId: nextBinderId,
             nextCollectionCardId: nextCollectionCardId,
@@ -320,6 +330,7 @@ final class LocalStore {
             nextWishlistId: nextWishlistId,
             nextWishlistRuleId: nextWishlistRuleId,
             nextTransactionId: nextTransactionId,
+            nextOnlineCodeId: nextOnlineCodeId,
             user: user,
             preferences: preferences,
             appSettings: appSettings,
@@ -422,6 +433,7 @@ final class LocalStore {
         binderPages = []
         wishlists = []
         sealedInventory = []
+        onlineCodes = []
         transactions = []
         tags = LocalStore.starterTags
         searchCatalog = []
@@ -433,6 +445,7 @@ final class LocalStore {
         nextWishlistId = 1
         nextWishlistRuleId = 1
         nextTransactionId = 1
+        nextOnlineCodeId = 1
         sampleDataLoaded = false
         seedBaseline()
         persist()
@@ -2773,6 +2786,131 @@ final class LocalStore {
         )
     }
 
+    // MARK: - Online Code Accessors
+
+    func getOnlineCodes(tcg: String? = nil) -> [OnlineCode] {
+        onlineCodes
+            .filter { tcg == nil || $0.tcg == tcg }
+            .sorted { $0.capturedAt > $1.capturedAt }
+    }
+
+    func createOnlineCodes(
+        tcg: String,
+        codes: [String],
+        source: OnlineCodeSource,
+        productName: String?,
+        notes: String?
+    ) throws -> OnlineCodeBatchResult {
+        guard !codes.isEmpty, codes.count <= 250 else {
+            throw APIService.APIError.serverError(
+                status: 400,
+                message: "A batch must contain 1 to 250 codes."
+            )
+        }
+
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let cleanedProduct = nonemptyOnlineCodeText(productName)
+        let cleanedNotes = nonemptyOnlineCodeText(notes)
+        var created: [OnlineCode] = []
+        var duplicates = 0
+        var seen = Set(
+            onlineCodes
+                .filter { $0.tcg == tcg }
+                .map { normalizeOnlineCode($0.code) }
+        )
+
+        for rawCode in codes {
+            let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = normalizeOnlineCode(code)
+            guard normalized.count >= 4, code.count <= 512 else {
+                throw APIService.APIError.serverError(
+                    status: 400,
+                    message: "Each code must contain 4 to 512 characters."
+                )
+            }
+            guard seen.insert(normalized).inserted else {
+                duplicates += 1
+                continue
+            }
+
+            let item = OnlineCode(
+                id: "local-online-code-\(nextOnlineCodeId)",
+                tcg: tcg,
+                code: code,
+                status: .unused,
+                source: source,
+                productName: cleanedProduct,
+                notes: cleanedNotes,
+                capturedAt: now,
+                redeemedAt: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+            nextOnlineCodeId += 1
+            onlineCodes.insert(item, at: 0)
+            created.append(item)
+        }
+
+        try persistOrThrow()
+        return OnlineCodeBatchResult(
+            created: created.count,
+            duplicates: duplicates,
+            items: created
+        )
+    }
+
+    func updateOnlineCode(
+        id: String,
+        status: OnlineCodeStatus,
+        productName: String?,
+        notes: String?,
+        updateDetails: Bool
+    ) throws -> OnlineCode {
+        guard let index = onlineCodes.firstIndex(where: { $0.id == id }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Online code not found.")
+        }
+        let current = onlineCodes[index]
+        let now = LocalStore.isoFormatter.string(from: Date())
+        let updated = OnlineCode(
+            id: current.id,
+            tcg: current.tcg,
+            code: current.code,
+            status: status,
+            source: current.source,
+            productName: updateDetails
+                ? nonemptyOnlineCodeText(productName)
+                : current.productName,
+            notes: updateDetails ? nonemptyOnlineCodeText(notes) : current.notes,
+            capturedAt: current.capturedAt,
+            redeemedAt: status == .redeemed ? current.redeemedAt ?? now : nil,
+            createdAt: current.createdAt,
+            updatedAt: now
+        )
+        onlineCodes[index] = updated
+        try persistOrThrow()
+        return updated
+    }
+
+    func deleteOnlineCode(id: String) throws {
+        guard onlineCodes.contains(where: { $0.id == id }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Online code not found.")
+        }
+        onlineCodes.removeAll { $0.id == id }
+        try persistOrThrow()
+    }
+
+    private func normalizeOnlineCode(_ value: String) -> String {
+        value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+            .uppercased()
+    }
+
+    private func nonemptyOnlineCodeText(_ value: String?) -> String? {
+        let cleaned = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned?.isEmpty == false ? cleaned : nil
+    }
+
     // MARK: - Sealed Accessors
 
     func getSealedProducts() -> [SealedProduct] {
@@ -2833,13 +2971,56 @@ final class LocalStore {
         return FinanceSummary(totalSpent: spent, totalEarned: earned, profitLoss: earned - spent, transactionCount: transactions.count)
     }
 
-    func createTransaction(type: String, cardName: String?, tcg: String?, quantity: Int, amount: Double, platform: String?, notes: String?) -> Transaction {
+    func createTransaction(
+        type: String,
+        cardName: String?,
+        tcg: String?,
+        quantity: Int,
+        amount: Double,
+        platform: String?,
+        costBasis: Double?,
+        fees: Double?,
+        shippingCost: Double?,
+        acquiredAt: String?,
+        notes: String?
+    ) -> Transaction {
         let now = LocalStore.isoFormatter.string(from: Date())
-        let txn = Transaction(id: "local-txn-\(nextTransactionId)", type: type, cardName: cardName, tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform, notes: notes, date: now)
+        let netProceeds = type == "sale" ? amount - (fees ?? 0) - (shippingCost ?? 0) : nil
+        let txn = Transaction(
+            id: "local-txn-\(nextTransactionId)", type: type, cardName: cardName,
+            tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform,
+            costBasis: costBasis, fees: fees, shippingCost: shippingCost, acquiredAt: acquiredAt,
+            netProceeds: netProceeds,
+            realizedProfit: costBasis.map { (netProceeds ?? amount) - $0 },
+            notes: notes, date: now
+        )
         nextTransactionId += 1
         transactions.insert(txn, at: 0)
         persist()
         return txn
+    }
+
+    func getRealizedPerformance() -> RealizedPerformance {
+        let sales = transactions.filter { $0.type == "sale" }
+        let revenue = sales.reduce(0.0) { $0 + $1.amount }
+        let fees = sales.reduce(0.0) { $0 + ($1.fees ?? 0) }
+        let shipping = sales.reduce(0.0) { $0 + ($1.shippingCost ?? 0) }
+        let costed = sales.filter { $0.costBasis != nil }
+        let costBasis = costed.reduce(0.0) { $0 + ($1.costBasis ?? 0) }
+        let realized = costed.reduce(0.0) { $0 + ($1.realizedProfit ?? 0) }
+        let inventoryCards = collections.flatMap(\.cards).flatMap(\.copies)
+        return RealizedPerformance(
+            byCurrency: [RealizedPerformanceCurrency(
+                currency: "USD", revenue: revenue, costBasis: costBasis, fees: fees,
+                shippingCost: shipping, netProceeds: revenue - fees - shipping,
+                realizedProfit: realized, saleCount: sales.count,
+                costedSaleCount: costed.count, averageHoldingDays: nil
+            )],
+            inventoryCost: inventoryCards.reduce(0.0) { $0 + ($1.acquisitionPrice ?? 0) },
+            inventoryMarketValue: collections.flatMap(\.cards).reduce(0.0) { $0 + ($1.price ?? 0) * Double($1.quantity) },
+            inventoryCurrency: "USD",
+            truncated: false
+        )
     }
 
     func deleteTransaction(id: String) {

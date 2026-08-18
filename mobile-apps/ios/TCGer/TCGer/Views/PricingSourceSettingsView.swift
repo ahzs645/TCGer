@@ -3,6 +3,7 @@ import SwiftUI
 struct PricingSourceSettingsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var configuration: APIService.PricingSourceConfiguration?
+    @State private var availableOptions: [APIService.PriceSourceOption] = []
     @State private var isLoading = false
     @State private var isTesting = false
     @State private var testResult: APIService.TestSourceResult?
@@ -35,6 +36,10 @@ struct PricingSourceSettingsView: View {
         environmentStore.pricingSource
     }
 
+    private var selectedOption: APIService.PriceSourceOption? {
+        availableOptions.first { $0.id == selectedSource }
+    }
+
     var body: some View {
         Form {
             sourceSelectionSection
@@ -49,15 +54,21 @@ struct PricingSourceSettingsView: View {
             case .collectrPrivateTest:
                 collectrSessionSection
                 collectrMappingSection
+            default:
+                EmptyView()
             }
-            connectionSection
+            if selectedSource == .justTCG || selectedSource == .collectrPrivateTest {
+                connectionSection
+            }
         }
         .navigationTitle("Pricing Source")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            await loadAvailableSources()
             await loadConfiguration()
         }
         .refreshable {
+            await loadAvailableSources()
             await loadConfiguration()
         }
         .onChange(of: environmentStore.pricingSource) {
@@ -87,9 +98,9 @@ struct PricingSourceSettingsView: View {
     private var sourceSelectionSection: some View {
         Section {
             Picker("Price Provider", selection: $environmentStore.pricingSource) {
-                ForEach(PricingSource.allCases) { source in
-                    Text(source.displayName)
-                        .tag(source)
+                ForEach(availableOptions) { option in
+                    Text(option.label)
+                        .tag(option.id)
                 }
             }
             .pickerStyle(.navigationLink)
@@ -111,9 +122,7 @@ struct PricingSourceSettingsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(configuration?.label ?? selectedSource.displayName)
                         .font(.headline)
-                    Text(selectedSource == .justTCG
-                        ? "Pokémon, Magic, Yu-Gi-Oh!, and more"
-                        : "Live prices from explicitly mapped Collectr products")
+                    Text(selectedOption?.description ?? "Configured market pricing source")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -146,7 +155,7 @@ struct PricingSourceSettingsView: View {
             }
 
             if selectedSource == .justTCG {
-                Text("Use JustTCG paid as the primary commercial provider. It covers Pokémon, Magic, Yu-Gi-Oh!, and other games, with condition and printing variants plus price history. Its paid commercial terms allow TCGer to display, cache, derive valuations, and combine prices with other lawful sources.")
+                Text("Use JustTCG paid for Magic pricing in the current TCGer integration, including Near Mint regular and foil variants. Its commercial plan supports server-side display and cached valuations.")
                     .font(.subheadline)
 
                 Link(destination: URL(string: "https://justtcg.com/docs/quickstart")!) {
@@ -164,7 +173,7 @@ struct PricingSourceSettingsView: View {
                 Link(destination: URL(string: "https://justtcg.com")!) {
                     Label("Create or Manage API Key", systemImage: "key")
                 }
-            } else {
+            } else if selectedSource == .collectrPrivateTest {
                 Label {
                     Text("Private-build experiment. It makes live requests using session headers you capture from your own Collectr account. TCGer does not derive or embed X-COLLECTR-KEY.")
                         .font(.subheadline)
@@ -180,8 +189,12 @@ struct PricingSourceSettingsView: View {
                 Text(isOnDevice
                     ? "Phone-only mode uses a personal paid JustTCG key from this iPhone. It never becomes part of your collection export or iCloud preferences."
                     : "TCGer uses the paid JustTCG plan for commercial pricing. The API key stays on your server and is never downloaded to this iPhone.")
-            } else {
+            } else if selectedSource == .collectrPrivateTest {
                 Text("Session values are stored in this iPhone's non-synchronizing Keychain. Only cards with an explicit Collectr product-ID mapping make requests.")
+            } else if let selectedOption {
+                Text(selectedOption.games.isEmpty
+                    ? "This server can use the source for every compatible card."
+                    : "Available for: \(selectedOption.games.map(\.capitalized).joined(separator: ", ")).")
             }
         }
     }
@@ -510,6 +523,34 @@ struct PricingSourceSettingsView: View {
         } catch is CancellationError {
             return
         } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadAvailableSources() async {
+        let token = isOnDevice ? nil : environmentStore.authToken
+        do {
+            let catalog = try await api.getAvailablePriceSources(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            availableOptions = catalog.sources
+            if !catalog.sources.contains(where: { $0.id == selectedSource }) {
+                environmentStore.pricingSource = catalog.defaultSource
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            availableOptions = isOnDevice
+                ? [APIService.PriceSourceOption(
+                    id: .justTCG,
+                    label: "JustTCG (Personal Key)",
+                    description: "Direct pricing using a personal key stored only on this iPhone.",
+                    games: ["magic"],
+                    requiresServer: false
+                )]
+                : []
             errorMessage = error.localizedDescription
         }
     }

@@ -3,6 +3,7 @@ import type {
   TransactionResponse,
   FinanceSummary,
   FinanceSummaryByCurrency,
+  RealizedPerformance,
   ShopConnectionResponse,
   CreatePriceAlertInput,
   UpdatePriceAlertInput,
@@ -12,6 +13,8 @@ import type {
   PriceAnalyticsMovers,
   TrackedPriceItem,
   TrackedPricesResponse,
+  PriceSource,
+  PriceSourcesResponse,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -20,11 +23,14 @@ export type {
   TransactionResponse,
   FinanceSummary,
   FinanceSummaryByCurrency,
+  RealizedPerformance,
   ShopConnectionResponse,
   PriceResult,
   PriceAnalyticsMovers,
   TrackedPriceItem,
   TrackedPricesResponse,
+  PriceSource,
+  PriceSourcesResponse,
 };
 
 async function authFetch(
@@ -112,6 +118,16 @@ export async function getFinanceSummaryByCurrency(
 ): Promise<FinanceSummaryByCurrency> {
   return authFetch(`${API_BASE_URL}/finance/summary/by-currency`, token);
 }
+export async function getRealizedPerformance(
+  token: string,
+  periodDays?: number,
+): Promise<RealizedPerformance> {
+  const query = periodDays ? `?periodDays=${periodDays}` : "";
+  return authFetch(
+    `${API_BASE_URL}/finance/realized-performance${query}`,
+    token,
+  );
+}
 
 // Shop Connections
 export async function getShopConnections(
@@ -148,9 +164,11 @@ export async function getCardPrices(
   tcg: string,
   cardId: string,
   finishCode?: string,
+  source: PriceSource = "automatic",
 ): Promise<PriceResult[]> {
   const params = new URLSearchParams();
   if (finishCode) params.set("finish", finishCode);
+  params.set("source", source);
   const query = params.size ? `?${params.toString()}` : "";
   return authFetch(
     `${API_BASE_URL}/prices/${encodeURIComponent(tcg)}/${encodeURIComponent(cardId)}${query}`,
@@ -161,13 +179,18 @@ export async function getTrackedCardPrices(
   token: string,
   items: TrackedPriceItem[],
   force = false,
+  source: PriceSource = "automatic",
 ): Promise<TrackedPricesResponse> {
   const responses: TrackedPricesResponse[] = [];
   for (let index = 0; index < items.length; index += 100) {
     responses.push(
       await authFetch(`${API_BASE_URL}/prices/tracked`, token, {
         method: "POST",
-        body: JSON.stringify({ items: items.slice(index, index + 100), force }),
+        body: JSON.stringify({
+          items: items.slice(index, index + 100),
+          force,
+          source,
+        }),
       }),
     );
   }
@@ -184,6 +207,12 @@ export async function getTrackedCardPrices(
       responses[0].refreshAfter,
     ),
   };
+}
+
+export async function getPriceSources(
+  token: string,
+): Promise<PriceSourcesResponse> {
+  return authFetch(`${API_BASE_URL}/prices/sources`, token);
 }
 export async function getPriceMovers(
   token: string,

@@ -20,6 +20,7 @@ import {
 import type {
   CreateTransactionInput,
   FinanceSummaryByCurrency,
+  RealizedPerformance,
   TransactionResponse,
 } from "@tcg/api-types";
 
@@ -50,6 +51,7 @@ import {
   deleteTransaction,
   getTransactions,
   getFinanceSummaryByCurrency,
+  getRealizedPerformance,
 } from "@/lib/api/pricing";
 import { useAuthStore } from "@/stores/auth";
 
@@ -90,6 +92,8 @@ export function TransactionsContent() {
     byCurrency: [],
     transactionCount: 0,
   });
+  const [performance, setPerformance] = useState<RealizedPerformance | null>(null);
+  const [performancePeriod, setPerformancePeriod] = useState<number | undefined>(90);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -104,12 +108,14 @@ export function TransactionsContent() {
     setLoading(true);
     setError(null);
     try {
-      const [nextTransactions, nextSummary] = await Promise.all([
+      const [nextTransactions, nextSummary, nextPerformance] = await Promise.all([
         getTransactions(token),
         getFinanceSummaryByCurrency(token),
+        getRealizedPerformance(token, performancePeriod),
       ]);
       setTransactions(nextTransactions);
       setSummary(nextSummary);
+      setPerformance(nextPerformance);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -119,7 +125,7 @@ export function TransactionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [performancePeriod, token]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void load(), 0);
@@ -187,6 +193,13 @@ export function TransactionsContent() {
           <Metric label="Total earned" value={formatSummary("totalEarned")} />
           <Metric label="Net cash flow" value={formatSummary("profitLoss")} />
         </div>
+        {performance ? (
+          <PerformanceDashboard
+            performance={performance}
+            period={performancePeriod}
+            onPeriodChange={setPerformancePeriod}
+          />
+        ) : null}
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle asChild>
@@ -279,8 +292,10 @@ export function TransactionsContent() {
                                 : ""}
                             {money(transaction.amount, transaction.currency)}
                           </p>
-                          <p className="text-xs capitalize text-muted-foreground">
-                            {config.label}
+                          <p className="text-xs text-muted-foreground">
+                            {transaction.realizedProfit === undefined
+                              ? config.label
+                              : `${transaction.realizedProfit >= 0 ? "+" : "−"}${money(Math.abs(transaction.realizedProfit), transaction.currency)} realized`}
                           </p>
                         </div>
                         <Button
@@ -323,6 +338,145 @@ export function TransactionsContent() {
         onRefresh={() => void load()}
       />
     </AppShell>
+  );
+}
+
+function PerformanceDashboard({
+  performance,
+  period,
+  onPeriodChange,
+}: {
+  performance: RealizedPerformance;
+  period: number | undefined;
+  onPeriodChange: (period: number | undefined) => void;
+}) {
+  const currencyText = (
+    key: "revenue" | "netProceeds" | "realizedProfit" | "fees",
+  ) =>
+    performance.byCurrency.length
+      ? performance.byCurrency
+          .map((row) => money(row[key], row.currency))
+          .join(" · ")
+      : money(0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Select
+          value={period === undefined ? "all" : String(period)}
+          onValueChange={(value) => onPeriodChange(value === "all" ? undefined : Number(value))}
+        >
+          <SelectTrigger className="w-44" aria-label="Performance period"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="30">Last 30 days</SelectItem>
+            <SelectItem value="90">Last 90 days</SelectItem>
+            <SelectItem value="365">Last year</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Sales revenue" value={currencyText("revenue")} />
+        <Metric label="Net proceeds" value={currencyText("netProceeds")} />
+        <Metric label="Realized profit" value={currencyText("realizedProfit")} />
+        <Metric label="Fees" value={currencyText("fees")} />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle asChild><h2>Realized P&amp;L</h2></CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {performance.byCurrency.length ? performance.byCurrency.map((row) => (
+              <div key={row.currency} className="rounded-lg border p-3">
+                <div className="flex justify-between font-medium">
+                  <span>{row.currency}</span>
+                  <span>{money(row.realizedProfit, row.currency)}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {row.costedSaleCount} of {row.saleCount} sales have cost basis
+                  {row.averageHoldingDays === undefined ? "" : ` · ${row.averageHoldingDays} day average hold`}
+                </p>
+              </div>
+            )) : <p className="text-muted-foreground">Record a sale to see realized performance.</p>}
+          </CardContent>
+        </Card>
+        <BreakdownCard title="By platform" rows={performance.byPlatform} />
+        <BreakdownCard title="By game" rows={performance.byGame} />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle asChild><h2>Inventory position</h2></CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Acquisition cost</p>
+              <p className="text-xl font-semibold tabular-nums">{money(performance.inventoryCost, performance.inventoryCurrency)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Market value</p>
+              <p className="text-xl font-semibold tabular-nums">{money(performance.inventoryMarketValue, performance.inventoryCurrency)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle asChild><h2>Fastest sales</h2></CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {performance.fastestSales.length ? performance.fastestSales.map((sale) => (
+              <div key={sale.id} className="flex justify-between gap-3">
+                <span className="truncate">{sale.cardName || "Sale"}</span>
+                <span className="shrink-0 tabular-nums">{sale.holdingDays} days</span>
+              </div>
+            )) : <p className="text-muted-foreground">Add acquisition dates to calculate holding time.</p>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle asChild><h2>Best / worst returns</h2></CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <ReturnRow label="Best" sale={performance.bestReturns[0]} />
+            <ReturnRow label="Worst" sale={performance.worstReturns[0]} />
+            {!performance.bestReturns.length ? <p className="text-muted-foreground">Add acquisition cost to sales to compare returns.</p> : null}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function ReturnRow({
+  label,
+  sale,
+}: {
+  label: string;
+  sale: RealizedPerformance["bestReturns"][number] | undefined;
+}) {
+  if (!sale || sale.realizedProfit === undefined) return null;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="min-w-0 truncate"><span className="text-xs text-muted-foreground">{label}</span> · {sale.cardName || "Sale"}</span>
+      <span className="shrink-0 font-medium tabular-nums">{money(sale.realizedProfit, sale.currency)}</span>
+    </div>
+  );
+}
+
+function BreakdownCard({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: RealizedPerformance["byPlatform"];
+}) {
+  return (
+    <Card>
+      <CardHeader><CardTitle asChild><h2>{title}</h2></CardTitle></CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {rows.length ? rows.slice(0, 6).map((row) => (
+          <div key={`${row.currency}-${row.key}`} className="flex items-center justify-between gap-3">
+            <span className="truncate">{row.key} <span className="text-xs text-muted-foreground">({row.saleCount})</span></span>
+            <span className="shrink-0 font-medium tabular-nums">{money(row.realizedProfit, row.currency)}</span>
+          </div>
+        )) : <p className="text-muted-foreground">No sales yet.</p>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -371,6 +525,10 @@ function CreateTransactionDialog({
     tcg: "pokemon",
     quantity: "1",
     amount: "",
+    costBasis: "",
+    fees: "",
+    shippingCost: "",
+    acquiredAt: "",
     currency: "USD",
     platform: "",
     date: new Date().toISOString().slice(0, 10),
@@ -410,6 +568,12 @@ function CreateTransactionDialog({
         tcg: form.tcg || undefined,
         quantity,
         amount,
+        costBasis: form.costBasis.trim() ? Number(form.costBasis) : undefined,
+        fees: form.fees.trim() ? Number(form.fees) : undefined,
+        shippingCost: form.shippingCost.trim() ? Number(form.shippingCost) : undefined,
+        acquiredAt: form.acquiredAt
+          ? new Date(`${form.acquiredAt}T12:00:00`).toISOString()
+          : undefined,
         currency: form.currency.trim().toUpperCase() || "USD",
         platform: form.platform.trim() || undefined,
         notes: form.notes.trim() || undefined,
@@ -426,6 +590,10 @@ function CreateTransactionDialog({
         cardName: "",
         quantity: "1",
         amount: "",
+        costBasis: "",
+        fees: "",
+        shippingCost: "",
+        acquiredAt: "",
         platform: "",
         notes: "",
       }));
@@ -541,6 +709,51 @@ function CreateTransactionDialog({
                 placeholder="0.00"
               />
             </Field>
+            {form.type === "sale" ? (
+              <>
+                <Field id={fieldId("costBasis")} label="Acquisition cost">
+                  <Input
+                    id={fieldId("costBasis")}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.costBasis}
+                    onChange={(event) => setForm({ ...form, costBasis: event.target.value })}
+                    placeholder="Optional"
+                  />
+                </Field>
+                <Field id={fieldId("fees")} label="Marketplace fees">
+                  <Input
+                    id={fieldId("fees")}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.fees}
+                    onChange={(event) => setForm({ ...form, fees: event.target.value })}
+                    placeholder="0.00"
+                  />
+                </Field>
+                <Field id={fieldId("shipping")} label="Shipping cost">
+                  <Input
+                    id={fieldId("shipping")}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.shippingCost}
+                    onChange={(event) => setForm({ ...form, shippingCost: event.target.value })}
+                    placeholder="0.00"
+                  />
+                </Field>
+                <Field id={fieldId("acquiredAt")} label="Acquired date">
+                  <Input
+                    id={fieldId("acquiredAt")}
+                    type="date"
+                    value={form.acquiredAt}
+                    onChange={(event) => setForm({ ...form, acquiredAt: event.target.value })}
+                  />
+                </Field>
+              </>
+            ) : null}
             <Field id={fieldId("currency")} label="Currency">
               <Input
                 id={fieldId("currency")}

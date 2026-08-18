@@ -648,8 +648,8 @@ video {
 .h-\[calc\(100dvh-15rem\)\] {
   height: calc(100dvh - 15rem);
 }
-.h-dvh {
-  height: 100dvh;
+.h-full {
+  height: 100%;
 }
 .min-h-0 {
   min-height: 0px;

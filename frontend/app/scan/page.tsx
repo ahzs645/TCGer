@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { CardScanPanel } from "@/components/scan/card-scan-panel";
 import { VideoScanLab } from "@/components/scan/video-scan-lab";
+import { SharedScanSessionPanel } from "@/components/scan/shared-scan-session";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -27,9 +28,10 @@ export default function ScanPage() {
           </p>
         </div>
         <Tabs defaultValue="video" className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-xl grid-cols-3">
             <TabsTrigger value="video">Video Mode</TabsTrigger>
             <TabsTrigger value="image">Image Mode</TabsTrigger>
+            <TabsTrigger value="shared">iPhone Session</TabsTrigger>
           </TabsList>
 
           <TabsContent value="video" className="space-y-3">
@@ -61,6 +63,10 @@ export default function ScanPage() {
               </p>
             </div>
             <CardScanPanel data-oid="ojjtkru" />
+          </TabsContent>
+
+          <TabsContent value="shared" className="space-y-3">
+            <SharedScanSessionPanel />
           </TabsContent>
         </Tabs>
       </div>

@@ -71,12 +71,17 @@ export default function PricesPage() {
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore(
-    useShallow((state) => ({
-      enabledGames: state.enabledGames,
-      showPricing: state.showPricing,
-    })),
-  );
+  const { enabledGames, showPricing, priceSource, hydratePriceSource } =
+    useModuleStore(
+      useShallow((state) => ({
+        enabledGames: state.enabledGames,
+        showPricing: state.showPricing,
+        priceSource: state.priceSource,
+        hydratePriceSource: state.hydratePriceSource,
+      })),
+    );
+
+  useEffect(() => hydratePriceSource(), [hydratePriceSource]);
 
   const { collections, fetchCollections, isLoading, hasFetched, error } =
     useCollectionsStore(
@@ -128,11 +133,11 @@ export default function PricesPage() {
   }, [collections, enabledGames, selectedGame]);
 
   const trackedPricesQuery = useQuery({
-    queryKey: ["prices", "tracked", trackedItems],
+    queryKey: ["prices", "tracked", priceSource, trackedItems],
     queryFn: async () => {
       const force = forceNextRefresh.current;
       forceNextRefresh.current = false;
-      return getTrackedCardPrices(token!, trackedItems, force);
+      return getTrackedCardPrices(token!, trackedItems, force, priceSource);
     },
     enabled:
       mounted &&
@@ -287,7 +292,8 @@ export default function PricesPage() {
             </h1>
             <p className="text-sm text-muted-foreground">
               Collection cards are checked on the server&apos;s refresh schedule
-              while this page is open.
+              while this page is open. Source:{" "}
+              {priceSource === "automatic" ? "best available" : priceSource}.
             </p>
             {trackedPricesQuery.data && (
               <p className="mt-1 text-xs text-muted-foreground">

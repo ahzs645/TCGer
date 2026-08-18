@@ -19,6 +19,8 @@ import { usersRouter } from './users.router';
 import { convexWishlistsRouter } from './wishlists.convex.router';
 import { convexDecksRouter } from './decks.convex.router';
 import { convexGuidesRouter } from './guides.convex.router';
+import { convexOnlineCodesRouter } from './online-codes.convex.router';
+import { convexScanSessionsRouter } from './scan-sessions.convex.router';
 
 async function loadCollectionsRouter(): Promise<ExpressRouter> {
   if (env.BACKEND_MODE === 'convex' || env.COLLECTIONS_BACKEND === 'convex') {
@@ -98,6 +100,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/guides', convexGuidesRouter);
   app.use('/news', newsRouter);
   app.use('/prices', pricesRouter);
+  app.use('/online-codes', convexOnlineCodesRouter);
+  app.use('/scan-sessions', convexScanSessionsRouter);
 
   // Convex-native feature routers and explicit legacy-feature availability
   // signals, mounted only in full Convex mode.

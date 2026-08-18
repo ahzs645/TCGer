@@ -25,6 +25,13 @@ boundaries. They do not grant permission to copy code, models, indexes, or use
 private services. TCGer should reproduce useful general techniques with its
 own code and licensed assets.
 
+The August 18 review of four downloaded open-source scanner projects and one
+new detector dataset is recorded in the
+[open-source scanner project audit](scanner-open-source-project-audit-2026-08-18.md).
+Its two promoted ideas are exact-print footer constraints and temporal
+best-frame evidence; its new CC BY 4.0 detector dataset is archived in the
+Google Drive Reference library.
+
 ## Pipeline comparison
 
 | Boundary          | TCGer                                                                                      | Collectr                                          | ManaBox                                                   | Purplemana current                                               | Purplemana legacy                               |

@@ -541,6 +541,13 @@ const DEMO_TRANSACTIONS: TransactionResponse[] = [
     amount: 24,
     currency: "USD",
     platform: "eBay",
+    costBasis: 11,
+    fees: 3.12,
+    shippingCost: 1.35,
+    acquiredAt: "2025-01-04T16:00:00.000Z",
+    netProceeds: 19.53,
+    realizedProfit: 8.53,
+    holdingDays: 67,
     notes: "Tracked shipping included",
     date: "2025-03-12T16:00:00.000Z",
   },
@@ -1339,6 +1346,25 @@ export async function handleDemoRequest(
     return json(demoPriceMovers(tcg));
   }
 
+  if (
+    segments[0] === "prices" &&
+    segments[1] === "sources" &&
+    method === "GET"
+  ) {
+    return json({
+      sources: [
+        {
+          id: "automatic",
+          label: "Saved catalog prices",
+          description: "Use the prices included with the offline demo catalog.",
+          games: [],
+          requiresServer: false,
+        },
+      ],
+      defaultSource: "automatic",
+    });
+  }
+
   // ── Setup ───────────────────────────────────────────────────────
   if (segments[0] === "setup") {
     if (segments[1] === "setup-required" && method === "GET") {
@@ -1635,6 +1661,75 @@ function handleFinance(
       transactionCount: transactions.length,
     });
   }
+  if (segments[0] === "realized-performance" && method === "GET") {
+    const sales = transactions.filter((transaction) => transaction.type === "sale");
+    const metrics = sales.map((sale) => {
+      const fees = sale.fees ?? 0;
+      const shippingCost = sale.shippingCost ?? 0;
+      const netProceeds = sale.amount - fees - shippingCost;
+      return {
+        id: sale.id,
+        cardName: sale.cardName,
+        tcg: sale.tcg,
+        platform: sale.platform,
+        currency: sale.currency,
+        quantity: sale.quantity,
+        date: sale.date,
+        revenue: sale.amount,
+        costBasis: sale.costBasis,
+        fees,
+        shippingCost,
+        netProceeds,
+        realizedProfit: sale.costBasis === undefined ? undefined : netProceeds - sale.costBasis,
+        holdingDays: sale.holdingDays,
+      };
+    });
+    const byCurrency = new Map<string, typeof metrics>();
+    for (const metric of metrics) {
+      byCurrency.set(metric.currency, [...(byCurrency.get(metric.currency) ?? []), metric]);
+    }
+    const breakdown = (field: "platform" | "tcg") => {
+      const groups = new Map<string, { key: string; currency: string; revenue: number; realizedProfit: number; saleCount: number }>();
+      for (const metric of metrics) {
+        const key = metric[field] || "Unspecified";
+        const mapKey = `${metric.currency}:${key}`;
+        const group = groups.get(mapKey) ?? { key, currency: metric.currency, revenue: 0, realizedProfit: 0, saleCount: 0 };
+        group.revenue += metric.revenue;
+        group.realizedProfit += metric.realizedProfit ?? 0;
+        group.saleCount += 1;
+        groups.set(mapKey, group);
+      }
+      return [...groups.values()];
+    };
+    const inventory = demoCollectionCards();
+    return json({
+      byCurrency: [...byCurrency.entries()].map(([currency, rows]) => {
+        const holding = rows.flatMap((row) => row.holdingDays === undefined ? [] : [row.holdingDays]);
+        return {
+          currency,
+          revenue: rows.reduce((sum, row) => sum + row.revenue, 0),
+          costBasis: rows.reduce((sum, row) => sum + (row.costBasis ?? 0), 0),
+          fees: rows.reduce((sum, row) => sum + row.fees, 0),
+          shippingCost: rows.reduce((sum, row) => sum + row.shippingCost, 0),
+          netProceeds: rows.reduce((sum, row) => sum + row.netProceeds, 0),
+          realizedProfit: rows.reduce((sum, row) => sum + (row.realizedProfit ?? 0), 0),
+          saleCount: rows.length,
+          costedSaleCount: rows.filter((row) => row.costBasis !== undefined).length,
+          averageHoldingDays: holding.length ? Math.round(holding.reduce((sum, value) => sum + value, 0) / holding.length) : undefined,
+        };
+      }),
+      byPlatform: breakdown("platform"),
+      byGame: breakdown("tcg"),
+      recentSales: metrics.slice(0, 8),
+      bestReturns: [...metrics].filter((row) => row.realizedProfit !== undefined).sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0)).slice(0, 5),
+      worstReturns: [...metrics].filter((row) => row.realizedProfit !== undefined).sort((a, b) => (a.realizedProfit ?? 0) - (b.realizedProfit ?? 0)).slice(0, 5),
+      fastestSales: [...metrics].filter((row) => row.holdingDays !== undefined).sort((a, b) => (a.holdingDays ?? 0) - (b.holdingDays ?? 0)).slice(0, 5),
+      inventoryCost: inventory.reduce((sum, { card }) => sum + (card.copies ?? []).reduce((copySum, copy) => copySum + (copy.acquisitionPrice ?? 0), 0), 0),
+      inventoryMarketValue: inventory.reduce((sum, { card }) => sum + card.price * card.quantity, 0),
+      inventoryCurrency: "USD",
+      truncated: false,
+    });
+  }
   if (segments[0] !== "transactions") return notFound();
   if (segments.length === 1 && method === "GET") {
     return json(
@@ -1659,6 +1754,14 @@ function handleFinance(
       amount: input.amount,
       currency: input.currency ?? "USD",
       platform: input.platform,
+      costBasis: input.costBasis,
+      fees: input.fees,
+      shippingCost: input.shippingCost,
+      acquiredAt: input.acquiredAt,
+      netProceeds: input.type === "sale" ? input.amount - (input.fees ?? 0) - (input.shippingCost ?? 0) : undefined,
+      realizedProfit: input.type === "sale" && input.costBasis !== undefined
+        ? input.amount - (input.fees ?? 0) - (input.shippingCost ?? 0) - input.costBasis
+        : undefined,
       notes: input.notes,
       date: input.date ?? new Date().toISOString(),
     };

@@ -17,6 +17,7 @@ export function getHealthResponse() {
       sealed: true,
       analytics: true,
       trades: true,
+      onlineCodes: true,
       prices: supportsLegacyFeatures,
       notifications: supportsLegacyFeatures,
       alerts: supportsLegacyFeatures,

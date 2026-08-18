@@ -106,6 +106,45 @@ export default defineSchema({
     .index("by_binder", ["binderId"])
     .index("by_binder_and_page_number", ["binderId", "pageNumber"]),
 
+  scanSessions: defineTable({
+    userId: v.id("users"),
+    code: v.string(),
+    name: v.string(),
+    status: v.union(v.literal("open"), v.literal("committed"), v.literal("closed")),
+    defaultLanguage: v.string(),
+    binderId: v.optional(v.id("binders")),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_code", ["code"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"]),
+
+  scanSessionItems: defineTable({
+    userId: v.id("users"),
+    sessionId: v.id("scanSessions"),
+    clientEventId: v.string(),
+    tcg: tcgCode,
+    externalId: v.string(),
+    name: v.string(),
+    setCode: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    rarity: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    price: v.optional(v.number()),
+    confidence: v.optional(v.number()),
+    condition: v.optional(v.string()),
+    language: v.string(),
+    finishCode: v.optional(v.string()),
+    finishLabel: v.optional(v.string()),
+    committedEntryId: v.optional(v.id("collectionEntries")),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_event", ["sessionId", "clientEventId"]),
+
   cardIdentities: defineTable({
     tcg: tcgCode,
     externalId: v.string(),
@@ -354,6 +393,36 @@ export default defineSchema({
     .index("by_source_audit", ["sourceAuditId"])
     .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"]),
 
+  // Online code vault
+  onlineCodes: defineTable({
+    userId: v.id("users"),
+    tcg: tcgCode,
+    code: v.string(),
+    normalizedCode: v.string(),
+    status: v.union(
+      v.literal("unused"),
+      v.literal("redeemed"),
+      v.literal("invalid"),
+      v.literal("traded")
+    ),
+    source: v.union(
+      v.literal("camera"),
+      v.literal("manual"),
+      v.literal("import")
+    ),
+    productName: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    capturedAt: v.number(),
+    redeemedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_tcg", ["userId", "tcg"])
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_user_tcg_and_status", ["userId", "tcg", "status"])
+    .index("by_user_tcg_and_normalized_code", ["userId", "tcg", "normalizedCode"]),
+
   // Decks (convex-native)
   decks: defineTable({
     userId: v.id("users"),
@@ -399,6 +468,10 @@ export default defineSchema({
     amount: v.number(),
     currency: v.string(),
     platform: v.optional(v.string()),
+    costBasis: v.optional(v.number()),
+    fees: v.optional(v.number()),
+    shippingCost: v.optional(v.number()),
+    acquiredAt: v.optional(v.number()),
     notes: v.optional(v.string()),
     date: v.number(),
     createdAt: v.number(),

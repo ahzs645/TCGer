@@ -283,6 +283,10 @@ final class EnvironmentStore: ObservableObject {
             rawValue: storage.string(forKey: Keys.setBrowserSort) ?? ""
         ) ?? .newest
 
+        if serverConfiguration.isOnDevice && !pricingSource.isAvailableOnDevice {
+            pricingSource = .justTCG
+        }
+
         if serverConfiguration.isOnDevice {
             enableLocalSession(force: false)
         }

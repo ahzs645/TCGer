@@ -1154,8 +1154,36 @@ struct Transaction: Identifiable, Codable, Hashable, Sendable {
     let amount: Double
     let currency: String
     let platform: String?
+    var costBasis: Double? = nil
+    var fees: Double? = nil
+    var shippingCost: Double? = nil
+    var acquiredAt: String? = nil
+    var netProceeds: Double? = nil
+    var realizedProfit: Double? = nil
+    var holdingDays: Int? = nil
     let notes: String?
     let date: String
+}
+
+struct RealizedPerformanceCurrency: Codable, Sendable {
+    let currency: String
+    let revenue: Double
+    let costBasis: Double
+    let fees: Double
+    let shippingCost: Double
+    let netProceeds: Double
+    let realizedProfit: Double
+    let saleCount: Int
+    let costedSaleCount: Int
+    let averageHoldingDays: Int?
+}
+
+struct RealizedPerformance: Codable, Sendable {
+    let byCurrency: [RealizedPerformanceCurrency]
+    let inventoryCost: Double
+    let inventoryMarketValue: Double
+    let inventoryCurrency: String
+    let truncated: Bool
 }
 
 struct FinanceSummary: Codable, Sendable {

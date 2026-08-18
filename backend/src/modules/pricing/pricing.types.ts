@@ -7,6 +7,8 @@ export interface PriceProviderQuote {
 
 export interface PriceProvider {
   readonly name: string;
+  /** Expensive or comparison-only providers opt out of automatic selection. */
+  readonly includeInAutomatic?: boolean;
   fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null>;
 }
 

@@ -48,4 +48,27 @@ describe('tracked pricing cache', () => {
     expect((await service.getTrackedPrices([item], true)).prices[0].cached).toBe(false);
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
+
+  it('keeps provider-specific cache entries isolated', async () => {
+    const fetcher = jest.fn(async (_tcg, _externalId, _finish, source) => [
+      {
+        source,
+        price: source === 'scryfall' ? 2 : 7,
+        currency: 'USD',
+        updatedAt: '2026-08-15T00:00:00.000Z',
+      },
+    ]);
+    const service = createTrackedPricingService(fetcher, {
+      ttlMs: 60_000,
+      forceCooldownMs: 10_000,
+    });
+    const item = { tcg: 'magic', externalId: 'abc' };
+
+    const scryfall = await service.getTrackedPrices([item], false, 'scryfall');
+    const justTcg = await service.getTrackedPrices([item], false, 'justtcg');
+
+    expect(scryfall.prices[0]).toMatchObject({ price: 2, source: 'scryfall' });
+    expect(justTcg.prices[0]).toMatchObject({ price: 7, source: 'justtcg' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });
