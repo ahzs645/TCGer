@@ -50,6 +50,19 @@ let metadata = null;
 let lastVersionCheck = 0;
 let refreshPromise = null;
 let imageTargetByFilename = new Map();
+let imageCachePromise = null;
+let imageCacheCompletedFor = null;
+let imageCacheState = {
+  enabled: imageCacheConfig.enabled,
+  status: imageCacheConfig.enabled ? 'idle' : 'disabled',
+  expected: 0,
+  cached: 0,
+  remaining: 0,
+  downloaded: 0,
+  failed: 0,
+  startedAt: null,
+  completedAt: null
+};
 
 function sanitizeFilename(value) {
   return value.replace(/[^a-zA-Z0-9_.-]/g, '-');
@@ -171,10 +184,14 @@ async function fetchVersionInfo() {
     throw new Error(`Failed to fetch Yu-Gi-Oh! DB version: ${response.status}`);
   }
   const payload = await response.json();
-  if (typeof payload !== 'object' || payload === null) {
+  const version = Array.isArray(payload) ? payload[0] : payload;
+  if (typeof version !== 'object' || version === null) {
     throw new Error('Unexpected version payload');
   }
-  return payload;
+  return {
+    ...version,
+    date: version.date ?? version.last_update ?? null
+  };
 }
 
 async function downloadDataset(versionLabel) {
@@ -220,6 +237,7 @@ async function loadCards(cardList, filePath, versionInfo) {
     totalCards: cards.length,
     loadedAt: new Date().toISOString()
   };
+  imageCacheCompletedFor = null;
 }
 
 async function loadLatestFromDisk() {
@@ -274,6 +292,7 @@ async function refreshData(force = false) {
   refreshPromise = (async () => {
     const now = Date.now();
     if (!force && cards.length && now - lastVersionCheck < config.refreshMs) {
+      startImageCache(cards, metadata?.filePath);
       return metadata;
     }
     try {
@@ -286,11 +305,12 @@ async function refreshData(force = false) {
           version: remoteVersion,
           remoteDate: versionInfo?.date ?? metadata?.remoteDate
         };
+        startImageCache(cards, metadata?.filePath);
         return metadata;
       }
       const { cards: remoteCards, filePath } = await downloadDataset(remoteVersion || 'latest');
       await loadCards(remoteCards, filePath, versionInfo);
-      await cacheCardImages(cards);
+      startImageCache(cards, filePath);
       return metadata;
     } catch (error) {
       console.error('Failed to refresh Yu-Gi-Oh! cache', error);
@@ -320,41 +340,60 @@ async function downloadImage(job) {
   if (!response.ok || !response.body) {
     throw new Error(`Download failed with status ${response.status}`);
   }
-  const tempPath = `${job.filePath}.tmp`;
-  const writer = createWriteStream(tempPath);
-  await pipeline(response.body, writer);
-  await rename(tempPath, job.filePath);
+  const contentType = response.headers.get('content-type');
+  if (contentType && !contentType.toLowerCase().startsWith('image/')) {
+    throw new Error(`Download returned unexpected content type ${contentType}`);
+  }
+  const tempPath = `${job.filePath}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  try {
+    const writer = createWriteStream(tempPath);
+    await pipeline(response.body, writer);
+    const downloaded = await stat(tempPath);
+    if (downloaded.size <= 0) {
+      throw new Error('Download returned an empty file');
+    }
+    await rename(tempPath, job.filePath);
+  } catch (error) {
+    await rm(tempPath, { force: true });
+    throw error;
+  }
 }
 
 async function cacheCardImages(cardList) {
   if (!imageCacheConfig.enabled || !cardList?.length) {
-    return;
+    return { expected: 0, cached: 0, remaining: 0, downloaded: 0, failed: 0 };
   }
 
   await ensureDirectory(imageCacheConfig.directory);
+  const existing = new Set(await readdir(imageCacheConfig.directory));
+  const targets = [...imageTargetByFilename.entries()];
+  const allMissing = targets.filter(([filename]) => !existing.has(filename));
+  imageCacheState.expected = targets.length;
+  imageCacheState.cached = targets.length - allMissing.length;
+  imageCacheState.remaining = allMissing.length;
   const queue = [];
-
-  outer: for (const card of cardList) {
-    for (const target of buildImageTargets(card)) {
-      const filePath = path.join(imageCacheConfig.directory, target.filename);
-      if (await fileExists(filePath)) {
-        continue;
-      }
-      queue.push({ ...target, filePath });
-      if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
-        break outer;
-      }
+  for (const [filename, target] of allMissing) {
+    queue.push({ ...target, filePath: path.join(imageCacheConfig.directory, filename) });
+    if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
+      break;
     }
   }
 
   if (!queue.length) {
-    return;
+    return {
+      expected: targets.length,
+      cached: targets.length - allMissing.length,
+      remaining: allMissing.length,
+      downloaded: 0,
+      failed: 0
+    };
   }
 
   console.log(`Caching ${queue.length} Yu-Gi-Oh! images (target dir: ${imageCacheConfig.directory})`);
   const workers = Math.min(imageCacheConfig.concurrency, queue.length);
   let index = 0;
   const errors = [];
+  let downloaded = 0;
 
   await Promise.all(
     Array.from({ length: workers }, async () => {
@@ -367,6 +406,13 @@ async function cacheCardImages(cardList) {
         const job = queue[currentIndex];
         try {
           await downloadImage(job);
+          downloaded += 1;
+          imageCacheState.downloaded = downloaded;
+          imageCacheState.cached = targets.length - allMissing.length + downloaded;
+          imageCacheState.remaining = Math.max(0, targets.length - imageCacheState.cached);
+          if (downloaded % 500 === 0) {
+            console.log(`Cached ${downloaded}/${queue.length} Yu-Gi-Oh! images in this pass`);
+          }
         } catch (error) {
           errors.push({ job, error });
         }
@@ -380,6 +426,55 @@ async function cacheCardImages(cardList) {
       console.warn(`  - ${job.filename}: ${error.message}`);
     });
   }
+  const cached = targets.length - allMissing.length + downloaded;
+  return {
+    expected: targets.length,
+    cached,
+    remaining: Math.max(0, targets.length - cached),
+    downloaded,
+    failed: errors.length
+  };
+}
+
+function startImageCache(cardList, catalogKey) {
+  if (!imageCacheConfig.enabled || !cardList?.length || imageCachePromise) {
+    return;
+  }
+  if (catalogKey && imageCacheCompletedFor === catalogKey) {
+    return;
+  }
+  imageCacheState = {
+    ...imageCacheState,
+    status: 'running',
+    expected: imageTargetByFilename.size,
+    downloaded: 0,
+    failed: 0,
+    startedAt: new Date().toISOString(),
+    completedAt: null
+  };
+  imageCachePromise = cacheCardImages(cardList)
+    .then((result) => {
+      imageCacheState = {
+        ...imageCacheState,
+        ...result,
+        status: result.remaining === 0 ? 'complete' : 'incomplete',
+        completedAt: new Date().toISOString()
+      };
+      if (result.remaining === 0) {
+        imageCacheCompletedFor = catalogKey;
+      }
+    })
+    .catch((error) => {
+      imageCacheState = {
+        ...imageCacheState,
+        status: 'failed',
+        completedAt: new Date().toISOString()
+      };
+      console.error('Yu-Gi-Oh! background image cache failed', error);
+    })
+    .finally(() => {
+      imageCachePromise = null;
+    });
 }
 
 function toLowerSet(value, separator = ',') {
@@ -705,7 +800,8 @@ const server = http.createServer(async (request, response) => {
       await refreshData();
       sendJson(response, 200, {
         status: 'ok',
-        data: metadata
+        data: metadata,
+        images: imageCacheState
       });
       return;
     }

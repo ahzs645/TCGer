@@ -2,6 +2,8 @@
 
 This service mirrors the behaviour of YGOPRODeck's `/cardinfo.php` endpoint using a locally cached dataset. The cache keeps a full copy of the Yu-Gi-Oh! catalog on disk so the backend can perform searches without repeatedly hitting the public API (and risking rate limits).
 
+Card images are filled in the background and resumed after a restart. Set `YGO_CACHE_IMAGE_MAX_PER_REFRESH=0` for a complete pass; `/health` reports image progress.
+
 ## Features
 - Periodically downloads the entire card database via the official API (once every 12 hours by default).
 - Persists the downloaded JSON in `/data` and restores it on restart.
@@ -21,6 +23,11 @@ This service mirrors the behaviour of YGOPRODeck's `/cardinfo.php` endpoint usin
 | `YGO_CACHE_PAGE_SIZE` | `20` | Default page size when `num` is omitted |
 | `YGO_CACHE_MAX_PAGE_SIZE` | `200` | Safety cap applied to `num` |
 | `YGO_CACHE_DATA_DIR` | `/data` | Cache directory (mount a persistent volume here) |
+| `YGO_CACHE_IMAGES` | `true` | Enable local card-image caching |
+| `YGO_CACHE_IMAGE_DIR` | `/data/images` | Destination directory for cached images |
+| `YGO_CACHE_IMAGE_VARIANTS` | `full,small` | Comma-separated image variants to mirror |
+| `YGO_CACHE_IMAGE_MAX_PER_REFRESH` | `250` | Maximum new images per pass (`0` for unlimited) |
+| `YGO_CACHE_IMAGE_CONCURRENCY` | `4` | Parallel image-download workers |
 | `PORT` | `4020` | Listen port |
 
 ## Usage

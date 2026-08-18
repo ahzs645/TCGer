@@ -4,6 +4,8 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { URL } from 'node:url';
+import { createGunzip } from 'node:zlib';
+import { createInterface } from 'node:readline';
 
 const BULK_INDEX_URL = 'https://api.scryfall.com/bulk-data';
 const DEFAULT_LIMIT = 50;
@@ -13,7 +15,13 @@ const config = {
   port: Number.parseInt(process.env.PORT || '4010', 10),
   host: process.env.HOST || '0.0.0.0',
   refreshMs: Math.max(5 * 60 * 1000, Number.parseInt(process.env.SCRYFALL_BULK_REFRESH_MS || `${12 * 60 * 60 * 1000}`, 10)),
-  resultLimit: Math.max(1, Number.parseInt(process.env.SCRYFALL_BULK_MAX_RESULTS || `${20}`, 10))
+  resultLimit: Math.max(1, Number.parseInt(process.env.SCRYFALL_BULK_MAX_RESULTS || `${20}`, 10)),
+  userAgent: (process.env.SCRYFALL_USER_AGENT || 'TCGer/1.0 (self-hosted card catalog)').trim()
+};
+
+const scryfallHeaders = {
+  'User-Agent': config.userAgent,
+  Accept: 'application/json;q=0.9,*/*;q=0.8'
 };
 
 function parseBoolean(value, defaultValue) {
@@ -47,13 +55,26 @@ let lastMetadataCheck = 0;
 let dataState = null;
 let refreshPromise = null;
 let imageTargetByFilename = new Map();
+let imageCachePromise = null;
+let imageCacheCompletedFor = null;
+let imageCacheState = {
+  enabled: imageCacheConfig.enabled,
+  status: imageCacheConfig.enabled ? 'idle' : 'disabled',
+  expected: 0,
+  cached: 0,
+  remaining: 0,
+  downloaded: 0,
+  failed: 0,
+  startedAt: null,
+  completedAt: null
+};
 
 function sanitizeFilename(value) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
 async function fetchMetadata() {
-  const response = await fetch(BULK_INDEX_URL);
+  const response = await fetch(BULK_INDEX_URL, { headers: scryfallHeaders });
   if (!response.ok) {
     throw new Error(`Failed to fetch Scryfall bulk index: ${response.status}`);
   }
@@ -75,20 +96,28 @@ async function ensureDirectory(dirPath) {
 async function downloadBulk(entry) {
   await ensureDirectory(config.dataDir);
   const timestampTag = sanitizeFilename(entry.updated_at || entry.id || 'latest');
-  const targetPath = path.join(config.dataDir, `${config.bulkType}-${timestampTag}.json`);
+  const downloadUri = entry.jsonl_download_uri || entry.download_uri;
+  if (!downloadUri) {
+    throw new Error(`Bulk type ${config.bulkType} has no supported download URI`);
+  }
+  const extension = downloadUri.endsWith('.jsonl.gz')
+    ? '.jsonl.gz'
+    : downloadUri.endsWith('.jsonl')
+      ? '.jsonl'
+      : '.json';
+  const targetPath = path.join(config.dataDir, `${config.bulkType}-${timestampTag}${extension}`);
   try {
     await stat(targetPath);
     return targetPath;
   } catch {}
 
-  const response = await fetch(entry.download_uri);
+  const response = await fetch(downloadUri, { headers: scryfallHeaders });
   if (!response.ok || !response.body) {
     throw new Error(`Failed to download bulk file: ${response.status}`);
   }
 
   const tempPath = `${targetPath}.tmp`;
   const writer = createWriteStream(tempPath);
-  // fetch() automatically decompresses gzip, so we don't need to decompress again
   await pipeline(response.body, writer);
   await rename(tempPath, targetPath);
 
@@ -100,6 +129,20 @@ async function downloadBulk(entry) {
   );
 
   return targetPath;
+}
+
+async function readJsonLines(filePath) {
+  const fileStream = createReadStream(filePath);
+  const input = filePath.endsWith('.gz') ? fileStream.pipe(createGunzip()) : fileStream;
+  const lines = createInterface({ input, crlfDelay: Infinity });
+  const parsed = [];
+  for await (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed) {
+      parsed.push(JSON.parse(trimmed));
+    }
+  }
+  return parsed;
 }
 
 function indexCards(cardList) {
@@ -121,8 +164,9 @@ function indexCards(cardList) {
 }
 
 async function loadCardsFromFile(filePath) {
-  const raw = await readFile(filePath, 'utf8');
-  const parsed = JSON.parse(raw);
+  const parsed = filePath.endsWith('.jsonl') || filePath.endsWith('.jsonl.gz')
+    ? await readJsonLines(filePath)
+    : JSON.parse(await readFile(filePath, 'utf8'));
   if (!Array.isArray(parsed)) {
     throw new Error('Bulk file is not an array');
   }
@@ -134,6 +178,7 @@ async function loadCardsFromFile(filePath) {
     filePath,
     loadedAt: new Date().toISOString()
   };
+  imageCacheCompletedFor = null;
 }
 
 function parseQueryString(query) {
@@ -239,6 +284,7 @@ async function refreshData(force = false) {
   refreshPromise = (async () => {
     const now = Date.now();
     if (!force && now - lastMetadataCheck < config.refreshMs && cards.length) {
+      startImageCache(cards, activeFilePath);
       return dataState;
     }
     const metadata = await fetchMetadata();
@@ -247,11 +293,11 @@ async function refreshData(force = false) {
     if (filePath !== activeFilePath || !cards.length) {
       await loadCardsFromFile(filePath);
     }
-    await cacheCardImages(cards);
+    startImageCache(cards, filePath);
     dataState = {
       ...dataState,
       updatedAt: metadata.updated_at,
-      downloadUri: metadata.download_uri,
+      downloadUri: metadata.jsonl_download_uri || metadata.download_uri,
       totalCards: cards.length
     };
     return dataState;
@@ -284,7 +330,8 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, {
         status: 'ok',
         bulkType: config.bulkType,
-        data: dataState
+        data: dataState,
+        images: imageCacheState
       });
       return;
     }
@@ -482,35 +529,39 @@ async function fileExists(filePath) {
 
 async function cacheCardImages(cardList) {
   if (!imageCacheConfig.enabled || !cardList?.length) {
-    return;
+    return { expected: 0, cached: 0, remaining: 0, downloaded: 0, failed: 0 };
   }
 
-  const fieldOrder = getImageFieldOrder();
   await ensureDirectory(imageCacheConfig.directory);
-
+  const existing = new Set(await readdir(imageCacheConfig.directory));
+  const targets = [...imageTargetByFilename.entries()];
+  const allMissing = targets.filter(([filename]) => !existing.has(filename));
+  imageCacheState.expected = targets.length;
+  imageCacheState.cached = targets.length - allMissing.length;
+  imageCacheState.remaining = allMissing.length;
   const queue = [];
-  outer: for (const card of cardList) {
-    const targets = buildImageTargets(card, fieldOrder);
-    for (const target of targets) {
-      const filePath = path.join(imageCacheConfig.directory, `${target.id}${target.extension}`);
-      if (await fileExists(filePath)) {
-        continue;
-      }
-      queue.push({ ...target, filePath });
-      if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
-        break outer;
-      }
+  for (const [filename, target] of allMissing) {
+    queue.push({ ...target, filePath: path.join(imageCacheConfig.directory, filename) });
+    if (imageCacheConfig.maxDownloadsPerRefresh > 0 && queue.length >= imageCacheConfig.maxDownloadsPerRefresh) {
+      break;
     }
   }
 
   if (!queue.length) {
-    return;
+    return {
+      expected: targets.length,
+      cached: targets.length - allMissing.length,
+      remaining: allMissing.length,
+      downloaded: 0,
+      failed: 0
+    };
   }
 
   console.log(`Caching ${queue.length} Scryfall images (target dir: ${imageCacheConfig.directory})`);
   const workers = Math.min(imageCacheConfig.concurrency, queue.length);
   let index = 0;
   const errors = [];
+  let downloaded = 0;
 
   await Promise.all(
     Array.from({ length: workers }, async () => {
@@ -523,6 +574,13 @@ async function cacheCardImages(cardList) {
         const job = queue[currentIndex];
         try {
           await downloadImage(job);
+          downloaded += 1;
+          imageCacheState.downloaded = downloaded;
+          imageCacheState.cached = targets.length - allMissing.length + downloaded;
+          imageCacheState.remaining = Math.max(0, targets.length - imageCacheState.cached);
+          if (downloaded % 500 === 0) {
+            console.log(`Cached ${downloaded}/${queue.length} Scryfall images in this pass`);
+          }
         } catch (error) {
           errors.push({ job, error });
         }
@@ -536,17 +594,79 @@ async function cacheCardImages(cardList) {
       console.warn(`  - ${job.label} (${job.url}): ${error.message}`);
     });
   }
+  const cached = targets.length - allMissing.length + downloaded;
+  return {
+    expected: targets.length,
+    cached,
+    remaining: Math.max(0, targets.length - cached),
+    downloaded,
+    failed: errors.length
+  };
+}
+
+function startImageCache(cardList, catalogKey) {
+  if (!imageCacheConfig.enabled || !cardList?.length || imageCachePromise) {
+    return;
+  }
+  if (catalogKey && imageCacheCompletedFor === catalogKey) {
+    return;
+  }
+  imageCacheState = {
+    ...imageCacheState,
+    status: 'running',
+    expected: imageTargetByFilename.size,
+    downloaded: 0,
+    failed: 0,
+    startedAt: new Date().toISOString(),
+    completedAt: null
+  };
+  imageCachePromise = cacheCardImages(cardList)
+    .then((result) => {
+      imageCacheState = {
+        ...imageCacheState,
+        ...result,
+        status: result.remaining === 0 ? 'complete' : 'incomplete',
+        completedAt: new Date().toISOString()
+      };
+      if (result.remaining === 0) {
+        imageCacheCompletedFor = catalogKey;
+      }
+    })
+    .catch((error) => {
+      imageCacheState = {
+        ...imageCacheState,
+        status: 'failed',
+        completedAt: new Date().toISOString()
+      };
+      console.error('Scryfall background image cache failed', error);
+    })
+    .finally(() => {
+      imageCachePromise = null;
+    });
 }
 
 async function downloadImage(job) {
-  const response = await fetch(job.url);
+  const response = await fetch(job.url, { headers: scryfallHeaders });
   if (!response.ok || !response.body) {
     throw new Error(`Download failed with status ${response.status}`);
   }
-  const tempPath = `${job.filePath}.tmp`;
-  const writer = createWriteStream(tempPath);
-  await pipeline(response.body, writer);
-  await rename(tempPath, job.filePath);
+  const contentType = response.headers.get('content-type');
+  if (contentType && !contentType.toLowerCase().startsWith('image/')) {
+    throw new Error(`Download returned unexpected content type ${contentType}`);
+  }
+  const tempPath = `${job.filePath}.tmp-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  try {
+    const writer = createWriteStream(tempPath);
+    await pipeline(response.body, writer);
+    const downloaded = await stat(tempPath);
+    if (downloaded.size <= 0) {
+      throw new Error('Download returned an empty file');
+    }
+    await rename(tempPath, job.filePath);
+  } catch (error) {
+    await rm(tempPath, { force: true });
+    throw error;
+  }
 }
 
 function cloneCard(card) {
