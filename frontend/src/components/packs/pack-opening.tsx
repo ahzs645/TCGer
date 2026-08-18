@@ -1,23 +1,25 @@
 "use client";
 
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
-import { Check, Download, History, Trash2 } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 
 import {
   PackOpening as SharedPackOpening,
   type PackOpeningEvent,
+  type PackOpeningNativeCommand,
+  type PackOpeningNativeState,
   type PackOpeningPull,
   type PackOpeningPullSession,
 } from "@tcg/pack-core/experience";
 
-import { CardImage } from "@/components/cards/card-image";
-import { Badge } from "@/components/ui/badge";
+import { PackCardCloseUp } from "@/components/packs/pack-card-close-up";
+import { PackOpeningReviewSheet } from "@/components/packs/pack-opening-review-sheet";
+import { PackOpeningShell } from "@/components/packs/pack-opening-shell";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,6 +28,11 @@ const CONFIGURED_ASSET_BASE =
   process.env.NEXT_PUBLIC_PACK_ASSET_BASE_URL?.replace(/\/+$/, "") ?? "";
 const SAVED_OPENINGS_KEY = "tcger-saved-pack-openings";
 const SAVED_OPENINGS_EVENT = "tcger-saved-pack-openings-changed";
+
+interface InspectTarget {
+  pulls: PackOpeningPull[];
+  index: number;
+}
 
 function subscribeToSavedOpenings(onChange: () => void) {
   const onStorage = (event: StorageEvent) => {
@@ -99,13 +106,20 @@ function downloadOpening(session: PackOpeningPullSession) {
 }
 
 /**
+ * Website host for the shared pack-opening scene. The scene and its state
+ * machine come from `@tcg/pack-core`; this file supplies the same chrome the
+ * iOS app wraps around it — phase controls, results, close-up and save review.
+ *
  * Production reads the projected wrapper sheets from R2. A failed remote load
  * remounts against the bundled pack assets so local/offline use still works.
  */
 export function PackOpening() {
   const [assetBase, setAssetBase] = useState(CONFIGURED_ASSET_BASE);
-  const [inspectedPull, setInspectedPull] = useState<PackOpeningPull | null>(null);
-  const [savedSession, setSavedSession] =
+  const [rendererReady, setRendererReady] = useState(false);
+  const [interfaceState, setInterfaceState] =
+    useState<PackOpeningNativeState | null>(null);
+  const [inspect, setInspect] = useState<InspectTarget | null>(null);
+  const [reviewSession, setReviewSession] =
     useState<PackOpeningPullSession | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -118,88 +132,92 @@ export function PackOpening() {
     () => parseSavedOpenings(savedOpeningsRaw),
     [savedOpeningsRaw],
   );
-  const savedPulls = useMemo(
-    () => savedSession?.packs.flat() ?? [],
-    [savedSession],
+  const resultPulls = useMemo(
+    () => interfaceState?.session?.packs.flat() ?? [],
+    [interfaceState?.session],
   );
+
   const handleEvent = useCallback(
     (event: PackOpeningEvent) => {
       if (event.type === "error") {
-        if (assetBase) setAssetBase("");
+        if (assetBase) {
+          setRendererReady(false);
+          setInterfaceState(null);
+          setAssetBase("");
+        }
+        return;
+      }
+      if (event.type === "ready") {
+        setRendererReady(true);
+        return;
+      }
+      if (event.type === "nativeState") {
+        setInterfaceState(event.state);
         return;
       }
       if (event.type === "inspectRequested") {
-        setInspectedPull(event.pull);
+        setInspect({ pulls: [event.pull], index: 0 });
         return;
       }
       if (event.type === "saveRequested") {
+        // The local copy keeps the browser-side history working; the review
+        // sheet then offers the collection save, like the iOS sheet does.
         setSaveFailed(!persistOpening(event.session));
-        setSavedSession(event.session);
+        setReviewSession(event.session);
       }
     },
     [assetBase],
   );
 
+  const sendCommand = useCallback((command: PackOpeningNativeCommand) => {
+    window.dispatchEvent(
+      new CustomEvent<PackOpeningNativeCommand>("tcger-pack-command", {
+        detail: command,
+      }),
+    );
+  }, []);
+
   return (
-    <>
-      {savedOpenings.length ? (
-        <div className="mb-3 flex justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="mr-2 h-4 w-4" aria-hidden="true" />
-            Saved openings ({savedOpenings.length})
-          </Button>
-        </div>
-      ) : null}
+    <div className="relative isolate h-full w-full overflow-hidden">
       <SharedPackOpening
         key={assetBase || "bundled"}
         assetBase={assetBase}
+        embedded
+        nativeControls
         completionActionLabel="Save pulls"
         onEvent={handleEvent}
       />
+      <PackOpeningShell
+        ready={rendererReady}
+        state={interfaceState}
+        savedOpeningsCount={savedOpenings.length}
+        onOpenHistory={() => setHistoryOpen(true)}
+        onCommand={sendCommand}
+        onInspect={(index) => setInspect({ pulls: resultPulls, index })}
+      />
 
-      <Dialog
-        open={Boolean(inspectedPull)}
-        onOpenChange={(open) => !open && setInspectedPull(null)}
-      >
-        <DialogContent className="max-w-md">
-          {inspectedPull ? (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-2 pr-8">
-                  <Badge variant="secondary">{inspectedPull.rarity}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {inspectedPull.setCode} · {inspectedPull.collectorNumber}
-                  </span>
-                </div>
-                <DialogTitle>{inspectedPull.name}</DialogTitle>
-                <DialogDescription>
-                  {inspectedPull.setName}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="relative mx-auto aspect-[63/88] w-full max-w-72 overflow-hidden rounded-xl bg-muted">
-                <CardImage
-                  src={inspectedPull.imageUrl}
-                  fallbackSrc={inspectedPull.imageUrlSmall}
-                  tcg={inspectedPull.tcg}
-                  alt={inspectedPull.name}
-                  fill
-                  priority
-                  sizes="288px"
-                  className="object-contain"
-                />
-              </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {inspect ? (
+        <PackCardCloseUp
+          pulls={inspect.pulls}
+          index={inspect.index}
+          onIndexChange={(index) =>
+            setInspect((current) => (current ? { ...current, index } : current))
+          }
+          onClose={() => setInspect(null)}
+        />
+      ) : null}
+
+      {reviewSession ? (
+        <PackOpeningReviewSheet
+          session={reviewSession}
+          localSaveFailed={saveFailed}
+          onDownload={downloadOpening}
+          onClose={() => setReviewSession(null)}
+        />
+      ) : null}
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-h-[85dvh] max-w-xl">
           <DialogHeader>
             <DialogTitle>Saved pack openings</DialogTitle>
             <DialogDescription>
@@ -207,7 +225,7 @@ export function PackOpening() {
               review its pulls or download a portable copy.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+          <div className="max-h-[55dvh] space-y-2 overflow-y-auto">
             {savedOpenings.map((session) => {
               const pullCount = session.packs.reduce(
                 (total, pack) => total + pack.length,
@@ -223,8 +241,7 @@ export function PackOpening() {
                     className="min-w-0 flex-1 text-left"
                     onClick={() => {
                       setHistoryOpen(false);
-                      setSaveFailed(false);
-                      setSavedSession(session);
+                      setInspect({ pulls: session.packs.flat(), index: 0 });
                     }}
                   >
                     <span className="block truncate text-sm font-medium">
@@ -259,66 +276,6 @@ export function PackOpening() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog
-        open={Boolean(savedSession)}
-        onOpenChange={(open) => !open && setSavedSession(null)}
-      >
-        <DialogContent className="max-w-lg">
-          {savedSession ? (
-            <>
-              <DialogHeader>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
-                  <Check className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <DialogTitle>
-                  {saveFailed
-                    ? "The browser could not store these pulls"
-                    : "Pulls saved to this browser"}
-                </DialogTitle>
-                <DialogDescription>
-                  {saveFailed
-                    ? `Download the ${savedPulls.length} cards from ${savedSession.packLabel} to keep a portable copy instead.`
-                    : `Saved ${savedPulls.length} cards from ${savedSession.packLabel}. Download a portable copy if you want to keep or share the opening outside this browser.`}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-3">
-                {savedPulls.map((pull, index) => (
-                  <button
-                    type="button"
-                    key={`${pull.cardId}-${index}`}
-                    onClick={() => {
-                      setSavedSession(null);
-                      setInspectedPull(pull);
-                    }}
-                    className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted"
-                  >
-                    <span className="min-w-0 truncate text-sm font-medium">
-                      {pull.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {pull.rarity}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => downloadOpening(savedSession)}
-                >
-                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Download JSON
-                </Button>
-                <Button type="button" onClick={() => setSavedSession(null)}>
-                  Done
-                </Button>
-              </DialogFooter>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }

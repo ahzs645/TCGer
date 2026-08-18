@@ -124,9 +124,15 @@ function primaryNavigationFor(demoMode: boolean): NavigationItem[] {
 
 interface AppShellProps {
   children: React.ReactNode;
+  /**
+   * Hands the page the whole area between the fixed header and the mobile tab
+   * bar, with no container padding and no page scroll — for immersive stages
+   * like pack opening, which own their own chrome.
+   */
+  fullBleed?: boolean;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, fullBleed = false }: AppShellProps) {
   const pathname = usePathname();
   const dashboardHref = getAppRoute("/", pathname);
   const features = useServerFeatures();
@@ -303,13 +309,22 @@ export function AppShell({ children }: AppShellProps) {
       </header>
       <main
         id="main-content"
-        className="flex-1 bg-muted/20 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] md:pb-0"
+        className={cn(
+          "bg-muted/20",
+          fullBleed
+            ? "flex h-[100dvh] flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(4rem+env(safe-area-inset-top))] md:pb-0"
+            : "flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] md:pb-0",
+        )}
         tabIndex={-1}
         data-oid="qz_1-v1"
       >
-        <div className="container space-y-6 py-6 md:py-8" data-oid="1zq._:c">
-          {children}
-        </div>
+        {fullBleed ? (
+          <div className="min-h-0 flex-1">{children}</div>
+        ) : (
+          <div className="container space-y-6 py-6 md:py-8" data-oid="1zq._:c">
+            {children}
+          </div>
+        )}
       </main>
 
       {/* Mobile bottom navigation */}
