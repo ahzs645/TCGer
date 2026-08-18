@@ -750,7 +750,10 @@ final class LocalStore {
     /// base, while an owned card with the same external id replaces that row.
     private func catalogCards(base: [Card], owned: [Card]) -> [Card] {
         var result = base
-        var indexByID = Dictionary(uniqueKeysWithValues: base.enumerated().map { ($1.id, $0) })
+        var indexByID = Dictionary(
+            base.enumerated().map { ($1.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         for card in owned {
             if let index = indexByID[card.id] {
                 result[index] = card
@@ -2915,9 +2918,10 @@ final class LocalStore {
 
     func getSealedProducts() -> [SealedProduct] {
         var productsByName = Dictionary(
-            uniqueKeysWithValues: sealedProducts.map {
+            sealedProducts.map {
                 ("\($0.tcg)|\($0.name.lowercased())", $0)
-            }
+            },
+            uniquingKeysWith: { _, latest in latest }
         )
         for product in CatalogStore.shared.sealedProducts() {
             productsByName["\(product.tcg)|\(product.name.lowercased())"] = product

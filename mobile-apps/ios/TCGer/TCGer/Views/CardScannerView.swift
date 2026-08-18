@@ -103,7 +103,7 @@ struct CardScannerView: View {
     @AppStorage("binderScanner.savePageImages") private var savesBinderPageImages = true
     @AppStorage("binderScanner.replacePageImages") private var replacesBinderPageImages = true
     @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
-    @AppStorage("scanner.defaultLanguage") private var sharedSessionLanguage = "English"
+    @AppStorage("scanner.defaultLanguage") private var assumedScanLanguage = "English"
     @StateObject private var viewModel = CardScannerViewModel()
     @State private var showingRecentDebugCaptures = false
     @State private var photoPickerMode: ScannerPhotoPickerMode?
@@ -185,6 +185,11 @@ struct CardScannerView: View {
             Task { await scanSelectedPhotos(items) }
         }
         .onChange(of: viewModel.sessionResults.map(\.id), initial: false) { _, _ in
+            Task { await syncNewResultsToSharedSession() }
+        }
+        .onChange(of: sharedSessionCode, initial: false) { oldCode, newCode in
+            guard oldCode != newCode else { return }
+            sharedSessionSyncedIDs.removeAll()
             Task { await syncNewResultsToSharedSession() }
         }
         .photosPicker(
@@ -291,7 +296,7 @@ struct CardScannerView: View {
                     token: environmentStore.authToken,
                     code: code,
                     result: result,
-                    language: sharedSessionLanguage
+                    language: assumedScanLanguage
                 )
                 sharedSessionSyncedIDs.insert(result.id)
             } catch {
@@ -314,7 +319,10 @@ struct CardScannerView: View {
                 automaticallyShowResults: $automaticallyShowResults,
                 savesBinderPageImages: $savesBinderPageImages,
                 replacesBinderPageImages: $replacesBinderPageImages,
+                assumedLanguage: $assumedScanLanguage,
+                sharedSessionCode: $sharedSessionCode,
                 availableScanEngines: availableScanEngines,
+                sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,
                 showsBinderOptions: viewModel.captureMode == .binder,
                 showsTestInputs: showTestingTools || isSimulator,
                 isProcessing: isProcessingPhoto,
@@ -336,6 +344,16 @@ struct CardScannerView: View {
                 statusContent
             }
         }
+    }
+
+    private var sharedSessionUnavailableMessage: String? {
+        if environmentStore.serverConfiguration.isOnDevice {
+            return "Connect the app to your TCGer server before using a shared web session."
+        }
+        if environmentStore.authToken == nil {
+            return "Sign in before connecting to a shared web session."
+        }
+        return nil
     }
 
     /// Always visible while dev-mode recording is on: every scan on this

@@ -356,7 +356,10 @@ struct SetBrowserView: View {
             token: token,
             useCache: useCache
         )) ?? []
-        let setsByKey = Dictionary(uniqueKeysWithValues: sets.map { ($0.focusID, $0) })
+        let setsByKey = Dictionary(
+            sets.map { ($0.focusID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         var ownership: [String: Set<String>] = [:]
         var standardOwnership: [String: Set<String>] = [:]
 

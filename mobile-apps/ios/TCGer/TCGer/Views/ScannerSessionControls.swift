@@ -11,7 +11,10 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     @Binding var automaticallyShowResults: Bool
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
+    @Binding var assumedLanguage: String
+    @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
+    let sharedSessionUnavailableMessage: String?
     let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
@@ -67,7 +70,10 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     automaticallyShowResults: $automaticallyShowResults,
                     savesBinderPageImages: $savesBinderPageImages,
                     replacesBinderPageImages: $replacesBinderPageImages,
+                    assumedLanguage: $assumedLanguage,
+                    sharedSessionCode: $sharedSessionCode,
                     availableScanEngines: availableScanEngines,
+                    sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,
                     showsBinderOptions: showsBinderOptions,
                     showsTestInputs: showsTestInputs,
                     isProcessing: isProcessing,
@@ -164,7 +170,10 @@ private struct ScannerOptionsPopover: View {
     @Binding var automaticallyShowResults: Bool
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
+    @Binding var assumedLanguage: String
+    @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
+    let sharedSessionUnavailableMessage: String?
     let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
@@ -176,6 +185,36 @@ private struct ScannerOptionsPopover: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Session") {
+                    Picker(selection: $assumedLanguage) {
+                        ForEach(CardLanguage.supportedNames, id: \.self) { language in
+                            Text(language).tag(language)
+                        }
+                    } label: {
+                        Label("Assumed Language", systemImage: "character.book.closed")
+                    }
+
+                    NavigationLink {
+                        SharedWebSessionSettingsView(
+                            sessionCode: $sharedSessionCode,
+                            unavailableMessage: sharedSessionUnavailableMessage
+                        )
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Shared Web Session")
+                                if !sharedSessionCode.isEmpty {
+                                    Text(sharedSessionCode)
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        } icon: {
+                            Image(systemName: "iphone.and.arrow.forward")
+                        }
+                    }
+                }
+
                 if !showsBinderOptions {
                     Section("Single-card scan") {
                         Picker("Capture", selection: $triggerMode) {
@@ -268,6 +307,62 @@ private struct ScannerOptionsPopover: View {
             }
         }
         .frame(idealWidth: 360, idealHeight: 560)
+    }
+}
+
+private struct SharedWebSessionSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding private var sessionCode: String
+    @State private var draftCode: String
+
+    let unavailableMessage: String?
+
+    init(sessionCode: Binding<String>, unavailableMessage: String?) {
+        _sessionCode = sessionCode
+        _draftCode = State(initialValue: sessionCode.wrappedValue)
+        self.unavailableMessage = unavailableMessage
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Session code", text: $draftCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .fontDesign(.monospaced)
+                    .disabled(unavailableMessage != nil)
+
+                Button {
+                    sessionCode = normalizedCode
+                    dismiss()
+                } label: {
+                    Label(
+                        sessionCode.isEmpty ? "Connect Session" : "Update Session",
+                        systemImage: "link"
+                    )
+                }
+                .disabled(normalizedCode.isEmpty || unavailableMessage != nil)
+            } footer: {
+                Text(unavailableMessage ?? "Start an iPhone session from the web Scan page, then enter its code here. Scans already in this tray and new scans will appear on the web.")
+            }
+
+            if !sessionCode.isEmpty {
+                Section {
+                    Button("Disconnect Web Session", role: .destructive) {
+                        sessionCode = ""
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .navigationTitle("Shared Web Session")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var normalizedCode: String {
+        draftCode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
     }
 }
 

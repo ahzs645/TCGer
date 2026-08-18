@@ -29,6 +29,38 @@ final class ScannerReplayRunnerTests: XCTestCase {
         XCTAssertGreaterThan(archive.count, 100)
     }
 
+    func testSelectedDevModeSessionsExportOnlyRequestedDirectories() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("selected-session-export-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let selectedNames = ["scan-session-20260817-214400", "scan-session-20260816-204700"]
+        let omittedName = "scan-session-20260816-165400"
+        for name in selectedNames + [omittedName] {
+            let directory = root.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data("contents-for-\(name)".utf8)
+                .write(to: directory.appendingPathComponent("results.json"))
+        }
+
+        let sessions = selectedNames.map { name in
+            ScannerDevModeStore.SessionInfo(
+                url: root.appendingPathComponent(name, isDirectory: true),
+                frameCount: 1,
+                sizeBytes: 1
+            )
+        }
+        let archive = try DevModeExporter.zip(sessions: sessions)
+        defer { try? FileManager.default.removeItem(at: archive.url) }
+        let archiveData = try Data(contentsOf: archive.url)
+
+        for name in selectedNames {
+            XCTAssertNotNil(archiveData.range(of: Data(name.utf8)))
+        }
+        XCTAssertNil(archiveData.range(of: Data(omittedName.utf8)))
+    }
+
     func testLegacyRecordingDecodesWithoutNewLabelFields() throws {
         let data = Data(#"""
         {

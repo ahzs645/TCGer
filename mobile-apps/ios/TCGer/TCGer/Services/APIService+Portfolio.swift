@@ -7,13 +7,26 @@ extension APIService {
         let finishCode: String?
 
         init(tcg: String, externalId: String, finishCode: String? = nil) {
-            self.tcg = tcg
-            self.externalId = externalId
-            self.finishCode = finishCode
+            self.tcg = Self.normalized(tcg)
+            self.externalId = Self.normalized(externalId)
+            let normalizedFinish = Self.normalized(finishCode ?? "")
+            self.finishCode = normalizedFinish.isEmpty ? nil : normalizedFinish
+        }
+
+        static func lookupKey(tcg: String, externalId: String) -> String {
+            "\(normalized(tcg).lowercased()):\(normalized(externalId).lowercased())"
+        }
+
+        var lookupKey: String {
+            Self.lookupKey(tcg: tcg, externalId: externalId)
         }
 
         var key: String {
-            "\(tcg.lowercased()):\(externalId):\(finishCode?.lowercased() ?? "")"
+            "\(Self.normalized(tcg).lowercased()):\(Self.normalized(externalId)):\(Self.normalized(finishCode ?? "").lowercased())"
+        }
+
+        private static func normalized(_ value: String) -> String {
+            value.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 
@@ -28,6 +41,10 @@ extension APIService {
         let updatedAt: String?
         let cached: Bool
         let error: String?
+
+        var lookupKey: String {
+            TrackedPriceItem.lookupKey(tcg: tcg, externalId: externalId)
+        }
     }
 
     struct TrackedPricesResponse: Codable, Sendable {
@@ -48,7 +65,10 @@ extension APIService {
         items: [TrackedPriceItem],
         force: Bool = false
     ) async throws -> TrackedPricesResponse {
-        let uniqueItems = Array(Dictionary(uniqueKeysWithValues: items.map { ($0.key, $0) }).values)
+        let uniqueItems = Array(Dictionary(
+            items.map { ($0.key, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        ).values)
             .sorted { $0.key < $1.key }
         guard !uniqueItems.isEmpty else {
             let now = ISO8601DateFormatter().string(from: Date())

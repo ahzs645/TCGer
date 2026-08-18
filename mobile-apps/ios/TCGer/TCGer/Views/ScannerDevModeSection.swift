@@ -256,6 +256,13 @@ struct ScannerDevModeSessionsView: View {
 
                     Spacer()
 
+                    Button {
+                        shareSelectedSessions()
+                    } label: {
+                        Label(exportSelectionTitle, systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(selectedSessionIDs.isEmpty)
+
                     Button(role: .destructive) {
                         deletionRequest = .sessions(selectedSessionIDs)
                     } label: {
@@ -303,6 +310,10 @@ struct ScannerDevModeSessionsView: View {
         selectedSessionIDs.isEmpty ? "Delete" : "Delete (\(selectedSessionIDs.count))"
     }
 
+    private var exportSelectionTitle: String {
+        selectedSessionIDs.isEmpty ? "Export" : "Export (\(selectedSessionIDs.count))"
+    }
+
     private func refresh() {
         sessions = ScannerDevModeStore.listSessions()
         selectedSessionIDs.formIntersection(sessions.map(\.id))
@@ -314,6 +325,16 @@ struct ScannerDevModeSessionsView: View {
             errorMessage = nil
         } catch {
             errorMessage = "Share failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func shareSelectedSessions() {
+        let selectedSessions = sessions.filter { selectedSessionIDs.contains($0.id) }
+        do {
+            shareArchive = try DevModeExporter.zip(sessions: selectedSessions)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Export failed: \(error.localizedDescription)"
         }
     }
 
@@ -441,6 +462,14 @@ struct ScannerDevModeSessionsView: View {
 }
 
 enum DevModeExporter {
+    private enum ExportError: LocalizedError {
+        case noSessionsSelected
+
+        var errorDescription: String? {
+            "Select at least one recorded session to export."
+        }
+    }
+
     static let sizeFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
@@ -451,16 +480,48 @@ enum DevModeExporter {
         try zipDirectory(session.url, as: "TCGer-DevMode-\(session.url.lastPathComponent).zip")
     }
 
+    /// Copies only the requested session folders into a temporary container,
+    /// then packages that container so the archive preserves each session's
+    /// directory name and replayable contents.
+    static func zip(sessions: [ScannerDevModeStore.SessionInfo]) throws -> DevModeShareArchive {
+        guard !sessions.isEmpty else { throw ExportError.noSessionsSelected }
+        if sessions.count == 1, let session = sessions.first {
+            return try zip(session: session)
+        }
+
+        let fileManager = FileManager.default
+        let stagingDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("TCGer-DevMode-Selected-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: stagingDirectory) }
+
+        for session in sessions {
+            try fileManager.copyItem(
+                at: session.url,
+                to: stagingDirectory.appendingPathComponent(session.url.lastPathComponent, isDirectory: true)
+            )
+        }
+
+        return try zipDirectory(
+            stagingDirectory,
+            as: "TCGer-DevMode-Selected-\(archiveTimestamp()).zip"
+        )
+    }
+
     /// Zips the whole ScannerDevMode root — every session — into one archive
     /// so a tester can hand over everything they have collected in one send.
     static func zipAllSessions() throws -> DevModeShareArchive {
+        return try zipDirectory(
+            ScannerDevModeStore.rootDirectory(),
+            as: "TCGer-DevMode-All-\(archiveTimestamp()).zip"
+        )
+    }
+
+    private static func archiveTimestamp() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return try zipDirectory(
-            ScannerDevModeStore.rootDirectory(),
-            as: "TCGer-DevMode-All-\(formatter.string(from: Date())).zip"
-        )
+        return formatter.string(from: Date())
     }
 
     private static func zipDirectory(_ directory: URL, as filename: String) throws -> DevModeShareArchive {

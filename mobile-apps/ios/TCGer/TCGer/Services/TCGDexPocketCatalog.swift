@@ -236,7 +236,10 @@ nonisolated enum TCGDexPocketCatalogAdapter {
         }
 
         let sets = series.sets.map(mapSet)
-        let setsByID = Dictionary(uniqueKeysWithValues: sets.map { ($0.code, $0) })
+        let setsByID = Dictionary(
+            sets.map { ($0.code, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let cards = cardDetails.values
             .map { mapCard($0, set: setsByID[$0.set.id]) }
             .sorted { lhs, rhs in

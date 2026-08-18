@@ -48,14 +48,18 @@ struct PricesView: View {
 
     private var trackedCards: [TrackedCard] {
         let changes = Dictionary(
-            uniqueKeysWithValues: (movers.gainers + movers.losers).map {
-                ("\($0.tcg):\($0.externalId)", $0.percentChange)
-            }
+            (movers.gainers + movers.losers).map {
+                (APIService.TrackedPriceItem.lookupKey(tcg: $0.tcg, externalId: $0.externalId), $0.percentChange)
+            },
+            uniquingKeysWith: { _, latest in latest }
         )
         var cards: [String: TrackedCard] = [:]
         for card in collections.flatMap(\.cards) {
-            let key = "\(card.tcg):\(card.externalId ?? card.cardId)"
-            let market = livePrices[key.lowercased()]
+            let key = APIService.TrackedPriceItem.lookupKey(
+                tcg: card.tcg,
+                externalId: card.externalId ?? card.cardId
+            )
+            let market = livePrices[key]
             if var existing = cards[key] {
                 existing.owned += card.quantity
                 cards[key] = existing
@@ -278,10 +282,11 @@ struct PricesView: View {
                 force: force
             )
             livePrices = Dictionary(
-                uniqueKeysWithValues: response.prices.compactMap { result in
+                response.prices.compactMap { result in
                     guard result.price != nil else { return nil }
-                    return ("\(result.tcg):\(result.externalId)".lowercased(), result)
-                }
+                    return (result.lookupKey, result)
+                },
+                uniquingKeysWith: { _, latest in latest }
             )
             lastPriceCheck = ISO8601DateFormatter().date(from: response.refreshedAt) ?? Date()
             nextPriceRefresh = ISO8601DateFormatter().date(from: response.refreshAfter)

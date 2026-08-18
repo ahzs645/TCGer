@@ -30,39 +30,7 @@ struct RecoveryPointsView: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(recoveryPoints) { recoveryPoint in
-                        NavigationLink {
-                            RecoveryPointDetailView(recoveryPoint: recoveryPoint) {
-                                refreshRecoveryPoints()
-                            }
-                        } label: {
-                            RecoveryPointRow(
-                                recoveryPoint: recoveryPoint,
-                                isLatest: recoveryPoint.id == recoveryPoints.first?.id
-                            )
-                        }
-                        .tag(recoveryPoint.url)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                pendingConfirmation = .delete([recoveryPoint.url])
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-
-                            Button {
-                                shareRequest = RecoveryPointShareRequest(urls: [recoveryPoint.url])
-                            } label: {
-                                Label("Export", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.blue)
-                        }
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                pendingConfirmation = .restore(recoveryPoint.url)
-                            } label: {
-                                Label("Restore", systemImage: "clock.arrow.circlepath")
-                            }
-                            .tint(.blue)
-                        }
+                        recoveryPointListRow(recoveryPoint)
                     }
                 }
             } footer: {
@@ -71,10 +39,20 @@ struct RecoveryPointsView: View {
         }
         .navigationTitle("Recovery Points")
         .environment(\.editMode, $editMode)
+        .toolbarVisibility(editMode.isEditing ? .hidden : .automatic, for: .tabBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if !recoveryPoints.isEmpty {
-                    EditButton()
+                    Button {
+                        toggleEditing()
+                    } label: {
+                        if editMode.isEditing {
+                            Image(systemName: "checkmark")
+                                .accessibilityLabel("Done")
+                        } else {
+                            Text("Edit")
+                        }
+                    }
                 }
 
                 Button {
@@ -135,6 +113,62 @@ struct RecoveryPointsView: View {
 
     private var selectedURLs: [URL] {
         recoveryPoints.map(\.url).filter(selection.contains)
+    }
+
+    @ViewBuilder
+    private func recoveryPointListRow(_ recoveryPoint: LocalRecoveryPoint) -> some View {
+        if editMode.isEditing {
+            RecoveryPointRow(
+                recoveryPoint: recoveryPoint,
+                isLatest: recoveryPoint.id == recoveryPoints.first?.id
+            )
+            .tag(recoveryPoint.url)
+        } else {
+            NavigationLink {
+                RecoveryPointDetailView(recoveryPoint: recoveryPoint) {
+                    refreshRecoveryPoints()
+                }
+            } label: {
+                RecoveryPointRow(
+                    recoveryPoint: recoveryPoint,
+                    isLatest: recoveryPoint.id == recoveryPoints.first?.id
+                )
+            }
+            .tag(recoveryPoint.url)
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) {
+                    pendingConfirmation = .delete([recoveryPoint.url])
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+
+                Button {
+                    shareRequest = RecoveryPointShareRequest(urls: [recoveryPoint.url])
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .tint(.blue)
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    pendingConfirmation = .restore(recoveryPoint.url)
+                } label: {
+                    Label("Restore", systemImage: "clock.arrow.circlepath")
+                }
+                .tint(.blue)
+            }
+        }
+    }
+
+    private func toggleEditing() {
+        withAnimation {
+            if editMode.isEditing {
+                selection.removeAll()
+                editMode = .inactive
+            } else {
+                editMode = .active
+            }
+        }
     }
 
     private func requestCreateRecoveryPoint() {

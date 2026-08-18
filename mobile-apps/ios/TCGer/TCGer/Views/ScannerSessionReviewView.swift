@@ -17,8 +17,6 @@ struct ScannerSessionReviewView: View {
     @AppStorage("scanner.defaultLanguage") private var defaultLanguage = "English"
     @State private var languageOverrides: [CardScanResult.ID: String] = [:]
     @State private var finishOverrides: [CardScanResult.ID: String] = [:]
-    @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
-    @State private var isSendingToWeb = false
     @State private var isLoadingCollections = true
     @State private var isAdding = false
     @State private var isCreatingBinder = false
@@ -49,40 +47,6 @@ struct ScannerSessionReviewView: View {
                     List {
                         Section {
                             summary
-                        }
-
-                        Section("Copy Details") {
-                            Picker("Session language", selection: $defaultLanguage) {
-                                ForEach(CardLanguage.supportedNames, id: \.self) { language in
-                                    Text(language).tag(language)
-                                }
-                            }
-
-                            Text("This language is applied to every selected scan unless you override it on that card below.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Section("Shared Web Session") {
-                            TextField("Session code", text: $sharedSessionCode)
-                                .textInputAutocapitalization(.characters)
-                                .autocorrectionDisabled()
-                                .fontDesign(.monospaced)
-                            Button {
-                                Task { await sendSelectedToWeb() }
-                            } label: {
-                                if isSendingToWeb {
-                                    ProgressView()
-                                } else {
-                                    Label("Send Selected to Web", systemImage: "iphone.and.arrow.forward")
-                                }
-                            }
-                            .disabled(selectedResultIDs.isEmpty || sharedSessionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSendingToWeb)
-                            Text(environmentStore.serverConfiguration.isOnDevice
-                                ? "Connect the app to your TCGer server to use shared sessions."
-                                : "The web Scan page will receive these cards and can edit and commit them together.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
 
                         Section("Scanned Cards") {
@@ -366,31 +330,6 @@ struct ScannerSessionReviewView: View {
             selectedResultIDs.removeAll()
         } else {
             selectedResultIDs = availableResultIDs
-        }
-    }
-
-    @MainActor
-    private func sendSelectedToWeb() async {
-        let code = sharedSessionCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !code.isEmpty else { return }
-        isSendingToWeb = true
-        defer { isSendingToWeb = false }
-        var sent = 0
-        do {
-            for result in viewModel.sessionResults where selectedResultIDs.contains(result.id) {
-                try await apiService.sendToSharedScanSession(
-                    config: environmentStore.serverConfiguration,
-                    token: environmentStore.authToken,
-                    code: code,
-                    result: result,
-                    language: language(for: result),
-                    finishCode: finishCode(for: result)
-                )
-                sent += 1
-            }
-            HapticManager.notification(.success)
-        } catch {
-            errorMessage = "Sent \(sent) card\(sent == 1 ? "" : "s") to the web. \(error.localizedDescription)"
         }
     }
 
