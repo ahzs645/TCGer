@@ -107,6 +107,13 @@ struct PackOpeningInterfaceState: Codable, Equatable {
 
     var availableCardPools: [CardPool] { cardPools ?? [] }
 
+    var selectedCardPool: CardPool? {
+        let poolID = selectedPackOption?.packPoolID ?? selectedSetID
+        return availableCardPools.first {
+            $0.id.caseInsensitiveCompare(poolID) == .orderedSame
+        }
+    }
+
     var selectedSetLabel: String {
         selectedPackOption?.resolvedSetLabel ?? selectedPackLabel
     }

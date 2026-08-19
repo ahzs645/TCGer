@@ -21,7 +21,7 @@ final class APIServiceTrackedPricesTests: XCTestCase {
         )
 
         XCTAssertEqual(first.key, second.key)
-        XCTAssertEqual(first.lookupKey, "pokemon:sv1-001")
+        XCTAssertEqual(first.lookupKey, "pokemon:sv1-001:holo")
         XCTAssertEqual(first.tcg, "Pokemon")
         XCTAssertEqual(first.externalId, "sv1-001")
         XCTAssertEqual(first.finishCode, "Holo")
@@ -29,7 +29,7 @@ final class APIServiceTrackedPricesTests: XCTestCase {
 
     func testGetTrackedPricesDeduplicatesEquivalentItemsBeforeRequesting() async throws {
         TrackedPricesURLProtocol.handler = { request in
-            let body = try XCTUnwrap(request.httpBody)
+            let body = try Self.requestBody(request)
             let json = try XCTUnwrap(
                 JSONSerialization.jsonObject(with: body) as? [String: Any]
             )
@@ -84,8 +84,58 @@ final class APIServiceTrackedPricesTests: XCTestCase {
         )
 
         XCTAssertEqual(response.prices.count, 1)
-        XCTAssertEqual(response.prices.first?.lookupKey, "pokemon:sv1-001")
+        XCTAssertEqual(response.prices.first?.lookupKey, "pokemon:sv1-001:holo")
         XCTAssertEqual(response.prices.first?.price, 3.25)
+    }
+
+    func testOnDeviceScryfallUsesFinishSpecificQuoteAndRequiredHeaders() async throws {
+        let defaults = UserDefaults.standard
+        let previousSource = defaults.string(forKey: PricingSource.storageKey)
+        defaults.set(PricingSource.scryfall.rawValue, forKey: PricingSource.storageKey)
+        defer {
+            if let previousSource {
+                defaults.set(previousSource, forKey: PricingSource.storageKey)
+            } else {
+                defaults.removeObject(forKey: PricingSource.storageKey)
+            }
+        }
+
+        TrackedPricesURLProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "TCGer/0.1 (iOS pricing integration)")
+            XCTAssertTrue(request.value(forHTTPHeaderField: "Accept")?.contains("application/json") == true)
+            XCTAssertTrue(request.url?.absoluteString.contains("api.scryfall.com/cards/finish-test-card") == true)
+            return try Self.response(
+                for: request,
+                status: 200,
+                json: [
+                    "prices": [
+                        "usd": "2.00",
+                        "usd_foil": "5.50",
+                        "usd_etched": "8.25",
+                        "eur": "1.80",
+                        "eur_foil": "4.90"
+                    ]
+                ]
+            )
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TrackedPricesURLProtocol.self]
+        let service = APIService(session: URLSession(configuration: configuration))
+        let response = try await service.getTrackedPrices(
+            config: .onDevice,
+            token: "local",
+            items: [APIService.TrackedPriceItem(
+                tcg: "magic",
+                externalId: "finish-test-card",
+                finishCode: "etched"
+            )],
+            force: true
+        )
+
+        XCTAssertEqual(response.prices.first?.price, 8.25)
+        XCTAssertEqual(response.prices.first?.currency, "USD")
+        XCTAssertEqual(response.prices.first?.source, "scryfall")
     }
 
     private static func response(
@@ -100,6 +150,22 @@ final class APIServiceTrackedPricesTests: XCTestCase {
             headerFields: ["Content-Type": "application/json"]
         ))
         return (response, try JSONSerialization.data(withJSONObject: json))
+    }
+
+    private static func requestBody(_ request: URLRequest) throws -> Data {
+        if let body = request.httpBody { return body }
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 { throw stream.streamError ?? URLError(.cannotDecodeContentData) }
+            if count == 0 { break }
+            data.append(buffer, count: count)
+        }
+        return data
     }
 }
 

@@ -8,39 +8,25 @@ struct AddCardToBinderSheet: View {
     let initialBinderId: String?
     let onAdd: (Card, String, BinderCardAddDetails) async throws -> Void
 
-    @State private var selectedCard: Card
+    @State private var draft: CardEditorDraft
     @State private var collections: [Collection] = []
+    @State private var localTags: [CollectionCardTag] = []
     @State private var selectedBinderId: String?
-    @State private var quantity: Int = 1
-    @State private var condition: String = CardCondition.nearMint.rawValue
     // Tracks what the picker was last seeded with, so switching binders only
     // re-seeds the condition while the user hasn't picked one themselves.
     @State private var seededCondition: String = CardCondition.nearMint.rawValue
-    @State private var language: String = "English"
-    @State private var notes: String = ""
-    @State private var isFoil: Bool = false
-    @State private var isSigned: Bool = false
-    @State private var isAltered: Bool = false
-    @State private var finishCode: String = ""
-    @State private var edition: String = ""
-    @State private var stamp: String = ""
-    @State private var isSealedPromo = false
-    @State private var isOversized = false
-    @State private var isPeelOff = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
     @State private var isCreatingBinder = false
     @State private var wishlistCard: Card?
     @State private var didAddToWishlist = false
-    @State private var worldChampionshipPrints: [Card] = []
-    @State private var championshipPicker: WorldChampionshipPickerContext?
+    @State private var printPickerCard: Card?
 
     private let apiService = APIService()
 
-    private let languages = PokemonCardLanguage.allCases.map(\.rawValue)
     private var finishOptions: [PokemonFinishOption] {
-        PokemonFinishOption.options(for: selectedCard, includeCatalog: true)
+        draft.finishOptions(for: originalCard)
     }
 
     init(
@@ -51,7 +37,27 @@ struct AddCardToBinderSheet: View {
         self.originalCard = card
         self.initialBinderId = initialBinderId
         self.onAdd = onAdd
-        self._selectedCard = State(initialValue: card)
+        self._draft = State(initialValue: CardEditorDraft(
+            quantity: 1,
+            condition: CardCondition.nearMint.rawValue,
+            language: "English",
+            notes: "",
+            isFoil: false,
+            isSigned: false,
+            isAltered: false,
+            finishCode: "",
+            edition: "",
+            stamp: "",
+            isSealedPromo: false,
+            isOversized: false,
+            isPeelOff: false,
+            selectedPrint: card,
+            gradingCompany: "",
+            gradingScore: "",
+            certNumber: "",
+            storageLocation: "",
+            selectedTagIds: []
+        ))
     }
 
     var body: some View {
@@ -59,7 +65,7 @@ struct AddCardToBinderSheet: View {
             Form {
                 // Card Preview Section
                 Section {
-                    CardPreviewRow(card: selectedCard)
+                    CardPreviewRow(card: draft.selectedPrint ?? originalCard)
                 } header: {
                     Text("Card")
                 }
@@ -96,7 +102,7 @@ struct AddCardToBinderSheet: View {
 
                 Section {
                     Button {
-                        wishlistCard = selectedCard
+                        wishlistCard = draft.selectedPrint ?? originalCard
                     } label: {
                         Label("Add to Wishlist", systemImage: "heart")
                     }
@@ -107,91 +113,49 @@ struct AddCardToBinderSheet: View {
                     Text("Track this card without adding a copy to a binder")
                 }
 
-                // Card Details
-                Section {
-                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
-
-                    ConditionPicker(selection: $condition)
-
-                    Picker("Language", selection: $language) {
-                        ForEach(languages, id: \.self) { lang in
-                            Text(lang).tag(lang)
-                        }
-                    }
-                } header: {
-                    Text("Card Details")
+                if originalCard.supportsPrintSelection {
+                    CardPrintSelectionSection(
+                        card: originalCard,
+                        selectedPrint: draft.selectedPrint,
+                        isDisabled: isAdding,
+                        onSelect: showPrintPicker
+                    )
                 }
 
-                // Attributes
-                Section {
-                    if selectedCard.tcg.lowercased() == "pokemon" {
-                        Picker("Finish", selection: $finishCode) {
-                            Text("Not specified").tag("")
-                            ForEach(finishOptions) { finish in
-                                Text(finish.label).tag(finish.code)
-                            }
-                        }
-                        TextField("Edition (e.g. 1st Edition)", text: $edition)
-                        TextField("Stamp (e.g. Prerelease, Staff)", text: $stamp)
-                        Toggle("Sealed promo", isOn: $isSealedPromo)
-                        Toggle("Oversized", isOn: $isOversized)
-                        Toggle("Peel-off", isOn: $isPeelOff)
-                    } else {
-                        Toggle(isOn: $isFoil) {
-                            Label("Foil", systemImage: "sparkles")
-                        }
-                    }
-                    Toggle(isOn: $isSigned) {
-                        Label("Signed", systemImage: "pencil.line")
-                    }
-                    Toggle(isOn: $isAltered) {
-                        Label("Altered Art", systemImage: "paintpalette")
-                    }
-                } header: {
-                    Text("Attributes")
-                }
+                CardEditorDetailsSection(
+                    quantity: $draft.quantity,
+                    condition: $draft.condition,
+                    language: $draft.language,
+                    showsQuantity: true
+                )
 
-                // Notes
-                Section {
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Notes")
-                }
+                CardEditorAttributesSection(
+                    card: draft.selectedPrint ?? originalCard,
+                    finishOptions: finishOptions,
+                    isFoil: $draft.isFoil,
+                    isSigned: $draft.isSigned,
+                    isAltered: $draft.isAltered,
+                    finishCode: $draft.finishCode,
+                    edition: $draft.edition,
+                    stamp: $draft.stamp,
+                    isSealedPromo: $draft.isSealedPromo,
+                    isOversized: $draft.isOversized,
+                    isPeelOff: $draft.isPeelOff
+                )
 
-                if !worldChampionshipPrints.isEmpty {
-                    Section {
-                        Button {
-                            championshipPicker = WorldChampionshipPickerContext(
-                                standardCard: originalCard,
-                                championshipPrints: worldChampionshipPrints
-                            )
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "trophy.fill")
-                                    .foregroundStyle(.orange)
+                CardEditorGradingSection(
+                    company: $draft.gradingCompany,
+                    score: $draft.gradingScore,
+                    certNumber: $draft.certNumber
+                )
 
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("World Championship Version")
-                                        .foregroundStyle(.primary)
-                                    Text(championshipSelectionDescription)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .disabled(isAdding)
-                    } header: {
-                        Text("Special Version")
-                    } footer: {
-                        Text("Optional. Choose an official World Championship replica instead of the standard card.")
-                    }
-                }
+                CardEditorStorageSection(storageLocation: $draft.storageLocation)
+                CardEditorNotesSection(notes: $draft.notes)
+                CardEditorTagsSection(
+                    tags: $localTags,
+                    selectedTagIds: $draft.selectedTagIds,
+                    onCreateTag: createTag
+                )
 
                 // Error Message
                 if let error = errorMessage {
@@ -222,26 +186,22 @@ struct AddCardToBinderSheet: View {
             }
         }
         .task {
-            if finishCode.isEmpty {
-                finishCode = finishOptions.first?.code ?? ""
-            }
-            if edition.isEmpty, selectedCard.pokemonPrint?.variants?.firstEdition == true {
-                edition = "1st Edition"
+            if draft.finishCode.isEmpty {
+                draft.applyPrintDefaults(for: draft.selectedPrint ?? originalCard)
             }
             await loadCollections()
-            await loadWorldChampionshipPrints()
+            await loadTags()
         }
         .onChange(of: selectedBinderId) { _, _ in
             applyBinderDefaultCondition()
         }
-        .onChange(of: selectedCard.id) { _, _ in
-            applySelectedCardDefaults()
+        .onChange(of: draft.selectedPrint?.id) { _, _ in
+            guard let selectedPrint = draft.selectedPrint else { return }
+            draft.applyPrintDefaults(for: selectedPrint)
         }
-        .sheet(item: $championshipPicker) { context in
-            WorldChampionshipPrintPicker(
-                context: context,
-                selection: $selectedCard
-            )
+        .sheet(item: $printPickerCard) { print in
+            SelectPrintSheet(card: print, selectedPrint: $draft.selectedPrint)
+                .environmentObject(environmentStore)
         }
         .sheet(item: $wishlistCard, onDismiss: {
             if didAddToWishlist {
@@ -255,45 +215,34 @@ struct AddCardToBinderSheet: View {
         }
     }
 
-    private var championshipSelectionDescription: String {
-        guard let worlds = selectedCard.pokemonPrint?.worldChampionship else {
-            return "Standard card"
-        }
-        return [String(worlds.year), worlds.playerName, worlds.deckName]
-            .compactMap { $0 }
-            .joined(separator: " · ")
+    private func showPrintPicker() {
+        printPickerCard = draft.selectedPrint ?? originalCard
     }
 
     @MainActor
-    private func loadWorldChampionshipPrints() async {
-        guard originalCard.tcg.lowercased() == TCGGame.pokemon.rawValue else { return }
-
-        let token: String
-        if environmentStore.serverConfiguration.isOnDevice {
-            token = environmentStore.authToken ?? ""
-        } else if let authToken = environmentStore.authToken {
-            token = authToken
-        } else {
-            return
-        }
-
+    private func loadTags() async {
+        guard let token = environmentStore.authToken else { return }
         do {
-            worldChampionshipPrints = try await apiService.getWorldChampionshipPrints(
+            localTags = try await apiService.getTags(
                 config: environmentStore.serverConfiguration,
-                token: token,
-                card: originalCard
+                token: token
             )
+            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
         } catch {
-            // Adding the standard card should remain uninterrupted when the
-            // optional championship lookup is unavailable.
-            worldChampionshipPrints = []
+            // Tags are optional; the rest of the add flow remains available.
         }
     }
 
-    private func applySelectedCardDefaults() {
-        finishCode = finishOptions.first?.code ?? ""
-        edition = selectedCard.pokemonPrint?.variants?.firstEdition == true ? "1st Edition" : ""
-        stamp = selectedCard.pokemonPrint?.worldChampionship?.stamp ?? ""
+    @MainActor
+    private func createTag(_ label: String) async throws -> CollectionCardTag {
+        guard let token = environmentStore.authToken else {
+            throw APIService.APIError.unauthorized
+        }
+        return try await apiService.createTag(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            label: label
+        )
     }
 
     @MainActor
@@ -375,32 +324,33 @@ struct AddCardToBinderSheet: View {
 
         isAdding = true
         errorMessage = nil
-        let trimmedEdition = edition.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedStamp = stamp.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectedCard = draft.selectedPrint ?? originalCard
+
+        func trimmed(_ value: String) -> String? {
+            let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return result.isEmpty ? nil : result
+        }
 
         do {
             try await onAdd(
                 selectedCard,
                 binderId,
                 BinderCardAddDetails(
-                    quantity: quantity,
-                    condition: condition,
-                    language: language,
-                    notes: notes.isEmpty ? nil : notes,
+                    quantity: draft.quantity,
+                    condition: trimmed(draft.condition),
+                    language: trimmed(draft.language),
+                    notes: trimmed(draft.notes),
                     isFoil: selectedCard.tcg.lowercased() == "pokemon"
-                        ? PokemonFinishOption.isFoil(finishCode)
-                        : isFoil,
-                    variant: CardCopyVariant(
-                        finishCode: finishCode.isEmpty ? nil : finishCode,
-                        finishLabel: finishCode.isEmpty ? nil : PokemonFinishOption.label(for: finishCode),
-                        edition: trimmedEdition.isEmpty ? nil : trimmedEdition,
-                        stamp: trimmedStamp.isEmpty ? nil : trimmedStamp,
-                        isSealedPromo: isSealedPromo,
-                        isOversized: isOversized,
-                        isPeelOff: isPeelOff
-                    ),
-                    isSigned: isSigned,
-                    isAltered: isAltered
+                        ? draft.variant.isFoil
+                        : draft.isFoil,
+                    variant: draft.variant,
+                    isSigned: draft.isSigned,
+                    isAltered: draft.isAltered,
+                    tags: draft.selectedTagIds.sorted(),
+                    gradingCompany: trimmed(draft.gradingCompany),
+                    gradingScore: trimmed(draft.gradingScore),
+                    certNumber: trimmed(draft.certNumber),
+                    storageLocation: trimmed(draft.storageLocation)
                 )
             )
             isAdding = false
@@ -423,119 +373,10 @@ struct AddCardToBinderSheet: View {
     private func applyBinderDefaultCondition() {
         let binderDefault = collection(for: selectedBinderId)?.defaultCondition
         let seed = CardCondition.canonicalize(binderDefault ?? CardCondition.nearMint.rawValue)
-        if condition == seededCondition {
-            condition = seed
+        if draft.condition == seededCondition {
+            draft.condition = seed
         }
         seededCondition = seed
-    }
-}
-
-private struct WorldChampionshipPickerContext: Identifiable {
-    let standardCard: Card
-    let championshipPrints: [Card]
-
-    var id: String { standardCard.id }
-}
-
-private struct WorldChampionshipPrintPicker: View {
-    @Environment(\.dismiss) private var dismiss
-
-    let context: WorldChampionshipPickerContext
-    @Binding var selection: Card
-    @State private var draftSelection: Card
-
-    init(
-        context: WorldChampionshipPickerContext,
-        selection: Binding<Card>
-    ) {
-        self.context = context
-        self._selection = selection
-        self._draftSelection = State(initialValue: selection.wrappedValue)
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Current Printing") {
-                    printRow(
-                        card: context.standardCard,
-                        title: "Standard card",
-                        subtitle: context.standardCard.setName ?? context.standardCard.setCode ?? "Current printing"
-                    )
-                }
-
-                Section {
-                    ForEach(context.championshipPrints.filter { $0.id != context.standardCard.id }) { card in
-                        championshipPrintRow(card)
-                    }
-                } header: {
-                    Text("World Championship Versions")
-                } footer: {
-                    Text("Official replica cards with printed signatures and championship card backs.")
-                }
-            }
-            .navigationTitle("Championship Version")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Use Version") {
-                        selection = draftSelection
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-
-    private func championshipPrintRow(_ card: Card) -> some View {
-        let worlds = card.pokemonPrint?.worldChampionship
-        let titleParts = [worlds?.playerName, worlds?.deckName].compactMap { $0 }
-        var subtitleParts: [String] = []
-        if let year = worlds?.year {
-            subtitleParts.append(String(year))
-        }
-        if let setName = card.setName {
-            subtitleParts.append(setName)
-        }
-        subtitleParts.append("Replica · Not tournament legal")
-
-        return printRow(
-            card: card,
-            title: titleParts.joined(separator: " · "),
-            subtitle: subtitleParts.joined(separator: " · ")
-        )
-    }
-
-    private func printRow(card: Card, title: String, subtitle: String) -> some View {
-        Button {
-            draftSelection = card
-        } label: {
-            HStack(spacing: 12) {
-                CardArtworkImage(card: card, useFullResolution: false)
-                    .frame(width: 44, height: 62)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title.isEmpty ? card.name : title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer()
-                Image(systemName: draftSelection.id == card.id ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(draftSelection.id == card.id ? Color.accentColor : Color.secondary)
-                    .font(.title3)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Select this card version")
     }
 }
 

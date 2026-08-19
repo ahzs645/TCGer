@@ -86,6 +86,11 @@ struct PackOpeningView: View {
                 ) { optionID in
                     send(.selectPack(optionID))
                 }
+            case .possibleCards(let poolID):
+                PackPossiblePullsSheet(
+                    poolID: poolID,
+                    cardPools: interfaceState.availableCardPools
+                )
             case .review(let session):
                 PackOpeningReviewSheet(session: session) {
                     phase = "Saved to collection"
@@ -266,21 +271,34 @@ struct PackOpeningView: View {
                     .accessibilityHint("Multi-pack openings show the stacked cutting animation, then go directly to grouped results.")
                 }
 
-                Button {
-                    presentedSheet = .packSelection
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "square.stack.3d.up.fill")
-                        Text(interfaceState.selectedPackDisplayLabel)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Button {
+                        presentedSheet = .packSelection
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                            Text(interfaceState.selectedPackDisplayLabel)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Choose set and pack, currently \(interfaceState.selectedPackDisplayLabel)")
+
+                    if let pool = interfaceState.selectedCardPool {
+                        Button {
+                            presentedSheet = .possibleCards(pool.id)
+                        } label: {
+                            Label("Cards", systemImage: "rectangle.grid.2x2.fill")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("View possible cards for \(pool.label)")
                     }
                 }
-                .buttonStyle(.glass)
-                .accessibilityLabel("Choose set and pack, currently \(interfaceState.selectedPackDisplayLabel)")
 
                 HStack(spacing: 8) {
                     ForEach([1, 5, 10], id: \.self) { count in
@@ -486,12 +504,15 @@ struct PackOpeningView: View {
 private extension PackOpeningView {
     enum SheetDestination: Identifiable {
         case packSelection
+        case possibleCards(String)
         case review(PackOpeningPullSession)
 
         var id: String {
             switch self {
             case .packSelection:
                 "pack-selection"
+            case .possibleCards(let poolID):
+                "possible-cards-\(poolID)"
             case .review(let session):
                 "review-\(session.id)"
             }

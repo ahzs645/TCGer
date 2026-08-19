@@ -22,7 +22,7 @@ export function getPriceSourceCatalog(): PriceSourcesResponse {
     {
       id: 'scryfall',
       label: 'Scryfall',
-      description: 'Current USD or EUR market prices for Magic cards.',
+      description: 'Current regular, foil, and etched USD or EUR market prices for Magic cards.',
       games: ['magic'],
       requiresServer: true,
     },

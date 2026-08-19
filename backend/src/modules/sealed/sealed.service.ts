@@ -230,7 +230,9 @@ export async function updateSealedInventory(userId: string, itemId: string, inpu
     data: {
       ...(input.quantity !== undefined && { quantity: input.quantity }),
       ...(input.purchasePrice !== undefined && { purchasePrice: input.purchasePrice }),
-      ...(input.purchaseDate !== undefined && { purchaseDate: new Date(input.purchaseDate) }),
+      ...(input.purchaseDate !== undefined && {
+        purchaseDate: input.purchaseDate === null ? null : new Date(input.purchaseDate)
+      }),
       ...(input.notes !== undefined && { notes: input.notes })
     },
     include: { product: true }

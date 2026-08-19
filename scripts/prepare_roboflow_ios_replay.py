@@ -101,6 +101,16 @@ def records_for_dataset(dataset_name: str, root: Path, output_root: Path) -> lis
                     "category": category_names.get(int(annotation["category_id"]), "unknown"),
                     "bbox": [float(value) for value in bbox],
                     "area": float(annotation.get("area", bbox[2] * bbox[3])),
+                    # Preserve polygon truth for mask/corner evaluation and
+                    # perspective rectification previews. RLE masks are left in
+                    # the source COCO file until the replay schema supports them.
+                    "segmentation": [
+                        [float(value) for value in polygon]
+                        for polygon in (annotation.get("segmentation") or [])
+                        if isinstance(polygon, list)
+                        and len(polygon) >= 6
+                        and len(polygon) % 2 == 0
+                    ],
                 }
             )
 

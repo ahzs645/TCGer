@@ -523,15 +523,15 @@ struct SettingsView: View {
                                 environmentStore.loadSampleSmartFolders()
                                 sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                             } label: {
-                                Label("Load Sample Collection", systemImage: "sparkles")
+                                Label("Load Sample Data", systemImage: "sparkles")
                             }
                         }
                     } header: {
                         Text("Sample Data")
                     } footer: {
                         Text(sampleDataLoaded
-                            ? "Sample binders, wishlists, sealed items, and transactions are loaded. Removing them leaves everything you added untouched."
-                            : "Adds a few example binders, wishlists, and transactions so you can try the app out. Your own cards are never affected.")
+                            ? "Sample binders, wishlists, sealed items, Code Vault entries, and transactions are loaded. Removing them leaves everything you added untouched."
+                            : "Adds example binders, wishlists, sealed items, Code Vault entries, and transactions so you can try the app out. Your own data is never affected.")
                     }
                 }
 

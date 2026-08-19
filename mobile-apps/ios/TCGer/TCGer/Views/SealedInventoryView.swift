@@ -108,7 +108,17 @@ struct SealedInventoryView: View {
                         if !filteredInventory.isEmpty {
                             Section("Sealed Inventory") {
                                 ForEach(filteredInventory) { item in
-                                    SealedInventoryRow(item: item)
+                                    SealedInventoryRow(item: item) {
+                                        actionSheet = .setCards(item.product)
+                                    }
+                                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                            Button {
+                                                actionSheet = .edit(item)
+                                            } label: {
+                                                Label("Edit", systemImage: "square.and.pencil")
+                                            }
+                                            .tint(.blue)
+                                        }
                                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                             Button(role: .destructive) {
                                                 Task { await deleteItem(item) }
@@ -213,6 +223,13 @@ struct SealedInventoryView: View {
             }
             .sheet(item: $actionSheet) { action in
                 switch action {
+                case .edit(let item):
+                    EditSealedInventorySheet(item: item) { updatedItem in
+                        if let index = inventory.firstIndex(where: { $0.id == updatedItem.id }) {
+                            inventory[index] = updatedItem
+                        }
+                    }
+                    .environmentObject(environmentStore)
                 case .open(let item):
                     RecordSealedOpeningSheet(item: item) {
                         await loadInventory()
@@ -223,6 +240,9 @@ struct SealedInventoryView: View {
                         await loadInventory()
                     }
                     .environmentObject(environmentStore)
+                case .setCards(let product):
+                    SealedSetCardsSheet(product: product)
+                        .environmentObject(environmentStore)
                 }
             }
         .alert("Barcode Scan", isPresented: Binding(
@@ -305,13 +325,17 @@ struct SealedInventoryView: View {
 }
 
 private enum SealedActionSheet: Identifiable {
+    case edit(SealedInventoryItem)
     case open(SealedInventoryItem)
     case ledger(SealedOpeningLedger)
+    case setCards(SealedProduct)
 
     var id: String {
         switch self {
+        case .edit(let item): "edit-\(item.id)"
         case .open(let item): "open-\(item.id)"
         case .ledger(let ledger): "ledger-\(ledger.id)"
+        case .setCards(let product): "set-cards-\(product.id)"
         }
     }
 }
@@ -360,6 +384,7 @@ private struct SealedLedgerRow: View {
 
 private struct SealedInventoryRow: View {
     let item: SealedInventoryItem
+    let onBrowseSetCards: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -404,6 +429,12 @@ private struct SealedInventoryRow: View {
                         .foregroundColor(.secondary)
                 }
 
+                if let setCode = item.product.setCode, !setCode.isEmpty {
+                    Text("Set \(setCode)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let price = item.purchasePrice {
                     Text(price.priceText)
                         .font(.caption)
@@ -411,8 +442,337 @@ private struct SealedInventoryRow: View {
                 }
             }
             Spacer()
+
+            if let setCode = item.product.setCode, !setCode.isEmpty {
+                Button(action: onBrowseSetCards) {
+                    Label("Cards", systemImage: "rectangle.grid.2x2.fill")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor.opacity(0.12), in: .capsule)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("View cards in set \(setCode)")
+                .accessibilityHint("Shows cards associated with this sealed product's linked set")
+            }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct EditSealedInventorySheet: View {
+    let item: SealedInventoryItem
+    let onSaved: (SealedInventoryItem) -> Void
+
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var quantity: Int
+    @State private var purchasePrice: String
+    @State private var includesPurchaseDate: Bool
+    @State private var purchaseDate: Date
+    @State private var notes: String
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private let apiService = APIService()
+
+    init(item: SealedInventoryItem, onSaved: @escaping (SealedInventoryItem) -> Void) {
+        self.item = item
+        self.onSaved = onSaved
+        _quantity = State(initialValue: item.quantity)
+        _purchasePrice = State(initialValue: item.purchasePrice.map { String($0) } ?? "")
+
+        let parsedPurchaseDate = Self.parseDate(item.purchaseDate)
+        _includesPurchaseDate = State(initialValue: parsedPurchaseDate != nil)
+        _purchaseDate = State(initialValue: parsedPurchaseDate ?? Date())
+        _notes = State(initialValue: item.notes ?? "")
+    }
+
+    private var trimmedPrice: String {
+        purchasePrice.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var parsedPrice: Double? {
+        guard !trimmedPrice.isEmpty else { return nil }
+        return Double(trimmedPrice)
+    }
+
+    private var priceIsValid: Bool {
+        trimmedPrice.isEmpty || parsedPrice.map { $0 >= 0 && $0.isFinite } == true
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Product") {
+                    Text(item.product.name)
+                        .font(.headline)
+                    LabeledContent("Game", value: item.product.tcg)
+                    LabeledContent("Type", value: item.product.productType.capitalized)
+                }
+
+                Section("Inventory") {
+                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...9_999)
+
+                    TextField("Purchase price", text: $purchasePrice)
+                        .keyboardType(.decimalPad)
+
+                    if !priceIsValid {
+                        Text("Enter a valid non-negative purchase price.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    Toggle("Include purchase date", isOn: $includesPurchaseDate)
+                    if includesPurchaseDate {
+                        DatePicker("Purchase date", selection: $purchaseDate, displayedComponents: .date)
+                    }
+                }
+
+                Section("Notes") {
+                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Edit Sealed Product")
+            .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(isSaving)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || !priceIsValid)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Sign in before editing sealed inventory."
+            return
+        }
+
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSaving = true
+        errorMessage = nil
+
+        do {
+            let updatedItem = try await apiService.updateSealedInventory(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                itemId: item.id,
+                quantity: quantity,
+                purchasePrice: parsedPrice,
+                purchaseDate: includesPurchaseDate
+                    ? ISO8601DateFormatter().string(from: purchaseDate)
+                    : nil,
+                notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                clearPurchasePrice: trimmedPrice.isEmpty && item.purchasePrice != nil,
+                clearPurchaseDate: !includesPurchaseDate && item.purchaseDate != nil,
+                clearNotes: trimmedNotes.isEmpty && item.notes != nil
+            )
+            onSaved(updatedItem)
+            HapticManager.notification(.success)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            isSaving = false
+        }
+    }
+
+    private static func parseDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        if let date = ISO8601DateFormatter().date(from: value) {
+            return date
+        }
+
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+}
+
+private struct SealedSetCardsSheet: View {
+    let product: SealedProduct
+
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var cards: [Card] = []
+    @State private var searchText = ""
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    private let apiService = APIService()
+    private let columns = [
+        GridItem(.adaptive(minimum: 132, maximum: 190), spacing: 14)
+    ]
+
+    private var filteredCards: [Card] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cards
+            .filter { card in
+                query.isEmpty ||
+                    card.name.localizedCaseInsensitiveContains(query) ||
+                    (card.rarity?.localizedCaseInsensitiveContains(query) ?? false) ||
+                    (card.collectorNumber?.localizedCaseInsensitiveContains(query) ?? false)
+            }
+            .sorted {
+                ($0.collectorNumber ?? $0.name).localizedStandardCompare(
+                    $1.collectorNumber ?? $1.name
+                ) == .orderedAscending
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView("Loading set cards…")
+                } else if let errorMessage {
+                    ContentUnavailableView {
+                        Label("Cards Unavailable", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Try Again") { Task { await loadCards() } }
+                    }
+                } else if filteredCards.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Label(
+                                "Cards from the linked set are shown here. Exact contents and pull rates depend on the sealed product and its collation.",
+                                systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            LazyVGrid(columns: columns, spacing: 20) {
+                                ForEach(filteredCards) { card in
+                                    SealedSetCardCell(card: card)
+                                }
+                            }
+                        }
+                        .padding(16)
+                    }
+                }
+            }
+            .navigationTitle(product.setCode.map { "Set \($0) Cards" } ?? "Set Cards")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Name, rarity, or number")
+            .safeAreaInset(edge: .bottom) {
+                if !isLoading && errorMessage == nil && !cards.isEmpty {
+                    Text("Showing \(filteredCards.count) of \(cards.count) cards")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(.regularMaterial, in: .capsule)
+                        .padding(.bottom, 8)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+            .task(id: "\(product.tcg):\(product.setCode ?? "")") {
+                await loadCards()
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @MainActor
+    private func loadCards() async {
+        guard let setCode = product.setCode, !setCode.isEmpty else {
+            isLoading = false
+            errorMessage = "This product is not linked to a card set."
+            return
+        }
+
+        let token = environmentStore.authToken ?? ""
+        guard environmentStore.serverConfiguration.isOnDevice || !token.isEmpty else {
+            isLoading = false
+            errorMessage = "Sign in to load cards for this set."
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        do {
+            cards = try await apiService.getSetCards(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                tcg: product.tcg,
+                setCode: setCode
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+private struct SealedSetCardCell: View {
+    let card: Card
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CachedAsyncImage(card: card, thumbnail: true) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFit()
+                case .failure:
+                    Image(systemName: "rectangle.portrait.slash")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                default:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .aspectRatio(2.5 / 3.5, contentMode: .fit)
+            .clipShape(TradingCardShape())
+            .shadow(color: .black.opacity(0.12), radius: 7, y: 4)
+
+            Text(card.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+            Text([
+                card.collectorNumber.map { "#\($0)" },
+                card.rarity
+            ].compactMap { $0 }.joined(separator: " · "))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel([
+            card.name,
+            card.collectorNumber.map { "number \($0)" },
+            card.rarity
+        ].compactMap { $0 }.joined(separator: ", "))
     }
 }
 

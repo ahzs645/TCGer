@@ -6,9 +6,7 @@ describe('Collectr test price provider', () => {
       id: 'collectr-product-1',
       market_price: '42.75',
       currency: 'cad',
-      external_ids: [
-        { external_id: 'sv04-214', product_sub_type: 'Normal', grade_id: 'ungraded' },
-      ],
+      external_ids: [{ external_id: 'sv04-214', product_sub_type: 'Normal', grade_id: 'ungraded' }],
     });
     const provider = new CollectrTestPriceProvider(loader);
 
@@ -16,6 +14,7 @@ describe('Collectr test price provider', () => {
       currency: 'CAD',
       price: 42.75,
       foilPrice: undefined,
+      etchedPrice: undefined,
       reverseHoloPrice: undefined,
     });
     expect(loader).toHaveBeenCalledWith('pokemon', 'sv04-214');

@@ -81,6 +81,7 @@ final class CardScannerViewModel: ObservableObject {
     @Published private(set) var liveConfirmationRequired = 2
     @Published private(set) var nextBinderPageNumber = 1
     @Published private(set) var latestCaptureQuality: ScannerCaptureQualityReport?
+    @Published private(set) var hasCompletedScanInCurrentSession = false
     @Published var cropRescueRequest: ScannerCropRescueRequest? {
         didSet { syncCameraOverlayState() }
     }
@@ -197,6 +198,7 @@ final class CardScannerViewModel: ObservableObject {
             let fresh = restored.filter { !existingIDs.contains($0.result.id) }
             guard !fresh.isEmpty else { return }
             self.sessionResults = fresh.map(\.result) + self.sessionResults
+            self.hasCompletedScanInCurrentSession = true
             self.addedSessionResultIDs.formUnion(
                 fresh.filter(\.addedToCollection).map(\.result.id)
             )
@@ -517,6 +519,7 @@ final class CardScannerViewModel: ObservableObject {
                 binderPages.append(record)
                 binderPages.sort { $0.pageNumber < $1.pageNumber }
             }
+            hasCompletedScanInCurrentSession = true
             nextBinderPageNumber = max(
                 scannedPageNumber + 1,
                 (binderPages.map(\.pageNumber).max() ?? 0) + 1
@@ -644,6 +647,7 @@ final class CardScannerViewModel: ObservableObject {
     func clearBinderSession() {
         binderReviewPresentation = nil
         binderPages.removeAll()
+        hasCompletedScanInCurrentSession = false
         selectedBinderID = nil
         binderDestinationMode = .oneBinder
         binderPageDestinationIDs.removeAll()
@@ -669,6 +673,7 @@ final class CardScannerViewModel: ObservableObject {
 
     func clearSession() {
         sessionResults.removeAll()
+        hasCompletedScanInCurrentSession = false
         addedSessionResultIDs.removeAll()
         rescueSources.removeAll()
         liveConsensus.reset()
@@ -1123,6 +1128,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private func appendToSession(_ result: CardScanResult) {
         sessionResults.append(result)
+        hasCompletedScanInCurrentSession = true
         if sessionResults.count > 100 {
             let removedIDs = Set(sessionResults.prefix(sessionResults.count - 100).map(\.id))
             sessionResults.removeFirst(sessionResults.count - 100)

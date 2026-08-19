@@ -15,6 +15,39 @@ extension APIService {
         let purchasePrice: Double?
         let purchaseDate: String?
         let notes: String?
+        let clearPurchasePrice: Bool
+        let clearPurchaseDate: Bool
+        let clearNotes: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            case quantity
+            case purchasePrice
+            case purchaseDate
+            case notes
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(quantity, forKey: .quantity)
+
+            if clearPurchasePrice {
+                try container.encodeNil(forKey: .purchasePrice)
+            } else {
+                try container.encodeIfPresent(purchasePrice, forKey: .purchasePrice)
+            }
+
+            if clearPurchaseDate {
+                try container.encodeNil(forKey: .purchaseDate)
+            } else {
+                try container.encodeIfPresent(purchaseDate, forKey: .purchaseDate)
+            }
+
+            if clearNotes {
+                try container.encodeNil(forKey: .notes)
+            } else {
+                try container.encodeIfPresent(notes, forKey: .notes)
+            }
+        }
     }
 
     private struct CreateSealedOpeningRequest: Encodable {
@@ -257,7 +290,10 @@ extension APIService {
         quantity: Int? = nil,
         purchasePrice: Double? = nil,
         purchaseDate: String? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        clearPurchasePrice: Bool = false,
+        clearPurchaseDate: Bool = false,
+        clearNotes: Bool = false
     ) async throws -> SealedInventoryItem {
         if config.isOnDevice {
             return try LocalStore.shared.updateSealedInventory(
@@ -265,14 +301,20 @@ extension APIService {
                 quantity: quantity,
                 purchasePrice: purchasePrice,
                 purchaseDate: purchaseDate,
-                notes: notes
+                notes: notes,
+                clearPurchasePrice: clearPurchasePrice,
+                clearPurchaseDate: clearPurchaseDate,
+                clearNotes: clearNotes
             )
         }
         let body = UpdateSealedInventoryRequest(
             quantity: quantity,
             purchasePrice: purchasePrice,
             purchaseDate: purchaseDate,
-            notes: notes
+            notes: notes,
+            clearPurchasePrice: clearPurchasePrice,
+            clearPurchaseDate: clearPurchaseDate,
+            clearNotes: clearNotes
         )
         let (data, response) = try await makeRequest(
             config: config, path: "sealed/inventory/\(itemId)", method: "PATCH", token: token, body: body

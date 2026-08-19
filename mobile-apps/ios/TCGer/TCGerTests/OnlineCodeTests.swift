@@ -83,6 +83,35 @@ final class OnlineCodeTests: XCTestCase {
             .redeemed
         )
     }
+
+    func testSampleDataSeedsAndRemovesRepresentativeCodeVaultEntries() throws {
+        let repository = OnlineCodeMemoryRepository()
+        let store = LocalStore(persistenceRepository: repository)
+
+        store.loadSampleData()
+
+        let samples = store.getOnlineCodes().filter { $0.id.hasPrefix("sample-") }
+        XCTAssertEqual(samples.count, 9)
+        XCTAssertEqual(
+            Set(samples.map(\.tcg)),
+            Set(TCGGame.allCases.filter { $0 != .all }.map(\.rawValue))
+        )
+        XCTAssertEqual(Set(samples.map { $0.status.rawValue }), Set(OnlineCodeStatus.allCases.map(\.rawValue)))
+        XCTAssertEqual(Set(samples.map { $0.source.rawValue }), Set(["camera", "manual", "import"]))
+        XCTAssertTrue(samples.allSatisfy { $0.code.hasPrefix("DEMO-") })
+
+        _ = try store.createOnlineCodes(
+            tcg: "pokemon",
+            codes: ["USER-KEPT-1234"],
+            source: .manual,
+            productName: "My booster",
+            notes: nil
+        )
+        store.removeSampleData()
+
+        let remaining = store.getOnlineCodes()
+        XCTAssertEqual(remaining.map(\.code), ["USER-KEPT-1234"])
+    }
 }
 
 private final class OnlineCodeMemoryRepository: LocalStorePersistenceRepository {

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "model": "example-card-segmenter",
+  "samples": [
+    {
+      "imagePath": "datasets/tcgx-annotations-v7/test/example.jpg",
+      "confidence": 0.97,
+      "polygons": [
+        [[0.15, 0.08], [0.83, 0.1], [0.87, 0.91], [0.12, 0.89]]
+      ],
+      "corners": [[0.15, 0.08], [0.83, 0.1], [0.87, 0.91], [0.12, 0.89]],
+      "rectifiedPath": "/optional/path/to/model-rectified-card.jpg"
+    }
+  ]
+}

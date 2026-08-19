@@ -34,7 +34,7 @@ enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 
     var isAvailableOnDevice: Bool {
-        self == .justTCG
+        self == .automatic || self == .scryfall || self == .justTCG
     }
 
     var isServerSelectable: Bool {
@@ -42,7 +42,7 @@ enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 
     static func selected(in defaults: UserDefaults = .standard) -> PricingSource {
-        defaults.string(forKey: storageKey).flatMap(PricingSource.init(rawValue:)) ?? .justTCG
+        defaults.string(forKey: storageKey).flatMap(PricingSource.init(rawValue:)) ?? .automatic
     }
 }
 

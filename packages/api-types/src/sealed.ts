@@ -15,9 +15,9 @@ export type CreateSealedInventoryInput = z.infer<typeof createSealedInventorySch
 
 export const updateSealedInventorySchema = z.object({
   quantity: z.number().int().positive().optional(),
-  purchasePrice: z.number().finite().nonnegative().optional(),
-  purchaseDate: z.string().datetime().optional(),
-  notes: z.string().optional()
+  purchasePrice: z.number().finite().nonnegative().nullable().optional(),
+  purchaseDate: z.string().datetime().nullable().optional(),
+  notes: z.string().nullable().optional()
 }).refine(data => Object.values(data).some(v => v !== undefined), {
   message: 'At least one field must be provided'
 });

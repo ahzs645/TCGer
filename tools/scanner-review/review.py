@@ -19,11 +19,17 @@ from typing import Any, Iterable
 
 import numpy as np
 
+from diagnostics import write_diagnostic_dashboards
 from geometry import (
+    CARD_HEIGHT,
+    CARD_WIDTH,
+    boundary_iou,
+    corner_error,
     load_coco_geometry,
     normalized_points,
     perspective_distortion,
     polygon_points,
+    polygon_iou,
     quad_from_annotation,
     render_rectification_preview,
 )
@@ -32,7 +38,9 @@ from performance import (
     decision_label,
     disagreement_score,
     file_sha256,
+    normalize_card_name,
     render_metrics_table,
+    render_performance_charts,
     run_metrics,
     write_metrics,
 )
@@ -42,6 +50,7 @@ TOOL_DIR = Path(__file__).resolve().parent
 DEFAULT_STATE_DIR = TOOL_DIR / ".fiftyone"
 DEFAULT_DATASET_NAME = "tcger-scanner-ios-replay"
 DEFAULT_PREVIEW_DATASET_NAME = "tcger-scanner-rectification-previews"
+DEFAULT_SESSION_DATASET_NAME = "tcger-scanner-real-sessions"
 DEFAULT_REFERENCE_ROOT = (
     Path.home()
     / "Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference"
@@ -57,6 +66,19 @@ VALID_LABEL_CATEGORIES = {
     "outsideIndex",
     "needsLabel",
     "unlabeled",
+}
+
+AUGMENTATION_POLICIES = {
+    "tcgx-annotations-v7": "three-version export: right-angle rotation plus salt-and-pepper noise",
+    "pokemon-card-detector-v1": "three-version export: flips, rotation, crop, shear, brightness, exposure, blur, noise",
+    "pk-detect-v3": "three-version export: right-angle rotation, brightness, and blur",
+    "pokefolio-v1": "no Roboflow augmentation",
+    "labelyolo-v4": "no Roboflow augmentation",
+}
+AUGMENTED_DATASETS = {
+    "tcgx-annotations-v7",
+    "pokemon-card-detector-v1",
+    "pk-detect-v3",
 }
 
 
@@ -236,6 +258,22 @@ def prediction_verdict(label: dict[str, Any] | None, sample: dict[str, Any]) -> 
     return "declined" if not predicted_id else "false_positive"
 
 
+def name_prediction_verdict(label: dict[str, Any] | None, sample: dict[str, Any]) -> str:
+    if not label or label.get("category") in {None, "needsLabel", "unlabeled"}:
+        return "unscored"
+    result = sample.get("result") or {}
+    matched = bool(result.get("matched") and result.get("cardID"))
+    if label.get("category") != "singleCard":
+        return "declined" if not matched else "false_positive"
+    if not matched:
+        return "missed"
+    expected = normalize_card_name(label.get("name"))
+    predicted = normalize_card_name(result.get("name"))
+    if not expected:
+        return "unscored"
+    return "correct" if predicted == expected else "wrong"
+
+
 def configure_fiftyone_state(state_dir: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("FIFTYONE_DATABASE_DIR", str(state_dir / "db"))
@@ -310,6 +348,14 @@ def record_geometry(fo: Any, record: ReplayRecord) -> tuple[Any, Any, str, float
         if sources
         else "unavailable"
     )
+    largest = max(record.annotations, key=lambda item: float(item.get("area") or 0), default=None)
+    quad = quad_from_annotation(largest)[0] if largest else None
+    return (
+        fo.Polylines(polylines=polylines),
+        fo.Keypoints(keypoints=keypoints),
+        source,
+        perspective_distortion(quad),
+    )
 
 
 def save_review_views(dataset: Any, runs: Iterable[ModelRun]) -> None:
@@ -328,22 +374,35 @@ def save_review_views(dataset: Any, runs: Iterable[ModelRun]) -> None:
         "04 · Perspective stress cases": dataset.match(
             field("perspective_distortion") > 0.15
         ).sort_by("perspective_distortion", reverse=True),
+        "05 · Roboflow augmented datasets": dataset.match(
+            field("provenance_kind") == "roboflow_augmented_dataset"
+        ),
+        "06 · Roboflow unaugmented datasets": dataset.match(
+            field("provenance_kind") == "roboflow_unaugmented_dataset"
+        ),
+        "07 · Geometry holdout": dataset.match(
+            field("geometry_evaluation_eligible") == True  # noqa: E712
+        ),
+        "08 · Source-group split leakage": dataset.match(
+            field("source_group_split_leakage") == True  # noqa: E712
+        ).sort_by("source_group_key"),
     }
     for run in runs:
         verdict_field = f"verdict_{run.field_suffix}"
         views[f"Failures · {run.field_suffix}"] = dataset.match(
             field(verdict_field).is_in(["wrong", "missed", "false_positive"])
         )
+        views[f"Name failures · {run.field_suffix}"] = dataset.match(
+            field(f"name_verdict_{run.field_suffix}").is_in(
+                ["wrong", "missed", "false_positive"]
+            )
+        )
+        views[f"Name right, printing wrong · {run.field_suffix}"] = dataset.match(
+            (field(verdict_field) == "wrong")
+            & (field(f"name_verdict_{run.field_suffix}") == "correct")
+        )
     for name, view in views.items():
         dataset.save_view(name, view, overwrite=True)
-    largest = max(record.annotations, key=lambda item: float(item.get("area") or 0), default=None)
-    quad = quad_from_annotation(largest)[0] if largest else None
-    return (
-        fo.Polylines(polylines=polylines),
-        fo.Keypoints(keypoints=keypoints),
-        source,
-        perspective_distortion(quad),
-    )
 
 
 def build_dataset(
@@ -423,7 +482,19 @@ def build_dataset(
     distortions = []
     truth_values = []
     record_by_key = {record.sample_key: record for record in records}
-    for sample_key in dataset.values("sample_key"):
+    working_columns = dataset.values(
+        ["sample_key", "label_category", "label_card_id", "label_card_name"]
+    )
+    working_rows = list(zip(*working_columns))
+    working_labels = {
+        sample_key: {
+            "category": category or "unlabeled",
+            "cardId": card_id or "",
+            "name": card_name or "",
+        }
+        for sample_key, category, card_id, card_name in working_rows
+    }
+    for sample_key, category, card_id, _ in working_rows:
         record = record_by_key[sample_key]
         polygons, corners, geometry_source, distortion = record_geometry(fo, record)
         polygon_values.append(polygons)
@@ -431,10 +502,8 @@ def build_dataset(
         geometry_sources.append(geometry_source)
         card_counts.append(len(record.annotations))
         distortions.append(distortion)
-        label = labels.get(record.label_key) or {}
-        category = label.get("category", "unlabeled")
         identity = None if category in {"needsLabel", "unlabeled"} else str(
-            label.get("cardId") or f"__{category}__"
+            card_id or f"__{category}__"
         )
         truth_values.append(fo.Classification(label=identity) if identity else None)
     dataset.set_values("ground_truth_polygons", polygon_values)
@@ -443,6 +512,54 @@ def build_dataset(
     dataset.set_values("card_count", card_counts)
     dataset.set_values("perspective_distortion", distortions)
     dataset.set_values("ground_truth_identity", truth_values)
+
+    group_splits: dict[str, set[str]] = {}
+    for record in records:
+        group_key = f"{record.source_dataset}:{record.label_key}"
+        group_splits.setdefault(group_key, set()).add(record.split)
+    source_group_keys = []
+    provenance_kinds = []
+    augmentation_policies = []
+    augmentation_statuses = []
+    evaluation_roles = []
+    geometry_eligible = []
+    recognition_eligible = []
+    split_leakage = []
+    for index, (sample_key, category, _, _) in enumerate(working_rows):
+        record = record_by_key[sample_key]
+        group_key = f"{record.source_dataset}:{record.label_key}"
+        augmented = record.source_dataset in AUGMENTED_DATASETS
+        source_group_keys.append(group_key)
+        provenance_kinds.append(
+            "roboflow_augmented_dataset" if augmented else "roboflow_unaugmented_dataset"
+        )
+        augmentation_policies.append(
+            AUGMENTATION_POLICIES.get(record.source_dataset, "unknown")
+        )
+        augmentation_statuses.append(
+            "unknown_member_of_augmented_export" if augmented else "not_augmented_by_export"
+        )
+        evaluation_roles.append(
+            "roboflow_geometry_holdout"
+            if record.split in {"test", "valid"}
+            else "training_pool"
+        )
+        geometry_eligible.append(
+            record.split in {"test", "valid"} and geometry_sources[index] == "source_polygon"
+        )
+        recognition_eligible.append(category not in {"needsLabel", "unlabeled"})
+        split_leakage.append(len(group_splits[group_key]) > 1)
+    dataset.set_values("provenance_kind", provenance_kinds)
+    dataset.set_values("media_role", ["scanner_query"] * len(dataset))
+    dataset.set_values("source_group_key", source_group_keys)
+    dataset.set_values("augmentation_policy", augmentation_policies)
+    dataset.set_values("augmentation_status", augmentation_statuses)
+    dataset.set_values("is_synthetic", [False] * len(dataset))
+    dataset.set_values("is_derived", [False] * len(dataset))
+    dataset.set_values("evaluation_role", evaluation_roles)
+    dataset.set_values("geometry_evaluation_eligible", geometry_eligible)
+    dataset.set_values("recognition_evaluation_eligible", recognition_eligible)
+    dataset.set_values("source_group_split_leakage", split_leakage)
 
     existing_schema = dataset.get_field_schema()
     if "review_status" not in existing_schema:
@@ -457,15 +574,21 @@ def build_dataset(
         for item in (dataset.info or {}).get("tcger_model_runs", [])
         if isinstance(item, dict)
     }
-    updated_runs: set[str] = set()
     metrics_by_suffix = {
-        run.field_suffix: run_metrics(labels, run.predictions, label_key_for_path) for run in runs
+        run.field_suffix: run_metrics(
+            working_labels, run.predictions, lambda sample_key: sample_key
+        )
+        for run in runs
     }
     for run in runs:
         prediction_field = f"pred_{run.field_suffix}"
         decision_field = f"decision_{run.field_suffix}"
+        identified_id_field = f"identified_card_id_{run.field_suffix}"
+        identified_name_field = f"identified_card_name_{run.field_suffix}"
+        identified_confidence_field = f"identified_confidence_{run.field_suffix}"
         outcome_field = f"outcome_{run.field_suffix}"
         verdict_field = f"verdict_{run.field_suffix}"
+        name_verdict_field = f"name_verdict_{run.field_suffix}"
         elapsed_field = f"elapsed_ms_{run.field_suffix}"
         source_stat = run.source_path.stat()
         previous = previous_run_info.get(prediction_field) or {}
@@ -477,25 +600,54 @@ def build_dataset(
             and previous.get("source") == str(run.source_path.resolve())
             and previous.get("generatedAt") == run.generated_at
         )
+        current_verdicts = []
+        current_name_verdicts = []
+        for sample_key in sample_keys:
+            run_sample = run.predictions.get(sample_key)
+            if run_sample is None:
+                current_verdicts.append("not_run")
+                current_name_verdicts.append("not_run")
+            else:
+                current_verdicts.append(
+                    prediction_verdict(working_labels.get(sample_key), run_sample)
+                )
+                current_name_verdicts.append(
+                    name_prediction_verdict(working_labels.get(sample_key), run_sample)
+                )
+        dataset.set_values(verdict_field, current_verdicts)
+        dataset.set_values(name_verdict_field, current_name_verdicts)
         if (
             fingerprint_matches
-            and {prediction_field, decision_field, outcome_field, verdict_field, elapsed_field}
+            and {
+                prediction_field,
+                decision_field,
+                identified_id_field,
+                identified_name_field,
+                identified_confidence_field,
+                outcome_field,
+                verdict_field,
+                name_verdict_field,
+                elapsed_field,
+            }
             <= set(existing_schema)
         ):
             continue
         predictions: list[Any | None] = []
         decisions: list[Any | None] = []
+        identified_ids: list[str] = []
+        identified_names: list[str] = []
+        identified_confidences: list[float | None] = []
         outcomes: list[str] = []
-        verdicts: list[str] = []
         elapsed_values: list[float | None] = []
         for sample_key in sample_keys:
             sample = run.predictions.get(sample_key)
-            label = labels.get(label_key_for_path(sample_key))
             if sample is None:
                 predictions.append(None)
                 decisions.append(None)
+                identified_ids.append("")
+                identified_names.append("")
+                identified_confidences.append(None)
                 outcomes.append("not_run")
-                verdicts.append("not_run")
                 elapsed_values.append(None)
                 continue
             result = sample.get("result") or {}
@@ -503,6 +655,9 @@ def build_dataset(
             diagnostic = result.get("diagnostic") or {}
             candidates = diagnostic.get("candidates") or []
             if matched:
+                identified_ids.append(str(result["cardID"]))
+                identified_names.append(str(result.get("name") or ""))
+                identified_confidences.append(float(result.get("confidence") or 0))
                 predictions.append(
                     fo.Classification(
                         label=str(result["cardID"]),
@@ -514,6 +669,9 @@ def build_dataset(
                 )
                 outcomes.append("matched")
             else:
+                identified_ids.append("")
+                identified_names.append("")
+                identified_confidences.append(None)
                 predictions.append(None)
                 outcomes.append(str(result.get("failure") or "declined"))
             decisions.append(
@@ -522,23 +680,23 @@ def build_dataset(
                     confidence=float(result.get("confidence") or 0),
                 )
             )
-            verdicts.append(prediction_verdict(label, sample))
             elapsed_values.append(
                 float(result["elapsedMs"]) if result.get("elapsedMs") is not None else None
             )
         dataset.set_values(prediction_field, predictions)
         dataset.set_values(decision_field, decisions)
+        dataset.set_values(identified_id_field, identified_ids)
+        dataset.set_values(identified_name_field, identified_names)
+        dataset.set_values(identified_confidence_field, identified_confidences)
         dataset.set_values(outcome_field, outcomes)
-        dataset.set_values(verdict_field, verdicts)
         dataset.set_values(elapsed_field, elapsed_values)
-        updated_runs.add(run.field_suffix)
 
     # Model disagreement is a useful no-download proxy for hard examples and
     # likely reference-label problems.
     disagreement_values = []
     issue_values = []
     for sample_key in sample_keys:
-        label = labels.get(label_key_for_path(sample_key)) or {}
+        label = working_labels.get(sample_key) or {}
         expected = label.get("cardId") if label.get("category") == "singleCard" else None
         decisions = [decision_label(run.predictions.get(sample_key)) for run in runs]
         disagreement, issue = disagreement_score(decisions, expected)
@@ -553,17 +711,16 @@ def build_dataset(
     for run in runs:
         decision_field = f"decision_{run.field_suffix}"
         eval_key = f"identity_{run.field_suffix}"
-        if run.field_suffix in updated_runs or eval_key not in dataset.list_evaluations():
-            if eval_key in dataset.list_evaluations():
-                dataset.delete_evaluation(eval_key)
-            evaluation_view = dataset.exists(decision_field).exists("ground_truth_identity")
-            if len(evaluation_view):
-                evaluation_view.evaluate_classifications(
-                    decision_field,
-                    gt_field="ground_truth_identity",
-                    eval_key=eval_key,
-                    method="simple",
-                )
+        if eval_key in dataset.list_evaluations():
+            dataset.delete_evaluation(eval_key)
+        evaluation_view = dataset.exists(decision_field).exists("ground_truth_identity")
+        if len(evaluation_view):
+            evaluation_view.evaluate_classifications(
+                decision_field,
+                gt_field="ground_truth_identity",
+                eval_key=eval_key,
+                method="simple",
+            )
 
     save_review_views(dataset, runs)
 
@@ -581,6 +738,9 @@ def build_dataset(
                 "size": run.source_path.stat().st_size,
                 "mtimeNs": run.source_path.stat().st_mtime_ns,
                 "decisionField": f"decision_{run.field_suffix}",
+                "identifiedCardIdField": f"identified_card_id_{run.field_suffix}",
+                "identifiedCardNameField": f"identified_card_name_{run.field_suffix}",
+                "identifiedConfidenceField": f"identified_confidence_{run.field_suffix}",
                 "evaluationKey": f"identity_{run.field_suffix}",
                 "metrics": metrics_by_suffix[run.field_suffix],
             }
@@ -592,18 +752,22 @@ def build_dataset(
 
 
 def performance_rows(dataset: Any) -> list[dict[str, Any]]:
+    cohort = (dataset.info or {}).get("tcger_evaluation_cohort", "reviewed_ios_replay")
     return [
         {
             "name": item["field"].removeprefix("pred_"),
             "source": item["source"],
             "samples": item["samples"],
+            "cohort": cohort,
             "metrics": item["metrics"],
         }
         for item in dataset.info.get("tcger_model_runs", [])
     ]
 
 
-def write_performance_report(dataset: Any, output_dir: Path) -> Path:
+def write_performance_report(
+    dataset: Any, output_dir: Path, session_dataset: Any | None = None
+) -> Path:
     rows = performance_rows(dataset)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_metrics(output_dir / "model-performance.json", rows)
@@ -612,13 +776,21 @@ def write_performance_report(dataset: Any, output_dir: Path) -> Path:
         writer.writerow(
             [
                 "run",
+                "cohort",
                 "samples",
                 "scored",
+                "positives",
+                "negatives",
+                "unscored",
                 "precision",
                 "recall",
                 "f1",
+                "name_recall",
                 "end_to_end_accuracy",
                 "correct",
+                "name_correct",
+                "name_scored",
+                "declined",
                 "wrong",
                 "missed",
                 "false_positive",
@@ -630,20 +802,52 @@ def write_performance_report(dataset: Any, output_dir: Path) -> Path:
             writer.writerow(
                 [
                     row["name"],
+                    row["cohort"],
                     row["samples"],
                     metrics.get("scored", 0),
+                    metrics.get("positives", 0),
+                    metrics.get("negatives", 0),
+                    metrics.get("unscored", 0),
                     metrics["precision"],
                     metrics["recall"],
                     metrics["f1"],
+                    metrics.get("name_recall", 0),
                     metrics["end_to_end_accuracy"],
                     metrics.get("correct", 0),
+                    metrics.get("name_correct", 0),
+                    metrics.get("name_scored", 0),
+                    metrics.get("declined", 0),
                     metrics.get("wrong", 0),
                     metrics.get("missed", 0),
                     metrics.get("false_positive", 0),
                     metrics.get("mean_elapsed_ms"),
                 ]
             )
-    return render_metrics_table(rows, output_dir / "model-performance.png")
+    render_metrics_table(rows, output_dir / "model-performance.png")
+    dashboard = render_performance_charts(rows, output_dir)["dashboard"]
+    diagnostic_paths, _ = write_diagnostic_dashboards(
+        dataset,
+        output_dir,
+        session_dataset=session_dataset,
+        repo_root=TOOL_DIR.parents[1],
+    )
+    dashboard_paths = {
+        "performance": str(dashboard.resolve()),
+        **{
+            name: str(path.resolve())
+            for name, path in diagnostic_paths.items()
+            if name != "data"
+        },
+    }
+    dataset.info = {
+        **(dataset.info or {}),
+        "tcger_evaluation_cohort": "reviewed_ios_replay",
+        "tcger_performance_dashboard": str(dashboard.resolve()),
+        "tcger_dashboards": dashboard_paths,
+        "tcger_diagnostic_data": str(diagnostic_paths["data"].resolve()),
+    }
+    dataset.save()
+    return dashboard
 
 
 def build_preview_dataset(
@@ -655,7 +859,6 @@ def build_preview_dataset(
 ) -> tuple[Any, Path]:
     fo = import_fiftyone()
     records = {record.sample_key: record for record in load_replay_records(replay_dir)}
-    labels = load_scanner_labels(replay_dir)
     ranked_runs = sorted(
         runs,
         key=lambda run: dataset.info["tcger_model_runs"][
@@ -675,16 +878,28 @@ def build_preview_dataset(
     preview_samples = []
     main_by_key = {sample.sample_key: sample for sample in dataset}
     for sample_key, record in records.items():
-        label = labels.get(record.label_key)
-        if not label:
-            continue
         main_sample = main_by_key[sample_key]
+        category = main_sample.get_field("label_category") or "unlabeled"
+        if category == "unlabeled":
+            continue
+        label = {
+            "category": category,
+            "cardId": main_sample.get_field("label_card_id") or "",
+            "name": main_sample.get_field("label_card_name") or "",
+        }
         basename = re.sub(r"[^a-zA-Z0-9_-]+", "_", record.label_key)[:80]
         preview_path = output_dir / "samples" / f"{basename}-{main_sample.id}.jpg"
-        run_lines = [
-            f"{run.field_suffix}: {main_sample.get_field(f'verdict_{run.field_suffix}')}"
-            for run in ranked_runs
-        ]
+        run_lines = []
+        for run in ranked_runs:
+            identified_name = main_sample.get_field(
+                f"identified_card_name_{run.field_suffix}"
+            )
+            identified_id = main_sample.get_field(f"identified_card_id_{run.field_suffix}")
+            verdict = main_sample.get_field(f"verdict_{run.field_suffix}")
+            identity = identified_name or "declined"
+            if identified_id:
+                identity += f" [{identified_id}]"
+            run_lines.append(f"{run.field_suffix}: {identity} · {verdict}")
         preview_path, rectified_path, geometry_source, distortion = render_rectification_preview(
             record.filepath,
             record.annotations,
@@ -706,6 +921,16 @@ def build_preview_dataset(
             review_status=main_sample.get_field("review_status") or "unreviewed",
             model_disagreement=main_sample.get_field("model_disagreement") or 0.0,
             label_issue_score=main_sample.get_field("label_issue_score") or 0.0,
+            provenance_kind="derived_rectification",
+            media_role="rectification_comparison",
+            source_group_key=main_sample.get_field("source_group_key") or "",
+            augmentation_policy=main_sample.get_field("augmentation_policy") or "",
+            augmentation_status=main_sample.get_field("augmentation_status") or "",
+            is_synthetic=False,
+            is_derived=True,
+            evaluation_role="visualization_only",
+            geometry_evaluation_eligible=False,
+            recognition_evaluation_eligible=False,
         )
         for run in runs:
             preview[f"verdict_{run.field_suffix}"] = main_sample.get_field(
@@ -713,6 +938,18 @@ def build_preview_dataset(
             )
             decision = main_sample.get_field(f"decision_{run.field_suffix}")
             preview[f"decision_{run.field_suffix}"] = decision
+            preview[f"identified_card_id_{run.field_suffix}"] = main_sample.get_field(
+                f"identified_card_id_{run.field_suffix}"
+            )
+            preview[f"identified_card_name_{run.field_suffix}"] = main_sample.get_field(
+                f"identified_card_name_{run.field_suffix}"
+            )
+            preview[f"identified_confidence_{run.field_suffix}"] = main_sample.get_field(
+                f"identified_confidence_{run.field_suffix}"
+            )
+            preview[f"name_verdict_{run.field_suffix}"] = main_sample.get_field(
+                f"name_verdict_{run.field_suffix}"
+            )
         preview_samples.append(preview)
     previews.add_samples(preview_samples, progress=True)
     previews.persistent = True
@@ -727,6 +964,207 @@ def build_preview_dataset(
     previews.save()
     summary_path = write_performance_report(dataset, output_dir)
     return previews, summary_path
+
+
+def _vision_quad(fo: Any, quad: Any) -> Any:
+    if not isinstance(quad, list) or len(quad) != 4:
+        return fo.Keypoints(keypoints=[])
+    points = [
+        [float(point[0]), 1.0 - float(point[1])]
+        for point in quad
+        if isinstance(point, list) and len(point) >= 2
+    ]
+    if len(points) != 4:
+        return fo.Keypoints(keypoints=[])
+    return fo.Keypoints(
+        keypoints=[
+            fo.Keypoint(
+                label="scanner_quad",
+                points=points,
+                coordinate_source="Vision normalized, converted to top-left origin",
+            )
+        ]
+    )
+
+
+def build_session_dataset(
+    reference_root: Path,
+    dataset_name: str,
+    rebuild: bool,
+) -> Any:
+    """Loads real device sessions while keeping derived crops non-scoring."""
+    fo = import_fiftyone()
+    sessions_root = reference_root / "TCGer-Session-Reference" / "sessions"
+    if not sessions_root.is_dir():
+        raise SystemExit(f"Session archive not found: {sessions_root}")
+    if fo.dataset_exists(dataset_name) and rebuild:
+        fo.delete_dataset(dataset_name)
+    if fo.dataset_exists(dataset_name):
+        return fo.load_dataset(dataset_name)
+    dataset = fo.Dataset(dataset_name)
+    samples = []
+    session_count = 0
+    role_counts: dict[str, int] = {}
+    for session_dir in sorted(path for path in sessions_root.iterdir() if path.is_dir()):
+        results_path = session_dir / "results.json"
+        if not results_path.is_file():
+            continue
+        results = read_json(results_path)
+        frames = results.get("frames") if isinstance(results, dict) else None
+        if not isinstance(frames, list):
+            continue
+        evidence_path = session_dir / "evidence.json"
+        evidence = read_json(evidence_path) if evidence_path.is_file() else []
+        evidence_by_image = {
+            item.get("imageFile"): item
+            for item in evidence
+            if isinstance(item, dict) and item.get("imageFile")
+        }
+        session_count += 1
+        for frame in frames:
+            image_file = frame.get("imageFile")
+            if not image_file:
+                continue
+            frame_index = int(frame.get("index") or 0)
+            group_key = f"{session_dir.name}:frame-{frame_index:04d}"
+            frame_evidence = evidence_by_image.get(image_file) or {}
+            files: list[tuple[str, Path, int | None, dict[str, Any] | None]] = []
+            original_name = frame_evidence.get("originalImageFile")
+            if original_name:
+                files.append(("real_camera_original", session_dir / original_name, None, None))
+            selected_path = session_dir / image_file
+            files.append(("selected_scanner_crop", selected_path, None, None))
+            attempts = frame_evidence.get("attempts") or []
+            attempt_by_index: dict[int, dict[str, Any]] = {}
+            for attempt in attempts:
+                index = attempt.get("imageIndex")
+                if isinstance(index, int):
+                    current = attempt_by_index.get(index)
+                    if current is None or attempt.get("outcome") == "accepted":
+                        attempt_by_index[index] = attempt
+            for index, attempt_name in enumerate(frame_evidence.get("attemptImageFiles") or []):
+                files.append(
+                    ("scanner_attempt_crop", session_dir / attempt_name, index, attempt_by_index.get(index))
+                )
+
+            for role, media_path, attempt_index, attempt in files:
+                if not media_path.is_file():
+                    continue
+                if attempt is not None:
+                    candidates = attempt.get("topCandidates") or []
+                    top = candidates[0] if candidates else {}
+                    identified_id = str(top.get("cardID") or "")
+                    identified_name = str(top.get("name") or "")
+                    confidence = (
+                        float(top["similarity"]) if top.get("similarity") is not None else None
+                    )
+                    outcome = str(attempt.get("outcome") or "unknown")
+                    quad = attempt.get("quad")
+                    strategy = str(attempt.get("kind") or "")
+                else:
+                    identified_id = str(frame.get("bestMatchCardId") or "")
+                    identified_name = str(frame.get("bestMatchName") or "")
+                    confidence = (
+                        float(frame["confidence"]) if frame.get("confidence") is not None else None
+                    )
+                    candidates = [
+                        {"cardID": card_id, "name": name}
+                        for card_id, name in zip(
+                            frame.get("alternativeCardIds") or [], frame.get("alternatives") or []
+                        )
+                    ]
+                    outcome = "identified" if frame.get("identified") else "unidentified"
+                    quad = frame.get("quad")
+                    strategy = str(frame.get("strategy") or "")
+                derived = role != "real_camera_original"
+                prediction = None
+                if identified_id:
+                    prediction = fo.Classification(
+                        label=identified_id,
+                        confidence=confidence,
+                        card_name=identified_name,
+                    )
+                sample = fo.Sample(
+                    filepath=str(media_path.resolve()),
+                    sample_key=f"{group_key}:{role}:{attempt_index if attempt_index is not None else 0}",
+                    label_key=group_key,
+                    capture_session=session_dir.name,
+                    frame_index=frame_index,
+                    source_group_key=group_key,
+                    provenance_kind="derived_camera_crop" if derived else "real_camera",
+                    media_role=role,
+                    is_synthetic=False,
+                    is_derived=derived,
+                    augmentation_policy="none",
+                    augmentation_status="not_applicable",
+                    evaluation_role=(
+                        "visualization_only" if derived else "real_camera_benchmark_candidate"
+                    ),
+                    geometry_evaluation_eligible=False,
+                    recognition_evaluation_eligible=False,
+                    source_group_split_leakage=False,
+                    identified=bool(identified_id),
+                    identified_card_id=identified_id,
+                    identified_card_name=identified_name,
+                    identified_confidence=confidence,
+                    prediction=prediction,
+                    outcome=outcome,
+                    strategy=strategy,
+                    elapsed_ms=(
+                        float(frame["elapsedMs"]) if frame.get("elapsedMs") is not None else None
+                    ),
+                    alternatives_json=json.dumps(candidates[:10], ensure_ascii=False),
+                    scanner_quad=_vision_quad(fo, quad),
+                    attempt_index=attempt_index,
+                    gate_score=(
+                        float(attempt["gateScore"])
+                        if attempt is not None and attempt.get("gateScore") is not None
+                        else None
+                    ),
+                    label_category="unlabeled",
+                    label_card_id="",
+                    label_card_name="",
+                    label_notes="",
+                    review_status="unreviewed",
+                    review_geometry_notes="",
+                )
+                sample.tags.extend(
+                    [
+                        "provenance:real_camera" if not derived else "provenance:derived",
+                        f"role:{role}",
+                        f"session:{session_dir.name}",
+                    ]
+                )
+                samples.append(sample)
+                role_counts[role] = role_counts.get(role, 0) + 1
+    dataset.add_samples(samples, progress=True)
+    dataset.persistent = True
+    field = fo.ViewField
+    views = {
+        "01 · Real camera originals": dataset.match(field("is_derived") == False),  # noqa: E712
+        "02 · Selected scanner crops": dataset.match(
+            field("media_role") == "selected_scanner_crop"
+        ),
+        "03 · Attempt crops": dataset.match(field("media_role") == "scanner_attempt_crop"),
+        "04 · Identified cards": dataset.match(field("identified") == True),  # noqa: E712
+        "05 · Unidentified cards": dataset.match(field("identified") == False),  # noqa: E712
+        "06 · Originals needing labels": dataset.match(
+            (field("is_derived") == False) & (field("label_category") == "unlabeled")  # noqa: E712
+        ),
+    }
+    for name, view in views.items():
+        dataset.save_view(name, view, overwrite=True)
+    dataset.info = {
+        "tcger_sessions_root": str(sessions_root.resolve()),
+        "captureSessions": session_count,
+        "mediaRoles": role_counts,
+        "truthWarning": (
+            "identified_card_* fields are recorded scanner predictions, not human truth. "
+            "Label real_camera_original samples before benchmark scoring."
+        ),
+    }
+    dataset.save()
+    return dataset
 
 
 def compute_brain_analysis(dataset: Any) -> None:
@@ -774,6 +1212,238 @@ def compute_brain_analysis(dataset: Any) -> None:
         },
     }
     dataset.save()
+
+
+def _prediction_points(values: Any, width: int, height: int) -> list[list[float]]:
+    if not isinstance(values, list):
+        return []
+    if values and isinstance(values[0], (int, float)):
+        values = [values[index : index + 2] for index in range(0, len(values), 2)]
+    points = [[float(point[0]), float(point[1])] for point in values if len(point) >= 2]
+    if points and max(max(abs(x), abs(y)) for x, y in points) > 1.5:
+        return normalized_points(points, width, height)
+    return points
+
+
+def import_geometry_run(dataset_name: str, input_path: Path, model_name: str | None) -> None:
+    """Imports a model's masks/corners and registers polygon evaluation metrics."""
+    from PIL import Image
+
+    fo = import_fiftyone()
+    if not fo.dataset_exists(dataset_name):
+        raise SystemExit(f"FiftyOne dataset does not exist: {dataset_name}")
+    document = read_json(input_path)
+    raw_samples = document.get("samples") if isinstance(document, dict) else None
+    if not isinstance(raw_samples, list):
+        raise SystemExit("Geometry input must contain a samples[] array")
+    raw_name = model_name or document.get("model") or input_path.stem
+    suffix = re.sub(r"[^a-zA-Z0-9]+", "_", str(raw_name)).strip("_").lower()
+    if not suffix:
+        raise SystemExit("Geometry model name is empty")
+    by_key = {
+        item.get("imagePath"): item
+        for item in raw_samples
+        if isinstance(item, dict) and item.get("imagePath")
+    }
+
+    dataset = fo.load_dataset(dataset_name)
+    polygon_field = f"geometry_pred_{suffix}"
+    corner_field = f"corners_pred_{suffix}"
+    iou_field = f"mask_iou_{suffix}"
+    boundary_iou_field = f"boundary_iou_{suffix}"
+    corner_error_field = f"corner_error_{suffix}"
+    verdict_field = f"geometry_verdict_{suffix}"
+    rectified_field = f"rectified_path_{suffix}"
+    rectification_valid_field = f"rectification_valid_{suffix}"
+    rectified_aspect_error_field = f"rectified_aspect_error_{suffix}"
+    polygon_values = []
+    corner_values = []
+    iou_values = []
+    boundary_iou_values = []
+    corner_errors = []
+    verdicts = []
+    rectified_paths = []
+    rectification_valid_values = []
+    rectified_aspect_errors = []
+    scored_ious = []
+    scored_boundary_ious = []
+    scored_corners = []
+    matched = 0
+    missing = 0
+    for sample in dataset:
+        item = by_key.get(sample.sample_key)
+        width, height = Image.open(sample.filepath).size
+        raw_polygons = (item or {}).get("polygons") or []
+        if raw_polygons and isinstance(raw_polygons[0], (int, float)):
+            raw_polygons = [raw_polygons]
+        polylines = []
+        predicted_polygons = []
+        for raw_polygon in raw_polygons:
+            points = _prediction_points(raw_polygon, width, height)
+            if len(points) < 3:
+                continue
+            predicted_polygons.append(points)
+            polylines.append(
+                fo.Polyline(
+                    label="card",
+                    points=[points],
+                    closed=True,
+                    filled=True,
+                    confidence=float((item or {}).get("confidence") or 0),
+                )
+            )
+        polygon_values.append(fo.Polylines(polylines=polylines))
+
+        predicted_corners = _prediction_points((item or {}).get("corners") or [], width, height)
+        keypoints = []
+        if len(predicted_corners) == 4:
+            keypoints.append(fo.Keypoint(label="card_corners", points=predicted_corners))
+        corner_values.append(fo.Keypoints(keypoints=keypoints))
+        raw_rectified_path = str((item or {}).get("rectifiedPath") or "")
+        resolved_rectified_path = Path(raw_rectified_path).expanduser() if raw_rectified_path else None
+        if resolved_rectified_path is not None and not resolved_rectified_path.is_absolute():
+            resolved_rectified_path = input_path.parent / resolved_rectified_path
+        rectification_valid = bool(resolved_rectified_path and resolved_rectified_path.is_file())
+        aspect_error = None
+        if rectification_valid and resolved_rectified_path is not None:
+            try:
+                rectified_width, rectified_height = Image.open(resolved_rectified_path).size
+                expected_aspect = CARD_WIDTH / CARD_HEIGHT
+                observed_aspect = rectified_width / rectified_height
+                aspect_error = abs(observed_aspect - expected_aspect) / expected_aspect
+            except OSError:
+                rectification_valid = False
+        rectified_paths.append(str(resolved_rectified_path.resolve()) if rectification_valid else raw_rectified_path)
+        rectification_valid_values.append(rectification_valid)
+        rectified_aspect_errors.append(aspect_error)
+
+        truth_polygons = []
+        if sample.ground_truth_polygons:
+            truth_polygons = [
+                polyline.points[0]
+                for polyline in sample.ground_truth_polygons.polylines
+                if polyline.points
+            ]
+        best_iou = None
+        if truth_polygons and predicted_polygons:
+            best_iou = max(
+                polygon_iou(truth, prediction)
+                for truth in truth_polygons
+                for prediction in predicted_polygons
+            )
+            scored_ious.append(best_iou)
+        iou_values.append(best_iou)
+        best_boundary_iou = None
+        if truth_polygons and predicted_polygons:
+            best_boundary_iou = max(
+                boundary_iou(truth, prediction)
+                for truth in truth_polygons
+                for prediction in predicted_polygons
+            )
+            scored_boundary_ious.append(best_boundary_iou)
+        boundary_iou_values.append(best_boundary_iou)
+
+        expected_corners = []
+        if sample.reference_corners:
+            expected_corners = [
+                keypoint.points
+                for keypoint in sample.reference_corners.keypoints
+                if keypoint.geometry_source == "source_polygon" and len(keypoint.points) == 4
+            ]
+        best_corner_error = None
+        if expected_corners and len(predicted_corners) == 4:
+            best_corner_error = min(
+                corner_error(predicted_corners, expected, 1, 1) for expected in expected_corners
+            )
+            scored_corners.append(best_corner_error)
+        corner_errors.append(best_corner_error)
+
+        has_truth = bool(truth_polygons)
+        if not has_truth:
+            verdict = "unscored"
+        elif not predicted_polygons:
+            verdict = "missed"
+            missing += 1
+        elif best_iou is not None and best_iou >= 0.8 and (
+            best_corner_error is None or best_corner_error <= 0.03
+        ):
+            verdict = "pass"
+            matched += 1
+        else:
+            verdict = "geometry_error"
+        verdicts.append(verdict)
+
+    dataset.set_values(polygon_field, polygon_values)
+    dataset.set_values(corner_field, corner_values)
+    dataset.set_values(iou_field, iou_values)
+    dataset.set_values(boundary_iou_field, boundary_iou_values)
+    dataset.set_values(corner_error_field, corner_errors)
+    dataset.set_values(verdict_field, verdicts)
+    dataset.set_values(rectified_field, rectified_paths)
+    dataset.set_values(rectification_valid_field, rectification_valid_values)
+    dataset.set_values(rectified_aspect_error_field, rectified_aspect_errors)
+
+    eval_key = f"geometry_{suffix}"
+    if eval_key in dataset.list_evaluations():
+        dataset.delete_evaluation(eval_key)
+    geometry_view = dataset.match(fo.ViewField("geometry_source") == "source_polygon")
+    if len(geometry_view):
+        geometry_view.evaluate_detections(
+            polygon_field,
+            gt_field="ground_truth_polygons",
+            eval_key=eval_key,
+            method="coco",
+        )
+    run_info = {
+        "name": suffix,
+        "source": str(input_path.resolve()),
+        "samples": len(by_key),
+        "polygonField": polygon_field,
+        "cornerField": corner_field,
+        "maskIoUField": iou_field,
+        "boundaryIoUField": boundary_iou_field,
+        "cornerErrorField": corner_error_field,
+        "geometryVerdictField": verdict_field,
+        "rectifiedPathField": rectified_field,
+        "rectificationValidField": rectification_valid_field,
+        "rectifiedAspectErrorField": rectified_aspect_error_field,
+        "evaluationKey": eval_key,
+        "metrics": {
+            "meanMaskIoU": sum(scored_ious) / len(scored_ious) if scored_ious else None,
+            "meanBoundaryIoU": (
+                sum(scored_boundary_ious) / len(scored_boundary_ious)
+                if scored_boundary_ious
+                else None
+            ),
+            "meanCornerError": sum(scored_corners) / len(scored_corners) if scored_corners else None,
+            "geometryPasses": matched,
+            "missed": missing,
+            "maskSamplesScored": len(scored_ious),
+            "boundarySamplesScored": len(scored_boundary_ious),
+            "cornerSamplesScored": len(scored_corners),
+            "rectificationsValid": sum(rectification_valid_values),
+            "rectificationsReported": sum(bool(value) for value in rectified_paths),
+            "meanRectifiedAspectError": (
+                sum(value for value in rectified_aspect_errors if value is not None)
+                / sum(value is not None for value in rectified_aspect_errors)
+                if any(value is not None for value in rectified_aspect_errors)
+                else None
+            ),
+        },
+    }
+    existing = [
+        item
+        for item in (dataset.info or {}).get("tcger_geometry_runs", [])
+        if item.get("name") != suffix
+    ]
+    dataset.info = {**(dataset.info or {}), "tcger_geometry_runs": [*existing, run_info]}
+    dataset.save_view(
+        f"Geometry failures · {suffix}",
+        dataset.match(fo.ViewField(verdict_field).is_in(["missed", "geometry_error"])),
+        overwrite=True,
+    )
+    dataset.save()
+    print(json.dumps(run_info, indent=2))
 
 
 def export_labels(dataset_name: str, output: Path, overwrite: bool) -> None:
@@ -848,6 +1518,44 @@ def parser() -> argparse.ArgumentParser:
     load.add_argument("--no-launch", action="store_true")
     load.add_argument("--port", type=int, default=5151)
 
+    preview = subparsers.add_parser(
+        "preview", help="Build paired source/rectified previews and open their dataset"
+    )
+    preview.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
+    preview.add_argument("--replay-dir", type=Path)
+    preview.add_argument("--dataset-name", default=DEFAULT_DATASET_NAME)
+    preview.add_argument("--preview-dataset-name", default=DEFAULT_PREVIEW_DATASET_NAME)
+    preview.add_argument("--output-dir", type=Path)
+    preview.add_argument("--no-launch", action="store_true")
+    preview.add_argument("--port", type=int, default=5152)
+
+    brain = subparsers.add_parser(
+        "brain", help="Compute compact similarity, uniqueness, and duplicate analysis"
+    )
+    brain.add_argument("--dataset-name", default=DEFAULT_DATASET_NAME)
+
+    report = subparsers.add_parser(
+        "report", help="Write JSON, CSV, and PNG model-performance summaries"
+    )
+    report.add_argument("--dataset-name", default=DEFAULT_DATASET_NAME)
+    report.add_argument("--output-dir", type=Path)
+
+    geometry = subparsers.add_parser(
+        "import-geometry", help="Import one model's polygons/corners and evaluate them"
+    )
+    geometry.add_argument("--dataset-name", default=DEFAULT_DATASET_NAME)
+    geometry.add_argument("--input", type=Path, required=True)
+    geometry.add_argument("--model-name")
+
+    sessions = subparsers.add_parser(
+        "sessions", help="Load real device sessions as a separate provenance-aware dataset"
+    )
+    sessions.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
+    sessions.add_argument("--dataset-name", default=DEFAULT_SESSION_DATASET_NAME)
+    sessions.add_argument("--rebuild", action="store_true")
+    sessions.add_argument("--no-launch", action="store_true")
+    sessions.add_argument("--port", type=int, default=5153)
+
     export = subparsers.add_parser(
         "export-labels", help="Export App-edited labels without touching source files"
     )
@@ -864,11 +1572,79 @@ def main() -> None:
         export_labels(args.dataset_name, args.output.expanduser().resolve(), args.overwrite)
         return
 
+    if args.command == "brain":
+        fo = import_fiftyone()
+        if not fo.dataset_exists(args.dataset_name):
+            raise SystemExit(f"FiftyOne dataset does not exist: {args.dataset_name}")
+        dataset = fo.load_dataset(args.dataset_name)
+        compute_brain_analysis(dataset)
+        print(f"Brain analysis completed for {len(dataset)} samples")
+        return
+
+    if args.command == "report":
+        fo = import_fiftyone()
+        if not fo.dataset_exists(args.dataset_name):
+            raise SystemExit(f"FiftyOne dataset does not exist: {args.dataset_name}")
+        dataset = fo.load_dataset(args.dataset_name)
+        session_dataset = (
+            fo.load_dataset(DEFAULT_SESSION_DATASET_NAME)
+            if fo.dataset_exists(DEFAULT_SESSION_DATASET_NAME)
+            else None
+        )
+        output_dir = args.output_dir or (args.state_dir / "previews")
+        result = write_performance_report(
+            dataset,
+            output_dir.expanduser().resolve(),
+            session_dataset=session_dataset,
+        )
+        print(f"Performance report: {result}")
+        return
+
+    if args.command == "import-geometry":
+        import_geometry_run(
+            args.dataset_name,
+            args.input.expanduser().resolve(),
+            args.model_name,
+        )
+        return
+
+    if args.command == "sessions":
+        dataset = build_session_dataset(
+            args.reference_root.expanduser().resolve(), args.dataset_name, args.rebuild
+        )
+        print(f"Session dataset: {dataset.name} ({len(dataset)} samples)")
+        print(f"Media roles: {dataset.info.get('mediaRoles', {})}")
+        if not args.no_launch:
+            fo = import_fiftyone()
+            session = fo.launch_app(dataset, port=args.port, address="localhost", auto=True)
+            print(f"Real sessions are available at http://localhost:{args.port}")
+            session.wait()
+        return
+
     replay_dir = args.replay_dir or (args.reference_root / REPLAY_RELATIVE_PATH)
     dataset, runs, label_count = build_dataset(
-        replay_dir.expanduser().resolve(), args.dataset_name, args.rebuild
+        replay_dir.expanduser().resolve(), args.dataset_name, getattr(args, "rebuild", False)
     )
     print_summary(dataset, runs, label_count)
+
+    if args.command == "preview":
+        output_dir = args.output_dir or (args.state_dir / "previews")
+        preview_dataset, summary_path = build_preview_dataset(
+            dataset,
+            replay_dir.expanduser().resolve(),
+            runs,
+            args.preview_dataset_name,
+            output_dir.expanduser().resolve(),
+        )
+        print(f"Preview dataset: {preview_dataset.name} ({len(preview_dataset)} samples)")
+        print(f"Performance summary: {summary_path}")
+        if not args.no_launch:
+            fo = import_fiftyone()
+            session = fo.launch_app(preview_dataset, port=args.port, address="localhost", auto=True)
+            print(f"FiftyOne previews are available at http://localhost:{args.port}")
+            session.wait()
+        return
+
     if not args.no_launch:
         fo = import_fiftyone()
         session = fo.launch_app(dataset, port=args.port, address="localhost", auto=True)
@@ -878,3 +1654,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    polygon_iou,

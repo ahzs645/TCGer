@@ -3,6 +3,22 @@ import type { PriceProvider, PriceProviderQuote } from './pricing.types';
 import { normalizePriceQuote, parsePrice } from './pricing.types';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const SCRYFALL_REQUEST_DELAY_MS = 120;
+
+let scryfallRateLimitChain: Promise<void> = Promise.resolve();
+let nextScryfallRequestAt = 0;
+
+async function waitForScryfallRateLimit(): Promise<void> {
+  const waitPromise = scryfallRateLimitChain.then(async () => {
+    const wait = Math.max(0, nextScryfallRequestAt - Date.now());
+    if (wait > 0) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    nextScryfallRequestAt = Date.now() + SCRYFALL_REQUEST_DELAY_MS;
+  });
+  scryfallRateLimitChain = waitPromise.catch(() => {});
+  await waitPromise;
+}
 
 function cardUrl(baseUrl: string, externalId: string): string {
   return `${baseUrl.replace(/\/$/, '')}/cards/${encodeURIComponent(externalId)}`;
@@ -155,23 +171,39 @@ export class ScryfallPriceProvider implements PriceProvider {
 
   async fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null> {
     if (tcg.toLowerCase() !== 'magic') return null;
+    if (/scryfall\.(io|com)$/i.test(new URL(env.SCRYFALL_API_BASE_URL).hostname)) {
+      await waitForScryfallRateLimit();
+    }
     const card = await fetchCardJson(cardUrl(env.SCRYFALL_API_BASE_URL, externalId));
     const prices = childRecord(card, 'prices');
     if (!prices) return null;
 
     const usd = parsePrice(prices.usd);
-    if (usd !== undefined) {
+    const usdFoil = parsePrice(prices.usd_foil);
+    const usdEtched = parsePrice(prices.usd_etched);
+    const eur = parsePrice(prices.eur);
+    const eurFoil = parsePrice(prices.eur_foil);
+
+    // Prefer the currency with a regular price so ordinary copies never inherit
+    // a foil-only quote. Keep every finish in that currency for finish-aware
+    // collection valuation.
+    if (
+      usd !== undefined ||
+      (eur === undefined && (usdFoil !== undefined || usdEtched !== undefined))
+    ) {
       return normalizePriceQuote({
         currency: 'USD',
         price: usd,
+        foilPrice: usdFoil,
+        etchedPrice: usdEtched,
       });
     }
 
-    const eur = parsePrice(prices.eur);
-    if (eur !== undefined) {
+    if (eur !== undefined || eurFoil !== undefined) {
       return normalizePriceQuote({
         currency: 'EUR',
         price: eur,
+        foilPrice: eurFoil,
       });
     }
     return null;

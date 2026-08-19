@@ -311,6 +311,7 @@ final class LocalStore {
         if sampleDataLoaded {
             seedSampleCatalog()
             seedSampleBinderPages()
+            seedSampleOnlineCodes()
         }
     }
 
@@ -1380,6 +1381,10 @@ final class LocalStore {
         variant: CardCopyVariant = .empty,
         isSigned: Bool?,
         isAltered: Bool?,
+        gradingCompany: String? = nil,
+        gradingScore: String? = nil,
+        certNumber: String? = nil,
+        storageLocation: String? = nil,
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         card: Card?
@@ -1396,6 +1401,10 @@ final class LocalStore {
             variant: variant,
             isSigned: isSigned,
             isAltered: isAltered,
+            gradingCompany: gradingCompany,
+            gradingScore: gradingScore,
+            certNumber: certNumber,
+            storageLocation: storageLocation,
             tagIds: tagIds,
             newTags: newTags,
             card: card
@@ -1415,6 +1424,10 @@ final class LocalStore {
         variant: CardCopyVariant = .empty,
         isSigned: Bool?,
         isAltered: Bool?,
+        gradingCompany: String? = nil,
+        gradingScore: String? = nil,
+        certNumber: String? = nil,
+        storageLocation: String? = nil,
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         card: Card?
@@ -1448,7 +1461,11 @@ final class LocalStore {
                 variant: variant,
                 isSigned: isSigned,
                 isAltered: isAltered,
-                tags: selectedTags
+                tags: selectedTags,
+                gradingCompany: gradingCompany,
+                gradingScore: gradingScore,
+                certNumber: certNumber,
+                storageLocation: storageLocation
             )
             let allCopies = existing.copies + newCopies
             existing = CollectionCard(
@@ -1499,7 +1516,11 @@ final class LocalStore {
                     variant: variant,
                     isSigned: isSigned,
                     isAltered: isAltered,
-                    tags: selectedTags
+                    tags: selectedTags,
+                    gradingCompany: gradingCompany,
+                    gradingScore: gradingScore,
+                    certNumber: certNumber,
+                    storageLocation: storageLocation
                 )
             )
             nextCollectionCardId += 1
@@ -1811,6 +1832,7 @@ final class LocalStore {
         seedSampleCollections()
         seedSampleBinderPages()
         seedSampleWishlistsAndFinance()
+        seedSampleOnlineCodes()
         sampleDataLoaded = true
         persist()
     }
@@ -1855,6 +1877,7 @@ final class LocalStore {
         }
 
         sealedInventory.removeAll { LocalStore.isSampleId($0.id) }
+        onlineCodes.removeAll { LocalStore.isSampleId($0.id) }
         transactions.removeAll { LocalStore.isSampleId($0.id) }
         searchCatalog = []
         printGroups = [:]
@@ -2460,6 +2483,141 @@ final class LocalStore {
         ])
     }
 
+    /// A representative vault spanning every supported game, capture source,
+    /// and status. Values are intentionally synthetic so sample content can
+    /// never be mistaken for a redeemable code.
+    private func seedSampleOnlineCodes() {
+        func timestamp(daysAgo: Int) -> String {
+            let date = Calendar(identifier: .gregorian).date(
+                byAdding: .day,
+                value: -daysAgo,
+                to: Date()
+            ) ?? Date()
+            return LocalStore.isoFormatter.string(from: date)
+        }
+
+        func sampleCode(
+            id: String,
+            tcg: TCGGame,
+            code: String,
+            status: OnlineCodeStatus,
+            source: OnlineCodeSource,
+            productName: String,
+            notes: String? = nil,
+            daysAgo: Int
+        ) -> OnlineCode {
+            let capturedAt = timestamp(daysAgo: daysAgo)
+            let redeemedAt = status == .redeemed
+                ? timestamp(daysAgo: max(0, daysAgo - 1))
+                : nil
+            return OnlineCode(
+                id: id,
+                tcg: tcg.rawValue,
+                code: code,
+                status: status,
+                source: source,
+                productName: productName,
+                notes: notes,
+                capturedAt: capturedAt,
+                redeemedAt: redeemedAt,
+                createdAt: capturedAt,
+                updatedAt: redeemedAt ?? capturedAt
+            )
+        }
+
+        let samples = [
+            sampleCode(
+                id: "sample-online-code-1",
+                tcg: .pokemon,
+                code: "DEMO-PKMN-7K4Q-2J9X",
+                status: .unused,
+                source: .camera,
+                productName: "Destined Rivals Booster Pack",
+                notes: "Scanned from the code card",
+                daysAgo: 1
+            ),
+            sampleCode(
+                id: "sample-online-code-2",
+                tcg: .pokemon,
+                code: "DEMO-PKMN-ETB-8R2M",
+                status: .redeemed,
+                source: .manual,
+                productName: "Paldean Fates Elite Trainer Box",
+                notes: "Redeemed on Pokémon TCG Live",
+                daysAgo: 8
+            ),
+            sampleCode(
+                id: "sample-online-code-3",
+                tcg: .magic,
+                code: "DEMO-MTGA-PRERELEASE-25",
+                status: .unused,
+                source: .camera,
+                productName: "Prerelease Pack",
+                notes: "Arena reward code",
+                daysAgo: 3
+            ),
+            sampleCode(
+                id: "sample-online-code-4",
+                tcg: .magic,
+                code: "DEMO-MTGA-STARTER-24",
+                status: .traded,
+                source: .import,
+                productName: "Starter Kit",
+                notes: "Traded with a friend",
+                daysAgo: 18
+            ),
+            sampleCode(
+                id: "sample-online-code-5",
+                tcg: .yugioh,
+                code: "DEMO-YGO-NEURON-4M8K",
+                status: .redeemed,
+                source: .manual,
+                productName: "Yu-Gi-Oh! Promotional Insert",
+                daysAgo: 12
+            ),
+            sampleCode(
+                id: "sample-online-code-6",
+                tcg: .yugioh,
+                code: "DEMO-YGO-LEGACY-9P3D",
+                status: .invalid,
+                source: .camera,
+                productName: "Legacy of Destruction Booster Box",
+                notes: "Damaged print; kept for reference",
+                daysAgo: 24
+            ),
+            sampleCode(
+                id: "sample-online-code-7",
+                tcg: .onepiece,
+                code: "DEMO-OPTCG-6H2W-5N8C",
+                status: .unused,
+                source: .manual,
+                productName: "One Piece Card Game Promotion",
+                daysAgo: 5
+            ),
+            sampleCode(
+                id: "sample-online-code-8",
+                tcg: .lorcana,
+                code: "DEMO-LORCANA-3F7B-1Q6T",
+                status: .traded,
+                source: .import,
+                productName: "Organized Play Reward",
+                daysAgo: 15
+            ),
+            sampleCode(
+                id: "sample-online-code-9",
+                tcg: .dragonball,
+                code: "DEMO-DBSCG-2V9L-7A4R",
+                status: .unused,
+                source: .camera,
+                productName: "Fusion World Starter Deck",
+                daysAgo: 6
+            )
+        ]
+
+        let existing = Set(onlineCodes.map(\.id))
+        onlineCodes.append(contentsOf: samples.filter { !existing.contains($0.id) })
+    }
+
     // MARK: - Wishlist Accessors
 
     func getWishlists() -> [Wishlist] {
@@ -2987,7 +3145,16 @@ final class LocalStore {
         return item
     }
 
-    func updateSealedInventory(itemId: String, quantity: Int?, purchasePrice: Double?, purchaseDate: String?, notes: String?) throws -> SealedInventoryItem {
+    func updateSealedInventory(
+        itemId: String,
+        quantity: Int?,
+        purchasePrice: Double?,
+        purchaseDate: String?,
+        notes: String?,
+        clearPurchasePrice: Bool = false,
+        clearPurchaseDate: Bool = false,
+        clearNotes: Bool = false
+    ) throws -> SealedInventoryItem {
         guard let idx = sealedInventory.firstIndex(where: { $0.id == itemId }) else {
             throw APIService.APIError.serverError(status: 404, message: "Inventory item not found")
         }
@@ -2996,9 +3163,9 @@ final class LocalStore {
             id: item.id,
             product: item.product,
             quantity: quantity ?? item.quantity,
-            purchasePrice: purchasePrice ?? item.purchasePrice,
-            purchaseDate: purchaseDate ?? item.purchaseDate,
-            notes: notes ?? item.notes,
+            purchasePrice: clearPurchasePrice ? nil : purchasePrice ?? item.purchasePrice,
+            purchaseDate: clearPurchaseDate ? nil : purchaseDate ?? item.purchaseDate,
+            notes: clearNotes ? nil : notes ?? item.notes,
             createdAt: item.createdAt
         )
         sealedInventory[idx] = updated

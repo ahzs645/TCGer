@@ -255,6 +255,31 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertTrue(movers.gainers.isEmpty)
         XCTAssertTrue(movers.losers.isEmpty)
     }
+
+    func testSealedInventoryUpdateCanClearOptionalPurchaseFields() throws {
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 2)
+        let store = LocalStore(persistenceRepository: repository)
+        store.loadSampleData()
+        let item = try XCTUnwrap(store.getSealedInventory().first { $0.purchasePrice != nil })
+
+        let updated = try store.updateSealedInventory(
+            itemId: item.id,
+            quantity: item.quantity + 1,
+            purchasePrice: nil,
+            purchaseDate: nil,
+            notes: nil,
+            clearPurchasePrice: true,
+            clearPurchaseDate: true,
+            clearNotes: true
+        )
+
+        XCTAssertEqual(updated.quantity, item.quantity + 1)
+        XCTAssertNil(updated.purchasePrice)
+        XCTAssertNil(updated.purchaseDate)
+        XCTAssertNil(updated.notes)
+        XCTAssertEqual(store.getSealedInventory().first { $0.id == item.id }, updated)
+        XCTAssertNoThrow(try store.requireLatestMutationPersisted())
+    }
 }
 
 private struct FailingPersistenceRepository: LocalStorePersistenceRepository {

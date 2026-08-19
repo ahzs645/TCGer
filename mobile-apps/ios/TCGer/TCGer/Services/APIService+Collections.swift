@@ -826,6 +826,10 @@ extension APIService {
         let isPeelOff: Bool?
         let isSigned: Bool?
         let isAltered: Bool?
+        let gradingCompany: String?
+        let gradingScore: String?
+        let certNumber: String?
+        let storageLocation: String?
         let tags: [String]?
         let newTags: [TagPayload]?
         let cardData: CardData?
@@ -995,6 +999,10 @@ extension APIService {
         variant: CardCopyVariant = .empty,
         isSigned: Bool? = nil,
         isAltered: Bool? = nil,
+        gradingCompany: String? = nil,
+        gradingScore: String? = nil,
+        certNumber: String? = nil,
+        storageLocation: String? = nil,
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         card: Card? = nil
@@ -1012,6 +1020,10 @@ extension APIService {
                 variant: variant,
                 isSigned: isSigned,
                 isAltered: isAltered,
+                gradingCompany: gradingCompany,
+                gradingScore: gradingScore,
+                certNumber: certNumber,
+                storageLocation: storageLocation,
                 tagIds: tags,
                 newTags: newTags,
                 card: card
@@ -1076,6 +1088,10 @@ extension APIService {
             isPeelOff: variant.isPeelOff,
             isSigned: isSigned,
             isAltered: isAltered,
+            gradingCompany: gradingCompany,
+            gradingScore: gradingScore,
+            certNumber: certNumber,
+            storageLocation: storageLocation,
             tags: tags,
             newTags: newTags,
             cardData: cardData
@@ -1402,6 +1418,11 @@ nonisolated struct BinderCardAddDetails: Sendable {
     var variant: CardCopyVariant = .empty
     var isSigned: Bool = false
     var isAltered: Bool = false
+    var tags: [String] = []
+    var gradingCompany: String? = nil
+    var gradingScore: String? = nil
+    var certNumber: String? = nil
+    var storageLocation: String? = nil
 }
 
 extension APIService {
@@ -1438,6 +1459,11 @@ extension APIService {
             variant: details.variant,
             isSigned: details.isSigned,
             isAltered: details.isAltered,
+            gradingCompany: details.gradingCompany,
+            gradingScore: details.gradingScore,
+            certNumber: details.certNumber,
+            storageLocation: details.storageLocation,
+            tags: details.tags,
             card: pricedCard
         )
     }

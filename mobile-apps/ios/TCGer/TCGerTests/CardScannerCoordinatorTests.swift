@@ -29,12 +29,14 @@ final class CardScannerCoordinatorTests: XCTestCase {
 
         XCTAssertNil(viewModel.cropRescueRequest)
         XCTAssertNotNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.hasCompletedScanInCurrentSession)
 
         defaults.set(true, forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
         await viewModel.scan(image: ScannerTestImage.solid())
 
         XCTAssertNotNil(viewModel.cropRescueRequest)
         XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.hasCompletedScanInCurrentSession)
     }
 
     func testEnvironmentChoosesRecognitionEngineForRegularScans() {
@@ -75,7 +77,12 @@ final class CardScannerCoordinatorTests: XCTestCase {
         await viewModel.scan(image: ScannerTestImage.solid())
 
         XCTAssertEqual(viewModel.sessionResults.map(\.primary.details.identity.id), ["session-card"])
+        XCTAssertTrue(viewModel.hasCompletedScanInCurrentSession)
         XCTAssertNil(viewModel.latestResult)
+
+        viewModel.clearSession()
+
+        XCTAssertFalse(viewModel.hasCompletedScanInCurrentSession)
     }
 
     func testSuccessfulManualScanCanAutomaticallyPresentResult() async {

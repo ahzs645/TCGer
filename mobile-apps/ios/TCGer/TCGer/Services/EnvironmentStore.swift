@@ -284,7 +284,7 @@ final class EnvironmentStore: ObservableObject {
         ) ?? .newest
 
         if serverConfiguration.isOnDevice && !pricingSource.isAvailableOnDevice {
-            pricingSource = .justTCG
+            pricingSource = .automatic
         }
 
         if serverConfiguration.isOnDevice {

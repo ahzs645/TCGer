@@ -1,5 +1,59 @@
 import SwiftUI
 
+private struct CollectionPricingLot {
+    let finishCode: String?
+    let finishLabel: String?
+    var quantity: Int
+    var storedPriceTotal: Double
+    var storedPriceCount: Int
+
+    var storedPrice: Double? {
+        storedPriceCount > 0 ? storedPriceTotal / Double(storedPriceCount) : nil
+    }
+}
+
+private func collectionPricingLots(for card: CollectionCard) -> [CollectionPricingLot] {
+    var lots: [String: CollectionPricingLot] = [:]
+    func append(finishCode: String?, finishLabel: String?, quantity: Int, price: Double?) {
+        let normalizedCode = finishCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = normalizedCode?.isEmpty == false ? normalizedCode : nil
+        let key = code?.lowercased() ?? ""
+        var lot = lots[key] ?? CollectionPricingLot(
+            finishCode: code,
+            finishLabel: finishLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
+                ?? code.map { PokemonFinishOption.label(for: $0) },
+            quantity: 0,
+            storedPriceTotal: 0,
+            storedPriceCount: 0
+        )
+        lot.quantity += quantity
+        if let price, price >= 0, price.isFinite {
+            lot.storedPriceTotal += price * Double(quantity)
+            lot.storedPriceCount += quantity
+        }
+        lots[key] = lot
+    }
+
+    for copy in card.copies {
+        append(
+            finishCode: copy.finishCode ?? (copy.isFoil == true ? "foil" : nil),
+            finishLabel: copy.finishLabel,
+            quantity: 1,
+            price: copy.price ?? card.price
+        )
+    }
+    let unrepresented = max(0, card.quantity - card.copies.count)
+    if unrepresented > 0 || card.copies.isEmpty {
+        append(
+            finishCode: nil,
+            finishLabel: nil,
+            quantity: unrepresented > 0 ? unrepresented : card.quantity,
+            price: card.price
+        )
+    }
+    return lots.values.sorted { ($0.finishCode ?? "") < ($1.finishCode ?? "") }
+}
+
 struct PricesView: View {
     let parentProvidesNavigation: Bool
 
@@ -29,6 +83,8 @@ struct PricesView: View {
         let tcg: String
         let setName: String?
         let rarity: String?
+        let finishCode: String?
+        let finishLabel: String?
         let price: Double
         let currency: String
         let source: String?
@@ -55,28 +111,38 @@ struct PricesView: View {
         )
         var cards: [String: TrackedCard] = [:]
         for card in collections.flatMap(\.cards) {
-            let key = APIService.TrackedPriceItem.lookupKey(
+            let externalID = card.externalId ?? card.cardId
+            let changeKey = APIService.TrackedPriceItem.lookupKey(
                 tcg: card.tcg,
-                externalId: card.externalId ?? card.cardId
+                externalId: externalID
             )
-            let market = livePrices[key]
-            if var existing = cards[key] {
-                existing.owned += card.quantity
-                cards[key] = existing
-            } else {
-                cards[key] = TrackedCard(
-                    id: key,
-                    name: card.name,
+            for lot in collectionPricingLots(for: card) {
+                let key = APIService.TrackedPriceItem.lookupKey(
                     tcg: card.tcg,
-                    setName: card.setName,
-                    rarity: card.rarity,
-                    price: market?.price ?? card.price ?? 0,
-                    currency: market?.currency ?? "USD",
-                    source: market?.source,
-                    owned: card.quantity,
-                    imageURL: card.imageUrlSmall ?? card.imageUrl,
-                    change: changes[key]
+                    externalId: externalID,
+                    finishCode: lot.finishCode
                 )
+                let market = livePrices[key]
+                if var existing = cards[key] {
+                    existing.owned += lot.quantity
+                    cards[key] = existing
+                } else {
+                    cards[key] = TrackedCard(
+                        id: key,
+                        name: card.name,
+                        tcg: card.tcg,
+                        setName: card.setName,
+                        rarity: card.rarity,
+                        finishCode: lot.finishCode,
+                        finishLabel: lot.finishLabel,
+                        price: market?.price ?? lot.storedPrice ?? card.price ?? 0,
+                        currency: market?.currency ?? "USD",
+                        source: market?.source,
+                        owned: lot.quantity,
+                        imageURL: card.imageUrlSmall ?? card.imageUrl,
+                        change: changes[changeKey]
+                    )
+                }
             }
         }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -265,11 +331,14 @@ struct PricesView: View {
     @MainActor
     private func refreshTrackedPrices(force: Bool) async {
         guard !isRefreshingPrices, let token = environmentStore.authToken else { return }
-        let items = collections.flatMap(\.cards).map {
-            APIService.TrackedPriceItem(
-                tcg: $0.tcg,
-                externalId: $0.externalId ?? $0.cardId
-            )
+        let items = collections.flatMap(\.cards).flatMap { card in
+            collectionPricingLots(for: card).map { lot in
+                APIService.TrackedPriceItem(
+                    tcg: card.tcg,
+                    externalId: card.externalId ?? card.cardId,
+                    finishCode: lot.finishCode
+                )
+            }
         }
         guard !items.isEmpty else { return }
         isRefreshingPrices = true
@@ -335,6 +404,9 @@ private struct TrackedCardRow: View {
                 Text(card.name).font(.subheadline.weight(.medium)).lineLimit(1)
                 HStack(spacing: 6) {
                     GameBadge(tcg: card.tcg)
+                    if let finishLabel = card.finishLabel {
+                        Text(finishLabel)
+                    }
                     if let set = card.setName { Text(set).lineLimit(1) }
                 }
                 .font(.caption)

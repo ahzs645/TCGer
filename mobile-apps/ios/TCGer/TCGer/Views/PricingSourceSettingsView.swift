@@ -57,7 +57,9 @@ struct PricingSourceSettingsView: View {
             default:
                 EmptyView()
             }
-            if selectedSource == .justTCG || selectedSource == .collectrPrivateTest {
+            if selectedSource == .justTCG || selectedSource == .scryfall
+                || (isOnDevice && selectedSource == .automatic)
+                || selectedSource == .collectrPrivateTest {
                 connectionSection
             }
         }
@@ -83,7 +85,7 @@ struct PricingSourceSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Phone-only pricing will stop until another personal key is saved.")
+            Text("Best Available will fall back to free Scryfall pricing after the key is removed.")
         }
         .alert("Remove Collectr Test Session?", isPresented: $showingRemoveCollectrConfirmation) {
             Button("Remove", role: .destructive) {
@@ -173,6 +175,18 @@ struct PricingSourceSettingsView: View {
                 Link(destination: URL(string: "https://justtcg.com")!) {
                     Label("Create or Manage API Key", systemImage: "key")
                 }
+            } else if selectedSource == .scryfall {
+                Text("Scryfall provides free Magic market references for regular, traditional foil, and etched printings. TCGer caches results for 12 hours and keeps requests below Scryfall's published API limit.")
+                    .font(.subheadline)
+
+                Link(destination: URL(string: "https://scryfall.com/docs/api")!) {
+                    Label("Open Scryfall API Documentation", systemImage: "safari")
+                }
+            } else if selectedSource == .automatic {
+                Text(isOnDevice
+                    ? "Best Available uses your personal JustTCG key when one is saved, then falls back to Scryfall without requiring setup."
+                    : "Best Available asks the server for the first compatible configured quote.")
+                    .font(.subheadline)
             } else if selectedSource == .collectrPrivateTest {
                 Label {
                     Text("Private-build experiment. It makes live requests using session headers you capture from your own Collectr account. TCGer does not derive or embed X-COLLECTR-KEY.")
@@ -189,6 +203,10 @@ struct PricingSourceSettingsView: View {
                 Text(isOnDevice
                     ? "Phone-only mode uses a personal paid JustTCG key from this iPhone. It never becomes part of your collection export or iCloud preferences."
                     : "TCGer uses the paid JustTCG plan for commercial pricing. The API key stays on your server and is never downloaded to this iPhone.")
+            } else if selectedSource == .scryfall {
+                Text(isOnDevice
+                    ? "No API key is required. Requests identify TCGer and use the app's shared 12-hour on-device quote cache."
+                    : "Scryfall access is configured and rate-limited by the TCGer server.")
             } else if selectedSource == .collectrPrivateTest {
                 Text("Session values are stored in this iPhone's non-synchronizing Keychain. Only cards with an explicit Collectr product-ID mapping make requests.")
             } else if let selectedOption {
@@ -411,10 +429,8 @@ struct PricingSourceSettingsView: View {
             } label: {
                 HStack {
                     Label(
-                        selectedSource == .justTCG
-                            ? "Test JustTCG Connection"
-                            : "Test Live Collectr Price",
-                        systemImage: selectedSource == .justTCG ? "network" : "checkmark.circle"
+                        connectionTestLabel,
+                        systemImage: selectedSource == .collectrPrivateTest ? "checkmark.circle" : "network"
                     )
                     Spacer()
                     if isTesting {
@@ -430,7 +446,7 @@ struct PricingSourceSettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(result.ok ? "Connection successful" : "Connection failed")
                         if result.ok {
-                            Text("\(selectedSource == .collectrPrivateTest ? "Collectr" : (isOnDevice ? "JustTCG" : "Server")) response: \(result.latencyMs) ms")
+                            Text("\(connectionResponseLabel) response: \(result.latencyMs) ms")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if let error = result.error {
@@ -465,6 +481,23 @@ struct PricingSourceSettingsView: View {
             Text(text)
                 .font(.subheadline)
         }
+    }
+
+    private var connectionTestLabel: String {
+        switch selectedSource {
+        case .scryfall: return "Test Scryfall Connection"
+        case .automatic: return "Test Best Available Source"
+        case .justTCG: return "Test JustTCG Connection"
+        case .collectrPrivateTest: return "Test Live Collectr Price"
+        default: return "Test Server Connection"
+        }
+    }
+
+    private var connectionResponseLabel: String {
+        if selectedSource == .collectrPrivateTest { return "Collectr" }
+        if selectedSource == .scryfall { return "Scryfall" }
+        if isOnDevice && selectedSource == .automatic { return "Best available" }
+        return isOnDevice ? "JustTCG" : "Server"
     }
 
     private func loadConfiguration() async {
@@ -543,13 +576,29 @@ struct PricingSourceSettingsView: View {
             return
         } catch {
             availableOptions = isOnDevice
-                ? [APIService.PriceSourceOption(
-                    id: .justTCG,
-                    label: "JustTCG (Personal Key)",
-                    description: "Direct pricing using a personal key stored only on this iPhone.",
-                    games: ["magic"],
-                    requiresServer: false
-                )]
+                ? [
+                    APIService.PriceSourceOption(
+                        id: .automatic,
+                        label: "Best Available",
+                        description: "Use JustTCG when configured, then fall back to Scryfall.",
+                        games: ["magic"],
+                        requiresServer: false
+                    ),
+                    APIService.PriceSourceOption(
+                        id: .scryfall,
+                        label: "Scryfall",
+                        description: "Free finish-aware Magic pricing with no API key.",
+                        games: ["magic"],
+                        requiresServer: false
+                    ),
+                    APIService.PriceSourceOption(
+                        id: .justTCG,
+                        label: "JustTCG (Personal Key)",
+                        description: "Direct pricing using a personal key stored only on this iPhone.",
+                        games: ["magic"],
+                        requiresServer: false
+                    )
+                ]
                 : []
             errorMessage = error.localizedDescription
         }

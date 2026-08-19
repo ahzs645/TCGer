@@ -41,6 +41,7 @@ export async function fetchCardPrices(
     currency: string;
     basePrice?: number;
     foilPrice?: number;
+    etchedPrice?: number;
     reverseHoloPrice?: number;
     finishCode?: string;
     updatedAt: string;

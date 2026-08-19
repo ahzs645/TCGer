@@ -104,6 +104,7 @@ export async function fetchLiveCardPrices(
         currency: quote.currency,
         basePrice: quote.price,
         foilPrice: quote.foilPrice,
+        etchedPrice: quote.etchedPrice,
         reverseHoloPrice: quote.reverseHoloPrice,
         finishCode,
         updatedAt: new Date().toISOString(),

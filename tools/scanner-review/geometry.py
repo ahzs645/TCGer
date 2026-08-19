@@ -175,7 +175,64 @@ def polygon_iou(first: Iterable[Iterable[float]], second: Iterable[Iterable[floa
     second_area = abs(cv2.contourArea(second_hull))
     intersection, _ = cv2.intersectConvexConvex(first_hull, second_hull)
     union = first_area + second_area - intersection
-    return float(intersection / union) if union > 0 else 0.0
+    return max(0.0, min(float(intersection / union), 1.0)) if union > 0 else 0.0
+
+
+def boundary_iou(
+    first: Iterable[Iterable[float]],
+    second: Iterable[Iterable[float]],
+    dilation_ratio: float = 0.02,
+    canvas_size: int = 512,
+) -> float:
+    """Compute IoU between fixed-width polygon boundary bands.
+
+    Inputs may use normalized or pixel coordinates, but both polygons must use
+    the same coordinate system. Rasterization preserves the source aspect ratio.
+    """
+    first_array = np.asarray(list(first), dtype=np.float32)
+    second_array = np.asarray(list(second), dtype=np.float32)
+    if len(first_array) < 3 or len(second_array) < 3:
+        return 0.0
+    joint = np.vstack([first_array, second_array])
+    minimum = joint.min(axis=0)
+    maximum = joint.max(axis=0)
+    extent = maximum - minimum
+    if np.any(extent <= 0):
+        return 0.0
+    padding = 0.08
+    usable = canvas_size * (1 - 2 * padding)
+
+    looks_normalized = bool(joint.min() >= -0.01 and joint.max() <= 1.01)
+    if looks_normalized:
+        origin = np.zeros(2, dtype=np.float32)
+        scale = usable
+        offset = np.full(2, padding * canvas_size, dtype=np.float32)
+    else:
+        scale = usable / float(max(extent))
+        rendered_extent = extent * scale
+        origin = minimum
+        offset = (np.full(2, canvas_size, dtype=np.float32) - rendered_extent) / 2
+
+    def rasterize(points: np.ndarray) -> np.ndarray:
+        pixels = np.round(offset + (points - origin) * scale).astype(np.int32)
+        mask = np.zeros((canvas_size, canvas_size), dtype=np.uint8)
+        cv2.fillPoly(mask, [pixels], 1)
+        return mask
+
+    kernel_radius = max(1, round(dilation_ratio * math.hypot(canvas_size, canvas_size)))
+    kernel_size = kernel_radius * 2 + 1
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+
+    def band(mask: np.ndarray) -> np.ndarray:
+        dilated = cv2.dilate(mask, kernel)
+        eroded = cv2.erode(mask, kernel)
+        return (dilated != eroded).astype(np.uint8)
+
+    first_band = band(rasterize(first_array))
+    second_band = band(rasterize(second_array))
+    intersection = np.logical_and(first_band, second_band).sum()
+    union = np.logical_or(first_band, second_band).sum()
+    return float(intersection / union) if union else 0.0
 
 
 def warp_card(image: Image.Image, quad: np.ndarray) -> Image.Image:

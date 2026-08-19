@@ -209,67 +209,6 @@ extension APIService {
         return printsResponse.prints
     }
 
-    /// Returns only World Championship replica printings for the same named
-    /// Pokémon card. Ordinary reprints are intentionally excluded so this can
-    /// be offered as an exceptional choice during Add Card.
-    func getWorldChampionshipPrints(
-        config: ServerConfiguration,
-        token: String,
-        card: Card
-    ) async throws -> [Card] {
-        guard card.tcg.lowercased() == TCGGame.pokemon.rawValue else { return [] }
-
-        var candidates: [Card] = []
-        var loadingError: Error?
-
-        do {
-            candidates = try await getCardPrints(
-                config: config,
-                token: token,
-                tcg: card.tcg,
-                cardId: card.id
-            )
-        } catch {
-            loadingError = error
-        }
-
-        do {
-            candidates.append(contentsOf: try await searchAllCards(
-                config: config,
-                token: token,
-                query: card.name,
-                game: .pokemon,
-                includeAllPrintings: true,
-                limit: 500
-            ))
-        } catch {
-            loadingError = loadingError ?? error
-        }
-
-        let exactName = SearchTextNormalizer.key(card.name)
-        var seenIDs: Set<String> = []
-        let championshipPrints = candidates
-            .filter {
-                SearchTextNormalizer.key($0.name) == exactName
-                    && $0.pokemonPrint?.worldChampionship != nil
-                    && seenIDs.insert($0.id).inserted
-            }
-            .sorted {
-                let left = $0.pokemonPrint?.worldChampionship
-                let right = $1.pokemonPrint?.worldChampionship
-                if left?.year != right?.year {
-                    return (left?.year ?? 0) > (right?.year ?? 0)
-                }
-                return (left?.playerName ?? "")
-                    .localizedCaseInsensitiveCompare(right?.playerName ?? "") == .orderedAscending
-            }
-
-        if championshipPrints.isEmpty, let loadingError {
-            throw loadingError
-        }
-        return championshipPrints
-    }
-
     // MARK: - Sets
 
     struct SetsResponse: Decodable {

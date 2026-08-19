@@ -131,6 +131,38 @@ describe('sealed response serialization', () => {
     }
   });
 
+  test('clears optional inventory purchase fields and notes', async () => {
+    const clearedInventory = {
+      ...inventory,
+      purchasePrice: null,
+      purchaseDate: null,
+      notes: null
+    };
+    jest.mocked(prisma.sealedInventory.findFirst).mockResolvedValue(inventory);
+    jest.mocked(prisma.sealedInventory.update).mockResolvedValue(clearedInventory);
+
+    const updated = await updateSealedInventory('user-1', inventory.id, {
+      purchasePrice: null,
+      purchaseDate: null,
+      notes: null
+    });
+
+    expect(prisma.sealedInventory.update).toHaveBeenCalledWith({
+      where: { id: inventory.id },
+      data: {
+        purchasePrice: null,
+        purchaseDate: null,
+        notes: null
+      },
+      include: { product: true }
+    });
+    expect(updated).toMatchObject({
+      purchasePrice: undefined,
+      purchaseDate: undefined,
+      notes: undefined
+    });
+  });
+
   test('keeps custom products private and owner-controlled', async () => {
     const customProduct = { ...product, ownerId: 'user-1' };
     jest.mocked(prisma.sealedProduct.create).mockResolvedValue(customProduct);

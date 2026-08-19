@@ -499,10 +499,13 @@ struct CardScannerView: View {
                         style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
                     )
 
-                framingInstructionLabel
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                if !viewModel.hasCompletedScanInCurrentSession {
+                    framingInstructionLabel
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
             }
                 .frame(width: width, height: height)
                 .background {
@@ -518,6 +521,7 @@ struct CardScannerView: View {
                     y: topClearance + availableHeight / 2
                 )
                 .animation(.snappy, value: bottomControlsHeight)
+                .animation(.snappy, value: viewModel.hasCompletedScanInCurrentSession)
         }
         .allowsHitTesting(false)
     }

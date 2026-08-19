@@ -52,6 +52,7 @@ describe('market price providers', () => {
       await expect(new TcgDexPriceProvider().fetchPrice('pokemon', 'sv01-001')).resolves.toEqual({
         price: 4.5,
         foilPrice: undefined,
+        etchedPrice: undefined,
         reverseHoloPrice: undefined,
         currency: 'EUR',
       });
@@ -59,15 +60,19 @@ describe('market price providers', () => {
   });
 
   describe('Scryfall', () => {
-    it('uses USD even when a foil value is available', async () => {
+    it('returns regular, foil, and etched USD prices', async () => {
       fetchMock.mockResolvedValueOnce(
-        jsonResponse({ prices: { usd: '3.25', usd_foil: '8.10', eur: '2.90' } }),
+        jsonResponse({
+          prices: { usd: '3.25', usd_foil: '8.10', usd_etched: '9.40', eur: '2.90' },
+        }),
       );
 
       await expect(
         new ScryfallPriceProvider().fetchPrice('magic', 'card-id'),
       ).resolves.toMatchObject({
         price: 3.25,
+        foilPrice: 8.1,
+        etchedPrice: 9.4,
         currency: 'USD',
       });
     });
@@ -81,6 +86,7 @@ describe('market price providers', () => {
         new ScryfallPriceProvider().fetchPrice('magic', 'card-id'),
       ).resolves.toMatchObject({
         price: 2.9,
+        foilPrice: 7.5,
         currency: 'EUR',
       });
     });
@@ -137,6 +143,7 @@ describe('market price providers', () => {
         ).resolves.toEqual({
           price: 2.25,
           foilPrice: 5.75,
+          etchedPrice: undefined,
           reverseHoloPrice: undefined,
           currency: 'USD',
         });

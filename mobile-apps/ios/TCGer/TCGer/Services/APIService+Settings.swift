@@ -40,14 +40,30 @@ extension APIService {
     ) async throws -> PriceSourcesResponse {
         if config.isOnDevice {
             return PriceSourcesResponse(
-                sources: [PriceSourceOption(
-                    id: .justTCG,
-                    label: "JustTCG (Personal Key)",
-                    description: "Direct pricing using a personal key stored only on this iPhone.",
-                    games: ["magic"],
-                    requiresServer: false
-                )],
-                defaultSource: .justTCG
+                sources: [
+                    PriceSourceOption(
+                        id: .automatic,
+                        label: "Best Available",
+                        description: "Use a personal JustTCG key when available, then fall back to free Scryfall pricing.",
+                        games: ["magic"],
+                        requiresServer: false
+                    ),
+                    PriceSourceOption(
+                        id: .scryfall,
+                        label: "Scryfall",
+                        description: "Free regular, foil, and etched Magic prices with no API key.",
+                        games: ["magic"],
+                        requiresServer: false
+                    ),
+                    PriceSourceOption(
+                        id: .justTCG,
+                        label: "JustTCG (Personal Key)",
+                        description: "Direct pricing using a personal key stored only on this iPhone.",
+                        games: ["magic"],
+                        requiresServer: false
+                    )
+                ],
+                defaultSource: .automatic
             )
         }
         let (data, response) = try await makeRequest(
@@ -98,6 +114,14 @@ extension APIService {
             )
         }
 
+        if config.isOnDevice && (source == .scryfall || source == .automatic) {
+            return PricingSourceConfiguration(
+                url: "https://api.scryfall.com",
+                label: source == .automatic ? "Best Available (Scryfall fallback)" : "Scryfall",
+                configured: true
+            )
+        }
+
         if config.isOnDevice {
             return PricingSourceConfiguration(
                 url: "https://api.justtcg.com/v1",
@@ -134,6 +158,13 @@ extension APIService {
         }
 
         if config.isOnDevice {
+            if source == .scryfall {
+                return try await testOnDeviceScryfallConnection()
+            }
+            if source == .automatic,
+               (try? JustTCGCredentialStore.loadAPIKey()) == nil {
+                return try await testOnDeviceScryfallConnection()
+            }
             return try await testOnDeviceJustTCGConnection()
         }
 
@@ -260,6 +291,28 @@ extension APIService {
             error: response.statusCode >= 200 && response.statusCode < 300
                 ? nil
                 : (parseServerMessage(from: data) ?? "JustTCG returned HTTP \(response.statusCode).")
+        )
+    }
+
+    private func testOnDeviceScryfallConnection() async throws -> TestSourceResult {
+        guard let url = URL(string: "https://api.scryfall.com/cards/b0faa7f2-b547-42c4-a810-839da50dadfe") else {
+            throw APIError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        request.setValue("TCGer/0.1 (iOS pricing integration)", forHTTPHeaderField: "User-Agent")
+
+        let startedAt = ContinuousClock.now
+        let (_, response) = try await execute(request)
+        let elapsed = startedAt.duration(to: .now)
+        let latencyMs = Int(elapsed.components.seconds * 1_000)
+            + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+        return TestSourceResult(
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            latencyMs: latencyMs,
+            error: response.statusCode >= 200 && response.statusCode < 300
+                ? nil
+                : "Scryfall returned HTTP \(response.statusCode)."
         )
     }
 

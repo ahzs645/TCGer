@@ -282,6 +282,8 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(state?.revealedCount, 3)
         XCTAssertEqual(state?.currentCardFaceUp, true)
         XCTAssertEqual(state?.session?.id, "opening-native-1")
+        XCTAssertEqual(state?.selectedCardPool?.id, "base1")
+        XCTAssertEqual(state?.selectedCardPool?.cards.first?.name, "Charizard")
     }
 
     func testPackArtworkChoicesAreFilteredByTheSelectedSet() {

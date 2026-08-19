@@ -28,6 +28,10 @@ import { useModuleStore } from "@/stores/preferences";
 import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
 import { GameBadge } from "@/components/cards/game-badge";
+import {
+  collectionPriceLots,
+  trackedPriceLookupKey,
+} from "@/lib/pricing/collection-price-lots";
 type SortKey = "price" | "30d" | "owned";
 const PRICE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
@@ -37,6 +41,8 @@ interface OwnedPrice {
   tcg: string;
   setName?: string;
   rarity?: string;
+  finishCode?: string;
+  finishLabel?: string;
   price: number;
   currency: string;
   source?: string;
@@ -106,16 +112,27 @@ export default function PricesPage() {
         if (enabledGames[card.tcg as keyof typeof enabledGames] === false)
           continue;
         if (selectedGame !== "all" && card.tcg !== selectedGame) continue;
-        const item = {
-          tcg: card.tcg,
-          externalId: card.externalId ?? card.cardId,
-        };
-        byKey.set(`${item.tcg}:${item.externalId}`, item);
+        const externalId = card.externalId ?? card.cardId;
+        for (const lot of collectionPriceLots(card)) {
+          const item = {
+            tcg: card.tcg,
+            externalId,
+            finishCode: lot.finishCode,
+          };
+          byKey.set(
+            trackedPriceLookupKey(item.tcg, item.externalId, item.finishCode),
+            item,
+          );
+        }
       }
     }
     return Array.from(byKey.values()).sort((left, right) =>
-      `${left.tcg}:${left.externalId}`.localeCompare(
-        `${right.tcg}:${right.externalId}`,
+      trackedPriceLookupKey(
+        left.tcg,
+        left.externalId,
+        left.finishCode,
+      ).localeCompare(
+        trackedPriceLookupKey(right.tcg, right.externalId, right.finishCode),
       ),
     );
   }, [collections, enabledGames, selectedGame]);
@@ -147,7 +164,14 @@ export default function PricesPage() {
     const map = new Map<string, TrackedPriceResult>();
     for (const result of trackedPricesQuery.data?.prices ?? []) {
       if (result.price !== undefined) {
-        map.set(`${result.tcg}:${result.externalId}`, result);
+        map.set(
+          trackedPriceLookupKey(
+            result.tcg,
+            result.externalId,
+            result.finishCode,
+          ),
+          result,
+        );
       }
     }
     return map;
@@ -171,24 +195,33 @@ export default function PricesPage() {
           continue;
         if (selectedGame !== "all" && card.tcg !== selectedGame) continue;
         const externalId = card.externalId ?? card.cardId;
-        const key = `${card.tcg}:${externalId}`;
-        const market = marketPriceByCard.get(key);
-        const existing = byKey.get(key);
-        if (existing) {
-          existing.owned += card.quantity ?? 0;
-        } else {
-          byKey.set(key, {
-            key,
-            name: card.name,
-            tcg: card.tcg,
-            setName: card.setName,
-            rarity: card.rarity,
-            price: market?.price ?? card.price ?? 0,
-            currency: market?.currency ?? "USD",
-            source: market?.source,
-            owned: card.quantity ?? 0,
-            change30d: changeByCard.get(key) ?? null,
-          });
+        const cardChangeKey = `${card.tcg}:${externalId}`;
+        for (const lot of collectionPriceLots(card)) {
+          const key = trackedPriceLookupKey(
+            card.tcg,
+            externalId,
+            lot.finishCode,
+          );
+          const market = marketPriceByCard.get(key);
+          const existing = byKey.get(key);
+          if (existing) {
+            existing.owned += lot.quantity;
+          } else {
+            byKey.set(key, {
+              key,
+              name: card.name,
+              tcg: card.tcg,
+              setName: card.setName,
+              rarity: card.rarity,
+              finishCode: lot.finishCode,
+              finishLabel: lot.finishLabel,
+              price: market?.price ?? lot.storedPrice ?? card.price ?? 0,
+              currency: market?.currency ?? "USD",
+              source: market?.source,
+              owned: lot.quantity,
+              change30d: changeByCard.get(cardChangeKey) ?? null,
+            });
+          }
         }
       }
     }
@@ -483,6 +516,14 @@ export default function PricesPage() {
                         >
                           <td className="p-3">
                             <span className="font-medium">{p.name}</span>
+                            {p.finishLabel && (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 text-[10px] font-normal"
+                              >
+                                {p.finishLabel}
+                              </Badge>
+                            )}
                             {p.rarity && (
                               <span className="ml-2 text-xs text-muted-foreground hidden xl:inline">
                                 {p.rarity}

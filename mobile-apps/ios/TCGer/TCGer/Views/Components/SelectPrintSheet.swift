@@ -7,6 +7,7 @@ struct SelectPrintSheet: View {
     @Binding var selectedPrint: Card?
     let onCancel: (() -> Void)?
 
+    @State private var draftSelection: Card?
     @State private var prints: [Card] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -21,6 +22,7 @@ struct SelectPrintSheet: View {
     ) {
         self.card = card
         self._selectedPrint = selectedPrint
+        self._draftSelection = State(initialValue: selectedPrint.wrappedValue ?? card)
         self.onCancel = onCancel
         if let initialPrints {
             self._prints = State(initialValue: initialPrints)
@@ -72,20 +74,16 @@ struct SelectPrintSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Use This Print") {
+                        selectedPrint = draftSelection
                         dismiss()
                     }
-                    .disabled(isLoading || selectedPrint == nil)
+                    .disabled(isLoading || draftSelection == nil)
                 }
             }
         }
         .task {
             if isLoading {
                 await loadPrints()
-            } else if prints.count <= 1 {
-                if selectedPrint == nil {
-                    selectedPrint = prints.first ?? card
-                }
-                dismiss()
             }
         }
     }
@@ -127,8 +125,8 @@ struct SelectPrintSheet: View {
             ForEach(prints) { print in
                 PrintRow(
                     print: print,
-                    isSelected: selectedPrint?.id == print.id,
-                    onTap: { selectedPrint = print }
+                    isSelected: draftSelection?.id == print.id,
+                    onTap: { draftSelection = print }
                 )
             }
         }
@@ -193,19 +191,11 @@ struct SelectPrintSheet: View {
 
         // If current selected print is in the list, keep it selected;
         // otherwise select the scanned printing when available.
-        if !prints.contains(where: { $0.id == selectedPrint?.id }) {
-            selectedPrint = prints.first(where: { $0.id == card.id }) ?? prints.first ?? card
+        if !prints.contains(where: { $0.id == draftSelection?.id }) {
+            draftSelection = prints.first(where: { $0.id == card.id }) ?? prints.first ?? card
         }
 
         isLoading = false
-
-        // Automatically skip the picker when one or fewer print options are available.
-        if prints.count <= 1 {
-            if selectedPrint == nil {
-                selectedPrint = prints.first ?? card
-            }
-            dismiss()
-        }
     }
 }
 

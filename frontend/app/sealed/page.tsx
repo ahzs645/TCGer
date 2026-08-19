@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign,
   Edit3,
+  LayoutGrid,
   Package,
   PackageOpen,
   Plus,
@@ -79,6 +80,9 @@ import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
 import { PageHeader } from "@/components/layout/page-header";
 import { GameBadge } from "@/components/cards/game-badge";
+import { CardImage } from "@/components/cards/card-image";
+import { getSetCards } from "@/lib/api/cards";
+import type { Card as TradingCard, TcgCode } from "@tcg/api-types";
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
@@ -129,6 +133,8 @@ export default function SealedPage() {
     null,
   );
   const [selling, setSelling] = useState<SealedLedgerCard | null>(null);
+  const [browsingSetCards, setBrowsingSetCards] =
+    useState<SealedProductResponse | null>(null);
   useEffect(() => setMounted(true), []);
 
   const { token, isAuthenticated } = useAuthStore();
@@ -342,6 +348,9 @@ export default function SealedPage() {
                         showPricing={showPricing}
                         onEdit={() => setEditing(item)}
                         onOpen={() => setOpening(item)}
+                        onBrowseSetCards={() =>
+                          setBrowsingSetCards(item.product)
+                        }
                         onDelete={() => setDeleting(item)}
                       />
                     ))}
@@ -406,6 +415,12 @@ export default function SealedPage() {
           void queryClient.invalidateQueries({ queryKey: ["sealed-openings"] })
         }
       />
+      <SealedSetCardsDialog
+        key={browsingSetCards?.id ?? "closed"}
+        product={browsingSetCards}
+        token={token}
+        onOpenChange={(open) => !open && setBrowsingSetCards(null)}
+      />
     </AppShell>
   );
 }
@@ -466,12 +481,14 @@ function InventoryCard({
   showPricing,
   onEdit,
   onOpen,
+  onBrowseSetCards,
   onDelete,
 }: {
   item: SealedInventoryResponse;
   showPricing: boolean;
   onEdit: () => void;
   onOpen: () => void;
+  onBrowseSetCards: () => void;
   onDelete: () => void;
 }) {
   const totalCost =
@@ -526,7 +543,18 @@ function InventoryCard({
                 </>
               )}
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
+              {item.product.setCode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onBrowseSetCards}
+                  aria-label={`View cards in set ${item.product.setCode}`}
+                >
+                  <LayoutGrid className="mr-1.5 h-4 w-4" />
+                  Cards
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -558,6 +586,140 @@ function InventoryCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SealedSetCardsDialog({
+  product,
+  token,
+  onOpenChange,
+}: {
+  product: SealedProductResponse | null;
+  token: string | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const setCode = product?.setCode ?? "";
+
+  const cardsQuery = useQuery({
+    queryKey: ["sealed-set-cards", product?.tcg, setCode],
+    queryFn: () =>
+      getSetCards(token!, product!.tcg as TcgCode, product!.setCode!),
+    enabled: Boolean(product && token && setCode),
+    staleTime: 5 * 60_000,
+  });
+
+  const cards = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return (cardsQuery.data ?? [])
+      .filter(
+        (card) =>
+          !query ||
+          card.name.toLocaleLowerCase().includes(query) ||
+          card.rarity?.toLocaleLowerCase().includes(query) ||
+          card.collectorNumber?.toLocaleLowerCase().includes(query),
+      )
+      .sort((left, right) =>
+        (left.collectorNumber ?? left.name).localeCompare(
+          right.collectorNumber ?? right.name,
+          undefined,
+          { numeric: true },
+        ),
+      );
+  }, [cardsQuery.data, search]);
+
+  return (
+    <Dialog open={Boolean(product)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[92dvh] max-w-5xl flex-col">
+        <DialogHeader>
+          <DialogTitle>
+            {setCode ? `Set ${setCode} cards` : "Set cards"}
+          </DialogTitle>
+          <DialogDescription>
+            Cards from the linked set are shown here. Exact contents and pull
+            rates depend on the sealed product and its collation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, rarity, or number"
+            className="pl-9"
+          />
+        </div>
+
+        <ScrollArea className="min-h-0 flex-1 pr-3">
+          {cardsQuery.isLoading ? (
+            <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {Array.from({ length: 10 }, (_, index) => (
+                <Skeleton key={index} className="aspect-[5/7] rounded-lg" />
+              ))}
+            </div>
+          ) : cardsQuery.error ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-destructive">
+                {(cardsQuery.error as Error).message}
+              </p>
+              <Button
+                className="mt-4"
+                size="sm"
+                variant="outline"
+                onClick={() => void cardsQuery.refetch()}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : cards.length === 0 ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              {search ? "No cards match your search." : "No set cards found."}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {cards.map((card) => (
+                <SealedSetCard key={card.id} card={card} />
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        {!cardsQuery.isLoading && !cardsQuery.error && (
+          <p className="text-xs text-muted-foreground">
+            Showing {cards.length} of {(cardsQuery.data ?? []).length} cards
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SealedSetCard({ card }: { card: TradingCard }) {
+  const details = [
+    card.collectorNumber ? `#${card.collectorNumber}` : null,
+    card.rarity,
+  ].filter(Boolean);
+
+  return (
+    <div className="min-w-0 rounded-lg border bg-card p-2">
+      <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
+        <CardImage
+          src={card.imageUrlSmall ?? card.imageUrl}
+          fallbackSrc={card.imageUrl}
+          tcg={card.tcg}
+          alt={card.name}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 18vw"
+          className="object-contain"
+          unoptimized
+        />
+      </div>
+      <p className="mt-2 truncate text-sm font-medium">{card.name}</p>
+      <p className="truncate text-xs text-muted-foreground">
+        {details.join(" · ") || "Printing details unavailable"}
+      </p>
+    </div>
   );
 }
 

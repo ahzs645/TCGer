@@ -135,7 +135,26 @@ struct OnlineCodesView: View {
                     .accessibilityLabel("Export codes")
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Picker("Game", selection: $gameFilter) {
+                        Text("All Games").tag(TCGGame.all)
+                        ForEach(availableGames) { game in
+                            Label(game.displayName, systemImage: game.systemIconName)
+                                .tag(game)
+                        }
+                    }
+                } label: {
+                    Label(
+                        gameFilter == .all
+                            ? "Filter by Game"
+                            : "Game Filter: \(gameFilter.displayName)",
+                        systemImage: gameFilter == .all
+                            ? "line.3.horizontal.decrease.circle"
+                            : "line.3.horizontal.decrease.circle.fill"
+                    )
+                }
+
                 Menu {
                     Button {
                         presentedSheet = .scanner(defaultAddGame)
@@ -208,13 +227,6 @@ struct OnlineCodesView: View {
 
     private var filterSection: some View {
         Section {
-            Picker("Game", selection: $gameFilter) {
-                Text("All Games").tag(TCGGame.all)
-                ForEach(availableGames) { game in
-                    Text(game.displayName).tag(game)
-                }
-            }
-
             Picker("Status", selection: $statusFilter) {
                 ForEach(OnlineCodeStatusFilter.allCases) { filter in
                     Text(filter.title).tag(filter)

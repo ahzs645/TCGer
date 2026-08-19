@@ -1,0 +1,11 @@
+name: "@tcger/scanner-review"
+description: TCGer run comparison, geometry review, and manual decision queues
+version: 0.1.0
+fiftyone:
+  version: ">=1.20,<2"
+license: MIT
+operators:
+  - show_performance_dashboard
+  - compare_scanner_runs
+  - review_scanner_geometry
+  - set_scanner_review_status

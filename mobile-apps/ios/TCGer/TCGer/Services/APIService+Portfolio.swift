@@ -1,5 +1,18 @@
 import Foundation
 
+private actor ScryfallPricingThrottle {
+    static let shared = ScryfallPricingThrottle()
+    private var nextRequestAt = Date.distantPast
+
+    func wait() async throws {
+        let delay = nextRequestAt.timeIntervalSinceNow
+        if delay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+        nextRequestAt = Date().addingTimeInterval(0.12)
+    }
+}
+
 extension APIService {
     struct TrackedPriceItem: Codable, Hashable, Sendable {
         let tcg: String
@@ -13,16 +26,16 @@ extension APIService {
             self.finishCode = normalizedFinish.isEmpty ? nil : normalizedFinish
         }
 
-        static func lookupKey(tcg: String, externalId: String) -> String {
-            "\(normalized(tcg).lowercased()):\(normalized(externalId).lowercased())"
+        static func lookupKey(tcg: String, externalId: String, finishCode: String? = nil) -> String {
+            "\(normalized(tcg).lowercased()):\(normalized(externalId).lowercased()):\(normalized(finishCode ?? "").lowercased())"
         }
 
         var lookupKey: String {
-            Self.lookupKey(tcg: tcg, externalId: externalId)
+            Self.lookupKey(tcg: tcg, externalId: externalId, finishCode: finishCode)
         }
 
         var key: String {
-            "\(Self.normalized(tcg).lowercased()):\(Self.normalized(externalId)):\(Self.normalized(finishCode ?? "").lowercased())"
+            lookupKey
         }
 
         private static func normalized(_ value: String) -> String {
@@ -43,7 +56,7 @@ extension APIService {
         let error: String?
 
         var lookupKey: String {
-            TrackedPriceItem.lookupKey(tcg: tcg, externalId: externalId)
+            TrackedPriceItem.lookupKey(tcg: tcg, externalId: externalId, finishCode: finishCode)
         }
     }
 
@@ -153,13 +166,32 @@ extension APIService {
     }
 
     private func fetchOnDeviceTrackedPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
-        if PricingSource.selected() == .collectrPrivateTest,
+        let source = PricingSource.selected()
+        if source == .collectrPrivateTest,
            let configuration = try CollectrPrivateCredentialStore.load() {
             return try await CollectrTestPriceProvider(
                 configuration: configuration,
                 mappings: CollectrProductMappingStore().mappings
             ).fetchPrice(tcg: item.tcg, externalID: item.externalId)
         }
+
+        if source == .scryfall {
+            return try await fetchOnDeviceScryfallPrice(item)
+        }
+        if source == .automatic {
+            if (try? JustTCGCredentialStore.loadAPIKey()) != nil,
+               let quote = try await fetchOnDeviceJustTCGPrice(item) {
+                return quote
+            }
+            return try await fetchOnDeviceScryfallPrice(item)
+        }
+        if source == .justTCG {
+            return try await fetchOnDeviceJustTCGPrice(item)
+        }
+        return nil
+    }
+
+    private func fetchOnDeviceJustTCGPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
         guard item.tcg.lowercased() == "magic",
               let apiKey = try JustTCGCredentialStore.loadAPIKey(),
               var components = URLComponents(string: "https://api.justtcg.com/v1/cards") else {
@@ -196,6 +228,89 @@ extension APIService {
             price = regular?.price ?? foil?.price
         }
         return price.map { CardPriceQuote(source: "justtcg", price: $0, currency: "USD") }
+    }
+
+    private struct ScryfallCardPriceResponse: Decodable {
+        struct Prices: Decodable {
+            let usd: String?
+            let usdFoil: String?
+            let usdEtched: String?
+            let eur: String?
+            let eurFoil: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case usd
+                case usdFoil = "usd_foil"
+                case usdEtched = "usd_etched"
+                case eur
+                case eurFoil = "eur_foil"
+            }
+        }
+
+        let prices: Prices
+    }
+
+    private func fetchOnDeviceScryfallPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
+        guard item.tcg.lowercased() == "magic",
+              let url = URL(string: "https://api.scryfall.com/cards/\(item.externalId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? item.externalId)") else {
+            return nil
+        }
+        try await ScryfallPricingThrottle.shared.wait()
+        var request = URLRequest(url: url)
+        request.setValue("application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        request.setValue("TCGer/0.1 (iOS pricing integration)", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await execute(request)
+        if response.statusCode == 404 { return nil }
+        guard response.statusCode >= 200 && response.statusCode < 300 else {
+            throw APIError.serverError(
+                status: response.statusCode,
+                message: parseServerMessage(from: data)
+            )
+        }
+        guard let payload = try? JSONDecoder().decode(ScryfallCardPriceResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+
+        let usd = scryfallPrice(
+            regular: payload.prices.usd,
+            foil: payload.prices.usdFoil,
+            etched: payload.prices.usdEtched,
+            finishCode: item.finishCode
+        )
+        let eur = scryfallPrice(
+            regular: payload.prices.eur,
+            foil: payload.prices.eurFoil,
+            etched: nil,
+            finishCode: item.finishCode
+        )
+        if let usd { return CardPriceQuote(source: "scryfall", price: usd, currency: "USD") }
+        return eur.map { CardPriceQuote(source: "scryfall", price: $0, currency: "EUR") }
+    }
+
+    private func scryfallPrice(
+        regular: String?,
+        foil: String?,
+        etched: String?,
+        finishCode: String?
+    ) -> Double? {
+        func price(_ value: String?) -> Double? {
+            guard let value, let parsed = Double(value), parsed > 0, parsed.isFinite else { return nil }
+            return parsed
+        }
+        let regularPrice = price(regular)
+        let foilPrice = price(foil)
+        let etchedPrice = price(etched)
+        let finish = finishCode?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if ["normal", "regular", "nonfoil", "non-foil", "nonholo", "non-holo"].contains(finish) {
+            return regularPrice ?? foilPrice ?? etchedPrice
+        }
+        if finish.contains("etched") {
+            return etchedPrice ?? foilPrice ?? regularPrice
+        }
+        if finish.contains("foil") || finish.contains("holo") {
+            return foilPrice ?? regularPrice
+        }
+        return regularPrice ?? foilPrice ?? etchedPrice
     }
 
     private struct JustTcgCardsResponse: Decodable {

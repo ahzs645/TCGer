@@ -15,12 +15,14 @@ describe('finish-aware pricing rules', () => {
         currency: 'usd',
         price: Number.NaN,
         foilPrice: 4.5,
+        etchedPrice: 6.25,
         reverseHoloPrice: 0,
       }),
     ).toEqual({
       currency: 'USD',
       price: undefined,
       foilPrice: 4.5,
+      etchedPrice: 6.25,
       reverseHoloPrice: undefined,
     });
   });
@@ -30,9 +32,10 @@ describe('finish-aware pricing rules', () => {
       currency: 'USD',
       price: 2,
       foilPrice: 5,
+      etchedPrice: 7,
     };
     expect(selectPriceForFinish(quote, 'reverse-holo')).toBe(5);
-    expect(selectPriceForFinish(quote, 'etched-foil')).toBe(5);
+    expect(selectPriceForFinish(quote, 'etched-foil')).toBe(7);
     expect(selectPriceForFinish(quote, 'normal')).toBe(2);
   });
 });

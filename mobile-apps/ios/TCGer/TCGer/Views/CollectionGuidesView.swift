@@ -12,10 +12,33 @@ private enum GuideOwnershipFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum CollectionGuideListFilter {
+    static func apply(
+        to guides: [CollectionGuide],
+        enabledGames: [TCGGame],
+        selectedGame: TCGGame,
+        query: String
+    ) -> [CollectionGuide] {
+        let enabledGameIDs = Set(enabledGames.map(\.rawValue))
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return guides.filter { guide in
+            let guideGame = guide.tcg.lowercased()
+            let matchesEnabledGame = enabledGameIDs.contains(guideGame)
+            let matchesSelectedGame = selectedGame == .all || guideGame == selectedGame.rawValue
+            let matchesSearch = trimmedQuery.isEmpty
+                || guide.title.localizedCaseInsensitiveContains(trimmedQuery)
+                || guide.description.localizedCaseInsensitiveContains(trimmedQuery)
+                || guide.tags.contains { $0.localizedCaseInsensitiveContains(trimmedQuery) }
+            return matchesEnabledGame && matchesSelectedGame && matchesSearch
+        }
+    }
+}
+
 struct CollectionGuidesView: View {
     let parentProvidesNavigation: Bool
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @EnvironmentObject private var wishlistStore: WishlistStore
     @State private var guides: [CollectionGuide] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -35,13 +58,25 @@ struct CollectionGuidesView: View {
     }
 
     private var filteredGuides: [CollectionGuide] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return guides }
-        return guides.filter { guide in
-            guide.title.localizedCaseInsensitiveContains(query)
-                || guide.description.localizedCaseInsensitiveContains(query)
-                || guide.tags.contains { $0.localizedCaseInsensitiveContains(query) }
+        CollectionGuideListFilter.apply(
+            to: guides,
+            enabledGames: environmentStore.enabledGames,
+            selectedGame: selectedGame,
+            query: searchText
+        )
+    }
+
+    private func progress(for guide: CollectionGuide) -> CollectionGuideProgress? {
+        guard guide.followed,
+              let wishlistId = guide.wishlistId,
+              let wishlist = wishlistStore.wishlists.first(where: { $0.id == wishlistId }) else {
+            return nil
         }
+        return CollectionGuideProgress(
+            ownedCards: wishlist.ownedCards,
+            totalCards: wishlist.totalCards,
+            completionPercent: wishlist.completionPercent
+        )
     }
 
     var body: some View {
@@ -65,35 +100,55 @@ struct CollectionGuidesView: View {
             } else if searchScope == .cards {
                 guideCardSearchContent
             } else if filteredGuides.isEmpty {
-                ContentUnavailableView.search(text: searchText)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(filteredGuides) { guide in
-                            NavigationLink {
-                                CollectionGuideDetailView(guide: guide) { updatedGuide in
-                                    guard let index = guides.firstIndex(where: { $0.id == updatedGuide.id }) else {
-                                        return
-                                    }
-                                    guides[index] = updatedGuide
-                                }
-                            } label: {
-                                CollectionGuideRow(guide: guide)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                VStack(spacing: 0) {
+                    gamePicker
+                    ContentUnavailableView {
+                        Label("No Guides Found", systemImage: "books.vertical")
+                    } description: {
+                        Text("Try a different search or game.")
                     }
-                    .padding()
                 }
-                .refreshable { await loadGuides() }
+            } else {
+                VStack(spacing: 0) {
+                    gamePicker
+
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(filteredGuides) { guide in
+                                NavigationLink {
+                                    CollectionGuideDetailView(guide: guide) { updatedGuide in
+                                        guard let index = guides.firstIndex(where: { $0.id == updatedGuide.id }) else {
+                                            return
+                                        }
+                                        guides[index] = updatedGuide
+                                    }
+                                } label: {
+                                    CollectionGuideRow(
+                                        guide: guide,
+                                        progress: progress(for: guide)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        async let guideLoad: Void = loadGuides()
+                        async let wishlistLoad: Void = loadWishlists(force: true)
+                        _ = await (guideLoad, wishlistLoad)
+                    }
+                }
             }
         }
         .navigationTitle("Collection Guides")
         .searchable(
             text: $searchText,
             prompt: searchScope == .cards
-                ? "Clay, Ditto, Connected Art…"
-                : "Clay, artist, Pokémon…"
+                ? "Search guide cards"
+                : selectedGame == .all
+                    ? "Search guides"
+                    : "Search \(selectedGame.shortName) guides"
         )
         .searchScopes($searchScope) {
             ForEach(GuideSearchScope.allCases, id: \.self) { scope in
@@ -102,7 +157,9 @@ struct CollectionGuidesView: View {
         }
         .task {
             resolveSelectedGame()
-            await loadGuides()
+            async let guideLoad: Void = loadGuides()
+            async let wishlistLoad: Void = loadWishlists()
+            _ = await (guideLoad, wishlistLoad)
         }
         .onChange(of: environmentStore.enabledGames) {
             resolveSelectedGame()
@@ -112,6 +169,16 @@ struct CollectionGuidesView: View {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             await searchGuideCards()
+        }
+    }
+
+    @ViewBuilder
+    private var gamePicker: some View {
+        if environmentStore.shouldShowGamePicker {
+            GamePickerPills(
+                selection: $selectedGame,
+                games: environmentStore.gamePickerGames
+            )
         }
     }
 
@@ -196,6 +263,16 @@ struct CollectionGuidesView: View {
     }
 
     @MainActor
+    private func loadWishlists(force: Bool = false) async {
+        guard let token = environmentStore.authToken else { return }
+        await wishlistStore.load(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            force: force
+        )
+    }
+
+    @MainActor
     private func searchGuideCards() async {
         guard let token = environmentStore.authToken else { return }
         isSearchingCards = true
@@ -259,8 +336,22 @@ private struct GlobalGuideCardCell: View {
     }
 }
 
+private struct CollectionGuideProgress: Equatable {
+    let ownedCards: Int
+    let totalCards: Int
+    let completionPercent: Int
+}
+
 private struct CollectionGuideRow: View {
     let guide: CollectionGuide
+    let progress: CollectionGuideProgress?
+
+    private var displayedCardCount: Int? {
+        if let progress, progress.totalCards > 0 {
+            return progress.totalCards
+        }
+        return guide.cardCountHint
+    }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -286,13 +377,33 @@ private struct CollectionGuideRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
-                HStack(spacing: 6) {
-                    Label("\(guide.cardCountHint ?? 0)", systemImage: "rectangle.stack")
-                    Text("•")
-                    Text(guide.curatorName)
+                if let displayedCardCount {
+                    HStack(spacing: 8) {
+                        GameBadge(tcg: guide.tcg, showsName: true)
+                        Label("\(displayedCardCount) cards", systemImage: "rectangle.stack")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    GameBadge(tcg: guide.tcg, showsName: true)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+                if let progress, progress.totalCards > 0 {
+                    ProgressView(
+                        value: Double(progress.ownedCards),
+                        total: Double(progress.totalCards)
+                    )
+                    .tint(progress.completionPercent >= 100 ? .green : .accentColor)
+
+                    HStack {
+                        Text("\(progress.ownedCards) of \(progress.totalCards) owned")
+                        Spacer()
+                        Text("\(progress.completionPercent)%")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -761,6 +872,10 @@ private struct CollectionGuideDetailView: View {
         cardCountHint: 224,
         followed: true,
         wishlistId: "preview-wishlist"
+    ), progress: CollectionGuideProgress(
+        ownedCards: 73,
+        totalCards: 224,
+        completionPercent: 33
     ))
     .padding()
 }

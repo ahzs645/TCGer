@@ -89,7 +89,41 @@ struct PackSelectionSheet: View {
     }
 }
 
-private struct PackPossiblePullsView: View {
+struct PackPossiblePullsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let poolID: String
+    let cardPools: [PackOpeningInterfaceState.CardPool]
+
+    private var pool: PackOpeningInterfaceState.CardPool? {
+        cardPools.first { $0.id.caseInsensitiveCompare(poolID) == .orderedSame }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let pool {
+                    PackPossiblePullsView(pool: pool)
+                } else {
+                    ContentUnavailableView(
+                        "Cards Unavailable",
+                        systemImage: "rectangle.grid.2x2",
+                        description: Text("This pack's card pool could not be loaded.")
+                    )
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+struct PackPossiblePullsView: View {
     let pool: PackOpeningInterfaceState.CardPool
     @State private var searchText = ""
 
