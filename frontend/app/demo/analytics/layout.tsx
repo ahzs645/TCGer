@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Analytics · TCGer Demo",
+  title: "Analytics",
 };
 
 export default function DemoAnalyticsLayout({

@@ -35,16 +35,11 @@ import {
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Deck } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
+import { GameBadge } from "@/components/cards/game-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Fake deck data                                                      */
 /* ------------------------------------------------------------------ */
-
-const TCG_COLORS: Record<string, string> = {
-  "Yu-Gi-Oh!": "#ef4444",
-  Magic: "#8b5cf6",
-  Pokemon: "#f59e0b",
-};
 
 export default function DecksPage() {
   const [selectedDeck, setSelectedDeck] = useState<string | null>(null);
@@ -208,7 +203,10 @@ export default function DecksPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 md:gap-6" data-oid="9m6z._l">
+        <div
+          className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3"
+          data-oid="9m6z._l"
+        >
           <Card data-oid="4m-d.b5">
             <CardHeader className="p-3 pb-1 md:p-6 md:pb-4" data-oid="g0oh.f4">
               <CardTitle
@@ -277,7 +275,10 @@ export default function DecksPage() {
         </div>
 
         {/* Deck grid + detail view */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]" data-oid="1pzpcl0">
+        <div
+          className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start"
+          data-oid="1pzpcl0"
+        >
           {/* Deck list */}
           <div className="space-y-3" data-oid="t-_eku1">
             {DECKS.length === 0 ? (
@@ -335,14 +336,7 @@ export default function DecksPage() {
                             className="flex items-center gap-2 mt-0.5"
                             data-oid="g33:5-h"
                           >
-                            <Badge
-                              variant="outline"
-                              className="text-xs"
-                              style={{ borderColor: TCG_COLORS[deck.tcg] }}
-                              data-oid="_xw156-"
-                            >
-                              {deck.tcg}
-                            </Badge>
+                            <GameBadge game={deck.tcg} />
                             <span
                               className="text-xs text-muted-foreground"
                               data-oid="z.v4zkg"
@@ -382,7 +376,13 @@ export default function DecksPage() {
               A selected deck still renders its detail card on every size. */}
           <div
             ref={detailRef}
-            className={activeDeck ? "scroll-mt-20" : "hidden lg:block"}
+            // Sticky above lg so the deck you picked stays on screen while the
+            // list beside it scrolls.
+            className={
+              activeDeck
+                ? "scroll-mt-20 lg:sticky lg:top-20"
+                : "hidden lg:sticky lg:top-20 lg:block"
+            }
             data-oid="dldgokf"
           >
             {activeDeck ? (
@@ -423,13 +423,7 @@ export default function DecksPage() {
                     className="flex items-center gap-2 mt-1"
                     data-oid="l4vk8xh"
                   >
-                    <Badge
-                      variant="outline"
-                      style={{ borderColor: TCG_COLORS[activeDeck.tcg] }}
-                      data-oid=".egf41l"
-                    >
-                      {activeDeck.tcg}
-                    </Badge>
+                    <GameBadge game={activeDeck.tcg} />
                     <Badge variant="secondary" data-oid="2469m-j">
                       {activeDeck.format}
                     </Badge>
@@ -499,7 +493,7 @@ export default function DecksPage() {
               </Card>
             ) : (
               <Card
-                className="flex items-center justify-center p-12"
+                className="flex items-center justify-center p-12 lg:min-h-[24rem]"
                 data-oid="h68dzf9"
               >
                 <div

@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardSearchPanel } from "@/components/cards/card-search-panel";
+
+export const metadata: Metadata = {
+  title: "Card Explorer",
+};
 
 export default function CardSearchPage() {
   return (

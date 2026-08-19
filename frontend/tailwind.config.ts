@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   darkMode: ["class"],
@@ -59,6 +60,14 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
+          grid: "hsl(var(--chart-grid))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -81,7 +90,18 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    /*
+     * `coarse:` targets touch input rather than a viewport width. Controls sized
+     * for a mouse (36-40px) are below the 44px iOS HIG / WCAG 2.5.5 minimum on a
+     * finger, but widening them at every breakpoint would cost desktop density —
+     * this lets the primitives grow only where a finger is doing the pointing.
+     */
+    plugin(({ addVariant }) => {
+      addVariant("coarse", "@media (pointer: coarse)");
+    }),
+  ],
 };
 
 export default config;

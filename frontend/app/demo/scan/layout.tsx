@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Card Scan · TCGer Demo",
+  title: "Card Scan",
 };
 
 export default function DemoScanLayout({

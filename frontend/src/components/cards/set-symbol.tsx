@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { gamePresentation } from "@/lib/games";
 import type { TcgCode } from "@/types/card";
 
 interface SetSymbolProps {
@@ -31,21 +32,6 @@ const SIZE_MAP = {
   md: { icon: 24, label: "text-[10px] px-2 py-1 min-w-[32px]" },
   lg: { icon: 32, label: "text-[11px] px-2.5 py-1 min-w-[40px]" },
 } as const;
-
-const TCG_COLORS: Record<TcgCode, string> = {
-  pokemon:
-    "bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700",
-  magic:
-    "bg-amber-500/15 text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-700",
-  yugioh:
-    "bg-violet-500/15 text-violet-700 border-violet-300 dark:text-violet-400 dark:border-violet-700",
-  onepiece:
-    "bg-sky-500/15 text-sky-700 border-sky-300 dark:text-sky-400 dark:border-sky-700",
-  lorcana:
-    "bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-300 dark:text-fuchsia-400 dark:border-fuchsia-700",
-  dragonball:
-    "bg-orange-500/15 text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-700",
-};
 
 /**
  * Derive a short label from a set code for the fallback display.
@@ -79,10 +65,9 @@ export function SetSymbol({
     () =>
       Array.from(
         new Set(
-          (
-            variant === "logo"
-              ? [logoUrl, symbolUrl, symbolFallbackUrl]
-              : [symbolUrl, symbolFallbackUrl, logoUrl]
+          (variant === "logo"
+            ? [logoUrl, symbolUrl, symbolFallbackUrl]
+            : [symbolUrl, symbolFallbackUrl, logoUrl]
           ).filter((url): url is string => Boolean(url)),
         ),
       ),
@@ -115,9 +100,14 @@ export function SetSymbol({
   const sizeConfig = SIZE_MAP[size];
   const label = deriveLabel(setCode, tcg);
   const title = setName ?? setCode ?? "Unknown set";
-  const colorClass = tcg
-    ? TCG_COLORS[tcg]
-    : "bg-muted text-muted-foreground border-border";
+  const accent = gamePresentation(tcg).color;
+  const fallbackStyle = tcg
+    ? {
+        color: accent,
+        borderColor: `${accent}66`,
+        backgroundColor: `${accent}1f`,
+      }
+    : undefined;
 
   const showImage = Boolean(imageUrl) && !imgFailed;
 
@@ -137,8 +127,9 @@ export function SetSymbol({
             className={cn(
               "inline-flex items-center justify-center rounded border font-mono font-semibold uppercase leading-none",
               sizeConfig.label,
-              colorClass,
+              !tcg && "border-border bg-muted text-muted-foreground",
             )}
+            style={fallbackStyle}
             data-oid="hy-z:jc"
           >
             {label}
@@ -170,9 +161,10 @@ export function SetSymbol({
       className={cn(
         "inline-flex items-center justify-center rounded border font-mono font-semibold uppercase leading-none",
         sizeConfig.label,
-        colorClass,
+        !tcg && "border-border bg-muted text-muted-foreground",
         className,
       )}
+      style={fallbackStyle}
       title={title}
       data-oid="u3gb8zd"
     >

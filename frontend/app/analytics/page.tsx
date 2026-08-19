@@ -39,6 +39,8 @@ import { useModuleStore } from "@/stores/preferences";
 import { useGameFilterStore } from "@/stores/game-filter";
 
 import { useShallow } from "zustand/react/shallow";
+import { ValueBarChart } from "@/components/analytics/value-bar-chart";
+import { formatMoney, formatMoneyCompact } from "@/lib/format-money";
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
@@ -57,7 +59,7 @@ function tcgLabel(tcg: string): string {
 }
 
 function currency(value: number): string {
-  return `$${value.toFixed(2)}`;
+  return formatMoney(value);
 }
 
 /* ------------------------------------------------------------------ */
@@ -75,10 +77,12 @@ export default function AnalyticsPage() {
 
   const { token, isAuthenticated } = useAuthStore();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
-  const { enabledGames, showPricing } = useModuleStore(useShallow((state) => ({
-    enabledGames: state.enabledGames,
-    showPricing: state.showPricing,
-  })));
+  const { enabledGames, showPricing } = useModuleStore(
+    useShallow((state) => ({
+      enabledGames: state.enabledGames,
+      showPricing: state.showPricing,
+    })),
+  );
 
   const noGamesEnabled = Object.values(enabledGames).every(
     (enabled) => !enabled,
@@ -139,7 +143,9 @@ export default function AnalyticsPage() {
         <PageHeader />
         <Card>
           <CardHeader>
-            <CardTitle asChild><h2>Sign in required</h2></CardTitle>
+            <CardTitle asChild>
+              <h2>Sign in required</h2>
+            </CardTitle>
             <CardDescription>
               Sign in to view analytics for your collection.
             </CardDescription>
@@ -189,7 +195,9 @@ export default function AnalyticsPage() {
         <PageHeader />
         <Card role="alert">
           <CardHeader>
-            <CardTitle asChild><h2>Couldn&apos;t load analytics</h2></CardTitle>
+            <CardTitle asChild>
+              <h2>Couldn&apos;t load analytics</h2>
+            </CardTitle>
             <CardDescription>
               {(loadError as Error).message ||
                 "Something went wrong while fetching your analytics."}
@@ -240,7 +248,9 @@ export default function AnalyticsPage() {
         <PageHeader />
         <Card>
           <CardHeader>
-            <CardTitle asChild><h2>No cards to analyze yet</h2></CardTitle>
+            <CardTitle asChild>
+              <h2>No cards to analyze yet</h2>
+            </CardTitle>
             <CardDescription>
               Add cards to a binder and your value trends, price movers, and
               distribution breakdowns will appear here.
@@ -255,8 +265,6 @@ export default function AnalyticsPage() {
       </AppShell>
     );
   }
-
-  const maxBarValue = Math.max(1, ...(history?.history ?? []).map((m) => m.value));
 
   const gainers = (movers?.gainers ?? []).filter(
     (c) => enabledGames[c.tcg as keyof typeof enabledGames] !== false,
@@ -372,7 +380,8 @@ export default function AnalyticsPage() {
               <div className="rounded-lg border border-dashed p-6 text-center">
                 <p className="font-medium">No excess copies found</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Every exact printing is at or below your keep count of {keepCount}.
+                  Every exact printing is at or below your keep count of{" "}
+                  {keepCount}.
                 </p>
               </div>
             ) : (
@@ -405,19 +414,27 @@ export default function AnalyticsPage() {
                           <span className="text-xs text-muted-foreground">
                             {tcgLabel(item.tcg)}
                             {item.setName ? ` · ${item.setName}` : ""}
-                            {item.collectorNumber ? ` #${item.collectorNumber}` : ""}
+                            {item.collectorNumber
+                              ? ` #${item.collectorNumber}`
+                              : ""}
                           </span>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
                             <MapPin className="h-3.5 w-3.5" />
                             {item.binders
-                              .map((binder) => `${binder.binderName} (${binder.quantity})`)
+                              .map(
+                                (binder) =>
+                                  `${binder.binderName} (${binder.quantity})`,
+                              )
                               .join(", ")}
                           </span>
                           <span>
                             {item.conditions
-                              .map((condition) => `${condition.condition} (${condition.quantity})`)
+                              .map(
+                                (condition) =>
+                                  `${condition.condition} (${condition.quantity})`,
+                              )
                               .join(", ")}
                           </span>
                         </div>
@@ -447,8 +464,8 @@ export default function AnalyticsPage() {
                 </div>
                 {showPricing && (
                   <p className="text-xs text-muted-foreground">
-                    Surplus value assumes you keep the highest-valued copies when
-                    stored prices differ.
+                    Surplus value assumes you keep the highest-valued copies
+                    when stored prices differ.
                   </p>
                 )}
               </>
@@ -468,7 +485,9 @@ export default function AnalyticsPage() {
                   </h2>
                 </CardTitle>
                 <CardDescription>
-                  Estimated {selectedGame === "all" ? "total" : tcgLabel(selectedGame)} value across the selected period.
+                  Estimated{" "}
+                  {selectedGame === "all" ? "total" : tcgLabel(selectedGame)}{" "}
+                  value across the selected period.
                 </CardDescription>
               </div>
               <div className="flex shrink-0 gap-1">
@@ -487,26 +506,18 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               {history && history.history.length > 0 ? (
-                <div
-                  className="flex items-end gap-1.5 h-48"
-                  role="img"
-                  aria-label={`Collection value over the selected period, currently ${currency(history.currentValue)}`}
-                >
-                  {history.history.map((m) => (
-                    <div
-                      key={m.date}
-                      className="flex h-full flex-1 items-end"
-                      title={`${new Date(m.date).toLocaleDateString()}: ${currency(m.value)}`}
-                    >
-                      <div
-                        className="w-full rounded-t bg-primary/80 transition-all"
-                        style={{
-                          height: `${Math.max(2, (m.value / maxBarValue) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
+                <ValueBarChart
+                  points={history.history.map((m) => ({
+                    key: m.date,
+                    label: new Date(m.date).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    }),
+                    value: m.value,
+                  }))}
+                  formatValue={(value) => formatMoneyCompact(value)}
+                  ariaLabel={`Collection value over the selected period, currently ${currency(history.currentValue)}`}
+                />
               ) : (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Not enough history yet to chart value over time.
@@ -541,7 +552,9 @@ export default function AnalyticsPage() {
           {showPricing && (
             <Card>
               <CardHeader>
-                <CardTitle asChild><h2>Value by Game</h2></CardTitle>
+                <CardTitle asChild>
+                  <h2>Value by Game</h2>
+                </CardTitle>
                 <CardDescription>
                   How your collection value is distributed across TCGs.
                 </CardDescription>
@@ -585,9 +598,15 @@ export default function AnalyticsPage() {
           {/* Rarity distribution */}
           <Card>
             <CardHeader>
-              <CardTitle asChild><h2>Rarity Distribution</h2></CardTitle>
+              <CardTitle asChild>
+                <h2>Rarity Distribution</h2>
+              </CardTitle>
               <CardDescription>
-                Breakdown of {selectedGame === "all" ? "your collection" : `your ${tcgLabel(selectedGame)} cards`} by rarity.
+                Breakdown of{" "}
+                {selectedGame === "all"
+                  ? "your collection"
+                  : `your ${tcgLabel(selectedGame)} cards`}{" "}
+                by rarity.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -634,7 +653,8 @@ function PageHeader() {
     <div>
       <h1 className="text-3xl font-heading font-semibold">Analytics</h1>
       <p className="text-sm text-muted-foreground">
-        Collection value trends, duplicates, price movers, and distribution breakdowns.
+        Collection value trends, duplicates, price movers, and distribution
+        breakdowns.
       </p>
     </div>
   );

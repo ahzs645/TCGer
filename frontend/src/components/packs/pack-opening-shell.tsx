@@ -563,7 +563,7 @@ function ModeButton({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        "flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-[13px] font-semibold transition sm:text-sm",
+        "flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-[13px] font-semibold transition coarse:min-h-11 sm:text-sm",
         active && "bg-background text-foreground shadow-sm",
       )}
     >

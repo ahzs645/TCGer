@@ -7,12 +7,12 @@ import { Eye, Layers3, LockKeyhole } from "lucide-react";
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GameBadge } from "@/components/cards/game-badge";
 import {
   useDemoStore,
   whenDemoStoreHydrated,
   type DemoBinder,
 } from "@/stores/demo-store";
-import { GAME_LABELS } from "@/lib/utils";
 
 type SharedBinderResolution =
   | { status: "public"; binder: DemoBinder }
@@ -151,7 +151,7 @@ export function DemoSharedBinder({ shareToken }: { shareToken: string }) {
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-base">{card.name}</CardTitle>
                   <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">{GAME_LABELS[card.tcg]}</Badge>
+                    <GameBadge game={card.tcg} />
                     <span>{card.setName}</span>
                     {card.rarity && <span>{card.rarity}</span>}
                     {card.condition && <span>{card.condition}</span>}

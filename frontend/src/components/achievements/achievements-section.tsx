@@ -96,7 +96,7 @@ export function AchievementsSection({
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {achievements.map((achievement) => (
             <AchievementTile key={achievement.id} achievement={achievement} />
           ))}
@@ -116,7 +116,7 @@ function AchievementTile({
   return (
     <article
       className={cn(
-        "flex min-h-48 flex-col rounded-xl border p-4 transition-colors",
+        "flex flex-col rounded-xl border p-4 transition-colors sm:min-h-48",
         achievement.unlocked
           ? "border-amber-500/30 bg-amber-500/[0.08]"
           : "bg-background/55",

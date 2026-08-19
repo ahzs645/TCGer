@@ -23,6 +23,12 @@ import {
   useDemoGameBreakdown,
   useDemoRarityBreakdown,
 } from "@/stores/demo-store";
+import { ValueBarChart } from "@/components/analytics/value-bar-chart";
+import {
+  formatMoney,
+  formatMoneyCompact,
+  formatMoneyDelta,
+} from "@/lib/format-money";
 
 /* ------------------------------------------------------------------ */
 /*  Fake analytics data                                                */
@@ -85,7 +91,6 @@ export default function AnalyticsPage() {
   const monthlyValues = mounted
     ? [...monthlyHistory, { month: CURRENT_MONTH, value: totalValue }]
     : monthlyHistory;
-  const maxBarValue = Math.max(1, ...monthlyValues.map((m) => m.value));
   const latestChartValue = monthlyValues[monthlyValues.length - 1].value;
 
   const previousMonth = monthlyHistory[monthlyHistory.length - 1];
@@ -123,7 +128,7 @@ export default function AnalyticsPage() {
         >
           <StatCard
             title="Total Value"
-            value={mounted ? `$${totalValue.toFixed(2)}` : "—"}
+            value={mounted ? formatMoney(totalValue) : "—"}
             icon={<DollarSign className="h-5 w-5" data-oid="mt89jh7" />}
             sub="Across all games"
             data-oid="mun8pi5"
@@ -141,11 +146,7 @@ export default function AnalyticsPage() {
           />
           <StatCard
             title="30-Day Change"
-            value={
-              mounted
-                ? `${monthChange >= 0 ? "+" : "-"}$${Math.abs(monthChange).toFixed(2)}`
-                : "—"
-            }
+            value={mounted ? formatMoneyDelta(monthChange) : "—"}
             icon={
               mounted && monthChange < 0 ? (
                 <TrendingDown className="h-5 w-5" />
@@ -164,7 +165,7 @@ export default function AnalyticsPage() {
           />
           <StatCard
             title="Avg Card Value"
-            value={mounted ? `$${avgCardValue.toFixed(2)}` : "—"}
+            value={mounted ? formatMoney(avgCardValue) : "—"}
             icon={<BarChart3 className="h-5 w-5" data-oid="4mjb6dx" />}
             sub="Per card average"
             data-oid="_cm1w::"
@@ -183,44 +184,15 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent data-oid="pu8f.fm">
-            <div
-              className="flex h-48 min-w-0 items-end gap-1 sm:gap-3"
-              role="img"
-              aria-label={`Collection value over the last ${monthlyValues.length} months, currently $${latestChartValue.toFixed(2)}`}
-              data-oid="rtts-rv"
-            >
-              {monthlyValues.map((m) => (
-                <div
-                  key={m.month}
-                  className="flex h-full min-w-0 flex-1 flex-col items-center gap-1"
-                  title={`${m.month}: $${m.value.toFixed(2)}`}
-                  data-oid="4f:xh5c"
-                >
-                  <span
-                    className="hidden text-xs font-medium text-muted-foreground min-[360px]:inline"
-                    data-oid="geq.yah"
-                  >
-                    ${Math.round(m.value)}
-                  </span>
-                  <div className="flex w-full flex-1 items-end">
-                    <div
-                      className="w-full rounded-t bg-primary/80 transition-all"
-                      style={{
-                        height: `${Math.max(2, (m.value / maxBarValue) * 100)}%`,
-                      }}
-                      data-oid="yypyl_v"
-                    />
-                  </div>
-
-                  <span
-                    className="text-xs text-muted-foreground"
-                    data-oid="tzif5.3"
-                  >
-                    {m.month}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ValueBarChart
+              points={monthlyValues.map((m) => ({
+                key: m.month,
+                label: m.month,
+                value: m.value,
+              }))}
+              formatValue={(value) => formatMoneyCompact(value)}
+              ariaLabel={`Collection value over the last ${monthlyValues.length} months, currently ${formatMoney(latestChartValue)}`}
+            />
           </CardContent>
         </Card>
 
@@ -257,7 +229,7 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="text-right" data-oid="xis4-8q">
                       <p className="text-sm font-semibold" data-oid="cjy.n7r">
-                        ${c.price.toFixed(2)}
+                        {formatMoney(c.price)}
                       </p>
                       <p className="text-xs text-green-500" data-oid="-o2pfrm">
                         +{c.change}%
@@ -301,7 +273,7 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="text-right" data-oid="hz2:zrf">
                       <p className="text-sm font-semibold" data-oid="p5f_:mv">
-                        ${c.price.toFixed(2)}
+                        {formatMoney(c.price)}
                       </p>
                       <p className="text-xs text-red-500" data-oid="sx86n2d">
                         {c.change}%
@@ -340,7 +312,7 @@ export default function AnalyticsPage() {
                           className="text-muted-foreground"
                           data-oid="xx-9yap"
                         >
-                          ${g.value.toFixed(2)} ({pct}%)
+                          {formatMoney(g.value)} ({pct}%)
                         </span>
                       </div>
                       <div

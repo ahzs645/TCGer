@@ -58,6 +58,7 @@ import {
   DEMO_TRANSACTIONS_STORAGE_KEY,
   SMART_FOLDER_STORAGE_KEY_PREFIX,
 } from "@/lib/storage/keys";
+import { gamePresentation } from "@/lib/games";
 import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useDemoStore } from "@/stores/demo-store";
@@ -66,15 +67,6 @@ import { useTheme } from "next-themes";
 import { CatalogManagementPanel } from "./catalog-management-panel";
 
 import { useShallow } from "zustand/react/shallow";
-const iconPaths = {
-  yugioh: "/icons/Yugioh.svg",
-  magic: "/icons/MTG.svg",
-  pokemon: "/icons/Pokemon.svg",
-  onepiece: "/icons/OnePiece.svg",
-  lorcana: "/icons/Lorcana.svg",
-  dragonball: "/icons/DragonBall.svg",
-};
-
 interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -491,7 +483,7 @@ export function AccountSettingsDialog({
               {(
                 Object.entries(enabledGames) as Array<[ManageableGame, boolean]>
               ).map(([game, enabled]) => {
-                const iconPath = iconPaths[game];
+                const { icon } = gamePresentation(game);
                 return (
                   <div
                     key={game}
@@ -503,14 +495,16 @@ export function AccountSettingsDialog({
                         className="flex h-9 w-9 items-center justify-center rounded-md bg-muted"
                         data-oid="0qhu8yu"
                       >
-                        <Image
-                          src={iconPath}
-                          alt={GAME_LABELS[game]}
-                          width={16}
-                          height={16}
-                          className="dark:invert"
-                          data-oid="swmrv_o"
-                        />
+                        {icon ? (
+                          <Image
+                            src={icon}
+                            alt={GAME_LABELS[game]}
+                            width={16}
+                            height={16}
+                            className="dark:invert"
+                            data-oid="swmrv_o"
+                          />
+                        ) : null}
                       </span>
                       <div data-oid="eva596k">
                         <p className="text-sm font-medium" data-oid="8g2aev:">

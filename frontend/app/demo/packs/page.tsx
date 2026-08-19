@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PackOpening } from "@/components/packs/pack-opening";
 
 export const metadata: Metadata = {
-  title: "Pack Opening · TCGer Demo",
+  title: "Pack Opening",
 };
 
 export default function PackOpeningPage() {

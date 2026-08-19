@@ -85,6 +85,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
+import { ServerStatusBanner } from "./server-status-banner";
 import { getAppRoute } from "@/lib/app-routes";
 import {
   areSealedProductsEnabled,
@@ -185,7 +186,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
     <div className="flex min-h-screen flex-col" data-oid="zfaufj9">
       <a
         href="#main-content"
-        className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-transform focus:translate-y-0"
+        className="fixed left-4 top-4 z-[100] flex -translate-y-24 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition-transform coarse:min-h-11 focus:translate-y-0"
       >
         Skip to main content
       </a>
@@ -195,14 +196,26 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
         className="fixed inset-x-0 top-0 z-40 border-b bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur"
         data-oid="4h6rq90"
       >
+        {/*
+         * The header is deliberately NOT inside `.container`. `.container` caps
+         * at 1360px (tailwind.config.ts), which is narrower than the header row
+         * needs once the nav shows labels — the nav used to overflow *underneath*
+         * the right-hand cluster and make the More menu unclickable at every
+         * width from 1360 up. Giving the header the full viewport, and only
+         * expanding the labels where they demonstrably fit, removes the conflict
+         * instead of re-tuning it.
+         */}
         <div
-          className="container flex h-16 items-center justify-between gap-4"
+          className="mx-auto flex h-16 w-full items-center justify-between gap-4 px-4 sm:px-6"
           data-oid="2j-vv-i"
         >
-          <div className="flex min-w-0 items-center gap-6" data-oid="8gzdp.f">
+          <div
+            className="flex min-w-0 flex-1 items-center gap-6"
+            data-oid="8gzdp.f"
+          >
             <Link
               href={dashboardHref}
-              className="flex shrink-0 items-center gap-2 whitespace-nowrap text-lg font-heading font-semibold"
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap font-heading text-lg font-semibold coarse:min-h-11"
               data-oid="vv0.7_x"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -225,8 +238,13 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
                 Demo Mode
               </Badge>
             )}
+            {/*
+             * `min-w-0 overflow-hidden` is the structural guarantee: even if a
+             * future item pushes the row past the available width, the nav
+             * clips itself instead of painting over the controls to its right.
+             */}
             <nav
-              className="hidden items-center gap-1 md:flex"
+              className="hidden min-w-0 items-center gap-1 overflow-hidden md:flex"
               aria-label="Primary navigation"
               data-oid="bq6jx8."
             >
@@ -241,7 +259,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
                     size="sm"
                     asChild
                     className={cn(
-                      "min-[1360px]:px-3",
+                      "min-[1700px]:px-3",
                       isActive && "bg-primary text-primary-foreground",
                     )}
                     data-oid="798:9uu"
@@ -255,7 +273,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
                     >
                       <Icon className="h-4 w-4" data-oid="-fddsij" />
                       <span
-                        className="hidden min-[1360px]:inline"
+                        className="hidden min-[1700px]:inline"
                         data-oid="lkg_0_o"
                       >
                         {item.label}
@@ -277,8 +295,8 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
                     aria-current={isDesktopSecondaryActive ? "page" : undefined}
                   >
                     <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                    <span className="hidden min-[1360px]:inline">More</span>
-                    <span className="sr-only min-[1360px]:hidden">
+                    <span className="hidden min-[1700px]:inline">More</span>
+                    <span className="sr-only min-[1700px]:hidden">
                       More sections
                     </span>
                   </Button>
@@ -307,6 +325,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
           </div>
           <div className="flex shrink-0 items-center gap-2" data-oid="3834h_j">
             <CommandMenu
+              primaryNavigation={primaryNavigation}
               secondaryNavigation={availableSecondaryNavigation}
               data-oid="i6m6x59"
             />
@@ -326,6 +345,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
         tabIndex={-1}
         data-oid="qz_1-v1"
       >
+        <ServerStatusBanner demoMode={demoMode} />
         {fullBleed ? (
           <div className="min-h-0 flex-1">{children}</div>
         ) : (
@@ -455,7 +475,10 @@ function MobileBottomNav({
               </button>
             </DrawerClose>
           </DrawerHeader>
-          <div className="grid grid-cols-3 gap-2 px-4" data-oid="0868z5k">
+          <div
+            className="grid max-h-[60vh] grid-cols-3 gap-2 overflow-y-auto px-4 pb-2"
+            data-oid="0868z5k"
+          >
             {secondaryNavigation.map((item) => {
               const href = getAppRoute(item.href, pathname);
               const isActive = isNavigationItemActive(pathname, href);

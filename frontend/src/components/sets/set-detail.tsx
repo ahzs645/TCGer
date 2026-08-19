@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GameBadge } from "@/components/cards/game-badge";
 import { getSetCards, getSets } from "@/lib/api/cards";
 import {
   addCardToCollection,
@@ -52,7 +53,7 @@ import {
   summarizeSetProgress,
   uniquePrintings,
 } from "@/lib/sets/progress";
-import { cn, GAME_LABELS, getCardBackImage } from "@/lib/utils";
+import { cn, getCardBackImage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import type {
@@ -113,12 +114,14 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const [mounted, setMounted] = useState(false);
   const { token, isAuthenticated, user } = useAuthStore();
   const { collections, fetchCollections, hasFetched, collectionsLoading } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      fetchCollections: state.fetchCollections,
-      hasFetched: state.hasFetched,
-      collectionsLoading: state.isLoading,
-    })));
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        hasFetched: state.hasFetched,
+        collectionsLoading: state.isLoading,
+      })),
+    );
   const [collectionId, setCollectionId] = useState(ALL_COLLECTION_ID);
   const [query, setQuery] = useState("");
   const [rarity, setRarity] = useState("all");
@@ -136,12 +139,14 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
     fetchWishlists,
     hasFetchedWishlists,
     addRule: addWishlistRule,
-  } = useWishlistsStore(useShallow((state) => ({
-    wishlists: state.wishlists,
-    fetchWishlists: state.fetchWishlists,
-    hasFetchedWishlists: state.hasFetched,
-    addRule: state.addRule,
-  })));
+  } = useWishlistsStore(
+    useShallow((state) => ({
+      wishlists: state.wishlists,
+      fetchWishlists: state.fetchWishlists,
+      hasFetchedWishlists: state.hasFetched,
+      addRule: state.addRule,
+    })),
+  );
   const [wishlistId, setWishlistId] = useState("");
   const [wishlistBusy, setWishlistBusy] = useState(false);
 
@@ -250,11 +255,16 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const setsHref = getAppRoute("/sets", pathname);
   const setTitle = set?.name ?? setCards[0]?.setName ?? setCode.toUpperCase();
   const releaseDate = formatDate(set?.releaseDate);
-  const selectedCollectionName =
-    collectionId === ALL_COLLECTION_ID
-      ? "All collection"
-      : (collections.find((entry) => entry.id === collectionId)?.name ??
-        "Selected binder");
+  const isAllCollections = collectionId === ALL_COLLECTION_ID;
+  const selectedCollectionName = isAllCollections
+    ? "All collection"
+    : (collections.find((entry) => entry.id === collectionId)?.name ??
+      "Selected binder");
+  // The scope name is a UI label ("All collection"), not a noun phrase that
+  // reads inside a sentence — interpolating it produced "in All collection."
+  const scopeSentence = isAllCollections
+    ? "Track every unique printing across your whole collection."
+    : `Track every unique printing in ${selectedCollectionName}.`;
 
   const toggleSelected = (cardId: string) => {
     setSelectedCardIds((current) => {
@@ -421,7 +431,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
             </div>
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{GAME_LABELS[tcg]}</Badge>
+                <GameBadge game={tcg} long />
                 <Badge variant="secondary">{setCode.toUpperCase()}</Badge>
                 {releaseDate && (
                   <span className="text-xs text-muted-foreground">
@@ -429,10 +439,10 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
                   </span>
                 )}
               </div>
-              <h1 className="text-3xl font-heading font-semibold">{setTitle}</h1>
-              <p className="text-sm text-muted-foreground">
-                Track every unique printing in {selectedCollectionName}.
-              </p>
+              <h1 className="text-3xl font-heading font-semibold">
+                {setTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">{scopeSentence}</p>
             </div>
           </div>
           <Select
@@ -520,7 +530,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
           </UiCard>
 
           <UiCard>
-            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_170px_auto]">
+            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-[1fr_190px_200px_190px_auto]">
               <label className="relative">
                 <span className="sr-only">Search cards in this set</span>
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -604,7 +614,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
                 <>
                   <Select value={wishlistId} onValueChange={setWishlistId}>
                     <SelectTrigger
-                      className="w-[180px]"
+                      className="w-full sm:w-[210px]"
                       aria-label="Target wishlist"
                     >
                       <SelectValue placeholder="Wishlist" />
@@ -737,7 +747,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
             <div
               className={cn(
                 view === "grid"
-                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
                   : "space-y-2",
               )}
             >
@@ -822,11 +832,11 @@ function SetCardEntry({
   return (
     <UiCard
       className={cn(
-        "overflow-hidden",
+        "h-full overflow-hidden",
         owned && "border-emerald-500/40 bg-emerald-500/5",
       )}
     >
-      <CardContent className="space-y-3 p-3">
+      <CardContent className="flex h-full flex-col gap-3 p-3">
         <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
           <CardImage
             src={image}
@@ -834,7 +844,7 @@ function SetCardEntry({
             tcg={card.tcg}
             alt={card.name}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1280px) 20vw, 14vw"
             className={cn(
               "object-contain transition",
               !owned && "grayscale-[0.35] opacity-70",
@@ -845,7 +855,7 @@ function SetCardEntry({
             <OwnershipBadge owned={owned} compact />
           </div>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-medium">{card.name}</p>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {details.join(" · ") || "Printing details unavailable"}
@@ -854,7 +864,7 @@ function SetCardEntry({
         <Button
           variant={selected ? "default" : "outline"}
           size="sm"
-          className="w-full"
+          className="mt-auto w-full"
           onClick={onToggle}
         >
           {selected ? "Selected" : "Select"}

@@ -98,6 +98,7 @@ import {
 } from "@/lib/copy-labels";
 
 import { useShallow } from "zustand/react/shallow";
+import { formatMoney, formatMoneyCompact } from "@/lib/format-money";
 type CardUpdateArgs = {
   cardId: string;
   binderId: string;
@@ -713,7 +714,7 @@ export function CollectionTable() {
                                 {cardsForGame.length} card(s),{" "}
                                 {formatCopyCount(gameQuantity)}
                                 {showPricing
-                                  ? ` • $${gameValue.toFixed(2)}`
+                                  ? ` • ${formatMoney(gameValue)}`
                                   : ""}
                               </p>
                             </div>
@@ -1356,7 +1357,7 @@ function CardDetailsPanel({
                     className="text-sm font-semibold text-foreground"
                     data-oid="5ie2ok3"
                   >
-                    ${(card.price ?? 0).toFixed(2)}
+                    {formatMoney(card.price ?? 0)}
                   </p>
                 </div>
               ) : null}
@@ -1979,7 +1980,7 @@ function CollectionRow({
         <TableCell className="text-right" data-oid="5-ch.5x">
           <div className="flex flex-col items-end gap-1" data-oid="v5ubtkf">
             <span className="font-medium" data-oid="q0h0mum">
-              ${price.toFixed(2)}
+              {formatMoney(price)}
             </span>
             <TooltipProvider data-oid="-ji0d5_">
               <Tooltip data-oid="v_o0o:_">
@@ -2172,7 +2173,8 @@ function FilterDialog({
                   className="text-xs text-muted-foreground"
                   data-oid="od9cr99"
                 >
-                  ${pendingRange[0].toFixed(2)} – ${pendingRange[1].toFixed(2)}
+                  {formatMoney(pendingRange[0])} –{" "}
+                  {formatMoney(pendingRange[1])}
                 </span>
               </div>
               <Slider
@@ -2255,7 +2257,8 @@ function ActiveFilters({
       )}
       {hasPrice && (
         <Badge variant="outline" data-oid="oyd0dpi">
-          Price: ${priceRange[0].toFixed(0)} – ${priceRange[1].toFixed(0)}
+          Price: {formatMoneyCompact(priceRange[0])} –{" "}
+          {formatMoneyCompact(priceRange[1])}
         </Badge>
       )}
       <button
@@ -2426,7 +2429,7 @@ function CollectionSelector({
             formatCopyCount(aggregateStats.totalCopies),
           ]}
           value={
-            showPricing ? `$${aggregateStats.totalValue.toFixed(2)}` : undefined
+            showPricing ? formatMoney(aggregateStats.totalValue) : undefined
           }
           updatedLabel={aggregateUpdatedLabel}
           active={activeId === ALL_COLLECTION_ID}
@@ -2461,7 +2464,7 @@ function CollectionSelector({
               }
               badgeText={`${uniqueGames} game${uniqueGames === 1 ? "" : "s"}`}
               stats={[`${uniqueCards} unique`, formatCopyCount(totalCopies)]}
-              value={showPricing ? `$${totalValue.toFixed(2)}` : undefined}
+              value={showPricing ? formatMoney(totalValue) : undefined}
               updatedLabel={new Date(collection.updatedAt).toLocaleDateString()}
               active={collection.id === activeId}
               onClick={() => onSelect(collection.id)}

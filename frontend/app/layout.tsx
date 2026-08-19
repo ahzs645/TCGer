@@ -17,30 +17,36 @@ const lexend = Lexend({ subsets: ["latin"], variable: "--font-heading" });
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b0b0f"
+  themeColor: "#0b0b0f",
 };
 
 export const metadata: Metadata = {
-  title: "TCGer",
+  // A template so every route can set a short title and still read as "<page> ·
+  // TCGer" in the tab, history and shared links. Without it every live route
+  // fell back to the single string below.
+  title: {
+    default: "TCGer",
+    template: "%s · TCGer",
+  },
   description: "Unified hub for Yu-Gi-Oh!, Magic, and Pokémon collections.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "TCGer"
+    title: "TCGer",
   },
   icons: {
     icon: "/logo.svg",
     shortcut: "/logo.svg",
-    apple: "/pwa-192.png"
-  }
+    apple: "/pwa-192.png",
+  },
 };
 
 export default async function RootLayout({
-  children
-
-
-}: {children: React.ReactNode;}) {
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const token = await getToken().catch(() => null);
   const singleUserConfig = {
     enabled: process.env.SINGLE_USER_MODE === "true",
@@ -55,9 +61,10 @@ export default async function RootLayout({
         className={cn(
           "min-h-screen bg-background font-sans antialiased text-foreground",
           inter.variable,
-          lexend.variable
+          lexend.variable,
         )}
-        data-oid="4lnnwrh">
+        data-oid="4lnnwrh"
+      >
         <Script
           id="tcger-single-user-config"
           strategy="beforeInteractive"
@@ -69,13 +76,17 @@ export default async function RootLayout({
         <ConvexClientProvider initialToken={token} data-oid=".wkkdfy">
           <ThemeProvider data-oid="jr5d..d">
             <QueryProvider data-oid="iu_0g7w">
-              <SetupGuard singleUserMode={singleUserConfig.enabled} data-oid="6n258ug">{children}</SetupGuard>
+              <SetupGuard
+                singleUserMode={singleUserConfig.enabled}
+                data-oid="6n258ug"
+              >
+                {children}
+              </SetupGuard>
             </QueryProvider>
           </ThemeProvider>
         </ConvexClientProvider>
         <ServiceWorkerRegister />
-
       </body>
-    </html>);
-
+    </html>
+  );
 }

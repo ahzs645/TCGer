@@ -8,6 +8,7 @@ import {
   Library,
   PackageOpen,
   Sparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAppRoute } from "@/lib/app-routes";
+import { usePackOpeningSpotlight } from "@/lib/packs/opening-history";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
@@ -39,6 +41,7 @@ import {
 } from "@/lib/sets/progress";
 
 import { useShallow } from "zustand/react/shallow";
+import { formatMoney } from "@/lib/format-money";
 type DashboardCard = CollectionCard & {
   updatedAt?: string;
   binderName?: string;
@@ -131,6 +134,7 @@ function buildDashboardStats(
 
 export function DashboardContent() {
   const pathname = usePathname();
+  const packSpotlight = usePackOpeningSpotlight();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const { enabledGames, showPricing } = useModuleStore(
     useShallow((state) => ({
@@ -353,7 +357,12 @@ export function DashboardContent() {
   return (
     <div className="space-y-6" data-oid="p0.l1lt">
       <DashboardHeading />
-      <PackOpeningSpotlight href={getAppRoute("/packs", pathname)} />
+      {packSpotlight.visible && (
+        <PackOpeningSpotlight
+          href={getAppRoute("/packs", pathname)}
+          onDismiss={packSpotlight.dismiss}
+        />
+      )}
       {noGamesEnabled && (
         <div
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
@@ -421,10 +430,7 @@ export function DashboardContent() {
             {showPricing ? (
               <StatCard
                 title="Estimated Value"
-                value={new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                }).format(stats.totalValue)}
+                value={formatMoney(stats.totalValue)}
                 description="Based on collection pricing"
                 icon={<Coins className="h-5 w-5" data-oid="bg_ukgc" />}
                 data-oid="lmka4i."
@@ -495,7 +501,20 @@ function DashboardHeading() {
   );
 }
 
-function PackOpeningSpotlight({ href }: { href: string }) {
+/**
+ * First-run pitch for the pack opener.
+ *
+ * It retires itself: `usePackOpeningSpotlight` hides it for good once a pack
+ * has been opened, and the dismiss control below covers visitors who are simply
+ * not interested. A permanent banner on the dashboard is an ad, not a hint.
+ */
+function PackOpeningSpotlight({
+  href,
+  onDismiss,
+}: {
+  href: string;
+  onDismiss: () => void;
+}) {
   return (
     <Card className="relative overflow-hidden border-primary/25 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
       <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
@@ -512,12 +531,23 @@ function PackOpeningSpotlight({ href }: { href: string }) {
             </p>
           </div>
         </div>
-        <Button asChild className="w-full shrink-0 sm:w-auto">
-          <Link href={href}>
-            Start opening
-            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-          </Link>
-        </Button>
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+          <Button asChild className="flex-1 sm:flex-none">
+            <Link href={href}>
+              Start opening
+              <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground"
+            onClick={onDismiss}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">Dismiss pack opening tip</span>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -544,13 +574,13 @@ function SetCompletionOverview({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <Skeleton key={index} className="h-32 w-full" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {metrics.map((metric) => (
               <Link
                 key={`${metric.tcg}:${metric.setCode}`}
@@ -678,7 +708,10 @@ function GameBreakdown({
         </CardDescription>
       </CardHeader>
       <CardContent data-oid="6hdte6l">
-        <div className="grid gap-4 md:grid-cols-3" data-oid="o8nfv1r">
+        <div
+          className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
+          data-oid="o8nfv1r"
+        >
           {Object.entries(byGame).map(([game, info]) => {
             const percentage = Math.round((info.copies / total) * 100);
             return (

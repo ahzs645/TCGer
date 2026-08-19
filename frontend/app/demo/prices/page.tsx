@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoCollectionTotals } from "@/stores/demo-store";
+import { formatMoney } from "@/lib/format-money";
+import { GameBadge } from "@/components/cards/game-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Fake price data                                                     */
@@ -243,12 +244,6 @@ const PRICE_DATA: PriceEntry[] = [
   },
 ];
 
-const TCG_COLORS: Record<string, string> = {
-  Pokemon: "#f59e0b",
-  Magic: "#8b5cf6",
-  "Yu-Gi-Oh!": "#ef4444",
-};
-
 /**
  * Sortable column header.
  *
@@ -360,7 +355,7 @@ export default function PricesPage() {
                 data-oid="9n.l63x"
               >
                 {mounted ? (
-                  `$${totals.totalValue.toFixed(2)}`
+                  formatMoney(totals.totalValue)
                 ) : (
                   <Skeleton
                     className="h-6 w-24 md:h-8 md:w-32"
@@ -440,7 +435,7 @@ export default function PricesPage() {
                 {PRICE_DATA[0].name}
               </div>
               <p className="text-xs text-muted-foreground" data-oid="abosiy7">
-                ${PRICE_DATA[0].price.toFixed(2)}
+                {formatMoney(PRICE_DATA[0].price)}
               </p>
             </CardContent>
           </Card>
@@ -532,19 +527,12 @@ export default function PricesPage() {
                           {p.name}
                         </p>
                         <div
-                          className="mt-1 flex items-center gap-2"
+                          className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1"
                           data-oid="price-mobile-meta"
                         >
-                          <Badge
-                            variant="outline"
-                            className="text-xs shrink-0"
-                            style={{ borderColor: TCG_COLORS[p.tcg] }}
-                            data-oid="price-mobile-tcg"
-                          >
-                            {p.tcg}
-                          </Badge>
+                          <GameBadge game={p.tcg} />
                           <span
-                            className="text-xs text-muted-foreground truncate"
+                            className="min-w-0 text-xs text-muted-foreground"
                             data-oid="price-mobile-set"
                           >
                             {p.setName}
@@ -559,7 +547,7 @@ export default function PricesPage() {
                           className="text-sm font-semibold"
                           data-oid="price-mobile-price"
                         >
-                          ${p.price.toFixed(2)}
+                          {formatMoney(p.price)}
                         </p>
                         <p
                           className="mt-1 flex items-center justify-end gap-1.5 text-xs"
@@ -683,14 +671,7 @@ export default function PricesPage() {
                         </span>
                       </td>
                       <td className="p-3" data-oid="tqe5.ty">
-                        <Badge
-                          variant="outline"
-                          className="text-xs"
-                          style={{ borderColor: TCG_COLORS[p.tcg] }}
-                          data-oid=":118di7"
-                        >
-                          {p.tcg}
-                        </Badge>
+                        <GameBadge game={p.tcg} />
                       </td>
                       <td
                         className="p-3 text-muted-foreground hidden md:table-cell"
@@ -708,7 +689,7 @@ export default function PricesPage() {
                         className="p-3 text-right font-semibold"
                         data-oid="_42r01a"
                       >
-                        ${p.price.toFixed(2)}
+                        {formatMoney(p.price)}
                       </td>
                       <td
                         className="p-3 text-right hidden sm:table-cell"

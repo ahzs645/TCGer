@@ -76,24 +76,16 @@ import {
 } from "@/stores/preferences";
 
 import { useShallow } from "zustand/react/shallow";
-const TCG_COLORS: Record<string, string> = {
-  yugioh: "#ef4444",
-  magic: "#8b5cf6",
-  pokemon: "#f59e0b",
-  onepiece: "#0ea5e9",
-  lorcana: "#a855f7",
-  dragonball: "#f97316",
-};
+import { formatMoney } from "@/lib/format-money";
+import { PageHeader } from "@/components/layout/page-header";
+import { GameBadge } from "@/components/cards/game-badge";
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
 }
 
 function currency(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
+  return formatMoney(value);
 }
 
 function dateLabel(value?: string): string {
@@ -216,8 +208,17 @@ export default function SealedPage() {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          onAdd={() => setAddOpen(true)}
-          disabled={!ready || noGamesEnabled}
+          title="Sealed Products"
+          description="Track sealed inventory, openings, pulls, and realized sales."
+          actions={
+            <Button
+              size="sm"
+              onClick={() => setAddOpen(true)}
+              disabled={!ready || noGamesEnabled}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Product
+            </Button>
+          }
         />
 
         {!mounted ? (
@@ -403,22 +404,6 @@ export default function SealedPage() {
   );
 }
 
-function PageHeader({ onAdd, disabled }: { onAdd: () => void; disabled: boolean }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-heading font-semibold">Sealed Products</h1>
-        <p className="text-sm text-muted-foreground">
-          Track sealed inventory, openings, pulls, and realized sales.
-        </p>
-      </div>
-      <Button size="sm" onClick={onAdd} disabled={disabled}>
-        <Plus className="mr-2 h-4 w-4" /> Add Product
-      </Button>
-    </div>
-  );
-}
-
 function MessageCard({
   title,
   description,
@@ -501,12 +486,7 @@ function InventoryCard({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{item.product.name}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge
-                  variant="outline"
-                  style={{ borderColor: TCG_COLORS[item.product.tcg] }}
-                >
-                  {tcgLabel(item.product.tcg)}
-                </Badge>
+                <GameBadge game={item.product.tcg} />
                 <Badge variant="secondary">{item.product.productType}</Badge>
                 {item.product.setCode && (
                   <span className="text-xs text-muted-foreground">

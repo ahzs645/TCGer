@@ -54,6 +54,8 @@ import {
   getRealizedPerformance,
 } from "@/lib/api/pricing";
 import { useAuthStore } from "@/stores/auth";
+import { formatMoney } from "@/lib/format-money";
+import { PageHeader } from "@/components/layout/page-header";
 
 const TYPE_CONFIG = {
   purchase: {
@@ -75,12 +77,9 @@ const TYPE_CONFIG = {
 
 function money(amount: number, currency = "USD") {
   try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-    }).format(amount);
+    return formatMoney(amount, { currency });
   } catch {
-    return `${amount.toFixed(2)} ${currency}`;
+    return formatMoney(amount);
   }
 }
 
@@ -166,25 +165,20 @@ export function TransactionsContent() {
     <AppShell>
       {confirmDialog}
       <div className="space-y-6">
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-heading font-semibold">
-              Transactions
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Track purchases, sales, and trade values in one financial ledger.
-            </p>
-          </div>
-          <Button
-            ref={createTriggerRef}
-            className="shrink-0"
-            size="sm"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Add transaction
-          </Button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PageHeader
+          title="Transactions"
+          description="Track purchases, sales, and trade values in one financial ledger."
+          actions={
+            <Button
+              ref={createTriggerRef}
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add transaction
+            </Button>
+          }
+        />
+        <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
           <Metric
             label="Transactions"
             value={String(summary.transactionCount)}
@@ -375,7 +369,7 @@ function PerformanceDashboard({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
         <Metric label="Sales revenue" value={currencyText("revenue")} />
         <Metric label="Net proceeds" value={currencyText("netProceeds")} />
         <Metric label="Realized profit" value={currencyText("realizedProfit")} />

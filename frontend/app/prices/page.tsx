@@ -26,12 +26,8 @@ import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 
 import { useShallow } from "zustand/react/shallow";
-const TCG_COLORS: Record<string, string> = {
-  pokemon: "#f59e0b",
-  magic: "#8b5cf6",
-  yugioh: "#ef4444",
-};
-
+import { formatMoney } from "@/lib/format-money";
+import { GameBadge } from "@/components/cards/game-badge";
 type SortKey = "price" | "30d" | "owned";
 const PRICE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
@@ -50,14 +46,6 @@ interface OwnedPrice {
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
-}
-
-function formatMoney(value: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 export default function PricesPage() {
@@ -397,7 +385,7 @@ export default function PricesPage() {
               <SummaryCard title="Portfolio Value">
                 <div className="space-y-0.5 text-lg md:text-2xl font-semibold">
                   {portfolioValues.map(([currency, value]) => (
-                    <div key={currency}>{formatMoney(value, currency)}</div>
+                    <div key={currency}>{formatMoney(value, { currency })}</div>
                   ))}
                 </div>
               </SummaryCard>
@@ -427,7 +415,9 @@ export default function PricesPage() {
                 </div>
                 {mostValuable && (
                   <p className="text-xs text-muted-foreground">
-                    {formatMoney(mostValuable.price, mostValuable.currency)}
+                    {formatMoney(mostValuable.price, {
+                      currency: mostValuable.currency,
+                    })}
                   </p>
                 )}
               </SummaryCard>
@@ -500,13 +490,7 @@ export default function PricesPage() {
                             )}
                           </td>
                           <td className="p-3">
-                            <Badge
-                              variant="outline"
-                              className="text-xs"
-                              style={{ borderColor: TCG_COLORS[p.tcg] }}
-                            >
-                              {tcgLabel(p.tcg)}
-                            </Badge>
+                            <GameBadge game={p.tcg} />
                           </td>
                           <td className="p-3 text-muted-foreground hidden md:table-cell">
                             {p.setName ?? "—"}
@@ -516,7 +500,7 @@ export default function PricesPage() {
                           </td>
                           <td className="p-3 text-right font-semibold">
                             {p.price > 0
-                              ? formatMoney(p.price, p.currency)
+                              ? formatMoney(p.price, { currency: p.currency })
                               : "—"}
                             {p.source && (
                               <span className="ml-1 text-[10px] font-normal text-muted-foreground">

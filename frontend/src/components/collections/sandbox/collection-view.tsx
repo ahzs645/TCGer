@@ -311,7 +311,9 @@ export function CollectionView() {
   const [editBinderSetCode, setEditBinderSetCode] = useState("");
   const [editBinderSetName, setEditBinderSetName] = useState("");
   const [editBinderIsPublic, setEditBinderIsPublic] = useState(false);
-  const [editBinderShareToken, setEditBinderShareToken] = useState<string | null>(null);
+  const [editBinderShareToken, setEditBinderShareToken] = useState<
+    string | null
+  >(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
@@ -1198,12 +1200,13 @@ export function CollectionView() {
     }
   };
 
-  const shareUrl = editBinderShareToken && typeof window !== "undefined"
-    ? `${window.location.origin}${getAppRoute(
-        `/shared/${encodeURIComponent(editBinderShareToken)}`,
-        pathname,
-      )}`
-    : null;
+  const shareUrl =
+    editBinderShareToken && typeof window !== "undefined"
+      ? `${window.location.origin}${getAppRoute(
+          `/shared/${encodeURIComponent(editBinderShareToken)}`,
+          pathname,
+        )}`
+      : null;
 
   const handleCopyShareLink = async () => {
     if (!shareUrl) return;
@@ -1501,7 +1504,7 @@ export function CollectionView() {
                           type="button"
                           aria-pressed={isSelected}
                           aria-label={`Edit ${card.name}`}
-                          className="min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="min-w-0 flex-1 rounded-sm text-left coarse:min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           onClick={(event) =>
                             selectCard(card.id, undefined, event.currentTarget)
                           }
@@ -1583,7 +1586,7 @@ export function CollectionView() {
                                 copyCount: card.copies?.length ?? 0,
                               })}
                               className={cn(
-                                "w-full text-left rounded-md border px-3 py-2 text-xs transition",
+                                "w-full rounded-md border px-3 py-2 text-left text-xs transition coarse:min-h-11",
                                 selectedCopyId === copy.id
                                   ? "border-primary/70 bg-muted/40"
                                   : "hover:border-primary/40",
@@ -1695,7 +1698,7 @@ export function CollectionView() {
                             card.id,
                             undefined,
                             event.currentTarget.querySelector<HTMLElement>(
-                              'button[aria-pressed]',
+                              "button[aria-pressed]",
                             ) ?? undefined,
                           )
                         }
@@ -2684,7 +2687,8 @@ export function CollectionView() {
                 <div>
                   <Label htmlFor="edit-binder-public">Public share link</Label>
                   <p className="text-xs text-muted-foreground">
-                    Anyone with the link can view this binder without signing in.
+                    Anyone with the link can view this binder without signing
+                    in.
                   </p>
                 </div>
                 <Switch

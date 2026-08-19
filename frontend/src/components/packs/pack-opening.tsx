@@ -24,73 +24,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import {
+  parseSavedOpenings,
+  persistOpening,
+  recordPackOpened,
+  removeOpening,
+  savedOpeningsServerSnapshot,
+  savedOpeningsSnapshot,
+  subscribeToPackHistory,
+} from "@/lib/packs/opening-history";
+
 const CONFIGURED_ASSET_BASE =
   process.env.NEXT_PUBLIC_PACK_ASSET_BASE_URL?.replace(/\/+$/, "") ?? "";
-const SAVED_OPENINGS_KEY = "tcger-saved-pack-openings";
-const SAVED_OPENINGS_EVENT = "tcger-saved-pack-openings-changed";
 
 interface InspectTarget {
   pulls: PackOpeningPull[];
   index: number;
-}
-
-function subscribeToSavedOpenings(onChange: () => void) {
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === SAVED_OPENINGS_KEY) onChange();
-  };
-  window.addEventListener("storage", onStorage);
-  window.addEventListener(SAVED_OPENINGS_EVENT, onChange);
-  return () => {
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener(SAVED_OPENINGS_EVENT, onChange);
-  };
-}
-
-function savedOpeningsSnapshot() {
-  return localStorage.getItem(SAVED_OPENINGS_KEY) ?? "[]";
-}
-
-function parseSavedOpenings(raw: string): PackOpeningPullSession[] {
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistOpening(session: PackOpeningPullSession): boolean {
-  let sessions: PackOpeningPullSession[] = [];
-  try {
-    const stored = localStorage.getItem(SAVED_OPENINGS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) sessions = parsed;
-    }
-  } catch {
-    // A damaged prior value should not prevent the current opening from saving.
-  }
-  try {
-    localStorage.setItem(
-      SAVED_OPENINGS_KEY,
-      JSON.stringify([
-        session,
-        ...sessions.filter((item) => item.id !== session.id),
-      ]),
-    );
-    window.dispatchEvent(new Event(SAVED_OPENINGS_EVENT));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function removeOpening(sessionId: string) {
-  const sessions = parseSavedOpenings(savedOpeningsSnapshot()).filter(
-    (session) => session.id !== sessionId,
-  );
-  localStorage.setItem(SAVED_OPENINGS_KEY, JSON.stringify(sessions));
-  window.dispatchEvent(new Event(SAVED_OPENINGS_EVENT));
 }
 
 function downloadOpening(session: PackOpeningPullSession) {
@@ -124,9 +73,9 @@ export function PackOpening() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const savedOpeningsRaw = useSyncExternalStore(
-    subscribeToSavedOpenings,
+    subscribeToPackHistory,
     savedOpeningsSnapshot,
-    () => "[]",
+    savedOpeningsServerSnapshot,
   );
   const savedOpenings = useMemo(
     () => parseSavedOpenings(savedOpeningsRaw),
@@ -153,6 +102,10 @@ export function PackOpening() {
       }
       if (event.type === "nativeState") {
         setInterfaceState(event.state);
+        // The dashboard's first-run spotlight retires once a pack has actually
+        // been opened — not merely once the opener has been visited, and not
+        // only when the pulls are saved, since saving is optional.
+        if (event.state.phase !== "select") recordPackOpened();
         return;
       }
       if (event.type === "inspectRequested") {

@@ -54,6 +54,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { GameBadge } from "@/components/cards/game-badge";
 import { SetSymbol } from "@/components/cards/set-symbol";
 import {
   cn,
@@ -611,7 +612,8 @@ export function WishlistContent() {
                   />
                 )}
                 <span
-                  className="min-w-0 flex-1 text-sm font-medium truncate"
+                  className="min-w-0 flex-1 truncate text-sm font-medium"
+                  title={wishlist.name}
                   data-oid="_z6fklr"
                 >
                   {wishlist.name}
@@ -795,13 +797,16 @@ export function WishlistContent() {
             </div>
           )}
           <div className="border-b px-4 py-3 sm:px-6" data-oid="rf4iju2">
-            <div className="flex gap-2" data-oid="j3hjjed">
+            <div
+              className="flex flex-col gap-2 sm:flex-row"
+              data-oid="j3hjjed"
+            >
               <Input
                 aria-label="Search within wishlist"
                 value={collectionSearchTerm}
                 onChange={(e) => setCollectionSearchTerm(e.target.value)}
-                placeholder="Search within wishlist..."
-                className="flex-1"
+                placeholder="Search this wishlist..."
+                className="min-w-0 flex-1"
                 data-oid="1cv2ua5"
               />
 
@@ -813,7 +818,7 @@ export function WishlistContent() {
                 data-oid="7.gxmsp"
               >
                 <SelectTrigger
-                  className="w-[110px] sm:w-[130px]"
+                  className="w-full sm:w-[150px]"
                   aria-label="Filter wishlist by ownership"
                   data-oid="w8gvxu4"
                 >
@@ -1332,13 +1337,7 @@ export function WishlistContent() {
                             {card.setName ?? card.setCode ?? "Unknown set"}
                           </span>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="mt-1 text-[10px]"
-                          data-oid="s9dd93-"
-                        >
-                          {GAME_LABELS[card.tcg]}
-                        </Badge>
+                        <GameBadge game={card.tcg} className="mt-1" />
                       </div>
                       <Button
                         size="sm"
@@ -1385,10 +1384,13 @@ export function WishlistContent() {
 
       {/* Desktop layout: side-by-side */}
       <div
-        className="hidden lg:grid lg:grid-cols-[280px_1fr] lg:gap-6"
+        className="hidden lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[360px_minmax(0,1fr)]"
         data-oid="lgwel0t"
       >
-        <div className="min-w-0" data-oid="w-63780">
+        <div
+          className="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+          data-oid="w-63780"
+        >
           {sidebarContent}
         </div>
         {detailContent}

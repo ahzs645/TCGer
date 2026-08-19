@@ -57,14 +57,8 @@ import {
   type ManageableGame,
 } from "@/stores/preferences";
 
-const TCG_COLORS: Record<string, string> = {
-  yugioh: "#ef4444",
-  magic: "#8b5cf6",
-  pokemon: "#f59e0b",
-  onepiece: "#0ea5e9",
-  lorcana: "#a855f7",
-  dragonball: "#f97316",
-};
+import { GameBadge } from "@/components/cards/game-badge";
+import { gameColor } from "@/lib/games";
 const MANAGEABLE_GAMES: readonly ManageableGame[] = [
   "magic",
   "yugioh",
@@ -184,7 +178,7 @@ export default function DecksPage() {
         ) : (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 md:gap-6">
+            <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
               <StatCard title="Total Decks" value={totalDecks} />
               <StatCard title="Cards in Decks" value={totalCards} />
               <StatCard title="Games" value={distinctGames} />
@@ -206,12 +200,12 @@ export default function DecksPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+              <div className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start">
                 {/* Deck list */}
                 <div className="space-y-3">
                   {decks.map((deck) => {
                     const isSelected = selectedDeck === deck.id;
-                    const color = deck.colorHex ?? TCG_COLORS[deck.tcg];
+                    const color = deck.colorHex ?? gameColor(deck.tcg);
                     return (
                       <Card
                         key={deck.id}
@@ -243,13 +237,7 @@ export default function DecksPage() {
                                   {deck.name}
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{ borderColor: TCG_COLORS[deck.tcg] }}
-                                  >
-                                    {tcgLabel(deck.tcg)}
-                                  </Badge>
+                                  <GameBadge game={deck.tcg} />
                                   {deck.format && (
                                     <span className="text-xs text-muted-foreground">
                                       {deck.format}
@@ -283,8 +271,9 @@ export default function DecksPage() {
                   })}
                 </div>
 
-                {/* Deck detail */}
-                <div>
+                {/* Deck detail — sticky so it stays on screen while the list
+                    beside it scrolls. */}
+                <div className="lg:sticky lg:top-20">
                   {activeDeck ? (
                     <DeckDetail
                       deck={activeDeck}
@@ -301,7 +290,7 @@ export default function DecksPage() {
                       deleting={deleteMutation.isPending}
                     />
                   ) : (
-                    <Card className="flex items-center justify-center p-12">
+                    <Card className="flex items-center justify-center p-12 lg:min-h-[24rem]">
                       <div className="text-center text-muted-foreground">
                         <Layers className="mx-auto h-12 w-12 mb-3 opacity-40" />
                         <p className="text-sm">
@@ -357,7 +346,7 @@ function DeckDetail({
           <div className="flex items-center gap-2">
             <div
               className="h-6 w-1.5 rounded-full"
-              style={{ backgroundColor: deck.colorHex ?? TCG_COLORS[deck.tcg] }}
+              style={{ backgroundColor: deck.colorHex ?? gameColor(deck.tcg) }}
             />
             <CardTitle>{deck.name}</CardTitle>
           </div>
@@ -376,9 +365,7 @@ function DeckDetail({
           <CardDescription>{deck.description}</CardDescription>
         )}
         <div className="flex items-center gap-2 mt-1">
-          <Badge variant="outline" style={{ borderColor: TCG_COLORS[deck.tcg] }}>
-            {tcgLabel(deck.tcg)}
-          </Badge>
+          <GameBadge game={deck.tcg} />
           {deck.format && <Badge variant="secondary">{deck.format}</Badge>}
           <span className="text-xs text-muted-foreground">
             Updated{" "}
@@ -986,7 +973,7 @@ function StatCard({ title, value }: { title: string; value: number }) {
 function DecksSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, idx) => (
           <Card key={idx}>
             <CardHeader className="p-3 md:p-6">
@@ -998,7 +985,7 @@ function DecksSkeleton() {
           </Card>
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, idx) => (
             <Skeleton key={idx} className="h-24 w-full" />

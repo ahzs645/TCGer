@@ -83,6 +83,7 @@ import type {
   UpdateBinderInput,
   UserPreferences,
 } from "@tcg/api-types";
+import { gameColor } from "@/lib/games";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -2397,15 +2398,6 @@ const GAME_ORDER: TcgCode[] = [
   "dragonball",
 ];
 
-const GAME_COLORS: Record<TcgCode, string> = {
-  yugioh: "#ef4444",
-  magic: "#8b5cf6",
-  pokemon: "#f59e0b",
-  onepiece: "#0ea5e9",
-  lorcana: "#14b8a6",
-  dragonball: "#f97316",
-};
-
 /**
  * Rarity tiers, in display order. Each demo rarity string maps to exactly one
  * bucket so the counts always sum back to the collection total; anything
@@ -2452,7 +2444,7 @@ function gameBreakdown(binders: DemoBinder[]): DemoGameBreakdownEntry[] {
   return GAME_ORDER.map((tcg) => ({
     tcg,
     game: GAME_LABELS[tcg],
-    color: GAME_COLORS[tcg],
+    color: gameColor(tcg),
     cards: acc.get(tcg)?.cards ?? 0,
     value: Math.round((acc.get(tcg)?.value ?? 0) * 100) / 100,
   })).filter((entry) => entry.cards > 0);

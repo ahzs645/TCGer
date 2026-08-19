@@ -23,6 +23,19 @@
   --destructive-foreground: 210 40% 98%;
   --ring: 215 20.2% 65.1%;
   --radius: 0.75rem;
+
+  /*
+   * Data-visualisation ramp. `--primary` is deliberately neutral (near-black in
+   * light, near-white in dark), which is right for buttons and wrong for charts:
+   * bars painted with it read as unstyled grey slabs. These tokens give charts
+   * and progress a colour identity without repainting every control.
+   */
+  --chart-1: 221 83% 53%;
+  --chart-2: 262 83% 58%;
+  --chart-3: 199 89% 48%;
+  --chart-4: 160 84% 39%;
+  --chart-5: 25 95% 53%;
+  --chart-grid: 214.3 31.8% 88%;
 }
 
 .dark {
@@ -45,6 +58,13 @@
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
   --ring: 216 34% 17%;
+
+  --chart-1: 217 91% 65%;
+  --chart-2: 258 90% 72%;
+  --chart-3: 199 89% 60%;
+  --chart-4: 158 74% 52%;
+  --chart-5: 27 96% 63%;
+  --chart-grid: 216 34% 20%;
 }
 
 body {
@@ -52,12 +72,44 @@ body {
   color: hsl(var(--foreground));
 }
 
+/*
+ * Card padding lives in the components layer, not in the Card component's base
+ * class list. 24px on every side is a desktop measure — on a 393px phone it
+ * costs 48px of a 361px content width and 48px of height per card, and there
+ * are ~20 cards on a page. But putting `p-4 sm:p-6` in the base class leaks:
+ * tailwind-merge drops the conflicting `p-4` when a caller passes `p-3`, keeps
+ * `sm:p-6`, and the caller's deliberate compact padding is silently overridden
+ * from 640px up. In the components layer a caller's `p-*` utility wins at every
+ * breakpoint, which is what a call-site override should do.
+ */
+@layer components {
+  .card-pad {
+    padding: 1rem;
+  }
+  .card-pad-t0 {
+    padding: 1rem;
+    padding-top: 0;
+  }
+  @media (min-width: 640px) {
+    .card-pad {
+      padding: 1.5rem;
+    }
+    .card-pad-t0 {
+      padding: 1.5rem;
+      padding-top: 0;
+    }
+  }
+}
+
 * {
   @apply border-border;
 }
 
 html {
-  font-feature-settings: "ss01" on, "ss02" on, "cv01" on;
+  font-feature-settings:
+    "ss01" on,
+    "ss02" on,
+    "cv01" on;
 }
 
 @media (min-width: 768px) {

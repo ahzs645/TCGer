@@ -72,6 +72,41 @@ export const DEMO_STORE_STORAGE_KEY = "tcg-demo-store";
 export const DEMO_TRANSACTIONS_STORAGE_KEY = "tcger.demo.transactions.v1";
 
 /**
+ * Locally saved pack openings: an array of `PackOpeningPullSession` objects,
+ * newest first. Written when a visitor saves the pulls from an opening; read by
+ * the opener's history dialog.
+ *
+ * Owner: `src/lib/packs/opening-history.ts`.
+ *
+ * Cleared: the browser-side opening history is gone. Pulls the visitor also
+ * saved into a collection survive; anything kept only here does not.
+ */
+export const SAVED_PACK_OPENINGS_STORAGE_KEY = "tcger-saved-pack-openings";
+
+/**
+ * `"1"` once the visitor has actually opened a pack — the opener left its
+ * pack-select phase. Saving the pulls afterwards is optional, so
+ * {@link SAVED_PACK_OPENINGS_STORAGE_KEY} cannot answer "has this visitor ever
+ * opened a pack"; this key can.
+ *
+ * Owner: `src/lib/packs/opening-history.ts`.
+ *
+ * Cleared: the dashboard's first-run "Open a pack" spotlight comes back. No
+ * data loss.
+ */
+export const PACK_OPENED_STORAGE_KEY = "tcger:pack-opened";
+
+/**
+ * `"1"` when the visitor dismissed the dashboard's "Open a pack" spotlight
+ * instead of retiring it by opening one.
+ *
+ * Owner: `src/lib/packs/opening-history.ts`.
+ *
+ * Cleared: the spotlight comes back. No data loss.
+ */
+export const PACK_SPOTLIGHT_DISMISSED_KEY = "tcger:pack-spotlight-dismissed";
+
+/**
  * `next-themes` theme selection (`"light" | "dark" | "system"`).
  *
  * Owner: `next-themes`, mounted by `src/components/providers/theme-provider.tsx`
@@ -225,6 +260,9 @@ export const LOCAL_STORAGE_KEYS = [
   AUTH_STORE_STORAGE_KEY,
   DEMO_STORE_STORAGE_KEY,
   DEMO_TRANSACTIONS_STORAGE_KEY,
+  SAVED_PACK_OPENINGS_STORAGE_KEY,
+  PACK_OPENED_STORAGE_KEY,
+  PACK_SPOTLIGHT_DISMISSED_KEY,
   THEME_STORAGE_KEY,
 ] as const;
 

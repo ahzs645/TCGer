@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardScanPanel } from "@/components/scan/card-scan-panel";
 import { VideoScanLab } from "@/components/scan/video-scan-lab";
 import { SharedScanSessionPanel } from "@/components/scan/shared-scan-session";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+export const metadata: Metadata = {
+  title: "Card Scan",
+};
 
 export default function ScanPage() {
   return (
@@ -37,7 +42,9 @@ export default function ScanPage() {
           <TabsContent value="video" className="space-y-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-heading font-semibold">Video Scan</h2>
+                <h2 className="text-2xl font-heading font-semibold">
+                  Video Scan
+                </h2>
                 <Badge variant="secondary">Experimental</Badge>
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
@@ -53,7 +60,9 @@ export default function ScanPage() {
           <TabsContent value="image" className="space-y-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-heading font-semibold">Image Scan</h2>
+                <h2 className="text-2xl font-heading font-semibold">
+                  Image Scan
+                </h2>
                 <Badge variant="outline">Classic</Badge>
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
