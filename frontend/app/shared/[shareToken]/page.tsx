@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Layers3 } from "lucide-react";
@@ -13,6 +14,10 @@ export function generateStaticParams() {
     ? [{ shareToken: STATIC_EXPORT_SHARE_TOKEN }]
     : [];
 }
+
+export const metadata: Metadata = {
+  title: "Shared Binder",
+};
 
 export default async function SharedCollectionPage({
   params,
@@ -35,9 +40,13 @@ export default async function SharedCollectionPage({
       <div className="mx-auto max-w-6xl space-y-8">
         <header className="space-y-3">
           <Badge variant="secondary">Shared binder</Badge>
-          <h1 className="font-heading text-4xl font-semibold">{collection.name}</h1>
+          <h1 className="font-heading text-4xl font-semibold">
+            {collection.name}
+          </h1>
           {collection.description && (
-            <p className="max-w-2xl text-muted-foreground">{collection.description}</p>
+            <p className="max-w-2xl text-muted-foreground">
+              {collection.description}
+            </p>
           )}
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Layers3 className="h-4 w-4" />
@@ -46,16 +55,31 @@ export default async function SharedCollectionPage({
         </header>
 
         {collection.cards.length === 0 ? (
-          <Card><CardContent className="py-12 text-center text-muted-foreground">This binder is empty.</CardContent></Card>
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              This binder is empty.
+            </CardContent>
+          </Card>
         ) : (
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {collection.cards.map((card, index) => (
-              <Card key={`${card.name}-${card.setName ?? ""}-${index}`} className="overflow-hidden">
+              <Card
+                key={`${card.name}-${card.setName ?? ""}-${index}`}
+                className="overflow-hidden"
+              >
                 <div className="relative aspect-[5/3] bg-muted">
                   {card.imageUrl ? (
-                    <Image src={card.imageUrl} alt={card.name} fill sizes="(max-width: 640px) 100vw, 25vw" className="object-contain p-3" />
+                    <Image
+                      src={card.imageUrl}
+                      alt={card.name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 25vw"
+                      className="object-contain p-3"
+                    />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground"><Layers3 className="h-10 w-10" /></div>
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      <Layers3 className="h-10 w-10" />
+                    </div>
                   )}
                 </div>
                 <CardHeader className="space-y-2">

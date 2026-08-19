@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { CollectionCard } from "@/types/card";
 import { formatCopyCount } from "@/lib/copy-labels";
+import { formatMoney } from "@/lib/format-money";
 
 interface CollectionSummaryProps {
   items: CollectionCard[];
@@ -71,7 +72,7 @@ export function CollectionSummary({
           <SummaryCard
             title="Portfolio value"
             description="Live estimates"
-            value={`$${totalValue.toFixed(2)}`}
+            value={formatMoney(totalValue)}
             icon={<Wallet className="h-5 w-5" data-oid=":su1y1e" />}
             delta={delta}
             data-oid="k1c0yaj"
@@ -80,7 +81,7 @@ export function CollectionSummary({
           <SummaryCard
             title="Avg. price"
             description="Per copy"
-            value={`$${avgPrice.toFixed(2)}`}
+            value={formatMoney(avgPrice)}
             icon={<PieChart className="h-5 w-5" data-oid="flfgm8k" />}
             data-oid="c6jzg:9"
           />
@@ -88,7 +89,7 @@ export function CollectionSummary({
           <SummaryCard
             title="Selected for export"
             description={`${selectedCards.length} card(s), ${formatCopyCount(selectedQuantity)}`}
-            value={`$${selectedValue.toFixed(2)}`}
+            value={formatMoney(selectedValue)}
             icon={<ArrowUpRight className="h-5 w-5" data-oid="_p13n6r" />}
             variant="muted"
             data-oid="eoqyn5b"

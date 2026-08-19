@@ -32,16 +32,20 @@ import { CardPreview } from "./card-preview";
 
 import { useShallow } from "zustand/react/shallow";
 export function CardSearchPanel() {
-  const { selectedGame, setGame } = useGameFilterStore(useShallow((state) => ({
-    selectedGame: state.selectedGame,
-    setGame: state.setGame,
-  })));
+  const { selectedGame, setGame } = useGameFilterStore(
+    useShallow((state) => ({
+      selectedGame: state.selectedGame,
+      setGame: state.setGame,
+    })),
+  );
   const enabledGames = useModuleStore((state) => state.enabledGames);
   const { token, isAuthenticated } = useAuthStore();
-  const { fetchCollections, hasFetched } = useCollectionsStore(useShallow((state) => ({
-    fetchCollections: state.fetchCollections,
-    hasFetched: state.hasFetched,
-  })));
+  const { fetchCollections, hasFetched } = useCollectionsStore(
+    useShallow((state) => ({
+      fetchCollections: state.fetchCollections,
+      hasFetched: state.hasFetched,
+    })),
+  );
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [setFilter, setSetFilter] = useState("");
@@ -73,9 +77,7 @@ export function CardSearchPanel() {
     }
     if (
       normalizedCollectorFilter &&
-      !card.collectorNumber
-        ?.toLowerCase()
-        .includes(normalizedCollectorFilter)
+      !card.collectorNumber?.toLowerCase().includes(normalizedCollectorFilter)
     ) {
       return false;
     }
@@ -115,9 +117,11 @@ export function CardSearchPanel() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]" data-oid="wsi0d3e">
-      <Card className="h-fit border-dashed" data-oid="-_rj04n">
+      <Card className="h-fit" data-oid="-_rj04n">
         <CardHeader data-oid="exck2hn">
-          <CardTitle asChild data-oid="._71p80"><h2>Search Parameters</h2></CardTitle>
+          <CardTitle asChild data-oid="._71p80">
+            <h2>Search Parameters</h2>
+          </CardTitle>
           <CardDescription data-oid="arc981r">
             Find cards by name or set across your enabled games.
           </CardDescription>
@@ -129,7 +133,11 @@ export function CardSearchPanel() {
             data-oid="shvo8j:"
           >
             <div className="space-y-2" data-oid="99ow48f">
-              <label htmlFor="card-search-keyword" className="text-sm font-medium" data-oid="1bz10j7">
+              <label
+                htmlFor="card-search-keyword"
+                className="text-sm font-medium"
+                data-oid="1bz10j7"
+              >
                 Keyword
               </label>
               <div className="flex gap-2" data-oid="3ihveu3">
@@ -163,7 +171,11 @@ export function CardSearchPanel() {
             </div>
 
             <div className="space-y-2" data-oid="zsrjmvw">
-              <label id="card-search-game-label" className="text-sm font-medium" data-oid="kdxgwae">
+              <label
+                id="card-search-game-label"
+                className="text-sm font-medium"
+                data-oid="kdxgwae"
+              >
                 TCG Filter
               </label>
               <Select
@@ -171,7 +183,10 @@ export function CardSearchPanel() {
                 onValueChange={(value) => setGame(value as SupportedGame)}
                 data-oid="19wtplw"
               >
-                <SelectTrigger aria-labelledby="card-search-game-label" data-oid="1z40tmp">
+                <SelectTrigger
+                  aria-labelledby="card-search-game-label"
+                  data-oid="1z40tmp"
+                >
                   <SelectValue placeholder="All games" data-oid="jj51dke" />
                 </SelectTrigger>
                 <SelectContent data-oid="c-c_6mu">
@@ -195,9 +210,14 @@ export function CardSearchPanel() {
             </div>
 
             <fieldset className="space-y-3 rounded-lg border p-3">
-              <legend className="px-1 text-sm font-medium">Refine results</legend>
+              <legend className="px-1 text-sm font-medium">
+                Refine results
+              </legend>
               <div className="space-y-2">
-                <label htmlFor="card-search-set" className="text-xs font-medium">
+                <label
+                  htmlFor="card-search-set"
+                  className="text-xs font-medium"
+                >
                   Set name or code
                 </label>
                 <Input
@@ -232,9 +252,7 @@ export function CardSearchPanel() {
                   <Input
                     id="card-search-collector"
                     value={collectorFilter}
-                    onChange={(event) =>
-                      setCollectorFilter(event.target.value)
-                    }
+                    onChange={(event) => setCollectorFilter(event.target.value)}
                     placeholder="138"
                   />
                 </div>
@@ -264,7 +282,9 @@ export function CardSearchPanel() {
           data-oid="duv85c-"
         >
           <div data-oid="3.cdfwa">
-            <CardTitle asChild data-oid="75.9olc"><h2>Results</h2></CardTitle>
+            <CardTitle asChild data-oid="75.9olc">
+              <h2>Results</h2>
+            </CardTitle>
             <CardDescription data-oid="_a9wnkx">
               {noGamesEnabled
                 ? "Enable at least one module to resume cross-game search."
@@ -279,7 +299,10 @@ export function CardSearchPanel() {
           </div>
           <div aria-live="polite" aria-atomic="true">
             {isFetching ? (
-              <span className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <span
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+                role="status"
+              >
                 <Loader2
                   className="h-5 w-5 animate-spin"
                   aria-hidden="true"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Card Explorer · TCGer Demo",
+  title: "Card Explorer",
 };
 
 export default function DemoCardsLayout({

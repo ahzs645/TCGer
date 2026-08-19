@@ -32,6 +32,8 @@ import {
   getInstalledSealedProducts,
   type SealedCatalogProduct,
 } from "@/lib/catalog/catalog-client";
+import { formatMoney } from "@/lib/format-money";
+import { PageHeader } from "@/components/layout/page-header";
 
 /* ------------------------------------------------------------------ */
 /*  Fake sealed products data                                           */
@@ -194,22 +196,10 @@ export default function SealedPage() {
   return (
     <AppShell data-oid="400i9:c">
       <div className="space-y-6" data-oid="46o67ox">
-        <div
-          className="flex items-start justify-between gap-3"
-          data-oid="24af:t7"
-        >
-          <div className="min-w-0 flex-1" data-oid="eh-_rpf">
-            <h1
-              className="text-3xl font-heading font-semibold"
-              data-oid="ol_wf5d"
-            >
-              Sealed Products
-            </h1>
-            <p className="text-sm text-muted-foreground" data-oid="k2:v5o8">
-              Track your sealed product investments and market values.
-            </p>
-          </div>
-          <div className="shrink-0">
+        <PageHeader
+          title="Sealed Products"
+          description="Track your sealed product investments and market values."
+          actions={
             <Button
               size="sm"
               onClick={() => setCreateOpen(true)}
@@ -218,8 +208,8 @@ export default function SealedPage() {
               <Plus className="mr-2 h-4 w-4" data-oid="zoob79u" />
               Add Product
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Summary */}
         <div
@@ -247,7 +237,7 @@ export default function SealedPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="pjv6w1v"
               >
-                ${totalInvested.toFixed(2)}
+                {formatMoney(totalInvested)}
               </div>
               <p
                 className="mt-1 text-xs text-muted-foreground"
@@ -278,7 +268,7 @@ export default function SealedPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="ww_f30c"
               >
-                ${totalCurrent.toFixed(2)}
+                {formatMoney(totalCurrent)}
               </div>
               <p
                 className="mt-1 text-xs text-muted-foreground"
@@ -309,7 +299,8 @@ export default function SealedPage() {
                 className={`text-xl md:text-3xl font-semibold ${totalProfit >= 0 ? "text-green-500" : "text-red-500"}`}
                 data-oid="pepqdf8"
               >
-                {totalProfit >= 0 ? "+" : ""}${totalProfit.toFixed(2)}
+                {totalProfit >= 0 ? "+" : ""}
+                {formatMoney(totalProfit)}
               </div>
               <p
                 className="mt-1 text-xs text-muted-foreground"
@@ -430,7 +421,7 @@ export default function SealedPage() {
                           className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
                           data-oid=".f8d7oi"
                         >
-                          <span className="truncate">{p.type}</span>
+                          <span className="min-w-0">{p.type}</span>
                           <span className="shrink-0" data-oid="a8xunk1">
                             ×{p.quantity}
                           </span>
@@ -447,13 +438,14 @@ export default function SealedPage() {
                         className="text-sm font-semibold whitespace-nowrap"
                         data-oid="0wicg5e"
                       >
-                        ${(p.currentValue * p.quantity).toFixed(2)}
+                        {formatMoney(p.currentValue * p.quantity)}
                       </p>
                       <p
                         className={`text-xs whitespace-nowrap ${profit >= 0 ? "text-green-500" : "text-red-500"}`}
                         data-oid="_hlp0de"
                       >
-                        {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
+                        {profit >= 0 ? "+" : ""}
+                        {formatMoney(profit)} (
                         {profitPct === null
                           ? "—"
                           : `${profitPct >= 0 ? "+" : ""}${profitPct.toFixed(1)}%`}

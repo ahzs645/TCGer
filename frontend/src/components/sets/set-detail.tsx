@@ -113,12 +113,14 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const [mounted, setMounted] = useState(false);
   const { token, isAuthenticated, user } = useAuthStore();
   const { collections, fetchCollections, hasFetched, collectionsLoading } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      fetchCollections: state.fetchCollections,
-      hasFetched: state.hasFetched,
-      collectionsLoading: state.isLoading,
-    })));
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        hasFetched: state.hasFetched,
+        collectionsLoading: state.isLoading,
+      })),
+    );
   const [collectionId, setCollectionId] = useState(ALL_COLLECTION_ID);
   const [query, setQuery] = useState("");
   const [rarity, setRarity] = useState("all");
@@ -136,12 +138,14 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
     fetchWishlists,
     hasFetchedWishlists,
     addRule: addWishlistRule,
-  } = useWishlistsStore(useShallow((state) => ({
-    wishlists: state.wishlists,
-    fetchWishlists: state.fetchWishlists,
-    hasFetchedWishlists: state.hasFetched,
-    addRule: state.addRule,
-  })));
+  } = useWishlistsStore(
+    useShallow((state) => ({
+      wishlists: state.wishlists,
+      fetchWishlists: state.fetchWishlists,
+      hasFetchedWishlists: state.hasFetched,
+      addRule: state.addRule,
+    })),
+  );
   const [wishlistId, setWishlistId] = useState("");
   const [wishlistBusy, setWishlistBusy] = useState(false);
 
@@ -250,11 +254,16 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
   const setsHref = getAppRoute("/sets", pathname);
   const setTitle = set?.name ?? setCards[0]?.setName ?? setCode.toUpperCase();
   const releaseDate = formatDate(set?.releaseDate);
-  const selectedCollectionName =
-    collectionId === ALL_COLLECTION_ID
-      ? "All collection"
-      : (collections.find((entry) => entry.id === collectionId)?.name ??
-        "Selected binder");
+  const isAllCollections = collectionId === ALL_COLLECTION_ID;
+  const selectedCollectionName = isAllCollections
+    ? "All collection"
+    : (collections.find((entry) => entry.id === collectionId)?.name ??
+      "Selected binder");
+  // The scope name is a UI label ("All collection"), not a noun phrase that
+  // reads inside a sentence — interpolating it produced "in All collection."
+  const scopeSentence = isAllCollections
+    ? "Track every unique printing across your whole collection."
+    : `Track every unique printing in ${selectedCollectionName}.`;
 
   const toggleSelected = (cardId: string) => {
     setSelectedCardIds((current) => {
@@ -429,10 +438,10 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
                   </span>
                 )}
               </div>
-              <h1 className="text-3xl font-heading font-semibold">{setTitle}</h1>
-              <p className="text-sm text-muted-foreground">
-                Track every unique printing in {selectedCollectionName}.
-              </p>
+              <h1 className="text-3xl font-heading font-semibold">
+                {setTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">{scopeSentence}</p>
             </div>
           </div>
           <Select
@@ -520,7 +529,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
           </UiCard>
 
           <UiCard>
-            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_170px_auto]">
+            <CardContent className="grid gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-[1fr_190px_200px_190px_auto]">
               <label className="relative">
                 <span className="sr-only">Search cards in this set</span>
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -604,7 +613,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
                 <>
                   <Select value={wishlistId} onValueChange={setWishlistId}>
                     <SelectTrigger
-                      className="w-[180px]"
+                      className="w-full sm:w-[210px]"
                       aria-label="Target wishlist"
                     >
                       <SelectValue placeholder="Wishlist" />

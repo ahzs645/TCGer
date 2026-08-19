@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Card Scan",
+  title: "Decks",
 };
 
-export default function DemoScanLayout({
+export default function DecksLayout({
   children,
 }: {
   children: React.ReactNode;

@@ -39,6 +39,7 @@ import {
 } from "@/lib/sets/progress";
 
 import { useShallow } from "zustand/react/shallow";
+import { formatMoney } from "@/lib/format-money";
 type DashboardCard = CollectionCard & {
   updatedAt?: string;
   binderName?: string;
@@ -421,10 +422,7 @@ export function DashboardContent() {
             {showPricing ? (
               <StatCard
                 title="Estimated Value"
-                value={new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                }).format(stats.totalValue)}
+                value={formatMoney(stats.totalValue)}
                 description="Based on collection pricing"
                 icon={<Coins className="h-5 w-5" data-oid="bg_ukgc" />}
                 data-oid="lmka4i."

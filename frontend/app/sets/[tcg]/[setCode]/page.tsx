@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -24,6 +25,10 @@ interface SetDetailPageProps {
     setCode: string;
   }>;
 }
+
+export const metadata: Metadata = {
+  title: "Set Explorer",
+};
 
 export default async function SetDetailPage({ params }: SetDetailPageProps) {
   const { tcg, setCode } = await params;

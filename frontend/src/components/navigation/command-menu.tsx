@@ -2,15 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  Calculator,
-  Camera,
-  Heart,
-  LayoutDashboard,
-  PackageOpen,
-  Search,
-  Table,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import {
@@ -28,22 +20,36 @@ import { cn, GAME_LABELS } from "@/lib/utils";
 import { supportedGameOptions, useGameFilterStore } from "@/stores/game-filter";
 
 import { useShallow } from "zustand/react/shallow";
-interface CommandMenuProps {
-  secondaryNavigation: Array<{
-    href: string;
-    label: string;
-    icon: LucideIcon;
-  }>;
+interface CommandMenuNavigationItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
 }
 
-export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
+interface CommandMenuProps {
+  /**
+   * Both lists come from AppShell so the palette can never advertise a
+   * destination the shell has filtered out — it used to hardcode its own copy
+   * of the primary nav, which still offered Card Scan in demo mode after the
+   * shell stopped doing so.
+   */
+  primaryNavigation: CommandMenuNavigationItem[];
+  secondaryNavigation: CommandMenuNavigationItem[];
+}
+
+export function CommandMenu({
+  primaryNavigation,
+  secondaryNavigation,
+}: CommandMenuProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { selectedGame, setGame } = useGameFilterStore(useShallow((state) => ({
-    selectedGame: state.selectedGame,
-    setGame: state.setGame,
-  })));
+  const { selectedGame, setGame } = useGameFilterStore(
+    useShallow((state) => ({
+      selectedGame: state.selectedGame,
+      setGame: state.setGame,
+    })),
+  );
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -60,12 +66,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
     setOpen(false);
     router.push(getAppRoute(path, pathname));
   };
-
-  const quickCalculations: { label: string; icon: LucideIcon; path: string }[] =
-    [
-      { label: "View price analytics", icon: Calculator, path: "/analytics" },
-      { label: "Track card prices", icon: Calculator, path: "/prices" },
-    ];
 
   return (
     <>
@@ -95,49 +95,7 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
         <CommandList data-oid="zd2rt9:">
           <CommandEmpty data-oid="zsto0ak">No results found.</CommandEmpty>
           <CommandGroup heading="Navigation" data-oid="z6o4cws">
-            <CommandItem
-              onSelect={() => handleNavigate("/")}
-              data-oid="ehzpm21"
-            >
-              <LayoutDashboard className="mr-2 h-4 w-4" data-oid="i:qe8qx" />
-              Dashboard
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleNavigate("/packs")}
-              data-oid="nav-open-packs"
-            >
-              <PackageOpen className="mr-2 h-4 w-4" />
-              Open Packs
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleNavigate("/cards")}
-              data-oid="ri6-_rt"
-            >
-              <Search className="mr-2 h-4 w-4" data-oid="ms58nkv" />
-              Card Search
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleNavigate("/scan")}
-              data-oid="0fjw32m"
-            >
-              <Camera className="mr-2 h-4 w-4" data-oid="pvvjix9" />
-              Card Scan
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleNavigate("/collections")}
-              data-oid="aj2pvdv"
-            >
-              <Table className="mr-2 h-4 w-4" data-oid="h9q6j_g" />
-              Collections
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleNavigate("/wishlists")}
-              data-oid="9-e.9bo"
-            >
-              <Heart className="mr-2 h-4 w-4" data-oid="tc7wp2." />
-              Wishlists
-            </CommandItem>
-            {secondaryNavigation.map((item) => {
+            {[...primaryNavigation, ...secondaryNavigation].map((item) => {
               const Icon = item.icon;
               return (
                 <CommandItem
@@ -173,19 +131,6 @@ export function CommandMenu({ secondaryNavigation }: CommandMenuProps) {
                 {selectedGame === option.value && (
                   <CommandShortcut data-oid="b:1rcww">Current</CommandShortcut>
                 )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandSeparator data-oid="8tzqeph" />
-          <CommandGroup heading="Utilities" data-oid=":l2ys-2">
-            {quickCalculations.map((item) => (
-              <CommandItem
-                key={item.label}
-                onSelect={() => handleNavigate(item.path)}
-                data-oid="n-u4meb"
-              >
-                <item.icon className="mr-2 h-4 w-4" data-oid="1omz2kt" />
-                {item.label}
               </CommandItem>
             ))}
           </CommandGroup>

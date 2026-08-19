@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pokédex · TCGer Demo",
+  title: "Pokédex",
   description: "Explore National Pokédex card completion in the TCGer demo.",
 };
 
@@ -12,4 +12,3 @@ export default function DemoPokedexLayout({
 }) {
   return <>{children}</>;
 }
-

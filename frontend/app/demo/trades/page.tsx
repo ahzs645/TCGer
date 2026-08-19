@@ -36,6 +36,8 @@ import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Trade } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
+import { formatMoney } from "@/lib/format-money";
+import { PageHeader } from "@/components/layout/page-header";
 
 /* ------------------------------------------------------------------ */
 /*  Fake trade data                                                     */
@@ -145,22 +147,10 @@ export default function TradesPage() {
   return (
     <AppShell data-oid="nkjvlu_">
       <div className="space-y-6" data-oid="64mg-f2">
-        <div
-          className="flex items-start justify-between gap-3"
-          data-oid="fm9pabc"
-        >
-          <div className="min-w-0 flex-1" data-oid="99k2..z">
-            <h1
-              className="text-3xl font-heading font-semibold"
-              data-oid="9d4:6yh"
-            >
-              Trades
-            </h1>
-            <p className="text-sm text-muted-foreground" data-oid="qodyw66">
-              Track card trades with other collectors.
-            </p>
-          </div>
-          <div className="shrink-0">
+        <PageHeader
+          title="Trades"
+          description="Track card trades with other collectors."
+          actions={
             <Button
               size="sm"
               onClick={() => setCreateOpen(true)}
@@ -169,8 +159,8 @@ export default function TradesPage() {
               <Plus className="mr-2 h-4 w-4" data-oid="u450_2:" />
               New Trade
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Stats */}
         <div
@@ -227,7 +217,7 @@ export default function TradesPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="qgucovk"
               >
-                ${totalGiven.toFixed(2)}
+                {formatMoney(totalGiven)}
               </div>
             </CardContent>
           </Card>
@@ -245,7 +235,7 @@ export default function TradesPage() {
                 className="text-xl md:text-3xl font-semibold"
                 data-oid="8i9ou3g"
               >
-                ${totalReceived.toFixed(2)}
+                {formatMoney(totalReceived)}
               </div>
             </CardContent>
           </Card>
@@ -418,7 +408,7 @@ export default function TradesPage() {
                             className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="wf30jzj"
                           >
-                            ${c.value.toFixed(2)}
+                            {formatMoney(c.value)}
                           </span>
                         </div>
                       ))}
@@ -426,7 +416,7 @@ export default function TradesPage() {
                         className="text-xs text-muted-foreground text-right"
                         data-oid="1v4dgaj"
                       >
-                        Total: ${givingTotal.toFixed(2)}
+                        Total: {formatMoney(givingTotal)}
                       </p>
                     </div>
 
@@ -473,7 +463,7 @@ export default function TradesPage() {
                             className="shrink-0 whitespace-nowrap text-muted-foreground"
                             data-oid="ii8kio."
                           >
-                            ${c.value.toFixed(2)}
+                            {formatMoney(c.value)}
                           </span>
                         </div>
                       ))}
@@ -481,7 +471,7 @@ export default function TradesPage() {
                         className="text-xs text-muted-foreground text-right"
                         data-oid="0khe_u8"
                       >
-                        Total: ${receivingTotal.toFixed(2)}
+                        Total: {formatMoney(receivingTotal)}
                       </p>
                     </div>
                   </div>

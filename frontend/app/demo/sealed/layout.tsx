@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Sealed Products · TCGer Demo",
+  title: "Sealed Products",
 };
 
 export default function DemoSealedLayout({

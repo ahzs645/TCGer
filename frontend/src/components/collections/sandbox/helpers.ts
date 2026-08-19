@@ -1,3 +1,5 @@
+import { formatMoney } from "@/lib/format-money";
+
 export const CONDITION_ORDER = ["MINT", "NM", "LP", "MP", "HP", "DMG"] as const;
 
 export const CONDITION_COPY: Record<
@@ -52,9 +54,5 @@ export function formatCurrency(value?: number) {
   if (value === undefined) {
     return "—";
   }
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-  }).format(value);
+  return formatMoney(value);
 }

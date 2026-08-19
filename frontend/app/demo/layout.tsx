@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "TCGer Demo",
+  // Own template so demo pages compose as "<page> · TCGer Demo" instead of
+  // inheriting the root "· TCGer" suffix on top of their own.
+  title: {
+    default: "TCGer Demo",
+    template: "%s · TCGer Demo",
+  },
   description: "Interactive demo of the TCGer collection manager.",
 };
 

@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoCollectionTotals } from "@/stores/demo-store";
+import { formatMoney } from "@/lib/format-money";
 
 /* ------------------------------------------------------------------ */
 /*  Fake price data                                                     */
@@ -360,7 +361,7 @@ export default function PricesPage() {
                 data-oid="9n.l63x"
               >
                 {mounted ? (
-                  `$${totals.totalValue.toFixed(2)}`
+                  formatMoney(totals.totalValue)
                 ) : (
                   <Skeleton
                     className="h-6 w-24 md:h-8 md:w-32"
@@ -440,7 +441,7 @@ export default function PricesPage() {
                 {PRICE_DATA[0].name}
               </div>
               <p className="text-xs text-muted-foreground" data-oid="abosiy7">
-                ${PRICE_DATA[0].price.toFixed(2)}
+                {formatMoney(PRICE_DATA[0].price)}
               </p>
             </CardContent>
           </Card>
@@ -532,7 +533,7 @@ export default function PricesPage() {
                           {p.name}
                         </p>
                         <div
-                          className="mt-1 flex items-center gap-2"
+                          className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1"
                           data-oid="price-mobile-meta"
                         >
                           <Badge
@@ -544,7 +545,7 @@ export default function PricesPage() {
                             {p.tcg}
                           </Badge>
                           <span
-                            className="text-xs text-muted-foreground truncate"
+                            className="min-w-0 text-xs text-muted-foreground"
                             data-oid="price-mobile-set"
                           >
                             {p.setName}
@@ -559,7 +560,7 @@ export default function PricesPage() {
                           className="text-sm font-semibold"
                           data-oid="price-mobile-price"
                         >
-                          ${p.price.toFixed(2)}
+                          {formatMoney(p.price)}
                         </p>
                         <p
                           className="mt-1 flex items-center justify-end gap-1.5 text-xs"
@@ -708,7 +709,7 @@ export default function PricesPage() {
                         className="p-3 text-right font-semibold"
                         data-oid="_42r01a"
                       >
-                        ${p.price.toFixed(2)}
+                        {formatMoney(p.price)}
                       </td>
                       <td
                         className="p-3 text-right hidden sm:table-cell"

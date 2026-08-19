@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { SetBrowser } from "@/components/sets/set-browser";
+
+export const metadata: Metadata = {
+  title: "Set Explorer",
+};
 
 export default function SetsPage() {
   return (

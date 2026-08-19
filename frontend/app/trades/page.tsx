@@ -44,6 +44,8 @@ import {
 } from "@/lib/api/trading";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { formatMoney } from "@/lib/format-money";
+import { PageHeader } from "@/components/layout/page-header";
 
 type StatusKey = "pending" | "accepted" | "declined";
 
@@ -129,13 +131,11 @@ export default function TradesPage() {
       .filter((c) => c.side === side)
       .reduce((s, c) => s + (c.estimatedValue ?? 0) * (c.quantity ?? 1), 0);
   const totalGiven = acceptedTrades.reduce(
-    (s, t) =>
-      s + sideValue(t, t.senderId === userId ? "sender" : "receiver"),
+    (s, t) => s + sideValue(t, t.senderId === userId ? "sender" : "receiver"),
     0,
   );
   const totalReceived = acceptedTrades.reduce(
-    (s, t) =>
-      s + sideValue(t, t.senderId === userId ? "receiver" : "sender"),
+    (s, t) => s + sideValue(t, t.senderId === userId ? "receiver" : "sender"),
     0,
   );
 
@@ -153,22 +153,20 @@ export default function TradesPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-heading font-semibold">Trades</h1>
-            <p className="text-sm text-muted-foreground">
-              Track card trades with other collectors.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setMatchesOpen(true)}
-            disabled={!mounted || !isAuthenticated}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Trade
-          </Button>
-        </div>
+        <PageHeader
+          title="Trades"
+          description="Track card trades with other collectors."
+          actions={
+            <Button
+              size="sm"
+              onClick={() => setMatchesOpen(true)}
+              disabled={!mounted || !isAuthenticated}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Trade
+            </Button>
+          }
+        />
 
         {mounted && !isAuthenticated ? (
           <Card>
@@ -209,10 +207,10 @@ export default function TradesPage() {
                 value={String(counts.pending ?? 0)}
                 accent="text-yellow-500"
               />
-              <StatCard title="Value Sent" value={`$${totalGiven.toFixed(2)}`} />
+              <StatCard title="Value Sent" value={formatMoney(totalGiven)} />
               <StatCard
                 title="Value Received"
-                value={`$${totalReceived.toFixed(2)}`}
+                value={formatMoney(totalReceived)}
               />
             </div>
 
@@ -378,7 +376,8 @@ function TradeRow({
                     : "text-muted-foreground"
               }
             >
-              {delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(2)}
+              {delta >= 0 ? "+" : "−"}
+              {formatMoney(Math.abs(delta))}
             </span>
           </p>
         )}
@@ -457,7 +456,7 @@ function TradeSide({
             </div>
             {c.estimatedValue ? (
               <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                ${c.estimatedValue.toFixed(2)}
+                {formatMoney(c.estimatedValue)}
               </span>
             ) : null}
           </div>
@@ -465,7 +464,7 @@ function TradeSide({
       )}
       {total > 0 && (
         <p className="text-xs text-muted-foreground text-right">
-          Total: ${total.toFixed(2)}
+          Total: {formatMoney(total)}
         </p>
       )}
     </div>
@@ -521,8 +520,8 @@ function MatchesDialog({
             Suggested trades
           </DialogTitle>
           <DialogDescription>
-            Collectors who have cards you want and want cards you have. Propose a
-            trade to send them an offer.
+            Collectors who have cards you want and want cards you have. Propose
+            a trade to send them an offer.
           </DialogDescription>
         </DialogHeader>
 
@@ -543,10 +542,7 @@ function MatchesDialog({
         ) : (
           <div className="max-h-[60vh] space-y-3 overflow-y-auto">
             {matches.map((match) => (
-              <div
-                key={match.userId}
-                className="rounded-lg border p-3 text-sm"
-              >
+              <div key={match.userId} className="rounded-lg border p-3 text-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="font-medium">
                     {match.username ?? "Collector"}
@@ -562,7 +558,10 @@ function MatchesDialog({
                     </p>
                     <ul className="space-y-0.5">
                       {match.youHave.slice(0, 4).map((c) => (
-                        <li key={`${c.tcg}:${c.externalId}`} className="truncate">
+                        <li
+                          key={`${c.tcg}:${c.externalId}`}
+                          className="truncate"
+                        >
                           {c.name}
                         </li>
                       ))}
@@ -574,7 +573,10 @@ function MatchesDialog({
                     </p>
                     <ul className="space-y-0.5">
                       {match.theyHave.slice(0, 4).map((c) => (
-                        <li key={`${c.tcg}:${c.externalId}`} className="truncate">
+                        <li
+                          key={`${c.tcg}:${c.externalId}`}
+                          className="truncate"
+                        >
                           {c.name}
                         </li>
                       ))}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Collection Sandbox · TCGer Demo",
+  title: "Collection Sandbox",
 };
 
 export default function DemoCollectionsLayout({

@@ -23,6 +23,11 @@ navigation and UI primitives.
 
 **17 findings: 1 blocker, 4 layout, 5 consistency, 5 mobile, 2 polish.**
 
+> **Outcome (2026-08-19):** all of these were worked in a fix pass —
+> 18 of 19 fixed, finding 19 withdrawn as a measurement error. Two bugs in this
+> review's own audit harness were also found and corrected. See
+> `docs/desktop-mobile-interface-fixes-2026-08-19.md`.
+
 The prior pass (`docs/demo-interface-review-2026-08-11.md`) closed 25 findings
 against the demo tree. Most of that work holds — trades no longer scrolls
 sideways, the price table is a card list on mobile, the analytics chart draws,
