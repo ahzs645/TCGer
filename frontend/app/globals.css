@@ -72,12 +72,44 @@ body {
   color: hsl(var(--foreground));
 }
 
+/*
+ * Card padding lives in the components layer, not in the Card component's base
+ * class list. 24px on every side is a desktop measure — on a 393px phone it
+ * costs 48px of a 361px content width and 48px of height per card, and there
+ * are ~20 cards on a page. But putting `p-4 sm:p-6` in the base class leaks:
+ * tailwind-merge drops the conflicting `p-4` when a caller passes `p-3`, keeps
+ * `sm:p-6`, and the caller's deliberate compact padding is silently overridden
+ * from 640px up. In the components layer a caller's `p-*` utility wins at every
+ * breakpoint, which is what a call-site override should do.
+ */
+@layer components {
+  .card-pad {
+    padding: 1rem;
+  }
+  .card-pad-t0 {
+    padding: 1rem;
+    padding-top: 0;
+  }
+  @media (min-width: 640px) {
+    .card-pad {
+      padding: 1.5rem;
+    }
+    .card-pad-t0 {
+      padding: 1.5rem;
+      padding-top: 0;
+    }
+  }
+}
+
 * {
   @apply border-border;
 }
 
 html {
-  font-feature-settings: "ss01" on, "ss02" on, "cv01" on;
+  font-feature-settings:
+    "ss01" on,
+    "ss02" on,
+    "cv01" on;
 }
 
 @media (min-width: 768px) {

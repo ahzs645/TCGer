@@ -208,7 +208,10 @@ export default function DecksPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 md:gap-6" data-oid="9m6z._l">
+        <div
+          className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3"
+          data-oid="9m6z._l"
+        >
           <Card data-oid="4m-d.b5">
             <CardHeader className="p-3 pb-1 md:p-6 md:pb-4" data-oid="g0oh.f4">
               <CardTitle
@@ -277,7 +280,10 @@ export default function DecksPage() {
         </div>
 
         {/* Deck grid + detail view */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]" data-oid="1pzpcl0">
+        <div
+          className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start"
+          data-oid="1pzpcl0"
+        >
           {/* Deck list */}
           <div className="space-y-3" data-oid="t-_eku1">
             {DECKS.length === 0 ? (
@@ -382,7 +388,13 @@ export default function DecksPage() {
               A selected deck still renders its detail card on every size. */}
           <div
             ref={detailRef}
-            className={activeDeck ? "scroll-mt-20" : "hidden lg:block"}
+            // Sticky above lg so the deck you picked stays on screen while the
+            // list beside it scrolls.
+            className={
+              activeDeck
+                ? "scroll-mt-20 lg:sticky lg:top-20"
+                : "hidden lg:sticky lg:top-20 lg:block"
+            }
             data-oid="dldgokf"
           >
             {activeDeck ? (
@@ -499,7 +511,7 @@ export default function DecksPage() {
               </Card>
             ) : (
               <Card
-                className="flex items-center justify-center p-12"
+                className="flex items-center justify-center p-12 lg:min-h-[24rem]"
                 data-oid="h68dzf9"
               >
                 <div

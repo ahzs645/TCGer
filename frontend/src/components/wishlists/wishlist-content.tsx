@@ -1389,10 +1389,13 @@ export function WishlistContent() {
 
       {/* Desktop layout: side-by-side */}
       <div
-        className="hidden lg:grid lg:grid-cols-[320px_1fr] lg:gap-6 xl:grid-cols-[360px_1fr]"
+        className="hidden lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[360px_minmax(0,1fr)]"
         data-oid="lgwel0t"
       >
-        <div className="min-w-0" data-oid="w-63780">
+        <div
+          className="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+          data-oid="w-63780"
+        >
           {sidebarContent}
         </div>
         {detailContent}

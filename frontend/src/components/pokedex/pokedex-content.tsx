@@ -461,7 +461,7 @@ export function PokedexContent() {
         <PokedexGridSkeleton />
       ) : visibleSpecies.length ? (
         <div
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8"
           aria-label="Pokédex species"
         >
           {renderedSpecies.map((entry) => (
@@ -584,12 +584,14 @@ function SpeciesTile({
           {species.owned ? "Owned" : "Missing"}
         </Badge>
       </div>
-      <div className="space-y-1 p-3">
-        <span className="text-xs font-medium tabular-nums text-muted-foreground">
+      <div className="space-y-0.5 p-2 sm:space-y-1 sm:p-3">
+        <span className="text-[11px] font-medium tabular-nums text-muted-foreground sm:text-xs">
           {formatNumber(species.number)}
         </span>
-        <p className="truncate font-heading font-semibold">{species.name}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="line-clamp-2 font-heading text-sm font-semibold leading-tight sm:text-base">
+          {species.name}
+        </p>
+        <p className="line-clamp-2 text-[11px] text-muted-foreground sm:text-xs">
           {species.printings.length
             ? `${species.ownedPrintings}/${species.printings.length} printings owned`
             : "Printings unavailable"}
@@ -629,7 +631,7 @@ function SpeciesDialog({
           </DialogDescription>
         </DialogHeader>
         {species.printings.length ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
             {species.printings.map((printing) => (
               <PrintingCard key={printing.id} printing={printing} />
             ))}
@@ -683,7 +685,7 @@ function PrintingCard({ printing }: { printing: PokedexPrinting }) {
 function PokedexGridSkeleton() {
   return (
     <div
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+      className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8"
       role="status"
       aria-label="Loading Pokédex"
     >

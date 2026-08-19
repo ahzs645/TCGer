@@ -116,8 +116,11 @@ export function CardSearchPanel() {
   }, [fetchCollections, hasFetched, isAuthenticated, token]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]" data-oid="wsi0d3e">
-      <Card className="h-fit" data-oid="-_rj04n">
+    <div
+      className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]"
+      data-oid="wsi0d3e"
+    >
+      <Card className="h-fit lg:sticky lg:top-20" data-oid="-_rj04n">
         <CardHeader data-oid="exck2hn">
           <CardTitle asChild data-oid="._71p80">
             <h2>Search Parameters</h2>
@@ -323,10 +326,12 @@ export function CardSearchPanel() {
         </CardHeader>
         <CardContent className="p-0" data-oid="bopkrlg">
           <ScrollArea
-            className={hasResults ? "h-[calc(100vh-280px)]" : "h-auto"}
+            className={
+              hasResults ? "h-auto lg:h-[calc(100vh-17rem)]" : "h-auto"
+            }
             data-oid="17p81o6"
           >
-            <div className="p-6 space-y-8" data-oid="ld:vdo3">
+            <div className="space-y-8 p-4 sm:p-6" data-oid="ld:vdo3">
               {!hasResults ? (
                 <div
                   className="flex h-40 items-center justify-center text-sm text-muted-foreground"

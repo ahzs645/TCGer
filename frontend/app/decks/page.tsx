@@ -184,7 +184,7 @@ export default function DecksPage() {
         ) : (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 md:gap-6">
+            <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
               <StatCard title="Total Decks" value={totalDecks} />
               <StatCard title="Cards in Decks" value={totalCards} />
               <StatCard title="Games" value={distinctGames} />
@@ -206,7 +206,7 @@ export default function DecksPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+              <div className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start">
                 {/* Deck list */}
                 <div className="space-y-3">
                   {decks.map((deck) => {
@@ -283,8 +283,9 @@ export default function DecksPage() {
                   })}
                 </div>
 
-                {/* Deck detail */}
-                <div>
+                {/* Deck detail — sticky so it stays on screen while the list
+                    beside it scrolls. */}
+                <div className="lg:sticky lg:top-20">
                   {activeDeck ? (
                     <DeckDetail
                       deck={activeDeck}
@@ -301,7 +302,7 @@ export default function DecksPage() {
                       deleting={deleteMutation.isPending}
                     />
                   ) : (
-                    <Card className="flex items-center justify-center p-12">
+                    <Card className="flex items-center justify-center p-12 lg:min-h-[24rem]">
                       <div className="text-center text-muted-foreground">
                         <Layers className="mx-auto h-12 w-12 mb-3 opacity-40" />
                         <p className="text-sm">
@@ -986,7 +987,7 @@ function StatCard({ title, value }: { title: string; value: number }) {
 function DecksSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, idx) => (
           <Card key={idx}>
             <CardHeader className="p-3 md:p-6">
@@ -998,7 +999,7 @@ function DecksSkeleton() {
           </Card>
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(300px,26rem)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, idx) => (
             <Skeleton key={idx} className="h-24 w-full" />

@@ -542,13 +542,13 @@ function SetCompletionOverview({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <Skeleton key={index} className="h-32 w-full" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {metrics.map((metric) => (
               <Link
                 key={`${metric.tcg}:${metric.setCode}`}
@@ -676,7 +676,10 @@ function GameBreakdown({
         </CardDescription>
       </CardHeader>
       <CardContent data-oid="6hdte6l">
-        <div className="grid gap-4 md:grid-cols-3" data-oid="o8nfv1r">
+        <div
+          className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
+          data-oid="o8nfv1r"
+        >
           {Object.entries(byGame).map(([game, info]) => {
             const percentage = Math.round((info.copies / total) * 100);
             return (

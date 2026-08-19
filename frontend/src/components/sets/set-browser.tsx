@@ -292,7 +292,7 @@ export function SetBrowser() {
             Add a set
           </Button>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           <label className="relative sm:col-span-2">
             <span className="sr-only">Search sets</span>
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -458,7 +458,7 @@ export function SetBrowser() {
               {sets.length} {sets.length === 1 ? "set" : "sets"}
             </Badge>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {sets.map((set) => {
               const owned = ownedCounts.get(`${set.tcg}:${set.code}`) ?? 0;
               const total = set.totalCards ?? 0;
@@ -488,8 +488,8 @@ export function SetBrowser() {
                     complete && "border-emerald-500/50",
                   )}
                 >
-                    <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3 sm:pb-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted sm:h-12 sm:w-12">
                         <SetSymbol
                           symbolUrl={set.iconUrl}
                           symbolFallbackUrl={set.iconFallbackUrl}
@@ -505,15 +505,17 @@ export function SetBrowser() {
                         <CardTitle className="line-clamp-2 text-base">
                           {set.name}
                         </CardTitle>
-                        <p className="mt-1 text-xs font-medium text-muted-foreground">
-                          {set.code.toLocaleUpperCase()}
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                          <span className="font-medium">
+                            {set.code.toLocaleUpperCase()}
+                          </span>
+                          {released && (
+                            <span className="flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3" />
+                              {released}
+                            </span>
+                          )}
                         </p>
-                        {released && (
-                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            <CalendarDays className="h-3 w-3" />
-                            {released}
-                          </p>
-                        )}
                       </div>
                       {complete && (
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />

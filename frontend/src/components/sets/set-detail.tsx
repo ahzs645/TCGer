@@ -746,7 +746,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
             <div
               className={cn(
                 view === "grid"
-                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
                   : "space-y-2",
               )}
             >
@@ -831,11 +831,11 @@ function SetCardEntry({
   return (
     <UiCard
       className={cn(
-        "overflow-hidden",
+        "h-full overflow-hidden",
         owned && "border-emerald-500/40 bg-emerald-500/5",
       )}
     >
-      <CardContent className="space-y-3 p-3">
+      <CardContent className="flex h-full flex-col gap-3 p-3">
         <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
           <CardImage
             src={image}
@@ -843,7 +843,7 @@ function SetCardEntry({
             tcg={card.tcg}
             alt={card.name}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1280px) 20vw, 14vw"
             className={cn(
               "object-contain transition",
               !owned && "grayscale-[0.35] opacity-70",
@@ -854,7 +854,7 @@ function SetCardEntry({
             <OwnershipBadge owned={owned} compact />
           </div>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-medium">{card.name}</p>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {details.join(" · ") || "Printing details unavailable"}
@@ -863,7 +863,7 @@ function SetCardEntry({
         <Button
           variant={selected ? "default" : "outline"}
           size="sm"
-          className="w-full"
+          className="mt-auto w-full"
           onClick={onToggle}
         >
           {selected ? "Selected" : "Select"}
