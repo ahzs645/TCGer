@@ -57,14 +57,8 @@ import {
   type ManageableGame,
 } from "@/stores/preferences";
 
-const TCG_COLORS: Record<string, string> = {
-  yugioh: "#ef4444",
-  magic: "#8b5cf6",
-  pokemon: "#f59e0b",
-  onepiece: "#0ea5e9",
-  lorcana: "#a855f7",
-  dragonball: "#f97316",
-};
+import { GameBadge } from "@/components/cards/game-badge";
+import { gameColor } from "@/lib/games";
 const MANAGEABLE_GAMES: readonly ManageableGame[] = [
   "magic",
   "yugioh",
@@ -211,7 +205,7 @@ export default function DecksPage() {
                 <div className="space-y-3">
                   {decks.map((deck) => {
                     const isSelected = selectedDeck === deck.id;
-                    const color = deck.colorHex ?? TCG_COLORS[deck.tcg];
+                    const color = deck.colorHex ?? gameColor(deck.tcg);
                     return (
                       <Card
                         key={deck.id}
@@ -243,13 +237,7 @@ export default function DecksPage() {
                                   {deck.name}
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{ borderColor: TCG_COLORS[deck.tcg] }}
-                                  >
-                                    {tcgLabel(deck.tcg)}
-                                  </Badge>
+                                  <GameBadge game={deck.tcg} />
                                   {deck.format && (
                                     <span className="text-xs text-muted-foreground">
                                       {deck.format}
@@ -358,7 +346,7 @@ function DeckDetail({
           <div className="flex items-center gap-2">
             <div
               className="h-6 w-1.5 rounded-full"
-              style={{ backgroundColor: deck.colorHex ?? TCG_COLORS[deck.tcg] }}
+              style={{ backgroundColor: deck.colorHex ?? gameColor(deck.tcg) }}
             />
             <CardTitle>{deck.name}</CardTitle>
           </div>
@@ -377,9 +365,7 @@ function DeckDetail({
           <CardDescription>{deck.description}</CardDescription>
         )}
         <div className="flex items-center gap-2 mt-1">
-          <Badge variant="outline" style={{ borderColor: TCG_COLORS[deck.tcg] }}>
-            {tcgLabel(deck.tcg)}
-          </Badge>
+          <GameBadge game={deck.tcg} />
           {deck.format && <Badge variant="secondary">{deck.format}</Badge>}
           <span className="text-xs text-muted-foreground">
             Updated{" "}

@@ -5,6 +5,7 @@ import { Layers3 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GameBadge } from "@/components/cards/game-badge";
 import { getPublicCollection } from "@/lib/api/public-collections";
 
 const STATIC_EXPORT_SHARE_TOKEN = "__static-export-placeholder__";
@@ -85,7 +86,7 @@ export default async function SharedCollectionPage({
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-base">{card.name}</CardTitle>
                   <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">{card.tcg}</Badge>
+                    <GameBadge game={card.tcg} />
                     {card.setName && <span>{card.setName}</span>}
                     {card.condition && <span>{card.condition}</span>}
                     <span>×{card.quantity}</span>

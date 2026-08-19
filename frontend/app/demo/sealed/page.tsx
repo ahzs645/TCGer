@@ -34,16 +34,11 @@ import {
 } from "@/lib/catalog/catalog-client";
 import { formatMoney } from "@/lib/format-money";
 import { PageHeader } from "@/components/layout/page-header";
+import { GameBadge } from "@/components/cards/game-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Fake sealed products data                                           */
 /* ------------------------------------------------------------------ */
-
-const TCG_COLORS: Record<string, string> = {
-  Pokemon: "#f59e0b",
-  Magic: "#8b5cf6",
-  "Yu-Gi-Oh!": "#ef4444",
-};
 
 export default function SealedPage() {
   const [sortBy, setSortBy] = useState<"date" | "value" | "profit">("date");
@@ -406,14 +401,7 @@ export default function SealedPage() {
                         className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5"
                         data-oid="yzftm0_"
                       >
-                        <Badge
-                          variant="outline"
-                          className="text-xs whitespace-nowrap"
-                          style={{ borderColor: TCG_COLORS[p.tcg] }}
-                          data-oid="8y7bxo:"
-                        >
-                          {p.tcg}
-                        </Badge>
+                        <GameBadge game={p.tcg} />
                         {/* Type and quantity are one wrap unit: as separate
                             flex children a long type pushed the "x2" onto a
                             line of its own. */}

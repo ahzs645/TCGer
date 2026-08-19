@@ -27,12 +27,7 @@ import { useModuleStore } from "@/stores/preferences";
 
 import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
-const TCG_COLORS: Record<string, string> = {
-  pokemon: "#f59e0b",
-  magic: "#8b5cf6",
-  yugioh: "#ef4444",
-};
-
+import { GameBadge } from "@/components/cards/game-badge";
 type SortKey = "price" | "30d" | "owned";
 const PRICE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
@@ -495,13 +490,7 @@ export default function PricesPage() {
                             )}
                           </td>
                           <td className="p-3">
-                            <Badge
-                              variant="outline"
-                              className="text-xs"
-                              style={{ borderColor: TCG_COLORS[p.tcg] }}
-                            >
-                              {tcgLabel(p.tcg)}
-                            </Badge>
+                            <GameBadge game={p.tcg} />
                           </td>
                           <td className="p-3 text-muted-foreground hidden md:table-cell">
                             {p.setName ?? "—"}

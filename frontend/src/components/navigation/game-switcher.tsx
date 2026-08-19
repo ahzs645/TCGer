@@ -12,20 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { gamePresentation } from "@/lib/games";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 
 import { useShallow } from "zustand/react/shallow";
-const iconPaths: Record<Exclude<SupportedGame, "all">, string> = {
-  yugioh: "/icons/Yugioh.svg",
-  magic: "/icons/MTG.svg",
-  pokemon: "/icons/Pokemon.svg",
-  onepiece: "/icons/OnePiece.svg",
-  lorcana: "/icons/Lorcana.svg",
-  dragonball: "/icons/DragonBall.svg",
-};
-
 function GameIcon({
   game,
   selected,
@@ -33,13 +25,15 @@ function GameIcon({
   game: SupportedGame;
   selected: boolean;
 }) {
-  if (game === "all") {
+  // Only "All games" has no mark of its own.
+  const { icon } = gamePresentation(game);
+  if (!icon) {
     return <Layers className="h-4 w-4" aria-hidden="true" />;
   }
   return (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={iconPaths[game]}
+      src={icon}
       alt=""
       width={16}
       height={16}

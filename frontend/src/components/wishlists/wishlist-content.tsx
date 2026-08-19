@@ -54,6 +54,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { GameBadge } from "@/components/cards/game-badge";
 import { SetSymbol } from "@/components/cards/set-symbol";
 import {
   cn,
@@ -1336,13 +1337,7 @@ export function WishlistContent() {
                             {card.setName ?? card.setCode ?? "Unknown set"}
                           </span>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="mt-1 text-[10px]"
-                          data-oid="s9dd93-"
-                        >
-                          {GAME_LABELS[card.tcg]}
-                        </Badge>
+                        <GameBadge game={card.tcg} className="mt-1" />
                       </div>
                       <Button
                         size="sm"

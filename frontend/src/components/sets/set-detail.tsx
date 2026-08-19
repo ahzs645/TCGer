@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GameBadge } from "@/components/cards/game-badge";
 import { getSetCards, getSets } from "@/lib/api/cards";
 import {
   addCardToCollection,
@@ -52,7 +53,7 @@ import {
   summarizeSetProgress,
   uniquePrintings,
 } from "@/lib/sets/progress";
-import { cn, GAME_LABELS, getCardBackImage } from "@/lib/utils";
+import { cn, getCardBackImage } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import type {
@@ -430,7 +431,7 @@ export function SetDetail({ tcg, setCode }: SetDetailProps) {
             </div>
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{GAME_LABELS[tcg]}</Badge>
+                <GameBadge game={tcg} long />
                 <Badge variant="secondary">{setCode.toUpperCase()}</Badge>
                 {releaseDate && (
                   <span className="text-xs text-muted-foreground">

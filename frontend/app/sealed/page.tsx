@@ -78,14 +78,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
 import { PageHeader } from "@/components/layout/page-header";
-const TCG_COLORS: Record<string, string> = {
-  yugioh: "#ef4444",
-  magic: "#8b5cf6",
-  pokemon: "#f59e0b",
-  onepiece: "#0ea5e9",
-  lorcana: "#a855f7",
-  dragonball: "#f97316",
-};
+import { GameBadge } from "@/components/cards/game-badge";
 
 function tcgLabel(tcg: string): string {
   return GAME_LABELS[tcg as SupportedGame] ?? tcg;
@@ -493,12 +486,7 @@ function InventoryCard({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{item.product.name}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge
-                  variant="outline"
-                  style={{ borderColor: TCG_COLORS[item.product.tcg] }}
-                >
-                  {tcgLabel(item.product.tcg)}
-                </Badge>
+                <GameBadge game={item.product.tcg} />
                 <Badge variant="secondary">{item.product.productType}</Badge>
                 {item.product.setCode && (
                   <span className="text-xs text-muted-foreground">

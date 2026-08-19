@@ -35,16 +35,11 @@ import {
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Deck } from "@/lib/data/demo-portfolio";
 import { useDemoStore } from "@/stores/demo-store";
+import { GameBadge } from "@/components/cards/game-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Fake deck data                                                      */
 /* ------------------------------------------------------------------ */
-
-const TCG_COLORS: Record<string, string> = {
-  "Yu-Gi-Oh!": "#ef4444",
-  Magic: "#8b5cf6",
-  Pokemon: "#f59e0b",
-};
 
 export default function DecksPage() {
   const [selectedDeck, setSelectedDeck] = useState<string | null>(null);
@@ -341,14 +336,7 @@ export default function DecksPage() {
                             className="flex items-center gap-2 mt-0.5"
                             data-oid="g33:5-h"
                           >
-                            <Badge
-                              variant="outline"
-                              className="text-xs"
-                              style={{ borderColor: TCG_COLORS[deck.tcg] }}
-                              data-oid="_xw156-"
-                            >
-                              {deck.tcg}
-                            </Badge>
+                            <GameBadge game={deck.tcg} />
                             <span
                               className="text-xs text-muted-foreground"
                               data-oid="z.v4zkg"
@@ -435,13 +423,7 @@ export default function DecksPage() {
                     className="flex items-center gap-2 mt-1"
                     data-oid="l4vk8xh"
                   >
-                    <Badge
-                      variant="outline"
-                      style={{ borderColor: TCG_COLORS[activeDeck.tcg] }}
-                      data-oid=".egf41l"
-                    >
-                      {activeDeck.tcg}
-                    </Badge>
+                    <GameBadge game={activeDeck.tcg} />
                     <Badge variant="secondary" data-oid="2469m-j">
                       {activeDeck.format}
                     </Badge>

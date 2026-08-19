@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { GameBadge } from "@/components/cards/game-badge";
 import { searchCardsApi } from "@/lib/api-client";
 import {
   commitBulkAdd,
@@ -100,8 +101,7 @@ export function BulkAddDialog() {
   const [committing, setCommitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const effectiveDefaultBinder =
-    defaultBinderId || collections[0]?.id || "";
+  const effectiveDefaultBinder = defaultBinderId || collections[0]?.id || "";
   const filteredRows = useMemo(() => {
     const query = stagedFilter.trim().toLocaleLowerCase();
     if (!query) return staged;
@@ -227,8 +227,7 @@ export function BulkAddDialog() {
         if (!filteredIds.has(row.rowId)) return row;
         return {
           ...row,
-          binderId:
-            batchBinderId === INHERIT ? row.binderId : batchBinderId,
+          binderId: batchBinderId === INHERIT ? row.binderId : batchBinderId,
           overrides: compactOverrides({
             ...row.overrides,
             condition: batchCondition || row.overrides.condition,
@@ -338,10 +337,10 @@ export function BulkAddDialog() {
                   {supportedGames
                     .filter((value) => value !== "all")
                     .map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {GAME_LABELS[value]}
-                    </SelectItem>
-                  ))}
+                      <SelectItem key={value} value={value}>
+                        {GAME_LABELS[value]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <div className="flex gap-2">
@@ -385,7 +384,7 @@ export function BulkAddDialog() {
                         .join(" • ") || "Representative printing"}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <Badge variant="outline">{GAME_LABELS[card.tcg]}</Badge>
+                      <GameBadge game={card.tcg} />
                       {card.printingKey && (
                         <Badge variant="secondary">Exact print</Badge>
                       )}
@@ -558,12 +557,16 @@ export function BulkAddDialog() {
                         {row.card.name}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {[row.card.setCode, row.card.collectorNumber, row.card.rarity]
+                        {[
+                          row.card.setCode,
+                          row.card.collectorNumber,
+                          row.card.rarity,
+                        ]
                           .filter(Boolean)
                           .join(" • ")}
                       </p>
                     </div>
-                    <Badge variant="outline">{GAME_LABELS[row.card.tcg]}</Badge>
+                    <GameBadge game={row.card.tcg} />
                     <Button
                       size="icon"
                       variant="ghost"
@@ -806,9 +809,7 @@ function cardSnapshot(card: Card): CardDataPayload {
   };
 }
 
-function compactOverrides(
-  overrides: BulkAddCopyFields,
-): BulkAddCopyFields {
+function compactOverrides(overrides: BulkAddCopyFields): BulkAddCopyFields {
   return Object.fromEntries(
     Object.entries(overrides).filter(([, value]) => value !== undefined),
   ) as BulkAddCopyFields;

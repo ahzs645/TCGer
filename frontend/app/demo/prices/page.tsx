@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDemoCollectionTotals } from "@/stores/demo-store";
 import { formatMoney } from "@/lib/format-money";
+import { GameBadge } from "@/components/cards/game-badge";
 
 /* ------------------------------------------------------------------ */
 /*  Fake price data                                                     */
@@ -243,12 +243,6 @@ const PRICE_DATA: PriceEntry[] = [
     owned: 1,
   },
 ];
-
-const TCG_COLORS: Record<string, string> = {
-  Pokemon: "#f59e0b",
-  Magic: "#8b5cf6",
-  "Yu-Gi-Oh!": "#ef4444",
-};
 
 /**
  * Sortable column header.
@@ -536,14 +530,7 @@ export default function PricesPage() {
                           className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1"
                           data-oid="price-mobile-meta"
                         >
-                          <Badge
-                            variant="outline"
-                            className="text-xs shrink-0"
-                            style={{ borderColor: TCG_COLORS[p.tcg] }}
-                            data-oid="price-mobile-tcg"
-                          >
-                            {p.tcg}
-                          </Badge>
+                          <GameBadge game={p.tcg} />
                           <span
                             className="min-w-0 text-xs text-muted-foreground"
                             data-oid="price-mobile-set"
@@ -684,14 +671,7 @@ export default function PricesPage() {
                         </span>
                       </td>
                       <td className="p-3" data-oid="tqe5.ty">
-                        <Badge
-                          variant="outline"
-                          className="text-xs"
-                          style={{ borderColor: TCG_COLORS[p.tcg] }}
-                          data-oid=":118di7"
-                        >
-                          {p.tcg}
-                        </Badge>
+                        <GameBadge game={p.tcg} />
                       </td>
                       <td
                         className="p-3 text-muted-foreground hidden md:table-cell"

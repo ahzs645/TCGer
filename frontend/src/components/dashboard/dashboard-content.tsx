@@ -8,6 +8,7 @@ import {
   Library,
   PackageOpen,
   Sparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAppRoute } from "@/lib/app-routes";
+import { usePackOpeningSpotlight } from "@/lib/packs/opening-history";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
@@ -132,6 +134,7 @@ function buildDashboardStats(
 
 export function DashboardContent() {
   const pathname = usePathname();
+  const packSpotlight = usePackOpeningSpotlight();
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const { enabledGames, showPricing } = useModuleStore(
     useShallow((state) => ({
@@ -354,7 +357,12 @@ export function DashboardContent() {
   return (
     <div className="space-y-6" data-oid="p0.l1lt">
       <DashboardHeading />
-      <PackOpeningSpotlight href={getAppRoute("/packs", pathname)} />
+      {packSpotlight.visible && (
+        <PackOpeningSpotlight
+          href={getAppRoute("/packs", pathname)}
+          onDismiss={packSpotlight.dismiss}
+        />
+      )}
       {noGamesEnabled && (
         <div
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
@@ -493,7 +501,20 @@ function DashboardHeading() {
   );
 }
 
-function PackOpeningSpotlight({ href }: { href: string }) {
+/**
+ * First-run pitch for the pack opener.
+ *
+ * It retires itself: `usePackOpeningSpotlight` hides it for good once a pack
+ * has been opened, and the dismiss control below covers visitors who are simply
+ * not interested. A permanent banner on the dashboard is an ad, not a hint.
+ */
+function PackOpeningSpotlight({
+  href,
+  onDismiss,
+}: {
+  href: string;
+  onDismiss: () => void;
+}) {
   return (
     <Card className="relative overflow-hidden border-primary/25 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
       <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
@@ -510,12 +531,23 @@ function PackOpeningSpotlight({ href }: { href: string }) {
             </p>
           </div>
         </div>
-        <Button asChild className="w-full shrink-0 sm:w-auto">
-          <Link href={href}>
-            Start opening
-            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-          </Link>
-        </Button>
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+          <Button asChild className="flex-1 sm:flex-none">
+            <Link href={href}>
+              Start opening
+              <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground"
+            onClick={onDismiss}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">Dismiss pack opening tip</span>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
