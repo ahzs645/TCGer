@@ -37,14 +37,25 @@ function actionLabel(status: CatalogInstallStatus): string {
 }
 
 export function CatalogManagementPanel() {
-  const { states, progress, errors, isLoading, install, update, remove, removeSealed } =
-    useCatalog();
+  const {
+    states,
+    progress,
+    errors,
+    isLoading,
+    install,
+    update,
+    remove,
+    removeSealed,
+  } = useCatalog();
   const [removing, setRemoving] = useState<CatalogTcgCode | null>(null);
   const includeSealedProducts = useSyncExternalStore(
     (onStoreChange) => {
       window.addEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
       return () =>
-        window.removeEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
+        window.removeEventListener(
+          SEALED_PRODUCTS_PREFERENCE_EVENT,
+          onStoreChange,
+        );
     },
     areSealedProductsEnabled,
     () => true,
@@ -122,7 +133,8 @@ export function CatalogManagementPanel() {
             state.sealedStatus !== "installed";
           const isRemoving = removing === tcg;
           const cardCount = entry?.cardCount ?? installed?.cardCount;
-          const bytes = entry?.compressedBytes ?? entry?.bytes ?? installed?.bytes;
+          const bytes =
+            entry?.compressedBytes ?? entry?.bytes ?? installed?.bytes;
 
           return (
             <div key={tcg} className="rounded-lg border bg-background p-3">
@@ -157,7 +169,8 @@ export function CatalogManagementPanel() {
                   </p>
                   {includeSealedProducts && sealedEntry && (
                     <p className="text-xs text-muted-foreground">
-                      {sealedEntry.productCount.toLocaleString()} sealed products
+                      {sealedEntry.productCount.toLocaleString()} sealed
+                      products
                       {` · ${formatBytes(sealedEntry.compressedBytes ?? sealedEntry.bytes)} download`}
                       {state.sealedStatus === "installed" ? " · installed" : ""}
                     </p>
@@ -206,7 +219,12 @@ export function CatalogManagementPanel() {
                       size="sm"
                       variant={isUpdate ? "default" : "outline"}
                       disabled={Boolean(download) || !entry || isRemoving}
-                      onClick={() => void handleInstall(tcg, isUpdate || state.sealedStatus === "update-available")}
+                      onClick={() =>
+                        void handleInstall(
+                          tcg,
+                          isUpdate || state.sealedStatus === "update-available",
+                        )
+                      }
                     >
                       {download ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

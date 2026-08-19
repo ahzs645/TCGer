@@ -24,6 +24,7 @@ struct PackOpeningInterfaceState: Codable, Equatable {
         let setID: String?
         let setLabel: String?
         let variationLabel: String?
+        let packPoolID: String?
         let oddsReference: OddsReference?
 
         var resolvedSetID: String { setID ?? id }
@@ -37,6 +38,12 @@ struct PackOpeningInterfaceState: Codable, Equatable {
         let options: [PackOption]
     }
 
+    struct CardPool: Codable, Equatable, Identifiable {
+        let id: String
+        let label: String
+        let cards: [PackOpeningPull]
+    }
+
     let phase: Phase
     let selectedPackID: String
     let selectedPackLabel: String
@@ -45,6 +52,7 @@ struct PackOpeningInterfaceState: Codable, Equatable {
     let packBackwards: Bool
     let currentCardFaceUp: Bool
     let packOptions: [PackOption]
+    let cardPools: [CardPool]?
     let revealedCount: Int
     let totalCards: Int
     let currentPackNumber: Int
@@ -62,6 +70,7 @@ struct PackOpeningInterfaceState: Codable, Equatable {
         packBackwards: false,
         currentCardFaceUp: true,
         packOptions: [],
+        cardPools: [],
         revealedCount: 0,
         totalCards: 0,
         currentPackNumber: 0,
@@ -95,6 +104,8 @@ struct PackOpeningInterfaceState: Codable, Equatable {
     var selectedPackOption: PackOption? {
         packOptions.first { $0.id == selectedPackID }
     }
+
+    var availableCardPools: [CardPool] { cardPools ?? [] }
 
     var selectedSetLabel: String {
         selectedPackOption?.resolvedSetLabel ?? selectedPackLabel
@@ -182,4 +193,3 @@ enum PackOpeningBridgeEvent: Equatable {
     case inspectRequested(PackOpeningPull)
     case error(String)
 }
-

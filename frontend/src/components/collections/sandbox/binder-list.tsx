@@ -191,7 +191,10 @@ export function BinderList({
                       binder.associatedSetName ||
                       binder.associatedSetCode) && (
                       <span className="block truncate text-xs text-muted-foreground">
-                        {[binder.containerType, binder.associatedSetName ?? binder.associatedSetCode]
+                        {[
+                          binder.containerType,
+                          binder.associatedSetName ?? binder.associatedSetCode,
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

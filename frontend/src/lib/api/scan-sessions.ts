@@ -33,7 +33,11 @@ export interface SharedScanItem {
   updatedAt: string;
 }
 
-async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  token: string,
+  init?: RequestInit,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -49,7 +53,10 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
   return response.json();
 }
 
-export function createSharedScanSession(token: string, defaultLanguage: string) {
+export function createSharedScanSession(
+  token: string,
+  defaultLanguage: string,
+) {
   return request<SharedScanSession>("/scan-sessions", token, {
     method: "POST",
     body: JSON.stringify({ defaultLanguage }),
@@ -57,12 +64,18 @@ export function createSharedScanSession(token: string, defaultLanguage: string) 
 }
 
 export function getSharedScanItems(token: string, sessionId: string) {
-  return request<SharedScanItem[]>(`/scan-sessions/${encodeURIComponent(sessionId)}/items`, token);
+  return request<SharedScanItem[]>(
+    `/scan-sessions/${encodeURIComponent(sessionId)}/items`,
+    token,
+  );
 }
 
 export function addSharedScanItem(
   token: string,
-  input: Omit<SharedScanItem, "id" | "createdAt" | "updatedAt" | "committedEntryId"> & { code: string },
+  input: Omit<
+    SharedScanItem,
+    "id" | "createdAt" | "updatedAt" | "committedEntryId"
+  > & { code: string },
 ) {
   return request<SharedScanItem>("/scan-sessions/items", token, {
     method: "POST",
@@ -73,17 +86,30 @@ export function addSharedScanItem(
 export function updateSharedScanItem(
   token: string,
   itemId: string,
-  patch: Pick<SharedScanItem, "language"> & Partial<Pick<SharedScanItem, "condition" | "finishCode" | "finishLabel">>,
+  patch: Pick<SharedScanItem, "language"> &
+    Partial<Pick<SharedScanItem, "condition" | "finishCode" | "finishLabel">>,
 ) {
-  return request<SharedScanItem>(`/scan-sessions/items/${encodeURIComponent(itemId)}`, token, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
+  return request<SharedScanItem>(
+    `/scan-sessions/items/${encodeURIComponent(itemId)}`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
 }
 
-export function commitSharedScanSession(token: string, sessionId: string, binderId: string) {
-  return request<{ committed: number }>(`/scan-sessions/${encodeURIComponent(sessionId)}/commit`, token, {
-    method: "POST",
-    body: JSON.stringify({ binderId }),
-  });
+export function commitSharedScanSession(
+  token: string,
+  sessionId: string,
+  binderId: string,
+) {
+  return request<{ committed: number }>(
+    `/scan-sessions/${encodeURIComponent(sessionId)}/commit`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ binderId }),
+    },
+  );
 }

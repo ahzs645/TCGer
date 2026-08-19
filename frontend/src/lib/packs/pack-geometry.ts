@@ -232,7 +232,8 @@ function crossSection(
       // way to where the fold really begins.
       const across = 1 - Math.abs(2 * t - 1);
       const s = 1 - across;
-      const depth = Math.sign(0.5 - t) * Math.pow(1 - Math.pow(1 - s, k), 1 / k);
+      const depth =
+        Math.sign(0.5 - t) * Math.pow(1 - Math.pow(1 - s, k), 1 / k);
       pts.push({
         x: dir * (panelHalf + a * (1 - s)),
         z: halfD * depth * dir,
@@ -336,8 +337,18 @@ function declaredLayout(
     back: [span(s.backFar, s.lapEnd), span(s.lap, s.backNear)],
     seams: [span(s.backNear, s.frontStart), span(s.frontEnd, s.backFar)],
     crimps: [
-      { x: s.lap * sheetW, y: y - s.capV * sheetH, w: (s.lapEnd - s.lap) * sheetW, h: s.capV * sheetH },
-      { x: s.lap * sheetW, y: y + h, w: (s.lapEnd - s.lap) * sheetW, h: s.capV * sheetH },
+      {
+        x: s.lap * sheetW,
+        y: y - s.capV * sheetH,
+        w: (s.lapEnd - s.lap) * sheetW,
+        h: s.capV * sheetH,
+      },
+      {
+        x: s.lap * sheetW,
+        y: y + h,
+        w: (s.lapEnd - s.lap) * sheetW,
+        h: s.capV * sheetH,
+      },
     ],
     displayFaceZ: -1,
     // The display face carries `panelWidth` of film across `front.w` of sheet and
@@ -474,7 +485,9 @@ export function buildPackGeometry(
     };
 
     // Every x either half turns over, so no quad straddles a vertex of either.
-    const xs = [...new Set(loop.map((p) => +p.x.toFixed(6)))].sort((a, b) => a - b);
+    const xs = [...new Set(loop.map((p) => +p.x.toFixed(6)))].sort(
+      (a, b) => a - b,
+    );
 
     for (let i = 0; i < xs.length - 1; i++) {
       const a0 = sample(halfA, xs[i]);
@@ -482,10 +495,17 @@ export function buildPackGeometry(
       const b0 = sample(halfB, xs[i]);
       const b1 = sample(halfB, xs[i + 1]);
       const quad: Array<[LoopPoint, number]> = [
-        [a0, vNear], [a1, vNear], [b1, vFar],
-        [a0, vNear], [b1, vFar], [b0, vFar],
+        [a0, vNear],
+        [a1, vNear],
+        [b1, vFar],
+        [a0, vNear],
+        [b1, vFar],
+        [b0, vFar],
       ];
-      const order = sign > 0 ? quad : [quad[0], quad[2], quad[1], quad[3], quad[5], quad[4]];
+      const order =
+        sign > 0
+          ? quad
+          : [quad[0], quad[2], quad[1], quad[3], quad[5], quad[4]];
       for (const [p, v] of order) {
         pos.push(p.x, y, p.z);
         uv.push(p.u, v);

@@ -116,7 +116,10 @@ function cropFooterRegion(
   const sw = Math.min(w - sx, Math.round(w * (region.right - region.left)));
   const sh = Math.min(h - sy, Math.round(h * (region.bottom - region.top)));
 
-  const out = createCanvas(Math.max(1, sw * UPSCALE), Math.max(1, sh * UPSCALE));
+  const out = createCanvas(
+    Math.max(1, sw * UPSCALE),
+    Math.max(1, sh * UPSCALE),
+  );
   const ctx = getContext2d(out);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
@@ -277,7 +280,12 @@ export function fuseOcrWithShortlist(
   tcg: TcgCode,
 ): OcrFusionResult {
   if (candidates.length === 0) {
-    return { candidates, matched: false, matchedExternalId: null, ocrNumber: null };
+    return {
+      candidates,
+      matched: false,
+      matchedExternalId: null,
+      ocrNumber: null,
+    };
   }
 
   // Only override the embedding on a clean "NNN/NNN" PAIR match. Bare single
@@ -319,14 +327,23 @@ export function fuseOcrWithShortlist(
   }
 
   if (!best) {
-    return { candidates, matched: false, matchedExternalId: null, ocrNumber: null };
+    return {
+      candidates,
+      matched: false,
+      matchedExternalId: null,
+      ocrNumber: null,
+    };
   }
 
   const chosen = best as { idx: number; number: string };
   const matchedCandidate = candidates[chosen.idx]!;
   // Promote the OCR-confirmed candidate to the top, marked confident.
   const reordered = [
-    { ...matchedCandidate, passedThreshold: true, proposalLabel: "embedding+ocr" },
+    {
+      ...matchedCandidate,
+      passedThreshold: true,
+      proposalLabel: "embedding+ocr",
+    },
     ...candidates.filter((_, i) => i !== chosen.idx),
   ];
 

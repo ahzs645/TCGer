@@ -57,6 +57,7 @@ import {
   type TcgCode,
 } from "@/lib/api/online-codes";
 import {
+  canonicalizeOnlineCode,
   getOnlineCodeGame,
   groupOnlineCodes,
   normalizeOnlineCode,
@@ -716,7 +717,7 @@ function CodeScannerDialog({
       const scanner = new QrScanner(
         videoRef.current,
         (result) => {
-          const value = result.data.trim();
+          const value = canonicalizeOnlineCode(result.data);
           if (!value) return;
           setCodes((current) =>
             current.some(

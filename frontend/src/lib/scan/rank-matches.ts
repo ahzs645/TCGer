@@ -137,9 +137,15 @@ function buildCandidate(
   };
 }
 
-function getStoredCardFeatureHashes(entry: CardScanHashEntry): CardFeatureHashes {
+function getStoredCardFeatureHashes(
+  entry: CardScanHashEntry,
+): CardFeatureHashes {
   return {
-    title: readFeatureHash(entry.titleRHash, entry.titleGHash, entry.titleBHash),
+    title: readFeatureHash(
+      entry.titleRHash,
+      entry.titleGHash,
+      entry.titleBHash,
+    ),
     footer: readFeatureHash(
       entry.footerRHash,
       entry.footerGHash,

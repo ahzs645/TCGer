@@ -80,6 +80,7 @@ struct PackOpeningView: View {
             case .packSelection:
                 PackSelectionSheet(
                     packSets: interfaceState.packSets,
+                    cardPools: interfaceState.availableCardPools,
                     selectedPackID: interfaceState.selectedPackID,
                     downloadManager: offlinePackDownloads
                 ) { optionID in

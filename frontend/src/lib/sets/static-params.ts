@@ -1,10 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import {
-  DEMO_CARDS,
-  splitDemoPrintingCode,
-} from "@/lib/data/demo-cards";
+import { DEMO_CARDS, splitDemoPrintingCode } from "@/lib/data/demo-cards";
 
 interface StaticSetParam {
   tcg: string;

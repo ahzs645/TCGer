@@ -233,7 +233,11 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
               </p>
               <p className="text-sm text-muted-foreground">{loadError}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void loadProfile()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadProfile()}
+            >
               Try again
             </Button>
           </div>

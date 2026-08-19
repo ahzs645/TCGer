@@ -39,7 +39,11 @@ export function CollectionExportMenu() {
       const date = new Date().toISOString().slice(0, 10);
       saveBlob(blob, `tcger-collection-${date}.${nextFormat}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to export collection.");
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to export collection.",
+      );
     } finally {
       setFormat(null);
     }
@@ -49,8 +53,16 @@ export function CollectionExportMenu() {
     <div className="space-y-1">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" disabled={!token || format !== null}>
-            {format ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!token || format !== null}
+          >
+            {format ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
             {format ? `Exporting ${format.toUpperCase()}…` : "Export"}
           </Button>
         </DropdownMenuTrigger>
@@ -65,7 +77,9 @@ export function CollectionExportMenu() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {error ? <p className="max-w-56 text-right text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="max-w-56 text-right text-xs text-destructive">{error}</p>
+      ) : null}
     </div>
   );
 }

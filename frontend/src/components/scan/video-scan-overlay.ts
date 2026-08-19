@@ -77,9 +77,7 @@ export function mapQuadToViewport(
 
 // ---------- palette ----------
 
-export function getOverlayPalette(
-  match: BrowserVideoScanCandidate | null,
-): {
+export function getOverlayPalette(match: BrowserVideoScanCandidate | null): {
   strokeColor: string;
   fillColor: string;
 } {

@@ -592,15 +592,13 @@ actor BinderPageScanner {
         return try detectRectangles(in: image)
     }
 
-    /// Only high-confidence matches are selected for the add batch initially.
-    /// Uncertain suggestions remain attached to their detections so review can
-    /// show the proposed identity and alternatives, but require an explicit
-    /// user selection before import. Unmatched regions remain visible and
-    /// excluded as well.
+    /// Every detection with a proposed match starts selected for the add batch.
+    /// Uncertain suggestions remain labeled for review, while unmatched regions
+    /// stay visible and excluded because there is no card identity to import.
     nonisolated static func shouldIncludeByDefault(
         status: BinderCardDetectionStatus
     ) -> Bool {
-        status == .matched
+        status != .unmatched
     }
 
     nonisolated static func binderPolicyReason(

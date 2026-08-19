@@ -26,6 +26,22 @@ pnpm-debug.log*
 # Coverage
 coverage/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
 # Generated test runner artifacts
 **/test-results/
 **/playwright-report/
@@ -50,6 +66,11 @@ tmp/
 
 # Local agent artifacts
 /.codex-prompts/
+
+# Local FiftyOne scanner-review runtime (database, generated dataset metadata,
+# and its repo-local Python environment). Source media stays in Reference.
+/tools/scanner-review/.fiftyone/
+/tools/scanner-review/.venv/
 
 # Generated frontend export
 /frontend/out/

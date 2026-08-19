@@ -184,7 +184,10 @@ function buildSegments(
 ): IdSegment[] {
   // With smoothing, allow a wider merge gap so segments bridge the dropped
   // one-frame blips instead of splitting (Slowking–Shinx–Slowking → Slowking).
-  const gap = Math.max(results.summary.sampleSeconds * (confirmation ? 3 : 2), 2.5);
+  const gap = Math.max(
+    results.summary.sampleSeconds * (confirmation ? 3 : 2),
+    2.5,
+  );
   const segments: IdSegment[] = [];
   for (const frame of results.frames) {
     const best = frame.bestMatch;
@@ -224,7 +227,10 @@ function windowNames(window: GroundTruthWindow): Set<string> {
   return names;
 }
 
-function windowMatched(window: GroundTruthWindow, results: ScanResults): boolean {
+function windowMatched(
+  window: GroundTruthWindow,
+  results: ScanResults,
+): boolean {
   const names = windowNames(window);
   return results.frames.some(
     (frame) =>
@@ -419,7 +425,8 @@ export function ScanReviewLab() {
         const rawName = normName(pm.bestMatch.name);
         const isConfirmed =
           !confirmation ||
-          confirmation.get(nearestFrame.timestampSeconds)?.has(rawName) === true;
+          confirmation.get(nearestFrame.timestampSeconds)?.has(rawName) ===
+            true;
         if (isConfirmed) {
           ctx.strokeStyle = `hsl(${hueFor(pm.bestMatch.externalId)} 90% 55%)`;
           ctx.setLineDash([]);
@@ -482,7 +489,12 @@ export function ScanReviewLab() {
     // Row 1 (y 6..30): identification segments, colored per card.
     for (const seg of segments) {
       ctx.fillStyle = `hsl(${hueFor(seg.externalId)} 85% 55%)`;
-      ctx.fillRect(x(seg.start), 6, Math.max(2, x(seg.end) - x(seg.start) + 2), 24);
+      ctx.fillRect(
+        x(seg.start),
+        6,
+        Math.max(2, x(seg.end) - x(seg.start) + 2),
+        24,
+      );
     }
 
     // Row 2 (y 40..64): ground-truth windows — green matched, red missed.
@@ -612,7 +624,9 @@ export function ScanReviewLab() {
                   onLoadedMetadata={(e) =>
                     setDuration(e.currentTarget.duration || 0)
                   }
-                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                  onTimeUpdate={(e) =>
+                    setCurrentTime(e.currentTarget.currentTime)
+                  }
                   onSeeked={(e) => setCurrentTime(e.currentTarget.currentTime)}
                 />
                 <canvas
@@ -655,7 +669,9 @@ export function ScanReviewLab() {
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               Nearest processed frame
               {nearestFrame ? (
-                <Badge variant="outline">{fmt(nearestFrame.timestampSeconds)}</Badge>
+                <Badge variant="outline">
+                  {fmt(nearestFrame.timestampSeconds)}
+                </Badge>
               ) : (
                 <Badge variant="outline">none</Badge>
               )}
@@ -681,7 +697,10 @@ export function ScanReviewLab() {
                         {gated && " · REJECTED by gate"}
                       </div>
                       {pm.candidates.slice(0, 3).map((c) => (
-                        <div key={c.externalId} className="flex justify-between">
+                        <div
+                          key={c.externalId}
+                          className="flex justify-between"
+                        >
                           <span>
                             {c.name}{" "}
                             <span className="text-muted-foreground">

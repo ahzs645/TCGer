@@ -83,7 +83,7 @@ export function registerOnlineCodesRoutes(http: HttpRouter) {
           );
         }
         return json(
-          await ctx.runQuery(internal.onlineCodes.list, {
+          await ctx.runMutation(internal.onlineCodes.list, {
             subject: identity.subject,
             tcg: tcgValue,
             status: statusValue,

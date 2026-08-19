@@ -48,12 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameBadge } from "@/components/cards/game-badge";
 import { SetSymbol } from "@/components/cards/set-symbol";
 import {
@@ -65,10 +60,7 @@ import {
 import { normalizeHexColor } from "@/lib/color";
 import { searchCardsApi } from "@/lib/api-client";
 import { getSets } from "@/lib/api/cards";
-import {
-  addCardsInChunks,
-  expandWishlistRule,
-} from "@/lib/wishlists/sync";
+import { addCardsInChunks, expandWishlistRule } from "@/lib/wishlists/sync";
 import { useAuthStore } from "@/stores/auth";
 import { useWishlistsStore } from "@/stores/wishlists";
 import { supportedGames } from "@/stores/game-filter";
@@ -747,7 +739,10 @@ export function WishlistContent() {
                   title="Re-run this wishlist's rules and add anything new"
                 >
                   <RefreshCw
-                    className={cn("h-4 w-4 sm:mr-1", isSyncing && "animate-spin")}
+                    className={cn(
+                      "h-4 w-4 sm:mr-1",
+                      isSyncing && "animate-spin",
+                    )}
                   />
                   <span className="hidden sm:inline">Sync</span>
                 </Button>
@@ -797,10 +792,7 @@ export function WishlistContent() {
             </div>
           )}
           <div className="border-b px-4 py-3 sm:px-6" data-oid="rf4iju2">
-            <div
-              className="flex flex-col gap-2 sm:flex-row"
-              data-oid="j3hjjed"
-            >
+            <div className="flex flex-col gap-2 sm:flex-row" data-oid="j3hjjed">
               <Input
                 aria-label="Search within wishlist"
                 value={collectionSearchTerm}
@@ -1079,7 +1071,9 @@ export function WishlistContent() {
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={keepUpdated}
-                  onCheckedChange={(checked) => setKeepUpdated(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setKeepUpdated(checked === true)
+                  }
                 />
                 Keep this wishlist updated as the set gets new cards
               </label>
@@ -1108,266 +1102,277 @@ export function WishlistContent() {
               value="search"
               className="flex flex-1 min-h-0 flex-col gap-3 data-[state=inactive]:hidden"
             >
-          <div
-            className="flex flex-col gap-3 flex-1 min-h-0"
-            data-oid="3bmqdmv"
-          >
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSearch();
-              }}
-              data-oid="3nbn3-7"
-            >
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by card name..."
-                className="flex-1"
-                data-oid="-253sm9"
-              />
-
-              <Select
-                value={searchTcg}
-                onValueChange={(v) => setSearchTcg(v as SupportedGame)}
-                data-oid="q4u...5"
-              >
-                <SelectTrigger
-                  className="w-[120px] sm:w-[140px]"
-                  data-oid="hs7519."
-                >
-                  <SelectValue data-oid="uj08yjx" />
-                </SelectTrigger>
-                <SelectContent data-oid="uxokjwj">
-                  <SelectItem value="all" data-oid="aqgu.0c">
-                    All Games
-                  </SelectItem>
-                  {supportedGames
-                    .filter((game) => game !== "all")
-                    .map((game) => (
-                      <SelectItem key={game} value={game}>
-                        {GAME_LABELS[game]}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Button type="submit" disabled={isSearching} data-oid="jw0dezj">
-                {isSearching ? (
-                  <Loader2
-                    className="h-4 w-4 animate-spin"
-                    data-oid="d1x56tx"
-                  />
-                ) : (
-                  <Search className="h-4 w-4" data-oid="9a.fnrg" />
-                )}
-              </Button>
-            </form>
-
-            {/* Grab everything matching the name, not just this preview page */}
-            {searchQuery.trim() && (
-              <div className="space-y-2 rounded-md border border-dashed p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span>
-                      Add <strong>every</strong> card matching &ldquo;
-                      {searchQuery.trim()}&rdquo;
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => void handleAddAllMatching()}
-                    disabled={isExpanding}
-                  >
-                    {isExpanding ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Plus className="mr-1 h-3 w-3" />
-                    )}
-                    Add all matches
-                  </Button>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Checkbox
-                      checked={includeAllPrintings}
-                      onCheckedChange={(checked) =>
-                        setIncludeAllPrintings(checked === true)
-                      }
-                    />
-                    Include every printing (uncheck for one entry per card)
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Checkbox
-                      checked={keepUpdated}
-                      onCheckedChange={(checked) =>
-                        setKeepUpdated(checked === true)
-                      }
-                    />
-                    Keep this wishlist updated with future printings
-                  </label>
-                </div>
-                {bulkStatus && addMode === "search" && (
-                  <p className="text-xs text-muted-foreground">{bulkStatus}</p>
-                )}
-              </div>
-            )}
-
-            {/* Select all bar */}
-            {searchResults.length > 0 && (
               <div
-                className="flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2"
-                data-oid="m4fhx2q"
+                className="flex flex-col gap-3 flex-1 min-h-0"
+                data-oid="3bmqdmv"
               >
-                <div className="flex items-center gap-2" data-oid="lk5-i8t">
-                  <Checkbox
-                    checked={allSelectableSelected}
-                    onCheckedChange={handleToggleAll}
-                    disabled={selectableCards.length === 0}
-                    aria-label="Select all"
-                    data-oid="q0.bdgk"
+                <form
+                  className="flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSearch();
+                  }}
+                  data-oid="3nbn3-7"
+                >
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by card name..."
+                    className="flex-1"
+                    data-oid="-253sm9"
                   />
 
-                  <span
-                    className="text-sm text-muted-foreground"
-                    data-oid="3qufqkg"
+                  <Select
+                    value={searchTcg}
+                    onValueChange={(v) => setSearchTcg(v as SupportedGame)}
+                    data-oid="q4u...5"
                   >
-                    {selectableCards.length === 0
-                      ? "All cards already added"
-                      : selectedCards.size > 0
-                        ? `${selectedCards.size} selected`
-                        : `Select all (${selectableCards.length} available)`}
-                  </span>
-                </div>
-                {selectedCards.size > 0 && (
+                    <SelectTrigger
+                      className="w-[120px] sm:w-[140px]"
+                      data-oid="hs7519."
+                    >
+                      <SelectValue data-oid="uj08yjx" />
+                    </SelectTrigger>
+                    <SelectContent data-oid="uxokjwj">
+                      <SelectItem value="all" data-oid="aqgu.0c">
+                        All Games
+                      </SelectItem>
+                      {supportedGames
+                        .filter((game) => game !== "all")
+                        .map((game) => (
+                          <SelectItem key={game} value={game}>
+                            {GAME_LABELS[game]}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                   <Button
-                    size="sm"
-                    onClick={handleBulkAdd}
-                    disabled={isBulkAdding}
-                    data-oid="s_v3lg3"
+                    type="submit"
+                    disabled={isSearching}
+                    data-oid="jw0dezj"
                   >
-                    {isBulkAdding ? (
+                    {isSearching ? (
                       <Loader2
-                        className="mr-1 h-3 w-3 animate-spin"
-                        data-oid="qudrgfk"
+                        className="h-4 w-4 animate-spin"
+                        data-oid="d1x56tx"
                       />
                     ) : (
-                      <Plus className="mr-1 h-3 w-3" data-oid="xt_9fsz" />
+                      <Search className="h-4 w-4" data-oid="9a.fnrg" />
                     )}
-                    Add {selectedCards.size} card
-                    {selectedCards.size !== 1 ? "s" : ""}
                   </Button>
-                )}
-              </div>
-            )}
+                </form>
 
-            <ScrollArea
-              className="flex-1 min-h-0"
-              style={{ maxHeight: "400px" }}
-              data-oid="xho-3f:"
-            >
-              <div className="space-y-2" data-oid=":dbwuvl">
-                {searchResults.length === 0 && !isSearching && (
-                  <p
-                    className="py-8 text-center text-sm text-muted-foreground"
-                    data-oid="04ff0y0"
-                  >
-                    Search for cards to add to your wishlist.
-                  </p>
-                )}
-                {searchResults.map((card) => {
-                  const alreadyAdded = isCardInWishlist(card.id);
-                  const isSelected = selectedCards.has(card.id);
-                  return (
-                    <div
-                      key={card.id}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg border p-3 transition-colors",
-                        isSelected &&
-                          !alreadyAdded &&
-                          "border-primary bg-primary/5",
-                      )}
-                      data-oid="f4b5-2a"
-                    >
-                      {!alreadyAdded && (
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => handleToggleCard(card.id)}
-                          aria-label={`Select ${card.name}`}
-                          data-oid="vac46wu"
-                        />
-                      )}
-                      <Image
-                        src={card.imageUrlSmall ?? getCardBackImage(card.tcg)}
-                        alt={card.name}
-                        width={40}
-                        height={56}
-                        className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = getCardBackImage(card.tcg);
-                        }}
-                        data-oid="4kvvuzd"
-                      />
-
-                      <div className="flex-1 min-w-0" data-oid="4q1-r28">
-                        <p
-                          className="text-sm font-medium truncate"
-                          data-oid="5or8ln5"
-                        >
-                          {card.name}
-                        </p>
-                        <div
-                          className="flex items-center gap-1 text-xs text-muted-foreground"
-                          data-oid="mnxj9jv"
-                        >
-                          <SetSymbol
-                            symbolUrl={card.setSymbolUrl}
-                            logoUrl={card.setLogoUrl}
-                            setCode={card.setCode}
-                            setName={card.setName}
-                            tcg={card.tcg}
-                            size="xs"
-                            data-oid="4v6eocx"
-                          />
-
-                          <span className="truncate" data-oid="68cioo9">
-                            {card.setName ?? card.setCode ?? "Unknown set"}
-                          </span>
-                        </div>
-                        <GameBadge game={card.tcg} className="mt-1" />
+                {/* Grab everything matching the name, not just this preview page */}
+                {searchQuery.trim() && (
+                  <div className="space-y-2 rounded-md border border-dashed p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <span>
+                          Add <strong>every</strong> card matching &ldquo;
+                          {searchQuery.trim()}&rdquo;
+                        </span>
                       </div>
                       <Button
                         size="sm"
-                        variant={alreadyAdded ? "secondary" : "default"}
-                        onClick={() => !alreadyAdded && handleAddCard(card)}
-                        disabled={alreadyAdded}
-                        className="flex-shrink-0"
-                        data-oid="r-bnl4b"
+                        onClick={() => void handleAddAllMatching()}
+                        disabled={isExpanding}
                       >
-                        {alreadyAdded ? (
-                          <>
-                            <Check
-                              className="mr-1 h-3 w-3"
-                              data-oid="iz_w3kc"
-                            />
-                            Added
-                          </>
+                        {isExpanding ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                         ) : (
-                          <>
-                            <Plus className="mr-1 h-3 w-3" data-oid=":ybk--k" />
-                            Add
-                          </>
+                          <Plus className="mr-1 h-3 w-3" />
                         )}
+                        Add all matches
                       </Button>
                     </div>
-                  );
-                })}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Checkbox
+                          checked={includeAllPrintings}
+                          onCheckedChange={(checked) =>
+                            setIncludeAllPrintings(checked === true)
+                          }
+                        />
+                        Include every printing (uncheck for one entry per card)
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Checkbox
+                          checked={keepUpdated}
+                          onCheckedChange={(checked) =>
+                            setKeepUpdated(checked === true)
+                          }
+                        />
+                        Keep this wishlist updated with future printings
+                      </label>
+                    </div>
+                    {bulkStatus && addMode === "search" && (
+                      <p className="text-xs text-muted-foreground">
+                        {bulkStatus}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Select all bar */}
+                {searchResults.length > 0 && (
+                  <div
+                    className="flex items-center justify-between rounded-md border bg-muted/50 px-3 py-2"
+                    data-oid="m4fhx2q"
+                  >
+                    <div className="flex items-center gap-2" data-oid="lk5-i8t">
+                      <Checkbox
+                        checked={allSelectableSelected}
+                        onCheckedChange={handleToggleAll}
+                        disabled={selectableCards.length === 0}
+                        aria-label="Select all"
+                        data-oid="q0.bdgk"
+                      />
+
+                      <span
+                        className="text-sm text-muted-foreground"
+                        data-oid="3qufqkg"
+                      >
+                        {selectableCards.length === 0
+                          ? "All cards already added"
+                          : selectedCards.size > 0
+                            ? `${selectedCards.size} selected`
+                            : `Select all (${selectableCards.length} available)`}
+                      </span>
+                    </div>
+                    {selectedCards.size > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleBulkAdd}
+                        disabled={isBulkAdding}
+                        data-oid="s_v3lg3"
+                      >
+                        {isBulkAdding ? (
+                          <Loader2
+                            className="mr-1 h-3 w-3 animate-spin"
+                            data-oid="qudrgfk"
+                          />
+                        ) : (
+                          <Plus className="mr-1 h-3 w-3" data-oid="xt_9fsz" />
+                        )}
+                        Add {selectedCards.size} card
+                        {selectedCards.size !== 1 ? "s" : ""}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <ScrollArea
+                  className="flex-1 min-h-0"
+                  style={{ maxHeight: "400px" }}
+                  data-oid="xho-3f:"
+                >
+                  <div className="space-y-2" data-oid=":dbwuvl">
+                    {searchResults.length === 0 && !isSearching && (
+                      <p
+                        className="py-8 text-center text-sm text-muted-foreground"
+                        data-oid="04ff0y0"
+                      >
+                        Search for cards to add to your wishlist.
+                      </p>
+                    )}
+                    {searchResults.map((card) => {
+                      const alreadyAdded = isCardInWishlist(card.id);
+                      const isSelected = selectedCards.has(card.id);
+                      return (
+                        <div
+                          key={card.id}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+                            isSelected &&
+                              !alreadyAdded &&
+                              "border-primary bg-primary/5",
+                          )}
+                          data-oid="f4b5-2a"
+                        >
+                          {!alreadyAdded && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleToggleCard(card.id)}
+                              aria-label={`Select ${card.name}`}
+                              data-oid="vac46wu"
+                            />
+                          )}
+                          <Image
+                            src={
+                              card.imageUrlSmall ?? getCardBackImage(card.tcg)
+                            }
+                            alt={card.name}
+                            width={40}
+                            height={56}
+                            className="h-14 w-10 flex-shrink-0 rounded-md object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = getCardBackImage(card.tcg);
+                            }}
+                            data-oid="4kvvuzd"
+                          />
+
+                          <div className="flex-1 min-w-0" data-oid="4q1-r28">
+                            <p
+                              className="text-sm font-medium truncate"
+                              data-oid="5or8ln5"
+                            >
+                              {card.name}
+                            </p>
+                            <div
+                              className="flex items-center gap-1 text-xs text-muted-foreground"
+                              data-oid="mnxj9jv"
+                            >
+                              <SetSymbol
+                                symbolUrl={card.setSymbolUrl}
+                                logoUrl={card.setLogoUrl}
+                                setCode={card.setCode}
+                                setName={card.setName}
+                                tcg={card.tcg}
+                                size="xs"
+                                data-oid="4v6eocx"
+                              />
+
+                              <span className="truncate" data-oid="68cioo9">
+                                {card.setName ?? card.setCode ?? "Unknown set"}
+                              </span>
+                            </div>
+                            <GameBadge game={card.tcg} className="mt-1" />
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={alreadyAdded ? "secondary" : "default"}
+                            onClick={() => !alreadyAdded && handleAddCard(card)}
+                            disabled={alreadyAdded}
+                            className="flex-shrink-0"
+                            data-oid="r-bnl4b"
+                          >
+                            {alreadyAdded ? (
+                              <>
+                                <Check
+                                  className="mr-1 h-3 w-3"
+                                  data-oid="iz_w3kc"
+                                />
+                                Added
+                              </>
+                            ) : (
+                              <>
+                                <Plus
+                                  className="mr-1 h-3 w-3"
+                                  data-oid=":ybk--k"
+                                />
+                                Add
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               </div>
-            </ScrollArea>
-          </div>
             </TabsContent>
           </Tabs>
           <DialogFooter data-oid="bs.6ddj">
@@ -1578,14 +1583,19 @@ function WishlistCardItem({
                 ? `Goal met · ${card.ownedQuantity} owned`
                 : `${card.ownedQuantity} of ${card.desiredQuantity} owned · ${card.missingQuantity} missing`}
             </span>
-            <div className="flex items-center gap-1" aria-label="Desired quantity">
+            <div
+              className="flex items-center gap-1"
+              aria-label="Desired quantity"
+            >
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 className="h-6 w-6"
                 disabled={isUpdatingQuantity || card.desiredQuantity <= 1}
-                onClick={() => void updateDesiredQuantity(card.desiredQuantity - 1)}
+                onClick={() =>
+                  void updateDesiredQuantity(card.desiredQuantity - 1)
+                }
                 aria-label={`Want one fewer ${card.name}`}
               >
                 <Minus className="h-3 w-3" />
@@ -1599,7 +1609,9 @@ function WishlistCardItem({
                 size="icon"
                 className="h-6 w-6"
                 disabled={isUpdatingQuantity || card.desiredQuantity >= 99}
-                onClick={() => void updateDesiredQuantity(card.desiredQuantity + 1)}
+                onClick={() =>
+                  void updateDesiredQuantity(card.desiredQuantity + 1)
+                }
                 aria-label={`Want one more ${card.name}`}
               >
                 {isUpdatingQuantity ? (

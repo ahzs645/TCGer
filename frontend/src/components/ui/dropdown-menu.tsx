@@ -6,7 +6,15 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+// Menus are transient popovers, so they should not remove the page scrollbar.
+// Callers can still opt into Radix's modal behavior when it is genuinely needed.
+const DropdownMenu = ({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) => (
+  <DropdownMenuPrimitive.Root modal={modal} {...props} />
+);
+DropdownMenu.displayName = "DropdownMenu";
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal;

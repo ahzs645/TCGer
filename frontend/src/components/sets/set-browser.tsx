@@ -89,17 +89,21 @@ export function SetBrowser() {
   const [mounted, setMounted] = useState(false);
   const { token, isAuthenticated } = useAuthStore();
   const enabledGames = useModuleStore((state) => state.enabledGames);
-  const { selectedGame: game, setGame } = useGameFilterStore(useShallow((state) => ({
-    selectedGame: state.selectedGame,
-    setGame: state.setGame,
-  })));
+  const { selectedGame: game, setGame } = useGameFilterStore(
+    useShallow((state) => ({
+      selectedGame: state.selectedGame,
+      setGame: state.setGame,
+    })),
+  );
   const { collections, fetchCollections, hasFetched, collectionsLoading } =
-    useCollectionsStore(useShallow((state) => ({
-      collections: state.collections,
-      fetchCollections: state.fetchCollections,
-      hasFetched: state.hasFetched,
-      collectionsLoading: state.isLoading,
-    })));
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        hasFetched: state.hasFetched,
+        collectionsLoading: state.isLoading,
+      })),
+    );
   const [query, setQuery] = useState("");
   const [progress, setProgress] = useState<ProgressFilter>("started");
   const [searchOverridesProgress, setSearchOverridesProgress] = useState(false);
@@ -231,7 +235,9 @@ export function SetBrowser() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle asChild><h2>Sign in required</h2></CardTitle>
+          <CardTitle asChild>
+            <h2>Sign in required</h2>
+          </CardTitle>
           <CardDescription>
             Sign in to browse set checklists and compare them with your
             collection.
@@ -313,15 +319,17 @@ export function SetBrowser() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All enabled games</SelectItem>
-              {supportedGames.filter((value) => value !== "all").map((value) => (
-                <SelectItem
-                  key={value}
-                  value={value}
-                  disabled={!enabledGames[value]}
-                >
-                  {GAME_LABELS[value]}
-                </SelectItem>
-              ))}
+              {supportedGames
+                .filter((value) => value !== "all")
+                .map((value) => (
+                  <SelectItem
+                    key={value}
+                    value={value}
+                    disabled={!enabledGames[value]}
+                  >
+                    {GAME_LABELS[value]}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={year} onValueChange={setYear}>
@@ -413,7 +421,11 @@ export function SetBrowser() {
                 ? setsQuery.error.message
                 : "Unable to load sets."}
             </p>
-            <Button variant="outline" size="sm" onClick={() => void setsQuery.refetch()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void setsQuery.refetch()}
+            >
               Try again
             </Button>
           </CardContent>
@@ -471,8 +483,7 @@ export function SetBrowser() {
                 pathname === "/demo" ||
                 pathname.startsWith("/demo/") ||
                 (mounted && isDemoMode());
-              const canOpenSet =
-                !isDemoExperience || isCatalogGame(set.tcg);
+              const canOpenSet = !isDemoExperience || isCatalogGame(set.tcg);
               const href = getAppRoute(
                 `/sets/${set.tcg}/${encodeURIComponent(set.code)}`,
                 pathname,
@@ -488,70 +499,65 @@ export function SetBrowser() {
                     complete && "border-emerald-500/50",
                   )}
                 >
-                    <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3 sm:pb-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted sm:h-12 sm:w-12">
-                        <SetSymbol
-                          symbolUrl={set.iconUrl}
-                          symbolFallbackUrl={set.iconFallbackUrl}
-                          logoUrl={set.logoUrl}
-                          setCode={set.code}
-                          setName={set.name}
-                          tcg={set.tcg}
-                          size="lg"
-                          className="max-h-10 max-w-10"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="line-clamp-2 text-base">
-                          {set.name}
-                        </CardTitle>
-                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                          <span className="font-medium">
-                            {set.code.toLocaleUpperCase()}
+                  <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3 sm:pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted sm:h-12 sm:w-12">
+                      <SetSymbol
+                        symbolUrl={set.iconUrl}
+                        symbolFallbackUrl={set.iconFallbackUrl}
+                        logoUrl={set.logoUrl}
+                        setCode={set.code}
+                        setName={set.name}
+                        tcg={set.tcg}
+                        size="lg"
+                        className="max-h-10 max-w-10"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="line-clamp-2 text-base">
+                        {set.name}
+                      </CardTitle>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                        <span className="font-medium">
+                          {set.code.toLocaleUpperCase()}
+                        </span>
+                        {released && (
+                          <span className="flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" />
+                            {released}
                           </span>
-                          {released && (
-                            <span className="flex items-center gap-1">
-                              <CalendarDays className="h-3 w-3" />
-                              {released}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      {complete && (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-                      )}
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className={cn(owned > 0 && "font-medium")}>
-                          {owned} unique {owned === 1 ? "print" : "prints"}{" "}
-                          owned
-                        </span>
-                        <span className="text-muted-foreground">
-                          {total > 0
-                            ? `${owned}/${total}`
-                            : "Total unavailable"}
-                        </span>
-                      </div>
+                        )}
+                      </p>
+                    </div>
+                    {complete && (
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className={cn(owned > 0 && "font-medium")}>
+                        {owned} unique {owned === 1 ? "print" : "prints"} owned
+                      </span>
+                      <span className="text-muted-foreground">
+                        {total > 0 ? `${owned}/${total}` : "Total unavailable"}
+                      </span>
+                    </div>
+                    <div
+                      className="h-2 overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-label={`${set.name} completion`}
+                      aria-valuemin={0}
+                      aria-valuemax={total || undefined}
+                      aria-valuenow={total ? Math.min(owned, total) : undefined}
+                    >
                       <div
-                        className="h-2 overflow-hidden rounded-full bg-muted"
-                        role="progressbar"
-                        aria-label={`${set.name} completion`}
-                        aria-valuemin={0}
-                        aria-valuemax={total || undefined}
-                        aria-valuenow={
-                          total ? Math.min(owned, total) : undefined
-                        }
-                      >
-                        <div
-                          className={cn(
-                            "h-full rounded-full bg-primary transition-all",
-                            complete && "bg-emerald-500",
-                          )}
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </CardContent>
+                        className={cn(
+                          "h-full rounded-full bg-primary transition-all",
+                          complete && "bg-emerald-500",
+                        )}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </CardContent>
                 </Card>
               );
 

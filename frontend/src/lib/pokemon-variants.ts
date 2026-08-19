@@ -72,9 +72,15 @@ const KNOWN_FINISH_LABELS: Record<string, string> = {
 };
 
 const normalizeFinishKey = (value: string) =>
-  value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 
-export function formatFinishLabel(code: string, suppliedLabel?: string): string {
+export function formatFinishLabel(
+  code: string,
+  suppliedLabel?: string,
+): string {
   if (suppliedLabel?.trim()) {
     return suppliedLabel.trim();
   }
@@ -160,7 +166,10 @@ export function getCopyVariantBadges(copy: {
   const badges: string[] = [];
   if (copy.finishCode || copy.finishLabel) {
     badges.push(
-      formatFinishLabel(copy.finishCode ?? copy.finishLabel ?? "", copy.finishLabel),
+      formatFinishLabel(
+        copy.finishCode ?? copy.finishLabel ?? "",
+        copy.finishLabel,
+      ),
     );
   } else if (copy.isFoil) {
     badges.push("Foil");

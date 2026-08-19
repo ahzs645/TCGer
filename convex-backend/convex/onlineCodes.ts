@@ -1,13 +1,8 @@
 import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
-import {
-  internalMutation,
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
-import { tcgCodeValidator, type TcgCode } from "./lib/validators";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+import { tcgCodeValidator } from "./lib/validators";
 
 export const onlineCodeStatusValidator = v.union(
   v.literal("unused"),
@@ -42,7 +37,7 @@ const bulkResultValidator = v.object({
   items: v.array(onlineCodeResponseValidator),
 });
 
-type ReaderCtx = QueryCtx | MutationCtx;
+type ReaderCtx = MutationCtx;
 type OnlineCodeStatus = "unused" | "redeemed" | "invalid" | "traded";
 
 async function requireViewerBySubject(ctx: ReaderCtx, subject: string) {
@@ -59,12 +54,55 @@ async function requireViewerBySubject(ctx: ReaderCtx, subject: string) {
   return viewer;
 }
 
+const redemptionCodeParameters = new Set([
+  "2d_code",
+  "code",
+  "redeem_code",
+  "redemption_code",
+]);
+
+function normalizeDashes(value: string): string {
+  return value.replace(/[‐‑‒–—―]/gu, "-");
+}
+
+function canonicalizeCode(value: string): string {
+  const cleaned = normalizeDashes(value.trim());
+  if (!cleaned) return "";
+
+  try {
+    const url = new URL(cleaned);
+    for (const [name, candidate] of url.searchParams) {
+      if (redemptionCodeParameters.has(name.toLocaleLowerCase("en-US"))) {
+        const code = normalizeDashes(candidate.trim());
+        if (code) return code;
+      }
+    }
+  } catch {
+    // A printed redemption code is expected to be a non-URL value.
+  }
+
+  const queryMatch = cleaned.match(
+    /[?&](?:2d_code|code|redeem_code|redemption_code)=([^&#]+)/iu,
+  );
+  if (queryMatch?.[1]) {
+    try {
+      return normalizeDashes(decodeURIComponent(queryMatch[1])).trim();
+    } catch {
+      return normalizeDashes(queryMatch[1]).trim();
+    }
+  }
+
+  return cleaned;
+}
+
 function normalizeCode(value: string): string {
-  return value.trim().replace(/\s+/gu, "").toLocaleUpperCase("en-US");
+  return canonicalizeCode(value)
+    .replace(/\s+/gu, "")
+    .toLocaleUpperCase("en-US");
 }
 
 function cleanCode(value: string): string {
-  const code = value.trim();
+  const code = canonicalizeCode(value);
   const normalized = normalizeCode(code);
   if (normalized.length < 4 || code.length > 512) {
     throw new ConvexError({
@@ -125,7 +163,84 @@ async function requireOwnedCode(
   return code;
 }
 
-export const list = internalQuery({
+function statusPriority(status: OnlineCodeStatus): number {
+  switch (status) {
+    case "redeemed":
+      return 4;
+    case "traded":
+      return 3;
+    case "invalid":
+      return 2;
+    case "unused":
+      return 1;
+  }
+}
+
+async function repairDuplicateCodes(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<Doc<"onlineCodes">[]> {
+  const rows = await ctx.db
+    .query("onlineCodes")
+    .withIndex("by_user", (query) => query.eq("userId", userId))
+    .order("desc")
+    .take(1_000);
+  const groups = new Map<string, Doc<"onlineCodes">[]>();
+
+  for (const row of rows) {
+    const key = `${row.tcg}:${normalizeCode(row.code)}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+
+  const repaired: Doc<"onlineCodes">[] = [];
+  for (const group of groups.values()) {
+    const sorted = [...group].sort((left, right) => {
+      const statusDifference =
+        statusPriority(right.status) - statusPriority(left.status);
+      return statusDifference || right.updatedAt - left.updatedAt;
+    });
+    const keeper = sorted[0]!;
+    const code = canonicalizeCode(keeper.code);
+    const normalizedCode = normalizeCode(code);
+    const status = keeper.status;
+    const productName = sorted.find((row) => row.productName)?.productName;
+    const notes = sorted.find((row) => row.notes)?.notes;
+    const redeemedAt =
+      status === "redeemed"
+        ? sorted.find((row) => row.redeemedAt !== undefined)?.redeemedAt
+        : undefined;
+    const capturedAt = Math.min(...sorted.map((row) => row.capturedAt));
+    const createdAt = Math.min(...sorted.map((row) => row.createdAt));
+    const updatedAt = Math.max(...sorted.map((row) => row.updatedAt));
+
+    if (
+      group.length > 1 ||
+      keeper.code !== code ||
+      keeper.normalizedCode !== normalizedCode
+    ) {
+      await ctx.db.patch(keeper._id, {
+        code,
+        normalizedCode,
+        status,
+        productName,
+        notes,
+        capturedAt,
+        redeemedAt,
+        createdAt,
+        updatedAt,
+      });
+    }
+    for (const duplicate of sorted.slice(1)) {
+      await ctx.db.delete(duplicate._id);
+    }
+    const persisted = await ctx.db.get(keeper._id);
+    if (persisted) repaired.push(persisted);
+  }
+
+  return repaired;
+}
+
+export const list = internalMutation({
   args: {
     subject: v.string(),
     tcg: v.optional(tcgCodeValidator),
@@ -134,46 +249,13 @@ export const list = internalQuery({
   returns: v.array(onlineCodeResponseValidator),
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    let rows: Doc<"onlineCodes">[];
-
-    if (args.tcg && args.status) {
-      rows = await ctx.db
-        .query("onlineCodes")
-        .withIndex("by_user_tcg_and_status", (query) =>
-          query
-            .eq("userId", viewer._id)
-            .eq("tcg", args.tcg as TcgCode)
-            .eq("status", args.status as OnlineCodeStatus),
-        )
-        .order("desc")
-        .take(500);
-    } else if (args.tcg) {
-      rows = await ctx.db
-        .query("onlineCodes")
-        .withIndex("by_user_and_tcg", (query) =>
-          query.eq("userId", viewer._id).eq("tcg", args.tcg as TcgCode),
-        )
-        .order("desc")
-        .take(500);
-    } else if (args.status) {
-      rows = await ctx.db
-        .query("onlineCodes")
-        .withIndex("by_user_and_status", (query) =>
-          query
-            .eq("userId", viewer._id)
-            .eq("status", args.status as OnlineCodeStatus),
-        )
-        .order("desc")
-        .take(500);
-    } else {
-      rows = await ctx.db
-        .query("onlineCodes")
-        .withIndex("by_user", (query) => query.eq("userId", viewer._id))
-        .order("desc")
-        .take(500);
-    }
-
-    return rows.map(toResponse);
+    const rows = await repairDuplicateCodes(ctx, viewer._id);
+    return rows
+      .filter((row) => args.tcg === undefined || row.tcg === args.tcg)
+      .filter((row) => args.status === undefined || row.status === args.status)
+      .sort((left, right) => right.capturedAt - left.capturedAt)
+      .slice(0, 500)
+      .map(toResponse);
   },
 });
 
@@ -201,11 +283,17 @@ export const createBatch = internalMutation({
     }
 
     const viewer = await requireViewerBySubject(ctx, args.subject);
+    const existingCodes = await repairDuplicateCodes(ctx, viewer._id);
     const productName = cleanOptionalText(args.productName, "productName", 120);
     const notes = cleanOptionalText(args.notes, "notes", 2_000);
     const now = Date.now();
     const items: ReturnType<typeof toResponse>[] = [];
     const seenInBatch = new Set<string>();
+    const existingKeys = new Set(
+      existingCodes
+        .filter((item) => item.tcg === args.tcg)
+        .map((item) => item.normalizedCode),
+    );
     let duplicates = 0;
 
     for (const input of args.codes) {
@@ -217,19 +305,11 @@ export const createBatch = internalMutation({
       }
       seenInBatch.add(normalizedCode);
 
-      const existing = await ctx.db
-        .query("onlineCodes")
-        .withIndex("by_user_tcg_and_normalized_code", (query) =>
-          query
-            .eq("userId", viewer._id)
-            .eq("tcg", args.tcg)
-            .eq("normalizedCode", normalizedCode),
-        )
-        .unique();
-      if (existing) {
+      if (existingKeys.has(normalizedCode)) {
         duplicates += 1;
         continue;
       }
+      existingKeys.add(normalizedCode);
 
       const capturedAt = input.capturedAt ?? now;
       if (

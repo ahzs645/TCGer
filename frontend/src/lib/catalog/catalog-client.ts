@@ -587,7 +587,9 @@ export async function downloadSealedCatalog(
   onProgress?: CatalogProgressCallback,
 ): Promise<void> {
   if (typeof caches === "undefined" || typeof localStorage === "undefined") {
-    throw new Error("Offline sealed-product catalogs are unavailable in this browser.");
+    throw new Error(
+      "Offline sealed-product catalogs are unavailable in this browser.",
+    );
   }
   const manifest = await fetchCatalogManifest();
   const entry = manifest.games[tcg]?.sealedProducts;
@@ -600,10 +602,16 @@ export async function downloadSealedCatalog(
       `Unable to download the ${tcg} sealed-product catalog (${response.status}).`,
     );
   }
-  const text = await readResponseWithProgress(response, entry.bytes, onProgress);
+  const text = await readResponseWithProgress(
+    response,
+    entry.bytes,
+    onProgress,
+  );
   const digest = await sha256Hex(text);
   if (digest && digest !== entry.sha256) {
-    throw new Error(`The ${tcg} sealed-product catalog failed its integrity check.`);
+    throw new Error(
+      `The ${tcg} sealed-product catalog failed its integrity check.`,
+    );
   }
   const pack = parseSealedCatalogPack(JSON.parse(text) as unknown, tcg);
   if (pack.version !== entry.version) {
@@ -631,9 +639,7 @@ export async function downloadSealedCatalog(
   localStorage.setItem(sealedInstallKey(tcg), JSON.stringify(installed));
 }
 
-export async function removeSealedCatalog(
-  tcg: CatalogTcgCode,
-): Promise<void> {
+export async function removeSealedCatalog(tcg: CatalogTcgCode): Promise<void> {
   const installed = installedSealedCatalog(tcg);
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(sealedInstallKey(tcg));

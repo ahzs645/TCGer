@@ -351,23 +351,25 @@ struct SettingsView: View {
                         Task { await updatePreferences(showPricing: environmentStore.showPricing) }
                     }
 
-                    Picker("Default Game", selection: Binding(
-                        get: { environmentStore.defaultGame ?? "" },
-                        set: { value in
-                            environmentStore.defaultGame = value.isEmpty ? nil : value
-                            Task {
-                                await updatePreferences(
-                                    defaultGame: .some(value.isEmpty ? nil : value)
-                                )
+                    if environmentStore.shouldShowGamePicker {
+                        Picker("Default Game", selection: Binding(
+                            get: { environmentStore.defaultGame ?? "" },
+                            set: { value in
+                                environmentStore.defaultGame = value.isEmpty ? nil : value
+                                Task {
+                                    await updatePreferences(
+                                        defaultGame: .some(value.isEmpty ? nil : value)
+                                    )
+                                }
+                            }
+                        )) {
+                            Text("None").tag("")
+                            ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
+                                Text(game.displayName).tag(game.rawValue)
                             }
                         }
-                    )) {
-                        Text("None").tag("")
-                        ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
-                            Text(game.displayName).tag(game.rawValue)
-                        }
+                        .disabled(!canEditPreferences)
                     }
-                    .disabled(!canEditPreferences)
                 } header: {
                     Text("Card Display")
                 }

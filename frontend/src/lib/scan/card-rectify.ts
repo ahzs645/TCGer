@@ -49,22 +49,36 @@ function toGray(image: RgbaImage): Float32Array {
   const gray = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
     gray[i] =
-      0.299 * data[i * 4]! + 0.587 * data[i * 4 + 1]! + 0.114 * data[i * 4 + 2]!;
+      0.299 * data[i * 4]! +
+      0.587 * data[i * 4 + 1]! +
+      0.114 * data[i * 4 + 2]!;
   }
   return gray;
 }
 
-function sobelMagnitude(gray: Float32Array, width: number, height: number): Float32Array {
+function sobelMagnitude(
+  gray: Float32Array,
+  width: number,
+  height: number,
+): Float32Array {
   const mag = new Float32Array(width * height);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
       const gx =
-        -gray[i - width - 1]! - 2 * gray[i - 1]! - gray[i + width - 1]! +
-        gray[i - width + 1]! + 2 * gray[i + 1]! + gray[i + width + 1]!;
+        -gray[i - width - 1]! -
+        2 * gray[i - 1]! -
+        gray[i + width - 1]! +
+        gray[i - width + 1]! +
+        2 * gray[i + 1]! +
+        gray[i + width + 1]!;
       const gy =
-        -gray[i - width - 1]! - 2 * gray[i - width]! - gray[i - width + 1]! +
-        gray[i + width - 1]! + 2 * gray[i + width]! + gray[i + width + 1]!;
+        -gray[i - width - 1]! -
+        2 * gray[i - width]! -
+        gray[i - width + 1]! +
+        gray[i + width - 1]! +
+        2 * gray[i + width]! +
+        gray[i + width + 1]!;
       mag[i] = Math.hypot(gx, gy);
     }
   }
@@ -73,7 +87,7 @@ function sobelMagnitude(gray: Float32Array, width: number, height: number): Floa
 
 // ---------- border-point collection ----------
 
-type Side = 'left' | 'right' | 'top' | 'bottom';
+type Side = "left" | "right" | "top" | "bottom";
 
 function collectEdgePoints(
   mag: Float32Array,
@@ -82,7 +96,7 @@ function collectEdgePoints(
   side: Side,
 ): Point[] {
   const points: Point[] = [];
-  const horizontal = side === 'left' || side === 'right';
+  const horizontal = side === "left" || side === "right";
   const lanes = horizontal ? height : width;
   const depth = horizontal ? width : height;
   const maxDepth = Math.floor(depth * 0.5);
@@ -115,13 +129,13 @@ function coord(
   height: number,
 ): [number, number] {
   switch (side) {
-    case 'left':
+    case "left":
       return [depth, lane];
-    case 'right':
+    case "right":
       return [width - 1 - depth, lane];
-    case 'top':
+    case "top":
       return [lane, depth];
-    case 'bottom':
+    case "bottom":
       return [lane, height - 1 - depth];
   }
 }
@@ -153,7 +167,9 @@ function fitLine(points: Point[], vertical: boolean): Line | null {
   // on the same RANSAC path. Math.random() made geometry-policy comparisons
   // noisy even when every frame and model artifact was unchanged.
   let randomState =
-    (Math.imul(points.length, 0x9e3779b1) ^ (vertical ? 0x51ed270b : 0x68bc21eb)) >>> 0;
+    (Math.imul(points.length, 0x9e3779b1) ^
+      (vertical ? 0x51ed270b : 0x68bc21eb)) >>>
+    0;
   const nextPointIndex = (): number => {
     randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
     return randomState % points.length;
@@ -249,10 +265,10 @@ export function detectCardQuad(
   const mag = sobelMagnitude(gray, width, height);
 
   const sides: Array<[Side, boolean]> = [
-    ['left', true],
-    ['right', true],
-    ['top', false],
-    ['bottom', false],
+    ["left", true],
+    ["right", true],
+    ["top", false],
+    ["bottom", false],
   ];
   const lines: Record<string, Line | null> = {};
   let fallbacks = 0;
@@ -262,12 +278,22 @@ export function detectCardQuad(
     if (!line && fallbackRect) {
       fallbacks += 1;
       line = vertical
-        ? { a: 1, b: 0, c: side === 'left' ? fallbackRect.left : fallbackRect.right }
-        : { a: 0, b: 1, c: side === 'top' ? fallbackRect.top : fallbackRect.bottom };
+        ? {
+            a: 1,
+            b: 0,
+            c: side === "left" ? fallbackRect.left : fallbackRect.right,
+          }
+        : {
+            a: 0,
+            b: 1,
+            c: side === "top" ? fallbackRect.top : fallbackRect.bottom,
+          };
     }
     lines[side] = line;
     if (debug) {
-      console.log(`  [rectify] ${side}: points=${pts.length} fit=${line ? 'ok' : 'FAIL'}`);
+      console.log(
+        `  [rectify] ${side}: points=${pts.length} fit=${line ? "ok" : "FAIL"}`,
+      );
     }
   }
   if (fallbacks > 1) return null;
@@ -325,7 +351,11 @@ function isConvex(quad: Point[]): boolean {
 // ---------- homography + warp ----------
 
 /** Solve the 8-DOF homography mapping the unit target rect to the quad (DLT). */
-function homographyToQuad(quad: Point[], targetW: number, targetH: number): number[] | null {
+function homographyToQuad(
+  quad: Point[],
+  targetW: number,
+  targetH: number,
+): number[] | null {
   const src: Point[] = [
     { x: 0, y: 0 },
     { x: targetW, y: 0 },
@@ -369,7 +399,10 @@ function solve8(A: number[][], b: number[]): number[] | null {
  * Warp the quad region of `image` into a flat card rectangle
  * (TARGET_WIDTH x card aspect) with bilinear sampling.
  */
-export function warpQuadToCard(image: RgbaImage, quad: Point[]): RgbaImage | null {
+export function warpQuadToCard(
+  image: RgbaImage,
+  quad: Point[],
+): RgbaImage | null {
   const targetW = TARGET_WIDTH;
   const targetH = Math.round(TARGET_WIDTH * CARD_ASPECT);
   const h = homographyToQuad(quad, targetW, targetH);
@@ -412,7 +445,7 @@ export function warpQuadToCard(image: RgbaImage, quad: Point[]): RgbaImage | nul
 
 export interface RectifyResult {
   image: RgbaImage;
-  method: 'quad' | 'none';
+  method: "quad" | "none";
 }
 
 /**
@@ -420,10 +453,13 @@ export interface RectifyResult {
  * Returns the original image with method 'none' when detection fails — the
  * caller's behavior is then identical to the pre-rectification pipeline.
  */
-export function rectifyCardCrop(image: RgbaImage, fallbackRect?: FallbackRect): RectifyResult {
+export function rectifyCardCrop(
+  image: RgbaImage,
+  fallbackRect?: FallbackRect,
+): RectifyResult {
   const quad = detectCardQuad(image, fallbackRect);
-  if (!quad) return { image, method: 'none' };
+  if (!quad) return { image, method: "none" };
   const warped = warpQuadToCard(image, quad);
-  if (!warped) return { image, method: 'none' };
-  return { image: warped, method: 'quad' };
+  if (!warped) return { image, method: "none" };
+  return { image: warped, method: "quad" };
 }

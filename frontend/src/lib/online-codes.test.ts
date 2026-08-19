@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  canonicalizeOnlineCode,
   getOnlineCodeGame,
   groupOnlineCodes,
   normalizeOnlineCode,
@@ -14,6 +15,14 @@ test("online code input trims, deduplicates, and preserves display formatting", 
     ["abcd-1234", "WXYZ-9876"],
   );
   assert.equal(normalizeOnlineCode(" ab cd-1234 "), "ABCD-1234");
+});
+
+test("extracts a redemption code from its QR URL and deduplicates printed text", () => {
+  const code = "ZNM1-B6Z2-4PL3-YYM";
+  const url = `https://pokemon.com/redeem?2d_code=${code}`;
+  assert.equal(canonicalizeOnlineCode(url), code);
+  assert.deepEqual(parseOnlineCodeInput(`${url}\n${code}`), [code]);
+  assert.equal(normalizeOnlineCode(url), normalizeOnlineCode(code));
 });
 
 test("accepts and identifies printed MTG Arena redemption codes", () => {

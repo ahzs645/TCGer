@@ -39,9 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  deriveCatalogImageUrls,
-} from "@/lib/catalog/catalog-search";
+import { deriveCatalogImageUrls } from "@/lib/catalog/catalog-search";
 import {
   getCatalogCards,
   getInstalledCatalog,
@@ -70,7 +68,10 @@ const SPECIES_PAGE_SIZE = 120;
 
 function normalizeCatalogCard(
   card: CatalogCard,
-  sets: Map<string, NonNullable<Awaited<ReturnType<typeof getInstalledCatalog>>>["sets"][number]>,
+  sets: Map<
+    string,
+    NonNullable<Awaited<ReturnType<typeof getInstalledCatalog>>>["sets"][number]
+  >,
 ): PokedexCardInput {
   const set = card.setCode ? sets.get(card.setCode) : undefined;
   const images = deriveCatalogImageUrls("pokemon", card, set);
@@ -91,7 +92,10 @@ function demoCatalogCards(): PokedexCardInput[] {
       ...card,
       setCode: printing.setCode,
       collectorNumber: printing.collectorNumber,
-      type: card.name === "Iono" || card.name.includes("Orders") ? "Trainer" : "Pokemon",
+      type:
+        card.name === "Iono" || card.name.includes("Orders")
+          ? "Trainer"
+          : "Pokemon",
     };
   });
 }
@@ -140,10 +144,10 @@ export function PokedexContent() {
   const [catalogReadError, setCatalogReadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [generation, setGeneration] = useState<number | "all">("all");
-  const [ownership, setOwnership] =
-    useState<PokedexOwnershipFilter>("all");
-  const [selectedSpecies, setSelectedSpecies] =
-    useState<PokedexSpecies | null>(null);
+  const [ownership, setOwnership] = useState<PokedexOwnershipFilter>("all");
+  const [selectedSpecies, setSelectedSpecies] = useState<PokedexSpecies | null>(
+    null,
+  );
   const [speciesLimit, setSpeciesLimit] = useState(INITIAL_SPECIES_LIMIT);
 
   useEffect(() => {
@@ -154,16 +158,13 @@ export function PokedexContent() {
     if (!demoMode && token && isAuthenticated && !hasFetched) {
       void fetchCollections(token);
     }
-  }, [
-    demoMode,
-    fetchCollections,
-    hasFetched,
-    isAuthenticated,
-    token,
-  ]);
+  }, [demoMode, fetchCollections, hasFetched, isAuthenticated, token]);
 
   const readCatalog = useCallback(async () => {
-    if (pokemonCatalog.status !== "installed" && pokemonCatalog.status !== "update-available") {
+    if (
+      pokemonCatalog.status !== "installed" &&
+      pokemonCatalog.status !== "update-available"
+    ) {
       setCatalogCards(demoMode ? demoCatalogCards() : []);
       setCatalogReadError(null);
       return;
@@ -283,7 +284,10 @@ export function PokedexContent() {
             disabled={Boolean(installProgress)}
           >
             {installProgress ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              <Loader2
+                className="mr-2 h-4 w-4 animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             )}
@@ -332,12 +336,18 @@ export function PokedexContent() {
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span>
-                <strong className="tabular-nums">{currentProgress.owned}</strong>{" "}
-                owned in {generation === "all" ? "all generations" : `Generation ${generation}`}
+                <strong className="tabular-nums">
+                  {currentProgress.owned}
+                </strong>{" "}
+                owned in{" "}
+                {generation === "all"
+                  ? "all generations"
+                  : `Generation ${generation}`}
               </span>
               <span className="text-muted-foreground">
                 {collectionCards.reduce(
-                  (total, card) => total + (card.quantity ?? card.copies?.length ?? 1),
+                  (total, card) =>
+                    total + (card.quantity ?? card.copies?.length ?? 1),
                   0,
                 )}{" "}
                 Pokémon cards tracked
@@ -356,7 +366,11 @@ export function PokedexContent() {
             {catalogReadError ?? collectionError ?? installError} Your saved
             collection has not been changed.
           </span>
-          <Button variant="outline" size="sm" onClick={() => void readCatalog()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void readCatalog()}
+          >
             Try again
           </Button>
         </div>
@@ -406,7 +420,10 @@ export function PokedexContent() {
               </div>
             </div>
             <div className="space-y-2">
-              <label id="pokedex-generation-label" className="text-sm font-medium">
+              <label
+                id="pokedex-generation-label"
+                className="text-sm font-medium"
+              >
                 Generation
               </label>
               <Select
@@ -430,7 +447,10 @@ export function PokedexContent() {
               </Select>
             </div>
             <div className="space-y-2">
-              <span id="pokedex-status-label" className="block text-sm font-medium">
+              <span
+                id="pokedex-status-label"
+                className="block text-sm font-medium"
+              >
                 Status
               </span>
               <ToggleGroup
@@ -492,7 +512,10 @@ export function PokedexContent() {
       ) : (
         <Card>
           <CardContent className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
-            <Grid2X2 className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            <Grid2X2
+              className="h-8 w-8 text-muted-foreground"
+              aria-hidden="true"
+            />
             <div>
               <p className="font-medium">No species match these filters</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -580,7 +603,9 @@ function SpeciesTile({
           variant={species.owned ? "default" : "secondary"}
           className="absolute right-2 top-2 gap-1 shadow-sm"
         >
-          {species.owned ? <Check className="h-3 w-3" aria-hidden="true" /> : null}
+          {species.owned ? (
+            <Check className="h-3 w-3" aria-hidden="true" />
+          ) : null}
           {species.owned ? "Owned" : "Missing"}
         </Badge>
       </div>
@@ -621,9 +646,18 @@ function SpeciesDialog({
             <span className="text-sm font-medium tabular-nums text-muted-foreground">
               {formatNumber(species.number)}
             </span>
-            {species.owned ? <Badge className="gap-1"><Check className="h-3 w-3" />Owned</Badge> : <Badge variant="secondary">Missing</Badge>}
+            {species.owned ? (
+              <Badge className="gap-1">
+                <Check className="h-3 w-3" />
+                Owned
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Missing</Badge>
+            )}
           </div>
-          <DialogTitle className="font-heading text-2xl">{species.name}</DialogTitle>
+          <DialogTitle className="font-heading text-2xl">
+            {species.name}
+          </DialogTitle>
           <DialogDescription>
             {species.printings.length
               ? `${species.ownedPrintings} of ${species.printings.length} card printings owned · ${formatTotalCopyCount(species.ownedQuantity)}`
@@ -675,7 +709,9 @@ function PrintingCard({ printing }: { printing: PokedexPrinting }) {
           {printing.collectorNumber ? ` · ${printing.collectorNumber}` : ""}
         </p>
         {printing.rarity ? (
-          <p className="truncate text-xs text-muted-foreground">{printing.rarity}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {printing.rarity}
+          </p>
         ) : null}
       </div>
     </article>

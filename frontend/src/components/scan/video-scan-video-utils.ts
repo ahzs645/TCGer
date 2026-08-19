@@ -80,8 +80,7 @@ export function drawVideoFrameToCanvas(
   targetLongSide = MAX_FRAME_LONG_SIDE,
 ): { width: number; height: number } {
   const longestSide = Math.max(video.videoWidth, video.videoHeight);
-  const scale =
-    longestSide > targetLongSide ? targetLongSide / longestSide : 1;
+  const scale = longestSide > targetLongSide ? targetLongSide / longestSide : 1;
   const width = Math.max(1, Math.round(video.videoWidth * scale));
   const height = Math.max(1, Math.round(video.videoHeight * scale));
 

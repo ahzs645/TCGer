@@ -28,12 +28,16 @@ describe("online code vault", () => {
           { code: "ABCD-1234" },
           { code: " abcd-1234 " },
           { code: "WXYZ-9876" },
+          {
+            code: "https://pokemon.com/redeem?2d_code=QR12-CODE-3456",
+          },
+          { code: "QR12-CODE-3456" },
         ],
       }),
     });
     expect(createResponse.status).toBe(201);
     const result = await createResponse.json();
-    expect(result).toMatchObject({ created: 2, duplicates: 1 });
+    expect(result).toMatchObject({ created: 3, duplicates: 2 });
     expect(result.items[0]).toMatchObject({
       tcg: "pokemon",
       status: "unused",
@@ -58,8 +62,10 @@ describe("online code vault", () => {
     });
 
     expect(
-      await (await t.fetch("/online-codes", { headers: requestHeaders })).json(),
-    ).toHaveLength(3);
+      await (
+        await t.fetch("/online-codes", { headers: requestHeaders })
+      ).json(),
+    ).toHaveLength(4);
     expect(
       await (
         await t.fetch("/online-codes?tcg=magic", { headers: requestHeaders })
@@ -101,7 +107,55 @@ describe("online code vault", () => {
       await (
         await t.fetch("/online-codes?tcg=pokemon", { headers: requestHeaders })
       ).json(),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+  });
+
+  test("repairs legacy QR URL and printed-code duplicates when the vault loads", async () => {
+    const t = createTestConvex();
+    const requestHeaders = headers("online_code_repair_owner");
+
+    await t.fetch("/online-codes", { headers: requestHeaders });
+    await t.run(async (ctx) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_auth_subject", (query) =>
+          query.eq("authSubject", "online_code_repair_owner"),
+        )
+        .unique();
+      if (!user) throw new Error("Expected provisioned test user");
+      const now = Date.now();
+      const shared = {
+        userId: user._id,
+        tcg: "pokemon" as const,
+        status: "unused" as const,
+        source: "camera" as const,
+        capturedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await ctx.db.insert("onlineCodes", {
+        ...shared,
+        code: "https://pokemon.com/redeem?2d_code=LEG1-ACY2-CODE",
+        normalizedCode: "HTTPS://POKEMON.COM/REDEEM?2D_CODE=LEG1-ACY2-CODE",
+      });
+      await ctx.db.insert("onlineCodes", {
+        ...shared,
+        code: "LEG1-ACY2-CODE",
+        normalizedCode: "LEG1-ACY2-CODE",
+      });
+    });
+
+    const response = await t.fetch("/online-codes", {
+      headers: requestHeaders,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject([
+      { code: "LEG1-ACY2-CODE", tcg: "pokemon" },
+    ]);
+    const persisted = await t.run(async (ctx) =>
+      ctx.db.query("onlineCodes").collect(),
+    );
+    expect(persisted).toHaveLength(1);
   });
 
   test("does not expose codes across users", async () => {

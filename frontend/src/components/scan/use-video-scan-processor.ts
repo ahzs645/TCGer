@@ -888,8 +888,14 @@ async function rescueWithRectify(
   const pad = 0.1;
   const left = Math.max(0, Math.round(cx - w / 2 - w * pad));
   const top = Math.max(0, Math.round(cy - h / 2 - h * pad));
-  const right = Math.min(cropFrameCanvas.width, Math.round(cx + w / 2 + w * pad));
-  const bottom = Math.min(cropFrameCanvas.height, Math.round(cy + h / 2 + h * pad));
+  const right = Math.min(
+    cropFrameCanvas.width,
+    Math.round(cx + w / 2 + w * pad),
+  );
+  const bottom = Math.min(
+    cropFrameCanvas.height,
+    Math.round(cy + h / 2 + h * pad),
+  );
   if (right - left < 40 || bottom - top < 40) return null;
 
   const ctx = cropFrameCanvas.getContext("2d", { willReadFrequently: true });

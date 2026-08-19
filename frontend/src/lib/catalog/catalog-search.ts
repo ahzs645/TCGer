@@ -53,16 +53,10 @@ function normalizeCatalogIdentifier(value?: string): string {
 }
 
 function normalizeCollectorNumber(value?: string): string {
-  return normalizeCatalogIdentifier(value).replace(
-    /^([a-z]*?)0+(?=\d)/,
-    "$1",
-  );
+  return normalizeCatalogIdentifier(value).replace(/^([a-z]*?)0+(?=\d)/, "$1");
 }
 
-function catalogMatchScore(
-  lookup: CatalogCardLookup,
-  candidate: Card,
-): number {
+function catalogMatchScore(lookup: CatalogCardLookup, candidate: Card): number {
   const lookupSetCode = normalizeCatalogIdentifier(lookup.setCode);
   const candidateSetCode = normalizeCatalogIdentifier(candidate.setCode);
   const lookupSetName = normalizeCatalogText(lookup.setName ?? "");
@@ -116,9 +110,7 @@ export function selectBestCatalogCardMatch(
     if (scoreDifference) return scoreDifference;
     return (
       (left.setCode ?? "").localeCompare(right.setCode ?? "") ||
-      (left.collectorNumber ?? "").localeCompare(
-        right.collectorNumber ?? "",
-      ) ||
+      (left.collectorNumber ?? "").localeCompare(right.collectorNumber ?? "") ||
       left.id.localeCompare(right.id)
     );
   })[0];
@@ -185,15 +177,18 @@ function catalogCardAttributes(card: CatalogCard): Record<string, unknown> {
   if (card.konamiId !== undefined) attributes.konamiId = card.konamiId;
   if (card.artist !== undefined) attributes.artist = card.artist;
   if (card.archetype !== undefined) attributes.archetype = card.archetype;
-  if (card.classifications !== undefined) attributes.classifications = card.classifications;
+  if (card.classifications !== undefined)
+    attributes.classifications = card.classifications;
   if (card.subtypes !== undefined) attributes.subtypes = card.subtypes;
   if (card.variants !== undefined) attributes.variants = card.variants;
   if (card.source !== undefined) attributes.source = card.source;
   if (card.character !== undefined) attributes.character = card.character;
   if (card.era !== undefined) attributes.era = card.era;
-  if (card.specialTrait !== undefined) attributes.specialTrait = card.specialTrait;
+  if (card.specialTrait !== undefined)
+    attributes.specialTrait = card.specialTrait;
   if (card.treatments !== undefined) attributes.treatments = card.treatments;
-  if (card.collectionTags !== undefined) attributes.collection_tags = card.collectionTags;
+  if (card.collectionTags !== undefined)
+    attributes.collection_tags = card.collectionTags;
   return attributes;
 }
 
@@ -239,7 +234,9 @@ function makeSetMap(sets: CatalogSet[]): Map<string, CatalogSet> {
   );
 }
 
-async function buildSearchIndex(tcg: CatalogTcgCode): Promise<SearchIndex | null> {
+async function buildSearchIndex(
+  tcg: CatalogTcgCode,
+): Promise<SearchIndex | null> {
   const installed = await getInstalledCatalog(tcg);
   if (!installed) return null;
 
@@ -363,7 +360,8 @@ export async function searchCatalogByArtist(
   if (!index) return [];
   return index.entries
     .filter(
-      (entry) => normalizeCatalogText(entry.card.artist ?? "") === normalizedArtist,
+      (entry) =>
+        normalizeCatalogText(entry.card.artist ?? "") === normalizedArtist,
     )
     .slice(0, limit)
     .map((entry) => entry.card);
@@ -381,8 +379,13 @@ export async function searchCatalogByCollectionTag(
   return index.entries
     .filter((entry) => {
       const values = entry.card.attributes?.collection_tags;
-      return Array.isArray(values) && values.some(
-        (value) => typeof value === "string" && normalizeCatalogText(value) === normalizedTag,
+      return (
+        Array.isArray(values) &&
+        values.some(
+          (value) =>
+            typeof value === "string" &&
+            normalizeCatalogText(value) === normalizedTag,
+        )
       );
     })
     .slice(0, limit)

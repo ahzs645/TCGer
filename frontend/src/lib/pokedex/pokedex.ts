@@ -302,8 +302,10 @@ export function filterPokedex(
     if (
       query &&
       !normalize(entry.name).includes(query) &&
-      !(/^\d+$/u.test(numericQuery) &&
-        String(entry.number).includes(numericQuery))
+      !(
+        /^\d+$/u.test(numericQuery) &&
+        String(entry.number).includes(numericQuery)
+      )
     ) {
       return false;
     }

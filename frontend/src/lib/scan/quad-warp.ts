@@ -1,8 +1,5 @@
 import { createCanvas, getContext2d } from "./canvas-utils";
-import type {
-  VideoQuad,
-  VideoQuadPoint,
-} from "./scan-types";
+import type { VideoQuad, VideoQuadPoint } from "./scan-types";
 
 export function warpCanvasFromQuad(
   sourceCanvas: HTMLCanvasElement,
@@ -60,14 +57,7 @@ function drawWarpedTriangle(
   context.lineTo(destinationTriangle[2].x, destinationTriangle[2].y);
   context.closePath();
   context.clip();
-  context.transform(
-    affine.a,
-    affine.b,
-    affine.c,
-    affine.d,
-    affine.e,
-    affine.f,
-  );
+  context.transform(affine.a, affine.b, affine.c, affine.d, affine.e, affine.f);
   context.drawImage(sourceCanvas, 0, 0);
   context.restore();
 }
@@ -108,15 +98,9 @@ function computeAffineTransform(
 }
 
 function invert3x3(matrix: number[][]): number[][] | null {
-  const [
-    [a, b, c],
-    [d, e, f],
-    [g, h, i],
-  ] = matrix;
+  const [[a, b, c], [d, e, f], [g, h, i]] = matrix;
   const determinant =
-    a * (e * i - f * h) -
-    b * (d * i - f * g) +
-    c * (d * h - e * g);
+    a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
 
   if (Math.abs(determinant) < 1e-8) {
     return null;
@@ -148,9 +132,15 @@ function multiplyMatrix3x3Vector(
   vector: [number, number, number],
 ): [number, number, number] {
   return [
-    matrix[0]![0]! * vector[0] + matrix[0]![1]! * vector[1] + matrix[0]![2]! * vector[2],
-    matrix[1]![0]! * vector[0] + matrix[1]![1]! * vector[1] + matrix[1]![2]! * vector[2],
-    matrix[2]![0]! * vector[0] + matrix[2]![1]! * vector[1] + matrix[2]![2]! * vector[2],
+    matrix[0]![0]! * vector[0] +
+      matrix[0]![1]! * vector[1] +
+      matrix[0]![2]! * vector[2],
+    matrix[1]![0]! * vector[0] +
+      matrix[1]![1]! * vector[1] +
+      matrix[1]![2]! * vector[2],
+    matrix[2]![0]! * vector[0] +
+      matrix[2]![1]! * vector[1] +
+      matrix[2]![2]! * vector[2],
   ];
 }
 

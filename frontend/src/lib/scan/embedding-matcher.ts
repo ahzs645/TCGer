@@ -283,9 +283,7 @@ export async function ensureEmbeddingModel(
       const net = (await transformers.AutoModel.from_pretrained(model, {
         dtype,
         ...device,
-      })) as (
-        inputs: Record<string, unknown>,
-      ) => Promise<{
+      })) as (inputs: Record<string, unknown>) => Promise<{
         last_hidden_state: { data: Float32Array; dims: number[] };
       }>;
       embedFn = async (image: unknown) => {

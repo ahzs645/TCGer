@@ -47,6 +47,79 @@ test("demo dashboard shows achievement progress", async ({ page }) => {
   );
 });
 
+test("desktop dropdown menus do not lock or shift the page", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-safari",
+    "Mobile More is a modal drawer; this regression covers desktop dropdown menus.",
+  );
+
+  await page.goto("/demo/dashboard");
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
+  ).toBeVisible();
+
+  const before = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyOverflow: getComputedStyle(document.body).overflow,
+  }));
+
+  await page.getByRole("button", { name: "More sections" }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+
+  const after = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyOverflow: getComputedStyle(document.body).overflow,
+  }));
+
+  expect(after).toEqual(before);
+});
+
+test("desktop modal overlays keep the scrollbar gutter stable", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile-safari",
+    "Classic scrollbar layout shifts only apply to desktop viewports.",
+  );
+
+  await page.goto("/demo");
+  await page.getByRole("button", { name: "Enter Demo" }).click();
+  await expect(page).toHaveURL(/\/demo\/dashboard$/);
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
+  ).toBeVisible();
+
+  const before = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyMarginRight: getComputedStyle(document.body).marginRight,
+  }));
+
+  await page.getByRole("button", { name: "Open user menu" }).click();
+  await page.getByRole("menuitem", { name: "Account & preferences" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  const after = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyMarginRight: getComputedStyle(document.body).marginRight,
+    scrollLock: document.body.getAttribute("data-scroll-locked"),
+  }));
+
+  expect(after).toEqual({ ...before, scrollLock: "1" });
+
+  await page.getByRole("combobox", { name: "Price source" }).click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+
+  const withNestedSelect = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    bodyMarginRight: getComputedStyle(document.body).marginRight,
+    scrollLock: document.body.getAttribute("data-scroll-locked"),
+  }));
+
+  expect(withNestedSelect).toEqual({ ...before, scrollLock: "2" });
+});
+
 test("demo Pokédex keeps completion states readable", async ({ page }) => {
   await page.goto("/demo/pokedex");
   await expect(page.getByRole("heading", { name: /pokédex/i })).toBeVisible();

@@ -1,9 +1,5 @@
 import type { CardScanHashEntry } from "@/lib/api/scan";
-import type {
-  CardFeatureHashes,
-  SupportedTcg,
-  TcgCode,
-} from "./scan-types";
+import type { CardFeatureHashes, SupportedTcg, TcgCode } from "./scan-types";
 import { computeRGBHashFromCanvas } from "./rgb-hash";
 import { clamp, createCanvas, getContext2d } from "./canvas-utils";
 
@@ -38,11 +34,19 @@ export function computeFeatureHashesByTcg(
 ): Partial<Record<SupportedTcg, CardFeatureHashes>> {
   const tcgs = new Set<SupportedTcg>();
 
-  if (tcgFilter === "magic" || tcgFilter === "pokemon" || tcgFilter === "yugioh") {
+  if (
+    tcgFilter === "magic" ||
+    tcgFilter === "pokemon" ||
+    tcgFilter === "yugioh"
+  ) {
     tcgs.add(tcgFilter);
   } else {
     for (const entry of hashEntries) {
-      if (entry.tcg === "magic" || entry.tcg === "pokemon" || entry.tcg === "yugioh") {
+      if (
+        entry.tcg === "magic" ||
+        entry.tcg === "pokemon" ||
+        entry.tcg === "yugioh"
+      ) {
         tcgs.add(entry.tcg);
       }
     }
@@ -106,6 +110,16 @@ function extractRegionCanvas(
 
   const canvas = createCanvas(width, height);
   const context = getContext2d(canvas);
-  context.drawImage(sourceCanvas, left, top, width, height, 0, 0, width, height);
+  context.drawImage(
+    sourceCanvas,
+    left,
+    top,
+    width,
+    height,
+    0,
+    0,
+    width,
+    height,
+  );
   return canvas;
 }

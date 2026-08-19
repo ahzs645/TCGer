@@ -19,6 +19,7 @@ import {
 
 import type {
   PackOpeningNativeCommand,
+  PackOpeningNativeCardPool,
   PackOpeningNativePackOption,
   PackOpeningNativeState,
   PackOpeningPull,
@@ -54,6 +55,7 @@ interface PackOpeningShellProps {
 interface PackSetGroup {
   id: string;
   label: string;
+  packPoolID: string;
   options: PackOpeningNativePackOption[];
 }
 
@@ -71,6 +73,7 @@ function groupPackOptions(
       groups.set(option.setID, {
         id: option.setID,
         label: option.setLabel,
+        packPoolID: option.packPoolID,
         options: [option],
       });
     }
@@ -115,6 +118,10 @@ export function PackOpeningShell({
   onInspect,
 }: PackOpeningShellProps) {
   const [packPickerOpen, setPackPickerOpen] = useState(false);
+  const [possiblePullsPoolID, setPossiblePullsPoolID] = useState<string | null>(
+    null,
+  );
+  const [possiblePullsQuery, setPossiblePullsQuery] = useState("");
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const packSets = useMemo(
     () => groupPackOptions(state?.packOptions ?? []),
@@ -124,6 +131,9 @@ export function PackOpeningShell({
     state &&
       (state.phase === "summary" || state.phase === "final") &&
       state.session,
+  );
+  const possiblePullsPool = state?.cardPools?.find(
+    (pool) => pool.id === possiblePullsPoolID,
   );
 
   const uploadArtwork = (file: File | undefined) => {
@@ -252,11 +262,28 @@ export function PackOpeningShell({
               <section key={packSet.id} className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold">{packSet.label}</h3>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {packSet.options.length}{" "}
-                    {packSet.options.length === 1 ? "variant" : "variants"}
-                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-primary transition hover:bg-muted"
+                    onClick={() => {
+                      setPackPickerOpen(false);
+                      setPossiblePullsQuery("");
+                      setPossiblePullsPoolID(packSet.packPoolID);
+                    }}
+                  >
+                    <GalleryVerticalEnd
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    />
+                    View possible cards
+                  </button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {packSet.options.length}{" "}
+                  {packSet.options.length === 1
+                    ? "wrapper variant"
+                    : "wrapper variants"}
+                </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {packSet.options.map((option) => {
                     const selected = option.id === state?.selectedPackID;
@@ -310,7 +337,110 @@ export function PackOpeningShell({
           </div>
         </DialogContent>
       </Dialog>
+
+      <PossiblePullsDialog
+        pool={possiblePullsPool}
+        query={possiblePullsQuery}
+        onQueryChange={setPossiblePullsQuery}
+        onOpenChange={(open) => {
+          if (!open) setPossiblePullsPoolID(null);
+        }}
+      />
     </>
+  );
+}
+
+function PossiblePullsDialog({
+  pool,
+  query,
+  onQueryChange,
+  onOpenChange,
+}: {
+  pool: PackOpeningNativeCardPool | undefined;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const cards = useMemo(
+    () =>
+      [...(pool?.cards ?? [])]
+        .filter((card) => {
+          if (!normalizedQuery) return true;
+          return [card.name, card.rarity, card.collectorNumber].some((value) =>
+            value.toLocaleLowerCase().includes(normalizedQuery),
+          );
+        })
+        .sort(
+          (left, right) =>
+            tierRank(right.tier) - tierRank(left.tier) ||
+            left.name.localeCompare(right.name),
+        ),
+    [normalizedQuery, pool?.cards],
+  );
+
+  return (
+    <Dialog open={Boolean(pool)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92dvh] max-w-3xl gap-4 overflow-hidden p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle>{pool?.label ?? "Pack"} possible cards</DialogTitle>
+          <DialogDescription>
+            Every card currently included in this simulated pack pool. A card
+            shown here is possible, but not guaranteed in one pack.
+          </DialogDescription>
+        </DialogHeader>
+        <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+          Search {pool?.cards.length.toLocaleString() ?? 0} cards
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Name, rarity, or card number"
+            className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          />
+        </label>
+        <div className="-mr-1 max-h-[62dvh] overflow-y-auto pr-1">
+          {cards.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {cards.map((card) => (
+                <article key={card.cardId} className="min-w-0 space-y-2">
+                  <div className="relative aspect-[2.5/3.5] overflow-hidden rounded-[5%] bg-muted shadow-sm">
+                    <CardImage
+                      src={card.imageUrlSmall || card.imageUrl}
+                      fallbackSrc={card.imageUrl || null}
+                      alt={`${card.name} card`}
+                      tcg={card.tcg}
+                      fill
+                      sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, 180px"
+                      className="object-contain"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-xs font-semibold"
+                      title={card.name}
+                    >
+                      {card.name}
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      #{card.collectorNumber} · {card.rarity}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+              No cards match “{query}”.
+            </div>
+          )}
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          Showing {cards.length.toLocaleString()} of{" "}
+          {pool?.cards.length.toLocaleString() ?? 0} cards
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
 

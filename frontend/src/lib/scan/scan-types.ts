@@ -1,7 +1,4 @@
-import type {
-  CardScanHashEntry,
-  CardScanMatch,
-} from "@/lib/api/scan";
+import type { CardScanHashEntry, CardScanMatch } from "@/lib/api/scan";
 import type { TcgCode } from "@/types/card";
 
 export type SupportedTcg = Extract<TcgCode, "magic" | "pokemon" | "yugioh">;

@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { Card } from "@tcg/api-types";
 
-import { catalogCardToCard, selectBestCatalogCardMatch } from "./catalog-search";
+import {
+  catalogCardToCard,
+  selectBestCatalogCardMatch,
+} from "./catalog-search";
 
 function card(overrides: Partial<Card> & Pick<Card, "id">): Card {
   const { id, ...rest } = overrides;
@@ -119,7 +122,10 @@ test("maps a World Championship catalog row as an exact replica printing", () =>
 
   assert.equal(mapped.printingKind, "replica");
   assert.equal(mapped.sanctionedPlayLegal, false);
-  assert.equal(mapped.pokemonPrint?.worldChampionship?.playerName, "Yuya Okita");
+  assert.equal(
+    mapped.pokemonPrint?.worldChampionship?.playerName,
+    "Yuya Okita",
+  );
   assert.deepEqual(mapped.pokemonPrint?.finishes, ["normal"]);
 });
 

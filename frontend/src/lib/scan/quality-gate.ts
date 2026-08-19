@@ -48,7 +48,9 @@ export function computeGrayDownsample(
   for (let i = 0; i < gray.length; i++) {
     // Rec. 601 luma
     gray[i] =
-      0.299 * data[i * 4]! + 0.587 * data[i * 4 + 1]! + 0.114 * data[i * 4 + 2]!;
+      0.299 * data[i * 4]! +
+      0.587 * data[i * 4 + 1]! +
+      0.114 * data[i * 4 + 2]!;
   }
   return gray;
 }
@@ -68,7 +70,11 @@ export function computeFocusVariance(
     for (let x = 1; x < size - 1; x++) {
       const i = y * size + x;
       const lap =
-        4 * gray[i]! - gray[i - 1]! - gray[i + 1]! - gray[i - size]! - gray[i + size]!;
+        4 * gray[i]! -
+        gray[i - 1]! -
+        gray[i + 1]! -
+        gray[i - size]! -
+        gray[i + size]!;
       sum += lap;
       sumSq += lap * lap;
       n += 1;

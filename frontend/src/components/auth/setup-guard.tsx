@@ -20,7 +20,10 @@ interface SetupGuardProps {
   singleUserMode?: boolean;
 }
 
-export function SetupGuard({ children, singleUserMode: singleUserModeProp }: SetupGuardProps) {
+export function SetupGuard({
+  children,
+  singleUserMode: singleUserModeProp,
+}: SetupGuardProps) {
   // Re-install demo fetch interceptor if user was already in demo mode
   // (e.g. returning from a page refresh). Must run before any API calls.
   ensureDemoInterceptor();
@@ -29,10 +32,12 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
   const pathname = usePathname();
   const { isPending: sessionPending } = useSession();
   const singleUserMode = singleUserModeProp ?? isSingleUserModeEnabled();
-  const { isAuthenticated, token } = useAuthStore(useShallow((state) => ({
-    isAuthenticated: state.isAuthenticated,
-    token: state.token,
-  })));
+  const { isAuthenticated, token } = useAuthStore(
+    useShallow((state) => ({
+      isAuthenticated: state.isAuthenticated,
+      token: state.token,
+    })),
+  );
   const setSetupRequired = useAuthStore((state) => state.setSetupRequired);
   const [loading, setLoading] = useState(!singleUserMode);
   const [initialCheckDone, setInitialCheckDone] = useState(singleUserMode);
@@ -195,10 +200,15 @@ export function SetupGuard({ children, singleUserMode: singleUserModeProp }: Set
   // Demo paths bypass all blocking conditions — they never need a real
   // backend session, and Better Auth's useSession may hang on GitHub Pages
   // where no server exists.
-  const isDemo = pathname?.startsWith("/demo") || pathname?.startsWith("/shared/");
+  const isDemo =
+    pathname?.startsWith("/demo") || pathname?.startsWith("/shared/");
 
   // Always render the same structure
-  if (loading || shouldBlock || (!isDemo && !singleUserMode && sessionPending)) {
+  if (
+    loading ||
+    shouldBlock ||
+    (!isDemo && !singleUserMode && sessionPending)
+  ) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"

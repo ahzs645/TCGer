@@ -376,12 +376,7 @@ export function commitCollectionSource(
   input: CollectionImportRequest,
   viewer?: CollectionsViewerContext | null,
 ) {
-  return importRequest<CollectionImportResult>(
-    token,
-    "commit",
-    input,
-    viewer,
-  );
+  return importRequest<CollectionImportResult>(token, "commit", input, viewer);
 }
 
 export async function downloadCollectionImportTemplate(
@@ -410,7 +405,9 @@ export async function downloadCollectionExport(
   );
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Failed to export collection as ${format.toUpperCase()}`);
+    throw new Error(
+      error.message || `Failed to export collection as ${format.toUpperCase()}`,
+    );
   }
   return response.blob();
 }

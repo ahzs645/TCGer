@@ -10,6 +10,13 @@ final class OnlineCodeTests: XCTestCase {
         )
     }
 
+    func testParserExtractsPokemonQRPayloadAndDeduplicatesPrintedCode() {
+        let code = "ZNM1-B6Z2-4PL3-YYM"
+        let url = "https://pokemon.com/redeem?2d_code=\(code)"
+        XCTAssertEqual(OnlineCodeParser.canonicalCode(url), code)
+        XCTAssertEqual(OnlineCodeParser.parse("\(url)\n\(code)"), [code])
+    }
+
     func testLiveTextExtractsMTGArenaCodesWithoutCapturingCardCopy() {
         let text = "THANKS FOR COMING TO THE PRERELEASE ABC12-3DE45-FG678-9HIJK-LM012"
         XCTAssertEqual(
@@ -33,6 +40,19 @@ final class OnlineCodeTests: XCTestCase {
         XCTAssertEqual(result.created, 2)
         XCTAssertEqual(result.duplicates, 1)
 
+        let qrResult = try store.createOnlineCodes(
+            tcg: "pokemon",
+            codes: [
+                "https://pokemon.com/redeem?2d_code=QR12-CODE-3456",
+                "QR12-CODE-3456"
+            ],
+            source: .camera,
+            productName: nil,
+            notes: nil
+        )
+        XCTAssertEqual(qrResult.created, 1)
+        XCTAssertEqual(qrResult.duplicates, 1)
+
         let magicResult = try store.createOnlineCodes(
             tcg: "magic",
             codes: ["ABCDE-12345-FGHIJ-67890-KLMNO"],
@@ -41,7 +61,7 @@ final class OnlineCodeTests: XCTestCase {
             notes: nil
         )
         XCTAssertEqual(magicResult.created, 1)
-        XCTAssertEqual(store.getOnlineCodes().count, 3)
+        XCTAssertEqual(store.getOnlineCodes().count, 4)
         XCTAssertEqual(store.getOnlineCodes(tcg: "magic").count, 1)
 
         let first = try XCTUnwrap(result.items.first)
@@ -57,7 +77,7 @@ final class OnlineCodeTests: XCTestCase {
         XCTAssertEqual(updated.productName, "Destined Rivals")
 
         let reloaded = LocalStore(persistenceRepository: repository)
-        XCTAssertEqual(reloaded.getOnlineCodes(tcg: "pokemon").count, 2)
+        XCTAssertEqual(reloaded.getOnlineCodes(tcg: "pokemon").count, 3)
         XCTAssertEqual(
             reloaded.getOnlineCodes(tcg: "pokemon").first { $0.id == first.id }?.status,
             .redeemed

@@ -239,7 +239,10 @@ function quadBoundingBox(quad: import("./scan-types").VideoQuad): {
   width: number;
   height: number;
 } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const p of quad) {
     if (p.x < minX) minX = p.x;
     if (p.y < minY) minY = p.y;
@@ -272,7 +275,9 @@ function selectDistinctProposalMatches(
 ): BrowserVideoProposalMatch[] {
   const selected: BrowserVideoProposalMatch[] = [];
 
-  for (const proposalMatch of [...proposalMatches].sort(compareProposalMatches)) {
+  for (const proposalMatch of [...proposalMatches].sort(
+    compareProposalMatches,
+  )) {
     if (!proposalMatch.bestMatch) {
       continue;
     }
@@ -280,7 +285,8 @@ function selectDistinctProposalMatches(
     if (
       selected.some(
         (existing) =>
-          windowIou(existing.proposal, proposalMatch.proposal) >= PROPOSAL_NMS_IOU,
+          windowIou(existing.proposal, proposalMatch.proposal) >=
+          PROPOSAL_NMS_IOU,
       )
     ) {
       continue;
@@ -322,7 +328,7 @@ function compareProposalMatches(
 /** Number of top artwork matches to use as pHash pre-filter. */
 const ARTWORK_PREFILTER_TOP_N = 50;
 /** Artwork similarity threshold below which we don't trust the match. */
-const ARTWORK_MIN_SIMILARITY = 0.90;
+const ARTWORK_MIN_SIMILARITY = 0.9;
 /** Artwork similarity margin over #2 to inject without pHash confirmation. */
 const ARTWORK_INJECT_MARGIN = 0.005;
 
@@ -445,7 +451,9 @@ function mergeArtworkAndPHashCandidates(
 
       // Convert artwork similarity to a synthetic scoreDistance for ranking
       // Lower scoreDistance = better match. Map similarity [0.9, 1.0] → distance [240, 0]
-      const syntheticDistance = Math.round((1 - artwork.similarity) * 240 * 1.5);
+      const syntheticDistance = Math.round(
+        (1 - artwork.similarity) * 240 * 1.5,
+      );
 
       candidateMap.set(key, {
         externalId: artwork.externalId,

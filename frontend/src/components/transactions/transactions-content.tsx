@@ -91,8 +91,12 @@ export function TransactionsContent() {
     byCurrency: [],
     transactionCount: 0,
   });
-  const [performance, setPerformance] = useState<RealizedPerformance | null>(null);
-  const [performancePeriod, setPerformancePeriod] = useState<number | undefined>(90);
+  const [performance, setPerformance] = useState<RealizedPerformance | null>(
+    null,
+  );
+  const [performancePeriod, setPerformancePeriod] = useState<
+    number | undefined
+  >(90);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -107,11 +111,12 @@ export function TransactionsContent() {
     setLoading(true);
     setError(null);
     try {
-      const [nextTransactions, nextSummary, nextPerformance] = await Promise.all([
-        getTransactions(token),
-        getFinanceSummaryByCurrency(token),
-        getRealizedPerformance(token, performancePeriod),
-      ]);
+      const [nextTransactions, nextSummary, nextPerformance] =
+        await Promise.all([
+          getTransactions(token),
+          getFinanceSummaryByCurrency(token),
+          getRealizedPerformance(token, performancePeriod),
+        ]);
       setTransactions(nextTransactions);
       setSummary(nextSummary);
       setPerformance(nextPerformance);
@@ -358,9 +363,13 @@ function PerformanceDashboard({
       <div className="flex justify-end">
         <Select
           value={period === undefined ? "all" : String(period)}
-          onValueChange={(value) => onPeriodChange(value === "all" ? undefined : Number(value))}
+          onValueChange={(value) =>
+            onPeriodChange(value === "all" ? undefined : Number(value))
+          }
         >
-          <SelectTrigger className="w-44" aria-label="Performance period"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-44" aria-label="Performance period">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="30">Last 30 days</SelectItem>
             <SelectItem value="90">Last 90 days</SelectItem>
@@ -372,27 +381,41 @@ function PerformanceDashboard({
       <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
         <Metric label="Sales revenue" value={currencyText("revenue")} />
         <Metric label="Net proceeds" value={currencyText("netProceeds")} />
-        <Metric label="Realized profit" value={currencyText("realizedProfit")} />
+        <Metric
+          label="Realized profit"
+          value={currencyText("realizedProfit")}
+        />
         <Metric label="Fees" value={currencyText("fees")} />
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle asChild><h2>Realized P&amp;L</h2></CardTitle>
+            <CardTitle asChild>
+              <h2>Realized P&amp;L</h2>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {performance.byCurrency.length ? performance.byCurrency.map((row) => (
-              <div key={row.currency} className="rounded-lg border p-3">
-                <div className="flex justify-between font-medium">
-                  <span>{row.currency}</span>
-                  <span>{money(row.realizedProfit, row.currency)}</span>
+            {performance.byCurrency.length ? (
+              performance.byCurrency.map((row) => (
+                <div key={row.currency} className="rounded-lg border p-3">
+                  <div className="flex justify-between font-medium">
+                    <span>{row.currency}</span>
+                    <span>{money(row.realizedProfit, row.currency)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {row.costedSaleCount} of {row.saleCount} sales have cost
+                    basis
+                    {row.averageHoldingDays === undefined
+                      ? ""
+                      : ` · ${row.averageHoldingDays} day average hold`}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {row.costedSaleCount} of {row.saleCount} sales have cost basis
-                  {row.averageHoldingDays === undefined ? "" : ` · ${row.averageHoldingDays} day average hold`}
-                </p>
-              </div>
-            )) : <p className="text-muted-foreground">Record a sale to see realized performance.</p>}
+              ))
+            ) : (
+              <p className="text-muted-foreground">
+                Record a sale to see realized performance.
+              </p>
+            )}
           </CardContent>
         </Card>
         <BreakdownCard title="By platform" rows={performance.byPlatform} />
@@ -400,35 +423,69 @@ function PerformanceDashboard({
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         <Card>
-          <CardHeader><CardTitle asChild><h2>Inventory position</h2></CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle asChild>
+              <h2>Inventory position</h2>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Acquisition cost</p>
-              <p className="text-xl font-semibold tabular-nums">{money(performance.inventoryCost, performance.inventoryCurrency)}</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {money(
+                  performance.inventoryCost,
+                  performance.inventoryCurrency,
+                )}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Market value</p>
-              <p className="text-xl font-semibold tabular-nums">{money(performance.inventoryMarketValue, performance.inventoryCurrency)}</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {money(
+                  performance.inventoryMarketValue,
+                  performance.inventoryCurrency,
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle asChild><h2>Fastest sales</h2></CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle asChild>
+              <h2>Fastest sales</h2>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {performance.fastestSales.length ? performance.fastestSales.map((sale) => (
-              <div key={sale.id} className="flex justify-between gap-3">
-                <span className="truncate">{sale.cardName || "Sale"}</span>
-                <span className="shrink-0 tabular-nums">{sale.holdingDays} days</span>
-              </div>
-            )) : <p className="text-muted-foreground">Add acquisition dates to calculate holding time.</p>}
+            {performance.fastestSales.length ? (
+              performance.fastestSales.map((sale) => (
+                <div key={sale.id} className="flex justify-between gap-3">
+                  <span className="truncate">{sale.cardName || "Sale"}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {sale.holdingDays} days
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground">
+                Add acquisition dates to calculate holding time.
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle asChild><h2>Best / worst returns</h2></CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle asChild>
+              <h2>Best / worst returns</h2>
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <ReturnRow label="Best" sale={performance.bestReturns[0]} />
             <ReturnRow label="Worst" sale={performance.worstReturns[0]} />
-            {!performance.bestReturns.length ? <p className="text-muted-foreground">Add acquisition cost to sales to compare returns.</p> : null}
+            {!performance.bestReturns.length ? (
+              <p className="text-muted-foreground">
+                Add acquisition cost to sales to compare returns.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -446,8 +503,13 @@ function ReturnRow({
   if (!sale || sale.realizedProfit === undefined) return null;
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="min-w-0 truncate"><span className="text-xs text-muted-foreground">{label}</span> · {sale.cardName || "Sale"}</span>
-      <span className="shrink-0 font-medium tabular-nums">{money(sale.realizedProfit, sale.currency)}</span>
+      <span className="min-w-0 truncate">
+        <span className="text-xs text-muted-foreground">{label}</span> ·{" "}
+        {sale.cardName || "Sale"}
+      </span>
+      <span className="shrink-0 font-medium tabular-nums">
+        {money(sale.realizedProfit, sale.currency)}
+      </span>
     </div>
   );
 }
@@ -461,14 +523,32 @@ function BreakdownCard({
 }) {
   return (
     <Card>
-      <CardHeader><CardTitle asChild><h2>{title}</h2></CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle asChild>
+          <h2>{title}</h2>
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-2 text-sm">
-        {rows.length ? rows.slice(0, 6).map((row) => (
-          <div key={`${row.currency}-${row.key}`} className="flex items-center justify-between gap-3">
-            <span className="truncate">{row.key} <span className="text-xs text-muted-foreground">({row.saleCount})</span></span>
-            <span className="shrink-0 font-medium tabular-nums">{money(row.realizedProfit, row.currency)}</span>
-          </div>
-        )) : <p className="text-muted-foreground">No sales yet.</p>}
+        {rows.length ? (
+          rows.slice(0, 6).map((row) => (
+            <div
+              key={`${row.currency}-${row.key}`}
+              className="flex items-center justify-between gap-3"
+            >
+              <span className="truncate">
+                {row.key}{" "}
+                <span className="text-xs text-muted-foreground">
+                  ({row.saleCount})
+                </span>
+              </span>
+              <span className="shrink-0 font-medium tabular-nums">
+                {money(row.realizedProfit, row.currency)}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground">No sales yet.</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -564,7 +644,9 @@ function CreateTransactionDialog({
         amount,
         costBasis: form.costBasis.trim() ? Number(form.costBasis) : undefined,
         fees: form.fees.trim() ? Number(form.fees) : undefined,
-        shippingCost: form.shippingCost.trim() ? Number(form.shippingCost) : undefined,
+        shippingCost: form.shippingCost.trim()
+          ? Number(form.shippingCost)
+          : undefined,
         acquiredAt: form.acquiredAt
           ? new Date(`${form.acquiredAt}T12:00:00`).toISOString()
           : undefined,
@@ -712,7 +794,9 @@ function CreateTransactionDialog({
                     min="0"
                     step="0.01"
                     value={form.costBasis}
-                    onChange={(event) => setForm({ ...form, costBasis: event.target.value })}
+                    onChange={(event) =>
+                      setForm({ ...form, costBasis: event.target.value })
+                    }
                     placeholder="Optional"
                   />
                 </Field>
@@ -723,7 +807,9 @@ function CreateTransactionDialog({
                     min="0"
                     step="0.01"
                     value={form.fees}
-                    onChange={(event) => setForm({ ...form, fees: event.target.value })}
+                    onChange={(event) =>
+                      setForm({ ...form, fees: event.target.value })
+                    }
                     placeholder="0.00"
                   />
                 </Field>
@@ -734,7 +820,9 @@ function CreateTransactionDialog({
                     min="0"
                     step="0.01"
                     value={form.shippingCost}
-                    onChange={(event) => setForm({ ...form, shippingCost: event.target.value })}
+                    onChange={(event) =>
+                      setForm({ ...form, shippingCost: event.target.value })
+                    }
                     placeholder="0.00"
                   />
                 </Field>
@@ -743,7 +831,9 @@ function CreateTransactionDialog({
                     id={fieldId("acquiredAt")}
                     type="date"
                     value={form.acquiredAt}
-                    onChange={(event) => setForm({ ...form, acquiredAt: event.target.value })}
+                    onChange={(event) =>
+                      setForm({ ...form, acquiredAt: event.target.value })
+                    }
                   />
                 </Field>
               </>

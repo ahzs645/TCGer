@@ -2792,7 +2792,8 @@ final class LocalStore {
     // MARK: - Online Code Accessors
 
     func getOnlineCodes(tcg: String? = nil) -> [OnlineCode] {
-        onlineCodes
+        repairOnlineCodeDuplicatesIfNeeded()
+        return onlineCodes
             .filter { tcg == nil || $0.tcg == tcg }
             .sorted { $0.capturedAt > $1.capturedAt }
     }
@@ -2823,7 +2824,7 @@ final class LocalStore {
         )
 
         for rawCode in codes {
-            let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let code = OnlineCodeParser.canonicalCode(rawCode)
             let normalized = normalizeOnlineCode(code)
             guard normalized.count >= 4, code.count <= 512 else {
                 throw APIService.APIError.serverError(
@@ -2903,10 +2904,55 @@ final class LocalStore {
     }
 
     private func normalizeOnlineCode(_ value: String) -> String {
-        value
-            .components(separatedBy: .whitespacesAndNewlines)
-            .joined()
-            .uppercased()
+        OnlineCodeParser.normalize(value)
+    }
+
+    private func repairOnlineCodeDuplicatesIfNeeded() {
+        var seen = Set<String>()
+        var repaired: [OnlineCode] = []
+        var changed = false
+
+        for item in onlineCodes.sorted(by: {
+            onlineCodeStatusPriority($0.status) > onlineCodeStatusPriority($1.status)
+        }) {
+            let canonical = OnlineCodeParser.canonicalCode(item.code)
+            let key = "\(item.tcg):\(normalizeOnlineCode(canonical))"
+            guard seen.insert(key).inserted else {
+                changed = true
+                continue
+            }
+            if canonical != item.code {
+                changed = true
+                repaired.append(OnlineCode(
+                    id: item.id,
+                    tcg: item.tcg,
+                    code: canonical,
+                    status: item.status,
+                    source: item.source,
+                    productName: item.productName,
+                    notes: item.notes,
+                    capturedAt: item.capturedAt,
+                    redeemedAt: item.redeemedAt,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt
+                ))
+            } else {
+                repaired.append(item)
+            }
+        }
+
+        guard changed else { return }
+        onlineCodes = repaired
+        try? persistOrThrow()
+    }
+
+    private func onlineCodeStatusPriority(_ status: OnlineCodeStatus) -> Int {
+        switch status {
+        case .redeemed: 4
+        case .traded: 3
+        case .invalid: 2
+        case .unused: 1
+        }
     }
 
     private func nonemptyOnlineCodeText(_ value: String?) -> String? {

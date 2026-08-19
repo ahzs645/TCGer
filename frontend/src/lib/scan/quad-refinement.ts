@@ -48,7 +48,12 @@ export function refineProposalCanvas(
   sourceCanvas: HTMLCanvasElement,
 ): CanvasBoundaryRefinement | null {
   const context = getContext2d(sourceCanvas);
-  const imageData = context.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+  const imageData = context.getImageData(
+    0,
+    0,
+    sourceCanvas.width,
+    sourceCanvas.height,
+  );
   const refinement = refineCardQuadInImageData(imageData);
   if (!refinement) {
     return null;
@@ -98,7 +103,9 @@ export function refineCardQuadInImageData(
   pushCandidate(
     candidates,
     "observed",
-    left && right && top && bottom ? buildObservedQuad(left, right, top, bottom) : null,
+    left && right && top && bottom
+      ? buildObservedQuad(left, right, top, bottom)
+      : null,
     [left, right, top, bottom],
     0,
     imageData.width,
@@ -167,7 +174,9 @@ function pushCandidate(
   }
 
   const boundaryStats = getQuadBoundaryStats(quad, width, height);
-  const edgeAnchoredCount = presentLines.filter((line) => line.isEdgeAnchored).length;
+  const edgeAnchoredCount = presentLines.filter(
+    (line) => line.isEdgeAnchored,
+  ).length;
   const isClipped =
     edgeAnchoredCount > 0 ||
     boundaryStats.outsidePoints > 0 ||
@@ -248,8 +257,14 @@ function computeGradientMaps(imageData: ImageDataLike): {
       const vScore = Math.max(0, absGx - absGy * 0.35);
       if (vScore > 0) {
         // NMS: suppress if not a local max horizontally
-        const left = Math.max(0, Math.abs(gx[index - 1]!) - Math.abs(gy[index - 1]!) * 0.35);
-        const right = Math.max(0, Math.abs(gx[index + 1]!) - Math.abs(gy[index + 1]!) * 0.35);
+        const left = Math.max(
+          0,
+          Math.abs(gx[index - 1]!) - Math.abs(gy[index - 1]!) * 0.35,
+        );
+        const right = Math.max(
+          0,
+          Math.abs(gx[index + 1]!) - Math.abs(gy[index + 1]!) * 0.35,
+        );
         verticalScores[index] = vScore >= left && vScore >= right ? vScore : 0;
       }
 
@@ -257,9 +272,16 @@ function computeGradientMaps(imageData: ImageDataLike): {
       const hScore = Math.max(0, absGy - absGx * 0.35);
       if (hScore > 0) {
         // NMS: suppress if not a local max vertically
-        const above = Math.max(0, Math.abs(gy[index - width]!) - Math.abs(gx[index - width]!) * 0.35);
-        const below = Math.max(0, Math.abs(gy[index + width]!) - Math.abs(gx[index + width]!) * 0.35);
-        horizontalScores[index] = hScore >= above && hScore >= below ? hScore : 0;
+        const above = Math.max(
+          0,
+          Math.abs(gy[index - width]!) - Math.abs(gx[index - width]!) * 0.35,
+        );
+        const below = Math.max(
+          0,
+          Math.abs(gy[index + width]!) - Math.abs(gx[index + width]!) * 0.35,
+        );
+        horizontalScores[index] =
+          hScore >= above && hScore >= below ? hScore : 0;
       }
     }
   }
@@ -461,7 +483,8 @@ function fitBorderLine(
     return Math.abs(actual - prediction) <= Math.max(6, residualLimit);
   });
 
-  const fittedPoints = refinedPoints.length >= MIN_BORDER_POINTS ? refinedPoints : points;
+  const fittedPoints =
+    refinedPoints.length >= MIN_BORDER_POINTS ? refinedPoints : points;
   const fitted = fitLine(fittedPoints, axis);
   if (!fitted) {
     return null;
@@ -757,7 +780,10 @@ function intersectLines(
   };
 }
 
-function toLineEquation(first: VideoQuadPoint, second: VideoQuadPoint): {
+function toLineEquation(
+  first: VideoQuadPoint,
+  second: VideoQuadPoint,
+): {
   a: number;
   b: number;
   c: number;
@@ -838,11 +864,7 @@ function getQuadAspectError(quad: VideoQuad): number {
   return Math.abs(width / height - CARD_ASPECT_RATIO);
 }
 
-function isValidQuad(
-  quad: VideoQuad,
-  width: number,
-  height: number,
-): boolean {
+function isValidQuad(quad: VideoQuad, width: number, height: number): boolean {
   const aspectError = getQuadAspectError(quad);
   if (!Number.isFinite(aspectError) || aspectError > MAX_QUAD_ASPECT_ERROR) {
     return false;

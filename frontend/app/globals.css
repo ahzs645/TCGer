@@ -117,6 +117,17 @@ html {
     scrollbar-gutter: stable;
   }
 
+  /*
+   * Radix dialogs/selects and Vaul drawers all lock the document through
+   * react-remove-scroll. Keep the desktop scrollbar visible while its event
+   * guard prevents background scrolling, so opening any overlay cannot resize
+   * the viewport or nudge fixed and centred UI.
+   */
+  html body[data-scroll-locked] {
+    overflow-y: scroll !important;
+    margin-right: 0 !important;
+  }
+
   ::-webkit-scrollbar {
     width: 12px;
   }

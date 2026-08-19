@@ -28,7 +28,7 @@ const ARTWORK_REGIONS: Record<
 > = {
   pokemon: { top: 0.08, bottom: 0.55, left: 0.05, right: 0.95 },
   magic: { top: 0.12, bottom: 0.55, left: 0.07, right: 0.93 },
-  yugioh: { top: 0.20, bottom: 0.60, left: 0.10, right: 0.90 },
+  yugioh: { top: 0.2, bottom: 0.6, left: 0.1, right: 0.9 },
 };
 
 // ---------- types ----------
@@ -207,8 +207,14 @@ export function computeHSVHistogramFromCanvas(
   const artCtx = getContext2d(artCanvas);
   artCtx.drawImage(
     cardCanvas,
-    cropLeft, cropTop, cropWidth, cropHeight,
-    0, 0, cropWidth, cropHeight,
+    cropLeft,
+    cropTop,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    cropWidth,
+    cropHeight,
   );
   const imageData = artCtx.getImageData(0, 0, cropWidth, cropHeight);
   const data = imageData.data;

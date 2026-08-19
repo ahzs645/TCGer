@@ -1,8 +1,5 @@
 import { clamp, createCanvas, getContext2d } from "./canvas-utils";
-import type {
-  VideoQuad,
-  VideoWindowProposal,
-} from "./scan-types";
+import type { VideoQuad, VideoWindowProposal } from "./scan-types";
 
 export const CARD_ASPECT_RATIO = 0.714;
 export const PROPOSAL_NMS_IOU = 0.4;
@@ -14,12 +11,37 @@ const PORTRAIT_WINDOW_PRESETS = [
   { label: "portrait-center-lg", scale: 0.78, anchorX: 0.5, anchorY: 0.53 },
   { label: "portrait-left-lg", scale: 0.78, anchorX: 0.3, anchorY: 0.53 },
   { label: "portrait-right-lg", scale: 0.78, anchorX: 0.7, anchorY: 0.53 },
-  { label: "portrait-left-upper-md", scale: 0.62, anchorX: 0.24, anchorY: 0.34 },
-  { label: "portrait-center-upper-md", scale: 0.62, anchorX: 0.5, anchorY: 0.34 },
-  { label: "portrait-right-upper-md", scale: 0.62, anchorX: 0.76, anchorY: 0.34 },
+  {
+    label: "portrait-left-upper-md",
+    scale: 0.62,
+    anchorX: 0.24,
+    anchorY: 0.34,
+  },
+  {
+    label: "portrait-center-upper-md",
+    scale: 0.62,
+    anchorX: 0.5,
+    anchorY: 0.34,
+  },
+  {
+    label: "portrait-right-upper-md",
+    scale: 0.62,
+    anchorX: 0.76,
+    anchorY: 0.34,
+  },
   { label: "portrait-left-lower-md", scale: 0.62, anchorX: 0.24, anchorY: 0.7 },
-  { label: "portrait-center-lower-md", scale: 0.62, anchorX: 0.5, anchorY: 0.7 },
-  { label: "portrait-right-lower-md", scale: 0.62, anchorX: 0.76, anchorY: 0.7 },
+  {
+    label: "portrait-center-lower-md",
+    scale: 0.62,
+    anchorX: 0.5,
+    anchorY: 0.7,
+  },
+  {
+    label: "portrait-right-lower-md",
+    scale: 0.62,
+    anchorX: 0.76,
+    anchorY: 0.7,
+  },
   { label: "portrait-left-sm", scale: 0.5, anchorX: 0.18, anchorY: 0.53 },
   { label: "portrait-right-sm", scale: 0.5, anchorX: 0.82, anchorY: 0.53 },
 ] as const;
@@ -116,10 +138,14 @@ export function windowIou(
   const leftBottom = left.top + left.height;
   const rightBottom = right.top + right.height;
 
-  const overlapWidth =
-    Math.max(0, Math.min(leftRight, rightRight) - Math.max(left.left, right.left));
-  const overlapHeight =
-    Math.max(0, Math.min(leftBottom, rightBottom) - Math.max(left.top, right.top));
+  const overlapWidth = Math.max(
+    0,
+    Math.min(leftRight, rightRight) - Math.max(left.left, right.left),
+  );
+  const overlapHeight = Math.max(
+    0,
+    Math.min(leftBottom, rightBottom) - Math.max(left.top, right.top),
+  );
   const intersection = overlapWidth * overlapHeight;
 
   if (intersection <= 0) {

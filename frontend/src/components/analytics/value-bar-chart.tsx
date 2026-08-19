@@ -88,9 +88,7 @@ export function ValueBarChart({
                 key={fraction}
                 className={cn(
                   "w-full border-t",
-                  fraction === 0
-                    ? "border-chart-grid"
-                    : "border-background/35",
+                  fraction === 0 ? "border-chart-grid" : "border-background/35",
                 )}
               />
             ))}

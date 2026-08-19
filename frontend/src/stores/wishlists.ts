@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import * as wishlistsApi from "@/lib/api/wishlists";
-import { syncWishlistRules, type WishlistSyncResult } from "@/lib/wishlists/sync";
+import {
+  syncWishlistRules,
+  type WishlistSyncResult,
+} from "@/lib/wishlists/sync";
 
 export type {
   WishlistResponse,
@@ -206,12 +209,7 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     input: wishlistsApi.UpdateWishlistCardInput,
   ) => {
     try {
-      await wishlistsApi.updateWishlistCard(
-        token,
-        wishlistId,
-        cardId,
-        input,
-      );
+      await wishlistsApi.updateWishlistCard(token, wishlistId, cardId, input);
       await get().fetchWishlists(token);
     } catch (error) {
       const message =

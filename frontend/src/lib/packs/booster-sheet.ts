@@ -206,7 +206,7 @@ function paintSheen(
 ): void {
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, "rgba(255,255,255,0.20)");
-  g.addColorStop(0.4, rgba(hexToRgb(accent), 0.10));
+  g.addColorStop(0.4, rgba(hexToRgb(accent), 0.1));
   g.addColorStop(1, "rgba(255,255,255,0)");
   ctx.save();
   ctx.globalCompositeOperation = "screen";

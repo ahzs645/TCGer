@@ -199,12 +199,14 @@ struct OnlineCodeScannerSheet: View {
                 if DataScannerViewController.isSupported,
                    DataScannerViewController.isAvailable {
                     OnlineCodeDataScanner { value in
-                        let normalized = OnlineCodeParser.normalize(value)
+                        let code = OnlineCodeParser.canonicalCode(value)
+                        let normalized = OnlineCodeParser.normalize(code)
                         guard scannedCodes.count < 250,
+                              normalized.count >= 4,
                               !scannedCodes.contains(where: {
                                   OnlineCodeParser.normalize($0) == normalized
                               }) else { return }
-                        scannedCodes.append(value.trimmingCharacters(in: .whitespacesAndNewlines))
+                        scannedCodes.append(code)
                         HapticManager.impact(.light)
                     }
                     .ignoresSafeArea(edges: .bottom)
@@ -358,8 +360,34 @@ private struct OnlineCodeDataScanner: UIViewControllerRepresentable {
 }
 
 enum OnlineCodeParser {
+    private static let redemptionCodeParameters = [
+        "2d_code", "code", "redeem_code", "redemption_code"
+    ]
+
+    static func canonicalCode(_ value: String) -> String {
+        let cleaned = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "[‐‑‒–—―]", with: "-", options: .regularExpression)
+        guard !cleaned.isEmpty else { return "" }
+
+        if let components = URLComponents(string: cleaned),
+           let queryItems = components.queryItems,
+           let candidate = queryItems.first(where: {
+               redemptionCodeParameters.contains($0.name.lowercased())
+           })?.value?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !candidate.isEmpty {
+            return candidate.replacingOccurrences(
+                of: "[‐‑‒–—―]",
+                with: "-",
+                options: .regularExpression
+            )
+        }
+
+        return cleaned
+    }
+
     static func normalize(_ value: String) -> String {
-        value
+        canonicalCode(value)
             .components(separatedBy: .whitespacesAndNewlines)
             .joined()
             .uppercased()
@@ -369,7 +397,7 @@ enum OnlineCodeParser {
         var seen = Set<String>()
         return input
             .components(separatedBy: CharacterSet(charactersIn: "\n,;"))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map(canonicalCode)
             .filter { value in
                 let normalized = normalize(value)
                 return normalized.count >= 4 && seen.insert(normalized).inserted

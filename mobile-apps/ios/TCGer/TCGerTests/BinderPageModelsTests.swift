@@ -3,9 +3,9 @@ import XCTest
 
 @MainActor
 final class BinderPageModelsTests: XCTestCase {
-    func testOnlyMatchedDetectionsAreIncludedByDefault() {
+    func testDetectionsWithMatchesAreIncludedByDefault() {
         XCTAssertTrue(BinderPageScanner.shouldIncludeByDefault(status: .matched))
-        XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .uncertain))
+        XCTAssertTrue(BinderPageScanner.shouldIncludeByDefault(status: .uncertain))
         XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .unmatched))
     }
 

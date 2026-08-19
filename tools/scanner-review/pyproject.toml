@@ -1,0 +1,11 @@
+[project]
+name = "tcger-scanner-review"
+version = "0.1.0"
+description = "Local FiftyOne OSS workbench for TCGer scanner evaluation"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "fiftyone==1.20.1",
+]
+
+[tool.uv]
+package = false

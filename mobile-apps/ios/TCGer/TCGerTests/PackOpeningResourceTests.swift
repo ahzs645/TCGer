@@ -228,12 +228,29 @@ final class PackOpeningResourceTests: XCTestCase {
                     "setID": "base1",
                     "setLabel": "Base Set",
                     "variationLabel": "Charizard",
+                    "packPoolID": "base1",
                     "oddsReference": [
                         "title": "Pokémon Trading Card Sequences",
                         "url": "https://www.cs.sjsu.edu/~stamp/cv/papers/pokemon.pdf",
                         "sampleSize": 153,
                         "note": "Historical sample; not official factory odds."
                     ]
+                ]],
+                "cardPools": [[
+                    "id": "base1",
+                    "label": "Base Set",
+                    "cards": [[
+                        "cardId": "base1-4",
+                        "name": "Charizard",
+                        "rarity": "Holo Rare",
+                        "tier": "chase",
+                        "collectorNumber": "4",
+                        "tcg": "pokemon",
+                        "setCode": "base1",
+                        "setName": "Base Set",
+                        "imageUrl": "https://example.com/charizard-high.webp",
+                        "imageUrlSmall": "https://example.com/charizard-low.webp"
+                    ]]
                 ]],
                 "revealedCount": 3,
                 "totalCards": 10,
@@ -255,6 +272,8 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(state?.packOptions.first?.id, "base-charizard")
         XCTAssertEqual(state?.packSets.first?.label, "Base Set")
         XCTAssertEqual(state?.selectedVariationLabel, "Charizard")
+        XCTAssertEqual(state?.packOptions.first?.packPoolID, "base1")
+        XCTAssertEqual(state?.availableCardPools.first?.cards.first?.name, "Charizard")
         XCTAssertEqual(state?.selectedOddsReference?.sampleSize, 153)
         XCTAssertEqual(
             state?.selectedOddsReference?.destination?.host,
@@ -279,6 +298,7 @@ final class PackOpeningResourceTests: XCTestCase {
                 setID: "base1",
                 setLabel: "Base Set",
                 variationLabel: "Venusaur",
+                packPoolID: "base1",
                 oddsReference: baseOdds
             ),
             PackOpeningInterfaceState.PackOption(
@@ -287,6 +307,7 @@ final class PackOpeningResourceTests: XCTestCase {
                 setID: "base1",
                 setLabel: "Base Set",
                 variationLabel: "Blastoise",
+                packPoolID: "base1",
                 oddsReference: baseOdds
             ),
             PackOpeningInterfaceState.PackOption(
@@ -295,6 +316,7 @@ final class PackOpeningResourceTests: XCTestCase {
                 setID: "swsh7",
                 setLabel: "Evolving Skies",
                 variationLabel: "Aurora wrapper",
+                packPoolID: "swsh7",
                 oddsReference: nil
             )
         ]
@@ -307,6 +329,7 @@ final class PackOpeningResourceTests: XCTestCase {
             packBackwards: false,
             currentCardFaceUp: true,
             packOptions: options,
+            cardPools: [],
             revealedCount: 0,
             totalCards: 0,
             currentPackNumber: 0,

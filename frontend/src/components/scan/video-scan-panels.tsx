@@ -62,9 +62,7 @@ export interface ScanControlsProps {
 
 export function ScanControlsSidebar(props: ScanControlsProps) {
   const hashScopeLabel =
-    props.scanFilter === "all"
-      ? "all games"
-      : GAME_LABELS[props.scanFilter];
+    props.scanFilter === "all" ? "all games" : GAME_LABELS[props.scanFilter];
 
   return (
     <div className="space-y-5">
@@ -437,11 +435,7 @@ export function ActiveTracksPanel({
 
 // ---------- Timeline Panel ----------
 
-export function TimelinePanel({
-  timeline,
-}: {
-  timeline: VideoTimelineItem[];
-}) {
+export function TimelinePanel({ timeline }: { timeline: VideoTimelineItem[] }) {
   return (
     <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
       <div className="flex items-center justify-between">

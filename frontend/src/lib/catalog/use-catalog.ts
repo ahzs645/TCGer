@@ -149,11 +149,12 @@ export function useCatalog() {
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    const [installedResult, sealedResult, manifestResult] = await Promise.allSettled([
-      getInstalledCatalogs(),
-      getInstalledSealedCatalogs(),
-      fetchCatalogManifest(),
-    ]);
+    const [installedResult, sealedResult, manifestResult] =
+      await Promise.allSettled([
+        getInstalledCatalogs(),
+        getInstalledSealedCatalogs(),
+        fetchCatalogManifest(),
+      ]);
     const installedPacks =
       installedResult.status === "fulfilled" ? installedResult.value : [];
     const installedSealedPacks =
@@ -184,7 +185,7 @@ export function useCatalog() {
           totalBytes:
             (states[tcg].manifest?.bytes ?? 0) +
               (includeSealedProducts
-                ? states[tcg].manifest?.sealedProducts?.bytes ?? 0
+                ? (states[tcg].manifest?.sealedProducts?.bytes ?? 0)
                 : 0) || null,
           percent: 0,
         },

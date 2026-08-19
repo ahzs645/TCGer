@@ -50,14 +50,57 @@ export function getOnlineCodeGame(tcg: TcgCode): OnlineCodeGame {
   return onlineCodeGames.find((game) => game.value === tcg)!;
 }
 
+const redemptionCodeParameters = new Set([
+  "2d_code",
+  "code",
+  "redeem_code",
+  "redemption_code",
+]);
+
+function normalizeDashes(value: string): string {
+  return value.replace(/[‐‑‒–—―]/g, "-");
+}
+
+export function canonicalizeOnlineCode(value: string): string {
+  const cleaned = normalizeDashes(value.trim());
+  if (!cleaned) return "";
+
+  try {
+    const url = new URL(cleaned);
+    for (const [name, candidate] of url.searchParams) {
+      if (redemptionCodeParameters.has(name.toLocaleLowerCase("en-US"))) {
+        const code = normalizeDashes(candidate.trim());
+        if (code) return code;
+      }
+    }
+  } catch {
+    // Printed codes are expected to be non-URL values.
+  }
+
+  const queryMatch = cleaned.match(
+    /[?&](?:2d_code|code|redeem_code|redemption_code)=([^&#]+)/i,
+  );
+  if (queryMatch?.[1]) {
+    try {
+      return normalizeDashes(decodeURIComponent(queryMatch[1])).trim();
+    } catch {
+      return normalizeDashes(queryMatch[1]).trim();
+    }
+  }
+
+  return cleaned;
+}
+
 export function normalizeOnlineCode(value: string): string {
-  return value.trim().replace(/\s+/g, "").toLocaleUpperCase("en-US");
+  return canonicalizeOnlineCode(value)
+    .replace(/\s+/g, "")
+    .toLocaleUpperCase("en-US");
 }
 
 export function parseOnlineCodeInput(value: string): string[] {
   const values = value
     .split(/[\n,;]+/)
-    .map((code) => code.trim())
+    .map(canonicalizeOnlineCode)
     .filter(Boolean);
   const seen = new Set<string>();
   return values.filter((code) => {

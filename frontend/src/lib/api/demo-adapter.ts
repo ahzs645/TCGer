@@ -1662,7 +1662,9 @@ function handleFinance(
     });
   }
   if (segments[0] === "realized-performance" && method === "GET") {
-    const sales = transactions.filter((transaction) => transaction.type === "sale");
+    const sales = transactions.filter(
+      (transaction) => transaction.type === "sale",
+    );
     const metrics = sales.map((sale) => {
       const fees = sale.fees ?? 0;
       const shippingCost = sale.shippingCost ?? 0;
@@ -1680,20 +1682,41 @@ function handleFinance(
         fees,
         shippingCost,
         netProceeds,
-        realizedProfit: sale.costBasis === undefined ? undefined : netProceeds - sale.costBasis,
+        realizedProfit:
+          sale.costBasis === undefined
+            ? undefined
+            : netProceeds - sale.costBasis,
         holdingDays: sale.holdingDays,
       };
     });
     const byCurrency = new Map<string, typeof metrics>();
     for (const metric of metrics) {
-      byCurrency.set(metric.currency, [...(byCurrency.get(metric.currency) ?? []), metric]);
+      byCurrency.set(metric.currency, [
+        ...(byCurrency.get(metric.currency) ?? []),
+        metric,
+      ]);
     }
     const breakdown = (field: "platform" | "tcg") => {
-      const groups = new Map<string, { key: string; currency: string; revenue: number; realizedProfit: number; saleCount: number }>();
+      const groups = new Map<
+        string,
+        {
+          key: string;
+          currency: string;
+          revenue: number;
+          realizedProfit: number;
+          saleCount: number;
+        }
+      >();
       for (const metric of metrics) {
         const key = metric[field] || "Unspecified";
         const mapKey = `${metric.currency}:${key}`;
-        const group = groups.get(mapKey) ?? { key, currency: metric.currency, revenue: 0, realizedProfit: 0, saleCount: 0 };
+        const group = groups.get(mapKey) ?? {
+          key,
+          currency: metric.currency,
+          revenue: 0,
+          realizedProfit: 0,
+          saleCount: 0,
+        };
         group.revenue += metric.revenue;
         group.realizedProfit += metric.realizedProfit ?? 0;
         group.saleCount += 1;
@@ -1704,7 +1727,9 @@ function handleFinance(
     const inventory = demoCollectionCards();
     return json({
       byCurrency: [...byCurrency.entries()].map(([currency, rows]) => {
-        const holding = rows.flatMap((row) => row.holdingDays === undefined ? [] : [row.holdingDays]);
+        const holding = rows.flatMap((row) =>
+          row.holdingDays === undefined ? [] : [row.holdingDays],
+        );
         return {
           currency,
           revenue: rows.reduce((sum, row) => sum + row.revenue, 0),
@@ -1712,20 +1737,48 @@ function handleFinance(
           fees: rows.reduce((sum, row) => sum + row.fees, 0),
           shippingCost: rows.reduce((sum, row) => sum + row.shippingCost, 0),
           netProceeds: rows.reduce((sum, row) => sum + row.netProceeds, 0),
-          realizedProfit: rows.reduce((sum, row) => sum + (row.realizedProfit ?? 0), 0),
+          realizedProfit: rows.reduce(
+            (sum, row) => sum + (row.realizedProfit ?? 0),
+            0,
+          ),
           saleCount: rows.length,
-          costedSaleCount: rows.filter((row) => row.costBasis !== undefined).length,
-          averageHoldingDays: holding.length ? Math.round(holding.reduce((sum, value) => sum + value, 0) / holding.length) : undefined,
+          costedSaleCount: rows.filter((row) => row.costBasis !== undefined)
+            .length,
+          averageHoldingDays: holding.length
+            ? Math.round(
+                holding.reduce((sum, value) => sum + value, 0) / holding.length,
+              )
+            : undefined,
         };
       }),
       byPlatform: breakdown("platform"),
       byGame: breakdown("tcg"),
       recentSales: metrics.slice(0, 8),
-      bestReturns: [...metrics].filter((row) => row.realizedProfit !== undefined).sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0)).slice(0, 5),
-      worstReturns: [...metrics].filter((row) => row.realizedProfit !== undefined).sort((a, b) => (a.realizedProfit ?? 0) - (b.realizedProfit ?? 0)).slice(0, 5),
-      fastestSales: [...metrics].filter((row) => row.holdingDays !== undefined).sort((a, b) => (a.holdingDays ?? 0) - (b.holdingDays ?? 0)).slice(0, 5),
-      inventoryCost: inventory.reduce((sum, { card }) => sum + (card.copies ?? []).reduce((copySum, copy) => copySum + (copy.acquisitionPrice ?? 0), 0), 0),
-      inventoryMarketValue: inventory.reduce((sum, { card }) => sum + card.price * card.quantity, 0),
+      bestReturns: [...metrics]
+        .filter((row) => row.realizedProfit !== undefined)
+        .sort((a, b) => (b.realizedProfit ?? 0) - (a.realizedProfit ?? 0))
+        .slice(0, 5),
+      worstReturns: [...metrics]
+        .filter((row) => row.realizedProfit !== undefined)
+        .sort((a, b) => (a.realizedProfit ?? 0) - (b.realizedProfit ?? 0))
+        .slice(0, 5),
+      fastestSales: [...metrics]
+        .filter((row) => row.holdingDays !== undefined)
+        .sort((a, b) => (a.holdingDays ?? 0) - (b.holdingDays ?? 0))
+        .slice(0, 5),
+      inventoryCost: inventory.reduce(
+        (sum, { card }) =>
+          sum +
+          (card.copies ?? []).reduce(
+            (copySum, copy) => copySum + (copy.acquisitionPrice ?? 0),
+            0,
+          ),
+        0,
+      ),
+      inventoryMarketValue: inventory.reduce(
+        (sum, { card }) => sum + card.price * card.quantity,
+        0,
+      ),
       inventoryCurrency: "USD",
       truncated: false,
     });
@@ -1758,10 +1811,17 @@ function handleFinance(
       fees: input.fees,
       shippingCost: input.shippingCost,
       acquiredAt: input.acquiredAt,
-      netProceeds: input.type === "sale" ? input.amount - (input.fees ?? 0) - (input.shippingCost ?? 0) : undefined,
-      realizedProfit: input.type === "sale" && input.costBasis !== undefined
-        ? input.amount - (input.fees ?? 0) - (input.shippingCost ?? 0) - input.costBasis
-        : undefined,
+      netProceeds:
+        input.type === "sale"
+          ? input.amount - (input.fees ?? 0) - (input.shippingCost ?? 0)
+          : undefined,
+      realizedProfit:
+        input.type === "sale" && input.costBasis !== undefined
+          ? input.amount -
+            (input.fees ?? 0) -
+            (input.shippingCost ?? 0) -
+            input.costBasis
+          : undefined,
       notes: input.notes,
       date: input.date ?? new Date().toISOString(),
     };

@@ -170,10 +170,12 @@ export function CardScanPanel() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const liveStreamRef = useRef<MediaStream | null>(null);
-  const { token, isAuthenticated } = useAuthStore(useShallow((state) => ({
-    token: state.token,
-    isAuthenticated: state.isAuthenticated,
-  })));
+  const { token, isAuthenticated } = useAuthStore(
+    useShallow((state) => ({
+      token: state.token,
+      isAuthenticated: state.isAuthenticated,
+    })),
+  );
   const selectedGame = useGameFilterStore((state) => state.selectedGame);
   const [scanFilter, setScanFilter] = useState<ScanFilter>(
     selectedGame === "all" || !isSupportedScannerTcg(selectedGame)
@@ -1809,23 +1811,32 @@ function AddScanMatchToCollection({
   match: CardScanMatch;
   card: CardType | null;
 }) {
-  const { token, isAuthenticated } = useAuthStore(useShallow((state) => ({
-    token: state.token,
-    isAuthenticated: state.isAuthenticated,
-  })));
-  const { collections, addCardToBinder, fetchCollections, hasFetched, isLoading } =
-    useCollectionsStore(useShallow((state) => ({
+  const { token, isAuthenticated } = useAuthStore(
+    useShallow((state) => ({
+      token: state.token,
+      isAuthenticated: state.isAuthenticated,
+    })),
+  );
+  const {
+    collections,
+    addCardToBinder,
+    fetchCollections,
+    hasFetched,
+    isLoading,
+  } = useCollectionsStore(
+    useShallow((state) => ({
       collections: state.collections,
       addCardToBinder: state.addCardToBinder,
       fetchCollections: state.fetchCollections,
       hasFetched: state.hasFetched,
       isLoading: state.isLoading,
-    })));
+    })),
+  );
 
   const [binderId, setBinderId] = useState("");
-  const [status, setStatus] = useState<"idle" | "pending" | "success" | "error">(
-    "idle",
-  );
+  const [status, setStatus] = useState<
+    "idle" | "pending" | "success" | "error"
+  >("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
