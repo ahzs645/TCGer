@@ -95,6 +95,11 @@ neighbour with it. The generator keeps the reverse face flat and puts the seal
 in its own 0.023-wide strip, which is what the film actually does. **That ramp
 is the entire 0.037 maximum deviation between the two meshes.**
 
+**The crimp caps are zipped, not fanned.** A fan to the ring's centre looks
+identical — the crimp is only 0.075 thick — but it makes triangles that span
+half the pack's width, and the tear cares about exactly that. See "What this
+buys" below; the first version fanned, and it cost a whole subdivision level.
+
 **Normals come from the sweep, not from the faces.** They are central
 differences across the grid, so the gussets shade round rather than faceted —
 the gussets are the whole reason a pack reads as a pouch instead of a slab. The
@@ -108,10 +113,10 @@ and reports 0 of 102 inward. The three that do flag sit at exactly
 
 | | shipped | generated |
 |---|---|---|
-| triangles | 282 | 306 |
-| unique positions | 143 | 146 |
+| triangles | 282 | 320 |
+| widest triangle, in x | 1.2839 | **1.1463** |
 | bounding box | 4.5544 × 8.1447 × 0.5747 | 4.5544 × 8.1447 × 0.5746 |
-| surface area | 80.222 | **80.233** (+0.014%) |
+| surface area | 80.222 | **80.227** (+0.006%) |
 | inward body normals | 0 / 102 | 0 / 102 |
 
 Surface distance, sampling triangle corners, edge midpoints and centroids on
@@ -149,6 +154,32 @@ gusset passes its 0.9 dot threshold. Anything painted against the read-back
 number is therefore drawn slightly too wide and pre-stretched slightly wrong.
 With a built mesh nobody has to guess: the budget is the answer.
 
+## What this buys: the tear
+
+`splitGeometryByCut` refines the **whole** mesh until the cut holds straight
+across its widest triangle — uniformly, because refining only near the cut would
+leave T-junctions that show as hairline cracks along the tear. So the cost of a
+tear is set by one number: the widest triangle in x. On both meshes that number
+comes from the crimp cap, not the panels.
+
+Measured, tearing at y≈3.1 with three cut shapes:
+
+| mesh | base | widest x | straight | gentle drag | fast wobble |
+|---|---|---|---|---|---|
+| shipped | 282 | 1.2839 | L0 · 282 | L1 · 1,128 | L3 · **18,048** |
+| generated, defaults | 320 | 1.1463 | L0 · 320 | L1 · 1,280 | L3 · 20,480 |
+| generated, `panelSegments: 8` | 552 | **0.5862** | L0 · 552 | **L0 · 552** | **L2 · 8,832** |
+
+Paying 552 base triangles instead of 282 — still one cheap draw call — takes a
+gentle drag from one subdivision level to **none**, and halves the worst case
+from 18,048 triangles to 8,832. That trade is a constructor argument on a built
+mesh. On a loaded one it is a remodelling job.
+
+It also cuts the other way, and did: the first version of the cap fanned to the
+ring's centre, which put its widest triangle at **2.2772** — worse than the
+shipped mesh — and pushed a gentle drag to level 2 (4,896 triangles). Zipping the
+two films together instead fixed it, and is what a crimped seal actually is.
+
 ## Where this leaves things
 
 The generator is standalone — three.js plus pack-core's public `SheetLayout`
@@ -165,7 +196,8 @@ resize by changing a number.
 ## Verification
 
 - `tsc --noEmit` clean; `npm test` 101/101; eslint reports nothing on the module.
-- Every number above is produced by a harness that loads the real `pack.obj`
+- Tear costs measured through pack-core's own `splitGeometryByCut`.
+- Every other number above is produced by a harness that loads the real `pack.obj`
   through pack-core's own `parseObj` and runs pack-core's own `readSheetLayout`
   on both meshes — no transcriptions.
 - Renders are headless Chromium (swiftshader) with the same

@@ -416,30 +416,81 @@ export function buildPackGeometry(
     }
   }
 
-  // Crimp caps: a fan to the ring's centre, which is what gives the sheet its
-  // ±Y strips — the dashes the wrapper's fold furniture is painted into.
+  /**
+   * Crimp caps: the two films zipped together, not a fan to the centre.
+   *
+   * A fan looks the same — the crimp is only 0.075 thick — but it makes
+   * triangles that span half the pack's width, and the tear cares. `splitMesh`
+   * refines the whole mesh until the cut holds straight across its *widest*
+   * triangle, so one wide cap triangle costs an extra global subdivision level:
+   * measured, a fan cap put a gentle drag at level 2 (4,896 triangles) where
+   * the shipped mesh needs level 1 (1,128). Zipping keeps every cap triangle
+   * inside one panel segment.
+   *
+   * The two rims also take opposite edges of the sheet's crimp strip, which is
+   * what gives those regions any height at all — and is what the film does,
+   * folding over onto itself.
+   */
   const cap = (ri: number, sign: 1 | -1) => {
     const loop = loops[ri];
     const y = rings[ri].y;
-    // The rim keeps the body's v and only the fan's centre takes the extra, so
-    // the cap covers a strip rather than a line — that strip is the crimp rect
-    // the wrapper's fold dashes are painted into.
-    const vRim = vForY(o, y);
-    const vHub = vRim + sign * o.sheet.capV;
-    const uHub = loop.reduce((sum, p) => sum + p.u, 0) / loop.length;
-    for (let li = 0; li < loopLen - 1; li++) {
-      const a = loop[li];
-      const b = loop[li + 1];
-      const tri = sign > 0 ? [a, b] : [b, a];
-      pos.push(tri[0].x, y, tri[0].z);
-      uv.push(tri[0].u, vRim);
-      nor.push(0, sign, 0);
-      pos.push(tri[1].x, y, tri[1].z);
-      uv.push(tri[1].u, vRim);
-      nor.push(0, sign, 0);
-      pos.push(0, y, 0);
-      uv.push(uHub, vHub);
-      nor.push(0, sign, 0);
+    const vNear = vForY(o, y);
+    const vFar = vNear + sign * o.sheet.capV;
+
+    // Split the ring at its extremes in x: one side of that is the display
+    // face's half of the seal, the other is the reverse face's.
+    let iMin = 0;
+    let iMax = 0;
+    for (let i = 0; i < loopLen; i++) {
+      if (loop[i].x < loop[iMin].x) iMin = i;
+      if (loop[i].x > loop[iMax].x) iMax = i;
+    }
+    const between = (from: number, to: number) => {
+      const out: LoopPoint[] = [];
+      for (let i = from; ; i = (i + 1) % loopLen) {
+        out.push(loop[i]);
+        if (i === to) break;
+      }
+      return out;
+    };
+    const halfA = between(iMax, iMin);
+    const halfB = between(iMin, iMax);
+
+    /** Where a half-ring sits at a given x, walked as a polyline. */
+    const sample = (half: LoopPoint[], x: number): LoopPoint => {
+      for (let i = 0; i < half.length - 1; i++) {
+        const a = half[i];
+        const b = half[i + 1];
+        const lo = Math.min(a.x, b.x);
+        const hi = Math.max(a.x, b.x);
+        if (x < lo - 1e-6 || x > hi + 1e-6) continue;
+        const t = Math.abs(b.x - a.x) < 1e-9 ? 0 : (x - a.x) / (b.x - a.x);
+        return { x, z: a.z + (b.z - a.z) * t, u: a.u + (b.u - a.u) * t };
+      }
+      const nearest = half.reduce((p, q) =>
+        Math.abs(q.x - x) < Math.abs(p.x - x) ? q : p,
+      );
+      return { ...nearest, x };
+    };
+
+    // Every x either half turns over, so no quad straddles a vertex of either.
+    const xs = [...new Set(loop.map((p) => +p.x.toFixed(6)))].sort((a, b) => a - b);
+
+    for (let i = 0; i < xs.length - 1; i++) {
+      const a0 = sample(halfA, xs[i]);
+      const a1 = sample(halfA, xs[i + 1]);
+      const b0 = sample(halfB, xs[i]);
+      const b1 = sample(halfB, xs[i + 1]);
+      const quad: Array<[LoopPoint, number]> = [
+        [a0, vNear], [a1, vNear], [b1, vFar],
+        [a0, vNear], [b1, vFar], [b0, vFar],
+      ];
+      const order = sign > 0 ? quad : [quad[0], quad[2], quad[1], quad[3], quad[5], quad[4]];
+      for (const [p, v] of order) {
+        pos.push(p.x, y, p.z);
+        uv.push(p.u, v);
+        nor.push(0, sign, 0);
+      }
     }
   };
   cap(rings.length - 1, 1);
