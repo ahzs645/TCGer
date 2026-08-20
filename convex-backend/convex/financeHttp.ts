@@ -41,10 +41,12 @@ export function registerFinanceRoutes(http: HttpRouter) {
     handler: httpAction(async (ctx, request) => {
       try {
         const identity = await requireBridgeIdentity(ctx, request);
+        const collectionEntryId = new URL(request.url).searchParams.get("collectionEntryId") ?? undefined;
         const transactions = await ctx.runQuery(
           internal.finance.listTransactions,
           {
             subject: identity.subject,
+            collectionEntryId,
           },
         );
         return json(transactions);
@@ -73,12 +75,14 @@ export function registerFinanceRoutes(http: HttpRouter) {
               (body.quantity as number) < 1)) ||
           (body.date !== undefined && !isIsoDateTime(body.date)) ||
           !hasValidOptionalStrings(body, [
+            "collectionEntryId",
             "cardId",
             "externalId",
             "tcg",
             "cardName",
             "currency",
             "platform",
+            "sourceUrl",
             "notes",
           ]) ||
           ["costBasis", "fees", "shippingCost"].some(
@@ -103,6 +107,7 @@ export function registerFinanceRoutes(http: HttpRouter) {
           {
             subject: identity.subject,
             type: body.type,
+            collectionEntryId: body.collectionEntryId as string | undefined,
             cardId: body.cardId as string | undefined,
             externalId: body.externalId as string | undefined,
             tcg: body.tcg as string | undefined,
@@ -111,6 +116,7 @@ export function registerFinanceRoutes(http: HttpRouter) {
             amount: body.amount,
             currency: body.currency as string | undefined,
             platform: body.platform as string | undefined,
+            sourceUrl: body.sourceUrl as string | undefined,
             costBasis: body.costBasis as number | undefined,
             fees: body.fees as number | undefined,
             shippingCost: body.shippingCost as number | undefined,
@@ -122,6 +128,74 @@ export function registerFinanceRoutes(http: HttpRouter) {
         return json(transaction, 201);
       } catch (error) {
         return handleConvexError(error, "Failed to create transaction");
+      }
+    }),
+  });
+
+  http.route({
+    pathPrefix: "/finance/transactions/",
+    method: "PATCH",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const url = new URL(request.url);
+        const segments = url.pathname
+          .replace(/^\/finance\/transactions\//, "")
+          .split("/")
+          .filter(Boolean);
+        if (segments.length !== 1) {
+          return errorJson(404, "NOT_FOUND", "Route not found");
+        }
+        const body = asRecord(await parseJsonBody(request));
+        const nullableStringFields = [
+          "collectionEntryId",
+          "cardId",
+          "externalId",
+          "tcg",
+          "cardName",
+          "platform",
+          "sourceUrl",
+          "notes",
+        ];
+        const invalidNullableString = nullableStringFields.some(
+          (field) =>
+            body[field] !== undefined &&
+            body[field] !== null &&
+            typeof body[field] !== "string",
+        );
+        if (
+          invalidNullableString ||
+          (body.amount !== undefined &&
+            (typeof body.amount !== "number" ||
+              !Number.isFinite(body.amount) ||
+              body.amount <= 0)) ||
+          (body.quantity !== undefined &&
+            (!Number.isInteger(body.quantity) || (body.quantity as number) < 1)) ||
+          (body.currency !== undefined &&
+            (typeof body.currency !== "string" || !/^[A-Za-z]{3}$/.test(body.currency))) ||
+          (body.date !== undefined && !isIsoDateTime(body.date))
+        ) {
+          return errorJson(400, "VALIDATION_ERROR", "Payload validation failed");
+        }
+        const transaction = await ctx.runMutation(internal.finance.updateTransaction, {
+          subject: identity.subject,
+          transactionId: segments[0] as Id<"transactions">,
+          collectionEntryId: body.collectionEntryId as string | null | undefined,
+          cardId: body.cardId as string | null | undefined,
+          externalId: body.externalId as string | null | undefined,
+          tcg: body.tcg as string | null | undefined,
+          cardName: body.cardName as string | null | undefined,
+          quantity: body.quantity as number | undefined,
+          amount: body.amount as number | undefined,
+          currency: body.currency as string | undefined,
+          platform: body.platform as string | null | undefined,
+          sourceUrl: body.sourceUrl as string | null | undefined,
+          notes: body.notes as string | null | undefined,
+          date: body.date as string | undefined,
+        });
+        return json(transaction);
+      } catch (error) {
+        return handleConvexError(error, "Failed to update transaction");
       }
     }),
   });

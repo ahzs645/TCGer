@@ -178,7 +178,7 @@ struct CardSearchView: View {
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 DefaultToolbarItem(kind: .search, placement: .bottomBar)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.hard, for: .top)
             .onSubmit(of: .search) {
                 isSearchPresented = false
                 Task { await performSearch() }
@@ -566,6 +566,13 @@ struct CardSearchView: View {
                     game: selectedGame
                 )
                 searchResults = response.cards
+            }
+            if searchScope == .catalog {
+                searchResults = SearchTextNormalizer.rankedByName(
+                    searchResults,
+                    query: query,
+                    name: \.name
+                )
             }
             isSearching = false
         } catch {

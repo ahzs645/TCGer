@@ -2117,7 +2117,9 @@ http.route({
             typeof body.notes === "string" || body.notes === null ? body.notes : undefined,
           price: typeof body.price === "number" ? body.price : undefined,
           acquisitionPrice:
-            typeof body.acquisitionPrice === "number" ? body.acquisitionPrice : undefined,
+            typeof body.acquisitionPrice === "number" || body.acquisitionPrice === null
+              ? body.acquisitionPrice
+              : undefined,
           serialNumber:
             typeof body.serialNumber === "string" || body.serialNumber === null
               ? body.serialNumber

@@ -21,6 +21,54 @@ nonisolated enum SearchTextNormalizer {
         return key(value).contains(queryKey)
     }
 
+    /// A normalized key that preserves word boundaries. Matching still ignores
+    /// punctuation differences, but `Darkrai` and `Dark Raichu` no longer look
+    /// like equally strong name prefixes.
+    static func boundaryKey(_ value: String) -> String {
+        value
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: nil
+            )
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    /// Stable, name-first relevance ordering for result sets that may arrive
+    /// in catalog or provider order.
+    static func rankedByName<T>(
+        _ values: [T],
+        query: String,
+        name: (T) -> String
+    ) -> [T] {
+        values.enumerated()
+            .sorted { left, right in
+                let leftRank = nameRelevanceRank(name(left.element), query: query)
+                let rightRank = nameRelevanceRank(name(right.element), query: query)
+                return leftRank == rightRank
+                    ? left.offset < right.offset
+                    : leftRank < rightRank
+            }
+            .map(\.element)
+    }
+
+    private static func nameRelevanceRank(_ name: String, query: String) -> Int {
+        let queryBoundaryKey = boundaryKey(query)
+        let nameBoundaryKey = boundaryKey(name)
+        let queryKey = key(query)
+        let nameKey = key(name)
+
+        guard !queryBoundaryKey.isEmpty, !queryKey.isEmpty else { return 6 }
+        if nameBoundaryKey == queryBoundaryKey { return 0 }
+        if nameBoundaryKey.hasPrefix("\(queryBoundaryKey) ") { return 1 }
+        if nameBoundaryKey.hasPrefix(queryBoundaryKey) { return 2 }
+        if nameKey.hasPrefix(queryKey) { return 3 }
+        if nameBoundaryKey.contains(queryBoundaryKey) { return 4 }
+        if nameKey.contains(queryKey) { return 5 }
+        return 6
+    }
+
     /// Search terms split only at whitespace. Punctuation within a printed
     /// identifier stays meaningful, so `Lucario 3/11` becomes `lucario` and
     /// `311` rather than three unrelated numeric terms.

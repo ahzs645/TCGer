@@ -256,6 +256,7 @@ export const updateCardSchema = z
     language: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
     serialNumber: z.string().nullable().optional(),
+    acquisitionPrice: z.number().finite().nonnegative().nullable().optional(),
     acquiredAt: z.string().datetime().nullable().optional(),
     isFoil: z.boolean().optional(),
     finishCode: z.string().min(1).nullable().optional(),

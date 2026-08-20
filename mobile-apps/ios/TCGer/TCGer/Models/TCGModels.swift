@@ -1148,12 +1148,16 @@ struct SealedOpeningLedger: Identifiable, Codable, Hashable, Sendable {
 struct Transaction: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let type: String
+    var collectionEntryId: String? = nil
+    var cardId: String? = nil
+    var externalId: String? = nil
     let cardName: String?
     let tcg: String?
     let quantity: Int
     let amount: Double
     let currency: String
     let platform: String?
+    var sourceUrl: String? = nil
     var costBasis: Double? = nil
     var fees: Double? = nil
     var shippingCost: Double? = nil

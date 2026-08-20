@@ -1537,6 +1537,8 @@ final class LocalStore {
         condition: String?,
         language: String?,
         notes: String?,
+        acquisitionPrice: Double?,
+        acquiredAt: String?,
         variant: CardCopyVariant?,
         isSigned: Bool?,
         isAltered: Bool?,
@@ -1545,6 +1547,7 @@ final class LocalStore {
         certNumber: String?,
         storageLocation: String?,
         includeOwnedCopyDetails: Bool,
+        includeAcquisitionDetails: Bool,
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         newPrint: Card?,
@@ -1681,6 +1684,7 @@ final class LocalStore {
         if condition != nil ||
             language != nil ||
             notes != nil ||
+            includeAcquisitionDetails ||
             variant != nil ||
             isSigned != nil ||
             isAltered != nil ||
@@ -1696,9 +1700,9 @@ final class LocalStore {
                     language: language ?? copy.language,
                     notes: notes ?? copy.notes,
                     price: copy.price,
-                    acquisitionPrice: copy.acquisitionPrice,
+                    acquisitionPrice: includeAcquisitionDetails ? acquisitionPrice : copy.acquisitionPrice,
                     serialNumber: copy.serialNumber,
-                    acquiredAt: copy.acquiredAt,
+                    acquiredAt: includeAcquisitionDetails ? acquiredAt : copy.acquiredAt,
                     isFoil: variant?.isFoil ?? copy.isFoil,
                     finishCode: variant == nil ? copy.finishCode : variant?.finishCode,
                     finishLabel: variant == nil ? copy.finishLabel : variant?.finishLabel,
@@ -3198,7 +3202,10 @@ final class LocalStore {
 
     // MARK: - Finance Accessors
 
-    func getTransactions() -> [Transaction] { transactions }
+    func getTransactions(collectionEntryId: String? = nil) -> [Transaction] {
+        guard let collectionEntryId else { return transactions }
+        return transactions.filter { $0.collectionEntryId == collectionEntryId }
+    }
 
     func getFinanceSummary() -> FinanceSummary {
         let spent = transactions.filter { $0.type == "purchase" }.reduce(0.0) { $0 + $1.amount }
@@ -3208,31 +3215,88 @@ final class LocalStore {
 
     func createTransaction(
         type: String,
+        collectionEntryId: String?,
+        cardId: String?,
+        externalId: String?,
         cardName: String?,
         tcg: String?,
         quantity: Int,
         amount: Double,
+        currency: String,
         platform: String?,
+        sourceUrl: String?,
         costBasis: Double?,
         fees: Double?,
         shippingCost: Double?,
         acquiredAt: String?,
-        notes: String?
+        notes: String?,
+        date: String?
     ) -> Transaction {
         let now = LocalStore.isoFormatter.string(from: Date())
         let netProceeds = type == "sale" ? amount - (fees ?? 0) - (shippingCost ?? 0) : nil
         let txn = Transaction(
-            id: "local-txn-\(nextTransactionId)", type: type, cardName: cardName,
-            tcg: tcg, quantity: quantity, amount: amount, currency: "USD", platform: platform,
+            id: "local-txn-\(nextTransactionId)", type: type,
+            collectionEntryId: collectionEntryId, cardId: cardId, externalId: externalId,
+            cardName: cardName, tcg: tcg, quantity: quantity, amount: amount,
+            currency: currency.uppercased(), platform: platform, sourceUrl: sourceUrl,
             costBasis: costBasis, fees: fees, shippingCost: shippingCost, acquiredAt: acquiredAt,
             netProceeds: netProceeds,
             realizedProfit: costBasis.map { (netProceeds ?? amount) - $0 },
-            notes: notes, date: now
+            notes: notes, date: date ?? now
         )
         nextTransactionId += 1
         transactions.insert(txn, at: 0)
         persist()
         return txn
+    }
+
+    func updateTransaction(
+        id: String,
+        collectionEntryId: String?,
+        cardId: String?,
+        externalId: String?,
+        cardName: String?,
+        tcg: String?,
+        quantity: Int,
+        amount: Double,
+        currency: String,
+        platform: String?,
+        sourceUrl: String?,
+        notes: String?,
+        date: String
+    ) throws -> Transaction {
+        guard let index = transactions.firstIndex(where: { $0.id == id }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Transaction not found")
+        }
+        let existing = transactions[index]
+        let updated = Transaction(
+            id: existing.id,
+            type: existing.type,
+            collectionEntryId: collectionEntryId,
+            cardId: cardId,
+            externalId: externalId,
+            cardName: cardName,
+            tcg: tcg,
+            quantity: quantity,
+            amount: amount,
+            currency: currency.uppercased(),
+            platform: platform,
+            sourceUrl: sourceUrl,
+            costBasis: existing.costBasis,
+            fees: existing.fees,
+            shippingCost: existing.shippingCost,
+            acquiredAt: existing.acquiredAt,
+            netProceeds: existing.type == "sale"
+                ? amount - (existing.fees ?? 0) - (existing.shippingCost ?? 0)
+                : nil,
+            realizedProfit: existing.realizedProfit,
+            holdingDays: existing.holdingDays,
+            notes: notes,
+            date: date
+        )
+        transactions[index] = updated
+        try persistOrThrow()
+        return updated
     }
 
     func getRealizedPerformance() -> RealizedPerformance {

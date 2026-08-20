@@ -5,6 +5,7 @@ import type {
   FinanceSummaryByCurrency,
   FinanceSummary,
   TransactionResponse,
+  UpdateTransactionInput,
 } from '@tcg/api-types';
 
 function serializeTransaction(transaction: Transaction): TransactionResponse {
@@ -18,20 +19,28 @@ function serializeTransaction(transaction: Transaction): TransactionResponse {
   return {
     id: transaction.id,
     type: transaction.type,
+    collectionEntryId: transaction.collectionEntryId ?? undefined,
+    cardId: transaction.cardId ?? undefined,
+    externalId: transaction.externalId ?? undefined,
     cardName: transaction.cardName ?? undefined,
     tcg: transaction.tcg ?? undefined,
     quantity: transaction.quantity,
     amount: Number(transaction.amount),
     currency: transaction.currency,
     platform: transaction.platform ?? undefined,
+    sourceUrl: transaction.sourceUrl ?? undefined,
     notes: transaction.notes ?? undefined,
     date: transaction.date.toISOString(),
   };
 }
 
-export async function getUserTransactions(userId: string, limit = 100) {
+export async function getUserTransactions(
+  userId: string,
+  limit = 100,
+  collectionEntryId?: string,
+) {
   const txns = await prisma.transaction.findMany({
-    where: { userId },
+    where: { userId, collectionEntryId },
     orderBy: { date: 'desc' },
     take: limit,
   });
@@ -43,6 +52,7 @@ export async function createTransaction(userId: string, input: CreateTransaction
     data: {
       userId,
       type: input.type,
+      collectionEntryId: input.collectionEntryId,
       cardId: input.cardId,
       externalId: input.externalId,
       tcg: input.tcg,
@@ -51,8 +61,42 @@ export async function createTransaction(userId: string, input: CreateTransaction
       amount: input.amount,
       currency: input.currency ?? 'USD',
       platform: input.platform,
+      sourceUrl: input.sourceUrl,
       notes: input.notes,
       date: input.date ? new Date(input.date) : new Date(),
+    },
+  });
+  return serializeTransaction(transaction);
+}
+
+export async function updateTransaction(
+  userId: string,
+  transactionId: string,
+  input: UpdateTransactionInput,
+) {
+  const existing = await prisma.transaction.findFirst({
+    where: { id: transactionId, userId },
+  });
+  if (!existing) {
+    const error = new Error('Transaction not found') as Error & { status: number };
+    error.status = 404;
+    throw error;
+  }
+  const transaction = await prisma.transaction.update({
+    where: { id: transactionId },
+    data: {
+      collectionEntryId: input.collectionEntryId,
+      cardId: input.cardId,
+      externalId: input.externalId,
+      tcg: input.tcg,
+      cardName: input.cardName,
+      quantity: input.quantity,
+      amount: input.amount,
+      currency: input.currency,
+      platform: input.platform,
+      sourceUrl: input.sourceUrl,
+      notes: input.notes,
+      date: input.date ? new Date(input.date) : undefined,
     },
   });
   return serializeTransaction(transaction);

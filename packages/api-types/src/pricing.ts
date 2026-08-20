@@ -110,6 +110,7 @@ export const transactionTypeSchema = z.enum(["purchase", "sale", "trade"]);
 
 export const createTransactionSchema = z.object({
   type: transactionTypeSchema,
+  collectionEntryId: z.string().optional(),
   cardId: z.string().optional(),
   externalId: z.string().optional(),
   tcg: z.string().optional(),
@@ -123,6 +124,7 @@ export const createTransactionSchema = z.object({
     .transform((value) => value.toUpperCase())
     .default("USD"),
   platform: z.string().optional(),
+  sourceUrl: z.string().url().optional(),
   costBasis: z.number().nonnegative().optional(),
   fees: z.number().nonnegative().optional(),
   shippingCost: z.number().nonnegative().optional(),
@@ -131,6 +133,27 @@ export const createTransactionSchema = z.object({
   date: z.string().datetime().optional(),
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
+
+export const updateTransactionSchema = z.object({
+  collectionEntryId: z.string().nullable().optional(),
+  cardId: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
+  tcg: z.string().nullable().optional(),
+  cardName: z.string().nullable().optional(),
+  quantity: z.number().int().positive().optional(),
+  amount: z.number().positive().optional(),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  platform: z.string().nullable().optional(),
+  sourceUrl: z.string().url().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  date: z.string().datetime().optional(),
+});
+export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
 // ---------------------------------------------------------------------------
 // Shop Connections
@@ -166,12 +189,16 @@ export interface PriceAlertResponse {
 export interface TransactionResponse {
   id: string;
   type: z.infer<typeof transactionTypeSchema>;
+  collectionEntryId?: string;
+  cardId?: string;
+  externalId?: string;
   cardName?: string;
   tcg?: string;
   quantity: number;
   amount: number;
   currency: string;
   platform?: string;
+  sourceUrl?: string;
   costBasis?: number;
   fees?: number;
   shippingCost?: number;

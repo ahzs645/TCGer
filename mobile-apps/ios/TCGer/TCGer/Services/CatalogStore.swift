@@ -326,11 +326,16 @@ final class CatalogStore: ObservableObject {
 
     nonisolated private struct CardSearchMetadata: Sendable {
         let name: String
+        let boundaryName: String
         let nameWords: [String]
         let searchableFields: [String]
         let collectorNumber: String?
         let displayCollectorNumber: String?
         let worldChampionshipYear: String?
+
+        func hasWholeWordNamePrefix(_ query: String) -> Bool {
+            boundaryName == query || boundaryName.hasPrefix("\(query) ")
+        }
 
         func matchesAll(_ queryTerms: [String]) -> Bool {
             queryTerms.allSatisfy { term in
@@ -457,6 +462,7 @@ final class CatalogStore: ObservableObject {
 
                 let cardMetadata = CardSearchMetadata(
                     name: Self.normalize(card.name),
+                    boundaryName: SearchTextNormalizer.boundaryKey(card.name),
                     nameWords: SearchTextNormalizer.wordKeys(card.name),
                     searchableFields: searchableFields,
                     collectorNumber: collectorNumber,
@@ -813,16 +819,41 @@ final class CatalogStore: ObservableObject {
         guard !needle.isEmpty, limit > 0 else { return [] }
         let normalizedNeedle = SearchTextNormalizer.key(needle)
         guard !normalizedNeedle.isEmpty else { return [] }
+        let boundaryNeedle = SearchTextNormalizer.boundaryKey(needle)
         let queryTerms = SearchTextNormalizer.termKeys(needle)
 
         let packs = searchablePacks(for: tcg)
         var results: [CatalogEntry] = []
         results.reserveCapacity(min(limit, 200))
 
-        // Ordered passes rank name prefixes, then name substrings, then set metadata.
+        // Prefer prefixes that respect printed word boundaries. A compact
+        // punctuation-insensitive prefix remains a lower-ranked fallback, so
+        // `Dark Raichu` is still found for `Darkrai` without preceding Darkrai.
         for (game, pack) in packs {
             for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata)
-                where metadata.name.hasPrefix(normalizedNeedle) {
+                where metadata.hasWholeWordNamePrefix(boundaryNeedle) {
+                results.append(CatalogEntry(tcg: game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        for (game, pack) in packs {
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata) {
+                guard !metadata.hasWholeWordNamePrefix(boundaryNeedle),
+                      metadata.boundaryName.hasPrefix(boundaryNeedle) else {
+                    continue
+                }
+                results.append(CatalogEntry(tcg: game, card: card))
+                if results.count == limit { return results }
+            }
+        }
+
+        for (game, pack) in packs {
+            for (card, metadata) in zip(pack.cards, pack.cardSearchMetadata) {
+                guard !metadata.boundaryName.hasPrefix(boundaryNeedle),
+                      metadata.name.hasPrefix(normalizedNeedle) else {
+                    continue
+                }
                 results.append(CatalogEntry(tcg: game, card: card))
                 if results.count == limit { return results }
             }
@@ -916,6 +947,7 @@ final class CatalogStore: ObservableObject {
         guard !needle.isEmpty, limit > 0 else { return [] }
         let normalizedNeedle = SearchTextNormalizer.key(needle)
         guard !normalizedNeedle.isEmpty else { return [] }
+        let boundaryNeedle = SearchTextNormalizer.boundaryKey(needle)
         let queryTerms = SearchTextNormalizer.termKeys(needle)
         var results: [CatalogEntry] = []
         results.reserveCapacity(min(limit, 200))
@@ -926,7 +958,37 @@ final class CatalogStore: ObservableObject {
                 for: normalizedNeedle,
                 postings: pack.nameTrigramPostings,
                 count: pack.cards.count
-            ) where pack.cardSearchMetadata[index].name.hasPrefix(normalizedNeedle) {
+            ) where pack.cardSearchMetadata[index].hasWholeWordNamePrefix(boundaryNeedle) {
+                results.append(CatalogEntry(tcg: snapshot.game, card: pack.cards[index]))
+                if results.count == limit { return results }
+            }
+        }
+
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in candidateIndices(
+                for: normalizedNeedle,
+                postings: pack.nameTrigramPostings,
+                count: pack.cards.count
+            ) {
+                let metadata = pack.cardSearchMetadata[index]
+                guard !metadata.hasWholeWordNamePrefix(boundaryNeedle),
+                      metadata.boundaryName.hasPrefix(boundaryNeedle) else { continue }
+                results.append(CatalogEntry(tcg: snapshot.game, card: pack.cards[index]))
+                if results.count == limit { return results }
+            }
+        }
+
+        for snapshot in packs {
+            let pack = snapshot.pack
+            for index in candidateIndices(
+                for: normalizedNeedle,
+                postings: pack.nameTrigramPostings,
+                count: pack.cards.count
+            ) {
+                let metadata = pack.cardSearchMetadata[index]
+                guard !metadata.boundaryName.hasPrefix(boundaryNeedle),
+                      metadata.name.hasPrefix(normalizedNeedle) else { continue }
                 results.append(CatalogEntry(tcg: snapshot.game, card: pack.cards[index]))
                 if results.count == limit { return results }
             }

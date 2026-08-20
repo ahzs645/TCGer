@@ -16,12 +16,16 @@ const transactionTypeValidator = v.union(
 const transactionResponseValidator = v.object({
   id: v.id("transactions"),
   type: transactionTypeValidator,
+  collectionEntryId: v.optional(v.string()),
+  cardId: v.optional(v.string()),
+  externalId: v.optional(v.string()),
   cardName: v.optional(v.string()),
   tcg: v.optional(v.string()),
   quantity: v.number(),
   amount: v.number(),
   currency: v.string(),
   platform: v.optional(v.string()),
+  sourceUrl: v.optional(v.string()),
   costBasis: v.optional(v.number()),
   fees: v.optional(v.number()),
   shippingCost: v.optional(v.number()),
@@ -145,12 +149,16 @@ function toTransactionResponse(transaction: Doc<"transactions">) {
   return {
     id: transaction._id,
     type: transaction.type,
+    collectionEntryId: transaction.collectionEntryId,
+    cardId: transaction.cardId,
+    externalId: transaction.externalId,
     cardName: transaction.cardName,
     tcg: transaction.tcg,
     quantity: transaction.quantity,
     amount: transaction.amount,
     currency: transaction.currency,
     platform: transaction.platform,
+    sourceUrl: transaction.sourceUrl,
     costBasis: transaction.costBasis,
     fees: transaction.fees,
     shippingCost: transaction.shippingCost,
@@ -217,15 +225,24 @@ async function updateSummary(
 export const listTransactions = internalQuery({
   args: {
     subject: v.string(),
+    collectionEntryId: v.optional(v.string()),
   },
   returns: v.array(transactionResponseValidator),
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    const transactions = await ctx.db
-      .query("transactions")
-      .withIndex("by_user_and_date", (q) => q.eq("userId", viewer._id))
-      .order("desc")
-      .take(100);
+    const transactions = args.collectionEntryId === undefined
+      ? await ctx.db
+          .query("transactions")
+          .withIndex("by_user_and_date", (q) => q.eq("userId", viewer._id))
+          .order("desc")
+          .take(100)
+      : await ctx.db
+          .query("transactions")
+          .withIndex("by_user_and_collection_entry", (q) =>
+            q.eq("userId", viewer._id).eq("collectionEntryId", args.collectionEntryId),
+          )
+          .order("desc")
+          .take(10);
     return transactions.map(toTransactionResponse);
   },
 });
@@ -234,6 +251,7 @@ export const createTransaction = internalMutation({
   args: {
     subject: v.string(),
     type: transactionTypeValidator,
+    collectionEntryId: v.optional(v.string()),
     cardId: v.optional(v.string()),
     externalId: v.optional(v.string()),
     tcg: v.optional(v.string()),
@@ -242,6 +260,7 @@ export const createTransaction = internalMutation({
     amount: v.number(),
     currency: v.optional(v.string()),
     platform: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
     costBasis: v.optional(v.number()),
     fees: v.optional(v.number()),
     shippingCost: v.optional(v.number()),
@@ -280,6 +299,7 @@ export const createTransaction = internalMutation({
     const transactionId = await ctx.db.insert("transactions", {
       userId: viewer._id,
       type: args.type,
+      collectionEntryId: args.collectionEntryId,
       cardId: args.cardId,
       externalId: args.externalId,
       tcg: args.tcg,
@@ -288,6 +308,7 @@ export const createTransaction = internalMutation({
       amount: args.amount,
       currency,
       platform: args.platform,
+      sourceUrl: args.sourceUrl,
       costBasis: args.costBasis,
       fees: args.fees,
       shippingCost: args.shippingCost,
@@ -310,6 +331,75 @@ export const createTransaction = internalMutation({
     }
     await updateSummary(ctx, viewer._id, transaction, 1);
     return toTransactionResponse(transaction);
+  },
+});
+
+const nullableString = v.union(v.string(), v.null());
+
+export const updateTransaction = internalMutation({
+  args: {
+    subject: v.string(),
+    transactionId: v.id("transactions"),
+    collectionEntryId: v.optional(nullableString),
+    cardId: v.optional(nullableString),
+    externalId: v.optional(nullableString),
+    tcg: v.optional(nullableString),
+    cardName: v.optional(nullableString),
+    quantity: v.optional(v.number()),
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    platform: v.optional(nullableString),
+    sourceUrl: v.optional(nullableString),
+    notes: v.optional(nullableString),
+    date: v.optional(v.string()),
+  },
+  returns: transactionResponseValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const transaction = await ctx.db.get(args.transactionId);
+    if (!transaction || transaction.userId !== viewer._id) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Transaction not found" });
+    }
+    if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity < 1)) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "quantity must be a positive integer" });
+    }
+    if (args.amount !== undefined && (!Number.isFinite(args.amount) || args.amount <= 0)) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "amount must be greater than zero" });
+    }
+    const currency = args.currency?.trim().toUpperCase();
+    if (currency !== undefined && !/^[A-Z]{3}$/.test(currency)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "currency must be a three-letter ISO code",
+      });
+    }
+
+    await updateSummary(ctx, viewer._id, transaction, -1);
+    await ctx.db.patch(transaction._id, {
+      collectionEntryId:
+        args.collectionEntryId === undefined
+          ? transaction.collectionEntryId
+          : args.collectionEntryId ?? undefined,
+      cardId: args.cardId === undefined ? transaction.cardId : args.cardId ?? undefined,
+      externalId:
+        args.externalId === undefined ? transaction.externalId : args.externalId ?? undefined,
+      tcg: args.tcg === undefined ? transaction.tcg : args.tcg ?? undefined,
+      cardName: args.cardName === undefined ? transaction.cardName : args.cardName ?? undefined,
+      quantity: args.quantity ?? transaction.quantity,
+      amount: args.amount ?? transaction.amount,
+      currency: currency ?? transaction.currency,
+      platform: args.platform === undefined ? transaction.platform : args.platform ?? undefined,
+      sourceUrl: args.sourceUrl === undefined ? transaction.sourceUrl : args.sourceUrl ?? undefined,
+      notes: args.notes === undefined ? transaction.notes : args.notes ?? undefined,
+      date: args.date === undefined ? transaction.date : parseIsoDate(args.date, "date"),
+      updatedAt: Date.now(),
+    });
+    const updated = await ctx.db.get(transaction._id);
+    if (!updated) {
+      throw new ConvexError({ code: "INVARIANT", message: "Transaction could not be updated" });
+    }
+    await updateSummary(ctx, viewer._id, updated, 1);
+    return toTransactionResponse(updated);
   },
 });
 

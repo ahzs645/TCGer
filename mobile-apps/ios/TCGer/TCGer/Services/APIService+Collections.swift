@@ -922,6 +922,8 @@ extension APIService {
         let condition: String?
         let language: String?
         let notes: String?
+        let acquisitionPrice: Double?
+        let acquiredAt: String?
         let isFoil: Bool?
         let variant: CardCopyVariant?
         let isSigned: Bool?
@@ -931,13 +933,14 @@ extension APIService {
         let certNumber: String?
         let storageLocation: String?
         let includeOwnedCopyDetails: Bool
+        let includeAcquisitionDetails: Bool
         let tags: [String]?
         let newTags: [TagPayload]?
         let cardOverride: CardOverride?
         let targetBinderId: String?
 
         enum CodingKeys: String, CodingKey {
-            case quantity, condition, language, notes, isFoil
+            case quantity, condition, language, notes, acquisitionPrice, acquiredAt, isFoil
             case finishCode, finishLabel, edition, stamp
             case isSealedPromo, isOversized, isPeelOff
             case isSigned, isAltered, gradingCompany, gradingScore, certNumber, storageLocation
@@ -950,6 +953,12 @@ extension APIService {
             try container.encodeIfPresent(condition, forKey: .condition)
             try container.encodeIfPresent(language, forKey: .language)
             try container.encodeIfPresent(notes, forKey: .notes)
+            if includeAcquisitionDetails {
+                if let acquisitionPrice { try container.encode(acquisitionPrice, forKey: .acquisitionPrice) }
+                else { try container.encodeNil(forKey: .acquisitionPrice) }
+                if let acquiredAt { try container.encode(acquiredAt, forKey: .acquiredAt) }
+                else { try container.encodeNil(forKey: .acquiredAt) }
+            }
             try container.encodeIfPresent(isFoil, forKey: .isFoil)
             if let variant {
                 if let value = variant.finishCode { try container.encode(value, forKey: .finishCode) }
@@ -1128,6 +1137,8 @@ extension APIService {
         condition: String? = nil,
         language: String? = nil,
         notes: String? = nil,
+        acquisitionPrice: Double? = nil,
+        acquiredAt: String? = nil,
         isFoil: Bool? = nil,
         variant: CardCopyVariant? = nil,
         isSigned: Bool? = nil,
@@ -1137,6 +1148,7 @@ extension APIService {
         certNumber: String? = nil,
         storageLocation: String? = nil,
         includeOwnedCopyDetails: Bool = false,
+        includeAcquisitionDetails: Bool = false,
         tags: [String]? = nil,
         newTags: [TagPayload]? = nil,
         newPrint: Card? = nil,
@@ -1150,6 +1162,8 @@ extension APIService {
                 condition: condition,
                 language: language,
                 notes: notes,
+                acquisitionPrice: acquisitionPrice,
+                acquiredAt: acquiredAt,
                 variant: variant,
                 isSigned: isSigned,
                 isAltered: isAltered,
@@ -1158,6 +1172,7 @@ extension APIService {
                 certNumber: certNumber,
                 storageLocation: storageLocation,
                 includeOwnedCopyDetails: includeOwnedCopyDetails,
+                includeAcquisitionDetails: includeAcquisitionDetails,
                 tagIds: tags,
                 newTags: newTags,
                 newPrint: newPrint,
@@ -1215,6 +1230,8 @@ extension APIService {
             condition: condition,
             language: language,
             notes: notes,
+            acquisitionPrice: acquisitionPrice,
+            acquiredAt: acquiredAt,
             isFoil: isFoil ?? variant?.isFoil,
             variant: variant,
             isSigned: isSigned,
@@ -1224,6 +1241,7 @@ extension APIService {
             certNumber: certNumber,
             storageLocation: storageLocation,
             includeOwnedCopyDetails: includeOwnedCopyDetails,
+            includeAcquisitionDetails: includeAcquisitionDetails,
             tags: tags,
             newTags: newTags,
             cardOverride: cardOverride,

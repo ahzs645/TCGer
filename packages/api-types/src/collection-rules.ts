@@ -275,6 +275,8 @@ export function applyUpdate(
     updates.acquisitionPrice !== null
   ) {
     changes.acquisitionPrice = updates.acquisitionPrice;
+  } else if (updates.acquisitionPrice === null) {
+    changes.acquisitionPrice = undefined;
   }
 
   changes.isFoil =

@@ -135,6 +135,7 @@ const collectionImportRowInput = v.object({
 });
 
 const nullableString = v.union(v.string(), v.null());
+const nullableNumber = v.union(v.number(), v.null());
 const nullableTcgCode = v.union(
   tcgCodeValidator,
   v.null()
@@ -1507,7 +1508,7 @@ export const updateEntry = internalMutation({
     language: v.optional(nullableString),
     notes: v.optional(nullableString),
     price: v.optional(v.number()),
-    acquisitionPrice: v.optional(v.number()),
+    acquisitionPrice: v.optional(nullableNumber),
     serialNumber: v.optional(nullableString),
     acquiredAt: v.optional(nullableString),
     isFoil: v.optional(v.boolean()),
@@ -1617,7 +1618,10 @@ export const updateEntry = internalMutation({
       language: args.language === undefined ? entry.language : args.language ?? undefined,
       notes: args.notes === undefined ? entry.notes : args.notes ?? undefined,
       price: args.price ?? entry.price,
-      acquisitionPrice: args.acquisitionPrice ?? entry.acquisitionPrice,
+      acquisitionPrice:
+        args.acquisitionPrice === undefined
+          ? entry.acquisitionPrice
+          : args.acquisitionPrice ?? undefined,
       serialNumber:
         args.serialNumber === undefined ? entry.serialNumber : args.serialNumber ?? undefined,
       acquiredAt:

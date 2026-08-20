@@ -18,6 +18,16 @@ final class CatalogSearchTests: XCTestCase {
         )
     }
 
+    func testWordBoundaryPrefixRanksAheadOfCollapsedPrefix() async throws {
+        let fixture = try await makeFixture()
+        defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
+
+        XCTAssertEqual(
+            fixture.store.search(query: "Darkrai", tcg: .pokemon, limit: 20).map(\.card.id),
+            ["darkrai-vstar", "darkrai", "dark-raichu"]
+        )
+    }
+
     func testTermsCanMatchAcrossNameAndDerivedCollectorFraction() async throws {
         let fixture = try await makeFixture()
         defer { fixture.defaults.removePersistentDomain(forName: fixture.suiteName) }
@@ -196,9 +206,19 @@ final class CatalogSearchTests: XCTestCase {
                   "count": 11,
                   "standardCount": 11,
                   "boosters": [{"id":"boo_lucario","name":"Lucario Pack"}]
+                },
+                {
+                  "code": "rocket",
+                  "name": "Team Rocket",
+                  "serie": "base",
+                  "count": 3,
+                  "standardCount": 3
                 }
               ],
               "cards": [
+                {"id":"dark-raichu","name":"Dark Raichu","setCode":"rocket","collectorNumber":"1"},
+                {"id":"darkrai-vstar","name":"Darkrai VSTAR","setCode":"rocket","collectorNumber":"2"},
+                {"id":"darkrai","name":"Darkrai","setCode":"rocket","collectorNumber":"3"},
                 {"id":"mega-lucario","name":"Mega Lucario","setCode":"tk-dp-l","collectorNumber":"13"},
                 {"id":"lucario-v","name":"Lucario V","setCode":"tk-dp-l","collectorNumber":"4","collectionTags":["pokemon.art.clay"],"type":"Pokémon","pokemonPocket":{"hp":120,"effect":"Charge your attack.","attacks":[{"cost":["Fighting"],"name":"Aura Sphere","damage":"70"}],"boosters":[{"id":"boo_lucario","name":"Lucario Pack"}]}},
                 {"id":"tk-dp-l-3","name":"Lucario","setCode":"tk-dp-l","collectorNumber":"3","rarity":"Promo"},
@@ -215,8 +235,8 @@ final class CatalogSearchTests: XCTestCase {
                 games: [
                     "pokemon": CatalogManifestGame(
                         version: 1,
-                        cardCount: 4,
-                        setCount: 1,
+                        cardCount: 7,
+                        setCount: 2,
                         bytes: pack.count,
                         sha256: digest,
                         file: "pokemon.test.pack.json"

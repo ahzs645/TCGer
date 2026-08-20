@@ -460,6 +460,7 @@ export default defineSchema({
   transactions: defineTable({
     userId: v.id("users"),
     type: v.union(v.literal("purchase"), v.literal("sale"), v.literal("trade")),
+    collectionEntryId: v.optional(v.string()),
     cardId: v.optional(v.string()),
     externalId: v.optional(v.string()),
     tcg: v.optional(v.string()),
@@ -468,6 +469,7 @@ export default defineSchema({
     amount: v.number(),
     currency: v.string(),
     platform: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
     costBasis: v.optional(v.number()),
     fees: v.optional(v.number()),
     shippingCost: v.optional(v.number()),
@@ -476,7 +478,9 @@ export default defineSchema({
     date: v.number(),
     createdAt: v.number(),
     updatedAt: v.number()
-  }).index("by_user_and_date", ["userId", "date"]),
+  })
+    .index("by_user_and_date", ["userId", "date"])
+    .index("by_user_and_collection_entry", ["userId", "collectionEntryId"]),
 
   financeSummaries: defineTable({
     userId: v.id("users"),

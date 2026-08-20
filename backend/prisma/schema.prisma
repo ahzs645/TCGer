@@ -667,6 +667,7 @@ model Transaction {
   id         String   @id @default(uuid())
   userId     String
   type       String // 'purchase' | 'sale' | 'trade'
+  collectionEntryId String?
   cardId     String?
   externalId String?
   tcg        String?
@@ -675,12 +676,15 @@ model Transaction {
   amount     Decimal  @db.Decimal(10, 2)
   currency   String   @default("USD")
   platform   String? // 'tcgplayer', 'cardmarket', 'local', etc.
+  sourceUrl  String?
   notes      String?
   date       DateTime @default(now())
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, collectionEntryId])
 }
 
 model ShopConnection {

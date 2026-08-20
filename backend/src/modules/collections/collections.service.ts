@@ -1131,6 +1131,9 @@ export async function updateCardInBinder(
   if (normalizedSerial !== undefined) {
     updatePayload.serialNumber = normalizedSerial;
   }
+  if (input.acquisitionPrice !== undefined) {
+    updatePayload.acquisitionPrice = input.acquisitionPrice;
+  }
   const parsedAcquiredAt = parseOptionalDate(input.acquiredAt);
   if (parsedAcquiredAt !== undefined) {
     updatePayload.acquiredAt = parsedAcquiredAt;
