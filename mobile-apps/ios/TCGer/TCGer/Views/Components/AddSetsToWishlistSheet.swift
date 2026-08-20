@@ -82,13 +82,40 @@ struct AddSetsToWishlistSheet: View {
         selectedWishlist != nil && !selectedSetIDs.isEmpty && !isAdding
     }
 
+    private var trimmedNewWishlistName: String {
+        newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 List {
                     if fixedWishlist == nil {
-                        wishlistSection
-                        createWishlistSection
+                        WishlistSelectionSection(
+                            title: "Wishlist",
+                            wishlists: wishlistStore.wishlists,
+                            selectedWishlistID: selectedWishlistID,
+                            showsSelectionIndicators: true,
+                            isLoading: wishlistStore.isLoading && !wishlistStore.hasLoaded,
+                            loadingMessage: "Loading wishlists…",
+                            loadError: wishlistStore.errorMessage,
+                            emptyMessage: "Create a wishlist below to continue.",
+                            isInteractionDisabled: false,
+                            showsActivityIndicator: false,
+                            onRetry: startReloadWishlists,
+                            onSelect: selectWishlist
+                        )
+                        CreateWishlistSection(
+                            title: "New Wishlist",
+                            placeholder: "Wishlist name",
+                            name: $newWishlistName,
+                            textInputAutocapitalization: .words,
+                            buttonTitle: isCreatingWishlist ? "Creating…" : "Create",
+                            isCreateDisabled: trimmedNewWishlistName.isEmpty
+                                || isCreatingWishlist
+                                || isAdding,
+                            onCreate: startCreateWishlist
+                        )
                     }
                     setSections
 
@@ -142,90 +169,6 @@ struct AddSetsToWishlistSheet: View {
         }
         .interactiveDismissDisabled(isAdding)
         .presentationDetents([.large])
-    }
-
-    @ViewBuilder
-    private var wishlistSection: some View {
-        Section("Wishlist") {
-            if wishlistStore.isLoading && !wishlistStore.hasLoaded {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading wishlists…")
-                        .foregroundStyle(.secondary)
-                }
-            } else if let loadError = wishlistStore.errorMessage,
-                      wishlistStore.wishlists.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(loadError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                    Button("Try Again") {
-                        Task { await reloadWishlists() }
-                    }
-                }
-            } else if wishlistStore.wishlists.isEmpty {
-                Text("Create a wishlist below to continue.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(wishlistStore.wishlists) { wishlist in
-                    Button {
-                        selectedWishlistID = wishlist.id
-                        didFinish = false
-                        operationMessage = nil
-                        errorMessage = nil
-                    } label: {
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Color.fromHex(wishlist.colorHex))
-                                .frame(width: 10, height: 10)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(wishlist.name)
-                                    .foregroundStyle(.primary)
-                                Text("\(wishlist.totalCards) cards")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName: selectedWishlistID == wishlist.id
-                                    ? "checkmark.circle.fill"
-                                    : "circle"
-                            )
-                            .font(.title3)
-                            .foregroundStyle(
-                                selectedWishlistID == wishlist.id
-                                    ? Color.accentColor
-                                    : Color.secondary
-                            )
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private var createWishlistSection: some View {
-        Section("New Wishlist") {
-            HStack {
-                TextField("Wishlist name", text: $newWishlistName)
-                    .textInputAutocapitalization(.words)
-
-                Button(isCreatingWishlist ? "Creating…" : "Create") {
-                    Task { await createWishlist() }
-                }
-                .disabled(
-                    newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || isCreatingWishlist
-                        || isAdding
-                )
-            }
-        }
     }
 
     @ViewBuilder
@@ -357,6 +300,17 @@ struct AddSetsToWishlistSheet: View {
         } else {
             selectedSetIDs.insert(set.id)
         }
+    }
+
+    private func selectWishlist(_ wishlist: Wishlist) {
+        selectedWishlistID = wishlist.id
+        didFinish = false
+        operationMessage = nil
+        errorMessage = nil
+    }
+
+    private func startCreateWishlist() {
+        Task { await createWishlist() }
     }
 
     @MainActor
@@ -516,5 +470,8 @@ struct AddSetsToWishlistSheet: View {
             token: token,
             force: true
         )
+    }
+    private func startReloadWishlists() {
+        Task { await reloadWishlists() }
     }
 }

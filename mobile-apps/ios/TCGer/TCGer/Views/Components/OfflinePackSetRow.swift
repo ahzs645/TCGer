@@ -70,11 +70,10 @@ struct OfflinePackSetRow: View {
             }
 
             if case .downloading(let progress) = manager.status(for: definition) {
-                ProgressView(value: progress)
-                    .accessibilityLabel("Downloading \(definition.name)")
-                    .accessibilityValue(
-                        Text(progress, format: .percent.precision(.fractionLength(0)))
-                    )
+                DownloadableAssetProgressView(
+                    progress: progress,
+                    accessibilityLabel: "Downloading \(definition.name)"
+                )
             }
         }
         .padding(.vertical, 4)
@@ -84,40 +83,59 @@ struct OfflinePackSetRow: View {
     private var statusLabel: some View {
         switch manager.status(for: definition) {
         case .notDownloaded:
-            Label("Not downloaded", systemImage: "icloud.and.arrow.down")
-                .foregroundStyle(.secondary)
-        case .downloading(let progress):
-            Label("Downloading \(progress, format: .percent.precision(.fractionLength(0)))", systemImage: "arrow.down.circle")
-                .foregroundStyle(.secondary)
-        case .downloaded(let record):
-            Label(
-                "Available offline · \(record.cardCount) cards · \(Self.formattedBytes(record.byteCount))",
-                systemImage: "checkmark.circle.fill"
+            DownloadableAssetStatusLabel(
+                text: "Not downloaded",
+                systemImage: "icloud.and.arrow.down",
+                tint: .secondary
             )
-            .foregroundStyle(.green)
+        case .downloading(let progress):
+            DownloadableAssetStatusLabel(
+                text: "Downloading \(progress.formatted(.percent.precision(.fractionLength(0))))",
+                systemImage: "arrow.down.circle",
+                tint: .secondary
+            )
+        case .downloaded(let record):
+            DownloadableAssetStatusLabel(
+                text: "Available offline · \(record.cardCount) cards · \(Self.formattedBytes(record.byteCount))",
+                systemImage: "checkmark.circle.fill",
+                tint: .green
+            )
         case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+            DownloadableAssetStatusLabel(
+                text: message,
+                systemImage: "exclamationmark.triangle.fill",
+                tint: .orange
+            )
         }
     }
 
-    @ViewBuilder
     private var actionButton: some View {
+        DownloadableAssetActionControl(
+            state: actionState,
+            action: performAction
+        )
+        .buttonStyle(.borderless)
+    }
+
+    private var actionState: DownloadableAssetActionControl.State {
         switch manager.status(for: definition) {
         case .downloading:
-            ProgressView()
-                .controlSize(.small)
+            return .busy(accessibilityLabel: "Downloading \(definition.name)")
         case .downloaded:
-            Button("Remove", role: .destructive) {
-                manager.remove(definition)
-            }
-            .buttonStyle(.borderless)
+            return .button(title: "Remove", role: .destructive)
         case .notDownloaded, .failed:
-            Button("Download") {
-                manager.download(definition)
-            }
-            .buttonStyle(.borderless)
-            .disabled(!NetworkMonitor.shared.isConnected)
+            return .button(
+                title: "Download",
+                isEnabled: NetworkMonitor.shared.isConnected
+            )
+        }
+    }
+
+    private func performAction() {
+        if case .downloaded = manager.status(for: definition) {
+            manager.remove(definition)
+        } else {
+            manager.download(definition)
         }
     }
 
@@ -132,20 +150,29 @@ struct PackOfflineAvailabilityLabel: View {
     var body: some View {
         switch status {
         case .notDownloaded:
-            Label("Set not downloaded for offline use", systemImage: "icloud.and.arrow.down")
-                .foregroundStyle(.secondary)
-        case .downloading(let progress):
-            Label(
-                "Offline download \(progress, format: .percent.precision(.fractionLength(0)))",
-                systemImage: "arrow.down.circle"
+            DownloadableAssetStatusLabel(
+                text: "Set not downloaded for offline use",
+                systemImage: "icloud.and.arrow.down",
+                tint: .secondary
             )
-            .foregroundStyle(.secondary)
+        case .downloading(let progress):
+            DownloadableAssetStatusLabel(
+                text: "Offline download \(progress.formatted(.percent.precision(.fractionLength(0))))",
+                systemImage: "arrow.down.circle",
+                tint: .secondary
+            )
         case .downloaded(let record):
-            Label("Available offline · \(record.cardCount) cards", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+            DownloadableAssetStatusLabel(
+                text: "Available offline · \(record.cardCount) cards",
+                systemImage: "checkmark.circle.fill",
+                tint: .green
+            )
         case .failed:
-            Label("Offline download needs attention", systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+            DownloadableAssetStatusLabel(
+                text: "Offline download needs attention",
+                systemImage: "exclamationmark.triangle.fill",
+                tint: .orange
+            )
         }
     }
 }

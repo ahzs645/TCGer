@@ -58,6 +58,7 @@ import {
   getPokemonFinishOptions,
   POKEMON_FINISH_CATALOG,
 } from "@/lib/pokemon-variants";
+import { CardAcquisitionEditor } from "@/components/collections/card-acquisition-editor";
 
 const GAME_LABELS: Record<string, string> = {
   magic: "Magic: The Gathering",
@@ -1160,6 +1161,11 @@ export function DetailPanel(props: DetailPanelProps) {
           printSelectionDisabled={printSelectionDisabled}
           data-oid="yhtsmuh"
         />
+        <CardAcquisitionEditor
+          card={card}
+          copy={selectedCopy}
+          binderId={card.binderId ?? draftBinderId}
+        />
       </CardHeader>
       <CardContent data-oid="-fqyxis">
         <EditForm
@@ -1383,6 +1389,12 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               printSelectionLabel={printSelectionLabel}
               printSelectionDisabled={printSelectionDisabled}
               data-oid="eju_4_-"
+            />
+            <CardAcquisitionEditor
+              card={card}
+              copy={selectedCopy}
+              binderId={card.binderId ?? draftBinderId}
+              compact
             />
 
             <EditForm

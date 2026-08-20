@@ -557,30 +557,33 @@ private struct DeckCardRow: View {
 }
 
 private struct DeckCardPicker: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+
     let deck: Deck
     let onAdded: () async -> Void
 
-    @EnvironmentObject private var environmentStore: EnvironmentStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-    @State private var results: [Card] = []
-    @State private var isSearching = false
-    @State private var errorMessage: String?
+    @State private var searchModel = CatalogCardSearchModel()
     @State private var selectedCard: Card?
     @State private var quantity = 1
     @State private var zone = "main"
+    @State private var addErrorMessage: String?
 
     private let apiService = APIService()
 
     var body: some View {
+        @Bindable var searchModel = searchModel
+
         NavigationStack {
             Group {
-                if isSearching { ProgressView("Searching…") }
-                else if let errorMessage { ErrorView(title: "Search Failed", message: errorMessage) }
-                else if results.isEmpty {
+                if searchModel.isSearching { ProgressView("Searching…") }
+                else if let errorMessage = searchModel.errorMessage ?? addErrorMessage {
+                    ErrorView(title: "Search Failed", message: errorMessage)
+                }
+                else if searchModel.results.isEmpty {
                     ContentUnavailableView("Search for Cards", systemImage: "magnifyingglass")
                 } else {
-                    List(results) { card in
+                    List(searchModel.results) { card in
                         Button { selectedCard = card } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -597,8 +600,11 @@ private struct DeckCardPicker: View {
             }
             .navigationTitle("Add Card")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "Search \(TCGGame(rawValue: deck.tcg)?.shortName ?? deck.tcg)")
+            .searchable(text: $searchModel.query, prompt: "Search \(TCGGame(rawValue: deck.tcg)?.shortName ?? deck.tcg)")
             .onSubmit(of: .search) { Task { await search() } }
+            .onChange(of: searchModel.query) {
+                searchModel.resetIfQueryIsEmpty()
+            }
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
             .sheet(item: $selectedCard) { card in
                 NavigationStack {
@@ -626,21 +632,12 @@ private struct DeckCardPicker: View {
 
     @MainActor
     private func search() async {
-        guard let token = environmentStore.authToken else { return }
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        isSearching = true
-        errorMessage = nil
-        do {
-            let response = try await apiService.searchCards(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                query: trimmed,
-                game: TCGGame(rawValue: deck.tcg) ?? .all
-            )
-            results = response.cards
-        } catch { errorMessage = error.localizedDescription }
-        isSearching = false
+        addErrorMessage = nil
+        await searchModel.search(
+            config: environmentStore.serverConfiguration,
+            authToken: environmentStore.authToken,
+            game: TCGGame(rawValue: deck.tcg) ?? .all
+        )
     }
 
     @MainActor
@@ -658,7 +655,7 @@ private struct DeckCardPicker: View {
             await onAdded()
             HapticManager.notification(.success)
             selectedCard = nil
-        } catch { errorMessage = error.localizedDescription; selectedCard = nil }
+        } catch { addErrorMessage = error.localizedDescription; selectedCard = nil }
     }
 }
 

@@ -1,17 +1,14 @@
 import SwiftUI
 
 struct AddCardToBinderFromSearchView: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+
     let binderId: String
     let onCardAdded: (String) async -> Void
 
-    @EnvironmentObject private var environmentStore: EnvironmentStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
+    @State private var searchModel = CatalogCardSearchModel()
     @State private var selectedGame: TCGGame = .all
-    @State private var searchResults: [Card] = []
-    @State private var isSearching = false
-    @State private var errorMessage: String?
-    @State private var hasSearched = false
     @State private var addSheetCard: Card?
 
     private let apiService = APIService()
@@ -25,19 +22,21 @@ struct AddCardToBinderFromSearchView: View {
     }
 
     var body: some View {
+        @Bindable var searchModel = searchModel
+
         NavigationStack {
             VStack(spacing: 0) {
                 // Search Results
-                if isSearching {
+                if searchModel.isSearching {
                     ProgressView("Searching...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = errorMessage {
+                } else if let error = searchModel.errorMessage {
                     ErrorView(title: "Search Failed", message: error) {
                         Task { await performSearch() }
                     }
-                } else if hasSearched && searchResults.isEmpty {
+                } else if searchModel.hasSearched && searchModel.results.isEmpty {
                     EmptySearchView()
-                } else if !hasSearched {
+                } else if !searchModel.hasSearched {
                     SearchPlaceholderView(
                         icon: "magnifyingglass",
                         title: "Search for Cards",
@@ -45,7 +44,7 @@ struct AddCardToBinderFromSearchView: View {
                     )
                 } else {
                     CardSearchResultsList(
-                        cards: searchResults,
+                        cards: searchModel.results,
                         selectedGame: selectedGame,
                         enabledGames: environmentStore.enabledGames,
                         showPricing: environmentStore.showPricing,
@@ -59,7 +58,7 @@ struct AddCardToBinderFromSearchView: View {
             .navigationTitle("Add Card to Binder")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
-                text: $searchText,
+                text: $searchModel.query,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search for cards..."
             )
@@ -103,15 +102,18 @@ struct AddCardToBinderFromSearchView: View {
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
             .onChange(of: selectedGame) {
-                if hasSearched && !searchText.isEmpty {
+                if searchModel.hasSearched && !searchModel.normalizedQuery.isEmpty {
                     Task { await performSearch() }
                 }
+            }
+            .onChange(of: searchModel.query) {
+                searchModel.resetIfQueryIsEmpty()
             }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
                    let game = TCGGame(rawValue: defaultGame),
                    environmentStore.isGameEnabled(game),
-                   !hasSearched {
+                   !searchModel.hasSearched {
                     selectedGame = game
                 }
                 validateSelectedGame()
@@ -125,33 +127,10 @@ struct AddCardToBinderFromSearchView: View {
 
     @MainActor
     private func performSearch() async {
-        guard !searchText.isEmpty else {
-            hasSearched = false
-            searchResults = []
-            return
-        }
-
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            return
-        }
-
-        isSearching = true
-        errorMessage = nil
-        hasSearched = true
-
-        do {
-            let response = try await apiService.searchCards(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                query: searchText,
-                game: selectedGame
-            )
-            searchResults = response.cards
-            isSearching = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isSearching = false
-        }
+        await searchModel.search(
+            config: environmentStore.serverConfiguration,
+            authToken: environmentStore.authToken,
+            game: selectedGame
+        )
     }
 }

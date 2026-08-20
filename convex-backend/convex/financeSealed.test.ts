@@ -186,6 +186,87 @@ describe("finance and sealed Convex HTTP routes", () => {
     ).toHaveLength(1);
   });
 
+  test("links, filters, and updates a card purchase", async () => {
+    const t = createTestConvex();
+    const headers = bridgeHeaders("finance_card_purchase");
+    const collectionEntryId = "copy_darkrai_dp24";
+
+    const createResponse = await t.fetch("/finance/transactions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        type: "purchase",
+        collectionEntryId,
+        cardId: "card_darkrai",
+        externalId: "dp24",
+        tcg: "pokemon",
+        cardName: "Darkrai",
+        quantity: 1,
+        amount: 18.5,
+        currency: "CAD",
+        platform: "Local card shop",
+        sourceUrl: "https://example.com/receipt/42",
+        notes: "Black Star Promo",
+        date: "2026-08-01T12:00:00.000Z",
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json();
+    expect(created).toMatchObject({
+      collectionEntryId,
+      cardId: "card_darkrai",
+      externalId: "dp24",
+      amount: 18.5,
+      currency: "CAD",
+      sourceUrl: "https://example.com/receipt/42",
+    });
+
+    const filteredResponse = await t.fetch(
+      `/finance/transactions?collectionEntryId=${collectionEntryId}`,
+      { headers },
+    );
+    expect(filteredResponse.status).toBe(200);
+    expect(await filteredResponse.json()).toEqual([created]);
+    expect(
+      await (
+        await t.fetch("/finance/transactions?collectionEntryId=another_copy", {
+          headers,
+        })
+      ).json(),
+    ).toEqual([]);
+
+    const updateResponse = await t.fetch(
+      `/finance/transactions/${created.id}`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          amount: 20,
+          currency: "USD",
+          platform: "eBay",
+          sourceUrl: null,
+        }),
+      },
+    );
+    expect(updateResponse.status).toBe(200);
+    const updated = await updateResponse.json();
+    expect(updated).toMatchObject({
+      id: created.id,
+      collectionEntryId,
+      amount: 20,
+      currency: "USD",
+      platform: "eBay",
+    });
+    expect(updated.sourceUrl).toBeUndefined();
+
+    expect(await (await t.fetch("/finance/summary", { headers })).json()).toEqual({
+      totalSpent: 20,
+      totalEarned: 0,
+      profitLoss: -20,
+      transactionCount: 1,
+    });
+  });
+
   test.each([0, -10])(
     "rejects non-positive transaction amount %s",
     async (amount) => {

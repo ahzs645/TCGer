@@ -1,5 +1,21 @@
 import SwiftUI
 
+struct CardCopyEditorValues: Sendable {
+    let quantity: Int
+    let condition: String?
+    let language: String?
+    let notes: String?
+    let isFoil: Bool
+    let isSigned: Bool
+    let isAltered: Bool
+    let variant: CardCopyVariant
+    let tags: [String]
+    let gradingCompany: String?
+    let gradingScore: String?
+    let certNumber: String?
+    let storageLocation: String?
+}
+
 struct CardEditorDraft {
     var quantity: Int
     var condition: String
@@ -34,6 +50,25 @@ struct CardEditorDraft {
         )
     }
 
+    func normalizedValues(for card: Card) -> CardCopyEditorValues {
+        let variant = variant
+        return CardCopyEditorValues(
+            quantity: quantity,
+            condition: condition.nonemptyEditorValue,
+            language: language.nonemptyEditorValue,
+            notes: notes.nonemptyEditorValue,
+            isFoil: card.tcg.lowercased() == TCGGame.pokemon.rawValue ? variant.isFoil : isFoil,
+            isSigned: isSigned,
+            isAltered: isAltered,
+            variant: variant,
+            tags: selectedTagIds.sorted(),
+            gradingCompany: gradingCompany.nonemptyEditorValue,
+            gradingScore: gradingScore.nonemptyEditorValue,
+            certNumber: certNumber.nonemptyEditorValue,
+            storageLocation: storageLocation.nonemptyEditorValue
+        )
+    }
+
     mutating func applyCardDefaults(for card: Card) {
         let options = PokemonFinishOption.options(for: card, includeCatalog: true)
         if !options.contains(where: { $0.code.caseInsensitiveCompare(finishCode) == .orderedSame }) {
@@ -41,6 +76,13 @@ struct CardEditorDraft {
         }
         edition = card.pokemonPrint?.variants?.firstEdition == true ? "1st Edition" : ""
         stamp = card.pokemonPrint?.worldChampionship?.stamp ?? ""
+    }
+}
+
+private extension String {
+    var nonemptyEditorValue: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

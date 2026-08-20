@@ -1,5 +1,130 @@
 import SwiftUI
 
+/// Shared loading, creation, filtering, and selection for any form that needs
+/// a binder destination. Callers retain the selected ID and binder collection
+/// so their domain-specific actions remain outside this component.
+struct BinderDestinationSection: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+
+    @Binding var binders: [Collection]
+    @Binding var selectedBinderId: String?
+    @Binding var isCreatingBinder: Bool
+    @Binding var errorMessage: String?
+
+    let title: String
+    var footer: String? = nil
+    var initialBinderId: String? = nil
+    var excludedBinderIds: Set<String> = []
+    var includesUnsortedLibrary = true
+    let isDisabled: Bool
+
+    @State private var isLoading = true
+
+    private let apiService = APIService()
+
+    var body: some View {
+        Section {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                BinderPickerSheetButton(
+                    binders: binders,
+                    selectedBinderId: $selectedBinderId,
+                    onCreate: createBinder
+                )
+                .binderPickerFieldStyle()
+                .disabled(isDisabled || isCreatingBinder)
+            }
+        } header: {
+            Text(title)
+        } footer: {
+            if let footer {
+                Text(footer)
+            }
+        }
+        .task {
+            await loadBinders()
+        }
+    }
+
+    @MainActor
+    private func loadBinders() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            isLoading = false
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetched = try await apiService.getCollections(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            binders = filteredAndSorted(fetched)
+            if let selectedBinderId,
+               binders.contains(where: { $0.id == selectedBinderId }) {
+                // Preserve the caller's current selection.
+            } else if let initialBinderId,
+                      binders.contains(where: { $0.id == initialBinderId }) {
+                selectedBinderId = initialBinderId
+            } else {
+                selectedBinderId = binders.first?.id
+            }
+            isLoading = false
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+        }
+    }
+
+    @MainActor
+    private func createBinder(
+        name: String,
+        description: String?,
+        colorHex: String?,
+        defaultCondition: String?
+    ) async {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !isCreatingBinder else { return }
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+
+        isCreatingBinder = true
+        defer { isCreatingBinder = false }
+
+        do {
+            let collection = try await apiService.createCollection(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                name: name,
+                description: description,
+                colorHex: colorHex,
+                defaultCondition: defaultCondition
+            )
+            binders.removeAll { $0.id == collection.id }
+            binders.append(collection)
+            binders = filteredAndSorted(binders)
+            selectedBinderId = collection.id
+            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func filteredAndSorted(_ collections: [Collection]) -> [Collection] {
+        collections
+            .filter { !excludedBinderIds.contains($0.id) }
+            .filter { includesUnsortedLibrary || !$0.isUnsortedBinder }
+            .sortedForDisplay()
+    }
+}
+
 /// A binder-selection field that presents available binders and, when an
 /// `onCreate` action is supplied, the shared new-binder form in one flow.
 struct BinderPickerSheetButton: View {

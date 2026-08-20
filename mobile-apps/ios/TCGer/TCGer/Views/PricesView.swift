@@ -81,6 +81,7 @@ struct PricesView: View {
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var collections: [Collection] = []
+    @State private var transactions: [Transaction] = []
     @State private var movers = PriceAnalyticsMovers(gainers: [], losers: [])
     @State private var livePrices: [String: APIService.TrackedPriceResult] = [:]
     @State private var lastPriceCheck: Date?
@@ -201,6 +202,56 @@ struct PricesView: View {
         }.joined(separator: " · ")
     }
 
+    private var purchasePerformanceLots: [PurchasePerformanceLot] {
+        var purchasesByEntry: [String: Transaction] = [:]
+        for transaction in transactions where transaction.type == "purchase" {
+            guard let entryID = transaction.collectionEntryId,
+                  purchasesByEntry[entryID] == nil else { continue }
+            purchasesByEntry[entryID] = transaction
+        }
+
+        return collections.flatMap(\.cards).flatMap { card in
+            card.copies.compactMap { copy in
+                let transaction = purchasesByEntry[copy.id]
+                guard transaction != nil || copy.acquisitionPrice != nil else { return nil }
+
+                let finishCode = copy.finishCode ?? (copy.isFoil == true ? "foil" : nil)
+                let key = APIService.TrackedPriceItem.lookupKey(
+                    tcg: card.tcg,
+                    externalId: card.externalId ?? card.cardId,
+                    finishCode: finishCode,
+                    condition: JustTCGPricingPreferences.resolvedCondition(
+                        preference: environmentStore.justTCGConditionPreference,
+                        cardValue: copy.condition ?? card.condition
+                    ),
+                    language: JustTCGPricingPreferences.resolvedLanguage(
+                        preference: environmentStore.justTCGLanguagePreference,
+                        cardValue: copy.language ?? card.language
+                    )
+                )
+                let market = livePrices[key]
+                let purchasedAt = transaction.flatMap {
+                    ISO8601DateFormatter().date(from: $0.date)
+                } ?? copy.acquiredAt.flatMap {
+                    ISO8601DateFormatter().date(from: $0)
+                }
+
+                return PurchasePerformanceLot(
+                    id: copy.id,
+                    cardName: card.name,
+                    setName: card.setName,
+                    imageURL: card.imageUrlSmall ?? card.imageUrl,
+                    paidAmount: transaction?.amount ?? copy.acquisitionPrice ?? 0,
+                    paidCurrency: transaction?.currency ?? "USD",
+                    purchasedAt: purchasedAt,
+                    source: transaction?.platform,
+                    currentValue: market?.price ?? copy.price ?? card.price,
+                    currentCurrency: market?.currency ?? "USD"
+                )
+            }
+        }
+    }
+
     var body: some View {
         Group {
             if parentProvidesNavigation { content } else { NavigationStack { content } }
@@ -241,6 +292,15 @@ struct PricesView: View {
                             )
                         }
                         .padding(.vertical, 6)
+
+                        NavigationLink {
+                            CostReturnsView(
+                                lots: purchasePerformanceLots,
+                                displayCurrency: environmentStore.displayCurrencyCode
+                            )
+                        } label: {
+                            Label("Cost & Returns", systemImage: "chart.line.uptrend.xyaxis")
+                        }
                     }
 
                     if let lastPriceCheck {
@@ -366,8 +426,13 @@ struct PricesView: View {
                 tcg: selectedGame == .all ? nil : selectedGame.rawValue,
                 period: 30
             )
+            async let fetchedTransactions = apiService.getTransactions(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
             collections = try await fetchedCollections
             movers = (try? await fetchedMovers) ?? PriceAnalyticsMovers(gainers: [], losers: [])
+            transactions = (try? await fetchedTransactions) ?? []
             await refreshTrackedPrices(force: forcePrices)
         } catch is CancellationError {
             return

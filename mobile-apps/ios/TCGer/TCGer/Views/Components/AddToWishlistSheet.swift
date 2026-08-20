@@ -14,6 +14,21 @@ struct AddToWishlistSheet: View {
 
     private let apiService = APIService()
 
+    private var errorIsPresented: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    errorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var trimmedNewName: String {
+        newName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -41,52 +56,31 @@ struct AddToWishlistSheet: View {
                 } else {
                     List {
                         if showingCreateNew {
-                            Section {
-                                HStack {
-                                    TextField("Wishlist name", text: $newName)
-                                    Button("Create") {
-                                        Task { await createAndAdd() }
-                                    }
-                                    .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAdding)
-                                }
-                            } header: {
-                                Text("New Wishlist")
-                            }
+                            CreateWishlistSection(
+                                title: "New Wishlist",
+                                placeholder: "Wishlist name",
+                                name: $newName,
+                                textInputAutocapitalization: nil,
+                                buttonTitle: "Create",
+                                isCreateDisabled: trimmedNewName.isEmpty || isAdding,
+                                onCreate: startCreateAndAdd
+                            )
                         }
 
-                        Section {
-                            ForEach(wishlistStore.wishlists) { wishlist in
-                                Button {
-                                    Task { await addToWishlist(wishlist) }
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Circle()
-                                            .fill(Color.fromHex(wishlist.colorHex))
-                                            .frame(width: 10, height: 10)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(wishlist.name)
-                                                .font(.body)
-                                            Text("\(wishlist.totalCards) cards")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        if isAdding {
-                                            ProgressView()
-                                                .scaleEffect(0.8)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(isAdding)
-                            }
-                        } header: {
-                            if !wishlistStore.wishlists.isEmpty {
-                                Text("Add to Wishlist")
-                            }
-                        }
+                        WishlistSelectionSection(
+                            title: wishlistStore.wishlists.isEmpty ? nil : "Add to Wishlist",
+                            wishlists: wishlistStore.wishlists,
+                            selectedWishlistID: nil,
+                            showsSelectionIndicators: false,
+                            isLoading: false,
+                            loadingMessage: "Loading wishlists...",
+                            loadError: nil,
+                            emptyMessage: nil,
+                            isInteractionDisabled: isAdding,
+                            showsActivityIndicator: isAdding,
+                            onRetry: nil,
+                            onSelect: startAddToWishlist
+                        )
 
                         if !showingCreateNew {
                             Section {
@@ -215,14 +209,11 @@ struct AddToWishlistSheet: View {
         environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists)
     }
 
-    private var errorIsPresented: Binding<Bool> {
-        Binding(
-            get: { errorMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    errorMessage = nil
-                }
-            }
-        )
+    private func startAddToWishlist(_ wishlist: Wishlist) {
+        Task { await addToWishlist(wishlist) }
+    }
+
+    private func startCreateAndAdd() {
+        Task { await createAndAdd() }
     }
 }

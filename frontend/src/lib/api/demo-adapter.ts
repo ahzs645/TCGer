@@ -49,6 +49,7 @@ import type {
   UpdateWishlistRuleInput,
   UserPreferences,
   CreateTransactionInput,
+  UpdateTransactionInput,
   CreateBinderInput,
   CollectionImportIssue,
   CollectionImportOptions,
@@ -64,6 +65,7 @@ import {
   createBinderSchema,
   createTagSchema,
   createTransactionSchema,
+  updateTransactionSchema,
   updateBinderSchema,
   updateSettingsSchema,
   collectionImportRequestSchema,
@@ -564,9 +566,12 @@ const DEMO_TRANSACTIONS: TransactionResponse[] = [
     date: "2025-03-05T20:15:00.000Z",
   },
 ];
+let demoTransactionsMemory: TransactionResponse[] | null = null;
 
 function getDemoTransactions(): TransactionResponse[] {
-  if (typeof localStorage === "undefined") return DEMO_TRANSACTIONS;
+  if (typeof localStorage === "undefined") {
+    return demoTransactionsMemory ?? DEMO_TRANSACTIONS;
+  }
   try {
     const raw = localStorage.getItem(DEMO_TRANSACTIONS_STORAGE_KEY);
     if (raw === null) return DEMO_TRANSACTIONS;
@@ -578,6 +583,10 @@ function getDemoTransactions(): TransactionResponse[] {
 }
 
 function setDemoTransactions(transactions: TransactionResponse[]) {
+  if (typeof localStorage === "undefined") {
+    demoTransactionsMemory = transactions;
+    return;
+  }
   localStorage.setItem(
     DEMO_TRANSACTIONS_STORAGE_KEY,
     JSON.stringify(transactions),
@@ -1310,7 +1319,7 @@ export async function handleDemoRequest(
   }
 
   if (segments[0] === "finance") {
-    return handleFinance(method, segments.slice(1), body);
+    return handleFinance(method, segments.slice(1), body, queryString);
   }
 
   if (segments[0] === "analytics") {
@@ -1612,6 +1621,7 @@ function handleFinance(
   method: string,
   segments: string[],
   body?: unknown,
+  queryString?: string,
 ): Promise<Response> {
   const transactions = getDemoTransactions();
   if (segments[0] === "summary" && segments.length === 1 && method === "GET") {
@@ -1785,11 +1795,20 @@ function handleFinance(
   }
   if (segments[0] !== "transactions") return notFound();
   if (segments.length === 1 && method === "GET") {
+    const collectionEntryId = new URLSearchParams(queryString ?? "").get(
+      "collectionEntryId",
+    );
     return json(
-      [...transactions].sort(
-        (left, right) =>
-          new Date(right.date).getTime() - new Date(left.date).getTime(),
-      ),
+      [...transactions]
+        .filter(
+          (transaction) =>
+            !collectionEntryId ||
+            transaction.collectionEntryId === collectionEntryId,
+        )
+        .sort(
+          (left, right) =>
+            new Date(right.date).getTime() - new Date(left.date).getTime(),
+        ),
     );
   }
   if (segments.length === 1 && method === "POST") {
@@ -1801,12 +1820,16 @@ function handleFinance(
     const transaction: TransactionResponse = {
       id: `demo-transaction-${crypto.randomUUID()}`,
       type: input.type,
+      collectionEntryId: input.collectionEntryId,
+      cardId: input.cardId,
+      externalId: input.externalId,
       cardName: input.cardName,
       tcg: input.tcg,
       quantity: input.quantity ?? 1,
       amount: input.amount,
       currency: input.currency ?? "USD",
       platform: input.platform,
+      sourceUrl: input.sourceUrl,
       costBasis: input.costBasis,
       fees: input.fees,
       shippingCost: input.shippingCost,
@@ -1832,6 +1855,68 @@ function handleFinance(
       ),
     );
     return json(transaction, 201);
+  }
+  if (segments.length === 2 && method === "PATCH") {
+    const existing = transactions.find((item) => item.id === segments[1]);
+    if (!existing) return notFound("Transaction not found");
+    const parsed = updateTransactionSchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ message: "Payload validation failed" }, 400);
+    }
+    const input: UpdateTransactionInput = parsed.data;
+    const amount = input.amount ?? existing.amount;
+    const fees = existing.fees ?? 0;
+    const shippingCost = existing.shippingCost ?? 0;
+    const netProceeds =
+      existing.type === "sale" ? amount - fees - shippingCost : undefined;
+    const updated: TransactionResponse = {
+      ...existing,
+      collectionEntryId:
+        input.collectionEntryId === undefined
+          ? existing.collectionEntryId
+          : (input.collectionEntryId ?? undefined),
+      cardId:
+        input.cardId === undefined
+          ? existing.cardId
+          : (input.cardId ?? undefined),
+      externalId:
+        input.externalId === undefined
+          ? existing.externalId
+          : (input.externalId ?? undefined),
+      cardName:
+        input.cardName === undefined
+          ? existing.cardName
+          : (input.cardName ?? undefined),
+      tcg: input.tcg === undefined ? existing.tcg : (input.tcg ?? undefined),
+      quantity: input.quantity ?? existing.quantity,
+      amount,
+      currency: input.currency ?? existing.currency,
+      platform:
+        input.platform === undefined
+          ? existing.platform
+          : (input.platform ?? undefined),
+      sourceUrl:
+        input.sourceUrl === undefined
+          ? existing.sourceUrl
+          : (input.sourceUrl ?? undefined),
+      notes:
+        input.notes === undefined ? existing.notes : (input.notes ?? undefined),
+      date: input.date ?? existing.date,
+      netProceeds,
+      realizedProfit:
+        existing.type === "sale" && existing.costBasis !== undefined
+          ? (netProceeds ?? amount) - existing.costBasis
+          : existing.realizedProfit,
+    };
+    setDemoTransactions(
+      transactions
+        .map((item) => (item.id === updated.id ? updated : item))
+        .sort(
+          (left, right) =>
+            new Date(right.date).getTime() - new Date(left.date).getTime(),
+        ),
+    );
+    return json(updated);
   }
   if (segments.length === 2 && method === "DELETE") {
     if (!transactions.some((item) => item.id === segments[1])) {

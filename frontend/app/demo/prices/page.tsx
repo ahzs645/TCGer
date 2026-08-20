@@ -1,7 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Search, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import {
+  Search,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  WalletCards,
+} from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -323,16 +330,27 @@ export default function PricesPage() {
   return (
     <AppShell data-oid="llm625j">
       <div className="space-y-6" data-oid="okhe2kx">
-        <div data-oid="xoqv4py">
-          <h1
-            className="text-3xl font-heading font-semibold"
-            data-oid="_p8g_q6"
-          >
-            Price Tracker
-          </h1>
-          <p className="text-sm text-muted-foreground" data-oid="9it-h89">
-            Market prices and trends for cards in your collection.
-          </p>
+        <div
+          className="flex flex-wrap items-start justify-between gap-3"
+          data-oid="xoqv4py"
+        >
+          <div>
+            <h1
+              className="text-3xl font-heading font-semibold"
+              data-oid="_p8g_q6"
+            >
+              Price Tracker
+            </h1>
+            <p className="text-sm text-muted-foreground" data-oid="9it-h89">
+              Market prices and trends for cards in your collection.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/demo/prices/cost-returns">
+              <WalletCards className="mr-2 h-4 w-4" aria-hidden />
+              Cost &amp; Returns
+            </Link>
+          </Button>
         </div>
 
         {/* Summary */}

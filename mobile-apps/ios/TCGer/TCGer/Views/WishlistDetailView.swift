@@ -567,39 +567,32 @@ private struct WishlistCardRow: View {
     let card: WishlistCard
 
     var body: some View {
-        HStack(spacing: 12) {
-            CardArtworkImage(card: card.previewCard, useFullResolution: false)
-                .frame(width: 50, height: 70)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(card.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(2)
-
-                HStack(spacing: 6) {
-                    if let setName = card.setName {
-                        Text(setName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                    GameBadge(tcg: card.tcg)
+        CardIdentityRow(
+            card: card.previewCard,
+            imageWidth: 50,
+            imageHeight: 70,
+            titleFont: .subheadline.weight(.medium)
+        ) {
+            HStack(spacing: 6) {
+                if let setName = card.setName {
+                    Text(setName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-
-                if let rarity = card.rarity {
-                    Text(rarity)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.15))
-                        .foregroundColor(.accentColor)
-                        .cornerRadius(4)
-                }
+                GameBadge(tcg: card.tcg)
             }
 
-            Spacer()
-
+            if let rarity = card.rarity {
+                Text(rarity)
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15))
+                    .foregroundColor(.accentColor)
+                    .cornerRadius(4)
+            }
+        } trailing: {
             if card.owned {
                 VStack(spacing: 2) {
                     Image(systemName: "checkmark.circle.fill")

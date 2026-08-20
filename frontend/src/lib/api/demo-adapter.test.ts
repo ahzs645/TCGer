@@ -436,6 +436,60 @@ test("seeds analytics, price movers, and the finance ledger", async () => {
     ["USD"],
   );
 
+  const linkedPurchaseResponse = await handleDemoRequest(
+    "POST",
+    "/finance/transactions",
+    {
+      type: "purchase",
+      collectionEntryId: "demo-copy-darkrai",
+      cardId: "demo-card-darkrai",
+      externalId: "dp24",
+      cardName: "Darkrai",
+      tcg: "pokemon",
+      quantity: 1,
+      amount: 18.5,
+      currency: "CAD",
+      sourceUrl: "https://example.com/receipt/42",
+      date: "2026-08-01T12:00:00.000Z",
+    },
+  );
+  assert.equal(linkedPurchaseResponse.status, 201);
+  const linkedPurchase = (await linkedPurchaseResponse.json()) as {
+    id: string;
+    collectionEntryId: string;
+    amount: number;
+    sourceUrl?: string;
+  };
+  assert.equal(linkedPurchase.collectionEntryId, "demo-copy-darkrai");
+
+  const filteredTransactionsResponse = await handleDemoRequest(
+    "GET",
+    "/finance/transactions?collectionEntryId=demo-copy-darkrai",
+  );
+  const filteredTransactions =
+    (await filteredTransactionsResponse.json()) as Array<{
+      id: string;
+    }>;
+  assert.deepEqual(
+    filteredTransactions.map((entry) => entry.id),
+    [linkedPurchase.id],
+  );
+
+  const updatedPurchaseResponse = await handleDemoRequest(
+    "PATCH",
+    `/finance/transactions/${linkedPurchase.id}`,
+    { amount: 20, currency: "USD", sourceUrl: null },
+  );
+  assert.equal(updatedPurchaseResponse.status, 200);
+  const updatedPurchase = (await updatedPurchaseResponse.json()) as {
+    amount: number;
+    currency: string;
+    sourceUrl?: string;
+  };
+  assert.equal(updatedPurchase.amount, 20);
+  assert.equal(updatedPurchase.currency, "USD");
+  assert.equal(updatedPurchase.sourceUrl, undefined);
+
   const invalidTransactionResponse = await handleDemoRequest(
     "POST",
     "/finance/transactions",

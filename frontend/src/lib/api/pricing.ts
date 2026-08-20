@@ -8,6 +8,7 @@ import type {
   CreatePriceAlertInput,
   UpdatePriceAlertInput,
   CreateTransactionInput,
+  UpdateTransactionInput,
   CreateShopConnectionInput,
   PriceResult,
   PriceAnalyticsMovers,
@@ -88,8 +89,12 @@ export async function deleteAlert(
 // Transactions / Finance
 export async function getTransactions(
   token: string,
+  collectionEntryId?: string,
 ): Promise<TransactionResponse[]> {
-  return authFetch(`${API_BASE_URL}/finance/transactions`, token);
+  const params = new URLSearchParams();
+  if (collectionEntryId) params.set("collectionEntryId", collectionEntryId);
+  const query = params.size ? `?${params.toString()}` : "";
+  return authFetch(`${API_BASE_URL}/finance/transactions${query}`, token);
 }
 export async function createTransaction(
   token: string,
@@ -97,6 +102,16 @@ export async function createTransaction(
 ): Promise<TransactionResponse> {
   return authFetch(`${API_BASE_URL}/finance/transactions`, token, {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+export async function updateTransaction(
+  token: string,
+  id: string,
+  input: UpdateTransactionInput,
+): Promise<TransactionResponse> {
+  return authFetch(`${API_BASE_URL}/finance/transactions/${id}`, token, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

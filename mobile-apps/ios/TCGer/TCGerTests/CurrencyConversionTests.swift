@@ -53,6 +53,55 @@ final class CurrencyConversionTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func testHistoricalRateUsesPurchaseDateAndCachesEachDaySeparately() async throws {
+        let suiteName = "CurrencyConversionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CurrencyURLProtocolStub.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+
+        var requestedDates: [String] = []
+        CurrencyURLProtocolStub.handler = { request in
+            let components = try XCTUnwrap(
+                URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+            )
+            let date = try XCTUnwrap(
+                components.queryItems?.first(where: { $0.name == "date" })?.value
+            )
+            requestedDates.append(date)
+            let rate = date == "2020-01-02" ? "1.2990" : "1.3410"
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (
+                response,
+                Data("{\"date\":\"\(date)\",\"base\":\"USD\",\"quote\":\"EUR\",\"rate\":\(rate)}".utf8)
+            )
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let firstDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2020, month: 1, day: 2)))
+        let secondDate = try XCTUnwrap(calendar.date(from: DateComponents(year: 2021, month: 3, day: 4)))
+        let converter = CurrencyConverter(session: session, defaults: defaults)
+
+        let first = try await converter.rate(from: "USD", to: "EUR", on: firstDate)
+        let cachedFirst = try await converter.rate(from: "USD", to: "EUR", on: firstDate)
+        let second = try await converter.rate(from: "USD", to: "EUR", on: secondDate)
+
+        XCTAssertEqual(first, cachedFirst)
+        XCTAssertEqual(first.exchangeRate.rate, Decimal(string: "1.2990"))
+        XCTAssertEqual(second.exchangeRate.rate, Decimal(string: "1.3410"))
+        XCTAssertEqual(requestedDates, ["2020-01-02", "2021-03-04"])
+    }
+
     func testCurrencyDisplayStateConvertsUSDUsingDecimalRate() throws {
         let rate = CachedExchangeRate(
             exchangeRate: ExchangeRate(

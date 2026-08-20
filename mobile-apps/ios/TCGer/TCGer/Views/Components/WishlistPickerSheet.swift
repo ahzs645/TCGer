@@ -14,6 +14,15 @@ struct WishlistPickerSheet: View {
 
     private let apiService = APIService()
 
+    private var pickerErrorMessage: String? {
+        errorMessage
+            ?? (wishlistStore.wishlists.isEmpty ? wishlistStore.errorMessage : nil)
+    }
+
+    private var trimmedNewName: String {
+        newName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -23,48 +32,31 @@ struct WishlistPickerSheet: View {
                 } else {
                     List {
                         if !wishlistStore.wishlists.isEmpty {
-                            Section {
-                                ForEach(wishlistStore.wishlists) { wishlist in
-                                    Button {
-                                        onSelect(wishlist)
-                                        dismiss()
-                                    } label: {
-                                        HStack(spacing: 12) {
-                                            Circle()
-                                                .fill(Color.fromHex(wishlist.colorHex))
-                                                .frame(width: 10, height: 10)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(wishlist.name)
-                                                Text("\(wishlist.totalCards) cards")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            Spacer()
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            } header: {
-                                Text("Choose a wishlist")
-                            }
+                            WishlistSelectionSection(
+                                title: "Choose a wishlist",
+                                wishlists: wishlistStore.wishlists,
+                                selectedWishlistID: nil,
+                                showsSelectionIndicators: false,
+                                isLoading: false,
+                                loadingMessage: "Loading wishlists…",
+                                loadError: nil,
+                                emptyMessage: nil,
+                                isInteractionDisabled: false,
+                                showsActivityIndicator: false,
+                                onRetry: nil,
+                                onSelect: select
+                            )
                         }
 
-                        Section {
-                            HStack {
-                                TextField("New wishlist name", text: $newName)
-                                Button("Create") {
-                                    Task { await createAndSelect() }
-                                }
-                                .disabled(
-                                    newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                        || isCreating
-                                )
-                            }
-                        } header: {
-                            Text("Or start a new one")
-                        }
+                        CreateWishlistSection(
+                            title: "Or start a new one",
+                            placeholder: "New wishlist name",
+                            name: $newName,
+                            textInputAutocapitalization: nil,
+                            buttonTitle: "Create",
+                            isCreateDisabled: trimmedNewName.isEmpty || isCreating,
+                            onCreate: startCreateAndSelect
+                        )
 
                         if let pickerErrorMessage {
                             Section {
@@ -122,8 +114,12 @@ struct WishlistPickerSheet: View {
         }
     }
 
-    private var pickerErrorMessage: String? {
-        errorMessage
-            ?? (wishlistStore.wishlists.isEmpty ? wishlistStore.errorMessage : nil)
+    private func select(_ wishlist: Wishlist) {
+        onSelect(wishlist)
+        dismiss()
+    }
+
+    private func startCreateAndSelect() {
+        Task { await createAndSelect() }
     }
 }

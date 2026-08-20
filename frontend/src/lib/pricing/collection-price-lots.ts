@@ -105,6 +105,10 @@ export function trackedPriceLookupKey(
   tcg: string,
   externalId: string,
   finishCode?: string,
+  condition?: string,
+  language?: string,
 ): string {
-  return `${tcg.trim().toLowerCase()}:${externalId.trim().toLowerCase()}:${finishCode?.trim().toLowerCase() ?? ""}`;
+  const base = `${tcg.trim().toLowerCase()}:${externalId.trim().toLowerCase()}:${finishCode?.trim().toLowerCase() ?? ""}`;
+  if (!condition && !language) return base;
+  return `${base}:${condition?.trim().toLowerCase() ?? ""}:${language?.trim().toLowerCase() ?? ""}`;
 }

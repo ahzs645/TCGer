@@ -35,15 +35,19 @@ struct CatalogInstallRow: View {
                 Text(game.displayName)
                     .font(.subheadline.weight(.semibold))
 
-                Label(statusSummary, systemImage: statusSystemImage)
+                DownloadableAssetStatusLabel(
+                    text: statusSummary,
+                    systemImage: statusSystemImage,
+                    tint: statusColor,
+                    lineLimit: 2
+                )
                     .font(.caption)
-                    .foregroundStyle(statusColor)
-                    .lineLimit(2)
 
                 if isInstalling {
-                    ProgressView(value: currentProgress)
-                        .progressViewStyle(.linear)
-                        .accessibilityLabel("Installing \(game.displayName) catalog")
+                    DownloadableAssetProgressView(
+                        progress: currentProgress,
+                        accessibilityLabel: "Installing \(game.displayName) catalog"
+                    )
                 }
 
                 if let errorMessage {
@@ -65,7 +69,10 @@ struct CatalogInstallRow: View {
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("About \(game.displayName) catalog")
 
-                actionButton
+                DownloadableAssetActionControl(
+                    state: actionState,
+                    action: performAction
+                )
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -121,34 +128,31 @@ struct CatalogInstallRow: View {
         .frame(idealWidth: 300, alignment: .leading)
     }
 
-    @ViewBuilder
-    private var actionButton: some View {
-        if isInstalling {
-            ProgressView()
-                .controlSize(.small)
-        } else {
-            switch catalogStore.installState(for: game) {
-            case .notInstalled:
-                Button(isAvailable ? "Install" : "Unavailable") {
-                    install()
-                }
-                .disabled(!isAvailable)
-            case .installed:
-                if needsCatalogUpdate, isAvailable {
-                    Button("Update") {
-                        install()
-                    }
-                } else if needsSealedInstall {
-                    Button("Add Products") {
-                        install()
-                    }
-                } else {
-                    Button("Remove", role: .destructive) {
-                        showingRemoveConfirmation = true
-                    }
-                }
-            }
+    private var actionState: DownloadableAssetActionControl.State {
+        guard !isInstalling else {
+            return .busy(accessibilityLabel: "Installing \(game.displayName) catalog")
         }
+
+        switch catalogStore.installState(for: game) {
+        case .notInstalled:
+            return .button(
+                title: isAvailable ? "Install" : "Unavailable",
+                isEnabled: isAvailable
+            )
+        case .installed:
+            if needsCatalogUpdate, isAvailable {
+                return .button(title: "Update")
+            }
+            if needsSealedInstall {
+                return .button(title: "Add Products")
+            }
+            return .button(title: "Remove", role: .destructive)
+        }
+    }
+
+    private var removesCatalog: Bool {
+        guard case .installed = catalogStore.installState(for: game) else { return false }
+        return !(needsCatalogUpdate && isAvailable) && !needsSealedInstall
     }
 
     private var catalogSummary: String {
@@ -208,6 +212,14 @@ struct CatalogInstallRow: View {
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func performAction() {
+        if removesCatalog {
+            showingRemoveConfirmation = true
+        } else {
+            install()
         }
     }
 

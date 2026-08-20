@@ -8,6 +8,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   RefreshCw,
+  WalletCards,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { TrackedPriceItem, TrackedPriceResult } from "@tcg/api-types";
@@ -327,23 +328,30 @@ export default function PricesPage() {
               </p>
             )}
           </div>
-          {mounted &&
-            isAuthenticated &&
-            showPricing &&
-            trackedItems.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleRefresh()}
-                disabled={trackedPricesQuery.isFetching}
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${trackedPricesQuery.isFetching ? "animate-spin" : ""}`}
-                  aria-hidden
-                />
-                Refresh prices
+          {mounted && isAuthenticated && showPricing && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/prices/cost-returns">
+                  <WalletCards className="mr-2 h-4 w-4" aria-hidden />
+                  Cost &amp; Returns
+                </Link>
               </Button>
-            )}
+              {trackedItems.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRefresh()}
+                  disabled={trackedPricesQuery.isFetching}
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${trackedPricesQuery.isFetching ? "animate-spin" : ""}`}
+                    aria-hidden
+                  />
+                  Refresh prices
+                </Button>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {trackedPricesQuery.error && (

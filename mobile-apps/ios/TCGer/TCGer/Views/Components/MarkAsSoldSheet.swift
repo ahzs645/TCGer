@@ -47,22 +47,20 @@ struct MarkAsSoldSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack(spacing: 12) {
-                        CardArtworkImage(card: card.previewCard, useFullResolution: false)
-                            .frame(width: 40, height: 56)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(card.name)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            if let setName = card.setName {
-                                Text(setName)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Text("Qty: \(card.quantity)")
+                    CardIdentityRow(
+                        card: card.previewCard,
+                        imageWidth: 40,
+                        imageHeight: 56,
+                        titleFont: .subheadline.weight(.medium)
+                    ) {
+                        if let setName = card.setName {
+                            Text(setName)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        Text("Qty: \(card.quantity)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 } header: {
                     Text("Card")

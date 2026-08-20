@@ -147,7 +147,8 @@ struct TransactionsView: View {
             let txn = try await apiService.createTransaction(
                 config: environmentStore.serverConfiguration, token: token,
                 type: draft.type, cardName: draft.cardName, tcg: draft.tcg,
-                quantity: draft.quantity, amount: draft.amount, platform: draft.platform,
+                quantity: draft.quantity, amount: draft.amount, currency: draft.currency,
+                platform: draft.platform,
                 costBasis: draft.costBasis, fees: draft.fees,
                 shippingCost: draft.shippingCost, acquiredAt: draft.acquiredAt,
                 notes: draft.notes
@@ -187,19 +188,19 @@ private struct TransactionDetailSheet: View {
             List {
                 Section("Transaction") {
                     LabeledContent("Type", value: transaction.type.capitalized)
-                    LabeledContent("Amount", value: transaction.amount.priceText)
+                    LabeledContent("Amount", value: transaction.amount.priceText(currency: transaction.currency))
                     LabeledContent("Quantity", value: "\(transaction.quantity)")
                     if let platform = transaction.platform { LabeledContent("Platform", value: platform) }
                     LabeledContent("Date", value: transaction.date)
                 }
                 if transaction.type == "sale" {
                     Section("Realized Sale") {
-                        if let cost = transaction.costBasis { LabeledContent("Acquisition cost", value: cost.priceText) }
-                        LabeledContent("Fees", value: (transaction.fees ?? 0).priceText)
-                        LabeledContent("Shipping", value: (transaction.shippingCost ?? 0).priceText)
-                        if let net = transaction.netProceeds { LabeledContent("Net proceeds", value: net.priceText) }
+                        if let cost = transaction.costBasis { LabeledContent("Acquisition cost", value: cost.priceText(currency: transaction.currency)) }
+                        LabeledContent("Fees", value: (transaction.fees ?? 0).priceText(currency: transaction.currency))
+                        LabeledContent("Shipping", value: (transaction.shippingCost ?? 0).priceText(currency: transaction.currency))
+                        if let net = transaction.netProceeds { LabeledContent("Net proceeds", value: net.priceText(currency: transaction.currency)) }
                         if let profit = transaction.realizedProfit {
-                            LabeledContent("Realized profit", value: profit.priceText)
+                            LabeledContent("Realized profit", value: profit.priceText(currency: transaction.currency))
                         } else {
                             Text("Add acquisition cost to calculate realized profit.")
                                 .font(.caption)
@@ -282,7 +283,7 @@ private struct TransactionRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(transaction.type == "purchase" ? "-" : "+")\(transaction.amount.priceText)")
+                Text("\(transaction.type == "purchase" ? "-" : "+")\(transaction.amount.priceText(currency: transaction.currency))")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(typeColor)
@@ -293,7 +294,7 @@ private struct TransactionRow: View {
                         .foregroundColor(.secondary)
                 }
                 if let profit = transaction.realizedProfit {
-                    Text("\(profit >= 0 ? "+" : "−")\(abs(profit).priceText) realized")
+                    Text("\(profit >= 0 ? "+" : "−")\(abs(profit).priceText(currency: transaction.currency)) realized")
                         .font(.caption)
                         .foregroundStyle(profit >= 0 ? Color.green : Color.red)
                 }
@@ -311,6 +312,7 @@ private struct NewTransactionDetails {
     let tcg: String?
     let quantity: Int
     let amount: Double
+    let currency: String
     let platform: String?
     let costBasis: Double?
     let fees: Double?
@@ -328,6 +330,8 @@ private struct CreateTransactionSheet: View {
     @State private var tcg = ""
     @State private var quantity = 1
     @State private var amountText = ""
+    @State private var currency = "USD"
+    @State private var supportedCurrencies = SupportedCurrency.fallback
     @State private var platform = ""
     @State private var costBasisText = ""
     @State private var feesText = ""
@@ -365,8 +369,16 @@ private struct CreateTransactionSheet: View {
                 }
 
                 Section {
-                    TextField("Amount ($)", text: $amountText)
-                        .keyboardType(.decimalPad)
+                    HStack {
+                        TextField("Amount", text: $amountText)
+                            .keyboardType(.decimalPad)
+                        Picker("Currency", selection: $currency) {
+                            ForEach(supportedCurrencies) { option in
+                                Text(option.isoCode).tag(option.isoCode)
+                            }
+                        }
+                        .labelsHidden()
+                    }
                     Picker("Platform", selection: $platform) {
                         ForEach(platforms, id: \.self) { p in
                             Text(p.isEmpty ? "None" : p).tag(p)
@@ -413,6 +425,7 @@ private struct CreateTransactionSheet: View {
                             tcg: tcg.isEmpty ? nil : tcg,
                             quantity: quantity,
                             amount: amount,
+                            currency: currency,
                             platform: platform.isEmpty ? nil : platform,
                             costBasis: Double(costBasisText),
                             fees: Double(feesText),
@@ -427,5 +440,23 @@ private struct CreateTransactionSheet: View {
             }
         }
         .presentationDetents([.large])
+        .onAppear {
+            if amountText.isEmpty {
+                currency = environmentStore.displayCurrencyCode
+                includeSelectedCurrency()
+            }
+        }
+        .task {
+            if let currencies = try? await CurrencyConverter.shared.supportedCurrencies() {
+                supportedCurrencies = currencies
+                includeSelectedCurrency()
+            }
+        }
+    }
+
+    private func includeSelectedCurrency() {
+        guard !supportedCurrencies.contains(where: { $0.isoCode == currency }) else { return }
+        supportedCurrencies.append(SupportedCurrency(isoCode: currency, name: currency, symbol: nil))
+        supportedCurrencies.sort { $0.isoCode < $1.isoCode }
     }
 }

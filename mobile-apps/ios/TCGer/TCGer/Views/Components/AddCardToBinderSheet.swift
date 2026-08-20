@@ -15,7 +15,6 @@ struct AddCardToBinderSheet: View {
     // Tracks what the picker was last seeded with, so switching binders only
     // re-seeds the condition while the user hasn't picked one themselves.
     @State private var seededCondition: String = CardCondition.nearMint.rawValue
-    @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var isAdding = false
     @State private var isCreatingBinder = false
@@ -64,35 +63,16 @@ struct AddCardToBinderSheet: View {
                     Text("Card")
                 }
 
-                // Binder Selection
-                Section {
-                    if isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
-                    } else {
-                        BinderPickerSheetButton(
-                            binders: collections,
-                            selectedBinderId: $selectedBinderId,
-                            onCreate: { name, description, colorHex, defaultCondition in
-                                await createBinder(
-                                    name: name,
-                                    description: description,
-                                    colorHex: colorHex,
-                                    defaultCondition: defaultCondition
-                                )
-                            }
-                        )
-                        .binderPickerFieldStyle()
-                        .disabled(isAdding || isCreatingBinder)
-                    }
-                } header: {
-                    Text("Binder")
-                } footer: {
-                    Text("Choose which binder to add this card to")
-                }
+                BinderDestinationSection(
+                    binders: $collections,
+                    selectedBinderId: $selectedBinderId,
+                    isCreatingBinder: $isCreatingBinder,
+                    errorMessage: $errorMessage,
+                    title: "Binder",
+                    footer: "Choose which binder to add this card to",
+                    initialBinderId: initialBinderId,
+                    isDisabled: isAdding
+                )
 
                 Section {
                     Button {
@@ -147,7 +127,6 @@ struct AddCardToBinderSheet: View {
             if draft.finishCode.isEmpty {
                 draft.applyCardDefaults(for: originalCard)
             }
-            await loadCollections()
             await loadTags()
         }
         .onChange(of: selectedBinderId) { _, _ in
@@ -192,76 +171,6 @@ struct AddCardToBinderSheet: View {
     }
 
     @MainActor
-    private func loadCollections() async {
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: token
-            ).sortedForDisplay()
-            if let selectedBinderId,
-               collections.contains(where: { $0.id == selectedBinderId }) {
-                // Preserve a selection the user already made if collections reload.
-            } else if let initialBinderId,
-                      collections.contains(where: { $0.id == initialBinderId }) {
-                selectedBinderId = initialBinderId
-            } else {
-                selectedBinderId = collections.first?.id
-            }
-            applyBinderDefaultCondition()
-            isLoading = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
-        }
-    }
-
-    @MainActor
-    private func createBinder(
-        name: String,
-        description: String?,
-        colorHex: String?,
-        defaultCondition: String?
-    ) async {
-        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !isCreatingBinder else { return }
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            return
-        }
-
-        isCreatingBinder = true
-        defer { isCreatingBinder = false }
-
-        do {
-            let collection = try await apiService.createCollection(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                name: name,
-                description: description,
-                colorHex: colorHex,
-                defaultCondition: defaultCondition
-            )
-            collections.removeAll { $0.id == collection.id }
-            collections.append(collection)
-            collections = collections.sortedForDisplay()
-            selectedBinderId = collection.id
-            applyBinderDefaultCondition()
-            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    @MainActor
     private func addCard() async {
         guard let binderId = selectedBinderId else {
             errorMessage = "Please select a binder"
@@ -270,32 +179,26 @@ struct AddCardToBinderSheet: View {
 
         isAdding = true
         errorMessage = nil
-
-        func trimmed(_ value: String) -> String? {
-            let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            return result.isEmpty ? nil : result
-        }
+        let values = draft.normalizedValues(for: originalCard)
 
         do {
             try await onAdd(
                 originalCard,
                 binderId,
                 BinderCardAddDetails(
-                    quantity: draft.quantity,
-                    condition: trimmed(draft.condition),
-                    language: trimmed(draft.language),
-                    notes: trimmed(draft.notes),
-                    isFoil: originalCard.tcg.lowercased() == "pokemon"
-                        ? draft.variant.isFoil
-                        : draft.isFoil,
-                    variant: draft.variant,
-                    isSigned: draft.isSigned,
-                    isAltered: draft.isAltered,
-                    tags: draft.selectedTagIds.sorted(),
-                    gradingCompany: trimmed(draft.gradingCompany),
-                    gradingScore: trimmed(draft.gradingScore),
-                    certNumber: trimmed(draft.certNumber),
-                    storageLocation: trimmed(draft.storageLocation)
+                    quantity: values.quantity,
+                    condition: values.condition,
+                    language: values.language,
+                    notes: values.notes,
+                    isFoil: values.isFoil,
+                    variant: values.variant,
+                    isSigned: values.isSigned,
+                    isAltered: values.isAltered,
+                    tags: values.tags,
+                    gradingCompany: values.gradingCompany,
+                    gradingScore: values.gradingScore,
+                    certNumber: values.certNumber,
+                    storageLocation: values.storageLocation
                 )
             )
             isAdding = false
@@ -330,27 +233,16 @@ private struct CardPreviewRow: View {
     let card: Card
 
     var body: some View {
-        HStack(spacing: 12) {
-            CardArtworkImage(card: card, useFullResolution: false)
-                .frame(width: 60, height: 84)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(card.name)
-                    .font(.headline)
-                    .lineLimit(2)
-
-                if let setName = card.setName {
-                    Text(setName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if let rarity = card.rarity {
-                    PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
-                }
+        CardIdentityRow(card: card) {
+            if let setName = card.setName {
+                Text(setName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
-            Spacer()
+            if let rarity = card.rarity {
+                PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
+            }
         }
         .padding(.vertical, 4)
     }

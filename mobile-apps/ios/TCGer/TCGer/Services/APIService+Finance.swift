@@ -35,6 +35,39 @@ extension APIService {
         let sourceUrl: String?
         let notes: String?
         let date: String
+
+        private enum CodingKeys: String, CodingKey {
+            case collectionEntryId
+            case cardId
+            case externalId
+            case tcg
+            case cardName
+            case quantity
+            case amount
+            case currency
+            case platform
+            case sourceUrl
+            case notes
+            case date
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            // These fields deliberately encode nil as JSON null so clearing an
+            // optional value in Purchase Details also clears it on the server.
+            try container.encode(collectionEntryId, forKey: .collectionEntryId)
+            try container.encode(cardId, forKey: .cardId)
+            try container.encode(externalId, forKey: .externalId)
+            try container.encode(tcg, forKey: .tcg)
+            try container.encode(cardName, forKey: .cardName)
+            try container.encode(quantity, forKey: .quantity)
+            try container.encode(amount, forKey: .amount)
+            try container.encode(currency, forKey: .currency)
+            try container.encode(platform, forKey: .platform)
+            try container.encode(sourceUrl, forKey: .sourceUrl)
+            try container.encode(notes, forKey: .notes)
+            try container.encode(date, forKey: .date)
+        }
     }
 
     func getTransactions(

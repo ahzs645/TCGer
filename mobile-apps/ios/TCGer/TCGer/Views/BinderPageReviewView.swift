@@ -1341,29 +1341,11 @@ private struct BinderCardDetectionDetailView: View {
                     imageComparison
 
                     if let candidate = detection.selectedCandidate {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 7) {
-                                Text(candidate.details.identity.name)
-                                    .font(.title3.weight(.semibold))
-                                if candidate.originatingStrategy == .manual {
-                                    Label("Manual match", systemImage: "hand.tap.fill")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            Text(candidate.details.identity.setName ?? candidate.details.identity.setCode ?? "Unknown set")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            if candidate.originatingStrategy == .manual {
-                                Text("Selected by you")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(String(format: "%.0f%% match", candidate.confidence.score * 100))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(statusColor)
-                            }
-                        }
+                        ScanCandidateSummary(
+                            candidate: candidate,
+                            style: .detail,
+                            tint: statusColor
+                        )
                     } else {
                         ContentUnavailableView(
                             "No Match",
@@ -1443,21 +1425,11 @@ private struct BinderCardDetectionDetailView: View {
             }
 
             VStack(spacing: 6) {
-                if let url = detection.selectedCandidate?.details.imageURL {
-                    CachedAsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fit)
-                        case .failure:
-                            candidatePlaceholder
-                        default:
-                            candidatePlaceholder.overlay(ProgressView())
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                } else {
-                    candidatePlaceholder
-                }
+                ScanCandidateArtwork(
+                    imageURL: detection.selectedCandidate?.details.imageURL,
+                    placeholderAspectRatio: 0.72
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
                 Text("Matched")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1513,13 +1485,6 @@ private struct BinderCardDetectionDetailView: View {
         }
         .padding()
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var candidatePlaceholder: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Color.secondary.opacity(0.12))
-            .aspectRatio(0.72, contentMode: .fit)
-            .overlay(Image(systemName: "rectangle.portrait").foregroundStyle(.secondary))
     }
 
     private var alternatives: some View {
@@ -1638,34 +1603,30 @@ private struct BinderCardMatchSearchView: View {
     let capturedCard: CGImage
     let onSelect: (Card) -> Void
 
-    @State private var searchText = ""
-    @State private var results: [Card] = []
-    @State private var isSearching = false
-    @State private var hasSearched = false
-    @State private var errorMessage: String?
-
-    private let apiService = APIService()
+    @State private var searchModel = CatalogCardSearchModel()
 
     private var game: TCGGame { mode.tcgGame }
 
     var body: some View {
+        @Bindable var searchModel = searchModel
+
         NavigationStack {
             Group {
-                if isSearching, results.isEmpty {
+                if searchModel.isSearching, searchModel.results.isEmpty {
                     ProgressView("Searching…")
-                } else if results.isEmpty {
+                } else if searchModel.results.isEmpty {
                     ContentUnavailableView(
-                        hasSearched ? "No Cards Found" : "Find a Card",
-                        systemImage: hasSearched ? "rectangle.stack.badge.questionmark" : "magnifyingglass",
+                        searchModel.hasSearched ? "No Cards Found" : "Find a Card",
+                        systemImage: searchModel.hasSearched ? "rectangle.stack.badge.questionmark" : "magnifyingglass",
                         description: Text(
-                            hasSearched
+                            searchModel.hasSearched
                                 ? "Try another card name or collector number."
                                 : "Search by card name or collector number."
                         )
                     )
                 } else {
                     CardSearchResultsList(
-                        cards: results,
+                        cards: searchModel.results,
                         selectedGame: game,
                         enabledGames: environmentStore.enabledGames,
                         showPricing: environmentStore.showPricing,
@@ -1680,7 +1641,7 @@ private struct BinderCardMatchSearchView: View {
             .navigationTitle("Choose Match")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
-                text: $searchText,
+                text: $searchModel.query,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search \(mode.displayName) cards"
             )
@@ -1691,11 +1652,8 @@ private struct BinderCardMatchSearchView: View {
             .onSubmit(of: .search) {
                 Task { await search() }
             }
-            .onChange(of: searchText) { _, newValue in
-                if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    results = []
-                    hasSearched = false
-                }
+            .onChange(of: searchModel.query) {
+                searchModel.resetIfQueryIsEmpty()
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1706,13 +1664,13 @@ private struct BinderCardMatchSearchView: View {
         .alert(
             "Search Failed",
             isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
+                get: { searchModel.errorMessage != nil },
+                set: { if !$0 { searchModel.clearError() } }
             )
         ) {
-            Button("OK", role: .cancel) { errorMessage = nil }
+            Button("OK", role: .cancel) { searchModel.clearError() }
         } message: {
-            Text(errorMessage ?? "An unknown error occurred.")
+            Text(searchModel.errorMessage ?? "An unknown error occurred.")
         }
     }
 
@@ -1751,30 +1709,10 @@ private struct BinderCardMatchSearchView: View {
 
     @MainActor
     private func search() async {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return }
-        let token: String
-        if environmentStore.serverConfiguration.isOnDevice {
-            token = environmentStore.authToken ?? ""
-        } else if let authToken = environmentStore.authToken {
-            token = authToken
-        } else {
-            errorMessage = "Not authenticated"
-            return
-        }
-
-        isSearching = true
-        hasSearched = true
-        defer { isSearching = false }
-        do {
-            results = try await apiService.searchCards(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                query: query,
-                game: game
-            ).cards
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        await searchModel.search(
+            config: environmentStore.serverConfiguration,
+            authToken: environmentStore.authToken,
+            game: game
+        )
     }
 }

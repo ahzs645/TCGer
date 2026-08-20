@@ -3,23 +3,11 @@ import SwiftUI
 struct EditCollectionCardSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    struct SavePayload: Sendable {
-        let quantity: Int
-        let condition: String?
-        let language: String?
-        let notes: String?
-        let isFoil: Bool
-        let isSigned: Bool
-        let isAltered: Bool
-        let variant: CardCopyVariant
-        let tags: [String]
-        let gradingCompany: String?
-        let gradingScore: String?
-        let certNumber: String?
-        let storageLocation: String?
-    }
+    typealias SavePayload = CardCopyEditorValues
 
     let card: CollectionCard
+    let binderId: String
+    let collectionEntryId: String
     let isIndividualCopy: Bool
     let copyDetails: CollectionCardCopy?
     let isSaving: Bool
@@ -41,6 +29,8 @@ struct EditCollectionCardSheet: View {
 
     init(
         card: CollectionCard,
+        binderId: String,
+        collectionEntryId: String,
         isIndividualCopy: Bool = false,
         copyDetails: CollectionCardCopy? = nil,
         isSaving: Bool,
@@ -50,6 +40,8 @@ struct EditCollectionCardSheet: View {
         onSave: @escaping @Sendable (SavePayload) -> Void
     ) {
         self.card = card
+        self.binderId = binderId
+        self.collectionEntryId = collectionEntryId
         self.isIndividualCopy = isIndividualCopy
         self.copyDetails = copyDetails
         self.isSaving = isSaving
@@ -83,38 +75,37 @@ struct EditCollectionCardSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    HStack(spacing: 12) {
-                        CardArtworkImage(card: card.previewCard, useFullResolution: false)
-                            .frame(width: 60, height: 84)
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(card.name)
-                                .font(.headline)
-                            if let setCode = card.setCode {
-                                Text(setCode)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            if let copyTitle {
-                                Text(copyTitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            if let copyDetailsLine {
-                                Text(copyDetailsLine)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("Currently ×\(card.quantity)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                    CardIdentityRow(card: card.previewCard) {
+                        if let setCode = card.setCode {
+                            Text(setCode)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        Spacer()
+                        if let copyTitle {
+                            Text(copyTitle)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        if let copyDetailsLine {
+                            Text(copyDetailsLine)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("Currently ×\(card.quantity)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 } header: {
                     Text("Card")
                 }
+
+                CardAcquisitionSection(
+                    card: card,
+                    binderId: binderId,
+                    collectionEntryId: collectionEntryId,
+                    copyDetails: copyDetails
+                )
 
                 CardCopyEditorSections(
                     card: card.previewCard,
@@ -141,27 +132,7 @@ struct EditCollectionCardSheet: View {
     }
 
     private func save() {
-        func trimmed(_ value: String) -> String? {
-            let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            return result.isEmpty ? nil : result
-        }
-
-        let variant = draft.variant
-        let payload = SavePayload(
-            quantity: draft.quantity,
-            condition: trimmed(draft.condition),
-            language: trimmed(draft.language),
-            notes: trimmed(draft.notes),
-            isFoil: card.tcg.lowercased() == TCGGame.pokemon.rawValue ? variant.isFoil : draft.isFoil,
-            isSigned: draft.isSigned,
-            isAltered: draft.isAltered,
-            variant: variant,
-            tags: draft.selectedTagIds.sorted(),
-            gradingCompany: trimmed(draft.gradingCompany),
-            gradingScore: trimmed(draft.gradingScore),
-            certNumber: trimmed(draft.certNumber),
-            storageLocation: trimmed(draft.storageLocation)
-        )
+        let payload = draft.normalizedValues(for: card.previewCard)
 #if DEBUG
         print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") tags:\(payload.tags)")
 #endif

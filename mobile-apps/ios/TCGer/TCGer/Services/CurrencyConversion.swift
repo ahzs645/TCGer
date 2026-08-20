@@ -87,6 +87,7 @@ actor CurrencyConverter {
     func rate(
         from source: String,
         to destination: String,
+        on date: Date? = nil,
         force: Bool = false,
         now: Date = Date()
     ) async throws -> CachedExchangeRate {
@@ -108,15 +109,17 @@ actor CurrencyConverter {
             )
         }
 
-        let key = Self.cacheKey(from: source, to: destination)
+        let key = Self.cacheKey(from: source, to: destination, on: date)
         let cached = memoryCache[key] ?? Self.loadCachedRate(forKey: key, from: defaults)
-        if !force, let cached, cached.isFresh(at: now, lifetime: Self.cacheLifetime) {
+        if !force,
+           let cached,
+           date != nil || cached.isFresh(at: now, lifetime: Self.cacheLifetime) {
             memoryCache[key] = cached
             return cached
         }
 
         do {
-            let fresh = try await fetchRate(from: source, to: destination, now: now)
+            let fresh = try await fetchRate(from: source, to: destination, on: date, now: now)
             memoryCache[key] = fresh
             Self.saveCachedRate(fresh, forKey: key, to: defaults)
             return fresh
@@ -132,6 +135,7 @@ actor CurrencyConverter {
     private func fetchRate(
         from source: String,
         to destination: String,
+        on date: Date?,
         now: Date
     ) async throws -> CachedExchangeRate {
         let shouldUseBankOfCanada = destination == "CAD"
@@ -143,6 +147,7 @@ actor CurrencyConverter {
                 providerName: shouldUseBankOfCanada
                     ? "Bank of Canada via Frankfurter"
                     : "Frankfurter central-bank blend",
+                date: date,
                 now: now
             )
         } catch where shouldUseBankOfCanada {
@@ -151,6 +156,7 @@ actor CurrencyConverter {
                 to: destination,
                 provider: nil,
                 providerName: "Frankfurter central-bank blend",
+                date: date,
                 now: now
             )
         }
@@ -161,6 +167,7 @@ actor CurrencyConverter {
         to destination: String,
         provider: String?,
         providerName: String,
+        date: Date?,
         now: Date
     ) async throws -> CachedExchangeRate {
         var components = URLComponents(
@@ -170,9 +177,12 @@ actor CurrencyConverter {
                 .appending(path: destination),
             resolvingAgainstBaseURL: false
         )
-        if let provider {
-            components?.queryItems = [URLQueryItem(name: "providers", value: provider)]
+        var queryItems: [URLQueryItem] = []
+        if let provider { queryItems.append(URLQueryItem(name: "providers", value: provider)) }
+        if let date {
+            queryItems.append(URLQueryItem(name: "date", value: Self.dateFormatter.string(from: date)))
         }
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
         guard let url = components?.url else {
             throw CurrencyConversionError.invalidCurrencyCode
         }
@@ -196,8 +206,9 @@ actor CurrencyConverter {
         value.count == 3 && value.allSatisfy { $0.isASCII && $0.isLetter }
     }
 
-    private static func cacheKey(from source: String, to destination: String) -> String {
-        "tcg.currency.rate.\(source).\(destination)"
+    private static func cacheKey(from source: String, to destination: String, on date: Date? = nil) -> String {
+        let day = date.map { ".\(dateFormatter.string(from: $0))" } ?? ""
+        return "tcg.currency.rate.\(source).\(destination)\(day)"
     }
 
     static func loadCachedRate(
@@ -244,6 +255,12 @@ final class CurrencyDisplayState: @unchecked Sendable {
     private var rate: CachedExchangeRate?
 
     private init() {}
+
+    var currentCurrencyCode: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return currencyCode
+    }
 
     func configure(currencyCode: String, rate: CachedExchangeRate?) {
         lock.lock()

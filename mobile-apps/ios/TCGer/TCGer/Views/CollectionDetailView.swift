@@ -627,6 +627,8 @@ struct CollectionDetailView: View {
                 .sheet(item: $editContext) { context in
                     EditCollectionCardSheet(
                         card: context.card,
+                        binderId: collection.id,
+                        collectionEntryId: context.collectionEntryId,
                         isIndividualCopy: !context.canEditQuantity,
                         copyDetails: context.copy,
                         isSaving: editingCardId == context.collectionEntryId,

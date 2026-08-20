@@ -53,6 +53,30 @@ final class CardEditorDraftTests: XCTestCase {
         XCTAssertEqual(json["tags"] as? [String], ["favorite"])
     }
 
+    func testNormalizedValuesAreSharedByAddAndEditFlows() {
+        var draft = makeDraft(
+            finishCode: "holo",
+            edition: "  1st Edition  ",
+            stamp: "  Staff  "
+        )
+        draft.condition = "  Near Mint  "
+        draft.language = "  English  "
+        draft.notes = "   "
+        draft.gradingCompany = " PSA "
+        draft.selectedTagIds = ["favorite", "graded"]
+
+        let values = draft.normalizedValues(for: makeCard(tcg: "pokemon"))
+
+        XCTAssertEqual(values.condition, "Near Mint")
+        XCTAssertEqual(values.language, "English")
+        XCTAssertNil(values.notes)
+        XCTAssertEqual(values.gradingCompany, "PSA")
+        XCTAssertEqual(values.tags, ["favorite", "graded"])
+        XCTAssertTrue(values.isFoil)
+        XCTAssertEqual(values.variant.edition, "1st Edition")
+        XCTAssertEqual(values.variant.stamp, "Staff")
+    }
+
     private func makeDraft(
         finishCode: String = "",
         edition: String = "",
@@ -77,6 +101,22 @@ final class CardEditorDraftTests: XCTestCase {
             certNumber: "",
             storageLocation: "",
             selectedTagIds: []
+        )
+    }
+
+    private func makeCard(tcg: String) -> Card {
+        Card(
+            id: "card-1",
+            name: "Test Card",
+            tcg: tcg,
+            setCode: "TST",
+            setName: "Test Set",
+            rarity: nil,
+            imageUrl: nil,
+            imageUrlSmall: nil,
+            price: nil,
+            collectorNumber: "1",
+            releasedAt: nil
         )
     }
 }

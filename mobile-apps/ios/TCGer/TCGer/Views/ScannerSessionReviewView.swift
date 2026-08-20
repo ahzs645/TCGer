@@ -595,7 +595,10 @@ private struct ScannerMatchPickerView: View {
             HapticManager.selection()
         } label: {
             VStack(alignment: .leading, spacing: 7) {
-                candidateImage(candidate)
+                ScanCandidateArtwork(
+                    imageURL: candidate.details.imageURL,
+                    contentMode: .fill
+                )
                     .frame(width: 116, height: 162)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay {
@@ -620,17 +623,11 @@ private struct ScannerMatchPickerView: View {
                         }
                     }
 
-                Text(candidate.details.identity.name)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                Text(candidate.details.identity.setCode ?? "Unknown set")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(candidate.confidence.score, format: .percent.precision(.fractionLength(0)))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isSelected ? color : Color.secondary)
+                ScanCandidateSummary(
+                    candidate: candidate,
+                    style: .compact,
+                    tint: isSelected ? color : Color.secondary
+                )
             }
             .frame(width: 116, alignment: .leading)
         }
@@ -642,27 +639,4 @@ private struct ScannerMatchPickerView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    @ViewBuilder
-    private func candidateImage(_ candidate: CardScanCandidate) -> some View {
-        if let url = candidate.details.imageURL {
-            CachedAsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .failure:
-                    candidatePlaceholder
-                default:
-                    candidatePlaceholder.overlay(ProgressView())
-                }
-            }
-        } else {
-            candidatePlaceholder
-        }
-    }
-
-    private var candidatePlaceholder: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Color.secondary.opacity(0.12))
-            .overlay(Image(systemName: "rectangle.portrait").foregroundStyle(.secondary))
-    }
 }
