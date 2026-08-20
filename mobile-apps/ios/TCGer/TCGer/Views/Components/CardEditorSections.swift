@@ -14,7 +14,6 @@ struct CardEditorDraft {
     var isSealedPromo: Bool
     var isOversized: Bool
     var isPeelOff: Bool
-    var selectedPrint: Card?
     var gradingCompany: String
     var gradingScore: String
     var certNumber: String
@@ -35,11 +34,7 @@ struct CardEditorDraft {
         )
     }
 
-    func finishOptions(for fallbackCard: Card) -> [PokemonFinishOption] {
-        PokemonFinishOption.options(for: selectedPrint ?? fallbackCard, includeCatalog: true)
-    }
-
-    mutating func applyPrintDefaults(for card: Card) {
+    mutating func applyCardDefaults(for card: Card) {
         let options = PokemonFinishOption.options(for: card, includeCatalog: true)
         if !options.contains(where: { $0.code.caseInsensitiveCompare(finishCode) == .orderedSame }) {
             finishCode = options.first?.code ?? ""
@@ -49,42 +44,54 @@ struct CardEditorDraft {
     }
 }
 
-struct CardPrintSelectionSection: View {
+/// The copy-level editor shared by both Add Card and Edit Card. The catalog
+/// card is immutable here so copy metadata can never replace card identity.
+struct CardCopyEditorSections: View {
     let card: Card
-    let selectedPrint: Card?
-    let isDisabled: Bool
-    let onSelect: () -> Void
+    @Binding var draft: CardEditorDraft
+    @Binding var tags: [CollectionCardTag]
+    let showsQuantity: Bool
+    let onCreateTag: ((String) async throws -> CollectionCardTag)?
+
+    private var finishOptions: [PokemonFinishOption] {
+        PokemonFinishOption.options(for: card, includeCatalog: true)
+    }
 
     var body: some View {
-        Section {
-            Button(action: onSelect) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Print")
-                            .foregroundStyle(.primary)
-                        if let setName = selectedPrint?.setName ?? card.setName {
-                            Text(setName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if let collectorNumber = selectedPrint?.collectorNumber ?? card.collectorNumber {
-                            Text("#\(collectorNumber)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .disabled(isDisabled)
-        } header: {
-            Text("Print Selection")
-        } footer: {
-            Text("Choose from every available printing, including World Championship versions.")
-        }
+        CardEditorDetailsSection(
+            quantity: $draft.quantity,
+            condition: $draft.condition,
+            language: $draft.language,
+            showsQuantity: showsQuantity
+        )
+
+        CardEditorAttributesSection(
+            card: card,
+            finishOptions: finishOptions,
+            isFoil: $draft.isFoil,
+            isSigned: $draft.isSigned,
+            isAltered: $draft.isAltered,
+            finishCode: $draft.finishCode,
+            edition: $draft.edition,
+            stamp: $draft.stamp,
+            isSealedPromo: $draft.isSealedPromo,
+            isOversized: $draft.isOversized,
+            isPeelOff: $draft.isPeelOff
+        )
+
+        CardEditorGradingSection(
+            company: $draft.gradingCompany,
+            score: $draft.gradingScore,
+            certNumber: $draft.certNumber
+        )
+
+        CardEditorStorageSection(storageLocation: $draft.storageLocation)
+        CardEditorNotesSection(notes: $draft.notes)
+        CardEditorTagsSection(
+            tags: $tags,
+            selectedTagIds: $draft.selectedTagIds,
+            onCreateTag: onCreateTag
+        )
     }
 }
 

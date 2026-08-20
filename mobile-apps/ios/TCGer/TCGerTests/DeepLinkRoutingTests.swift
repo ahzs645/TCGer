@@ -92,6 +92,16 @@ final class DeepLinkRoutingTests: XCTestCase {
         )
     }
 
+    func testServerOnlyTabsAreIdentifiedForOnDeviceFiltering() {
+        XCTAssertTrue(AppTab.decks.requiresServerConnection)
+        XCTAssertTrue(AppTab.trades.requiresServerConnection)
+        XCTAssertTrue(AppTab.activity.requiresServerConnection)
+
+        XCTAssertFalse(AppTab.home.requiresServerConnection)
+        XCTAssertFalse(AppTab.collections.requiresServerConnection)
+        XCTAssertFalse(AppTab.settings.requiresServerConnection)
+    }
+
     @MainActor
     func testEachRoutingLayerClaimsARequestOnlyOnce() throws {
         let store = EnvironmentStore()

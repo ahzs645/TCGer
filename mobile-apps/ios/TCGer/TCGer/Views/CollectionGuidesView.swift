@@ -43,6 +43,7 @@ struct CollectionGuidesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @State private var searchScope = GuideSearchScope.guides
     @State private var guideCardResults: [GuideCardSearchResult] = []
     @State private var guideCardTotal = 0
@@ -64,6 +65,12 @@ struct CollectionGuidesView: View {
             selectedGame: selectedGame,
             query: searchText
         )
+    }
+
+    private var guideCardActiveFilterCount: Int {
+        (selectedGame == .all ? 0 : 1)
+            + (selectedCategory == nil ? 0 : 1)
+            + (globalOwnership == .all ? 0 : 1)
     }
 
     private func progress(for guide: CollectionGuide) -> CollectionGuideProgress? {
@@ -142,17 +149,27 @@ struct CollectionGuidesView: View {
             }
         }
         .navigationTitle("Collection Guides")
-        .searchable(
-            text: $searchText,
-            prompt: searchScope == .cards
-                ? "Search guide cards"
-                : selectedGame == .all
-                    ? "Search guides"
-                    : "Search \(selectedGame.shortName) guides"
+        .modifier(
+            CollectionGuideSearchPresenter(
+                text: $searchText,
+                isPresented: $isSearchPresented,
+                scope: $searchScope,
+                prompt: searchScope == .cards
+                    ? "Search guide cards"
+                    : selectedGame == .all
+                        ? "Search guides"
+                        : "Search \(selectedGame.shortName) guides"
+            )
         )
-        .searchScopes($searchScope) {
-            ForEach(GuideSearchScope.allCases, id: \.self) { scope in
-                Text(scope.rawValue).tag(scope)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isSearchPresented = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel("Search collection guides")
+                .accessibilityIdentifier("collectionGuidesSearch")
             }
         }
         .task {
@@ -202,15 +219,28 @@ struct CollectionGuidesView: View {
                         Text("Story / Connected Art").tag(CollectionGuideCategory?.some(.story))
                         Text("Cameo").tag(CollectionGuideCategory?.some(.cameo))
                     }
-                } label: {
-                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
-                }
-                Picker("Ownership", selection: $globalOwnership) {
-                    ForEach(GuideOwnershipFilter.allCases) { filter in
-                        Text(filter.rawValue).tag(filter)
+
+                    Picker("Ownership", selection: $globalOwnership) {
+                        ForEach(GuideOwnershipFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
                     }
+                } label: {
+                    AppFilterMenuLabel(
+                        kind: .filter,
+                        title: "Filters",
+                        isActive: guideCardActiveFilterCount > 0,
+                        activeCount: guideCardActiveFilterCount
+                    )
                 }
-                .pickerStyle(.segmented)
+                .accessibilityLabel("Guide card filters")
+                .accessibilityValue(
+                    guideCardActiveFilterCount == 0
+                        ? "No active filters"
+                        : "\(guideCardActiveFilterCount) active"
+                )
+
+                Spacer()
             }
             .padding(.horizontal)
 
@@ -296,6 +326,32 @@ struct CollectionGuidesView: View {
             return
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CollectionGuideSearchPresenter: ViewModifier {
+    @Binding var text: String
+    @Binding var isPresented: Bool
+    @Binding var scope: GuideSearchScope
+    let prompt: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isPresented {
+            content
+                .searchable(
+                    text: $text,
+                    isPresented: $isPresented,
+                    prompt: prompt
+                )
+                .searchScopes($scope) {
+                    ForEach(GuideSearchScope.allCases, id: \.self) { scope in
+                        Text(scope.rawValue).tag(scope)
+                    }
+                }
+        } else {
+            content
         }
     }
 }
@@ -472,6 +528,11 @@ private struct CollectionGuideDetailView: View {
         }
     }
 
+    private var activeFilterCount: Int {
+        (ownershipFilter == .all ? 0 : 1)
+            + (selectedSet == "All sets" ? 0 : 1)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -575,18 +636,27 @@ private struct CollectionGuideDetailView: View {
 
     private var filters: some View {
         HStack {
-            Picker("Ownership", selection: $ownershipFilter) {
-                ForEach(OwnershipFilter.allCases) { filter in Text(filter.rawValue).tag(filter) }
-            }
-            .pickerStyle(.segmented)
-
             Menu {
+                Picker("Ownership", selection: $ownershipFilter) {
+                    ForEach(OwnershipFilter.allCases) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+
                 Picker("Set", selection: $selectedSet) {
                     ForEach(setOptions, id: \.self) { Text($0).tag($0) }
                 }
             } label: {
-                Label(selectedSet, systemImage: "line.3.horizontal.decrease.circle")
+                AppFilterMenuLabel(
+                    kind: .filter,
+                    title: "Filters",
+                    isActive: activeFilterCount > 0,
+                    activeCount: activeFilterCount
+                )
             }
+            .accessibilityLabel("Guide card filters")
+
+            Spacer()
         }
     }
 

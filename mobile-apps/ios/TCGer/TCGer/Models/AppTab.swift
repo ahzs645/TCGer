@@ -88,6 +88,18 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         self == .settings
     }
 
+    /// Destinations that do not have an on-device data implementation yet.
+    /// Keep this separate from server feature flags: a connected server can
+    /// support a feature even though phone-only mode cannot provide it.
+    var requiresServerConnection: Bool {
+        switch self {
+        case .decks, .trades, .activity:
+            return true
+        default:
+            return false
+        }
+    }
+
     func isSupported(by features: ServerFeatures) -> Bool {
         switch self {
         case .decks:

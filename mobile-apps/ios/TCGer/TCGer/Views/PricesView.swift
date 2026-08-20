@@ -253,20 +253,6 @@ struct PricesView: View {
                         }
                     }
 
-                    Section {
-                        if environmentStore.shouldShowGamePicker {
-                            GamePickerPills(
-                                selection: $selectedGame,
-                                games: environmentStore.gamePickerGames
-                            )
-                            .listRowInsets(EdgeInsets())
-                        }
-                        Picker("Sort", selection: $sort) {
-                            ForEach(PriceSort.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
                     if trackedCards.isEmpty {
                         ContentUnavailableView.search(text: searchText)
                     } else {
@@ -281,9 +267,13 @@ struct PricesView: View {
             }
         }
         .navigationTitle("Prices")
-        .searchable(text: $searchText, prompt: "Search tracked cards")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search tracked cards"
+        )
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     Task { await refreshTrackedPrices(force: true) }
                 } label: {
@@ -294,6 +284,31 @@ struct PricesView: View {
                     }
                 }
                 .disabled(isRefreshingPrices || collections.flatMap(\.cards).isEmpty)
+
+                Menu {
+                    if environmentStore.shouldShowGamePicker {
+                        Picker("Game", selection: $selectedGame) {
+                            ForEach(environmentStore.gamePickerGames) { game in
+                                GameLabel(game: game)
+                                    .tag(game)
+                            }
+                        }
+                    }
+
+                    Picker("Sort by", selection: $sort) {
+                        ForEach(PriceSort.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                } label: {
+                    AppFilterMenuLabel(
+                        kind: .overflow,
+                        isActive: selectedGame != .all || sort != .value
+                    )
+                }
+                .accessibilityLabel("Price filters and sorting")
+                .accessibilityValue("\(selectedGame.shortName), sorted by \(sort.rawValue)")
+                .accessibilityIdentifier("pricesFilterMenu")
             }
         }
         .refreshable { await load(forcePrices: true) }

@@ -643,7 +643,6 @@ struct CollectionDetailView: View {
                             "language:\(payload.language ?? "nil") " +
                             "notes:\(payload.notes ?? "nil") " +
                             "tags:\(payload.tags) " +
-                            "print:\(payload.selectedPrint?.id ?? "nil") " +
                             "canEditQuantity:\(context.canEditQuantity)"
                         )
 #endif
@@ -663,12 +662,10 @@ struct CollectionDetailView: View {
                                 gradingScore: payload.gradingScore,
                                 certNumber: payload.certNumber,
                                 storageLocation: payload.storageLocation,
-                                tags: payload.tags,
-                                newPrint: payload.selectedPrint
+                                tags: payload.tags
                             )
                         }
                     }
-                    .environmentObject(environmentStore)
                 }
                 .sheet(item: $moveContext) { context in
                     MoveCardToBinderSheet(
@@ -991,8 +988,7 @@ struct CollectionDetailView: View {
         gradingScore: String?,
         certNumber: String?,
         storageLocation: String?,
-        tags: [String],
-        newPrint: Card?
+        tags: [String]
     ) async {
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
@@ -1003,7 +999,7 @@ struct CollectionDetailView: View {
 
         do {
 #if DEBUG
-            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered) tags: \(tags) newPrint: \(newPrint?.id ?? "nil")")
+            print("CollectionDetailView.updateCard -> quantity: \(String(describing: quantity)) condition: \(condition ?? "nil") language: \(language ?? "nil") notes: \(notes ?? "nil") foil:\(isFoil) signed:\(isSigned) altered:\(isAltered) tags: \(tags)")
 #endif
             let updated = try await apiService.updateCardInBinder(
                 config: environmentStore.serverConfiguration,
@@ -1024,7 +1020,6 @@ struct CollectionDetailView: View {
                 storageLocation: storageLocation,
                 includeOwnedCopyDetails: true,
                 tags: tags,
-                newPrint: newPrint,
                 targetBinderId: nil
             )
 

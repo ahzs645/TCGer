@@ -289,11 +289,6 @@ struct SetDetailView: View {
                 searchText = ""
             }
         }
-        .safeAreaBar(edge: .top, spacing: 0) {
-            if !isLoading, errorMessage == nil, !cards.isEmpty {
-                cardControlBar
-            }
-        }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -330,14 +325,31 @@ struct SetDetailView: View {
 
                     Divider()
 
+                    Picker("Cards", selection: $cardFilter) {
+                        ForEach(SetCardFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+
+                    Picker("Sort", selection: $cardSort) {
+                        ForEach(SetCardSort.allCases) { sort in
+                            Text(sort.title).tag(sort)
+                        }
+                    }
+
                     Picker("Completion goal", selection: completionModeBinding) {
                         ForEach(SetCompletionMode.allCases) { mode in
                             Text(mode.title).tag(mode)
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    AppFilterMenuLabel(
+                        kind: .overflow,
+                        isActive: cardFilter != .all || cardSort != .collectorNumber
+                    )
                 }
+                .accessibilityLabel("Set options, filters, and sorting")
+                .accessibilityValue("\(cardFilter.title), sorted by \(cardSort.title)")
             }
         }
         .safeAreaBar(edge: .bottom) {
@@ -435,33 +447,6 @@ struct SetDetailView: View {
                     .environmentObject(environmentStore)
             }
         }
-    }
-
-    private var cardControlBar: some View {
-        HStack(spacing: 12) {
-            Picker("Cards", selection: $cardFilter) {
-                ForEach(SetCardFilter.allCases) { filter in
-                    Text(filter.title).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Menu {
-                Picker("Sort", selection: $cardSort) {
-                    ForEach(SetCardSort.allCases) { sort in
-                        Text(sort.title).tag(sort)
-                    }
-                }
-            } label: {
-                Label("Sort cards", systemImage: "arrow.up.arrow.down")
-                    .labelStyle(.iconOnly)
-                    .frame(width: 36, height: 32)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityLabel("Sort cards")
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
 
     /// Sends either the whole set (saving a rule so it stays current) or just

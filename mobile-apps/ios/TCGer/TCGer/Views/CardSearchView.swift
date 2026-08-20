@@ -165,11 +165,11 @@ struct CardSearchView: View {
                     Button {
                         showingFilters = true
                     } label: {
-                        Label(
-                            searchFilters.isActive ? "Filters, \(searchFilters.activeCount) active" : "Filters",
-                            systemImage: searchFilters.isActive
-                                ? "line.3.horizontal.decrease.circle.fill"
-                                : "line.3.horizontal.decrease.circle"
+                        AppFilterMenuLabel(
+                            kind: .filter,
+                            title: "Filters",
+                            isActive: searchFilters.isActive,
+                            activeCount: searchFilters.activeCount
                         )
                     }
                     .badge(searchFilters.activeCount)

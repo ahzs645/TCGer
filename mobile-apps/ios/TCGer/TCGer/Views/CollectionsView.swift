@@ -266,7 +266,7 @@ struct CollectionsView: View {
                     .accessibilityHint("Shows options for adding content")
                 }
 
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
                     if environmentStore.isAuthenticated {
                         Button {
                             showingSearch.wrappedValue = true
@@ -275,11 +275,24 @@ struct CollectionsView: View {
                         }
                         .accessibilityLabel("Search card catalog")
                     }
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if !sortedCollections.isEmpty {
-                    binderControlShelf
+
+                    if !sortedCollections.isEmpty {
+                        Menu {
+                            Picker("Sort by", selection: $sortOptionRaw) {
+                                ForEach(BinderSortOption.allCases) { option in
+                                    Label(option.rawValue, systemImage: option.systemImage)
+                                        .tag(option.rawValue)
+                                }
+                            }
+                        } label: {
+                            AppFilterMenuLabel(
+                                kind: .overflow,
+                                isActive: sortOption != .lastOpened
+                            )
+                        }
+                        .accessibilityLabel("Binder list options")
+                        .accessibilityValue("Sorted by \(sortOption.rawValue)")
+                    }
                 }
             }
             .refreshable {
@@ -363,32 +376,6 @@ struct CollectionsView: View {
     private func presentCollection(_ collection: Collection, editing: Bool) {
         selectedCollectionStartsInEditMode = editing
         selectedCollection = collection
-    }
-
-    private var binderControlShelf: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                Menu {
-                    Picker("Sort by", selection: $sortOptionRaw) {
-                        ForEach(BinderSortOption.allCases) { option in
-                            Label(option.rawValue, systemImage: option.systemImage)
-                                .tag(option.rawValue)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .accessibilityLabel("Sort binders")
-                .accessibilityValue(sortOption.rawValue)
-
-                Spacer(minLength: 12)
-            }
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, 16)
-        .padding(.vertical, 8)
     }
 
     @MainActor

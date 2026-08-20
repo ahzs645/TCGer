@@ -60,20 +60,12 @@ struct CollectionFilterBar: View {
                         showFilters.toggle()
                     }
                 } label: {
-                    Image(systemName: showFilters
-                        ? "line.3.horizontal.decrease.circle.fill"
-                        : "line.3.horizontal.decrease.circle")
-                        .font(.title3)
-                        .overlay(alignment: .topTrailing) {
-                            if activeFilterCount > 0 {
-                                Text("\(activeFilterCount)")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 16, minHeight: 16)
-                                    .background(Color.accentColor, in: Circle())
-                                    .offset(x: 8, y: -8)
-                            }
-                        }
+                    AppFilterMenuLabel(
+                        kind: .filter,
+                        isActive: showFilters || hasActiveFilters,
+                        activeCount: activeFilterCount
+                    )
+                    .font(.title3)
                 }
                 .buttonStyle(.plain)
                 .frame(width: 38, height: 38)

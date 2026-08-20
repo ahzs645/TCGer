@@ -74,7 +74,6 @@ struct OnlineCodesView: View {
             } else {
                 List {
                     summarySection
-                    filterSection
 
                     if let resultMessage {
                         Section {
@@ -141,19 +140,23 @@ struct OnlineCodesView: View {
                         Text("All Games").tag(TCGGame.all)
                         ForEach(availableGames) { game in
                             Label(game.displayName, systemImage: game.systemIconName)
-                                .tag(game)
+                            .tag(game)
+                        }
+                    }
+
+                    Picker("Status", selection: $statusFilter) {
+                        ForEach(OnlineCodeStatusFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
                         }
                     }
                 } label: {
-                    Label(
-                        gameFilter == .all
-                            ? "Filter by Game"
-                            : "Game Filter: \(gameFilter.displayName)",
-                        systemImage: gameFilter == .all
-                            ? "line.3.horizontal.decrease.circle"
-                            : "line.3.horizontal.decrease.circle.fill"
+                    AppFilterMenuLabel(
+                        kind: .overflow,
+                        isActive: gameFilter != .all || statusFilter != .all
                     )
                 }
+                .accessibilityLabel("Code filters")
+                .accessibilityValue("\(gameFilter.displayName), \(statusFilter.title)")
 
                 Menu {
                     Button {
@@ -222,19 +225,6 @@ struct OnlineCodesView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
-        }
-    }
-
-    private var filterSection: some View {
-        Section {
-            Picker("Status", selection: $statusFilter) {
-                ForEach(OnlineCodeStatusFilter.allCases) { filter in
-                    Text(filter.title).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
         }
     }
 

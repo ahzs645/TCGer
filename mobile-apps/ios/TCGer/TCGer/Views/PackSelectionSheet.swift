@@ -121,9 +121,10 @@ struct PackSelectionSheet: View {
                             }
                         }
                     } label: {
-                        Image(systemName: availabilityFilter == .all
-                            ? "line.3.horizontal.decrease"
-                            : "line.3.horizontal.decrease.circle.fill")
+                        AppFilterMenuLabel(
+                            kind: .filter,
+                            isActive: availabilityFilter != .all
+                        )
                     }
                     .accessibilityLabel("Filter sets by download status, \(availabilityFilter.rawValue)")
                 }
@@ -418,9 +419,10 @@ private struct PackCardBrowser<Header: View>: View {
                         }
                     }
                 } label: {
-                    Image(systemName: selectedRarity == nil
-                        ? "line.3.horizontal.decrease"
-                        : "line.3.horizontal.decrease.circle.fill")
+                    AppFilterMenuLabel(
+                        kind: .filter,
+                        isActive: selectedRarity != nil
+                    )
                 }
                 .accessibilityLabel("Filter cards by rarity, \(selectedRarity ?? "All Rarities")")
             }

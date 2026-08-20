@@ -21,13 +21,8 @@ struct AddCardToBinderSheet: View {
     @State private var isCreatingBinder = false
     @State private var wishlistCard: Card?
     @State private var didAddToWishlist = false
-    @State private var printPickerCard: Card?
 
     private let apiService = APIService()
-
-    private var finishOptions: [PokemonFinishOption] {
-        draft.finishOptions(for: originalCard)
-    }
 
     init(
         card: Card,
@@ -51,7 +46,6 @@ struct AddCardToBinderSheet: View {
             isSealedPromo: false,
             isOversized: false,
             isPeelOff: false,
-            selectedPrint: card,
             gradingCompany: "",
             gradingScore: "",
             certNumber: "",
@@ -65,7 +59,7 @@ struct AddCardToBinderSheet: View {
             Form {
                 // Card Preview Section
                 Section {
-                    CardPreviewRow(card: draft.selectedPrint ?? originalCard)
+                    CardPreviewRow(card: originalCard)
                 } header: {
                     Text("Card")
                 }
@@ -102,7 +96,7 @@ struct AddCardToBinderSheet: View {
 
                 Section {
                     Button {
-                        wishlistCard = draft.selectedPrint ?? originalCard
+                        wishlistCard = originalCard
                     } label: {
                         Label("Add to Wishlist", systemImage: "heart")
                     }
@@ -113,47 +107,11 @@ struct AddCardToBinderSheet: View {
                     Text("Track this card without adding a copy to a binder")
                 }
 
-                if originalCard.supportsPrintSelection {
-                    CardPrintSelectionSection(
-                        card: originalCard,
-                        selectedPrint: draft.selectedPrint,
-                        isDisabled: isAdding,
-                        onSelect: showPrintPicker
-                    )
-                }
-
-                CardEditorDetailsSection(
-                    quantity: $draft.quantity,
-                    condition: $draft.condition,
-                    language: $draft.language,
-                    showsQuantity: true
-                )
-
-                CardEditorAttributesSection(
-                    card: draft.selectedPrint ?? originalCard,
-                    finishOptions: finishOptions,
-                    isFoil: $draft.isFoil,
-                    isSigned: $draft.isSigned,
-                    isAltered: $draft.isAltered,
-                    finishCode: $draft.finishCode,
-                    edition: $draft.edition,
-                    stamp: $draft.stamp,
-                    isSealedPromo: $draft.isSealedPromo,
-                    isOversized: $draft.isOversized,
-                    isPeelOff: $draft.isPeelOff
-                )
-
-                CardEditorGradingSection(
-                    company: $draft.gradingCompany,
-                    score: $draft.gradingScore,
-                    certNumber: $draft.certNumber
-                )
-
-                CardEditorStorageSection(storageLocation: $draft.storageLocation)
-                CardEditorNotesSection(notes: $draft.notes)
-                CardEditorTagsSection(
+                CardCopyEditorSections(
+                    card: originalCard,
+                    draft: $draft,
                     tags: $localTags,
-                    selectedTagIds: $draft.selectedTagIds,
+                    showsQuantity: true,
                     onCreateTag: createTag
                 )
 
@@ -187,21 +145,13 @@ struct AddCardToBinderSheet: View {
         }
         .task {
             if draft.finishCode.isEmpty {
-                draft.applyPrintDefaults(for: draft.selectedPrint ?? originalCard)
+                draft.applyCardDefaults(for: originalCard)
             }
             await loadCollections()
             await loadTags()
         }
         .onChange(of: selectedBinderId) { _, _ in
             applyBinderDefaultCondition()
-        }
-        .onChange(of: draft.selectedPrint?.id) { _, _ in
-            guard let selectedPrint = draft.selectedPrint else { return }
-            draft.applyPrintDefaults(for: selectedPrint)
-        }
-        .sheet(item: $printPickerCard) { print in
-            SelectPrintSheet(card: print, selectedPrint: $draft.selectedPrint)
-                .environmentObject(environmentStore)
         }
         .sheet(item: $wishlistCard, onDismiss: {
             if didAddToWishlist {
@@ -213,10 +163,6 @@ struct AddCardToBinderSheet: View {
                 didAddToWishlist = true
             }
         }
-    }
-
-    private func showPrintPicker() {
-        printPickerCard = draft.selectedPrint ?? originalCard
     }
 
     @MainActor
@@ -324,7 +270,6 @@ struct AddCardToBinderSheet: View {
 
         isAdding = true
         errorMessage = nil
-        let selectedCard = draft.selectedPrint ?? originalCard
 
         func trimmed(_ value: String) -> String? {
             let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -333,14 +278,14 @@ struct AddCardToBinderSheet: View {
 
         do {
             try await onAdd(
-                selectedCard,
+                originalCard,
                 binderId,
                 BinderCardAddDetails(
                     quantity: draft.quantity,
                     condition: trimmed(draft.condition),
                     language: trimmed(draft.language),
                     notes: trimmed(draft.notes),
-                    isFoil: selectedCard.tcg.lowercased() == "pokemon"
+                    isFoil: originalCard.tcg.lowercased() == "pokemon"
                         ? draft.variant.isFoil
                         : draft.isFoil,
                     variant: draft.variant,

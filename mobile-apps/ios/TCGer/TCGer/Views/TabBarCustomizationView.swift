@@ -21,7 +21,7 @@ struct TabBarCustomizationView: View {
             } header: {
                 Text("Tabs")
             } footer: {
-                Text("Tap Edit, then drag to reorder. iPhone shows about five tabs at once — anything past that moves into the More list, so put what you use most at the top. Settings always stays available.")
+                Text("Tap Edit, then drag to reorder. iPhone shows about five tabs at once — anything past that moves into the More list, so put what you use most at the top. Settings always stays available. Tabs that require a TCGer server are hidden in On This iPhone mode.")
             }
 
             Section {

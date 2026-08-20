@@ -72,7 +72,6 @@ final class CardEditorDraftTests: XCTestCase {
             isSealedPromo: false,
             isOversized: false,
             isPeelOff: false,
-            selectedPrint: nil,
             gradingCompany: "",
             gradingScore: "",
             certNumber: "",

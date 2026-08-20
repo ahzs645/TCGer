@@ -694,7 +694,7 @@ final class EnvironmentStore: ObservableObject {
     private func isTabAvailable(_ tab: AppTab) -> Bool {
         tab.isSupported(by: serverFeatures)
             && (tab != .sealed || sealedProductsEnabled)
-            && (tab != .activity || !serverConfiguration.isOnDevice)
+            && (!tab.requiresServerConnection || !serverConfiguration.isOnDevice)
     }
 
     func resetTabBar() {

@@ -237,10 +237,18 @@ struct SetBrowserView: View {
                 }
             }
         } label: {
-            Image(systemName: "line.3.horizontal.decrease")
+            AppFilterMenuLabel(
+                kind: .overflow,
+                isActive: progressFilter != .all
+                    || environmentStore.setCompletionMode != .standard
+                    || environmentStore.setBrowserSort != .newest
+            )
         }
         .tint(.accentColor)
-        .accessibilityLabel("Filter and sort sets, \(progressFilter.filterTitle)")
+        .accessibilityLabel("Set filters and sorting")
+        .accessibilityValue(
+            "\(progressFilter.filterTitle), \(environmentStore.setCompletionMode.title), sorted by \(environmentStore.setBrowserSort.title)"
+        )
     }
 
     private var failedProvidersBanner: some View {

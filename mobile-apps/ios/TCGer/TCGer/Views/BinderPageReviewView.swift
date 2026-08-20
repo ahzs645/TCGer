@@ -536,7 +536,10 @@ struct BinderPageReviewView: View {
 
             Toggle("Hide Unmatched Cards", isOn: $hidesUnmatchedCards)
         } label: {
-            Image(systemName: "line.3.horizontal.decrease")
+            AppFilterMenuLabel(
+                kind: .filter,
+                isActive: statusFilter != nil || hidesUnmatchedCards
+            )
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 32, height: 32)
                 .foregroundStyle(

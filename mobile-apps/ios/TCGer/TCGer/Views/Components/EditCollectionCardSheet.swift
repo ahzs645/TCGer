@@ -2,7 +2,6 @@ import SwiftUI
 
 struct EditCollectionCardSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var environmentStore: EnvironmentStore
 
     struct SavePayload: Sendable {
         let quantity: Int
@@ -14,7 +13,6 @@ struct EditCollectionCardSheet: View {
         let isAltered: Bool
         let variant: CardCopyVariant
         let tags: [String]
-        let selectedPrint: Card?
         let gradingCompany: String?
         let gradingScore: String?
         let certNumber: String?
@@ -30,11 +28,6 @@ struct EditCollectionCardSheet: View {
 
     @State private var draft: CardEditorDraft
     @State private var localTags: [CollectionCardTag]
-    @State private var printPickerCard: Card?
-
-    private var finishOptions: [PokemonFinishOption] {
-        draft.finishOptions(for: card.previewCard)
-    }
 
     private var copyTitle: String? {
         guard let copy = copyDetails else { return nil }
@@ -77,7 +70,6 @@ struct EditCollectionCardSheet: View {
             isSealedPromo: copyDetails?.isSealedPromo ?? false,
             isOversized: copyDetails?.isOversized ?? false,
             isPeelOff: copyDetails?.isPeelOff ?? false,
-            selectedPrint: nil,
             gradingCompany: copyDetails?.gradingCompany ?? "",
             gradingScore: copyDetails?.gradingScore ?? "",
             certNumber: copyDetails?.certNumber ?? "",
@@ -124,47 +116,11 @@ struct EditCollectionCardSheet: View {
                     Text("Card")
                 }
 
-                if card.supportsPrintSelection {
-                    CardPrintSelectionSection(
-                        card: card.previewCard,
-                        selectedPrint: draft.selectedPrint,
-                        isDisabled: isSaving,
-                        onSelect: showPrintPicker
-                    )
-                }
-
-                CardEditorDetailsSection(
-                    quantity: $draft.quantity,
-                    condition: $draft.condition,
-                    language: $draft.language,
-                    showsQuantity: !isIndividualCopy
-                )
-
-                CardEditorAttributesSection(
-                    card: draft.selectedPrint ?? card.previewCard,
-                    finishOptions: finishOptions,
-                    isFoil: $draft.isFoil,
-                    isSigned: $draft.isSigned,
-                    isAltered: $draft.isAltered,
-                    finishCode: $draft.finishCode,
-                    edition: $draft.edition,
-                    stamp: $draft.stamp,
-                    isSealedPromo: $draft.isSealedPromo,
-                    isOversized: $draft.isOversized,
-                    isPeelOff: $draft.isPeelOff
-                )
-
-                CardEditorGradingSection(
-                    company: $draft.gradingCompany,
-                    score: $draft.gradingScore,
-                    certNumber: $draft.certNumber
-                )
-
-                CardEditorStorageSection(storageLocation: $draft.storageLocation)
-                CardEditorNotesSection(notes: $draft.notes)
-                CardEditorTagsSection(
+                CardCopyEditorSections(
+                    card: card.previewCard,
+                    draft: $draft,
                     tags: $localTags,
-                    selectedTagIds: $draft.selectedTagIds,
+                    showsQuantity: !isIndividualCopy,
                     onCreateTag: onCreateTag
                 )
             }
@@ -181,19 +137,7 @@ struct EditCollectionCardSheet: View {
                     .disabled(isSaving)
                 }
             }
-            .sheet(item: $printPickerCard) { print in
-                SelectPrintSheet(card: print, selectedPrint: $draft.selectedPrint)
-                    .environmentObject(environmentStore)
-            }
-            .onChange(of: draft.selectedPrint?.id) { _, _ in
-                guard let selectedPrint = draft.selectedPrint else { return }
-                draft.applyPrintDefaults(for: selectedPrint)
-            }
         }
-    }
-
-    private func showPrintPicker() {
-        printPickerCard = draft.selectedPrint ?? card.previewCard
     }
 
     private func save() {
@@ -213,14 +157,13 @@ struct EditCollectionCardSheet: View {
             isAltered: draft.isAltered,
             variant: variant,
             tags: draft.selectedTagIds.sorted(),
-            selectedPrint: draft.selectedPrint,
             gradingCompany: trimmed(draft.gradingCompany),
             gradingScore: trimmed(draft.gradingScore),
             certNumber: trimmed(draft.certNumber),
             storageLocation: trimmed(draft.storageLocation)
         )
 #if DEBUG
-        print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") tags:\(payload.tags) print:\(payload.selectedPrint?.id ?? "nil")")
+        print("EditCollectionCardSheet.onSave -> quantity:\(payload.quantity) condition:\(payload.condition ?? "nil") language:\(payload.language ?? "nil") notes:\(payload.notes ?? "nil") tags:\(payload.tags)")
 #endif
         onSave(payload)
     }

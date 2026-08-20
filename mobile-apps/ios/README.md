@@ -19,6 +19,17 @@ open mobile-apps/ios/TCGer/TCGer.xcodeproj
 
 Choose the `TCGer` scheme and an iOS 26 simulator, then Run. The Debug build uses the published catalog endpoint configured in the project and does not require a local backend for its bundled/offline catalog paths.
 
+## On-device and server tab availability
+
+The app has two operating modes:
+
+- **On This iPhone** uses `LocalStore` and does not require a TCGer server or account.
+- **Server mode** connects to a configured TCGer server and exposes features supported by that server.
+
+Tabs backed only by server APIs are not shown in the bottom tab bar, its More list, or **Settings > Customize Tab Bar** while the app is in On This iPhone mode. Currently those tabs are **Decks**, **Trades**, and **Activity**. Connecting to a server makes them eligible to appear again, subject to the server's feature flags, authentication, and the user's saved tab visibility preference. Their position and visibility preferences remain stored while they are unavailable.
+
+When an on-device implementation is added for one of these features, remove that case from `AppTab.requiresServerConnection`; tab availability is intentionally centralized there so navigation and customization stay consistent.
+
 ## Shared pack-opening catalog
 
 The pack picker does not keep an iOS-specific list. Its embedded web experience
