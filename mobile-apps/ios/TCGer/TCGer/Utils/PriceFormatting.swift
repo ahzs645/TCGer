@@ -1,14 +1,14 @@
 import Foundation
 
 extension Double {
-    /// The one way to render a price for display. All market prices in the app
-    /// are USD; going through `.currency` localizes symbol placement, grouping,
-    /// and negative signs instead of hand-rolling "$" + "%.2f".
+    /// The one way to render a price for display. Stored market prices remain
+    /// in their source currency; `CurrencyDisplayState` applies the user's
+    /// cached reference rate and Foundation localizes the resulting amount.
     var priceText: String {
-        formatted(.currency(code: "USD"))
+        CurrencyDisplayState.shared.formatted(self)
     }
 
     func priceText(currency: String) -> String {
-        formatted(.currency(code: currency.uppercased()))
+        CurrencyDisplayState.shared.formatted(self, sourceCurrency: currency)
     }
 }

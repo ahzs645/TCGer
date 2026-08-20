@@ -1,6 +1,10 @@
 import Foundation
 
 extension APIService {
+    private static let justTCGSupportedGames = TCGGame.allCases
+        .filter { $0 != .all }
+        .map(\.rawValue)
+
     struct PricingSourceConfiguration: Codable, Sendable {
         let url: String
         let label: String
@@ -45,7 +49,7 @@ extension APIService {
                         id: .automatic,
                         label: "Best Available",
                         description: "Use a personal JustTCG key when available, then fall back to free Scryfall pricing.",
-                        games: ["magic"],
+                        games: Self.justTCGSupportedGames,
                         requiresServer: false
                     ),
                     PriceSourceOption(
@@ -59,7 +63,7 @@ extension APIService {
                         id: .justTCG,
                         label: "JustTCG (Personal Key)",
                         description: "Direct pricing using a personal key stored only on this iPhone.",
-                        games: ["magic"],
+                        games: Self.justTCGSupportedGames,
                         requiresServer: false
                     )
                 ],

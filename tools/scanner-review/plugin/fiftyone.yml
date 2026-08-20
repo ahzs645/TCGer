@@ -1,12 +1,14 @@
 name: "@tcger/scanner-review"
 description: TCGer shutter benchmarking, run comparison, geometry review, and manual labels
-version: 0.3.0
+version: 0.5.1
 fiftyone:
   version: ">=1.20,<2"
 license: MIT
 operators:
   - show_shutter_benchmark
   - show_shutter_evidence
+  - label_binder_pocket
+  - set_scanner_overlay_layers
   - label_shutter_capture
   - show_performance_dashboard
   - compare_scanner_runs

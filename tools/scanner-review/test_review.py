@@ -28,17 +28,65 @@ class ScannerReviewTests(unittest.TestCase):
         self.assertEqual(remapped[0][1], 1.0)
         self.assertEqual(remapped[2][1], 0.0)
 
+    def test_quad_remap_converts_top_left_crop_offset_to_vision_y(self):
+        quad = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
+        remapped = review.remap_quad_to_media(
+            quad,
+            (812, 1138),
+            (1536, 2048),
+            (362.0, 313.0, 812.0, 1138.0),
+        )
+        self.assertAlmostEqual(remapped[0][1], 1.0 - 313 / 2048)
+        self.assertAlmostEqual(remapped[2][1], 1.0 - (313 + 1138) / 2048)
+
+    def test_top_left_registered_binder_points_map_to_original(self):
+        points = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+        mapped = review.remap_top_left_points_to_media(
+            points,
+            (1536, 2048),
+            (362.0, 313.0, 812.0, 1138.0),
+        )
+        self.assertAlmostEqual(mapped[0][0], 362 / 1536)
+        self.assertAlmostEqual(mapped[0][1], 313 / 2048)
+        self.assertAlmostEqual(mapped[2][0], (362 + 812) / 1536)
+        self.assertAlmostEqual(mapped[2][1], (313 + 1138) / 2048)
+
+    def test_page_fit_is_recovered_from_registered_pockets(self):
+        cards = []
+        for page_quad in (
+            [[0.1, 0.9], [0.3, 0.9], [0.3, 0.6], [0.1, 0.6]],
+            [[0.6, 0.4], [0.8, 0.4], [0.8, 0.1], [0.6, 0.1]],
+        ):
+            source_vision = [
+                [0.04 + x * 0.92, 0.22 + y * 0.78] for x, y in page_quad
+            ]
+            cards.append(
+                {
+                    "quad": page_quad,
+                    "registered_points_top_left": [
+                        [x, 1.0 - y] for x, y in source_vision
+                    ],
+                }
+            )
+        fit = review.estimate_binder_page_fit(cards)
+        self.assertIsNotNone(fit)
+        x, y, width, height = fit["rect_vision"]
+        self.assertAlmostEqual(x, 0.04)
+        self.assertAlmostEqual(y, 0.22)
+        self.assertAlmostEqual(width, 0.92)
+        self.assertAlmostEqual(height, 0.78)
+
     def test_quad_remap_keeps_resized_full_frame_coordinates(self):
         quad = [[0.1, 0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]]
-        self.assertEqual(
-            review.remap_quad_to_media(
-                quad,
-                (415, 544),
-                (1536, 2048),
-                (0.0, 0.0, 1536.0, 2048.0),
-            ),
+        remapped = review.remap_quad_to_media(
             quad,
+            (415, 544),
+            (1536, 2048),
+            (0.0, 0.0, 1536.0, 2048.0),
         )
+        for actual, expected in zip(remapped, quad):
+            self.assertAlmostEqual(actual[0], expected[0])
+            self.assertAlmostEqual(actual[1], expected[1])
 
     def test_binder_summary_keeps_one_best_record_per_pocket(self):
         attempts = [

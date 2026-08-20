@@ -88,15 +88,100 @@ final class APIServiceTrackedPricesTests: XCTestCase {
         XCTAssertEqual(response.prices.first?.price, 3.25)
     }
 
-    func testOnDeviceScryfallUsesFinishSpecificQuoteAndRequiredHeaders() async throws {
+    func testGetTrackedPricesUsesPerGameSourcesForMixedCollection() async throws {
         let defaults = UserDefaults.standard
         let previousSource = defaults.string(forKey: PricingSource.storageKey)
-        defaults.set(PricingSource.scryfall.rawValue, forKey: PricingSource.storageKey)
+        let previousPriorities = defaults.data(forKey: PricingSourcePreferences.storageKey)
+        defaults.set(PricingSource.automatic.rawValue, forKey: PricingSource.storageKey)
+        PricingSourcePreferences.save(
+            [
+                TCGGame.magic.rawValue: .scryfall,
+                TCGGame.pokemon.rawValue: .tcgDexCardmarket
+            ],
+            to: defaults
+        )
         defer {
             if let previousSource {
                 defaults.set(previousSource, forKey: PricingSource.storageKey)
             } else {
                 defaults.removeObject(forKey: PricingSource.storageKey)
+            }
+            if let previousPriorities {
+                defaults.set(previousPriorities, forKey: PricingSourcePreferences.storageKey)
+            } else {
+                defaults.removeObject(forKey: PricingSourcePreferences.storageKey)
+            }
+        }
+
+        TrackedPricesURLProtocol.handler = { request in
+            let body = try Self.requestBody(request)
+            let json = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: body) as? [String: Any]
+            )
+            let source = try XCTUnwrap(json["source"] as? String)
+            let items = try XCTUnwrap(json["items"] as? [[String: Any]])
+            let item = try XCTUnwrap(items.first)
+            let tcg = try XCTUnwrap(item["tcg"] as? String)
+            XCTAssertEqual(items.count, 1)
+            XCTAssertEqual(
+                source,
+                tcg == TCGGame.magic.rawValue
+                    ? PricingSource.scryfall.rawValue
+                    : PricingSource.tcgDexCardmarket.rawValue
+            )
+
+            return try Self.response(
+                for: request,
+                status: 200,
+                json: [
+                    "prices": [[
+                        "key": "\(tcg):card-id:",
+                        "tcg": tcg,
+                        "externalId": "card-id",
+                        "price": tcg == TCGGame.magic.rawValue ? 4.5 : 2.5,
+                        "currency": "USD",
+                        "source": source,
+                        "updatedAt": "2026-08-20T18:00:00Z",
+                        "cached": false
+                    ]],
+                    "refreshedAt": "2026-08-20T18:00:00Z",
+                    "refreshAfter": "2026-08-21T06:00:00Z"
+                ]
+            )
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TrackedPricesURLProtocol.self]
+        let service = APIService(session: URLSession(configuration: configuration))
+        let response = try await service.getTrackedPrices(
+            config: ServerConfiguration(baseURL: "https://example.test"),
+            token: "token",
+            items: [
+                APIService.TrackedPriceItem(tcg: "magic", externalId: "card-id"),
+                APIService.TrackedPriceItem(tcg: "pokemon", externalId: "card-id")
+            ]
+        )
+
+        XCTAssertEqual(response.prices.count, 2)
+        XCTAssertEqual(Set(response.prices.compactMap(\.source)), ["scryfall", "tcgdex-cardmarket"])
+    }
+
+    func testOnDeviceScryfallUsesFinishSpecificQuoteAndRequiredHeaders() async throws {
+        let defaults = UserDefaults.standard
+        let previousSource = defaults.string(forKey: PricingSource.storageKey)
+        let previousPriorities = defaults.data(forKey: PricingSourcePreferences.storageKey)
+        defaults.set(PricingSource.scryfall.rawValue, forKey: PricingSource.storageKey)
+        defaults.removeObject(forKey: PricingSourcePreferences.storageKey)
+        defer {
+            if let previousSource {
+                defaults.set(previousSource, forKey: PricingSource.storageKey)
+            } else {
+                defaults.removeObject(forKey: PricingSource.storageKey)
+            }
+            if let previousPriorities {
+                defaults.set(previousPriorities, forKey: PricingSourcePreferences.storageKey)
+            } else {
+                defaults.removeObject(forKey: PricingSourcePreferences.storageKey)
             }
         }
 

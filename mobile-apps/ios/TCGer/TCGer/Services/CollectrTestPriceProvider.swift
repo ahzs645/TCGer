@@ -41,8 +41,37 @@ enum PricingSource: String, CaseIterable, Codable, Identifiable, Sendable {
         self != .collectrPrivateTest
     }
 
+    func supports(tcg: String) -> Bool {
+        switch self {
+        case .automatic, .ebayActive, .collectrPrivateTest:
+            return true
+        case .justTCG:
+            return TCGGame(rawValue: tcg.lowercased()).map { $0 != .all } ?? false
+        case .scryfall:
+            return tcg.caseInsensitiveCompare(TCGGame.magic.rawValue) == .orderedSame
+        case .tcgDexCardmarket, .pokeWalletCardmarket, .pokeWalletTCGPlayer,
+             .pokeWalletBlended:
+            return tcg.caseInsensitiveCompare(TCGGame.pokemon.rawValue) == .orderedSame
+        case .lorcast:
+            return tcg.caseInsensitiveCompare(TCGGame.lorcana.rawValue) == .orderedSame
+        case .cardSource:
+            return [TCGGame.yugioh, .onepiece, .dragonball]
+                .map(\.rawValue)
+                .contains { tcg.caseInsensitiveCompare($0) == .orderedSame }
+        }
+    }
+
     static func selected(in defaults: UserDefaults = .standard) -> PricingSource {
         defaults.string(forKey: storageKey).flatMap(PricingSource.init(rawValue:)) ?? .automatic
+    }
+
+    static func selected(
+        for tcg: String,
+        in defaults: UserDefaults = .standard
+    ) -> PricingSource {
+        let candidate = PricingSourcePreferences.preferredSource(for: tcg, in: defaults)
+            ?? selected(in: defaults)
+        return candidate.supports(tcg: tcg) ? candidate : .automatic
     }
 }
 

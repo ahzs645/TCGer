@@ -18,20 +18,55 @@ extension APIService {
         let tcg: String
         let externalId: String
         let finishCode: String?
+        let condition: String?
+        let language: String?
+        let identifiers: JustTCGIdentifiers?
+        let lookupHint: JustTCGCardLookupHint?
 
-        init(tcg: String, externalId: String, finishCode: String? = nil) {
+        init(
+            tcg: String,
+            externalId: String,
+            finishCode: String? = nil,
+            condition: String? = nil,
+            language: String? = nil,
+            identifiers: JustTCGIdentifiers? = nil,
+            lookupHint: JustTCGCardLookupHint? = nil
+        ) {
             self.tcg = Self.normalized(tcg)
             self.externalId = Self.normalized(externalId)
             let normalizedFinish = Self.normalized(finishCode ?? "")
             self.finishCode = normalizedFinish.isEmpty ? nil : normalizedFinish
+            let normalizedCondition = Self.normalized(condition ?? "")
+            self.condition = normalizedCondition.isEmpty ? nil : normalizedCondition
+            let normalizedLanguage = Self.normalized(language ?? "")
+            self.language = normalizedLanguage.isEmpty ? nil : normalizedLanguage
+            self.identifiers = identifiers?.isEmpty == false ? identifiers : nil
+            self.lookupHint = lookupHint
         }
 
-        static func lookupKey(tcg: String, externalId: String, finishCode: String? = nil) -> String {
-            "\(normalized(tcg).lowercased()):\(normalized(externalId).lowercased()):\(normalized(finishCode ?? "").lowercased())"
+        static func lookupKey(
+            tcg: String,
+            externalId: String,
+            finishCode: String? = nil,
+            condition: String? = nil,
+            language: String? = nil
+        ) -> String {
+            var components = [tcg, externalId, finishCode ?? ""]
+            if condition != nil || language != nil {
+                components.append(condition ?? "")
+                components.append(language ?? "")
+            }
+            return components.map { normalized($0).lowercased() }.joined(separator: ":")
         }
 
         var lookupKey: String {
-            Self.lookupKey(tcg: tcg, externalId: externalId, finishCode: finishCode)
+            Self.lookupKey(
+                tcg: tcg,
+                externalId: externalId,
+                finishCode: finishCode,
+                condition: condition,
+                language: language
+            )
         }
 
         var key: String {
@@ -48,6 +83,10 @@ extension APIService {
         let tcg: String
         let externalId: String
         let finishCode: String?
+        let condition: String?
+        let language: String?
+        let identifiers: JustTCGIdentifiers?
+        let lookupHint: JustTCGCardLookupHint?
         let price: Double?
         let currency: String?
         let source: String?
@@ -56,7 +95,13 @@ extension APIService {
         let error: String?
 
         var lookupKey: String {
-            TrackedPriceItem.lookupKey(tcg: tcg, externalId: externalId, finishCode: finishCode)
+            TrackedPriceItem.lookupKey(
+                tcg: tcg,
+                externalId: externalId,
+                finishCode: finishCode,
+                condition: condition,
+                language: language
+            )
         }
     }
 
@@ -91,34 +136,38 @@ extension APIService {
             return try await getOnDeviceTrackedPrices(items: uniqueItems, force: force)
         }
 
-        let selectedSource = PricingSource.selected()
-        let serverSource = selectedSource.isServerSelectable ? selectedSource : .automatic
-
         var responses: [TrackedPricesResponse] = []
-        for start in stride(from: 0, to: uniqueItems.count, by: 100) {
-            let end = min(start + 100, uniqueItems.count)
-            let (data, response) = try await makeRequest(
-                config: config,
-                path: "prices/tracked",
-                method: "POST",
-                token: token,
-                body: TrackedPricesRequest(
-                    items: Array(uniqueItems[start..<end]),
-                    force: force,
-                    source: serverSource.rawValue
+        let itemsBySource = Dictionary(grouping: uniqueItems) { item in
+            let selected = PricingSource.selected(for: item.tcg)
+            return selected.isServerSelectable ? selected : .automatic
+        }
+        for source in itemsBySource.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+            let sourceItems = itemsBySource[source] ?? []
+            for start in stride(from: 0, to: sourceItems.count, by: 100) {
+                let end = min(start + 100, sourceItems.count)
+                let (data, response) = try await makeRequest(
+                    config: config,
+                    path: "prices/tracked",
+                    method: "POST",
+                    token: token,
+                    body: TrackedPricesRequest(
+                        items: Array(sourceItems[start..<end]),
+                        force: force,
+                        source: source.rawValue
+                    )
                 )
-            )
-            guard response.statusCode == 200 else {
-                if response.statusCode == 401 { throw APIError.unauthorized }
-                throw APIError.serverError(
-                    status: response.statusCode,
-                    message: parseServerMessage(from: data)
-                )
+                guard response.statusCode == 200 else {
+                    if response.statusCode == 401 { throw APIError.unauthorized }
+                    throw APIError.serverError(
+                        status: response.statusCode,
+                        message: parseServerMessage(from: data)
+                    )
+                }
+                guard let decoded = try? JSONDecoder().decode(TrackedPricesResponse.self, from: data) else {
+                    throw APIError.decodingError
+                }
+                responses.append(decoded)
             }
-            guard let decoded = try? JSONDecoder().decode(TrackedPricesResponse.self, from: data) else {
-                throw APIError.decodingError
-            }
-            responses.append(decoded)
         }
         return TrackedPricesResponse(
             prices: responses.flatMap(\.prices),
@@ -132,20 +181,52 @@ extension APIService {
         force: Bool
     ) async throws -> TrackedPricesResponse {
         let now = Date()
-        let source = PricingSource.selected()
         var results: [TrackedPriceResult] = []
+        var pending: [(item: TrackedPriceItem, source: PricingSource, cacheKey: String)] = []
         for item in items {
+            let selectedSource = PricingSource.selected(for: item.tcg)
+            let source = selectedSource.isAvailableOnDevice || selectedSource == .collectrPrivateTest
+                ? selectedSource
+                : .automatic
             let cacheKey = "\(source.rawValue):\(item.key)"
             if let cached = await OnDeviceTrackedPriceCache.shared.result(for: cacheKey, force: force) {
                 results.append(cached.withCached(true))
                 continue
             }
-            let quote = try await fetchOnDeviceTrackedPrice(item)
+            pending.append((item, source, cacheKey))
+        }
+
+        let justTCGItems = pending.compactMap { entry in
+            entry.source == .justTCG || entry.source == .automatic ? entry.item : nil
+        }
+        let justTCGQuotes: [String: CardPriceQuote]
+        do {
+            justTCGQuotes = try await fetchOnDeviceJustTCGPrices(justTCGItems)
+        } catch {
+            // Best Available can still fall back to a free compatible provider.
+            // Explicit JustTCG selections receive an unavailable result below.
+            justTCGQuotes = [:]
+        }
+
+        for entry in pending {
+            let item = entry.item
+            var quote = justTCGQuotes[item.key]
+            if quote == nil {
+                if entry.source == .automatic {
+                    quote = try await fetchOnDeviceScryfallPrice(item)
+                } else if entry.source != .justTCG {
+                    quote = try await fetchOnDeviceTrackedPrice(item, source: entry.source)
+                }
+            }
             let result = TrackedPriceResult(
                 key: item.key,
                 tcg: item.tcg,
                 externalId: item.externalId,
                 finishCode: item.finishCode,
+                condition: item.condition,
+                language: item.language,
+                identifiers: item.identifiers,
+                lookupHint: item.lookupHint,
                 price: quote?.price,
                 currency: quote?.currency,
                 source: quote?.source,
@@ -154,7 +235,7 @@ extension APIService {
                 error: quote == nil ? "No compatible on-device market quote is available" : nil
             )
             if quote != nil {
-                await OnDeviceTrackedPriceCache.shared.save(result, for: cacheKey, forced: force)
+                await OnDeviceTrackedPriceCache.shared.save(result, for: entry.cacheKey, forced: force)
             }
             results.append(result)
         }
@@ -165,8 +246,10 @@ extension APIService {
         )
     }
 
-    private func fetchOnDeviceTrackedPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
-        let source = PricingSource.selected()
+    private func fetchOnDeviceTrackedPrice(
+        _ item: TrackedPriceItem,
+        source: PricingSource
+    ) async throws -> CardPriceQuote? {
         if source == .collectrPrivateTest,
            let configuration = try CollectrPrivateCredentialStore.load() {
             return try await CollectrTestPriceProvider(
@@ -178,56 +261,8 @@ extension APIService {
         if source == .scryfall {
             return try await fetchOnDeviceScryfallPrice(item)
         }
-        if source == .automatic {
-            if (try? JustTCGCredentialStore.loadAPIKey()) != nil,
-               let quote = try await fetchOnDeviceJustTCGPrice(item) {
-                return quote
-            }
-            return try await fetchOnDeviceScryfallPrice(item)
-        }
-        if source == .justTCG {
-            return try await fetchOnDeviceJustTCGPrice(item)
-        }
+        if source == .automatic || source == .justTCG { return nil }
         return nil
-    }
-
-    private func fetchOnDeviceJustTCGPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
-        guard item.tcg.lowercased() == "magic",
-              let apiKey = try JustTCGCredentialStore.loadAPIKey(),
-              var components = URLComponents(string: "https://api.justtcg.com/v1/cards") else {
-            return nil
-        }
-        components.queryItems = [URLQueryItem(name: "scryfallId", value: item.externalId)]
-        guard let url = components.url else { throw APIError.invalidURL }
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        let (data, response) = try await execute(request)
-        guard response.statusCode == 200 else {
-            if response.statusCode == 404 { return nil }
-            throw APIError.serverError(
-                status: response.statusCode,
-                message: parseServerMessage(from: data)
-            )
-        }
-        guard let payload = try? JSONDecoder().decode(JustTcgCardsResponse.self, from: data) else {
-            throw APIError.decodingError
-        }
-        let variants = payload.cards.first?.variants ?? []
-        let nearMint = variants.filter {
-            let condition = $0.condition?.lowercased()
-            return condition == nil || condition == "near mint" || condition == "nm"
-        }
-        let candidates = nearMint.isEmpty ? variants : nearMint
-        let regular = candidates.first { !($0.printing?.lowercased().contains("foil") ?? false) }
-        let foil = candidates.first { $0.printing?.lowercased().contains("foil") ?? false }
-        let price: Double?
-        if item.finishCode?.lowercased().contains("foil") == true {
-            price = foil?.price ?? regular?.price
-        } else {
-            price = regular?.price ?? foil?.price
-        }
-        return price.map { CardPriceQuote(source: "justtcg", price: $0, currency: "USD") }
     }
 
     private struct ScryfallCardPriceResponse: Decodable {
@@ -311,31 +346,6 @@ extension APIService {
             return foilPrice ?? regularPrice
         }
         return regularPrice ?? foilPrice ?? etchedPrice
-    }
-
-    private struct JustTcgCardsResponse: Decodable {
-        let cards: [JustTcgCard]
-
-        private enum CodingKeys: String, CodingKey { case data }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            if let cards = try? container.decode([JustTcgCard].self, forKey: .data) {
-                self.cards = cards
-            } else {
-                self.cards = [try container.decode(JustTcgCard.self, forKey: .data)]
-            }
-        }
-    }
-
-    private struct JustTcgCard: Decodable {
-        let variants: [JustTcgVariant]
-    }
-
-    private struct JustTcgVariant: Decodable {
-        let condition: String?
-        let printing: String?
-        let price: Double?
     }
 
     private struct CreateDeckRequest: Encodable {
@@ -819,6 +829,10 @@ private extension APIService.TrackedPriceResult {
             tcg: tcg,
             externalId: externalId,
             finishCode: finishCode,
+            condition: condition,
+            language: language,
+            identifiers: identifiers,
+            lookupHint: lookupHint,
             price: price,
             currency: currency,
             source: source,

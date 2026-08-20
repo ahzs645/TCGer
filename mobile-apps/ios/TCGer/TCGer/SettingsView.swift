@@ -351,6 +351,13 @@ struct SettingsView: View {
                         Task { await updatePreferences(showPricing: environmentStore.showPricing) }
                     }
 
+                    NavigationLink {
+                        CurrencySettingsView()
+                            .environmentObject(environmentStore)
+                    } label: {
+                        LabeledContent("Display Currency", value: environmentStore.displayCurrencyCode)
+                    }
+
                     if environmentStore.shouldShowGamePicker {
                         Picker("Default Game", selection: Binding(
                             get: { environmentStore.defaultGame ?? "" },
@@ -385,9 +392,9 @@ struct SettingsView: View {
                                     .foregroundColor(.green)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Pricing Source")
-                                    Text(isLocalMode
-                                        ? "Personal JustTCG key on this phone"
-                                        : environmentStore.pricingSource.displayName)
+                                    Text(environmentStore.gamePricingSources.isEmpty
+                                        ? environmentStore.pricingSource.displayName
+                                        : "Custom priorities for \(environmentStore.gamePricingSources.count) game\(environmentStore.gamePricingSources.count == 1 ? "" : "s")")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }

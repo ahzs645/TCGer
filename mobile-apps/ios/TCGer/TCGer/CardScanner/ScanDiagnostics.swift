@@ -74,6 +74,9 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         let rotationDegreesApplied: Int
         let captureQuality: ScannerCaptureQualityReport?
         let pageQuad: [[Double]]
+        /// Axis-aligned page-result crop in the scanner input's Vision space:
+        /// `[minX, minY, width, height]`. Nil when no page fit was applied.
+        let pageFitRect: [Double]?
     }
 
     struct Attempt: Codable, Sendable {
@@ -110,6 +113,10 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         let rotationDegreesApplied: Int?
         let semanticOrientation: SemanticOrientation?
         let captureQuality: ScannerCaptureQualityReport?
+        /// Binder page-result crop in the original scanner input's Vision
+        /// coordinate space. This lets review tools draw page and pocket
+        /// geometry on the untouched photo without reconstructing the crop.
+        let binderPageFitRect: [Double]?
         /// Binder attempts keep `quad` in page coordinates for compatibility;
         /// this preserves the coordinator's localization inside the pocket.
         let coordinatorQuad: [[Double]]?
@@ -137,6 +144,7 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
             rotationDegreesApplied: Int? = nil,
             semanticOrientation: SemanticOrientation? = nil,
             captureQuality: ScannerCaptureQualityReport? = nil,
+            binderPageFitRect: [Double]? = nil,
             coordinatorQuad: [[Double]]? = nil
         ) {
             self.kind = kind
@@ -161,6 +169,7 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
             self.rotationDegreesApplied = rotationDegreesApplied
             self.semanticOrientation = semanticOrientation
             self.captureQuality = captureQuality
+            self.binderPageFitRect = binderPageFitRect
             self.coordinatorQuad = coordinatorQuad
         }
 
@@ -188,6 +197,7 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
                 rotationDegreesApplied: metadata.rotationDegreesApplied,
                 semanticOrientation: .unverified,
                 captureQuality: metadata.captureQuality,
+                binderPageFitRect: metadata.pageFitRect,
                 coordinatorQuad: quad
             )
         }

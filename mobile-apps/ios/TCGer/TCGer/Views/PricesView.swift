@@ -3,6 +3,8 @@ import SwiftUI
 private struct CollectionPricingLot {
     let finishCode: String?
     let finishLabel: String?
+    let condition: String?
+    let language: String?
     var quantity: Int
     var storedPriceTotal: Double
     var storedPriceCount: Int
@@ -14,14 +16,27 @@ private struct CollectionPricingLot {
 
 private func collectionPricingLots(for card: CollectionCard) -> [CollectionPricingLot] {
     var lots: [String: CollectionPricingLot] = [:]
-    func append(finishCode: String?, finishLabel: String?, quantity: Int, price: Double?) {
+    func append(
+        finishCode: String?,
+        finishLabel: String?,
+        condition: String?,
+        language: String?,
+        quantity: Int,
+        price: Double?
+    ) {
         let normalizedCode = finishCode?.trimmingCharacters(in: .whitespacesAndNewlines)
         let code = normalizedCode?.isEmpty == false ? normalizedCode : nil
-        let key = code?.lowercased() ?? ""
+        let normalizedCondition = condition?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedLanguage = language?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = [code, normalizedCondition, normalizedLanguage]
+            .map { ($0 ?? "").lowercased() }
+            .joined(separator: ":")
         var lot = lots[key] ?? CollectionPricingLot(
             finishCode: code,
             finishLabel: finishLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
                 ?? code.map { PokemonFinishOption.label(for: $0) },
+            condition: normalizedCondition?.isEmpty == false ? normalizedCondition : nil,
+            language: normalizedLanguage?.isEmpty == false ? normalizedLanguage : nil,
             quantity: 0,
             storedPriceTotal: 0,
             storedPriceCount: 0
@@ -38,6 +53,8 @@ private func collectionPricingLots(for card: CollectionCard) -> [CollectionPrici
         append(
             finishCode: copy.finishCode ?? (copy.isFoil == true ? "foil" : nil),
             finishLabel: copy.finishLabel,
+            condition: copy.condition ?? card.condition,
+            language: copy.language ?? card.language,
             quantity: 1,
             price: copy.price ?? card.price
         )
@@ -47,11 +64,16 @@ private func collectionPricingLots(for card: CollectionCard) -> [CollectionPrici
         append(
             finishCode: nil,
             finishLabel: nil,
+            condition: card.condition,
+            language: card.language,
             quantity: unrepresented > 0 ? unrepresented : card.quantity,
             price: card.price
         )
     }
-    return lots.values.sorted { ($0.finishCode ?? "") < ($1.finishCode ?? "") }
+    return lots.values.sorted {
+        [($0.finishCode ?? ""), ($0.condition ?? ""), ($0.language ?? "")].joined()
+            < [($1.finishCode ?? ""), ($1.condition ?? ""), ($1.language ?? "")].joined()
+    }
 }
 
 struct PricesView: View {
@@ -120,7 +142,15 @@ struct PricesView: View {
                 let key = APIService.TrackedPriceItem.lookupKey(
                     tcg: card.tcg,
                     externalId: externalID,
-                    finishCode: lot.finishCode
+                    finishCode: lot.finishCode,
+                    condition: JustTCGPricingPreferences.resolvedCondition(
+                        preference: environmentStore.justTCGConditionPreference,
+                        cardValue: lot.condition
+                    ),
+                    language: JustTCGPricingPreferences.resolvedLanguage(
+                        preference: environmentStore.justTCGLanguagePreference,
+                        cardValue: lot.language
+                    )
                 )
                 let market = livePrices[key]
                 if var existing = cards[key] {
@@ -216,17 +246,9 @@ struct PricesView: View {
                     if let lastPriceCheck {
                         Section {
                             LabeledContent("Source", value: environmentStore.pricingSource.displayName)
+                            LabeledContent("Display currency", value: environmentStore.displayCurrencyCode)
                             LabeledContent("Market prices") {
                                 Text(lastPriceCheck, format: .dateTime.month().day().hour().minute())
-                            }
-                            if let priceRefreshMessage {
-                                Text(priceRefreshMessage)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else if let nextPriceRefresh {
-                                Text("Next automatic check after \(nextPriceRefresh.formatted(date: .abbreviated, time: .shortened)), while this screen is open.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -276,6 +298,18 @@ struct PricesView: View {
         }
         .refreshable { await load(forcePrices: true) }
         .onChange(of: environmentStore.pricingSource) {
+            livePrices = [:]
+            Task { await refreshTrackedPrices(force: true) }
+        }
+        .onChange(of: environmentStore.gamePricingSources) {
+            livePrices = [:]
+            Task { await refreshTrackedPrices(force: true) }
+        }
+        .onChange(of: environmentStore.justTCGConditionPreference) {
+            livePrices = [:]
+            Task { await refreshTrackedPrices(force: true) }
+        }
+        .onChange(of: environmentStore.justTCGLanguagePreference) {
             livePrices = [:]
             Task { await refreshTrackedPrices(force: true) }
         }
@@ -336,7 +370,22 @@ struct PricesView: View {
                 APIService.TrackedPriceItem(
                     tcg: card.tcg,
                     externalId: card.externalId ?? card.cardId,
-                    finishCode: lot.finishCode
+                    finishCode: lot.finishCode,
+                    condition: JustTCGPricingPreferences.resolvedCondition(
+                        preference: environmentStore.justTCGConditionPreference,
+                        cardValue: lot.condition
+                    ),
+                    language: JustTCGPricingPreferences.resolvedLanguage(
+                        preference: environmentStore.justTCGLanguagePreference,
+                        cardValue: lot.language
+                    ),
+                    identifiers: card.justTCGIdentifiers,
+                    lookupHint: APIService.JustTCGCardLookupHint(
+                        name: card.name,
+                        setCode: card.setCode,
+                        setName: card.setName,
+                        collectorNumber: card.collectorNumber
+                    )
                 )
             }
         }

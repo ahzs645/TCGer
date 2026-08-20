@@ -46,8 +46,8 @@ export function getPriceSourceCatalog(): PriceSourcesResponse {
     sources.push({
       id: 'justtcg',
       label: 'JustTCG',
-      description: 'Near Mint commercial market prices from the server-held JustTCG key.',
-      games: ['magic'],
+      description: 'Condition, language, and printing-aware prices from the server-held JustTCG key.',
+      games: ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'dragonball'],
       requiresServer: true,
     });
   }

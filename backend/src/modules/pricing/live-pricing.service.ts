@@ -13,6 +13,7 @@ import {
   selectPriceForFinish,
 } from './pricing.types';
 import type { PriceSource } from '@tcg/api-types';
+import type { TrackedPriceItem } from '@tcg/api-types';
 import { EbayActivePriceProvider, PokeWalletPriceProvider } from './server-market-price-providers';
 
 export * from './pricing.types';
@@ -62,8 +63,9 @@ class AdapterPriceProvider implements PriceProvider {
   }
 }
 
+const justTcgProvider = new JustTcgPriceProvider();
 const providers: PriceProvider[] = [
-  new JustTcgPriceProvider(),
+  justTcgProvider,
   new TcgDexPriceProvider(),
   new ScryfallPriceProvider(),
   new LorcastPriceProvider(),
@@ -76,6 +78,36 @@ const providers: PriceProvider[] = [
   ),
 ];
 
+export function justTcgBatchItemKey(item: TrackedPriceItem): string {
+  return `${item.tcg}:${item.externalId}:${item.finishCode ?? ''}:${item.condition ?? ''}:${item.language ?? ''}`;
+}
+
+export async function fetchJustTcgTrackedPrices(
+  items: TrackedPriceItem[],
+): Promise<Map<string, LivePriceResult>> {
+  const quotes = await justTcgProvider.fetchBatch(items);
+  const results = new Map<string, LivePriceResult>();
+  for (const item of items) {
+    const key = justTcgBatchItemKey(item);
+    const quote = quotes.get(key);
+    if (!quote) continue;
+    const price = selectPriceForFinish(quote, item.finishCode);
+    if (!isUsablePrice(price)) continue;
+    results.set(key, {
+      source: justTcgProvider.name,
+      price,
+      currency: quote.currency,
+      basePrice: quote.price,
+      foilPrice: quote.foilPrice,
+      etchedPrice: quote.etchedPrice,
+      reverseHoloPrice: quote.reverseHoloPrice,
+      finishCode: item.finishCode,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  return results;
+}
+
 export function registerPriceProvider(provider: PriceProvider): void {
   if (!providers.some((candidate) => candidate.name === provider.name)) {
     providers.push(provider);
@@ -87,6 +119,10 @@ export async function fetchLiveCardPrices(
   externalId: string,
   finishCode?: string,
   source: PriceSource = 'automatic',
+  context?: Pick<
+    TrackedPriceItem,
+    'finishCode' | 'condition' | 'language' | 'identifiers' | 'lookupHint'
+  >,
 ): Promise<LivePriceResult[]> {
   const results: LivePriceResult[] = [];
   const selectedProviders = providers.filter((provider) =>
@@ -94,7 +130,7 @@ export async function fetchLiveCardPrices(
   );
   for (const provider of selectedProviders) {
     try {
-      const quote = normalizePriceQuote(await provider.fetchPrice(tcg, externalId));
+      const quote = normalizePriceQuote(await provider.fetchPrice(tcg, externalId, context));
       if (!quote) continue;
       const selected = selectPriceForFinish(quote, finishCode);
       if (!isUsablePrice(selected)) continue;

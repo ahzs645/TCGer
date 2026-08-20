@@ -5,7 +5,11 @@ import type {
   TrackedPricesResponse,
 } from '@tcg/api-types';
 import { env } from '../../config/env';
-import { fetchLiveCardPrices } from './live-pricing.service';
+import {
+  fetchJustTcgTrackedPrices,
+  fetchLiveCardPrices,
+  justTcgBatchItemKey,
+} from './live-pricing.service';
 import type { LivePriceResult } from './pricing.types';
 
 type PriceFetcher = (
@@ -13,6 +17,7 @@ type PriceFetcher = (
   externalId: string,
   finishCode?: string,
   source?: PriceSource,
+  item?: TrackedPriceItem,
 ) => Promise<LivePriceResult[]>;
 
 interface CacheEntry {
@@ -26,10 +31,21 @@ interface TrackedPricingOptions {
   forceCooldownMs: number;
   concurrency?: number;
   now?: () => number;
+  justTcgBatchFetcher?: (
+    items: TrackedPriceItem[],
+  ) => Promise<Map<string, LivePriceResult>>;
 }
 
 export function trackedPriceKey(item: TrackedPriceItem, source: PriceSource = 'automatic'): string {
-  const itemKey = `${item.tcg.trim().toLowerCase()}:${item.externalId.trim()}:${item.finishCode?.trim().toLowerCase() ?? ''}`;
+  const parts = [
+    item.tcg.trim().toLowerCase(),
+    item.externalId.trim().toLowerCase(),
+    item.finishCode?.trim().toLowerCase() ?? '',
+  ];
+  if (item.condition || item.language) {
+    parts.push(item.condition?.trim().toLowerCase() ?? '', item.language?.trim().toLowerCase() ?? '');
+  }
+  const itemKey = parts.join(':');
   return source === 'automatic' ? itemKey : `${source}:${itemKey}`;
 }
 
@@ -59,7 +75,7 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
 
     const request = (async () => {
       try {
-        const [quote] = await fetcher(item.tcg, item.externalId, item.finishCode, source);
+        const [quote] = await fetcher(item.tcg, item.externalId, item.finishCode, source, item);
         const result: TrackedPriceResult = quote
           ? {
               ...item,
@@ -106,6 +122,69 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
     const unique = Array.from(
       new Map(items.map((item) => [trackedPriceKey(item, source), item])).values(),
     );
+    if (source === 'justtcg' && options.justTcgBatchFetcher) {
+      const results = new Map<string, TrackedPriceResult>();
+      const pending: TrackedPriceItem[] = [];
+      const forcedKeys = new Set<string>();
+      for (const item of unique) {
+        const key = trackedPriceKey(item, source);
+        const timestamp = now();
+        const cached = cache.get(key);
+        const canForce =
+          force &&
+          (!cached?.lastForcedAt || timestamp - cached.lastForcedAt >= options.forceCooldownMs);
+        if (cached && cached.expiresAt > timestamp && !canForce) {
+          results.set(key, { ...cached.result, cached: true });
+        } else {
+          pending.push(item);
+          if (canForce) forcedKeys.add(key);
+        }
+      }
+      if (pending.length) {
+        try {
+          const quotes = await options.justTcgBatchFetcher(pending);
+          const timestamp = now();
+          for (const item of pending) {
+            const key = trackedPriceKey(item, source);
+            const quote = quotes.get(justTcgBatchItemKey(item));
+            const result: TrackedPriceResult = quote
+              ? {
+                  ...item,
+                  key,
+                  price: quote.price,
+                  currency: quote.currency,
+                  source: quote.source,
+                  updatedAt: quote.updatedAt,
+                  cached: false,
+                }
+              : { ...item, key, cached: false, error: 'No market price is available' };
+            cache.set(key, {
+              result,
+              expiresAt:
+                timestamp + (quote ? options.ttlMs : Math.min(options.ttlMs, 5 * 60 * 1000)),
+              lastForcedAt: forcedKeys.has(key) ? timestamp : cache.get(key)?.lastForcedAt,
+            });
+            results.set(key, result);
+          }
+        } catch (error) {
+          for (const item of pending) {
+            const key = trackedPriceKey(item, source);
+            results.set(key, {
+              ...item,
+              key,
+              cached: false,
+              error: error instanceof Error ? error.message : 'Price lookup failed',
+            });
+          }
+        }
+      }
+      const refreshedAt = new Date(now());
+      return {
+        prices: unique.map((item) => results.get(trackedPriceKey(item, source))!),
+        refreshedAt: refreshedAt.toISOString(),
+        refreshAfter: new Date(refreshedAt.getTime() + options.ttlMs).toISOString(),
+      };
+    }
     const prices: TrackedPriceResult[] = [];
     for (let index = 0; index < unique.length; index += concurrency) {
       prices.push(
@@ -130,14 +209,16 @@ async function fetchTrackedPrice(
   externalId: string,
   finishCode?: string,
   source: PriceSource = 'automatic',
+  item?: TrackedPriceItem,
 ) {
   if (env.BACKEND_MODE === 'convex') {
-    return fetchLiveCardPrices(tcg, externalId, finishCode, source);
+    return fetchLiveCardPrices(tcg, externalId, finishCode, source, item);
   }
-  return (await import('./pricing.service')).fetchCardPrices(tcg, externalId, finishCode, source);
+  return (await import('./pricing.service')).fetchCardPrices(tcg, externalId, finishCode, source, item);
 }
 
 export const trackedPricingService = createTrackedPricingService(fetchTrackedPrice, {
   ttlMs: env.PRICE_REFRESH_INTERVAL_MS,
   forceCooldownMs: env.PRICE_FORCE_REFRESH_COOLDOWN_MS,
+  justTcgBatchFetcher: fetchJustTcgTrackedPrices,
 });

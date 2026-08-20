@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { fetchLiveCardPrices } from './live-pricing.service';
 import { isUsablePrice } from './pricing.types';
-import type { PriceSource } from '@tcg/api-types';
+import type { PriceSource, TrackedPriceItem } from '@tcg/api-types';
 
 export * from './live-pricing.service';
 
@@ -30,6 +30,7 @@ export async function fetchCardPrices(
   externalId: string,
   finishCode?: string,
   source: PriceSource = 'automatic',
+  item?: TrackedPriceItem,
 ) {
   const card = await prisma.card.findFirst({
     where: { externalId, tcgGame: { code: tcg } },
@@ -48,7 +49,7 @@ export async function fetchCardPrices(
     isFallback?: boolean;
   }> = [];
 
-  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode, source);
+  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode, source, item);
   for (const result of liveResults) {
     results.push(result);
     if (card) {

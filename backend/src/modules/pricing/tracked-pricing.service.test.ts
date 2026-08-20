@@ -1,4 +1,6 @@
+import type { TrackedPriceItem } from '@tcg/api-types';
 import { createTrackedPricingService } from './tracked-pricing.service';
+import type { LivePriceResult } from './pricing.types';
 
 describe('tracked pricing cache', () => {
   it('deduplicates cards and reuses a fresh cached quote', async () => {
@@ -70,5 +72,44 @@ describe('tracked pricing cache', () => {
     expect(scryfall.prices[0]).toMatchObject({ price: 2, source: 'scryfall' });
     expect(justTcg.prices[0]).toMatchObject({ price: 7, source: 'justtcg' });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses one JustTCG batch fetch for a mixed-game collection', async () => {
+    const fetcher = jest.fn().mockResolvedValue([]);
+    const batchFetcher = jest.fn(async (items: TrackedPriceItem[]) =>
+      new Map<string, LivePriceResult>(
+        items.map((item) => [
+          `${item.tcg}:${item.externalId}:${item.finishCode ?? ''}:${item.condition ?? ''}:${item.language ?? ''}`,
+          {
+            source: 'justtcg',
+            price: item.tcg === 'magic' ? 5.5 : 7.25,
+            currency: 'USD',
+            updatedAt: '2026-08-20T00:00:00.000Z',
+          },
+        ]),
+      ),
+    );
+    const service = createTrackedPricingService(fetcher, {
+      ttlMs: 60_000,
+      forceCooldownMs: 10_000,
+      justTcgBatchFetcher: batchFetcher,
+    });
+
+    const response = await service.getTrackedPrices(
+      [
+        { tcg: 'magic', externalId: 'magic-card', condition: 'Near Mint', language: 'English' },
+        { tcg: 'pokemon', externalId: 'pokemon-card', condition: 'Near Mint', language: 'Japanese' },
+      ],
+      false,
+      'justtcg',
+    );
+
+    expect(batchFetcher).toHaveBeenCalledTimes(1);
+    expect(batchFetcher).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ tcg: 'magic' }),
+      expect.objectContaining({ tcg: 'pokemon' }),
+    ]));
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(response.prices.map((price) => price.price)).toEqual([5.5, 7.25]);
   });
 });

@@ -32,6 +32,9 @@ struct RootView: View {
             await refreshServerFeatures()
             await refreshBootstrapState(force: true)
         }
+        .task(id: environmentStore.displayCurrencyCode) {
+            await environmentStore.refreshExchangeRate()
+        }
         .alert("Oops", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { self.errorMessage = nil } }

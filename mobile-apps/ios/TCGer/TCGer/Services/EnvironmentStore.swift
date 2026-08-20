@@ -73,6 +73,13 @@ final class EnvironmentStore: ObservableObject {
     @Published var showCardNumbers: Bool
     @Published var showPricing: Bool
     @Published var pricingSource: PricingSource
+    @Published var gamePricingSources: [String: PricingSource]
+    @Published var justTCGConditionPreference: String
+    @Published var justTCGLanguagePreference: String
+    @Published var displayCurrencyCode: String
+    @Published private(set) var exchangeRate: CachedExchangeRate?
+    @Published private(set) var isRefreshingExchangeRate: Bool
+    @Published private(set) var exchangeRateError: String?
     @Published var defaultGame: String?
     @Published var offlineModeEnabled: Bool
     @Published var sealedProductsEnabled: Bool
@@ -110,6 +117,7 @@ final class EnvironmentStore: ObservableObject {
         static let showCardNumbers = "showCardNumbers"
         static let showPricing = "showPricing"
         static let pricingSource = PricingSource.storageKey
+        static let displayCurrency = CurrencyDisplayState.currencyDefaultsKey
         static let defaultGame = "defaultGame"
         static let offlineModeEnabled = "offlineModeEnabled"
         static let sealedProductsEnabled = "tcg.sealedProducts.enabled"
@@ -218,6 +226,24 @@ final class EnvironmentStore: ObservableObject {
             showPricing = storage.bool(forKey: Keys.showPricing)
         }
         pricingSource = PricingSource.selected(in: storage)
+        gamePricingSources = PricingSourcePreferences.load(from: storage)
+        justTCGConditionPreference = JustTCGPricingPreferences.condition(in: storage)
+        justTCGLanguagePreference = JustTCGPricingPreferences.language(in: storage)
+        let storedCurrency = storage.string(forKey: Keys.displayCurrency)?.uppercased() ?? "USD"
+        let initialDisplayCurrency = storedCurrency.count == 3 ? storedCurrency : "USD"
+        let initialExchangeRate = CurrencyConverter.loadCachedRate(
+            from: "USD",
+            to: initialDisplayCurrency,
+            defaults: storage
+        )
+        displayCurrencyCode = initialDisplayCurrency
+        exchangeRate = initialExchangeRate
+        isRefreshingExchangeRate = false
+        exchangeRateError = nil
+        CurrencyDisplayState.shared.configure(
+            currencyCode: initialDisplayCurrency,
+            rate: initialExchangeRate
+        )
 
         // Default game preference
         defaultGame = storage.string(forKey: Keys.defaultGame)
@@ -432,6 +458,45 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        $gamePricingSources
+            .dropFirst()
+            .sink { [weak self] sources in
+                guard let self else { return }
+                PricingSourcePreferences.save(sources, to: self.storage)
+            }
+            .store(in: &cancellables)
+
+        $justTCGConditionPreference
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value, forKey: JustTCGPricingPreferences.conditionStorageKey)
+            }
+            .store(in: &cancellables)
+
+        $justTCGLanguagePreference
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.storage.set(value, forKey: JustTCGPricingPreferences.languageStorageKey)
+            }
+            .store(in: &cancellables)
+
+        $displayCurrencyCode
+            .dropFirst()
+            .sink { [weak self] code in
+                guard let self else { return }
+                let normalized = code.uppercased()
+                self.storage.set(normalized, forKey: Keys.displayCurrency)
+                let cached = CurrencyConverter.loadCachedRate(
+                    from: "USD",
+                    to: normalized,
+                    defaults: self.storage
+                )
+                self.exchangeRate = cached
+                self.exchangeRateError = nil
+                CurrencyDisplayState.shared.configure(currencyCode: normalized, rate: cached)
+            }
+            .store(in: &cancellables)
+
         $offlineModeEnabled
             .dropFirst()
             .sink { [weak self] flag in
@@ -547,6 +612,49 @@ final class EnvironmentStore: ObservableObject {
         if enabledLorcana { games.append(.lorcana) }
         if enabledDragonball { games.append(.dragonball) }
         return games
+    }
+
+    func preferredPricingSource(for game: TCGGame) -> PricingSource? {
+        gamePricingSources[game.rawValue]
+    }
+
+    func setPreferredPricingSource(_ source: PricingSource?, for game: TCGGame) {
+        if let source {
+            gamePricingSources[game.rawValue] = source
+        } else {
+            gamePricingSources.removeValue(forKey: game.rawValue)
+        }
+    }
+
+    @MainActor
+    func refreshExchangeRate(force: Bool = false) async {
+        let destination = displayCurrencyCode.uppercased()
+        if destination == "USD" {
+            exchangeRate = nil
+            exchangeRateError = nil
+            CurrencyDisplayState.shared.configure(currencyCode: destination, rate: nil)
+            return
+        }
+
+        isRefreshingExchangeRate = true
+        exchangeRateError = nil
+        defer { isRefreshingExchangeRate = false }
+        do {
+            let refreshed = try await CurrencyConverter.shared.rate(
+                from: "USD",
+                to: destination,
+                force: force
+            )
+            guard displayCurrencyCode.uppercased() == destination else { return }
+            exchangeRate = refreshed
+            CurrencyDisplayState.shared.configure(currencyCode: destination, rate: refreshed)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard displayCurrencyCode.uppercased() == destination else { return }
+            exchangeRateError = error.localizedDescription
+            CurrencyDisplayState.shared.configure(currencyCode: destination, rate: exchangeRate)
+        }
     }
 
     // MARK: - Tab Bar
@@ -759,6 +867,9 @@ final class EnvironmentStore: ObservableObject {
         showCardNumbers = true
         showPricing = true
         pricingSource = .justTCG
+        gamePricingSources = [:]
+        justTCGConditionPreference = JustTCGPricingPreferences.matchCardValue
+        justTCGLanguagePreference = JustTCGPricingPreferences.matchCardValue
         defaultGame = nil
         offlineModeEnabled = false
         sealedProductsEnabled = true
@@ -787,6 +898,10 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.showCardNumbers)
         storage.removeObject(forKey: Keys.showPricing)
         storage.removeObject(forKey: Keys.pricingSource)
+        storage.removeObject(forKey: PricingSourcePreferences.storageKey)
+        storage.removeObject(forKey: JustTCGPricingPreferences.conditionStorageKey)
+        storage.removeObject(forKey: JustTCGPricingPreferences.languageStorageKey)
+        storage.removeObject(forKey: JustTCGIdentifierMappingStore.storageKey)
         storage.removeObject(forKey: Keys.sealedProductsEnabled)
         CollectrProductMappingStore().removeAll()
         try? CollectrPrivateCredentialStore.delete()

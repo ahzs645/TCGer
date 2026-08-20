@@ -49,6 +49,14 @@ def _shutter_verdict(expected_card_id, expected_no_match, identified_card_id):
     return "unscored"
 
 
+def _json_list(value):
+    try:
+        decoded = json.loads(value or "[]")
+    except (TypeError, ValueError):
+        return []
+    return decoded if isinstance(decoded, list) else []
+
+
 class ShowShutterBenchmark(foo.Operator):
     @property
     def config(self):
@@ -127,7 +135,8 @@ class ShowShutterEvidence(foo.Operator):
         return foo.OperatorConfig(
             name="show_shutter_evidence",
             label="TCGer: show selected shutter evidence",
-            description="Show the original and scanner-rectified card with candidates, OCR, and timing",
+            description="Show a single rectified card or every detected binder pocket",
+            dynamic=True,
         )
 
     def resolve_input(self, ctx):
@@ -141,6 +150,47 @@ class ShowShutterEvidence(foo.Operator):
 
     def execute(self, ctx):
         sample = ctx.dataset[ctx.selected[0]]
+        if sample.get_field("capture_mode") == "binder_page":
+            cards = _json_list(sample.get_field("binder_cards_json"))
+            lines = [
+                "### Binder-page recognition",
+                "",
+                f"**{len(cards)} pockets detected** — "
+                f"{sample.get_field('binder_matched_count') or 0} matched, "
+                f"{sample.get_field('binder_uncertain_count') or 0} uncertain, "
+                f"{sample.get_field('binder_unmatched_count') or 0} unmatched.",
+                f"**Page result:** {'outlined on the original' if sample.get_field('binder_page_result_available') else 'not recoverable'}; "
+                f"**located pocket overlays:** {sample.get_field('binder_overlay_count') or 0}/{len(cards)}.",
+                "",
+                "| Pocket | Scanner status | Predicted card | Confidence |",
+                "|---:|---|---|---:|",
+            ]
+            result = {"original": _image_data_uri(sample.filepath)}
+            for index, card in enumerate(cards[:12]):
+                confidence = card.get("confidence")
+                lines.append(
+                    f"| {int(card.get('pocket_index') or 0) + 1} | "
+                    f"{card.get('status') or 'unmatched'} | "
+                    f"{card.get('card_name') or 'No accepted identity'} "
+                    f"[{card.get('card_id') or 'no ID'}] | "
+                    f"{f'{float(confidence):.1%}' if confidence is not None else '—'} |"
+                )
+                result[f"binder_card_{index + 1}"] = _image_data_uri(
+                    card.get("rectified_filepath")
+                )
+            lines.extend(
+                [
+                    "",
+                    "Toggle `binder_page_result` for the fitted page outline, "
+                    "`binder_regions` for filled pockets, `binder_region_outlines` for "
+                    "outline-only quads, or `binder_corner_points` for corner dots. "
+                    "Rectified crops are linked "
+                    "evidence, not separate dataset rows. Use **TCGer: label/correct one binder pocket** to add "
+                    "human truth without assigning one identity to the whole page.",
+                ]
+            )
+            result["summary"] = "\n".join(lines)
+            return result
         candidates = sample.get_field("candidates_json") or "[]"
         try:
             candidate_text = json.dumps(json.loads(candidates), indent=2, ensure_ascii=False)
@@ -174,9 +224,221 @@ class ShowShutterEvidence(foo.Operator):
     def resolve_output(self, ctx):
         outputs = types.Object()
         outputs.str("original", label="Full-resolution shutter photo", view=types.ImageView())
-        outputs.str("rectified", label="Accepted rectified card", view=types.ImageView())
+        sample = ctx.dataset[ctx.selected[0]] if len(ctx.selected) == 1 else None
+        if sample is not None and sample.get_field("capture_mode") == "binder_page":
+            cards = _json_list(sample.get_field("binder_cards_json"))
+            for index, card in enumerate(cards[:12]):
+                pocket = int(card.get("pocket_index") or 0) + 1
+                name = card.get("card_name") or card.get("status") or "unmatched"
+                outputs.str(
+                    f"binder_card_{index + 1}",
+                    label=f"Pocket {pocket} rectified — {name}",
+                    view=types.ImageView(),
+                )
+        else:
+            outputs.str("rectified", label="Accepted rectified card", view=types.ImageView())
         outputs.str("summary", label="Recognition evidence", view=types.MarkdownView())
         return types.Property(outputs, view=types.View(label="Shutter evidence"))
+
+
+class LabelBinderPocket(foo.Operator):
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="label_binder_pocket",
+            label="TCGer: label/correct one binder pocket",
+            description="Add human truth to one detected pocket without changing source evidence",
+            dynamic=True,
+        )
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        sample = ctx.dataset[ctx.selected[0]] if len(ctx.selected) == 1 else None
+        if sample is None or sample.get_field("capture_mode") != "binder_page":
+            warning = inputs.view(
+                "warning",
+                types.Warning(label="Select exactly one binder-page capture first"),
+            )
+            warning.invalid = True
+            return types.Property(inputs, view=types.View(label="Label binder pocket"))
+
+        cards = _json_list(sample.get_field("binder_cards_json"))
+        manual = {
+            int(item.get("pocket_index")): item
+            for item in _json_list(sample.get_field("binder_manual_labels_json"))
+            if isinstance(item, dict) and item.get("pocket_index") is not None
+        }
+        pocket_choices = types.DropdownView()
+        for card in cards:
+            pocket = int(card.get("pocket_index") or 0)
+            name = card.get("card_name") or "No accepted identity"
+            pocket_choices.add_choice(str(pocket), label=f"Pocket {pocket + 1} — {name}")
+        default_pocket = str(int(cards[0].get("pocket_index") or 0)) if cards else "0"
+        inputs.enum(
+            "pocket_index",
+            pocket_choices.values(),
+            default=default_pocket,
+            required=True,
+            label="Binder pocket",
+            view=pocket_choices,
+        )
+        pocket_index = int(ctx.params.get("pocket_index") or default_pocket)
+        predicted = next(
+            (item for item in cards if int(item.get("pocket_index") or 0) == pocket_index),
+            {},
+        )
+        existing = manual.get(pocket_index, {})
+        kind_choices = types.DropdownView()
+        kind_choices.add_choice("exact_printing", label="Pokémon card — exact printing confirmed")
+        kind_choices.add_choice("pokemon_unknown_printing", label="Pokémon card — printing unknown")
+        kind_choices.add_choice("non_pokemon", label="Not a Pokémon card")
+        kind_choices.add_choice("card_back", label="Card back")
+        kind_choices.add_choice("empty_pocket", label="Empty / false detection")
+        kind_choices.add_choice("needs_label", label="Leave for later")
+        default_kind = existing.get("truth_kind") or (
+            "exact_printing" if predicted.get("card_id") else "needs_label"
+        )
+        inputs.enum(
+            "truth_kind",
+            kind_choices.values(),
+            default=default_kind,
+            required=True,
+            label="Human truth",
+            view=kind_choices,
+        )
+        truth_kind = ctx.params.get("truth_kind") or default_kind
+        if truth_kind == "exact_printing":
+            inputs.str(
+                "card_id",
+                default=existing.get("card_id") or predicted.get("card_id") or None,
+                required=True,
+                label="Exact printing ID",
+            )
+            inputs.str(
+                "card_name",
+                default=existing.get("card_name") or predicted.get("card_name") or None,
+                label="Card name",
+            )
+        elif truth_kind == "pokemon_unknown_printing":
+            inputs.str(
+                "card_name",
+                default=existing.get("card_name") or predicted.get("card_name") or None,
+                label="Card name if known",
+            )
+        inputs.str("notes", default=existing.get("notes") or None, label="Review notes")
+        return types.Property(inputs, view=types.View(label="Label binder pocket"))
+
+    def execute(self, ctx):
+        sample = ctx.dataset[ctx.selected[0]]
+        pocket_index = int(ctx.params["pocket_index"])
+        truth_kind = ctx.params["truth_kind"]
+        record = {
+            "pocket_index": pocket_index,
+            "truth_kind": truth_kind,
+            "card_id": (ctx.params.get("card_id") or "").strip(),
+            "card_name": (ctx.params.get("card_name") or "").strip(),
+            "notes": (ctx.params.get("notes") or "").strip(),
+            "provenance": "fiftyone_manual_review",
+        }
+        labels = [
+            item
+            for item in _json_list(sample.get_field("binder_manual_labels_json"))
+            if not isinstance(item, dict) or int(item.get("pocket_index", -1)) != pocket_index
+        ]
+        labels.append(record)
+        labels.sort(key=lambda item: int(item.get("pocket_index", -1)))
+        sample["binder_manual_labels_json"] = json.dumps(labels, ensure_ascii=False)
+        sample["binder_reviewed_count"] = sum(
+            item.get("truth_kind") != "needs_label" for item in labels
+        )
+        regions = sample.get_field("binder_regions")
+        for region in regions.polylines if regions else []:
+            if region.get_field("pocket_index") == pocket_index:
+                region["human_truth_kind"] = truth_kind
+                region["human_card_id"] = record["card_id"]
+                region["human_card_name"] = record["card_name"]
+                region["human_review_notes"] = record["notes"]
+        sample.save()
+        ctx.trigger("reload_dataset")
+
+
+class SetScannerOverlayLayers(foo.Operator):
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="set_scanner_overlay_layers",
+            label="TCGer: choose overlay display",
+            description="Globally choose filled regions, outlines, corner dots, or any combination",
+            dynamic=True,
+        )
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        current = ctx.dataset.app_config.active_fields
+        active = set(current.paths) if current and not current.exclude else set()
+        has_custom = bool(current and not current.exclude)
+        inputs.bool(
+            "show_page_result",
+            default="binder_page_result" in active if has_custom else True,
+            label="Binder page-result outline",
+            description="Outline the scanner's fitted binder-page result on the original photo",
+        )
+        inputs.bool(
+            "show_filled",
+            default="binder_regions" in active if has_custom else False,
+            label="Filled blue card regions",
+        )
+        inputs.bool(
+            "show_outlines",
+            default="binder_region_outlines" in active if has_custom else True,
+            label="Blue card outlines",
+        )
+        inputs.bool(
+            "show_corners",
+            default="binder_corner_points" in active if has_custom else False,
+            label="Card corner dots",
+        )
+        inputs.view(
+            "hint",
+            types.Notice(
+                label="Choose one display or combine them. This becomes the dataset-wide default."
+            ),
+        )
+        return types.Property(inputs, view=types.View(label="Scanner overlay display"))
+
+    def execute(self, ctx):
+        layer_fields = {
+            "binder_page_result",
+            "binder_regions",
+            "binder_region_outlines",
+            "binder_corner_points",
+        }
+        current = ctx.dataset.app_config.active_fields
+        if current and not current.exclude:
+            base_fields = [path for path in current.paths if path not in layer_fields]
+        else:
+            base_fields = [
+                path
+                for path in ctx.dataset.get_field_schema(
+                    embedded_doc_type=fo.Label
+                ).keys()
+                if path not in layer_fields
+            ]
+        selections = [
+            ("show_page_result", "binder_page_result"),
+            ("show_filled", "binder_regions"),
+            ("show_outlines", "binder_region_outlines"),
+            ("show_corners", "binder_corner_points"),
+        ]
+        active_fields = base_fields + [
+            field for parameter, field in selections if bool(ctx.params.get(parameter))
+        ]
+        ctx.dataset.app_config.active_fields = fo.core.odm.dataset.ActiveFields(
+            paths=active_fields,
+            exclude=False,
+        )
+        ctx.dataset.save()
+        ctx.trigger("reload_dataset")
 
 
 class LabelShutterCapture(foo.Operator):
@@ -533,6 +795,8 @@ class SetScannerReviewStatus(foo.Operator):
 def register(plugin):
     plugin.register(ShowShutterBenchmark)
     plugin.register(ShowShutterEvidence)
+    plugin.register(LabelBinderPocket)
+    plugin.register(SetScannerOverlayLayers)
     plugin.register(LabelShutterCapture)
     plugin.register(ShowPerformanceDashboard)
     plugin.register(CompareScannerRuns)

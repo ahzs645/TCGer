@@ -158,6 +158,34 @@ describe('market price providers', () => {
         env.JUSTTCG_API_KEY = originalAPIKey;
       }
     });
+
+    it('uses canonical TCGplayer IDs and explicitly prefers language for Pokemon', async () => {
+      const originalAPIKey = env.JUSTTCG_API_KEY;
+      env.JUSTTCG_API_KEY = 'test-key';
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({
+          data: [{
+            variants: [
+              { condition: 'Near Mint', printing: 'Normal', language: 'English', price: 7.25 },
+              { condition: 'Near Mint', printing: 'Normal', language: 'Japanese', price: 9 },
+            ],
+          }],
+        }),
+      );
+
+      try {
+        await expect(
+          new JustTcgPriceProvider().fetchPrice('pokemon', 'sv1-001', {
+            identifiers: { tcgplayerId: '219042' },
+            language: 'Japanese',
+            condition: 'Near Mint',
+          }),
+        ).resolves.toMatchObject({ price: 9, currency: 'USD' });
+        expect(String(fetchMock.mock.calls[0][0])).toContain('/cards?tcgplayerId=219042');
+      } finally {
+        env.JUSTTCG_API_KEY = originalAPIKey;
+      }
+    });
   });
 
   it('does not call an upstream API for an unsupported game', async () => {

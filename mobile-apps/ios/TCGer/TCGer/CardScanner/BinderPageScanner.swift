@@ -442,7 +442,10 @@ actor BinderPageScanner {
                     nativeCropPixelHeight: item.nativeCropPixelHeight,
                     rotationDegreesApplied: item.rotationDegreesApplied,
                     captureQuality: captureQuality,
-                    pageQuad: pageQuad
+                    pageQuad: pageQuad,
+                    pageFitRect: pageFitRect.map {
+                        [Double($0.minX), Double($0.minY), Double($0.width), Double($0.height)]
+                    }
                 )
                 // Custom/test strategies may not emit diagnostics. Retain one
                 // explicit summary in that case; production strategies keep

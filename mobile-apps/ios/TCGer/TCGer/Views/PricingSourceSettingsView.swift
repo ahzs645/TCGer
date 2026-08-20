@@ -40,9 +40,17 @@ struct PricingSourceSettingsView: View {
         availableOptions.first { $0.id == selectedSource }
     }
 
+    private var gamesWithPricingOptions: [TCGGame] {
+        environmentStore.enabledGames.filter { !compatibleOptions(for: $0).isEmpty }
+    }
+
     var body: some View {
         Form {
             sourceSelectionSection
+            if !gamesWithPricingOptions.isEmpty {
+                gamePrioritySection
+            }
+            justTCGPreferencesSection
             providerSection
             switch selectedSource {
             case .justTCG:
@@ -110,7 +118,76 @@ struct PricingSourceSettingsView: View {
         } header: {
             Text("Active Source")
         } footer: {
-            Text("The selected source is saved on this device and is used when card results are loaded. Existing saved card values are not rewritten automatically.")
+            Text("This is the default for games without a preferred source. Existing saved card values are not rewritten automatically.")
+        }
+    }
+
+    private var gamePrioritySection: some View {
+        Section {
+            ForEach(gamesWithPricingOptions) { game in
+                Picker(selection: preferredSourceBinding(for: game)) {
+                    Text("Use Default (\(defaultSourceName(for: game)))")
+                        .tag(Optional<PricingSource>.none)
+                    ForEach(compatibleOptions(for: game)) { option in
+                        Text(option.label)
+                            .tag(Optional(option.id))
+                    }
+                } label: {
+                    GameLabel(game: game)
+                }
+                .pickerStyle(.navigationLink)
+                .accessibilityIdentifier("pricingSourcePriority.\(game.rawValue)")
+            }
+        } header: {
+            Text("Game Priorities")
+        } footer: {
+            Text("A preferred source overrides the default only for that game. Best Available uses the server's compatible provider order.")
+        }
+    }
+
+    private func compatibleOptions(for game: TCGGame) -> [APIService.PriceSourceOption] {
+        availableOptions.filter { option in
+            option.games.isEmpty
+                || option.games.contains { $0.caseInsensitiveCompare(game.rawValue) == .orderedSame }
+        }
+    }
+
+    private func preferredSourceBinding(for game: TCGGame) -> Binding<PricingSource?> {
+        Binding(
+            get: { environmentStore.preferredPricingSource(for: game) },
+            set: { environmentStore.setPreferredPricingSource($0, for: game) }
+        )
+    }
+
+    private func defaultSourceName(for game: TCGGame) -> String {
+        selectedSource.supports(tcg: game.rawValue)
+            ? selectedSource.displayName
+            : PricingSource.automatic.displayName
+    }
+
+    private var justTCGPreferencesSection: some View {
+        Section {
+            Picker("Condition", selection: $environmentStore.justTCGConditionPreference) {
+                Text("Match Each Card").tag(JustTCGPricingPreferences.matchCardValue)
+                ForEach(JustTCGPricingPreferences.conditions, id: \.self) { condition in
+                    Text(condition).tag(condition)
+                }
+            }
+            .pickerStyle(.navigationLink)
+            .accessibilityIdentifier("justTCGConditionPreference")
+
+            Picker("Language", selection: $environmentStore.justTCGLanguagePreference) {
+                Text("Match Each Card").tag(JustTCGPricingPreferences.matchCardValue)
+                ForEach(JustTCGPricingPreferences.languages, id: \.self) { language in
+                    Text(language).tag(language)
+                }
+            }
+            .pickerStyle(.navigationLink)
+            .accessibilityIdentifier("justTCGLanguagePreference")
+        } header: {
+            Text("JustTCG Variant Preference")
+        } footer: {
+            Text("Match Each Card uses the condition and language saved on each copy, falling back to Near Mint and English. JustTCG returns language on variants; TCGer explicitly ranks that field when choosing a quote.")
         }
     }
 
@@ -157,7 +234,7 @@ struct PricingSourceSettingsView: View {
             }
 
             if selectedSource == .justTCG {
-                Text("Use JustTCG paid for Magic pricing in the current TCGer integration, including Near Mint regular and foil variants. Its commercial plan supports server-side display and cached valuations.")
+                Text("Use JustTCG pricing for supported games with condition, language, and printing-aware variant selection. Stable JustTCG or TCGplayer identifiers are saved locally after a card is matched.")
                     .font(.subheadline)
 
                 Link(destination: URL(string: "https://justtcg.com/docs/quickstart")!) {
@@ -581,7 +658,7 @@ struct PricingSourceSettingsView: View {
                         id: .automatic,
                         label: "Best Available",
                         description: "Use JustTCG when configured, then fall back to Scryfall.",
-                        games: ["magic"],
+                        games: TCGGame.allCases.filter { $0 != .all }.map(\.rawValue),
                         requiresServer: false
                     ),
                     APIService.PriceSourceOption(
@@ -595,7 +672,7 @@ struct PricingSourceSettingsView: View {
                         id: .justTCG,
                         label: "JustTCG (Personal Key)",
                         description: "Direct pricing using a personal key stored only on this iPhone.",
-                        games: ["magic"],
+                        games: TCGGame.allCases.filter { $0 != .all }.map(\.rawValue),
                         requiresServer: false
                     )
                 ]

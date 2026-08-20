@@ -182,8 +182,9 @@ evidence for the shutter event, not extra benchmark rows.
 
 The dataset includes:
 
-- scanner polygon, predicted card name/printing, confidence, top candidates,
-  title/footer OCR evidence, and the accepted rectified-card path;
+- scanner polygon registered back onto the untouched photo, predicted card
+  name/printing, confidence, top candidates, title/footer OCR evidence, and the
+  accepted rectified-card path;
 - assisted suggestions kept separate from human truth: exact-printing prefills,
   Pokémon-name-only hints, candidate-only rows that require content confirmation,
   and conservative likely-no-card hints;
@@ -194,8 +195,35 @@ The dataset includes:
   2-second latency breaches, OCR use, rectified previews, and many-attempt
   hotspots.
 
+Single-card and binder shutter captures are deliberately separate. The
+single-card queue has one identity, quad, and accepted rectification per shutter.
+A binder page has no page-level card identity. `binder_page_result` draws the
+scanner's fitted page result as an outline on the untouched photo, while
+the pocket geometry has three independent label switches: `binder_regions` for
+filled blue polygons, `binder_region_outlines` for outline-only quads, and
+`binder_corner_points` for corner dots. Each retains the predicted card name,
+printing ID, status, confidence, candidates, and rectified crop. Individual
+pocket crops are linked evidence, not gallery samples,
+so they are excluded from both the single-card queue and its denominator. The
+binder evidence operator shows all pockets together, while **TCGer: label/correct
+one binder pocket** stores human truth independently for each pocket. These edits
+stay in FiftyOne and do not modify the archived iPhone evidence.
+
+Older iPhone recordings saved binder quads relative to the fitted page but did
+not save the page-fit rectangle. The importer recovers those positions by
+registering each rectified pocket image back to the archived page and reports any
+unlocated false/weak detection rather than drawing a knowingly wrong polygon.
+New recordings persist `binderPageFitRect` directly.
+
+Run **TCGer: choose overlay display** from Browse operations for one global
+switcher. Its checkboxes control the page-result outline, filled regions,
+outline-only card quads, and corner dots. Any one option or combination is
+valid, and the selection becomes the dataset-wide default while preserving
+non-binder recognition labels.
+
 The importer freezes an outcome-independent queue of 200 full-resolution
-originals using a deterministic SHA-256 ordering. Use **Benchmark 200 — needs
+single-card originals using a deterministic SHA-256 ordering. Binder pages are
+excluded from the single-card accuracy denominator. Use **Benchmark 200 — needs
 labels** as the manual-labelling queue. The 28 truth records already present in
 the archive were created specifically when a user corrected a failure, so they
 remain a separate correction-only hard-case cohort and are excluded from the

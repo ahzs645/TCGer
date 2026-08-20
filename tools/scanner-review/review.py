@@ -1003,7 +1003,11 @@ def remap_quad_to_media(
             if not isinstance(point, list) or len(point) < 2:
                 return quad
             x = (float(point[0]) * crop_width + crop_x) / media_width
-            y = (float(point[1]) * crop_height + crop_y) / media_height
+            # Vision's normalized Y axis starts at the bottom, while the crop
+            # registration returned by OpenCV starts at the image's top-left.
+            y = 1.0 - (
+                crop_y + (1.0 - float(point[1])) * crop_height
+            ) / media_height
             remapped.append([min(1.0, max(0.0, x)), min(1.0, max(0.0, y))])
         return remapped
 
@@ -1118,13 +1122,23 @@ def _binder_regions(
     scanner_size: tuple[int, int] | None,
     media_size: tuple[int, int] | None,
     crop_rect: tuple[float, float, float, float] | None = None,
+    *,
+    filled: bool = True,
 ) -> Any:
     polylines = []
     for card in cards:
-        remapped = remap_quad_to_media(
-            card.get("quad"), scanner_size, media_size, crop_rect
-        )
-        points = _top_left_quad_points(remapped)
+        registered_points = card.get("registered_points_top_left")
+        if registered_points:
+            points = remap_top_left_points_to_media(
+                registered_points, media_size, crop_rect
+            )
+            quad_source = "rectified_feature_registration"
+        else:
+            # Historical binder diagnostics stored coordinates relative to a
+            # page-fit crop but did not archive that crop rectangle. Omitting
+            # an unregistered region is safer than drawing it in the wrong row.
+            points = []
+            quad_source = "historical_page_fit_unavailable"
         if len(points) != 4:
             continue
         pocket_number = int(card["pocket_index"]) + 1
@@ -1134,7 +1148,7 @@ def _binder_regions(
                 label=f"P{pocket_number} · {name}",
                 points=[points],
                 closed=True,
-                filled=True,
+                filled=filled,
                 confidence=card.get("confidence"),
                 pocket_index=int(card["pocket_index"]),
                 card_id=card.get("card_id") or "",
@@ -1142,9 +1156,162 @@ def _binder_regions(
                 binder_status=card.get("status") or "unmatched",
                 included_by_default=bool(card.get("included_by_default")),
                 policy_reason=card.get("policy_reason") or "",
+                quad_source=quad_source,
+                registration_inliers=card.get("registration_inliers"),
+                registration_inlier_ratio=card.get("registration_inlier_ratio"),
             )
         )
     return fo.Polylines(polylines=polylines)
+
+
+def _binder_corner_points(
+    fo: Any,
+    cards: list[dict[str, Any]],
+    media_size: tuple[int, int] | None,
+    crop_rect: tuple[float, float, float, float] | None,
+) -> Any:
+    keypoints = []
+    for card in cards:
+        points = remap_top_left_points_to_media(
+            card.get("registered_points_top_left"), media_size, crop_rect
+        )
+        if len(points) != 4:
+            continue
+        pocket_number = int(card["pocket_index"]) + 1
+        name = card.get("card_name") or card.get("status") or "unmatched"
+        confidence = card.get("confidence")
+        keypoints.append(
+            fo.Keypoint(
+                label=f"P{pocket_number} · {name}",
+                points=points,
+                confidence=[confidence] * 4 if confidence is not None else None,
+                pocket_index=int(card["pocket_index"]),
+                card_id=card.get("card_id") or "",
+                card_name=card.get("card_name") or "",
+                binder_status=card.get("status") or "unmatched",
+                quad_source="rectified_feature_registration",
+            )
+        )
+    return fo.Keypoints(keypoints=keypoints)
+
+
+def estimate_binder_page_fit(cards: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Recovers the historical page-result crop from registered pocket quads."""
+    page_x: list[float] = []
+    source_x: list[float] = []
+    page_y: list[float] = []
+    source_y: list[float] = []
+    for card in cards:
+        quad = card.get("quad")
+        registered = card.get("registered_points_top_left")
+        if not isinstance(quad, list) or len(quad) != 4 or not registered:
+            continue
+        page_points = np.asarray(quad, dtype=float)
+        source_top_left = np.asarray(registered, dtype=float)
+        source_vision = np.column_stack(
+            [source_top_left[:, 0], 1.0 - source_top_left[:, 1]]
+        )
+        page_x.extend([float(page_points[:, 0].min()), float(page_points[:, 0].max())])
+        source_x.extend([float(source_vision[:, 0].min()), float(source_vision[:, 0].max())])
+        page_y.extend([float(page_points[:, 1].min()), float(page_points[:, 1].max())])
+        source_y.extend([float(source_vision[:, 1].min()), float(source_vision[:, 1].max())])
+    if len(page_x) < 4:
+        return None
+    width, min_x = np.polyfit(page_x, source_x, 1)
+    height, min_y = np.polyfit(page_y, source_y, 1)
+    predicted_x = min_x + width * np.asarray(page_x)
+    predicted_y = min_y + height * np.asarray(page_y)
+    residual = float(
+        np.sqrt(
+            np.mean(
+                np.concatenate(
+                    [
+                        predicted_x - np.asarray(source_x),
+                        predicted_y - np.asarray(source_y),
+                    ]
+                )
+                ** 2
+            )
+        )
+    )
+    if not (
+        0.1 <= width <= 1.05
+        and 0.1 <= height <= 1.05
+        and -0.05 <= min_x <= 1.0
+        and -0.05 <= min_y <= 1.0
+        and min_x + width <= 1.05
+        and min_y + height <= 1.05
+        and residual <= 0.06
+    ):
+        return None
+    return {
+        "rect_vision": (float(min_x), float(min_y), float(width), float(height)),
+        "residual": residual,
+        "registered_pockets": len(page_x) // 2,
+        "source": "inferred_from_rectified_pocket_registration",
+    }
+
+
+def archived_binder_page_fit(
+    attempts: list[dict[str, Any]],
+    cards: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    raw = next(
+        (
+            attempt.get("binderPageFitRect")
+            for attempt in attempts
+            if isinstance(attempt.get("binderPageFitRect"), list)
+            and len(attempt["binderPageFitRect"]) == 4
+        ),
+        None,
+    )
+    if raw is None:
+        return estimate_binder_page_fit(cards)
+    x, y, width, height = (float(value) for value in raw)
+    if width <= 0 or height <= 0:
+        return estimate_binder_page_fit(cards)
+    return {
+        "rect_vision": (x, y, width, height),
+        "residual": 0.0,
+        "registered_pockets": len(cards),
+        "source": "archived_ios_page_fit_rect",
+    }
+
+
+def _binder_page_result(
+    fo: Any,
+    page_fit: dict[str, Any] | None,
+    scanner_size: tuple[int, int] | None,
+    media_size: tuple[int, int] | None,
+    crop_rect: tuple[float, float, float, float] | None,
+) -> Any:
+    if not page_fit:
+        return fo.Polylines(polylines=[])
+    x, y, width, height = page_fit["rect_vision"]
+    quad = [
+        [x, y + height],
+        [x + width, y + height],
+        [x + width, y],
+        [x, y],
+    ]
+    points = _top_left_quad_points(
+        remap_quad_to_media(quad, scanner_size, media_size, crop_rect)
+    )
+    if len(points) != 4:
+        return fo.Polylines(polylines=[])
+    return fo.Polylines(
+        polylines=[
+            fo.Polyline(
+                label="binder_page_result",
+                points=[points],
+                closed=True,
+                filled=False,
+                quad_source=page_fit["source"],
+                fit_residual=page_fit["residual"],
+                registered_pockets=page_fit["registered_pockets"],
+            )
+        ]
+    )
 
 
 def _image_size(path: Path) -> tuple[int, int] | None:
@@ -1200,6 +1367,78 @@ def locate_scanner_crop(
             float(min(scanner_height, media_height)),
         ),
         "confidence": None,
+    }
+
+
+def remap_top_left_points_to_media(
+    points: Any,
+    media_size: tuple[int, int] | None,
+    crop_rect: tuple[float, float, float, float] | None,
+) -> list[list[float]]:
+    if not isinstance(points, list) or len(points) != 4 or not media_size or not crop_rect:
+        return []
+    media_width, media_height = media_size
+    crop_x, crop_y, crop_width, crop_height = crop_rect
+    mapped = []
+    for point in points:
+        if not isinstance(point, list) or len(point) < 2:
+            return []
+        x = (crop_x + float(point[0]) * crop_width) / media_width
+        y = (crop_y + float(point[1]) * crop_height) / media_height
+        mapped.append([min(1.0, max(0.0, x)), min(1.0, max(0.0, y))])
+    return mapped
+
+
+def register_rectified_card_to_page(
+    rectified_path: Path,
+    page_path: Path,
+) -> dict[str, Any] | None:
+    """Recovers a historical binder pocket quad using local image features."""
+    rectified = cv2.imread(str(rectified_path), cv2.IMREAD_GRAYSCALE)
+    page = cv2.imread(str(page_path), cv2.IMREAD_GRAYSCALE)
+    if rectified is None or page is None:
+        return None
+    detector = cv2.SIFT_create(nfeatures=3_000)
+    crop_points, crop_descriptors = detector.detectAndCompute(rectified, None)
+    page_points, page_descriptors = detector.detectAndCompute(page, None)
+    if crop_descriptors is None or page_descriptors is None:
+        return None
+    matches = cv2.FlannBasedMatcher(
+        dict(algorithm=1, trees=5), dict(checks=50)
+    ).knnMatch(crop_descriptors, page_descriptors, k=2)
+    good = [first for first, second in matches if first.distance < 0.72 * second.distance]
+    if len(good) < 8:
+        return None
+    source = np.float32([crop_points[item.queryIdx].pt for item in good]).reshape(-1, 1, 2)
+    target = np.float32([page_points[item.trainIdx].pt for item in good]).reshape(-1, 1, 2)
+    homography, mask = cv2.findHomography(source, target, cv2.RANSAC, 4.0)
+    if homography is None or mask is None:
+        return None
+    inliers = int(mask.sum())
+    inlier_ratio = inliers / len(good)
+    if inliers < 10 or inlier_ratio < 0.45:
+        return None
+    height, width = rectified.shape[:2]
+    corners = np.float32(
+        [[[0, 0], [width, 0], [width, height], [0, height]]]
+    )
+    projected = cv2.perspectiveTransform(corners, homography)[0]
+    page_height, page_width = page.shape[:2]
+    normalized = [
+        [float(point[0] / page_width), float(point[1] / page_height)]
+        for point in projected
+    ]
+    if not all(-0.1 <= value <= 1.1 for point in normalized for value in point):
+        return None
+    area = abs(float(cv2.contourArea(projected))) / (page_width * page_height)
+    if not 0.008 <= area <= 0.30:
+        return None
+    return {
+        "points_top_left": normalized,
+        "matches": len(good),
+        "inliers": inliers,
+        "inlier_ratio": inlier_ratio,
+        "area": area,
     }
 
 
@@ -1586,6 +1825,21 @@ def build_shutter_dataset(
                         card_path = candidate_path.resolve()
                         binder_rectified_paths.append(str(card_path))
                 card["rectified_filepath"] = str(card_path) if card_path else ""
+                registration = (
+                    register_rectified_card_to_page(card_path, scanner_input_path)
+                    if card_path and scanner_input_path.is_file()
+                    else None
+                )
+                if registration:
+                    card["registered_points_top_left"] = registration["points_top_left"]
+                    card["registration_matches"] = registration["matches"]
+                    card["registration_inliers"] = registration["inliers"]
+                    card["registration_inlier_ratio"] = registration["inlier_ratio"]
+                    card["registration_area"] = registration["area"]
+                    card["quad_source"] = "rectified_feature_registration"
+                else:
+                    card["quad_source"] = "historical_page_fit_unavailable"
+            binder_page_fit = archived_binder_page_fit(attempts, binder_cards)
             accepted_attempt = next(
                 (attempt for attempt in attempts if attempt.get("outcome") == "accepted"),
                 None,
@@ -1701,6 +1955,22 @@ def build_shutter_dataset(
                 binder_regions=_binder_regions(
                     fo, binder_cards, scanner_size, media_size, crop_rect
                 ),
+                binder_region_outlines=_binder_regions(
+                    fo,
+                    binder_cards,
+                    scanner_size,
+                    media_size,
+                    crop_rect,
+                    filled=False,
+                ),
+                binder_corner_points=_binder_corner_points(
+                    fo, binder_cards, media_size, crop_rect
+                ),
+                binder_page_result=_binder_page_result(
+                    fo, binder_page_fit, scanner_size, media_size, crop_rect
+                ),
+                binder_page_fit_json=json.dumps(binder_page_fit, ensure_ascii=False),
+                binder_page_result_available=binder_page_fit is not None,
                 binder_cards_json=json.dumps(binder_cards, ensure_ascii=False),
                 binder_manual_labels_json="[]",
                 binder_reviewed_count=0,
@@ -1710,6 +1980,12 @@ def build_shutter_dataset(
                 binder_unmatched_count=sum(card.get("status") == "unmatched" for card in binder_cards),
                 binder_rectified_filepaths_json=json.dumps(binder_rectified_paths, ensure_ascii=False),
                 binder_rectified_count=len(binder_rectified_paths),
+                binder_overlay_count=sum(
+                    bool(card.get("registered_points_top_left")) for card in binder_cards
+                ),
+                binder_unlocated_count=sum(
+                    not bool(card.get("registered_points_top_left")) for card in binder_cards
+                ),
                 capture_best_match_card_id=capture_best_id,
                 capture_best_match_card_name=capture_best_name,
                 capture_best_match_confidence=capture_best_confidence,
@@ -1857,6 +2133,8 @@ def build_shutter_dataset(
         "binderMatchedCards": sum(dataset.values("binder_matched_count")),
         "binderUncertainCards": sum(dataset.values("binder_uncertain_count")),
         "binderUnmatchedCards": sum(dataset.values("binder_unmatched_count")),
+        "binderLocatedOverlays": sum(dataset.values("binder_overlay_count")),
+        "binderUnlocatedDetections": sum(dataset.values("binder_unlocated_count")),
         "fullResolutionOriginals": full_resolution_count,
         "humanTruthSamples": truth_count,
         "manualCorrectionHardCases": truth_count,

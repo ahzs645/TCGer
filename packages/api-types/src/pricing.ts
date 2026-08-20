@@ -4,10 +4,30 @@ import { z } from "zod";
 // Tracked collection pricing
 // ---------------------------------------------------------------------------
 
+export const justTcgIdentifiersSchema = z.object({
+  cardId: z.string().trim().min(1).max(240).optional(),
+  variantId: z.string().trim().min(1).max(240).optional(),
+  tcgplayerId: z.string().trim().min(1).max(80).optional(),
+  mtgjsonId: z.string().trim().min(1).max(240).optional(),
+  scryfallId: z.string().trim().min(1).max(240).optional(),
+  tcgplayerSkuId: z.string().trim().min(1).max(80).optional(),
+});
+
+export const justTcgLookupHintSchema = z.object({
+  name: z.string().trim().min(1).max(240).optional(),
+  setCode: z.string().trim().min(1).max(120).optional(),
+  setName: z.string().trim().min(1).max(240).optional(),
+  collectorNumber: z.string().trim().min(1).max(120).optional(),
+});
+
 export const trackedPriceItemSchema = z.object({
   tcg: z.string().trim().min(1).max(40),
   externalId: z.string().trim().min(1).max(240),
   finishCode: z.string().trim().min(1).max(80).optional(),
+  condition: z.string().trim().min(1).max(80).optional(),
+  language: z.string().trim().min(1).max(80).optional(),
+  identifiers: justTcgIdentifiersSchema.optional(),
+  lookupHint: justTcgLookupHintSchema.optional(),
 });
 export type TrackedPriceItem = z.infer<typeof trackedPriceItemSchema>;
 

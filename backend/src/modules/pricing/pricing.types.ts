@@ -1,3 +1,5 @@
+import type { TrackedPriceItem } from '@tcg/api-types';
+
 export interface PriceProviderQuote {
   price?: number;
   foilPrice?: number;
@@ -10,7 +12,14 @@ export interface PriceProvider {
   readonly name: string;
   /** Expensive or comparison-only providers opt out of automatic selection. */
   readonly includeInAutomatic?: boolean;
-  fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null>;
+  fetchPrice(
+    tcg: string,
+    externalId: string,
+    context?: Pick<
+      TrackedPriceItem,
+      'finishCode' | 'condition' | 'language' | 'identifiers' | 'lookupHint'
+    >,
+  ): Promise<PriceProviderQuote | null>;
 }
 
 export interface LivePriceResult {
