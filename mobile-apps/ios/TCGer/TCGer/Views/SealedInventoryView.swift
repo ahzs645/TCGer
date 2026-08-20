@@ -387,7 +387,7 @@ private struct SealedInventoryRow: View {
     let onBrowseSetCards: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             if let url = item.product.imageUrl, let imageURL = URL(string: url) {
                 CachedAsyncImage(url: imageURL) { phase in
                     switch phase {
@@ -418,6 +418,8 @@ private struct SealedInventoryRow: View {
 
                     Text(item.product.productType.capitalized)
                         .font(.caption2)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.15))
@@ -427,6 +429,8 @@ private struct SealedInventoryRow: View {
                     Text("Qty: \(item.quantity)")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
 
                 if let setCode = item.product.setCode, !setCode.isEmpty {
@@ -435,26 +439,35 @@ private struct SealedInventoryRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let price = item.purchasePrice {
-                    Text(price.priceText)
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-            }
-            Spacer()
+                HStack(spacing: 8) {
+                    if let price = item.purchasePrice {
+                        Text(price.priceText)
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.green)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityLabel("Purchase price \(price.priceText)")
+                    }
 
-            if let setCode = item.product.setCode, !setCode.isEmpty {
-                Button(action: onBrowseSetCards) {
-                    Label("Cards", systemImage: "rectangle.grid.2x2.fill")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 8)
-                        .background(Color.accentColor.opacity(0.12), in: .capsule)
+                    Spacer(minLength: 0)
+
+                    if let setCode = item.product.setCode, !setCode.isEmpty {
+                        Button(action: onBrowseSetCards) {
+                            Label("Cards", systemImage: "rectangle.grid.2x2.fill")
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 8)
+                                .background(Color.accentColor.opacity(0.12), in: .capsule)
+                        }
+                        .buttonStyle(.borderless)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityLabel("View cards in set \(setCode)")
+                        .accessibilityHint("Shows cards associated with this sealed product's linked set")
+                    }
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("View cards in set \(setCode)")
-                .accessibilityHint("Shows cards associated with this sealed product's linked set")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 4)
     }
