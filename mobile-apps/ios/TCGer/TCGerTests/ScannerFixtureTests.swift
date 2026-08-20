@@ -43,20 +43,20 @@ final class ScannerFixtureTests: XCTestCase {
         XCTAssertEqual(manifest.fixtures.map(\.id).count, Set(manifest.fixtures.map(\.id)).count)
     }
 
-    func testCleanCardFixturesRemainTopOne() async throws {
+    func testShutterCleanCardFixturesRemainTopOne() async throws {
         let fixtures = try loadManifest().fixtures.filter { $0.category == "clean" }
         for fixture in fixtures {
             let image = try makeImage(for: fixture)
             let result = await Self.coordinator.scan(
                 image: image,
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .importedPhoto
+                source: .photoCapture
             )
             assert(result: result, satisfies: fixture)
         }
     }
 
-    func testDistortedCardFixturesRemainRecognizable() async throws {
+    func testShutterDistortedCardFixturesRemainRecognizable() async throws {
         let supportedCategories: Set<String> = [
             "rotation", "perspective", "blur", "glare", "partialOcclusion", "multipleCards"
         ]
@@ -70,19 +70,19 @@ final class ScannerFixtureTests: XCTestCase {
             let result = await Self.coordinator.scan(
                 image: try makeImage(for: fixture),
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .importedPhoto
+                source: .photoCapture
             )
             assert(result: result, satisfies: fixture)
         }
     }
 
-    func testNegativeFixturesDoNotProduceMatches() async throws {
+    func testShutterNegativeFixturesDoNotProduceMatches() async throws {
         let fixtures = try loadManifest().fixtures.filter { $0.expectation == "noMatch" }
         for fixture in fixtures {
             let result = await Self.coordinator.scan(
                 image: try makeImage(for: fixture),
                 context: .test(mode: scanMode(fixture.mode), engine: .localOnly),
-                source: .importedPhoto
+                source: .photoCapture
             )
             guard case .failure(.noMatch) = result else {
                 return XCTFail("\(fixture.id) produced a card match; open-set rejection regressed")

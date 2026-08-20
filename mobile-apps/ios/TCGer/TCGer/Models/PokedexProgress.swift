@@ -10,6 +10,11 @@ nonisolated struct PokedexSpeciesProgress: Identifiable, Hashable, Sendable {
     var isOwned: Bool { ownedCopies > 0 }
 }
 
+nonisolated struct PokedexProgressSnapshot: Sendable {
+    let species: [PokedexSpeciesProgress]
+    let catalogEntriesByNumber: [Int: [CatalogEntry]]
+}
+
 nonisolated enum PokedexProgressBuilder {
     static func build(
         catalogCards: [Card],
@@ -57,6 +62,85 @@ nonisolated enum PokedexProgressBuilder {
                 imageURL: imageByNumber[entry.number]
             )
         }
+    }
+
+    static func build(
+        catalogEntries: [CatalogEntry],
+        pokemonSetSeriesByCode: [String: String],
+        collections: [Collection]
+    ) -> PokedexProgressSnapshot {
+        var entriesByNumber = Dictionary(
+            uniqueKeysWithValues: NationalPokedex.names.enumerated().map { offset, name in
+                let number = offset + 1
+                return (number, PokedexEntry(number: number, name: name))
+            }
+        )
+        var catalogEntriesByNumber: [Int: [CatalogEntry]] = [:]
+        var imageByNumber: [Int: String] = [:]
+        var ownedCopiesByNumber: [Int: Int] = [:]
+
+        for catalogEntry in catalogEntries {
+            for entry in NationalPokedex.species(for: catalogEntry) {
+                entriesByNumber[entry.number] = entry
+                catalogEntriesByNumber[entry.number, default: []].append(catalogEntry)
+                if imageByNumber[entry.number] == nil,
+                   let image = imageURL(
+                       for: catalogEntry,
+                       pokemonSetSeriesByCode: pokemonSetSeriesByCode
+                   ) {
+                    imageByNumber[entry.number] = image
+                }
+            }
+        }
+
+        for collection in collections {
+            for card in collection.cards where card.quantity > 0 {
+                for entry in NationalPokedex.species(for: card) {
+                    entriesByNumber[entry.number] = entry
+                    ownedCopiesByNumber[entry.number, default: 0] += card.quantity
+                    if imageByNumber[entry.number] == nil,
+                       let image = card.imageUrlSmall ?? card.imageUrl {
+                        imageByNumber[entry.number] = image
+                    }
+                }
+            }
+        }
+
+        let species = entriesByNumber.values.sorted().map { entry in
+            PokedexSpeciesProgress(
+                entry: entry,
+                printCount: catalogEntriesByNumber[entry.number]?.count ?? 0,
+                ownedCopies: ownedCopiesByNumber[entry.number] ?? 0,
+                imageURL: imageByNumber[entry.number]
+            )
+        }
+        return PokedexProgressSnapshot(
+            species: species,
+            catalogEntriesByNumber: catalogEntriesByNumber
+        )
+    }
+
+    private static func imageURL(
+        for entry: CatalogEntry,
+        pokemonSetSeriesByCode: [String: String]
+    ) -> String? {
+        if let storedURL = entry.card.imageUrlSmall ?? entry.card.imageUrl {
+            return storedURL
+        }
+        guard let setCode = entry.card.setCode,
+              let collectorNumber = entry.card.collectorNumber,
+              let series = pokemonSetSeriesByCode[setCode] else {
+            return nil
+        }
+        return "https://assets.tcgdex.net/en/\(path(series))/\(path(setCode))/\(path(collectorNumber))/low.webp"
+    }
+
+    private static func path(_ component: String) -> String {
+        component.addingPercentEncoding(
+            withAllowedCharacters: CharacterSet.alphanumerics.union(
+                CharacterSet(charactersIn: "-._~")
+            )
+        ) ?? component
     }
 }
 

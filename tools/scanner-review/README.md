@@ -154,10 +154,80 @@ Each frame family shares a `source_group_key`, while media is separated into:
 - `scanner_attempt_crop` — derived per-attempt diagnostic crop.
 
 Recorded `identified_card_name`, `identified_card_id`, confidence, alternatives,
-strategy, and scanner quad are visible. They are predictions, not truth. Label
-the real-camera originals before enabling benchmark scoring. Re-running the
-command preserves App edits; pass `--rebuild` only when intentionally replacing
-the local session dataset.
+strategy, scanner quad, and archived capture-quality measurements are visible.
+Quality fields include sharpness, luma, clipped highlights, glare, card fill,
+angle deviation, and the same prioritized guidance issue shown by the iOS app.
+For already rectified attempt crops, the condition tag intentionally uses only
+blur/lighting/glare; framing and angle are meaningful only on the framed capture.
+Saved views isolate quality failures and glare/foil-risk captures. They are
+predictions and diagnostic conditions, not truth. Label the real-camera
+originals before enabling benchmark scoring. Re-running the command preserves
+App edits; pass `--rebuild` only when intentionally replacing the local session
+dataset.
+
+## Shutter benchmark: accuracy and efficiency together
+
+Build the dedicated one-row-per-shutter-capture dataset:
+
+```sh
+uv run --project tools/scanner-review python tools/scanner-review/review.py \
+  shutter --no-launch
+```
+
+Remove `--no-launch` to open it at `http://localhost:5154`. The importer keeps
+the untouched full-resolution photo as the sample media when it was archived,
+then links the guide/scanner input and accepted perspective-normalized attempt
+through `scanner_input_filepath` and `rectified_filepath`. Derived attempts are
+evidence for the shutter event, not extra benchmark rows.
+
+The dataset includes:
+
+- scanner polygon, predicted card name/printing, confidence, top candidates,
+  title/footer OCR evidence, and the accepted rectified-card path;
+- assisted suggestions kept separate from human truth: exact-printing prefills,
+  Pokémon-name-only hints, candidate-only rows that require content confirmation,
+  and conservative likely-no-card hints;
+- imported iOS manual-correction truth plus editable `label_*` fields;
+- end-to-end `elapsed_ms`, latency bucket, attempt count, candidate margin,
+  capture quality, and separate single-card versus binder-page shutter tags;
+- saved queues for missing labels, wrong/missed decisions, 1-second and
+  2-second latency breaches, OCR use, rectified previews, and many-attempt
+  hotspots.
+
+The importer freezes an outcome-independent queue of 200 full-resolution
+originals using a deterministic SHA-256 ordering. Use **Benchmark 200 — needs
+labels** as the manual-labelling queue. The 28 truth records already present in
+the archive were created specifically when a user corrected a failure, so they
+remain a separate correction-only hard-case cohort and are excluded from the
+headline accuracy denominator.
+
+After installing the local plugin, use **TCGer: shutter accuracy and speed** to
+see label coverage, exact decision accuracy, p50/p90/p95 latency, and how many
+correct results meet a chosen responsiveness target. Select one capture and run
+**TCGer: show selected shutter evidence** to display the original and rectified
+card together with candidates, OCR, and timing. Use **TCGer: label/correct
+shutter capture** to confirm the prefilled suggestion or change it to a different
+printing, Pokémon card with unknown printing, non-Pokémon card, card back,
+multiple cards, or no card. Suggestions never count as benchmark truth until a
+person confirms them. App edits remain in the local FiftyOne database until
+explicitly exported.
+
+Latency is the recorded iOS end-to-end photo-capture/coordinator time. This is
+the user-visible efficiency measure and should lead model-only milliseconds.
+Per-stage detector, rectification, embedding, ANN, and OCR timings are not
+present in historical recordings; adding them to future iOS evidence remains a
+separate instrumentation improvement.
+
+The session-stability dashboard includes scanner outcomes by capture condition.
+To validate a revised session schema without replacing a labeled local dataset,
+load it under a new name and select that dataset when producing the report:
+
+```sh
+uv run --project tools/scanner-review python tools/scanner-review/review.py \
+  sessions --dataset-name tcger-scanner-real-sessions-quality-v2 --no-launch
+uv run --project tools/scanner-review python tools/scanner-review/review.py \
+  report --session-dataset-name tcger-scanner-real-sessions-quality-v2
+```
 
 ## Rectified-card previews
 
@@ -230,7 +300,8 @@ In an expanded sample, open **Annotate** and create an Annotation Schema that
 includes these primitive fields:
 
 - `label_category`: dropdown with `singleCard`, `cardBack`, `multiCard`,
-  `foreignLanguage`, `outsideIndex`, `needsLabel`, and `unlabeled`;
+  `foreignLanguage`, `outsideIndex`, `nonPokemon`, `noCard`, `needsLabel`, and
+  `unlabeled`;
 - `label_card_id`: text;
 - `label_card_name`: text;
 - `label_notes`: text.

@@ -31,6 +31,40 @@ final class PokedexProgressTests: XCTestCase {
         XCTAssertFalse(result[3].isOwned)
     }
 
+    func testBuildsLightweightCatalogSnapshotAndFallbackImageURL() {
+        let charmander = PokedexEntry(number: 4, name: "Charmander")
+        let catalogCard = CatalogCardEntry(
+            id: "base1-4",
+            name: "Charmander",
+            setCode: "base1",
+            collectorNumber: "4",
+            rarity: "Common",
+            dexEntries: [charmander],
+            type: "Pokemon",
+            types: ["Fire"],
+            colors: nil,
+            race: nil,
+            level: nil,
+            konamiId: nil,
+            imageUrl: nil,
+            imageUrlSmall: nil
+        )
+
+        let snapshot = PokedexProgressBuilder.build(
+            catalogEntries: [CatalogEntry(tcg: .pokemon, card: catalogCard)],
+            pokemonSetSeriesByCode: ["base1": "Base"],
+            collections: []
+        )
+
+        XCTAssertEqual(snapshot.species.count, 1025)
+        XCTAssertEqual(snapshot.species[3].printCount, 1)
+        XCTAssertEqual(snapshot.catalogEntriesByNumber[4]?.map(\.card.id), ["base1-4"])
+        XCTAssertEqual(
+            snapshot.species[3].imageURL,
+            "https://assets.tcgdex.net/en/Base/base1/4/low.webp"
+        )
+    }
+
     private func card(id: String, name: String, entries: [PokedexEntry]) -> Card {
         Card(
             id: id, name: name, tcg: "pokemon", setCode: nil, setName: nil,

@@ -683,6 +683,15 @@ def _session_records(session_dataset: Any) -> list[dict[str, Any]]:
         "outcome",
         "strategy",
         "scanner_quad.keypoints.points",
+        "capture_quality_available",
+        "capture_quality_issue",
+        "capture_quality_pass",
+        "capture_sharpness",
+        "capture_mean_luma",
+        "capture_clipped_highlight_fraction",
+        "capture_glare_fraction",
+        "capture_fill_ratio",
+        "capture_angle_deviation_degrees",
     ]
     columns = session_dataset.values(fields)
     records = []
@@ -703,6 +712,15 @@ def _session_records(session_dataset: Any) -> list[dict[str, Any]]:
                 "outcome": record["outcome"] or "unknown",
                 "strategy": record["strategy"] or "unknown",
                 "quad": points,
+                "quality_available": bool(record["capture_quality_available"]),
+                "quality_issue": record["capture_quality_issue"] or "missing",
+                "quality_pass": bool(record["capture_quality_pass"]),
+                "sharpness": record["capture_sharpness"],
+                "mean_luma": record["capture_mean_luma"],
+                "clipped": record["capture_clipped_highlight_fraction"],
+                "glare": record["capture_glare_fraction"],
+                "fill_ratio": record["capture_fill_ratio"],
+                "angle": record["capture_angle_deviation_degrees"],
             }
         )
     return records
@@ -780,6 +798,92 @@ def _attempt_outcomes_panel(records: list[dict[str, Any]]) -> tuple[Image.Image,
         draw.rectangle((570, y, 570 + width, y + 25), fill=color)
         draw.text((582 + width, y + 4), str(count), fill=CHART_MUTED, font=_font(13, True))
         output.append({"strategy": strategy, "outcome": outcome, "count": count})
+    return image, output
+
+
+def _capture_quality_outcomes_panel(
+    records: list[dict[str, Any]],
+) -> tuple[Image.Image, list[dict[str, Any]]]:
+    attempts = [
+        record
+        for record in records
+        if record["role"] == "scanner_attempt_crop" and record["quality_available"]
+    ]
+
+    def outcome_group(outcome: str) -> str:
+        if outcome in {"accepted", "identified"}:
+            return "accepted"
+        if outcome in {"printingAmbiguous", "titlePrintingUnresolved"}:
+            return "ambiguous"
+        if outcome == "belowAcceptanceThreshold":
+            return "below threshold"
+        if outcome in {"noCandidates", "unidentified", "noMatch"}:
+            return "no candidates"
+        if outcome == "rejectedInput":
+            return "rejected input"
+        return "other"
+
+    counts = Counter(
+        (record["quality_issue"], outcome_group(record["outcome"]))
+        for record in attempts
+    )
+    issue_totals = Counter(record["quality_issue"] for record in attempts)
+    issues = [name for name, _ in issue_totals.most_common(8)]
+    image, draw = _panel(
+        "Scanner outcomes by capture condition",
+        f"Recorded quality evidence on attempt crops · n={len(attempts)}; diagnostic, not accuracy",
+    )
+    colors = {
+        "accepted": CHART_OLIVE,
+        "ambiguous": CHART_GOLD,
+        "below threshold": CHART_ORANGE,
+        "no candidates": CHART_GREY,
+        "rejected input": CHART_PINK,
+        "other": CHART_BLUE,
+    }
+    left, right = 330, 1085
+    output = []
+    for index, issue in enumerate(issues):
+        y = 125 + index * 52
+        total = issue_totals[issue]
+        draw.text((38, y + 5), issue, fill=CHART_INK, font=_font(14, True))
+        cursor = left
+        groups = {}
+        for group in (
+            "accepted",
+            "ambiguous",
+            "below threshold",
+            "no candidates",
+            "rejected input",
+            "other",
+        ):
+            count = counts[(issue, group)]
+            groups[group] = count
+            width = (right - left) * count / total if total else 0
+            if width > 0:
+                draw.rectangle((cursor, y, cursor + width, y + 27), fill=colors[group])
+            cursor += width
+        draw.text((1095, y + 5), f"n={total}", fill=CHART_MUTED, font=_font(12))
+        output.append({"issue": issue, "n": total, "outcomes": groups})
+    legend_x = 330
+    for label in (
+        "accepted",
+        "ambiguous",
+        "below threshold",
+        "no candidates",
+        "rejected input",
+        "other",
+    ):
+        draw.rectangle((legend_x, 565, legend_x + 15, 580), fill=colors[label])
+        draw.text((legend_x + 21, 562), label, fill=CHART_MUTED, font=_font(12))
+        legend_x += 138
+    if not attempts:
+        draw.text(
+            (38, 180),
+            "No archived capture-quality evidence was loaded.",
+            fill=CHART_MUTED,
+            font=_font(17),
+        )
     return image, output
 
 
@@ -874,15 +978,22 @@ def render_session_dashboard(session_dataset: Any, output_dir: Path) -> tuple[Pa
     records = _session_records(session_dataset)
     timeline_panel, timeline_data = _session_timeline_panel(records)
     outcomes_panel, outcomes_data = _attempt_outcomes_panel(records)
+    quality_panel, quality_data = _capture_quality_outcomes_panel(records)
     jitter_panel, jitter_data = _quad_jitter_panel(records)
     agreement_panel, agreement_data = _frame_agreement_panel(records)
     path = _compose(
         "TCGer real-session stability dashboard",
         "Recorded scanner behaviour only; originals require human labels before performance scoring",
-        [timeline_panel, outcomes_panel, jitter_panel, agreement_panel],
+        [timeline_panel, outcomes_panel, quality_panel, jitter_panel, agreement_panel],
         output_dir / "session-stability-dashboard.png",
     )
-    return path, {"timeline": timeline_data, "attemptOutcomes": outcomes_data, "quadJitter": jitter_data, "identityAgreement": agreement_data}
+    return path, {
+        "timeline": timeline_data,
+        "attemptOutcomes": outcomes_data,
+        "captureQualityOutcomes": quality_data,
+        "quadJitter": jitter_data,
+        "identityAgreement": agreement_data,
+    }
 
 
 def write_diagnostic_dashboards(

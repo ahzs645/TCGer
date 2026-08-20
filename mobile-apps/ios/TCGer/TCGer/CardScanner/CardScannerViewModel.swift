@@ -896,8 +896,28 @@ final class CardScannerViewModel: ObservableObject {
         guard !isAnalyzingFrame else { return }
         guard !isProcessingPhoto else { return }
 
+        let liveContext: CardScannerContext?
+        if triggerMode == .automatic,
+           let context,
+           context.serverConfiguration.isOnDevice || context.authToken != nil,
+           coordinator.supportsLiveScanning(
+               for: context.mode,
+               preferredEngine: context.enginePreference
+           ) {
+            liveContext = context
+        } else {
+            liveContext = nil
+        }
+
         let now = Date()
-        if now.timeIntervalSince(lastQualityAnalysisDate) >= qualityAnalysisInterval {
+        let schedule = ScannerFrameAnalysisSchedule.decide(
+            automaticRecognitionAvailable: liveContext != nil,
+            secondsSinceQuality: now.timeIntervalSince(lastQualityAnalysisDate),
+            secondsSinceRecognition: now.timeIntervalSince(lastAnalysisDate),
+            qualityInterval: qualityAnalysisInterval,
+            recognitionInterval: analysisInterval
+        )
+        if schedule.analyzesQualityOnly {
             lastQualityAnalysisDate = now
             if let quality = await Self.analyzeLiveQuality(
                 pixelBuffer,
@@ -907,15 +927,13 @@ final class CardScannerViewModel: ObservableObject {
             }
         }
 
-        guard triggerMode == .automatic else { return }
-        guard let context else { return }
-        if !context.serverConfiguration.isOnDevice, context.authToken == nil { return }
-        guard coordinator.supportsLiveScanning(for: context.mode, preferredEngine: context.enginePreference) else { return }
-
-        guard now.timeIntervalSince(lastAnalysisDate) >= analysisInterval else { return }
+        guard schedule.runsRecognition, let context = liveContext else { return }
 
         isAnalyzingFrame = true
         lastAnalysisDate = now
+        // The full recognition path also returns capture quality, so it
+        // satisfies both clocks without a redundant quality-only pass.
+        lastQualityAnalysisDate = now
         defer { isAnalyzingFrame = false }
 
         var scanContext = context
@@ -994,7 +1012,10 @@ final class CardScannerViewModel: ObservableObject {
         case .success:
             cardPresent = true
         case .failure(.noMatch):
-            cardPresent = cardLikelyPresent(in: framedImage)
+            // Reuse the rectangle already found by capture-quality analysis.
+            // Only pay for the presence-only Vision request when that pass
+            // could not find a plausible card boundary.
+            cardPresent = captureQuality.fillRatio != nil || cardLikelyPresent(in: framedImage)
         case .failure:
             // Transient errors say nothing about the viewfinder; don't let
             // them accumulate toward idling the camera.

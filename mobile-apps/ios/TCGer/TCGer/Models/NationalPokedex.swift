@@ -1056,6 +1056,14 @@ nonisolated enum NationalPokedex {
         resolve(name: card.name, tcg: card.tcg, explicit: card.dexEntries)
     }
 
+    static func species(for entry: CatalogEntry) -> [PokedexEntry] {
+        resolve(
+            name: entry.card.name,
+            tcg: entry.tcg.rawValue,
+            explicit: entry.card.dexEntries
+        )
+    }
+
     private static func resolve(
         name: String,
         tcg: String,

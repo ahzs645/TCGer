@@ -15,6 +15,170 @@ SPEC.loader.exec_module(review)
 
 
 class ScannerReviewTests(unittest.TestCase):
+    def test_quad_remap_uses_registered_guide_crop(self):
+        quad = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
+        remapped = review.remap_quad_to_media(
+            quad,
+            (942, 2048),
+            (1536, 2048),
+            (297.0, 0.0, 942.0, 2048.0),
+        )
+        self.assertAlmostEqual(remapped[0][0], 297 / 1536)
+        self.assertAlmostEqual(remapped[1][0], 1239 / 1536)
+        self.assertEqual(remapped[0][1], 1.0)
+        self.assertEqual(remapped[2][1], 0.0)
+
+    def test_quad_remap_keeps_resized_full_frame_coordinates(self):
+        quad = [[0.1, 0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]]
+        self.assertEqual(
+            review.remap_quad_to_media(
+                quad,
+                (415, 544),
+                (1536, 2048),
+                (0.0, 0.0, 1536.0, 2048.0),
+            ),
+            quad,
+        )
+
+    def test_binder_summary_keeps_one_best_record_per_pocket(self):
+        attempts = [
+            {
+                "pocketIndex": 0,
+                "outcome": "candidateOnly",
+                "binderStatus": "uncertain",
+                "topCandidates": [{"cardID": "a", "name": "A", "similarity": 0.95}],
+                "quad": [[0, 1], [0.5, 1], [0.5, 0.5], [0, 0.5]],
+            },
+            {
+                "pocketIndex": 0,
+                "outcome": "accepted",
+                "binderStatus": "matched",
+                "binderIncludedByDefault": True,
+                "topCandidates": [{"cardID": "b", "name": "B", "similarity": 0.84}],
+                "imageIndex": 2,
+            },
+            {
+                "pocketIndex": 1,
+                "outcome": "candidateOnly",
+                "binderStatus": "uncertain",
+                "topCandidates": [{"cardID": "c", "name": "C", "similarity": 0.73}],
+            },
+        ]
+        cards = review.summarize_binder_cards(attempts)
+        self.assertEqual(len(cards), 2)
+        self.assertEqual(cards[0]["card_id"], "b")
+        self.assertEqual(cards[0]["status"], "matched")
+        self.assertEqual(cards[0]["image_index"], 2)
+        self.assertEqual(cards[1]["status"], "uncertain")
+
+    def test_fiftyone_state_uses_shared_plugin_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            old_values = {
+                key: review.os.environ.get(key)
+                for key in (
+                    "FIFTYONE_DATABASE_DIR",
+                    "FIFTYONE_DEFAULT_DATASET_DIR",
+                    "FIFTYONE_DEFAULT_APP_ADDRESS",
+                    "FIFTYONE_PLUGINS_DIR",
+                )
+            }
+            try:
+                for key in old_values:
+                    review.os.environ.pop(key, None)
+                review.configure_fiftyone_state(Path(temporary))
+                self.assertEqual(
+                    review.os.environ["FIFTYONE_PLUGINS_DIR"],
+                    str(Path.home() / "fiftyone" / "__plugins__"),
+                )
+            finally:
+                for key, value in old_values.items():
+                    if value is None:
+                        review.os.environ.pop(key, None)
+                    else:
+                        review.os.environ[key] = value
+
+    def test_capture_quality_issue_matches_ios_priority(self):
+        base = {
+            "sharpness": 0.01,
+            "meanLuma": 0.5,
+            "clippedHighlightFraction": 0,
+            "glareFraction": 0,
+            "fillRatio": 0.6,
+            "angleDeviationDegrees": 3,
+            "detectorConfidence": 0.9,
+        }
+        self.assertEqual(review.capture_quality_issue(base), "pass")
+        self.assertEqual(
+            review.capture_quality_issue({**base, "glareFraction": 0.15}),
+            "glare",
+        )
+        self.assertEqual(
+            review.capture_quality_issue({**base, "fillRatio": None}),
+            "noCard",
+        )
+        self.assertEqual(
+            review.capture_quality_issue(
+                {**base, "fillRatio": None, "angleDeviationDegrees": None},
+                includes_framing=False,
+            ),
+            "pass",
+        )
+        self.assertEqual(review.capture_quality_issue(None), "missing")
+
+    def test_shutter_verdict_keeps_unlabelled_captures_out_of_accuracy(self):
+        self.assertEqual(review.shutter_verdict("set-1", False, "set-1"), "correct")
+        self.assertEqual(review.shutter_verdict("set-1", False, "set-2"), "wrong")
+        self.assertEqual(review.shutter_verdict("set-1", False, None), "missed")
+        self.assertEqual(review.shutter_verdict(None, True, None), "correct_decline")
+        self.assertEqual(review.shutter_verdict(None, True, "set-2"), "false_positive")
+        self.assertEqual(review.shutter_verdict(None, None, "set-2"), "unscored")
+
+    def test_latency_summary_uses_recorded_end_to_end_time(self):
+        values = [100, 200, 300, 400, 500]
+        self.assertEqual(review.percentile(values, 0.5), 300)
+        self.assertEqual(review.percentile(values, 0.9), 500)
+        self.assertIsNone(review.percentile([], 0.5))
+        self.assertEqual(review.latency_bucket(249), "under_250ms")
+        self.assertEqual(review.latency_bucket(250), "250_499ms")
+        self.assertEqual(review.latency_bucket(1_500), "1_2s")
+        self.assertEqual(review.latency_bucket(None), "unavailable")
+
+    def test_assisted_shutter_suggestion_separates_hints_from_truth(self):
+        accepted = review.assisted_shutter_suggestion(
+            {
+                "identified_card_id": "sv4-1",
+                "identified_card_name": "Pikachu",
+                "identified_confidence": 0.91,
+                "candidates_json": "[]",
+                "title_ocr_names_json": '["Pikachu"]',
+                "ocr_verified_numbers_json": "[]",
+            }
+        )
+        self.assertEqual(accepted["category"], "pokemon_card")
+        self.assertEqual(accepted["strength"], "exact_printing")
+        self.assertEqual(accepted["source"], "accepted_visual_plus_ocr")
+
+        retrieval_only = review.assisted_shutter_suggestion(
+            {
+                "candidates_json": '[{"cardID":"sv4-1","name":"Pikachu","similarity":0.8}]',
+                "title_ocr_names_json": "[]",
+                "ocr_verified_numbers_json": "[]",
+                "capture_quality_issue": "pass",
+            }
+        )
+        self.assertEqual(retrieval_only["category"], "needs_content_confirmation")
+        self.assertEqual(retrieval_only["strength"], "candidate_hint_only")
+
+        no_card = review.assisted_shutter_suggestion(
+            {
+                "candidates_json": "[]",
+                "title_ocr_names_json": "[]",
+                "ocr_verified_numbers_json": "[]",
+                "capture_quality_issue": "noCard",
+            }
+        )
+        self.assertEqual(no_card["category"], "no_card")
+
     def test_label_key_strips_roboflow_hash(self):
         self.assertEqual(
             review.label_key_for_path("datasets/test/Card_jpg.rf.abc123.jpg"),

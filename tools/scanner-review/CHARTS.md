@@ -29,7 +29,7 @@ runs provide mask IoU, corner error, and rectification-validity measurements.
 | Geometry | Are masks, boundaries, corners, and rectifications accurate? | reference coverage bars, perspective histogram, IoU/corner ECDFs, failure composition | Reference panels render now; prediction panels show an explicit availability state until `import-geometry` supplies results |
 | Robustness | Which data sources and perspective conditions cause failures? | source-metric heatmap, provenance interval bars, perspective-tercile bars, condition coverage | Uses the best-F1 run and retains per-cell n; blur/glare/occlusion remain unavailable until tagged |
 | OCR/reference | Does OCR add name or exact-print evidence? | separate-cohort benchmark bars and instrumentation coverage panels | Existing Sinnoh video summary stays separate; an evidence curve is omitted until per-sample OCR text/token counts are logged |
-| Session stability | Are repeated attempts stable within real device sessions? | frame-confidence timeline, attempt outcome bars, quad-jitter distribution, within-frame agreement ranking | Diagnostic only because real-session originals are not yet human-labelled |
+| Session stability | Are repeated attempts stable within real device sessions, and which recorded capture conditions coincide with abstentions? | frame-confidence timeline, attempt outcome bars, capture-condition outcome composition, quad-jitter distribution, within-frame agreement ranking | Capture evidence is currently available for 92 recent attempt crops; diagnostic only because real-session originals are not yet human-labelled |
 
 These dashboards use the existing 1200×620 panel footprint and are combined as
 two-column PNGs for FiftyOne's `ImageView`. Lines use direct labels or distinct

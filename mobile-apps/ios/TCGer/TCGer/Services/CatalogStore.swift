@@ -356,6 +356,7 @@ final class CatalogStore: ObservableObject {
 
     nonisolated private struct LoadedCatalogPack: Sendable {
         let pack: CatalogPack
+        let setsByCode: [String: CatalogSetEntry]
         let setSearchMetadata: [String: SetSearchMetadata]
         let cardSearchMetadata: [CardSearchMetadata]
         let nameTrigramPostings: [String: [Int]]
@@ -365,6 +366,10 @@ final class CatalogStore: ObservableObject {
 
         init(pack: CatalogPack) {
             self.pack = pack
+            setsByCode = Dictionary(
+                pack.sets.map { ($0.code, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
             let setMetadata = Dictionary(
                 pack.sets.map { set in
                     let searchableName = set.serie?.lowercased() == "tcgp"
@@ -1076,7 +1081,16 @@ final class CatalogStore: ObservableObject {
             return []
         }
         return pack.cards.compactMap { card in
-            guard SearchTextNormalizer.key(card.type ?? "") == "pokemon" else { return nil }
+            let isPokemon: Bool
+            switch card.type {
+            case "Pokemon", "Pokémon":
+                isPokemon = true
+            case let type?:
+                isPokemon = SearchTextNormalizer.key(type) == "pokemon"
+            case nil:
+                isPokemon = false
+            }
+            guard isPokemon else { return nil }
             return CatalogEntry(tcg: .pokemon, card: card)
         }
     }
@@ -1143,7 +1157,7 @@ final class CatalogStore: ObservableObject {
         case .pokemon:
             guard let setCode = entry.card.setCode,
                   let collectorNumber = entry.card.collectorNumber,
-                  let serie = loadedPacks[.pokemon]?.sets.first(where: { $0.code == setCode })?.serie else {
+                  let serie = loadedPacks[.pokemon]?.setsByCode[setCode]?.serie else {
                 return nil
             }
             let size = thumbnail ? "low" : "high"
@@ -1166,7 +1180,7 @@ final class CatalogStore: ObservableObject {
 
     func set(for entry: CatalogEntry) -> CatalogSetEntry? {
         guard let setCode = entry.card.setCode else { return nil }
-        return loadedPacks[entry.tcg]?.sets.first(where: { $0.code == setCode })
+        return loadedPacks[entry.tcg]?.setsByCode[setCode]
     }
 
     /// A display/search form such as `3/11`, derived without changing the

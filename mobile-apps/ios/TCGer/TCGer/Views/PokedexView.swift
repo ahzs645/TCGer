@@ -8,13 +8,17 @@ private enum PokedexOwnershipFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private struct PokedexSpeciesRoute: Hashable {
+    let number: Int
+}
+
 struct PokedexView: View {
     let parentProvidesNavigation: Bool
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @StateObject private var catalogStore = CatalogStore.shared
     @State private var species: [PokedexSpeciesProgress] = []
-    @State private var catalogCards: [Card] = []
+    @State private var catalogEntriesBySpecies: [Int: [CatalogEntry]] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var searchText = ""
@@ -80,12 +84,7 @@ struct PokedexView: View {
                         generationPicker
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredSpecies) { item in
-                                NavigationLink {
-                                    PokedexSpeciesDetailView(
-                                        species: item,
-                                        cards: cards(for: item)
-                                    )
-                                } label: {
+                                NavigationLink(value: PokedexSpeciesRoute(number: item.id)) {
                                     PokedexSpeciesTile(species: item)
                                 }
                                 .buttonStyle(.plain)
@@ -103,6 +102,14 @@ struct PokedexView: View {
             }
         }
         .navigationTitle("Pokédex")
+        .navigationDestination(for: PokedexSpeciesRoute.self) { route in
+            if let selectedSpecies = species.first(where: { $0.id == route.number }) {
+                PokedexSpeciesDetailView(
+                    species: selectedSpecies,
+                    cards: cards(for: selectedSpecies)
+                )
+            }
+        }
         .searchable(text: $searchText, prompt: "Name or Pokédex number")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -160,9 +167,7 @@ struct PokedexView: View {
     }
 
     private func cards(for species: PokedexSpeciesProgress) -> [Card] {
-        catalogCards.filter { card in
-            NationalPokedex.species(for: card).contains(where: { $0.number == species.id })
-        }
+        (catalogEntriesBySpecies[species.id] ?? []).map(catalogStore.card(from:))
     }
 
     @MainActor
@@ -171,9 +176,14 @@ struct PokedexView: View {
         errorMessage = nil
         await catalogStore.loadIfNeeded(.pokemon)
         let entries = catalogStore.pokedexCards()
-        let cards = entries.map(catalogStore.card(from:))
+        let setSeriesByCode = Dictionary(
+            catalogStore.sets(tcg: .pokemon).compactMap { set in
+                set.serie.map { (set.code, $0) }
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
 
-        guard !cards.isEmpty else {
+        guard !entries.isEmpty else {
             errorMessage = "Install and enable the Pokémon card catalog in Settings to track species completion."
             isLoading = false
             return
@@ -185,12 +195,26 @@ struct PokedexView: View {
                 token: environmentStore.authToken,
                 useCache: useCache
             )
-            catalogCards = cards
-            species = PokedexProgressBuilder.build(catalogCards: cards, collections: collections)
+            let snapshot = await Task.detached(priority: .userInitiated) {
+                PokedexProgressBuilder.build(
+                    catalogEntries: entries,
+                    pokemonSetSeriesByCode: setSeriesByCode,
+                    collections: collections
+                )
+            }.value
+            catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
+            species = snapshot.species
         } catch {
             if species.isEmpty {
-                catalogCards = cards
-                species = PokedexProgressBuilder.build(catalogCards: cards, collections: [])
+                let snapshot = await Task.detached(priority: .userInitiated) {
+                    PokedexProgressBuilder.build(
+                        catalogEntries: entries,
+                        pokemonSetSeriesByCode: setSeriesByCode,
+                        collections: []
+                    )
+                }.value
+                catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
+                species = snapshot.species
             }
             errorMessage = "Couldn’t refresh collection ownership. Your previous Pokédex progress is still shown."
         }

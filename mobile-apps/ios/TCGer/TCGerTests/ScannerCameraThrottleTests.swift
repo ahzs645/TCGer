@@ -2,6 +2,58 @@ import XCTest
 @testable import TCGer
 
 final class ScannerCameraThrottleTests: XCTestCase {
+    func testRecognitionDueReplacesQualityOnlyAnalysis() {
+        let schedule = ScannerFrameAnalysisSchedule.decide(
+            automaticRecognitionAvailable: true,
+            secondsSinceQuality: 0.5,
+            secondsSinceRecognition: 1.0,
+            qualityInterval: 0.45,
+            recognitionInterval: 1.0
+        )
+
+        XCTAssertTrue(schedule.runsRecognition)
+        XCTAssertFalse(schedule.analyzesQualityOnly)
+    }
+
+    func testQualityRefreshRunsBetweenRecognitionPasses() {
+        let schedule = ScannerFrameAnalysisSchedule.decide(
+            automaticRecognitionAvailable: true,
+            secondsSinceQuality: 0.5,
+            secondsSinceRecognition: 0.6,
+            qualityInterval: 0.45,
+            recognitionInterval: 1.0
+        )
+
+        XCTAssertFalse(schedule.runsRecognition)
+        XCTAssertTrue(schedule.analyzesQualityOnly)
+    }
+
+    func testManualModeStillRefreshesCaptureQuality() {
+        let schedule = ScannerFrameAnalysisSchedule.decide(
+            automaticRecognitionAvailable: false,
+            secondsSinceQuality: 0.5,
+            secondsSinceRecognition: 10,
+            qualityInterval: 0.45,
+            recognitionInterval: 1.0
+        )
+
+        XCTAssertFalse(schedule.runsRecognition)
+        XCTAssertTrue(schedule.analyzesQualityOnly)
+    }
+
+    func testFrameDoesNoWorkBeforeEitherIntervalIsDue() {
+        let schedule = ScannerFrameAnalysisSchedule.decide(
+            automaticRecognitionAvailable: true,
+            secondsSinceQuality: 0.2,
+            secondsSinceRecognition: 0.2,
+            qualityInterval: 0.45,
+            recognitionInterval: 1.0
+        )
+
+        XCTAssertFalse(schedule.runsRecognition)
+        XCTAssertFalse(schedule.analyzesQualityOnly)
+    }
+
     func testIdlesAfterEmptyAnalysisStreakAndWakesOnCard() {
         var throttle = ScannerCameraThrottle()
         for _ in 0..<(ScannerCameraThrottle.emptyAnalysesBeforeIdle - 1) {

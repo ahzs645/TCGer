@@ -1,5 +1,32 @@
 import Foundation
 
+/// Chooses the work performed for one delivered preview frame.
+///
+/// A recognition pass already computes and returns capture quality. Keeping
+/// this decision explicit prevents the periodic guide-quality refresh from
+/// immediately decoding, cropping, and running Vision on the same frame a
+/// second time just before recognition.
+struct ScannerFrameAnalysisSchedule: Equatable {
+    let analyzesQualityOnly: Bool
+    let runsRecognition: Bool
+
+    static func decide(
+        automaticRecognitionAvailable: Bool,
+        secondsSinceQuality: TimeInterval,
+        secondsSinceRecognition: TimeInterval,
+        qualityInterval: TimeInterval,
+        recognitionInterval: TimeInterval
+    ) -> ScannerFrameAnalysisSchedule {
+        let recognitionDue = automaticRecognitionAvailable
+            && secondsSinceRecognition >= recognitionInterval
+        let qualityDue = secondsSinceQuality >= qualityInterval
+        return ScannerFrameAnalysisSchedule(
+            analyzesQualityOnly: qualityDue && !recognitionDue,
+            runsRecognition: recognitionDue
+        )
+    }
+}
+
 /// Decides when the capture device should drop to its low idle frame rate.
 ///
 /// Pure policy, no camera dependency: the view model feeds it delivered-frame

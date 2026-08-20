@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import numpy as np
+import cv2
+from PIL import Image
 
 from diagnostics import write_diagnostic_dashboards
 from geometry import (
@@ -51,6 +54,7 @@ DEFAULT_STATE_DIR = TOOL_DIR / ".fiftyone"
 DEFAULT_DATASET_NAME = "tcger-scanner-ios-replay"
 DEFAULT_PREVIEW_DATASET_NAME = "tcger-scanner-rectification-previews"
 DEFAULT_SESSION_DATASET_NAME = "tcger-scanner-real-sessions"
+DEFAULT_SHUTTER_DATASET_NAME = "tcger-scanner-shutter-benchmark"
 DEFAULT_REFERENCE_ROOT = (
     Path.home()
     / "Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference"
@@ -64,6 +68,8 @@ VALID_LABEL_CATEGORIES = {
     "multiCard",
     "foreignLanguage",
     "outsideIndex",
+    "nonPokemon",
+    "noCard",
     "needsLabel",
     "unlabeled",
 }
@@ -279,6 +285,12 @@ def configure_fiftyone_state(state_dir: Path) -> None:
     os.environ.setdefault("FIFTYONE_DATABASE_DIR", str(state_dir / "db"))
     os.environ.setdefault("FIFTYONE_DEFAULT_DATASET_DIR", str(state_dir / "datasets"))
     os.environ.setdefault("FIFTYONE_DEFAULT_APP_ADDRESS", "localhost")
+    # Keep datasets isolated while sharing the user's installed FiftyOne plugins.
+    # Without this override, FiftyOne derives a second empty plugin directory
+    # beneath DEFAULT_DATASET_DIR and the App cannot see the TCGer operators.
+    os.environ.setdefault(
+        "FIFTYONE_PLUGINS_DIR", str(Path.home() / "fiftyone" / "__plugins__")
+    )
 
 
 def import_fiftyone():
@@ -966,14 +978,78 @@ def build_preview_dataset(
     return previews, summary_path
 
 
-def _vision_quad(fo: Any, quad: Any) -> Any:
+def remap_quad_to_media(
+    quad: Any,
+    scanner_size: tuple[int, int] | None,
+    media_size: tuple[int, int] | None,
+    crop_rect: tuple[float, float, float, float] | None = None,
+) -> Any:
+    """Remaps scanner-input Vision coordinates into the displayed original."""
     if not isinstance(quad, list) or len(quad) != 4:
-        return fo.Keypoints(keypoints=[])
+        return quad
+    if not scanner_size or not media_size or scanner_size == media_size:
+        return quad
+    scanner_width, scanner_height = scanner_size
+    media_width, media_height = media_size
+    if min(scanner_width, scanner_height, media_width, media_height) <= 0:
+        return quad
+
+    if crop_rect is not None:
+        crop_x, crop_y, crop_width, crop_height = crop_rect
+        if crop_width <= 0 or crop_height <= 0:
+            return quad
+        remapped = []
+        for point in quad:
+            if not isinstance(point, list) or len(point) < 2:
+                return quad
+            x = (float(point[0]) * crop_width + crop_x) / media_width
+            y = (float(point[1]) * crop_height + crop_y) / media_height
+            remapped.append([min(1.0, max(0.0, x)), min(1.0, max(0.0, y))])
+        return remapped
+
+    scanner_aspect = scanner_width / scanner_height
+    media_aspect = media_width / media_height
+    # Older evidence sometimes stores a resized full frame rather than a
+    # pixel-aligned guide crop. Normalized coordinates already match there.
+    if abs(scanner_aspect / media_aspect - 1.0) <= 0.03:
+        return quad
+    if scanner_width > media_width or scanner_height > media_height:
+        return quad
+
+    offset_x = (media_width - scanner_width) / 2.0
+    offset_y = (media_height - scanner_height) / 2.0
+    remapped = []
+    for point in quad:
+        if not isinstance(point, list) or len(point) < 2:
+            return quad
+        x = (float(point[0]) * scanner_width + offset_x) / media_width
+        y = (float(point[1]) * scanner_height + offset_y) / media_height
+        remapped.append([min(1.0, max(0.0, x)), min(1.0, max(0.0, y))])
+    return remapped
+
+
+def _top_left_quad_points(quad: Any) -> list[list[float]]:
+    if not isinstance(quad, list) or len(quad) != 4:
+        return []
     points = [
         [float(point[0]), 1.0 - float(point[1])]
         for point in quad
         if isinstance(point, list) and len(point) >= 2
     ]
+    return points if len(points) == 4 else []
+
+
+def _vision_quad(
+    fo: Any,
+    quad: Any,
+    scanner_size: tuple[int, int] | None = None,
+    media_size: tuple[int, int] | None = None,
+    crop_rect: tuple[float, float, float, float] | None = None,
+) -> Any:
+    if not isinstance(quad, list) or len(quad) != 4:
+        return fo.Keypoints(keypoints=[])
+    remapped = remap_quad_to_media(quad, scanner_size, media_size, crop_rect)
+    points = _top_left_quad_points(remapped)
     if len(points) != 4:
         return fo.Keypoints(keypoints=[])
     return fo.Keypoints(
@@ -981,10 +1057,823 @@ def _vision_quad(fo: Any, quad: Any) -> Any:
             fo.Keypoint(
                 label="scanner_quad",
                 points=points,
-                coordinate_source="Vision normalized, converted to top-left origin",
+                coordinate_source=(
+                    "Vision normalized scanner input, remapped to displayed original"
+                    if scanner_size and media_size and scanner_size != media_size
+                    else "Vision normalized, converted to top-left origin"
+                ),
             )
         ]
     )
+
+
+def summarize_binder_cards(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Returns one representative recognition record per detected pocket."""
+    by_pocket: dict[int, list[dict[str, Any]]] = {}
+    for attempt in attempts:
+        pocket = attempt.get("pocketIndex")
+        if isinstance(pocket, int):
+            by_pocket.setdefault(pocket, []).append(attempt)
+
+    summaries = []
+    for pocket, pocket_attempts in sorted(by_pocket.items()):
+        def rank(attempt: dict[str, Any]) -> tuple[int, float]:
+            candidates = [
+                item for item in (attempt.get("topCandidates") or []) if isinstance(item, dict)
+            ]
+            similarity = float(candidates[0].get("similarity") or 0) if candidates else 0.0
+            priority = 3 if attempt.get("outcome") == "accepted" else (2 if candidates else 1)
+            return priority, similarity
+
+        representative = max(pocket_attempts, key=rank)
+        candidates = [
+            item for item in (representative.get("topCandidates") or []) if isinstance(item, dict)
+        ]
+        top = candidates[0] if candidates else {}
+        status_source = representative if representative.get("binderStatus") else next(
+            (item for item in pocket_attempts if item.get("binderStatus")), representative
+        )
+        quad = next((item.get("quad") for item in pocket_attempts if item.get("quad")), None)
+        summaries.append(
+            {
+                "pocket_index": pocket,
+                "status": str(status_source.get("binderStatus") or "unmatched"),
+                "included_by_default": bool(status_source.get("binderIncludedByDefault")),
+                "policy_reason": str(status_source.get("binderPolicyReason") or ""),
+                "outcome": str(representative.get("outcome") or "unknown"),
+                "image_index": representative.get("imageIndex"),
+                "quad": quad,
+                "card_id": str(top.get("cardID") or ""),
+                "card_name": str(top.get("name") or ""),
+                "confidence": float(top["similarity"]) if top.get("similarity") is not None else None,
+                "candidates": candidates[:10],
+            }
+        )
+    return summaries
+
+
+def _binder_regions(
+    fo: Any,
+    cards: list[dict[str, Any]],
+    scanner_size: tuple[int, int] | None,
+    media_size: tuple[int, int] | None,
+    crop_rect: tuple[float, float, float, float] | None = None,
+) -> Any:
+    polylines = []
+    for card in cards:
+        remapped = remap_quad_to_media(
+            card.get("quad"), scanner_size, media_size, crop_rect
+        )
+        points = _top_left_quad_points(remapped)
+        if len(points) != 4:
+            continue
+        pocket_number = int(card["pocket_index"]) + 1
+        name = card.get("card_name") or card.get("status") or "unmatched"
+        polylines.append(
+            fo.Polyline(
+                label=f"P{pocket_number} · {name}",
+                points=[points],
+                closed=True,
+                filled=True,
+                confidence=card.get("confidence"),
+                pocket_index=int(card["pocket_index"]),
+                card_id=card.get("card_id") or "",
+                card_name=card.get("card_name") or "",
+                binder_status=card.get("status") or "unmatched",
+                included_by_default=bool(card.get("included_by_default")),
+                policy_reason=card.get("policy_reason") or "",
+            )
+        )
+    return fo.Polylines(polylines=polylines)
+
+
+def _image_size(path: Path) -> tuple[int, int] | None:
+    try:
+        with Image.open(path) as image:
+            return int(image.width), int(image.height)
+    except (OSError, ValueError):
+        return None
+
+
+def locate_scanner_crop(
+    scanner_path: Path,
+    media_path: Path,
+) -> dict[str, Any]:
+    """Locates the archived guide crop inside its full-resolution photo."""
+    scanner_size = _image_size(scanner_path)
+    media_size = _image_size(media_path)
+    if not scanner_size or not media_size:
+        return {"mode": "unavailable", "rect": None, "confidence": None}
+    scanner_width, scanner_height = scanner_size
+    media_width, media_height = media_size
+    scanner_aspect = scanner_width / scanner_height
+    media_aspect = media_width / media_height
+    if abs(scanner_aspect / media_aspect - 1.0) <= 0.03:
+        return {
+            "mode": "normalized_full_frame",
+            "rect": (0.0, 0.0, float(media_width), float(media_height)),
+            "confidence": None,
+        }
+    if scanner_width <= media_width and scanner_height <= media_height:
+        scanner = cv2.imread(str(scanner_path), cv2.IMREAD_GRAYSCALE)
+        media = cv2.imread(str(media_path), cv2.IMREAD_GRAYSCALE)
+        if scanner is not None and media is not None:
+            result = cv2.matchTemplate(media, scanner, cv2.TM_CCOEFF_NORMED)
+            _, confidence, _, location = cv2.minMaxLoc(result)
+            if confidence >= 0.75:
+                return {
+                    "mode": "registered_guide_crop",
+                    "rect": (
+                        float(location[0]),
+                        float(location[1]),
+                        float(scanner_width),
+                        float(scanner_height),
+                    ),
+                    "confidence": float(confidence),
+                }
+    return {
+        "mode": "centered_crop_fallback",
+        "rect": (
+            max(0.0, (media_width - scanner_width) / 2.0),
+            max(0.0, (media_height - scanner_height) / 2.0),
+            float(min(scanner_width, media_width)),
+            float(min(scanner_height, media_height)),
+        ),
+        "confidence": None,
+    }
+
+
+def capture_quality_issue(quality: Any, *, includes_framing: bool = True) -> str:
+    """Mirror ScannerCaptureQualityReport.primaryIssue for archived evidence."""
+    if not isinstance(quality, dict):
+        return "missing"
+    fill = quality.get("fillRatio")
+    if includes_framing:
+        if fill is None:
+            return "noCard"
+        if float(fill) < 0.30:
+            return "tooFar"
+        if float(fill) > 0.98:
+            return "tooClose"
+    luma = float(quality.get("meanLuma") or 0)
+    clipped = float(quality.get("clippedHighlightFraction") or 0)
+    glare = float(quality.get("glareFraction") or 0)
+    angle = quality.get("angleDeviationDegrees")
+    sharpness = float(quality.get("sharpness") or 0)
+    if luma < 0.18:
+        return "tooDark"
+    if luma > 0.90 or clipped > 0.08:
+        return "tooBright"
+    if glare > 0.08:
+        return "glare"
+    if includes_framing and (angle is None or float(angle) > 12.0):
+        return "angle"
+    if sharpness < 0.001:
+        return "blur"
+    return "pass"
+
+
+def percentile(values: Iterable[float], quantile: float) -> float | None:
+    """Nearest-rank percentile used by the App-facing latency summary."""
+    ordered = sorted(float(value) for value in values)
+    if not ordered:
+        return None
+    index = min(len(ordered) - 1, max(0, int(len(ordered) * quantile)))
+    return ordered[index]
+
+
+def shutter_verdict(
+    expected_card_id: str | None,
+    expected_no_match: bool | None,
+    identified_card_id: str | None,
+) -> str:
+    """Scores an intentional photo capture without treating unlabeled data as wrong."""
+    predicted = identified_card_id or None
+    if expected_no_match is True:
+        return "correct_decline" if predicted is None else "false_positive"
+    if expected_card_id:
+        if predicted is None:
+            return "missed"
+        return "correct" if predicted == expected_card_id else "wrong"
+    return "unscored"
+
+
+def latency_bucket(elapsed_ms: float | None) -> str:
+    if elapsed_ms is None or elapsed_ms <= 0:
+        return "unavailable"
+    if elapsed_ms < 250:
+        return "under_250ms"
+    if elapsed_ms < 500:
+        return "250_499ms"
+    if elapsed_ms < 1_000:
+        return "500_999ms"
+    if elapsed_ms < 2_000:
+        return "1_2s"
+    return "2s_plus"
+
+
+def assisted_shutter_suggestion(record: dict[str, Any]) -> dict[str, Any]:
+    """Builds a conservative suggestion without presenting model output as truth."""
+    try:
+        candidates = json.loads(record.get("candidates_json") or "[]")
+    except (TypeError, ValueError):
+        candidates = []
+    if not isinstance(candidates, list):
+        candidates = []
+    candidates = [candidate for candidate in candidates if isinstance(candidate, dict)]
+
+    try:
+        title_names = json.loads(record.get("title_ocr_names_json") or "[]")
+    except (TypeError, ValueError):
+        title_names = []
+    if not isinstance(title_names, list):
+        title_names = []
+    title_names = [str(name) for name in title_names if name]
+
+    try:
+        verified_numbers = json.loads(record.get("ocr_verified_numbers_json") or "[]")
+    except (TypeError, ValueError):
+        verified_numbers = []
+    if not isinstance(verified_numbers, list):
+        verified_numbers = []
+
+    identified_id = str(record.get("identified_card_id") or "")
+    identified_name = str(record.get("identified_card_name") or "")
+    confidence = record.get("identified_confidence")
+    if identified_id:
+        evidence = "accepted_visual_plus_ocr" if (verified_numbers or title_names) else "accepted_visual"
+        return {
+            "category": "pokemon_card",
+            "printing_id": identified_id,
+            "card_name": identified_name or (title_names[0] if title_names else ""),
+            "confidence": confidence,
+            "strength": "exact_printing",
+            "source": evidence,
+            "explanation": (
+                "Scanner accepted an exact printing; OCR also supplied supporting evidence."
+                if evidence == "accepted_visual_plus_ocr"
+                else "Scanner accepted an exact printing. Confirm it against the original and rectified card."
+            ),
+        }
+
+    top_candidate = candidates[0] if candidates else {}
+    if title_names:
+        matching = [
+            candidate
+            for candidate in candidates
+            if normalize_card_name(str(candidate.get("name") or ""))
+            == normalize_card_name(title_names[0])
+        ]
+        unique_ids = {str(candidate.get("cardID") or "") for candidate in matching}
+        unique_ids.discard("")
+        exact_id = next(iter(unique_ids)) if len(unique_ids) == 1 else ""
+        return {
+            "category": "pokemon_card",
+            "printing_id": exact_id,
+            "card_name": title_names[0],
+            "confidence": None,
+            "strength": "exact_printing" if exact_id else "pokemon_name_only",
+            "source": "title_ocr",
+            "explanation": (
+                "OCR found a Pokémon name and only one matching candidate printing."
+                if exact_id
+                else "OCR found a likely Pokémon name, but the exact printing still needs confirmation."
+            ),
+        }
+
+    if not candidates and record.get("capture_quality_issue") == "noCard":
+        return {
+            "category": "no_card",
+            "printing_id": "",
+            "card_name": "",
+            "confidence": None,
+            "strength": "negative_hint",
+            "source": "capture_quality_no_card",
+            "explanation": "No card was detected and there was no candidate or OCR evidence. Confirm visually.",
+        }
+
+    if top_candidate:
+        return {
+            "category": "needs_content_confirmation",
+            "printing_id": str(top_candidate.get("cardID") or ""),
+            "card_name": str(top_candidate.get("name") or ""),
+            "confidence": top_candidate.get("similarity"),
+            "strength": "candidate_hint_only",
+            "source": "retrieval_candidate_only",
+            "explanation": (
+                "The scanner retrieved a candidate but did not accept it. First confirm that this is a Pokémon card."
+            ),
+        }
+
+    return {
+        "category": "needs_content_confirmation",
+        "printing_id": "",
+        "card_name": "",
+        "confidence": None,
+        "strength": "none",
+        "source": "no_reliable_evidence",
+        "explanation": "No reliable automated suggestion is available; label the visible content manually.",
+    }
+
+
+def apply_assisted_shutter_suggestions(dataset: Any) -> dict[str, int]:
+    """Adds editable pre-labels while preserving human truth as a separate layer."""
+    rows = zip(
+        dataset.values("identified_card_id"),
+        dataset.values("identified_card_name"),
+        dataset.values("identified_confidence"),
+        dataset.values("candidates_json"),
+        dataset.values("title_ocr_names_json"),
+        dataset.values("ocr_verified_numbers_json"),
+        dataset.values("capture_quality_issue"),
+        dataset.values("capture_mode"),
+    )
+    suggestions = [
+        (
+            {
+                "category": "binder_page",
+                "printing_id": "",
+                "card_name": "",
+                "confidence": None,
+                "strength": "binder_multi_card",
+                "source": "per_pocket_scanner_evidence",
+                "explanation": "Review each detected binder pocket separately; no page-level card identity is assigned.",
+            }
+            if capture_mode == "binder_page"
+            else assisted_shutter_suggestion(
+                {
+                    "identified_card_id": identified_id,
+                    "identified_card_name": identified_name,
+                    "identified_confidence": confidence,
+                    "candidates_json": candidates,
+                    "title_ocr_names_json": title_names,
+                    "ocr_verified_numbers_json": verified_numbers,
+                    "capture_quality_issue": quality_issue,
+                }
+            )
+        )
+        for (
+            identified_id,
+            identified_name,
+            confidence,
+            candidates,
+            title_names,
+            verified_numbers,
+            quality_issue,
+            capture_mode,
+        ) in rows
+    ]
+    field_map = {
+        "assisted_category": "category",
+        "assisted_printing_id": "printing_id",
+        "assisted_card_name": "card_name",
+        "assisted_confidence": "confidence",
+        "assisted_strength": "strength",
+        "assisted_source": "source",
+        "assisted_explanation": "explanation",
+    }
+    for dataset_field, suggestion_key in field_map.items():
+        dataset.set_values(dataset_field, [item[suggestion_key] for item in suggestions])
+    truth_available = [bool(value) for value in dataset.values("human_truth_available")]
+    expected_ids = [str(value or "") for value in dataset.values("expected_card_id")]
+    expected_no_match = [bool(value) for value in dataset.values("expected_no_match")]
+    assisted_statuses = []
+    for suggestion, has_truth, expected_id, expects_decline in zip(
+        suggestions, truth_available, expected_ids, expected_no_match
+    ):
+        if not has_truth:
+            assisted_statuses.append("suggested")
+            continue
+        matches = (
+            bool(expected_id) and suggestion["printing_id"] == expected_id
+        ) or (
+            expects_decline and suggestion["category"] == "no_card"
+        )
+        assisted_statuses.append("confirmed" if matches else "adjusted")
+    dataset.set_values(
+        "assisted_review_status",
+        assisted_statuses,
+    )
+    dataset.set_values(
+        "assisted_requires_confirmation", [not value for value in truth_available]
+    )
+
+    fo = import_fiftyone()
+    field = fo.ViewField
+    assisted_views = {
+        "12 · Assisted — exact printing suggestions": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+            & (field("assisted_strength") == "exact_printing")
+        ),
+        "13 · Assisted — Pokémon name only": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+            & (field("assisted_strength") == "pokemon_name_only")
+        ),
+        "14 · Assisted — candidate hint, confirm content": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+            & (field("assisted_strength") == "candidate_hint_only")
+        ),
+        "15 · Assisted — likely no card": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+            & (field("assisted_category") == "no_card")
+        ),
+        "16 · Assisted — no reliable suggestion": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+            & (field("assisted_strength") == "none")
+        ),
+    }
+    for name, view in assisted_views.items():
+        dataset.save_view(name, view, overwrite=True)
+
+    counts: dict[str, int] = {}
+    for suggestion in suggestions:
+        strength = str(suggestion["strength"])
+        counts[strength] = counts.get(strength, 0) + 1
+    info = dict(dataset.info or {})
+    info["assistedSuggestionPolicy"] = (
+        "TCGer consensus v1: accepted scanner decisions and OCR may prefill labels; "
+        "retrieval-only results require content confirmation; suggestions never become truth automatically."
+    )
+    info["assistedSuggestionCounts"] = counts
+    dataset.info = info
+    dataset.save()
+    return counts
+
+
+def build_shutter_dataset(
+    reference_root: Path,
+    dataset_name: str,
+    rebuild: bool,
+) -> Any:
+    """Builds one benchmark row per intentional photo capture.
+
+    Full-resolution originals are the primary media. The guide crop and the
+    accepted perspective-normalized attempt remain linked fields so a reviewer
+    can inspect what the scanner actually used without counting derived crops
+    as independent benchmark examples.
+    """
+    fo = import_fiftyone()
+    sessions_root = reference_root / "TCGer-Session-Reference" / "sessions"
+    if not sessions_root.is_dir():
+        raise SystemExit(f"Session archive not found: {sessions_root}")
+    if fo.dataset_exists(dataset_name) and rebuild:
+        fo.delete_dataset(dataset_name)
+    if fo.dataset_exists(dataset_name):
+        dataset = fo.load_dataset(dataset_name)
+        apply_assisted_shutter_suggestions(dataset)
+        return dataset
+
+    dataset = fo.Dataset(dataset_name)
+    samples = []
+    latency_values: list[float] = []
+    full_resolution_count = 0
+    truth_count = 0
+    rectified_count = 0
+    for session_dir in sorted(path for path in sessions_root.iterdir() if path.is_dir()):
+        results_path = session_dir / "results.json"
+        evidence_path = session_dir / "evidence.json"
+        if not results_path.is_file() or not evidence_path.is_file():
+            continue
+        results = read_json(results_path)
+        evidence = read_json(evidence_path)
+        frames = results.get("frames") if isinstance(results, dict) else None
+        if not isinstance(frames, list) or not isinstance(evidence, list):
+            continue
+        frames_by_image = {
+            frame.get("imageFile"): frame
+            for frame in frames
+            if isinstance(frame, dict) and frame.get("imageFile")
+        }
+        for item in evidence:
+            if not isinstance(item, dict) or item.get("source") != "photoCapture":
+                continue
+            image_file = str(item.get("imageFile") or "")
+            frame = frames_by_image.get(image_file) or {}
+            scanner_input_path = session_dir / image_file
+            original_name = str(item.get("originalImageFile") or "")
+            original_path = session_dir / original_name if original_name else None
+            has_original = bool(original_path and original_path.is_file())
+            media_path = original_path if has_original else scanner_input_path
+            if not media_path.is_file():
+                continue
+
+            attempts = [attempt for attempt in (item.get("attempts") or []) if isinstance(attempt, dict)]
+            attempt_files = [str(name) for name in (item.get("attemptImageFiles") or [])]
+            capture_mode = "binder_page" if any(
+                attempt.get("pocketIndex") is not None for attempt in attempts
+            ) else "single_card"
+            scanner_size = _image_size(scanner_input_path) if scanner_input_path.is_file() else None
+            media_size = _image_size(media_path)
+            crop_mapping = (
+                locate_scanner_crop(scanner_input_path, media_path)
+                if scanner_input_path.is_file()
+                else {"mode": "unavailable", "rect": None, "confidence": None}
+            )
+            crop_rect = crop_mapping["rect"]
+            binder_cards = summarize_binder_cards(attempts) if capture_mode == "binder_page" else []
+            binder_rectified_paths = []
+            for card in binder_cards:
+                image_index = card.get("image_index")
+                card_path = None
+                if isinstance(image_index, int) and 0 <= image_index < len(attempt_files):
+                    candidate_path = session_dir / attempt_files[image_index]
+                    if candidate_path.is_file():
+                        card_path = candidate_path.resolve()
+                        binder_rectified_paths.append(str(card_path))
+                card["rectified_filepath"] = str(card_path) if card_path else ""
+            accepted_attempt = next(
+                (attempt for attempt in attempts if attempt.get("outcome") == "accepted"),
+                None,
+            )
+            rectified_path: Path | None = None
+            if (
+                capture_mode == "single_card"
+                and accepted_attempt is not None
+                and isinstance(accepted_attempt.get("imageIndex"), int)
+            ):
+                image_index = int(accepted_attempt["imageIndex"])
+                if 0 <= image_index < len(attempt_files):
+                    candidate_path = session_dir / attempt_files[image_index]
+                    if candidate_path.is_file():
+                        rectified_path = candidate_path
+            if rectified_path is not None:
+                rectified_count += 1
+
+            capture_best_id = str(frame.get("bestMatchCardId") or "")
+            capture_best_name = str(frame.get("bestMatchName") or "")
+            capture_best_confidence = (
+                float(frame["confidence"]) if frame.get("confidence") is not None else None
+            )
+            identified_id = capture_best_id if capture_mode == "single_card" else ""
+            identified_name = capture_best_name if capture_mode == "single_card" else ""
+            confidence = capture_best_confidence if capture_mode == "single_card" else None
+            candidate_source = (
+                accepted_attempt
+                or next((attempt for attempt in attempts if attempt.get("topCandidates")), None)
+            ) if capture_mode == "single_card" else None
+            candidates = list((candidate_source or {}).get("topCandidates") or [])
+            if not candidates and capture_mode == "single_card":
+                candidates = [
+                    {"cardID": card_id, "name": name}
+                    for card_id, name in zip(
+                        frame.get("alternativeCardIds") or [], frame.get("alternatives") or []
+                    )
+                ]
+            similarities = [
+                float(candidate["similarity"])
+                for candidate in candidates
+                if isinstance(candidate, dict) and candidate.get("similarity") is not None
+            ]
+            margin = similarities[0] - similarities[1] if len(similarities) >= 2 else None
+
+            title_names = sorted({
+                str(attempt["titleMatchedName"])
+                for attempt in attempts
+                if attempt.get("titleMatchedName")
+            })
+            footer_pairs = sorted({
+                str(number)
+                for attempt in attempts
+                for number in (attempt.get("footerPairNumbers") or [])
+            })
+            verified_numbers = sorted({
+                str(attempt["ocrVerifiedCollectorNumber"])
+                for attempt in attempts
+                if attempt.get("ocrVerifiedCollectorNumber")
+            })
+            ocr_used = bool(title_names or footer_pairs or verified_numbers)
+
+            expected_id = str(frame.get("expectedCardId") or "")
+            expected_no_match = frame.get("expectedNoMatch")
+            has_truth = bool(expected_id or expected_no_match is True)
+            verdict = shutter_verdict(expected_id or None, expected_no_match, identified_id or None)
+            truth_label = expected_id if expected_id else ("__declined__" if expected_no_match is True else None)
+            decision_label_value = identified_id or "__declined__"
+            elapsed_ms = float(item.get("elapsedMs") or frame.get("elapsedMs") or 0)
+            valid_elapsed = elapsed_ms if elapsed_ms > 0 else None
+            if valid_elapsed is not None:
+                latency_values.append(valid_elapsed)
+            if has_original:
+                full_resolution_count += 1
+            if has_truth:
+                truth_count += 1
+
+            quality = item.get("captureQuality")
+            prediction = (
+                fo.Classification(label=identified_id, confidence=confidence, card_name=identified_name)
+                if identified_id
+                else None
+            )
+            sample = fo.Sample(
+                filepath=str(media_path.resolve()),
+                sample_key=f"{session_dir.name}:{image_file}",
+                label_key=f"{session_dir.name}:{image_file}",
+                capture_session=session_dir.name,
+                frame_index=int(frame.get("index") or 0),
+                scan_source="photoCapture",
+                scan_pipeline=str(frame.get("pipeline") or "dev-mode photoCapture"),
+                capture_mode=capture_mode,
+                is_shutter_capture=True,
+                has_full_resolution_original=has_original,
+                original_filepath=str(original_path.resolve()) if has_original and original_path else "",
+                scanner_input_filepath=str(scanner_input_path.resolve()) if scanner_input_path.is_file() else "",
+                rectified_filepath=str(rectified_path.resolve()) if rectified_path else "",
+                rectification_available=rectified_path is not None,
+                attempt_filepaths_json=json.dumps(
+                    [str((session_dir / name).resolve()) for name in attempt_files],
+                    ensure_ascii=False,
+                ),
+                scanner_quad=(
+                    _vision_quad(
+                        fo, frame.get("quad"), scanner_size, media_size, crop_rect
+                    )
+                    if capture_mode == "single_card"
+                    else fo.Keypoints(keypoints=[])
+                ),
+                scanner_crop_mapping=str(crop_mapping["mode"]),
+                scanner_crop_registration_confidence=crop_mapping["confidence"],
+                scanner_crop_rect_json=json.dumps(crop_rect),
+                binder_regions=_binder_regions(
+                    fo, binder_cards, scanner_size, media_size, crop_rect
+                ),
+                binder_cards_json=json.dumps(binder_cards, ensure_ascii=False),
+                binder_manual_labels_json="[]",
+                binder_reviewed_count=0,
+                binder_detected_count=len(binder_cards),
+                binder_matched_count=sum(card.get("status") == "matched" for card in binder_cards),
+                binder_uncertain_count=sum(card.get("status") == "uncertain" for card in binder_cards),
+                binder_unmatched_count=sum(card.get("status") == "unmatched" for card in binder_cards),
+                binder_rectified_filepaths_json=json.dumps(binder_rectified_paths, ensure_ascii=False),
+                binder_rectified_count=len(binder_rectified_paths),
+                capture_best_match_card_id=capture_best_id,
+                capture_best_match_card_name=capture_best_name,
+                capture_best_match_confidence=capture_best_confidence,
+                identified=bool(identified_id),
+                identified_card_id=identified_id,
+                identified_card_name=identified_name,
+                identified_confidence=confidence,
+                prediction=prediction,
+                decision=(
+                    fo.Classification(label=decision_label_value, confidence=confidence)
+                    if capture_mode == "single_card"
+                    else None
+                ),
+                outcome=str(item.get("outcome") or "unknown"),
+                strategy=str(frame.get("strategy") or ""),
+                candidates_json=json.dumps(candidates[:10], ensure_ascii=False),
+                candidate_count=len(candidates),
+                candidate_top_two_margin=margin,
+                attempt_count=len(attempts),
+                accepted_attempt_count=sum(attempt.get("outcome") == "accepted" for attempt in attempts),
+                elapsed_ms=valid_elapsed,
+                latency_bucket=latency_bucket(valid_elapsed),
+                title_ocr_names_json=json.dumps(title_names, ensure_ascii=False),
+                footer_ocr_pairs_json=json.dumps(footer_pairs, ensure_ascii=False),
+                ocr_verified_numbers_json=json.dumps(verified_numbers, ensure_ascii=False),
+                ocr_evidence_available=ocr_used,
+                expected_card_id=expected_id,
+                expected_no_match=expected_no_match,
+                human_truth_available=has_truth,
+                truth_provenance="ios_manual_correction" if has_truth else "",
+                ground_truth_identity=fo.Classification(label=truth_label) if truth_label else None,
+                prediction_verdict=verdict,
+                prediction_correct=verdict in {"correct", "correct_decline"} if has_truth else None,
+                benchmark_selected=False,
+                benchmark_accuracy_eligible=False,
+                label_category=(
+                    "singleCard" if expected_id else ("outsideIndex" if expected_no_match is True else "unlabeled")
+                ),
+                label_card_id=expected_id,
+                label_card_name="",
+                label_notes="Imported from iOS manual correction" if has_truth else "",
+                review_status="corrected" if has_truth else "unreviewed",
+                review_geometry_notes="",
+                capture_quality_available=isinstance(quality, dict),
+                capture_quality_issue=capture_quality_issue(quality),
+                capture_quality_pass=capture_quality_issue(quality) == "pass",
+                capture_sharpness=float(quality["sharpness"]) if isinstance(quality, dict) and quality.get("sharpness") is not None else None,
+                capture_mean_luma=float(quality["meanLuma"]) if isinstance(quality, dict) and quality.get("meanLuma") is not None else None,
+                capture_clipped_highlight_fraction=float(quality["clippedHighlightFraction"]) if isinstance(quality, dict) and quality.get("clippedHighlightFraction") is not None else None,
+                capture_glare_fraction=float(quality["glareFraction"]) if isinstance(quality, dict) and quality.get("glareFraction") is not None else None,
+                capture_fill_ratio=float(quality["fillRatio"]) if isinstance(quality, dict) and quality.get("fillRatio") is not None else None,
+                capture_angle_deviation_degrees=float(quality["angleDeviationDegrees"]) if isinstance(quality, dict) and quality.get("angleDeviationDegrees") is not None else None,
+                capture_detector_confidence=float(quality["detectorConfidence"]) if isinstance(quality, dict) and quality.get("detectorConfidence") is not None else None,
+                provenance_kind="real_camera_shutter",
+                media_role="shutter_original" if has_original else "shutter_scanner_input",
+                is_synthetic=False,
+                is_derived=not has_original,
+                evaluation_role="real_camera_shutter_benchmark" if has_truth else "labeling_candidate",
+                geometry_evaluation_eligible=False,
+                recognition_evaluation_eligible=False,
+                source_group_key=f"{session_dir.name}:{image_file}",
+                source_group_split_leakage=False,
+            )
+            sample.tags.extend([
+                "source:photoCapture",
+                f"capture-mode:{capture_mode}",
+                f"latency:{latency_bucket(valid_elapsed)}",
+                "truth:available" if has_truth else "truth:needed",
+            ])
+            samples.append(sample)
+
+    dataset.add_samples(samples, progress=True)
+    dataset.persistent = True
+    full_original_keys = dataset.match(
+        (fo.ViewField("has_full_resolution_original") == True)  # noqa: E712
+        & (fo.ViewField("capture_mode") == "single_card")
+    ).values("sample_key")
+    benchmark_keys = set(
+        sorted(
+            full_original_keys,
+            key=lambda key: hashlib.sha256(
+                f"tcger-shutter-benchmark-v1\0{key}".encode("utf-8")
+            ).hexdigest(),
+        )[:200]
+    )
+    sample_keys = dataset.values("sample_key")
+    benchmark_selected_values = [key in benchmark_keys for key in sample_keys]
+    truth_available_values = dataset.values("human_truth_available")
+    accuracy_eligible_values = [
+        selected and bool(has_truth)
+        for selected, has_truth in zip(benchmark_selected_values, truth_available_values)
+    ]
+    dataset.set_values("benchmark_selected", benchmark_selected_values)
+    dataset.set_values("benchmark_accuracy_eligible", accuracy_eligible_values)
+    dataset.set_values("recognition_evaluation_eligible", accuracy_eligible_values)
+    field = fo.ViewField
+    views = {
+        "01 · Benchmark 200 — needs labels": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == False)  # noqa: E712
+        ),
+        "02 · Benchmark 200 — labelled": dataset.match(
+            (field("benchmark_selected") == True)  # noqa: E712
+            & (field("human_truth_available") == True)  # noqa: E712
+        ),
+        "03 · Existing manual-correction hard cases": dataset.match(
+            field("truth_provenance") == "ios_manual_correction"
+        ),
+        "04 · Slow captures (1 second or more)": dataset.match(field("elapsed_ms") >= 1_000),
+        "05 · Very slow captures (2 seconds or more)": dataset.match(field("elapsed_ms") >= 2_000),
+        "06 · Wrong, missed, or false positive": dataset.match(
+            field("prediction_verdict").is_in(["wrong", "missed", "false_positive"])
+        ),
+        "07 · OCR evidence used": dataset.match(field("ocr_evidence_available") == True),  # noqa: E712
+        "08 · Rectified preview available": dataset.match(field("rectification_available") == True),  # noqa: E712
+        "09 · Many-attempt latency hotspots": dataset.match(field("attempt_count") >= 4).sort_by(
+            "elapsed_ms", reverse=True
+        ),
+        "10 · Binder pages — every detected pocket": dataset.match(
+            field("capture_mode") == "binder_page"
+        ),
+        "11 · Single-card shutter — isolated": dataset.match(
+            field("capture_mode") == "single_card"
+        ),
+    }
+    for name, view in views.items():
+        dataset.save_view(name, view, overwrite=True)
+    scoring_view = dataset.match(field("benchmark_accuracy_eligible") == True)  # noqa: E712
+    if len(scoring_view):
+        scoring_view.evaluate_classifications(
+            "decision",
+            gt_field="ground_truth_identity",
+            eval_key="shutter_identity",
+            method="simple",
+        )
+    dataset.info = {
+        "tcger_sessions_root": str(sessions_root.resolve()),
+        "benchmarkScope": "single-card iOS photoCapture records only; binder pages are reviewed per pocket",
+        "samples": len(samples),
+        "singleCardShutterCaptures": len(
+            dataset.match(field("capture_mode") == "single_card")
+        ),
+        "binderPageCaptures": len(dataset.match(field("capture_mode") == "binder_page")),
+        "binderDetectedCards": sum(dataset.values("binder_detected_count")),
+        "binderMatchedCards": sum(dataset.values("binder_matched_count")),
+        "binderUncertainCards": sum(dataset.values("binder_uncertain_count")),
+        "binderUnmatchedCards": sum(dataset.values("binder_unmatched_count")),
+        "fullResolutionOriginals": full_resolution_count,
+        "humanTruthSamples": truth_count,
+        "manualCorrectionHardCases": truth_count,
+        "benchmarkSelectionPolicy": "200 single-card full-resolution originals selected by outcome-independent SHA-256 order",
+        "benchmarkSelected": len(benchmark_keys),
+        "benchmarkLabels": sum(accuracy_eligible_values),
+        "rectifiedPreviews": rectified_count,
+        "latencySamples": len(latency_values),
+        "latencyP50Ms": percentile(latency_values, 0.50),
+        "latencyP90Ms": percentile(latency_values, 0.90),
+        "latencyP95Ms": percentile(latency_values, 0.95),
+        "latencyDefinition": "end-to-end coordinator time recorded by the iOS shutter path",
+        "truthWarning": "Unlabelled captures are excluded from accuracy; derived crops are linked evidence, not independent rows.",
+    }
+    dataset.save()
+    apply_assisted_shutter_suggestions(dataset)
+    return dataset
 
 
 def build_session_dataset(
@@ -1028,6 +1917,7 @@ def build_session_dataset(
             frame_index = int(frame.get("index") or 0)
             group_key = f"{session_dir.name}:frame-{frame_index:04d}"
             frame_evidence = evidence_by_image.get(image_file) or {}
+            frame_quality = frame_evidence.get("captureQuality")
             files: list[tuple[str, Path, int | None, dict[str, Any] | None]] = []
             original_name = frame_evidence.get("originalImageFile")
             if original_name:
@@ -1077,6 +1967,17 @@ def build_session_dataset(
                     quad = frame.get("quad")
                     strategy = str(frame.get("strategy") or "")
                 derived = role != "real_camera_original"
+                attempt_quality = attempt.get("captureQuality") if attempt is not None else None
+                capture_quality = attempt_quality or frame_quality
+                quality_scope = (
+                    "attempt_crop"
+                    if isinstance(attempt_quality, dict)
+                    else "framed_capture"
+                )
+                quality_issue = capture_quality_issue(
+                    capture_quality,
+                    includes_framing=quality_scope == "framed_capture",
+                )
                 prediction = None
                 if identified_id:
                     prediction = fo.Classification(
@@ -1121,6 +2022,53 @@ def build_session_dataset(
                         if attempt is not None and attempt.get("gateScore") is not None
                         else None
                     ),
+                    capture_quality_available=isinstance(capture_quality, dict),
+                    capture_quality_scope=quality_scope,
+                    capture_quality_issue=quality_issue,
+                    capture_quality_pass=quality_issue == "pass",
+                    capture_sharpness=(
+                        float(capture_quality["sharpness"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("sharpness") is not None
+                        else None
+                    ),
+                    capture_mean_luma=(
+                        float(capture_quality["meanLuma"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("meanLuma") is not None
+                        else None
+                    ),
+                    capture_clipped_highlight_fraction=(
+                        float(capture_quality["clippedHighlightFraction"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("clippedHighlightFraction") is not None
+                        else None
+                    ),
+                    capture_glare_fraction=(
+                        float(capture_quality["glareFraction"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("glareFraction") is not None
+                        else None
+                    ),
+                    capture_fill_ratio=(
+                        float(capture_quality["fillRatio"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("fillRatio") is not None
+                        else None
+                    ),
+                    capture_angle_deviation_degrees=(
+                        float(capture_quality["angleDeviationDegrees"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("angleDeviationDegrees") is not None
+                        else None
+                    ),
+                    capture_detector_confidence=(
+                        float(capture_quality["detectorConfidence"])
+                        if isinstance(capture_quality, dict)
+                        and capture_quality.get("detectorConfidence") is not None
+                        else None
+                    ),
+                    capture_quality_json=json.dumps(capture_quality or {}, ensure_ascii=False),
                     label_category="unlabeled",
                     label_card_id="",
                     label_card_name="",
@@ -1135,6 +2083,7 @@ def build_session_dataset(
                         f"session:{session_dir.name}",
                     ]
                 )
+                sample.tags.append(f"capture-quality:{quality_issue}")
                 samples.append(sample)
                 role_counts[role] = role_counts.get(role, 0) + 1
     dataset.add_samples(samples, progress=True)
@@ -1150,6 +2099,13 @@ def build_session_dataset(
         "05 · Unidentified cards": dataset.match(field("identified") == False),  # noqa: E712
         "06 · Originals needing labels": dataset.match(
             (field("is_derived") == False) & (field("label_category") == "unlabeled")  # noqa: E712
+        ),
+        "07 · Capture quality issues": dataset.match(
+            (field("capture_quality_available") == True)  # noqa: E712
+            & (field("capture_quality_pass") == False)  # noqa: E712
+        ),
+        "08 · Glare and foil-risk captures": dataset.match(
+            field("capture_quality_issue") == "glare"
         ),
     }
     for name, view in views.items():
@@ -1538,6 +2494,7 @@ def parser() -> argparse.ArgumentParser:
         "report", help="Write JSON, CSV, and PNG model-performance summaries"
     )
     report.add_argument("--dataset-name", default=DEFAULT_DATASET_NAME)
+    report.add_argument("--session-dataset-name", default=DEFAULT_SESSION_DATASET_NAME)
     report.add_argument("--output-dir", type=Path)
 
     geometry = subparsers.add_parser(
@@ -1555,6 +2512,16 @@ def parser() -> argparse.ArgumentParser:
     sessions.add_argument("--rebuild", action="store_true")
     sessions.add_argument("--no-launch", action="store_true")
     sessions.add_argument("--port", type=int, default=5153)
+
+    shutter = subparsers.add_parser(
+        "shutter",
+        help="Build one row per intentional photo capture with accuracy and latency evidence",
+    )
+    shutter.add_argument("--reference-root", type=Path, default=DEFAULT_REFERENCE_ROOT)
+    shutter.add_argument("--dataset-name", default=DEFAULT_SHUTTER_DATASET_NAME)
+    shutter.add_argument("--rebuild", action="store_true")
+    shutter.add_argument("--no-launch", action="store_true")
+    shutter.add_argument("--port", type=int, default=5154)
 
     export = subparsers.add_parser(
         "export-labels", help="Export App-edited labels without touching source files"
@@ -1587,8 +2554,8 @@ def main() -> None:
             raise SystemExit(f"FiftyOne dataset does not exist: {args.dataset_name}")
         dataset = fo.load_dataset(args.dataset_name)
         session_dataset = (
-            fo.load_dataset(DEFAULT_SESSION_DATASET_NAME)
-            if fo.dataset_exists(DEFAULT_SESSION_DATASET_NAME)
+            fo.load_dataset(args.session_dataset_name)
+            if fo.dataset_exists(args.session_dataset_name)
             else None
         )
         output_dir = args.output_dir or (args.state_dir / "previews")
@@ -1618,6 +2585,30 @@ def main() -> None:
             fo = import_fiftyone()
             session = fo.launch_app(dataset, port=args.port, address="localhost", auto=True)
             print(f"Real sessions are available at http://localhost:{args.port}")
+            session.wait()
+        return
+
+    if args.command == "shutter":
+        dataset = build_shutter_dataset(
+            args.reference_root.expanduser().resolve(), args.dataset_name, args.rebuild
+        )
+        print(f"Shutter dataset: {dataset.name} ({len(dataset)} captures)")
+        print(
+            "Coverage: "
+            f"{dataset.info.get('fullResolutionOriginals', 0)} full-resolution originals; "
+            f"{dataset.info.get('humanTruthSamples', 0)} human labels; "
+            f"{dataset.info.get('latencySamples', 0)} timings"
+        )
+        print(
+            "Latency: "
+            f"p50 {dataset.info.get('latencyP50Ms')} ms; "
+            f"p90 {dataset.info.get('latencyP90Ms')} ms; "
+            f"p95 {dataset.info.get('latencyP95Ms')} ms"
+        )
+        if not args.no_launch:
+            fo = import_fiftyone()
+            session = fo.launch_app(dataset, port=args.port, address="localhost", auto=True)
+            print(f"Shutter benchmark is available at http://localhost:{args.port}")
             session.wait()
         return
 
