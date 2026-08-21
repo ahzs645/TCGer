@@ -132,4 +132,36 @@ final class BinderPageModelsTests: XCTestCase {
         store.removeBinderPageImage(binderId: binder.id, pageNumber: 4)
         XCTAssertNil(store.getBinderPages(binderId: binder.id).first?.imageUrl)
     }
+
+    func testSavedPagesReportEveryPageAndPocketForACollectionCard() {
+        let page = LocalStore.makeSampleBinderPage(timestamp: "2026-08-10T12:00:00Z")
+        let card = CollectionCard(
+            id: "collection-card-1",
+            cardId: "sample-pokemon-charizard",
+            externalId: "sample-pokemon-charizard",
+            name: "Charizard ex",
+            tcg: "pokemon",
+            setCode: "PAF",
+            setName: "Paldean Fates",
+            rarity: "Ultra Rare",
+            imageUrl: nil,
+            imageUrlSmall: nil,
+            quantity: 2,
+            price: nil,
+            condition: nil,
+            language: nil,
+            notes: nil,
+            collectorNumber: "54",
+            copies: []
+        )
+
+        let locations = [page].locations(for: card)
+
+        XCTAssertEqual(locations.map(\.pageNumber), [1, 1])
+        XCTAssertEqual(locations.map(\.pocketNumber), [1, 8])
+        XCTAssertEqual(
+            BinderCardLocation.summary(for: locations),
+            "Page 1 · Pockets 1, 8"
+        )
+    }
 }

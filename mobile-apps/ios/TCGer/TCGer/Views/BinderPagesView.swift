@@ -8,6 +8,7 @@ struct BinderPagesView: View {
     }
 
     let collection: Collection
+    let initialLocation: BinderCardLocation?
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var pages: [SavedBinderPage] = []
@@ -17,6 +18,11 @@ struct BinderPagesView: View {
     @State private var removingImagePageNumber: Int?
 
     private let apiService = APIService()
+
+    init(collection: Collection, initialLocation: BinderCardLocation? = nil) {
+        self.collection = collection
+        self.initialLocation = initialLocation
+    }
 
     var body: some View {
         NavigationStack {
@@ -30,15 +36,23 @@ struct BinderPagesView: View {
                         description: Text("Use Binder mode in the scanner, then save a page layout to build this reference.")
                     )
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(pages) { page in
-                                pageCard(page)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(pages) { page in
+                                    pageCard(page)
+                                        .id(page.pageNumber)
+                                }
                             }
+                            .padding()
                         }
-                        .padding()
+                        .refreshable { await loadPages() }
+                        .task(id: initialLocation?.id) {
+                            guard let initialLocation else { return }
+                            await Task.yield()
+                            proxy.scrollTo(initialLocation.pageNumber, anchor: .top)
+                        }
                     }
-                    .refreshable { await loadPages() }
                 }
             }
             .navigationTitle("\(collection.name) Pages")
@@ -73,7 +87,9 @@ struct BinderPagesView: View {
     }
 
     private func pageCard(_ page: SavedBinderPage) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let highlightsInitialLocation = page.pageNumber == initialLocation?.pageNumber
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Page \(page.pageNumber)")
@@ -91,7 +107,8 @@ struct BinderPagesView: View {
 
             BinderPageSnapshot(
                 imageURL: resolvedImageURL(page.imageUrl),
-                placements: page.placements
+                placements: page.placements,
+                highlightedLocation: highlightsInitialLocation ? initialLocation : nil
             )
 
             if page.placements.isEmpty {
@@ -112,7 +129,18 @@ struct BinderPagesView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        if isHighlighted(placement, on: page) {
+                            Label("This card", systemImage: "location.fill")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.yellow)
+                        }
                     }
+                    .padding(.vertical, isHighlighted(placement, on: page) ? 6 : 0)
+                    .padding(.horizontal, isHighlighted(placement, on: page) ? 8 : 0)
+                    .background(
+                        isHighlighted(placement, on: page) ? Color.yellow.opacity(0.12) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
                 }
             }
 
@@ -132,6 +160,19 @@ struct BinderPagesView: View {
         }
         .padding()
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            if highlightsInitialLocation {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.yellow, lineWidth: 3)
+            }
+        }
+    }
+
+    private func isHighlighted(_ placement: BinderPagePlacement, on page: SavedBinderPage) -> Bool {
+        guard let initialLocation else { return false }
+        return page.pageNumber == initialLocation.pageNumber &&
+            placement.slotIndex == initialLocation.slotIndex &&
+            placement.cardId.caseInsensitiveCompare(initialLocation.cardId) == .orderedSame
     }
 
     private func resolvedImageURL(_ value: String?) -> URL? {
@@ -181,6 +222,7 @@ struct BinderPagesView: View {
 private struct BinderPageSnapshot: View {
     let imageURL: URL?
     let placements: [BinderPagePlacement]
+    let highlightedLocation: BinderCardLocation?
 
     var body: some View {
         GeometryReader { geometry in
@@ -188,15 +230,20 @@ private struct BinderPageSnapshot: View {
                 snapshotImage(size: geometry.size)
                 ForEach(placements) { placement in
                     let rect = placementRect(placement, size: geometry.size)
+                    let isHighlighted = placement.slotIndex == highlightedLocation?.slotIndex &&
+                        placement.cardId.caseInsensitiveCompare(highlightedLocation?.cardId ?? "") == .orderedSame
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(placement.status == "matched" ? Color.green : Color.orange, lineWidth: 2)
+                        .stroke(
+                            isHighlighted ? Color.yellow : (placement.status == "matched" ? Color.green : Color.orange),
+                            lineWidth: isHighlighted ? 5 : 2
+                        )
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
                     Text("\(placement.slotIndex + 1)")
                         .font(.caption2.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isHighlighted ? .black : .white)
                         .frame(width: 20, height: 20)
-                        .background(Color.accentColor, in: Circle())
+                        .background(isHighlighted ? Color.yellow : Color.accentColor, in: Circle())
                         .position(x: rect.minX + 10, y: rect.minY + 10)
                 }
             }

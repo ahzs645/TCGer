@@ -239,6 +239,7 @@ struct PricesView: View {
                 return PurchasePerformanceLot(
                     id: copy.id,
                     cardName: card.name,
+                    tcg: card.tcg,
                     setName: card.setName,
                     imageURL: card.imageUrlSmall ?? card.imageUrl,
                     paidAmount: transaction?.amount ?? copy.acquisitionPrice ?? 0,
@@ -530,17 +531,18 @@ private struct TrackedCardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if let image = card.imageURL, let url = URL(string: image) {
-                CachedAsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Color(.tertiarySystemFill)
-                    }
+            CachedAsyncImage(
+                url: card.imageURL.flatMap(URL.init(string:)),
+                tcg: card.tcg
+            ) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFit()
+                } else {
+                    Color(.tertiarySystemFill)
                 }
-                .frame(width: 38, height: 52)
-                .clipShape(.rect(cornerRadius: 4))
             }
+            .frame(width: 38, height: 52)
+            .clipShape(TradingCardShape())
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.name).font(.subheadline.weight(.medium)).lineLimit(1)
                 HStack(spacing: 6) {

@@ -3,6 +3,7 @@ import SwiftUI
 struct PurchasePerformanceLot: Identifiable, Sendable {
     let id: String
     let cardName: String
+    let tcg: String
     let setName: String?
     let imageURL: String?
     let paidAmount: Double
@@ -184,8 +185,8 @@ struct CostReturnsView: View {
             rates = [:]
             let missingPrices = lots.count - lots.filter { $0.currentValue != nil }.count
             rateMessage = missingPrices > 0
-                ? "Missing \(missingPrices) current price\(missingPrices == 1 ? "" : "s"), so some cards are omitted. Inflation adjustment is not included yet."
-                : "Returns use the original purchase cost. Inflation adjustment is not included yet."
+                ? "Missing \(missingPrices) current price\(missingPrices == 1 ? "" : "s"), so some cards are omitted."
+                : nil
             isLoadingRates = false
             return
         }
@@ -220,9 +221,9 @@ struct CostReturnsView: View {
             if missingPrices > 0 {
                 omissions.append("\(missingPrices) current price\(missingPrices == 1 ? "" : "s")")
             }
-            rateMessage = "Missing \(omissions.joined(separator: " and ")), so some cards are omitted. Inflation adjustment is not included yet."
+            rateMessage = "Missing \(omissions.joined(separator: " and ")), so some cards are omitted."
         } else {
-            rateMessage = "Purchase costs use the exchange rate from the purchase date. Current values use the latest reference rate. Inflation adjustment is not included yet."
+            rateMessage = nil
         }
         isLoadingRates = false
     }
@@ -288,17 +289,18 @@ private struct CostReturnRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if let imageURL = item.lot.imageURL, let url = URL(string: imageURL) {
-                CachedAsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Color(.tertiarySystemFill)
-                    }
+            CachedAsyncImage(
+                url: item.lot.imageURL.flatMap(URL.init(string:)),
+                tcg: item.lot.tcg
+            ) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFit()
+                } else {
+                    Color(.tertiarySystemFill)
                 }
-                .frame(width: 38, height: 52)
-                .clipShape(.rect(cornerRadius: 4))
             }
+            .frame(width: 38, height: 52)
+            .clipShape(TradingCardShape())
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.lot.cardName)

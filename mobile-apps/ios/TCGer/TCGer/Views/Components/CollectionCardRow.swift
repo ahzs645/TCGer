@@ -8,6 +8,8 @@ struct CollectionCardRow: View {
     let onCancelDelete: (() -> Void)?
     let isCopiesExpanded: Bool
     let onToggleCopies: (() -> Void)?
+    let binderLocations: [BinderCardLocation]
+    let onShowBinderLocation: ((BinderCardLocation) -> Void)?
     @Environment(\.colorScheme) private var colorScheme
 
     init(
@@ -17,7 +19,9 @@ struct CollectionCardRow: View {
         onConfirmDelete: (() -> Void)? = nil,
         onCancelDelete: (() -> Void)? = nil,
         isCopiesExpanded: Bool = false,
-        onToggleCopies: (() -> Void)? = nil
+        onToggleCopies: (() -> Void)? = nil,
+        binderLocations: [BinderCardLocation] = [],
+        onShowBinderLocation: ((BinderCardLocation) -> Void)? = nil
     ) {
         self.card = card
         self.showPricing = showPricing
@@ -26,6 +30,8 @@ struct CollectionCardRow: View {
         self.onCancelDelete = onCancelDelete
         self.isCopiesExpanded = isCopiesExpanded
         self.onToggleCopies = onToggleCopies
+        self.binderLocations = binderLocations
+        self.onShowBinderLocation = onShowBinderLocation
     }
 
     private func normalized(_ value: String?) -> String? {
@@ -269,6 +275,28 @@ struct CollectionCardRow: View {
                     let tags = aggregatedTags()
                     if !tags.isEmpty {
                         TagSummaryRow(tags: tags)
+                    }
+
+                    if let firstLocation = binderLocations.first {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label(
+                                BinderCardLocation.summary(for: binderLocations),
+                                systemImage: "rectangle.stack"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            if let onShowBinderLocation {
+                                Button {
+                                    onShowBinderLocation(firstLocation)
+                                } label: {
+                                    Label("Where is this card?", systemImage: "location.magnifyingglass")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityHint("Opens binder page \(firstLocation.pageNumber) and highlights the card")
+                            }
+                        }
                     }
 
                     if showPricing, let price = card.price {

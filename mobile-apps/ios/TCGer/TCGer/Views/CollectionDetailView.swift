@@ -7,6 +7,11 @@ private extension String {
     }
 }
 
+private struct BinderPagesPresentation: Identifiable {
+    let id = UUID()
+    let location: BinderCardLocation?
+}
+
 struct CollectionDetailView: View {
     let collection: Collection
     let parentProvidesNavigation: Bool
@@ -48,8 +53,8 @@ struct CollectionDetailView: View {
     @State private var showingBulkConditionSheet = false
     @State private var isBulkProcessing = false
     @State private var cardToSell: CollectionCard?
-    @State private var showingBinderPages = false
-    @State private var hasSavedBinderPages = false
+    @State private var binderPages: [SavedBinderPage] = []
+    @State private var binderPagesPresentation: BinderPagesPresentation?
 
     private let apiService = APIService()
     init(
@@ -227,9 +232,9 @@ struct CollectionDetailView: View {
 
                                         if environmentStore.isAuthenticated,
                                            !collection.isUnsortedBinder,
-                                           hasSavedBinderPages {
+                                           !binderPages.isEmpty {
                                             Button {
-                                                showingBinderPages = true
+                                                binderPagesPresentation = BinderPagesPresentation(location: nil)
                                             } label: {
                                                 Label("Pages", systemImage: "rectangle.stack")
                                             }
@@ -303,7 +308,8 @@ struct CollectionDetailView: View {
                                                 isCopiesExpanded: expandedCardIds.contains(card.id),
                                                 onToggleCopies: card.copies.count > 1 ? {
                                                     toggleCopies(for: card)
-                                                } : nil
+                                                } : nil,
+                                                binderLocations: binderPages.locations(for: card)
                                             )
                                         }
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -325,6 +331,10 @@ struct CollectionDetailView: View {
                                             isCopiesExpanded: expandedCardIds.contains(card.id),
                                             onToggleCopies: {
                                                 toggleCopies(for: card)
+                                            },
+                                            binderLocations: binderPages.locations(for: card),
+                                            onShowBinderLocation: { location in
+                                                binderPagesPresentation = BinderPagesPresentation(location: location)
                                             }
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -365,6 +375,10 @@ struct CollectionDetailView: View {
                                             isCopiesExpanded: expandedCardIds.contains(card.id),
                                             onToggleCopies: {
                                                 toggleCopies(for: card)
+                                            },
+                                            binderLocations: binderPages.locations(for: card),
+                                            onShowBinderLocation: { location in
+                                                binderPagesPresentation = BinderPagesPresentation(location: location)
                                             }
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -610,7 +624,7 @@ struct CollectionDetailView: View {
                     await loadAvailableTags()
                 }
                 .task(id: collection.id) {
-                    await refreshBinderPageAvailability()
+                    await loadBinderPages()
                 }
                 .sheet(isPresented: $showingAddCard) {
                     AddCardToBinderFromSearchView(binderId: collection.id) { destinationBinderId in
@@ -618,10 +632,13 @@ struct CollectionDetailView: View {
                         await reloadBinderCards()
                     }
                 }
-                .sheet(isPresented: $showingBinderPages, onDismiss: {
-                    Task { await refreshBinderPageAvailability() }
-                }) {
-                    BinderPagesView(collection: workingCollectionSnapshot)
+                .sheet(item: $binderPagesPresentation, onDismiss: {
+                    Task { await loadBinderPages() }
+                }) { presentation in
+                    BinderPagesView(
+                        collection: workingCollectionSnapshot,
+                        initialLocation: presentation.location
+                    )
                         .environmentObject(environmentStore)
                 }
                 .sheet(item: $editContext) { context in
@@ -1077,21 +1094,20 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
-    private func refreshBinderPageAvailability() async {
+    private func loadBinderPages() async {
         guard environmentStore.isAuthenticated, !collection.isUnsortedBinder else {
-            hasSavedBinderPages = false
+            binderPages = []
             return
         }
 
         do {
-            let pages = try await apiService.getBinderPages(
+            binderPages = try await apiService.getBinderPages(
                 config: environmentStore.serverConfiguration,
                 token: environmentStore.authToken,
                 binderId: collection.id
             )
-            hasSavedBinderPages = !pages.isEmpty
         } catch {
-            hasSavedBinderPages = false
+            binderPages = []
         }
     }
 
