@@ -313,6 +313,14 @@ struct PricesView: View {
                         }
                     }
 
+                    if let priceRefreshMessage {
+                        Section {
+                            Label(priceRefreshMessage, systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     if trackedCards.isEmpty {
                         ContentUnavailableView.search(text: searchText)
                     } else {
@@ -431,6 +439,10 @@ struct PricesView: View {
                 token: token
             )
             collections = try await fetchedCollections
+            // Stored collection prices are enough to render this screen. Live
+            // quotes can take substantially longer, especially in on-device
+            // mode where missing provider identifiers must be resolved first.
+            isLoading = false
             movers = (try? await fetchedMovers) ?? PriceAnalyticsMovers(gainers: [], losers: [])
             transactions = (try? await fetchedTransactions) ?? []
             await refreshTrackedPrices(force: forcePrices)

@@ -21,13 +21,14 @@ struct PokedexView: View {
     @State private var catalogEntriesBySpecies: [Int: [CatalogEntry]] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var refreshWarning: String?
     @State private var searchText = ""
     @State private var ownershipFilter: PokedexOwnershipFilter = .all
     @State private var selectedGeneration: Int?
     @State private var collectionRevision = 0
 
     private let apiService = APIService()
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+    private let columns = [GridItem(.adaptive(minimum: 104, maximum: 160), spacing: 12)]
 
     init(parentProvidesNavigation: Bool = false) {
         self.parentProvidesNavigation = parentProvidesNavigation
@@ -81,6 +82,9 @@ struct PokedexView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         progressHeader
+                        if let refreshWarning {
+                            refreshWarningBanner(refreshWarning)
+                        }
                         generationPicker
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(filteredSpecies) { item in
@@ -166,25 +170,34 @@ struct PokedexView: View {
         }
     }
 
+    private func refreshWarningBanner(_ message: String) -> some View {
+        Label(message, systemImage: "wifi.exclamationmark")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .accessibilityLabel("Refresh warning: \(message)")
+    }
+
     private func cards(for species: PokedexSpeciesProgress) -> [Card] {
         (catalogEntriesBySpecies[species.id] ?? []).map(catalogStore.card(from:))
     }
 
     @MainActor
     private func load(useCache: Bool = true) async {
-        isLoading = true
+        isLoading = species.isEmpty
         errorMessage = nil
+        refreshWarning = nil
         await catalogStore.loadIfNeeded(.pokemon)
         let entries = catalogStore.pokedexCards()
-        let setSeriesByCode = Dictionary(
-            catalogStore.sets(tcg: .pokemon).compactMap { set in
-                set.serie.map { (set.code, $0) }
-            },
-            uniquingKeysWith: { first, _ in first }
-        )
 
         guard !entries.isEmpty else {
-            errorMessage = "Install and enable the Pokémon card catalog in Settings to track species completion."
+            if species.isEmpty {
+                errorMessage = "Install and enable the Pokémon card catalog in Settings to track species completion."
+            } else {
+                refreshWarning = "The Pokémon catalog is unavailable. Showing the latest Pokédex snapshot."
+            }
             isLoading = false
             return
         }
@@ -198,25 +211,26 @@ struct PokedexView: View {
             let snapshot = await Task.detached(priority: .userInitiated) {
                 PokedexProgressBuilder.build(
                     catalogEntries: entries,
-                    pokemonSetSeriesByCode: setSeriesByCode,
                     collections: collections
                 )
             }.value
             catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
             species = snapshot.species
+        } catch is CancellationError {
+            isLoading = false
+            return
         } catch {
             if species.isEmpty {
                 let snapshot = await Task.detached(priority: .userInitiated) {
                     PokedexProgressBuilder.build(
                         catalogEntries: entries,
-                        pokemonSetSeriesByCode: setSeriesByCode,
                         collections: []
                     )
                 }.value
                 catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
                 species = snapshot.species
             }
-            errorMessage = "Couldn’t refresh collection ownership. Your previous Pokédex progress is still shown."
+            refreshWarning = "Couldn’t refresh ownership. Showing the latest available Pokédex progress."
         }
         isLoading = false
     }
@@ -228,16 +242,38 @@ private struct PokedexSpeciesTile: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                CachedAsyncImage(url: species.imageURL.flatMap(URL.init(string:))) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                CachedAsyncImage(url: species.artworkURL) { phase in
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(
+                                species.isOwned
+                                    ? Color.green.opacity(0.1)
+                                    : Color.secondary.opacity(0.08)
+                            )
+
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .saturation(species.isOwned ? 1 : 0)
+                                .opacity(species.isOwned ? 1 : 0.55)
+                                .padding(6)
+                        case .empty:
+                            ProgressView()
+                                .controlSize(.small)
+                        case .failure:
+                            Image(systemName: "pawprint.fill")
+                                .font(.title2)
+                                .foregroundStyle(.tertiary)
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .frame(height: 116)
+                .accessibilityHidden(true)
 
                 Image(systemName: species.isOwned ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(species.isOwned ? .green : .secondary)
@@ -253,6 +289,7 @@ private struct PokedexSpeciesTile: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Number \(species.entry.number), \(species.entry.name), \(species.isOwned ? "owned" : "missing")")

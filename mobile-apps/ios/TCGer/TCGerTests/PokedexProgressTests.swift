@@ -31,7 +31,7 @@ final class PokedexProgressTests: XCTestCase {
         XCTAssertFalse(result[3].isOwned)
     }
 
-    func testBuildsLightweightCatalogSnapshotAndFallbackImageURL() {
+    func testBuildsLightweightCatalogSnapshotAndSpeciesArtworkURL() {
         let charmander = PokedexEntry(number: 4, name: "Charmander")
         let catalogCard = CatalogCardEntry(
             id: "base1-4",
@@ -52,7 +52,6 @@ final class PokedexProgressTests: XCTestCase {
 
         let snapshot = PokedexProgressBuilder.build(
             catalogEntries: [CatalogEntry(tcg: .pokemon, card: catalogCard)],
-            pokemonSetSeriesByCode: ["base1": "Base"],
             collections: []
         )
 
@@ -60,9 +59,16 @@ final class PokedexProgressTests: XCTestCase {
         XCTAssertEqual(snapshot.species[3].printCount, 1)
         XCTAssertEqual(snapshot.catalogEntriesByNumber[4]?.map(\.card.id), ["base1-4"])
         XCTAssertEqual(
-            snapshot.species[3].imageURL,
-            "https://assets.tcgdex.net/en/Base/base1/4/low.webp"
+            snapshot.species[3].artworkURL?.absoluteString,
+            "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png"
         )
+    }
+
+    func testSpeciesArtworkURLOnlyAcceptsNationalPokedexNumbers() {
+        XCTAssertNotNil(PokedexArtwork.url(for: 1))
+        XCTAssertNotNil(PokedexArtwork.url(for: 1025))
+        XCTAssertNil(PokedexArtwork.url(for: 0))
+        XCTAssertNil(PokedexArtwork.url(for: 1026))
     }
 
     private func card(id: String, name: String, entries: [PokedexEntry]) -> Card {

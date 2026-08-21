@@ -831,7 +831,7 @@ function ResultCard({
     <button
       type="button"
       onClick={onInspect}
-      className="group min-w-0 space-y-2 text-center"
+      className="group w-full min-w-0 space-y-2 text-center"
       aria-label={`${pull.name}, ${pull.rarity}`}
     >
       <div className="relative aspect-[63/88] overflow-hidden rounded-xl bg-muted shadow-md transition group-hover:-translate-y-0.5 group-hover:shadow-lg">

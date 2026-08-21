@@ -356,52 +356,63 @@ private struct PackCardBrowser<Header: View>: View {
     }
 
     var body: some View {
-        ScrollView {
-            if filteredCards.isEmpty {
-                VStack(spacing: 24) {
-                    header
-                    ContentUnavailableView {
-                        Label("No Cards Found", systemImage: "magnifyingglass")
-                    } description: {
-                        Text("Try another search or rarity filter.")
-                    } actions: {
-                        Button("Clear Filters") {
-                            searchText = ""
-                            selectedRarity = nil
+        VStack(spacing: 0) {
+            ScrollView {
+                if filteredCards.isEmpty {
+                    VStack(spacing: 24) {
+                        header
+                        ContentUnavailableView {
+                            Label("No Cards Found", systemImage: "magnifyingglass")
+                        } description: {
+                            Text("Try another search or rarity filter.")
+                        } actions: {
+                            Button("Clear Filters") {
+                                searchText = ""
+                                selectedRarity = nil
+                            }
+                        }
+                        .padding(.vertical, 48)
+                    }
+                    .padding(16)
+                } else {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Possible cards")
+                                .font(.headline)
+                            Spacer()
+                            Text("\(pool.cards.count) total")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Label(
+                            "These cards are eligible in the simulator; one pack does not guarantee any specific card.",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+
+                        LazyVGrid(columns: columns, spacing: 20) {
+                            ForEach(filteredCards) { card in
+                                PackPossiblePullCard(card: card)
+                            }
                         }
                     }
-                    .padding(.vertical, 48)
+                    .padding(16)
                 }
-                .padding(16)
-            } else {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Possible cards")
-                            .font(.headline)
-                        Spacer()
-                        Text("\(pool.cards.count) total")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Label(
-                        "These cards are eligible in the simulator; one pack does not guarantee any specific card.",
-                        systemImage: "info.circle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-
-                    LazyVGrid(columns: columns, spacing: 20) {
-                        ForEach(filteredCards) { card in
-                            PackPossiblePullCard(card: card)
-                        }
-                    }
-                }
-                .padding(16)
             }
+
+            Divider()
+
+            Text("Showing \(filteredCards.count) of \(pool.cards.count) cards")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(.regularMaterial)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .searchable(
@@ -426,15 +437,6 @@ private struct PackCardBrowser<Header: View>: View {
                 }
                 .accessibilityLabel("Filter cards by rarity, \(selectedRarity ?? "All Rarities")")
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Text("Showing \(filteredCards.count) of \(pool.cards.count) cards")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(.regularMaterial, in: .capsule)
-                .padding(.bottom, 8)
         }
         .accessibilityLabel("\(pool.label) possible cards")
         .onChange(of: pool.id) {

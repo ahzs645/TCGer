@@ -4,10 +4,20 @@ nonisolated struct PokedexSpeciesProgress: Identifiable, Hashable, Sendable {
     let entry: PokedexEntry
     let printCount: Int
     let ownedCopies: Int
-    let imageURL: String?
 
     var id: Int { entry.number }
     var isOwned: Bool { ownedCopies > 0 }
+    var artworkURL: URL? { PokedexArtwork.url(for: entry.number) }
+}
+
+nonisolated enum PokedexArtwork {
+    private static let baseURL =
+        "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork"
+
+    static func url(for number: Int) -> URL? {
+        guard number > 0, number <= NationalPokedex.names.count else { return nil }
+        return URL(string: "\(baseURL)/\(number).png")
+    }
 }
 
 nonisolated struct PokedexProgressSnapshot: Sendable {
@@ -27,17 +37,12 @@ nonisolated enum PokedexProgressBuilder {
             }
         )
         var printIDsByNumber: [Int: Set<String>] = [:]
-        var imageByNumber: [Int: String] = [:]
         var ownedCopiesByNumber: [Int: Int] = [:]
 
         for card in catalogCards {
             for entry in NationalPokedex.species(for: card) {
                 entriesByNumber[entry.number] = entry
                 printIDsByNumber[entry.number, default: []].insert(card.id)
-                if imageByNumber[entry.number] == nil,
-                   let image = card.imageUrlSmall ?? card.imageUrl {
-                    imageByNumber[entry.number] = image
-                }
             }
         }
 
@@ -46,10 +51,6 @@ nonisolated enum PokedexProgressBuilder {
                 for entry in NationalPokedex.species(for: card) {
                     entriesByNumber[entry.number] = entry
                     ownedCopiesByNumber[entry.number, default: 0] += card.quantity
-                    if imageByNumber[entry.number] == nil,
-                       let image = card.imageUrlSmall ?? card.imageUrl {
-                        imageByNumber[entry.number] = image
-                    }
                 }
             }
         }
@@ -58,15 +59,13 @@ nonisolated enum PokedexProgressBuilder {
             PokedexSpeciesProgress(
                 entry: entry,
                 printCount: printIDsByNumber[entry.number]?.count ?? 0,
-                ownedCopies: ownedCopiesByNumber[entry.number] ?? 0,
-                imageURL: imageByNumber[entry.number]
+                ownedCopies: ownedCopiesByNumber[entry.number] ?? 0
             )
         }
     }
 
     static func build(
         catalogEntries: [CatalogEntry],
-        pokemonSetSeriesByCode: [String: String],
         collections: [Collection]
     ) -> PokedexProgressSnapshot {
         var entriesByNumber = Dictionary(
@@ -76,20 +75,12 @@ nonisolated enum PokedexProgressBuilder {
             }
         )
         var catalogEntriesByNumber: [Int: [CatalogEntry]] = [:]
-        var imageByNumber: [Int: String] = [:]
         var ownedCopiesByNumber: [Int: Int] = [:]
 
         for catalogEntry in catalogEntries {
             for entry in NationalPokedex.species(for: catalogEntry) {
                 entriesByNumber[entry.number] = entry
                 catalogEntriesByNumber[entry.number, default: []].append(catalogEntry)
-                if imageByNumber[entry.number] == nil,
-                   let image = imageURL(
-                       for: catalogEntry,
-                       pokemonSetSeriesByCode: pokemonSetSeriesByCode
-                   ) {
-                    imageByNumber[entry.number] = image
-                }
             }
         }
 
@@ -98,10 +89,6 @@ nonisolated enum PokedexProgressBuilder {
                 for entry in NationalPokedex.species(for: card) {
                     entriesByNumber[entry.number] = entry
                     ownedCopiesByNumber[entry.number, default: 0] += card.quantity
-                    if imageByNumber[entry.number] == nil,
-                       let image = card.imageUrlSmall ?? card.imageUrl {
-                        imageByNumber[entry.number] = image
-                    }
                 }
             }
         }
@@ -110,8 +97,7 @@ nonisolated enum PokedexProgressBuilder {
             PokedexSpeciesProgress(
                 entry: entry,
                 printCount: catalogEntriesByNumber[entry.number]?.count ?? 0,
-                ownedCopies: ownedCopiesByNumber[entry.number] ?? 0,
-                imageURL: imageByNumber[entry.number]
+                ownedCopies: ownedCopiesByNumber[entry.number] ?? 0
             )
         }
         return PokedexProgressSnapshot(
@@ -120,28 +106,6 @@ nonisolated enum PokedexProgressBuilder {
         )
     }
 
-    private static func imageURL(
-        for entry: CatalogEntry,
-        pokemonSetSeriesByCode: [String: String]
-    ) -> String? {
-        if let storedURL = entry.card.imageUrlSmall ?? entry.card.imageUrl {
-            return storedURL
-        }
-        guard let setCode = entry.card.setCode,
-              let collectorNumber = entry.card.collectorNumber,
-              let series = pokemonSetSeriesByCode[setCode] else {
-            return nil
-        }
-        return "https://assets.tcgdex.net/en/\(path(series))/\(path(setCode))/\(path(collectorNumber))/low.webp"
-    }
-
-    private static func path(_ component: String) -> String {
-        component.addingPercentEncoding(
-            withAllowedCharacters: CharacterSet.alphanumerics.union(
-                CharacterSet(charactersIn: "-._~")
-            )
-        ) ?? component
-    }
 }
 
 nonisolated struct PokedexGeneration: Identifiable, Hashable, Sendable {

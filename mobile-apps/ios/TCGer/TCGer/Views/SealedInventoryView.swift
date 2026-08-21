@@ -340,6 +340,47 @@ private enum SealedActionSheet: Identifiable {
     }
 }
 
+/// Sealed-product providers sometimes use a merchandising abbreviation that
+/// differs from the card catalog's canonical set code (for example, Pitch
+/// Black is `PBL` in TCGplayer and `me05` in TCGdex). Resolve the canonical
+/// card set before loading its checklist.
+nonisolated enum SealedSetResolver {
+    static func linkedSet(for product: SealedProduct, in sets: [TcgSet]) -> TcgSet? {
+        let productTCG = product.tcg.lowercased()
+        let matchingGameSets = sets.filter { $0.tcg.lowercased() == productTCG }
+        let providerCode = product.setCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let providerCode,
+           let exactCodeMatch = matchingGameSets.first(where: {
+               $0.code.caseInsensitiveCompare(providerCode) == .orderedSame
+           }) {
+            return exactCodeMatch
+        }
+
+        let productName = SearchTextNormalizer.boundaryKey(product.name)
+        return matchingGameSets
+            .filter {
+                containsPhrase(
+                    SearchTextNormalizer.boundaryKey($0.name),
+                    in: productName
+                )
+            }
+            .max {
+                SearchTextNormalizer.boundaryKey($0.name).count <
+                    SearchTextNormalizer.boundaryKey($1.name).count
+            }
+    }
+
+    private static func containsPhrase(_ phrase: String, in value: String) -> Bool {
+        guard !phrase.isEmpty else { return false }
+        return value == phrase ||
+            value.hasPrefix("\(phrase) ") ||
+            value.hasSuffix(" \(phrase)") ||
+            value.contains(" \(phrase) ")
+    }
+}
+
 private struct SealedLedgerRow: View {
     let ledger: SealedOpeningLedger
 
@@ -631,6 +672,7 @@ private struct SealedSetCardsSheet: View {
     @State private var searchText = ""
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var resolvedSetName: String?
 
     private let apiService = APIService()
     private let columns = [
@@ -666,8 +708,14 @@ private struct SealedSetCardsSheet: View {
                     } actions: {
                         Button("Try Again") { Task { await loadCards() } }
                     }
-                } else if filteredCards.isEmpty {
+                } else if filteredCards.isEmpty && !searchText.isEmpty {
                     ContentUnavailableView.search(text: searchText)
+                } else if filteredCards.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Cards Available", systemImage: "rectangle.grid.2x2")
+                    } description: {
+                        Text("No card checklist is available for this product's linked set.")
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
@@ -688,7 +736,11 @@ private struct SealedSetCardsSheet: View {
                     }
                 }
             }
-            .navigationTitle(product.setCode.map { "Set \($0) Cards" } ?? "Set Cards")
+            .navigationTitle(
+                resolvedSetName.map { "\($0) Cards" } ??
+                    product.setCode.map { "Set \($0) Cards" } ??
+                    "Set Cards"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Name, rarity, or number")
             .safeAreaInset(edge: .bottom) {
@@ -733,11 +785,21 @@ private struct SealedSetCardsSheet: View {
         isLoading = true
         errorMessage = nil
         do {
+            let sets = try? await apiService.getSets(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                tcg: product.tcg
+            )
+            let linkedSet = sets.flatMap {
+                SealedSetResolver.linkedSet(for: product, in: $0)
+            }
+            let cardSetCode = linkedSet?.code ?? setCode
+            resolvedSetName = linkedSet?.name
             cards = try await apiService.getSetCards(
                 config: environmentStore.serverConfiguration,
                 token: token,
                 tcg: product.tcg,
-                setCode: setCode
+                setCode: cardSetCode
             )
         } catch {
             errorMessage = error.localizedDescription
