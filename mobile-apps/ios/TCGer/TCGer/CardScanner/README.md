@@ -278,6 +278,28 @@ can serve a stale app install after `build-for-testing` (symptom: bundled
 resources suddenly "missing", suites finishing implausibly fast) — erase the
 sim and rerun before believing such failures.
 
+### Device stage profile (scan-session-20260821-231419, defaults build)
+
+First device session on the instrumented defaults build (ingested; 42
+frames). The new per-stage fields confirm the Simulator profile on real
+hardware — and that the capture round worked: accepted scans now run 87–484
+ms (median 232 ms, was 322) with no cold-start spike.
+
+- Accepted (mean 252 ms): footerOCR 36% + titleOCR 31% of wall, ann 23%,
+  detect 15%, embed 7%.
+- No-match (mean 456 ms): titleOCR 44% + footerOCR 25%, ann 33%, embed 8%.
+- Binder (mean 1,030 ms): ann 79% (!) — that figure is dominated by actor
+  QUEUE WAITS, not compute: `annMs` wraps the `await` on the index actor,
+  and concurrent pockets/orientations serialize on it. The vectorized scan
+  itself is sub-millisecond.
+
+Conclusions: OCR is ~2/3 of scan time on device — the fast-first footer
+read + `minimumTextHeight` retune + pass-reorder round is the next lever.
+Encoder retraining is definitively NOT a speed play at 7% embed share (it
+remains an accuracy play — ArcFace-on-catalog per TCG-AR). And the index
+actor's serialization is now worth removing (immutable post-load snapshot
+so queries stop hopping the actor), which mostly benefits binder pages.
+
 ### Running the replay/benchmark harnesses
 
 - Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan

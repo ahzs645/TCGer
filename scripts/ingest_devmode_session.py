@@ -215,6 +215,14 @@ def main() -> None:
                 continue
 
             destination = sessions_root / session_id
+            if destination.exists():
+                # A previous interrupted run copied files without registering
+                # them in the manifest, which wedges every retry on
+                # FileExistsError. The source archive remains the truth, so
+                # discard the unregistered partial copy and re-copy cleanly.
+                print(f"      removing unregistered partial copy of {session_id} "
+                      "left by an interrupted run")
+                shutil.rmtree(destination)
             shutil.copytree(session_dir, destination)
             for junk in destination.rglob(".DS_Store"):
                 junk.unlink()
