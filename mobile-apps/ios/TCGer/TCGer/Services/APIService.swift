@@ -263,6 +263,29 @@ final class LocalStore {
         var sampleDataLoaded: Bool?
     }
 
+    private struct PortableBackup: Codable {
+        let format: String
+        let schemaVersion: Int
+        let exportedAt: Date
+        let appVersion: String
+        let payload: PersistedState
+        let appPreferences: LocalDataAppPreferences?
+        /// Saved binder-page photos are user-created files rather than cache.
+        /// They travel inline so the JSON remains a single portable document.
+        let binderPageImages: [String: Data]?
+    }
+
+    /// Recovery points exported by older builds used this repository envelope.
+    /// Accepting it here makes those previously shared files importable too.
+    private struct RecoveryPointEnvelope: Decodable {
+        let schemaVersion: Int
+        let createdAt: Date
+        let payload: Data
+    }
+
+    private static let portableBackupFormat = "com.tcger.local-data-backup"
+    private static let portableBackupSchemaVersion = 1
+
     private func loadPersistedState() {
         do {
             guard let data = try persistenceRepository.load() else { return }
@@ -422,6 +445,206 @@ final class LocalStore {
             recordPersistenceFailure(error, operation: .restore)
             throw error
         }
+    }
+
+    /// Produces a complete, portable phone-only backup. Replaceable downloads
+    /// such as catalogs and artwork are intentionally not included.
+    func exportPortableBackup(appPreferences: LocalDataAppPreferences? = nil) throws -> Data {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let backup = PortableBackup(
+            format: Self.portableBackupFormat,
+            schemaVersion: Self.portableBackupSchemaVersion,
+            exportedAt: Date(),
+            appVersion: version,
+            payload: persistedState(),
+            appPreferences: appPreferences,
+            binderPageImages: portableBinderPageImages()
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(backup)
+    }
+
+    func portableBackupSummary(from data: Data) throws -> LocalDataBackupSummary {
+        let decoded = try decodePortableBackup(data)
+        return backupSummary(for: decoded.state, exportedAt: decoded.exportedAt)
+    }
+
+    /// Validates the entire file before saving anything. Repository `save`
+    /// rotates the current durable state into recovery points before replacing
+    /// it, so an import can always be rolled back from Settings.
+    @discardableResult
+    func importPortableBackup(_ data: Data) throws -> LocalDataAppPreferences? {
+        var importedImageURLs: [URL] = []
+        var didCommit = false
+        defer {
+            if !didCommit {
+                importedImageURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+            }
+        }
+        do {
+            let decoded = try decodePortableBackup(data)
+            let prepared = try prepareImportedBinderPageImages(
+                in: decoded.state,
+                imageDataByPageID: decoded.binderPageImages
+            )
+            importedImageURLs = prepared.createdURLs
+            let encodedState = try encodedPersistedState(prepared.state)
+            try persistenceRepository.save(encodedState)
+            applyPersistedState(prepared.state)
+            lastDurableState = persistedState()
+            persistenceFailure = nil
+            didCommit = true
+            return decoded.appPreferences
+        } catch {
+            recordPersistenceFailure(error, operation: .restore)
+            throw error
+        }
+    }
+
+    static func portableBackupFilename(date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "TCGer-Backup-\(formatter.string(from: date)).json"
+    }
+
+    private func decodePortableBackup(
+        _ data: Data
+    ) throws -> (
+        state: PersistedState,
+        exportedAt: Date?,
+        appPreferences: LocalDataAppPreferences?,
+        binderPageImages: [String: Data]?
+    ) {
+        guard !data.isEmpty else { throw LocalDataTransferError.emptyBackup }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let backup = try? decoder.decode(PortableBackup.self, from: data) {
+            guard backup.format == Self.portableBackupFormat else {
+                throw LocalDataTransferError.invalidBackup
+            }
+            guard backup.schemaVersion == Self.portableBackupSchemaVersion else {
+                throw LocalDataTransferError.unsupportedSchemaVersion(backup.schemaVersion)
+            }
+            return (
+                backup.payload,
+                backup.exportedAt,
+                backup.appPreferences,
+                backup.binderPageImages
+            )
+        }
+
+        // A Recovery Point exported from Settings is also a complete backup.
+        if let envelope = try? decoder.decode(RecoveryPointEnvelope.self, from: data) {
+            guard envelope.schemaVersion == FileLocalStorePersistenceRepository.currentSchemaVersion else {
+                throw LocalDataTransferError.unsupportedSchemaVersion(envelope.schemaVersion)
+            }
+            guard let state = try? JSONDecoder().decode(PersistedState.self, from: envelope.payload) else {
+                throw LocalDataTransferError.invalidBackup
+            }
+            return (state, envelope.createdAt, nil, nil)
+        }
+
+        // Accept unwrapped snapshots from early development builds.
+        if let state = try? JSONDecoder().decode(PersistedState.self, from: data) {
+            return (state, nil, nil, nil)
+        }
+        throw LocalDataTransferError.invalidBackup
+    }
+
+    private func portableBinderPageImages() -> [String: Data]? {
+        let images = binderPages.reduce(into: [String: Data]()) { result, page in
+            guard let value = page.imageUrl,
+                  let url = URL(string: value),
+                  url.isFileURL,
+                  let data = try? Data(contentsOf: url) else { return }
+            result[page.id] = data
+        }
+        return images.isEmpty ? nil : images
+    }
+
+    private func prepareImportedBinderPageImages(
+        in source: PersistedState,
+        imageDataByPageID: [String: Data]?
+    ) throws -> (state: PersistedState, createdURLs: [URL]) {
+        var state = source
+        guard var pages = state.binderPages else { return (state, []) }
+        var createdURLs: [URL] = []
+        var completed = false
+        defer {
+            if !completed {
+                createdURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+            }
+        }
+
+        if imageDataByPageID?.isEmpty == false {
+            guard let directory = Self.binderPageImageDirectory else {
+                throw CocoaError(.fileNoSuchFile)
+            }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        for index in pages.indices {
+            let page = pages[index]
+            var restoredImageURL = page.imageUrl
+            if let imageData = imageDataByPageID?[page.id] {
+                guard !imageData.isEmpty else { throw LocalDataTransferError.invalidBackup }
+                guard let directory = Self.binderPageImageDirectory else {
+                    throw CocoaError(.fileNoSuchFile)
+                }
+                let url = directory.appendingPathComponent("\(UUID().uuidString).jpg")
+                try imageData.write(to: url, options: [.atomic])
+                createdURLs.append(url)
+                restoredImageURL = url.absoluteString
+            } else if let value = page.imageUrl,
+                      let url = URL(string: value),
+                      url.isFileURL,
+                      !FileManager.default.fileExists(atPath: url.path) {
+                // An old backup from another device may only contain its stale
+                // sandbox URL. Keep the page layout, but do not retain a broken
+                // image link.
+                restoredImageURL = nil
+            }
+
+            if restoredImageURL != page.imageUrl {
+                pages[index] = SavedBinderPage(
+                    id: page.id,
+                    binderId: page.binderId,
+                    pageNumber: page.pageNumber,
+                    revision: page.revision,
+                    capturedAt: page.capturedAt,
+                    imageUrl: restoredImageURL,
+                    placements: page.placements,
+                    createdAt: page.createdAt,
+                    updatedAt: page.updatedAt
+                )
+            }
+        }
+        state.binderPages = pages
+        completed = true
+        return (state, createdURLs)
+    }
+
+    private func backupSummary(
+        for state: PersistedState,
+        exportedAt: Date?
+    ) -> LocalDataBackupSummary {
+        LocalDataBackupSummary(
+            exportedAt: exportedAt,
+            binderCount: state.collections.filter { $0.id != Constants.unsortedBinderId }.count,
+            cardCopyCount: state.collections
+                .flatMap(\.cards)
+                .reduce(0) { $0 + $1.quantity },
+            binderPageCount: state.binderPages?.count ?? 0,
+            wishlistCount: state.wishlists.count,
+            sealedItemCount: state.sealedInventory.count,
+            onlineCodeCount: state.onlineCodes?.count ?? 0,
+            transactionCount: state.transactions.count
+        )
     }
 
     private static func isLegacyDemoUser(_ user: User) -> Bool {

@@ -673,17 +673,22 @@ struct SettingsView: View {
                 if isLocalMode {
                     Section {
                         NavigationLink {
-                            RecoveryPointsView {
+                            LocalDataBackupView {
                                 sampleDataLoaded = LocalStore.shared.isSampleDataLoaded
                                 refreshLocalBackups()
                             }
                         } label: {
-                            LabeledContent("Recovery Points", value: "\(localBackupURLs.count)")
+                            HStack {
+                                Label("Backup & Restore", systemImage: "externaldrive")
+                                Spacer()
+                                Text("\(localBackupURLs.count) local")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     } header: {
-                        Text("Local Data Recovery")
+                        Text("All Local Data")
                     } footer: {
-                        Text("View, create, select, restore, export, or delete up to five local recovery points.")
+                        Text("Export or import a complete portable backup, including your collection, binders, wishlists, Code Vault, sealed items, and transactions.")
                     }
                 }
 

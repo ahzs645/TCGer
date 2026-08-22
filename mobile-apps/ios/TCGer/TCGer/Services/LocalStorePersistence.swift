@@ -33,6 +33,34 @@ enum LocalStorePersistenceError: LocalizedError, Equatable {
     }
 }
 
+enum LocalDataTransferError: LocalizedError, Equatable {
+    case invalidBackup
+    case unsupportedSchemaVersion(Int)
+    case emptyBackup
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidBackup:
+            return "This file is not a valid TCGer data backup."
+        case .unsupportedSchemaVersion(let version):
+            return "This backup uses unsupported schema version \(version). Update TCGer and try again."
+        case .emptyBackup:
+            return "The selected backup file is empty."
+        }
+    }
+}
+
+struct LocalDataBackupSummary: Equatable, Sendable {
+    let exportedAt: Date?
+    let binderCount: Int
+    let cardCopyCount: Int
+    let binderPageCount: Int
+    let wishlistCount: Int
+    let sealedItemCount: Int
+    let onlineCodeCount: Int
+    let transactionCount: Int
+}
+
 struct LocalStorePersistenceFailure: Equatable, Sendable {
     enum Operation: String, Equatable, Sendable {
         case load

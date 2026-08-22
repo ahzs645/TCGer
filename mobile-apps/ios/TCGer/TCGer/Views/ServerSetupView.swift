@@ -70,6 +70,10 @@ struct ServerSetupView: View {
                     .foregroundColor(.secondary)
                 Label("Works fully offline", systemImage: "wifi.slash")
                     .foregroundColor(.secondary)
+
+                LocalDataBackupImportButton(title: "Restore from Backup") { _ in
+                    finishRestoredSetup()
+                }
             }
         } else {
             Section(
@@ -188,5 +192,11 @@ struct ServerSetupView: View {
             LocalStore.shared.loadSampleData()
             environmentStore.loadSampleSmartFolders()
         }
+    }
+
+    private func finishRestoredSetup() {
+        environmentStore.serverConfiguration = .onDevice
+        environmentStore.enableLocalSession(force: true)
+        environmentStore.applyUserPreferences(LocalStore.shared.getUserPreferences())
     }
 }

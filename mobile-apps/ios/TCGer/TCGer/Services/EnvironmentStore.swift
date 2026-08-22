@@ -4,7 +4,7 @@ import Security
 import SwiftUI
 import WidgetKit
 
-enum AppColorScheme: String, CaseIterable, Identifiable {
+enum AppColorScheme: String, CaseIterable, Identifiable, Codable {
     case system, light, dark
 
     var id: String { rawValue }
@@ -26,7 +26,7 @@ enum AppColorScheme: String, CaseIterable, Identifiable {
     }
 }
 
-enum AccentColorChoice: String, CaseIterable, Identifiable {
+enum AccentColorChoice: String, CaseIterable, Identifiable, Codable {
     case blue, green, orange, pink, purple, red, yellow, teal, indigo, mint
 
     var id: String { rawValue }
@@ -47,6 +47,29 @@ enum AccentColorChoice: String, CaseIterable, Identifiable {
         case .mint: return .mint
         }
     }
+}
+
+/// Safe, user-chosen device preferences that travel with a portable local-data
+/// backup. Server addresses, sessions, passwords, API keys, caches, and
+/// developer diagnostics are deliberately excluded.
+struct LocalDataAppPreferences: Codable {
+    let pricingSource: PricingSource
+    let gamePricingSources: [String: PricingSource]
+    let justTCGConditionPreference: String
+    let justTCGLanguagePreference: String
+    let displayCurrencyCode: String
+    let offlineModeEnabled: Bool
+    let sealedProductsEnabled: Bool
+    let autoSyncEnabled: Bool
+    let appColorScheme: AppColorScheme
+    let accentColorChoice: AccentColorChoice
+    let biometricLockEnabled: Bool
+    let smartFolders: [SmartFolder]
+    let tabOrder: [AppTab]
+    let hiddenTabs: Set<AppTab>
+    let focusedSetOrder: [String]
+    let setCompletionMode: SetCompletionMode
+    let setBrowserSort: SetBrowserSort
 }
 
 final class EnvironmentStore: ObservableObject {
@@ -969,6 +992,50 @@ final class EnvironmentStore: ObservableObject {
         defaultGame = preferences.defaultGame
         focusedSetOrder = FocusedSetOrder.normalized(preferences.focusedSetOrder)
         setCompletionMode = SetCompletionMode(rawValue: preferences.setCompletionMode) ?? .standard
+    }
+
+    func localDataBackupPreferences() -> LocalDataAppPreferences {
+        LocalDataAppPreferences(
+            pricingSource: pricingSource,
+            gamePricingSources: gamePricingSources,
+            justTCGConditionPreference: justTCGConditionPreference,
+            justTCGLanguagePreference: justTCGLanguagePreference,
+            displayCurrencyCode: displayCurrencyCode,
+            offlineModeEnabled: offlineModeEnabled,
+            sealedProductsEnabled: sealedProductsEnabled,
+            autoSyncEnabled: autoSyncEnabled,
+            appColorScheme: appColorScheme,
+            accentColorChoice: accentColorChoice,
+            biometricLockEnabled: biometricLockEnabled,
+            smartFolders: smartFolders,
+            tabOrder: tabOrder,
+            hiddenTabs: hiddenTabs,
+            focusedSetOrder: focusedSetOrder,
+            setCompletionMode: setCompletionMode,
+            setBrowserSort: setBrowserSort
+        )
+    }
+
+    func applyLocalDataBackupPreferences(_ preferences: LocalDataAppPreferences) {
+        pricingSource = preferences.pricingSource.isAvailableOnDevice
+            ? preferences.pricingSource
+            : .automatic
+        gamePricingSources = preferences.gamePricingSources.filter { $0.value.isAvailableOnDevice }
+        justTCGConditionPreference = preferences.justTCGConditionPreference
+        justTCGLanguagePreference = preferences.justTCGLanguagePreference
+        displayCurrencyCode = preferences.displayCurrencyCode
+        offlineModeEnabled = preferences.offlineModeEnabled
+        sealedProductsEnabled = preferences.sealedProductsEnabled
+        autoSyncEnabled = preferences.autoSyncEnabled
+        appColorScheme = preferences.appColorScheme
+        accentColorChoice = preferences.accentColorChoice
+        biometricLockEnabled = preferences.biometricLockEnabled
+        smartFolders = preferences.smartFolders
+        tabOrder = AppTab.normalizedOrder(from: preferences.tabOrder.map(\.rawValue))
+        hiddenTabs = Set(preferences.hiddenTabs.filter { !$0.isPinned })
+        focusedSetOrder = FocusedSetOrder.normalized(preferences.focusedSetOrder)
+        setCompletionMode = preferences.setCompletionMode
+        setBrowserSort = preferences.setBrowserSort
     }
 
     // MARK: - Widget Data

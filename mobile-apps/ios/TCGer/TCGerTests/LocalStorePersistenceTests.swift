@@ -71,6 +71,51 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertEqual(store.persistenceFailure?.operation, .restore)
     }
 
+    func testPortableBackupRestoresCollectionWishlistAndCodeVault() throws {
+        let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
+        let destinationRoot = root.appendingPathComponent("destination", isDirectory: true)
+        let source = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: sourceRoot))
+        let destination = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: destinationRoot))
+
+        _ = source.createCollection(name: "Travel Binder", description: nil, colorHex: nil)
+        _ = source.createWishlist(name: "Chase Cards", description: nil, colorHex: nil)
+        _ = try source.createOnlineCodes(
+            tcg: "pokemon",
+            codes: ["ABCD-1234-EFGH"],
+            source: .manual,
+            productName: "Booster Box",
+            notes: "Keep safe"
+        )
+        _ = destination.createCollection(name: "Replace Me", description: nil, colorHex: nil)
+
+        let backup = try source.exportPortableBackup()
+        let summary = try destination.portableBackupSummary(from: backup)
+        XCTAssertEqual(summary.binderCount, 1)
+        XCTAssertEqual(summary.wishlistCount, 1)
+        XCTAssertEqual(summary.onlineCodeCount, 1)
+
+        try destination.importPortableBackup(backup)
+
+        XCTAssertTrue(destination.getCollections().contains { $0.name == "Travel Binder" })
+        XCTAssertFalse(destination.getCollections().contains { $0.name == "Replace Me" })
+        XCTAssertEqual(destination.getWishlists().map(\.name), ["Chase Cards"])
+        XCTAssertEqual(destination.getOnlineCodes().map(\.code), ["ABCD-1234-EFGH"])
+        XCTAssertEqual(try destination.availableLocalBackups().count, 1)
+        XCTAssertNil(destination.persistenceFailure)
+    }
+
+    func testPortableBackupRejectsInvalidDataWithoutReplacingCurrentLibrary() throws {
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 3)
+        let store = LocalStore(persistenceRepository: repository)
+        _ = store.createCollection(name: "Keep Me", description: nil, colorHex: nil)
+
+        XCTAssertThrowsError(try store.importPortableBackup(Data(#"{"not":"a backup"}"#.utf8))) { error in
+            XCTAssertEqual(error as? LocalDataTransferError, .invalidBackup)
+        }
+        XCTAssertTrue(store.getCollections().contains { $0.name == "Keep Me" })
+        XCTAssertEqual(store.persistenceFailure?.operation, .restore)
+    }
+
     func testWriteFailureRollsBackInMemoryStateAndIsObservable() {
         let store = LocalStore(persistenceRepository: FailingPersistenceRepository())
 
