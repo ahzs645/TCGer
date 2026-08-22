@@ -3,6 +3,16 @@ import XCTest
 
 @MainActor
 final class CardScannerCoordinatorTests: XCTestCase {
+    /// The staging tray persists in the app container across view models —
+    /// and therefore across tests and test *runs* on a reused simulator.
+    /// Without this purge, a previous test's staged scan is asynchronously
+    /// restored into a later test's fresh view model whenever the scheduler
+    /// interleaves that way, and session assertions flake.
+    override func setUp() async throws {
+        try await super.setUp()
+        await ScannerStagingStore.shared.clear()
+    }
+
     func testManualCropRescueOnlyAppearsWhenDeveloperOptionEnabled() async {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)

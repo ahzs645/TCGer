@@ -272,6 +272,32 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     // first accepted orientation would preserve a confident wrong result
     // from an upside-down crop even when its semantic counterpart is a much
     // stronger match.
+    /// One orientation's recognition, folded into a value so concurrent and
+    /// serial evaluation share identical downstream handling.
+    private enum OrientationOutcome {
+        case result(CardScanResult?)
+        case rejected
+        case failed(Error)
+    }
+
+    private func recognizeOutcome(
+        attempt: CropAttempt,
+        context: CardScannerContext,
+        source: ScanInvocationKind
+    ) async -> OrientationOutcome {
+        do {
+            return .result(try await recognize(
+                attempt: attempt,
+                context: context,
+                source: source
+            ))
+        } catch CardScannerError.rejectedInput {
+            return .rejected
+        } catch {
+            return .failed(error)
+        }
+    }
+
     private func evaluate(
         _ hypothesis: CropHypothesis,
         context: CardScannerContext,
@@ -280,20 +306,42 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         var sawRejection = false
         var uprightResult: CardScanResult?
         var semantic180Result: CardScanResult?
-        for attempt in hypothesis.orientations {
-            do {
-                let result = try await recognize(
-                    attempt: attempt,
-                    context: context,
-                    source: source
-                )
+        // Both orientations always run and arbitrate only afterwards, so the
+        // pair is order-independent — running it concurrently changes wall
+        // time, never the outcome. Serial evaluation remains for A/B runs.
+        let outcomes: [(attempt: CropAttempt, outcome: OrientationOutcome)]
+        if ScannerPerfOptions.isConcurrentOrientationsEnabled,
+           hypothesis.orientations.count == 2 {
+            let first = hypothesis.orientations[0]
+            let second = hypothesis.orientations[1]
+            async let firstOutcome = recognizeOutcome(
+                attempt: first, context: context, source: source
+            )
+            async let secondOutcome = recognizeOutcome(
+                attempt: second, context: context, source: source
+            )
+            outcomes = [(first, await firstOutcome), (second, await secondOutcome)]
+        } else {
+            var collected: [(CropAttempt, OrientationOutcome)] = []
+            for attempt in hypothesis.orientations {
+                collected.append((attempt, await recognizeOutcome(
+                    attempt: attempt, context: context, source: source
+                )))
+            }
+            outcomes = collected
+        }
+        for (attempt, outcome) in outcomes {
+            switch outcome {
+            case .result(let result):
                 if attempt.isSemantic180 {
                     semantic180Result = result
                 } else {
                     uprightResult = result
                 }
-            } catch CardScannerError.rejectedInput {
+            case .rejected:
                 sawRejection = true
+            case .failed(let error):
+                throw error
             }
         }
         if Self.shouldPreferSemantic180(
@@ -345,6 +393,22 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 quad: quad,
                 isBaseline: isBaseline
             )
+        }
+        if ScannerPerfOptions.isConcurrentOrientationsEnabled,
+           let rotated = cropper.rotated180(image) {
+            async let uprightAttempt = makeAttempt(for: image, kind: kind, quad: quad)
+            async let rotatedAttempt = makeAttempt(for: rotated, kind: kind, quad: quad)
+            guard var upright = try await uprightAttempt else {
+                _ = try? await rotatedAttempt
+                return nil
+            }
+            upright.isBaseline = isBaseline
+            var orientations = [upright]
+            if var semantic180 = try await rotatedAttempt {
+                semantic180.isSemantic180 = true
+                orientations.append(semantic180)
+            }
+            return CropHypothesis(orientations: orientations)
         }
         guard var upright = try await makeAttempt(for: image, kind: kind, quad: quad) else {
             return nil

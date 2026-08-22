@@ -182,18 +182,28 @@ private struct ScannerOptionsPopover: View {
     let demoTitle: String
     let onRunDemo: () -> Void
 
-    // Experimental speed options, read by the scan pipeline at call time via
+    // Speed options, read by the scan pipeline at call time via
     // `ScannerPerfOptions`; @AppStorage writes the same UserDefaults keys.
+    // Defaults here mirror ScannerPerfOptions' own defaults so the toggles
+    // show the effective state before a user ever touches them. The section
+    // only renders with Scanner Debug enabled — regular users get the
+    // validated defaults with no dials.
+    @AppStorage(ScannerDevModeStore.enabledDefaultsKey)
+    private var devModeEnabled = false
     @AppStorage(ScannerPerfOptions.vectorizedANNDefaultsKey)
-    private var vectorizedANNEnabled = false
+    private var vectorizedANNEnabled = true
     @AppStorage(ScannerPerfOptions.allowedIndexCacheDefaultsKey)
-    private var allowedIndexCacheEnabled = false
+    private var allowedIndexCacheEnabled = true
     @AppStorage(ScannerPerfOptions.stagedHypothesesDefaultsKey)
-    private var stagedHypothesesEnabled = false
+    private var stagedHypothesesEnabled = true
     @AppStorage(ScannerPerfOptions.batchedOrientationDefaultsKey)
     private var batchedOrientationEnabled = false
     @AppStorage(ScannerPerfOptions.warmStartDefaultsKey)
-    private var warmStartEnabled = false
+    private var warmStartEnabled = true
+    @AppStorage(ScannerPerfOptions.concurrentOrientationsDefaultsKey)
+    private var concurrentOrientationsEnabled = true
+    @AppStorage(ScannerPerfOptions.fastCaptureDefaultsKey)
+    private var fastCaptureEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -311,26 +321,34 @@ private struct ScannerOptionsPopover: View {
                     }
                 }
 
-                Section {
-                    Toggle(isOn: $vectorizedANNEnabled) {
-                        Label("Fast Index Search", systemImage: "bolt")
+                if devModeEnabled {
+                    Section {
+                        Toggle(isOn: $vectorizedANNEnabled) {
+                            Label("Fast Index Search", systemImage: "bolt")
+                        }
+                        Toggle(isOn: $stagedHypothesesEnabled) {
+                            Label("Staged Crop Retries", systemImage: "square.stack.3d.up")
+                        }
+                        Toggle(isOn: $allowedIndexCacheEnabled) {
+                            Label("Cache Search Scope", systemImage: "internaldrive")
+                        }
+                        Toggle(isOn: $concurrentOrientationsEnabled) {
+                            Label("Parallel Orientation Check", systemImage: "arrow.triangle.branch")
+                        }
+                        Toggle(isOn: $batchedOrientationEnabled) {
+                            Label("Batched Orientation Check", systemImage: "rotate.right")
+                        }
+                        Toggle(isOn: $warmStartEnabled) {
+                            Label("Preload Scanner Models", systemImage: "bolt.badge.clock")
+                        }
+                        Toggle(isOn: $fastCaptureEnabled) {
+                            Label("Fast Shutter Capture", systemImage: "camera.badge.clock")
+                        }
+                    } header: {
+                        Text("Speed")
+                    } footer: {
+                        Text("Validated speedups are on by default; these dev-mode switches exist for A/B sessions. Changes apply to the next scan (model preloading takes effect the next time the scanner opens).")
                     }
-                    Toggle(isOn: $stagedHypothesesEnabled) {
-                        Label("Staged Crop Retries", systemImage: "square.stack.3d.up")
-                    }
-                    Toggle(isOn: $allowedIndexCacheEnabled) {
-                        Label("Cache Search Scope", systemImage: "internaldrive")
-                    }
-                    Toggle(isOn: $batchedOrientationEnabled) {
-                        Label("Batched Orientation Check", systemImage: "rotate.right")
-                    }
-                    Toggle(isOn: $warmStartEnabled) {
-                        Label("Preload Scanner Models", systemImage: "bolt.badge.clock")
-                    }
-                } header: {
-                    Text("Speed (Experimental)")
-                } footer: {
-                    Text("Experimental recognition speedups. Applied to the next scan (model preloading takes effect the next time the scanner opens); turn any of them off to restore the original pipeline.")
                 }
             }
             .navigationTitle("Scanner Options")

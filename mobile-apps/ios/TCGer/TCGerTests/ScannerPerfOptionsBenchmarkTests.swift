@@ -40,6 +40,8 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
         ScannerPerfOptions.allowedIndexCacheDefaultsKey,
         ScannerPerfOptions.stagedHypothesesDefaultsKey,
         ScannerPerfOptions.batchedOrientationDefaultsKey,
+        ScannerPerfOptions.concurrentOrientationsDefaultsKey,
+        ScannerPerfOptions.warmStartDefaultsKey,
     ]
 
     override func tearDown() {
@@ -63,6 +65,7 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
             Config(name: "allowedIndexCache", enabledKeys: [ScannerPerfOptions.allowedIndexCacheDefaultsKey]),
             Config(name: "stagedHypotheses", enabledKeys: [ScannerPerfOptions.stagedHypothesesDefaultsKey]),
             Config(name: "batchedOrientation", enabledKeys: [ScannerPerfOptions.batchedOrientationDefaultsKey]),
+            Config(name: "concurrentOrientations", enabledKeys: [ScannerPerfOptions.concurrentOrientationsDefaultsKey]),
             Config(name: "all on", enabledKeys: Self.allPerfKeys),
         ]
 
@@ -107,11 +110,58 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
         // The pure-performance flags must not change outcomes. Staged
         // hypotheses may (ordering change) — reported above, judged by the
         // replay suite, not asserted here.
-        for name in ["vectorizedANN", "allowedIndexCache", "batchedOrientation"] {
+        for name in ["vectorizedANN", "allowedIndexCache", "batchedOrientation", "concurrentOrientations"] {
             XCTAssertEqual(
                 outcomesByConfig[name], baselineOutcomes,
                 "\(name) is a pure optimization and must not change scan outcomes"
             )
+        }
+    }
+
+    /// Per-stage profile under the current defaults: scans the corpus frames
+    /// with a diagnostics collector attached and aggregates the recorded
+    /// embed/ANN/OCR/detect milliseconds — the split that says whether the
+    /// model, retrieval, or OCR deserves the next optimization (or a model
+    /// retrain). Simulator proportions are CPU-skewed; the device recording
+    /// pipeline now captures the same fields for ground truth.
+    func testStageTimingProfile() async throws {
+        guard let dir = ProcessInfo.processInfo.environment["DEVMODE_SESSIONS_DIR"] else {
+            throw XCTSkip("Set DEVMODE_SESSIONS_DIR to an unzipped Export All archive to run.")
+        }
+        let cap = ProcessInfo.processInfo.environment["PERF_BENCH_FRAME_CAP"]
+            .flatMap(Int.init) ?? 16
+        let frames = try collectSingleCardFrames(from: dir, cap: cap)
+        XCTAssertFalse(frames.isEmpty)
+
+        let coordinator = CardScannerCoordinator.makeDefault()
+        _ = await scan(frames[0].image, with: coordinator)
+
+        var totals: [String: Double] = [:]
+        var elapsedTotal: Double = 0
+        for frame in frames {
+            let diagnostics = ScanDiagnostics()
+            var context = CardScannerContext.test(engine: .localOnly)
+            context.diagnostics = diagnostics
+            let started = Date()
+            _ = await coordinator.scan(image: frame.image, context: context, source: .photoCapture)
+            elapsedTotal += Date().timeIntervalSince(started) * 1_000
+            for (stage, ms) in diagnostics.stageTimings {
+                totals[stage, default: 0] += ms
+            }
+            for attempt in diagnostics.attempts {
+                totals["embed", default: 0] += attempt.embedMs ?? 0
+                totals["ann", default: 0] += attempt.annMs ?? 0
+                totals["titleOCR", default: 0] += attempt.titleOCRMs ?? 0
+                totals["footerOCR", default: 0] += attempt.footerOCRMs ?? 0
+            }
+        }
+        let accounted = totals.values.reduce(0, +)
+        print(String(format: "STAGEPROF frames %d  wall %.1fs  accounted %.1fs (%.0f%%)",
+                     frames.count, elapsedTotal / 1_000, accounted / 1_000,
+                     100 * accounted / max(elapsedTotal, 1)))
+        for (stage, ms) in totals.sorted(by: { $0.value > $1.value }) {
+            print(String(format: "STAGEPROF   %@ %.1fs (%.0f%% of wall)",
+                         stage, ms / 1_000, 100 * ms / max(elapsedTotal, 1)))
         }
     }
 

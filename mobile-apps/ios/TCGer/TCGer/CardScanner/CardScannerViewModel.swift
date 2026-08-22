@@ -171,9 +171,12 @@ final class CardScannerViewModel: ObservableObject {
         }
         startFrameConsumer()
         restoreStagedSession()
-        if ScannerPerfOptions.isWarmStartEnabled {
-            // Preload model/index/metadata off the presentation path so the
-            // first shutter press does not pay the multi-second lazy loads.
+        // Preload model/index/metadata off the presentation path so the
+        // first shutter press does not pay the multi-second lazy loads.
+        // Only for the default coordinator: an injected one (tests, debug
+        // harnesses) brings its own strategies, which have nothing bundled
+        // to warm and would just churn the scheduler.
+        if coordinator == nil, ScannerPerfOptions.isWarmStartEnabled {
             Task.detached(priority: .userInitiated) {
                 await resolvedCoordinator.warmUp()
             }
@@ -377,11 +380,13 @@ final class CardScannerViewModel: ObservableObject {
         state = .processing
         defer { isProcessingPhoto = false }
 
-        let captureQuality = await Self.captureQuality(
+        // The capture-quality pass (its own Vision detection + stats render)
+        // only feeds the guide hint and the dev-mode record, so it runs
+        // concurrently with recognition instead of serially ahead of it.
+        async let captureQualityTask = Self.captureQuality(
             image: image,
             intrinsics: cameraIntrinsics
         )
-        latestCaptureQuality = captureQuality
 
         var scanContext = context
         let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
@@ -389,6 +394,8 @@ final class CardScannerViewModel: ObservableObject {
         scanContext.cameraIntrinsics = cameraIntrinsics
         let started = Date()
         let result = await coordinator.scan(image: image, context: scanContext, source: source)
+        let captureQuality = await captureQualityTask
+        latestCaptureQuality = captureQuality
         if let diagnostics, let manualCropQuad {
             let imageIndex = diagnostics.registerAttemptImage(image)
             let candidates: [ScanDiagnostics.Candidate]
@@ -746,7 +753,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private func handleCapturedPhoto(_ photo: AVCapturePhoto) async {
         defer { isProcessingPhoto = false }
-        guard let cgImage = makeCGImage(from: photo) else {
+        guard let cgImage = await Self.decodeCapturedPhoto(photo) else {
             state = .error("Unable to process captured photo.")
             return
         }
@@ -1070,9 +1077,14 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    private func makeCGImage(from photo: AVCapturePhoto) -> CGImage? {
+    /// The HEIF container encode plus full decode + 2048 px downsample of a
+    /// sensor still is 100–500 ms of CPU. `nonisolated async` runs it on the
+    /// global executor so the shutter press never freezes the preview — a
+    /// nonisolated *synchronous* method would still execute on the caller's
+    /// main actor.
+    private nonisolated static func decodeCapturedPhoto(_ photo: AVCapturePhoto) async -> CGImage? {
         guard let data = photo.fileDataRepresentation() else { return nil }
-        return Self.makeCGImage(from: data)
+        return makeCGImage(from: data)
     }
 
     private var scannerGuideGeometry: ScannerGuideGeometry? {

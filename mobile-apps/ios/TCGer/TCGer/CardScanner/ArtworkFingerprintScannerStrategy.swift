@@ -162,6 +162,14 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
 
     // MARK: - Database Loading
 
+    /// The bundled fingerprint database is a ~53 MB JSON that otherwise
+    /// parses lazily inside the user's first no-match scan — while holding
+    /// the same lock `supports(_:)` takes from SwiftUI body evaluation. Warm
+    /// it with the other scanner assets instead.
+    func warmUp() async {
+        loadDatabaseIfNeeded(for: .pokemon)
+    }
+
     /// Loads (and caches) the database for a mode. Internal rather than
     /// private so performance tests can measure the cold-load cost directly.
     @discardableResult

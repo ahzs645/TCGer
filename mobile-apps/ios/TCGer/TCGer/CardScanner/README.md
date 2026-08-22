@@ -226,6 +226,58 @@ Follow-ups shipped 2026-08-21 (same flag pattern):
   180° pass on confidently non-card upright gates — each changes
   accept/abstain behavior, so each needs the replay treatment first.
 
+### Defaults flip + capture-path round (2026-08-21 evening)
+
+The validated options are now ON by default (`ScannerPerfOptions` returns the
+default when no explicit UserDefaults value exists; an explicit off sticks).
+The Speed section in the Scanner Options popover only renders with Scanner
+Debug enabled — regular users get the defaults with no dials. Two additions,
+same pattern:
+
+- `scannerPerfConcurrentOrientations` (default ON): the 0°/180° pair of one
+  hypothesis is embedded and recognized concurrently. Both orientations still
+  always run and arbitrate afterwards, so outcomes are order-independent —
+  verified empirically: the full replay under the new defaults reproduced
+  every previously-replayed frame identically (zero changed outcomes; same
+  31/76 summary). Benchmark: −42% median alone; all-on median 7.8 s → 2.2 s
+  on the 16-frame corpus (Simulator ratios).
+- `scannerPerfFastCapture` (default ON): `.balanced` photo prioritization and
+  a still capped near the pipeline's 2048 px decode target, instead of
+  `.quality` multi-frame fusion at full sensor resolution — 300–1200 ms of
+  post-shutter processing for pixels the decode path then discarded. The
+  sensor-native rationale for binder OCR was already defeated by the 2048 px
+  downsample in `makeCGImage`.
+
+Capture-path fixes from the latency audit (no flags — pure scheduling):
+
+- The captured still's HEIF encode + decode + downsample now runs off the
+  main actor (`decodeCapturedPhoto`); it was freezing the preview 100–500 ms
+  per shutter press.
+- The capture-quality pass (its own Vision detection) runs concurrently with
+  recognition instead of serially before it.
+- `ArtworkFingerprintScannerStrategy` joins `warmUp()`: its 53 MB fingerprint
+  JSON otherwise parsed lazily inside the first no-match scan while holding
+  the same lock `supports(_:)` takes from SwiftUI body evaluation.
+
+Audit backlog (larger, replay-gated, in impact order): fast-first footer OCR
+with `.accurate` fallback and strip `minimumTextHeight` retuning instead of
+2–4x upscales (Vision serializes text requests globally, so parallel OCR is
+NOT an option — reorder/reduce instead); one shared crop localization passed
+down the strategy chain (currently re-detected up to 4x per no-match);
+`ArtworkFingerprintMatcher` flat-buffer treatment; binder pre-phase
+parallelization (18 serial refinedQuad calls before the pocket task group);
+gating the 450 ms live quality pass off manual-shutter mode; pinning video
+output dimensions.
+
+Test-isolation note: `CardScannerCoordinatorTests` now purges
+`ScannerStagingStore.shared` in `setUp` — the tray persists in the app
+container across view models, tests, and test runs on a reused simulator,
+and restore/append timing races previously decided whether earlier tests'
+staged scans leaked into later assertions. Separately, a reused simulator
+can serve a stale app install after `build-for-testing` (symptom: bundled
+resources suddenly "missing", suites finishing implausibly fast) — erase the
+sim and rerun before believing such failures.
+
 ### Running the replay/benchmark harnesses
 
 - Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan

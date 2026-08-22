@@ -10,6 +10,9 @@ final class ScannerPerfOptionsTests: XCTestCase {
         ScannerPerfOptions.allowedIndexCacheDefaultsKey,
         ScannerPerfOptions.stagedHypothesesDefaultsKey,
         ScannerPerfOptions.batchedOrientationDefaultsKey,
+        ScannerPerfOptions.warmStartDefaultsKey,
+        ScannerPerfOptions.concurrentOrientationsDefaultsKey,
+        ScannerPerfOptions.fastCaptureDefaultsKey,
     ]
 
     override func setUp() {

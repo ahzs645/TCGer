@@ -167,12 +167,39 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     func capturePhoto() {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
-        settings.photoQualityPrioritization = .quality
-        settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        if ScannerPerfOptions.isFastCaptureEnabled {
+            // The decode path downsamples every still to 2048 px before any
+            // recognition sees it, so `.quality`'s multi-frame fusion and the
+            // full 48 MP sensor readout were pure post-shutter latency. Keep
+            // enough resolution for the 2048 px pipeline input plus margin.
+            settings.photoQualityPrioritization = .balanced
+            settings.maxPhotoDimensions = Self.fastCaptureDimensions(
+                from: videoDevice?.activeFormat.supportedMaxPhotoDimensions ?? [],
+                fallback: photoOutput.maxPhotoDimensions
+            )
+        } else {
+            settings.photoQualityPrioritization = .quality
+            settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        }
         if photoOutput.isCameraCalibrationDataDeliverySupported {
             settings.isCameraCalibrationDataDeliveryEnabled = true
         }
         photoOutput.capturePhoto(with: settings, delegate: self)
+    }
+
+    /// Smallest supported still whose short side covers the pipeline's
+    /// 2048 px decode target; the largest supported size when nothing does.
+    static func fastCaptureDimensions(
+        from supported: [CMVideoDimensions],
+        fallback: CMVideoDimensions
+    ) -> CMVideoDimensions {
+        let sufficient = supported
+            .filter { min($0.width, $0.height) >= 2_048 }
+            .min { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }
+        if let sufficient { return sufficient }
+        return supported.max {
+            Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height)
+        } ?? fallback
     }
 
     func canCapturePhoto() -> Bool {
