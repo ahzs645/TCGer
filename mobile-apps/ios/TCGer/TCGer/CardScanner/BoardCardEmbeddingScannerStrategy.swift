@@ -87,6 +87,41 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             metadataStore.supportedGames.contains(mode.tcgGame)
     }
 
+    /// Forces every expensive lazy load the first shutter press would
+    /// otherwise pay: the detector/Vision first-use cost, the embedding
+    /// model load plus its ANE compilation (triggered by the first
+    /// prediction, not the model load), the packed ANN index decode, and the
+    /// catalog metadata decode. A blank frame is enough — the outputs are
+    /// discarded; only the side-effectful loading matters.
+    func warmUp() async {
+        guard encoder.isAvailable, indexStore.isAvailable else { return }
+        guard let blank = Self.makeWarmUpImage() else { return }
+        _ = try? cropper.detectRectanglesDetailed(in: blank, intrinsics: nil)
+        let embedding = (try? await encoder.embedding(for: blank)) ?? []
+        _ = await metadataStore.physicalCardIndices(for: .pokemon, setCode: nil)
+        _ = try? await indexStore.nearestNeighbors(
+            for: embedding,
+            limit: 1,
+            allowedIndices: [0]
+        )
+    }
+
+    private static func makeWarmUpImage() -> CGImage? {
+        let side = 64
+        guard let context = CGContext(
+            data: nil,
+            width: side,
+            height: side,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        ) else { return nil }
+        context.setFillColor(CGColor(gray: 0.5, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+        return context.makeImage()
+    }
+
     func scan(
         image: CGImage,
         context: CardScannerContext,
@@ -104,7 +139,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let hypotheses = try await makeCropHypotheses(
             from: image,
             source: source,
-            intrinsics: context.cameraIntrinsics
+            intrinsics: context.cameraIntrinsics,
+            diagnostics: context.diagnostics
         )
 
         var sawRejection = false
@@ -136,7 +172,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let candidates = try makeCropCandidates(
             from: image,
             source: source,
-            intrinsics: context.cameraIntrinsics
+            intrinsics: context.cameraIntrinsics,
+            diagnostics: context.diagnostics
         )
         var sawRejection = false
         var evaluatedAnyHypothesis = false
@@ -177,12 +214,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private func makeCropCandidates(
         from image: CGImage,
         source: ScanInvocationKind,
-        intrinsics: ScannerCameraIntrinsics?
+        intrinsics: ScannerCameraIntrinsics?,
+        diagnostics: ScanDiagnostics?
     ) throws -> [CropCandidate] {
         var candidates: [CropCandidate] = []
+        let detectStarted = Date()
         let detailed = try cropper.detectRectanglesDetailed(
             in: image,
             intrinsics: intrinsics
+        )
+        diagnostics?.addStageTime(
+            "detect",
+            milliseconds: Date().timeIntervalSince(detectStarted) * 1_000
         )
         var candidateObservations: [VNRectangleObservation] = []
         if let best = CardCropper.preferredObservation(from: detailed.observations) {
@@ -331,7 +374,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     ) async throws -> CropHypothesis? {
         let rotated = cropper.rotated180(image)
         let images = [image] + (rotated.map { [$0] } ?? [])
+        let embedStarted = Date()
         let embeddings = try await encoder.embeddings(for: images)
+        // The batch is one request; attribute its wall time evenly so summed
+        // per-attempt embedMs still totals the real cost.
+        let embedMsPerImage = Date().timeIntervalSince(embedStarted) * 1_000 / Double(images.count)
         guard let uprightEmbedding = embeddings.first, !uprightEmbedding.isEmpty else {
             return nil
         }
@@ -340,7 +387,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             embedding: uprightEmbedding,
             gateScore: rejectionGate?.cardFaceScore(for: uprightEmbedding),
             kind: kind,
-            quad: quad
+            quad: quad,
+            embedMs: embedMsPerImage
         )
         upright.isBaseline = isBaseline
         var orientations = [upright]
@@ -350,7 +398,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 embedding: embeddings[1],
                 gateScore: rejectionGate?.cardFaceScore(for: embeddings[1]),
                 kind: kind,
-                quad: quad
+                quad: quad,
+                embedMs: embedMsPerImage
             )
             semantic180.isSemantic180 = true
             orientations.append(semantic180)
@@ -386,6 +435,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// The geometry-preserving crop turned by 180 degrees to test the
         /// otherwise unknowable semantic top edge.
         var isSemantic180: Bool = false
+        /// Wall time of this attempt's embedding (preprocess + inference).
+        var embedMs: Double = 0
     }
 
     private func makeAttempt(
@@ -393,6 +444,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         kind: ScanDiagnostics.AttemptKind,
         quad: [[Double]]? = nil
     ) async throws -> CropAttempt? {
+        let embedStarted = Date()
         let embedding = try await encoder.embedding(for: image)
         guard !embedding.isEmpty else { return nil }
         return CropAttempt(
@@ -400,19 +452,26 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             embedding: embedding,
             gateScore: rejectionGate?.cardFaceScore(for: embedding),
             kind: kind,
-            quad: quad
+            quad: quad,
+            embedMs: Date().timeIntervalSince(embedStarted) * 1_000
         )
     }
 
     private func makeCropHypotheses(
         from image: CGImage,
         source: ScanInvocationKind,
-        intrinsics: ScannerCameraIntrinsics?
+        intrinsics: ScannerCameraIntrinsics?,
+        diagnostics: ScanDiagnostics?
     ) async throws -> [CropHypothesis] {
         var hypotheses: [CropHypothesis] = []
+        let detectStarted = Date()
         let detailed = try cropper.detectRectanglesDetailed(
             in: image,
             intrinsics: intrinsics
+        )
+        diagnostics?.addStageTime(
+            "detect",
+            milliseconds: Date().timeIntervalSince(detectStarted) * 1_000
         )
         var candidateObservations: [VNRectangleObservation] = []
         if let best = CardCropper.preferredObservation(from: detailed.observations) {
@@ -489,6 +548,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         var evidenceTitleCount: Int?
         var evidenceFooterPairs: [String] = []
         var evidenceOCRNumber: String?
+        var annMs: Double = 0
+        var titleOCRMs: Double = 0
+        var footerOCRMs: Double = 0
         func recordOutcome(_ outcome: ScanDiagnostics.AttemptOutcome) {
             diagnostics?.record(ScanDiagnostics.Attempt(
                 kind: attempt.kind,
@@ -504,7 +566,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 imageIndex: attemptImageIndex,
                 sourceCropPixelWidth: cropped.width,
                 sourceCropPixelHeight: cropped.height,
-                semanticOrientation: attempt.isSemantic180 ? .upsideDown : .upright
+                semanticOrientation: attempt.isSemantic180 ? .upsideDown : .upright,
+                embedMs: attempt.embedMs,
+                annMs: annMs,
+                titleOCRMs: titleOCRMs > 0 ? titleOCRMs : nil,
+                footerOCRMs: footerOCRMs > 0 ? footerOCRMs : nil
             ))
         }
 
@@ -527,11 +593,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         let matches: [ANNVectorMatch]
         do {
+            let annStarted = Date()
             matches = try await indexStore.nearestNeighbors(
                 for: embedding,
                 limit: Configuration.maxNeighbors,
                 allowedIndices: allowedIndices
             )
+            annMs += Date().timeIntervalSince(annStarted) * 1_000
         } catch {
             if error is AnnoyIndexStore.StoreError {
                 recordOutcome(.indexUnavailable)
@@ -582,18 +650,22 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         var titleRunnerScore: Double?
         var titleConstrained = false
         if needsTitleEvidence {
+            let titleStarted = Date()
             let titleCandidates = titleOCR.read(from: cropped)
+            titleOCRMs += Date().timeIntervalSince(titleStarted) * 1_000
             if let titleMatch = await metadataStore.exactNameMatch(
                 for: titleCandidates,
                 game: context.mode.tcgGame,
                 setCode: context.setCode,
                 physicalCardsOnly: true
             ) {
+                let titleANNStarted = Date()
                 let titleMatches = try await indexStore.nearestNeighbors(
                     for: embedding,
                     limit: Configuration.maxNeighbors,
                     allowedIndices: titleMatch.indices
                 )
+                annMs += Date().timeIntervalSince(titleANNStarted) * 1_000
                 let titleRanked = await makeCandidates(
                     from: titleMatches,
                     game: context.mode.tcgGame,
@@ -635,7 +707,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 needsOCRVerification ||
                     (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
             }
+            let footerStarted = Date()
             let reading = footerReading(for: cropped, embedding: embedding, source: source)
+            footerOCRMs += Date().timeIntervalSince(footerStarted) * 1_000
             evidenceFooterPairs = reading.pairNumbers
             let pairNumbers = Set(reading.pairNumbers)
             var matched = ocrEligibleCandidates.first { candidate in

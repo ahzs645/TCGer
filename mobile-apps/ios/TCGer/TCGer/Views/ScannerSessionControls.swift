@@ -192,6 +192,8 @@ private struct ScannerOptionsPopover: View {
     private var stagedHypothesesEnabled = false
     @AppStorage(ScannerPerfOptions.batchedOrientationDefaultsKey)
     private var batchedOrientationEnabled = false
+    @AppStorage(ScannerPerfOptions.warmStartDefaultsKey)
+    private var warmStartEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -322,10 +324,13 @@ private struct ScannerOptionsPopover: View {
                     Toggle(isOn: $batchedOrientationEnabled) {
                         Label("Batched Orientation Check", systemImage: "rotate.right")
                     }
+                    Toggle(isOn: $warmStartEnabled) {
+                        Label("Preload Scanner Models", systemImage: "bolt.badge.clock")
+                    }
                 } header: {
                     Text("Speed (Experimental)")
                 } footer: {
-                    Text("Experimental recognition speedups. Applied to the next scan; turn any of them off to restore the original pipeline.")
+                    Text("Experimental recognition speedups. Applied to the next scan (model preloading takes effect the next time the scanner opens); turn any of them off to restore the original pipeline.")
                 }
             }
             .navigationTitle("Scanner Options")

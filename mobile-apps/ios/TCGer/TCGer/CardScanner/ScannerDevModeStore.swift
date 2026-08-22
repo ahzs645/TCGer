@@ -250,7 +250,8 @@ actor ScannerDevModeStore {
                 )
             },
             imageMetadata: Self.imageMetadata(for: image),
-            originalImageMetadata: originalImage.map(Self.imageMetadata(for:))
+            originalImageMetadata: originalImage.map(Self.imageMetadata(for:)),
+            stageTimingsMs: diagnostics.flatMap { $0.stageTimings.isEmpty ? nil : $0.stageTimings }
         ))
 
         trimSessionIfNeeded(directory: directory)

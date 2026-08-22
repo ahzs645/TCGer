@@ -201,6 +201,46 @@ final class ScannerPerfOptionsTests: XCTestCase {
         }
     }
 
+    // MARK: - Warm start
+
+    /// Warm-up must leave scanning behavior untouched and absorb the lazy
+    /// loads: after `warmUp()`, a fresh coordinator's first scan should not
+    /// be slower than the cold coordinator's warm (second) scan by more than
+    /// noise. Absolute timings are printed, not asserted — Debug Simulator
+    /// variance would make a hard threshold flaky.
+    @MainActor
+    func testWarmUpPreloadsWithoutChangingResults() async throws {
+        let image = try XCTUnwrap(UIImage(named: "BossOrders")?.cgImage)
+
+        let cold = CardScannerCoordinator.makeDefault()
+        let coldStarted = Date()
+        let coldResult = await cold.scan(
+            image: image, context: .test(engine: .localOnly), source: .importedPhoto
+        )
+        let coldFirstMs = Date().timeIntervalSince(coldStarted) * 1_000
+
+        let warmed = CardScannerCoordinator.makeDefault()
+        await warmed.warmUp()
+        let warmStarted = Date()
+        let warmResult = await warmed.scan(
+            image: image, context: .test(engine: .localOnly), source: .importedPhoto
+        )
+        let warmFirstMs = Date().timeIntervalSince(warmStarted) * 1_000
+
+        print(String(
+            format: "WARMSTART cold-first %.0fms vs warmed-first %.0fms",
+            coldFirstMs, warmFirstMs
+        ))
+        guard case .success(let coldScan) = coldResult,
+              case .success(let warmScan) = warmResult else {
+            return XCTFail("bundled fixture must scan on both coordinators")
+        }
+        XCTAssertEqual(
+            coldScan.primary.details.identity.id,
+            warmScan.primary.details.identity.id
+        )
+    }
+
     // MARK: - End-to-end smoke parity
 
     /// The bundled fixture must resolve to the same card with every perf

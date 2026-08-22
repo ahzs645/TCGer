@@ -51,6 +51,16 @@ nonisolated enum ScannerPerfOptions {
         flag(batchedOrientationDefaultsKey, environment: "SCANNER_PERF_BATCHED_ORIENTATION")
     }
 
+    /// Warm start: preload the heavy scanner assets (embedding model + ANE
+    /// compilation, detector/Vision first-use, ANN index, catalog metadata)
+    /// in the background when the scanner opens, instead of lazily inside the
+    /// first shutter press. Device evidence 2026-08-21: the first capture of
+    /// a session took 3.3 s where an identical warm capture took 258 ms.
+    static let warmStartDefaultsKey = "scannerPerfWarmStart"
+    static var isWarmStartEnabled: Bool {
+        flag(warmStartDefaultsKey, environment: "SCANNER_PERF_WARM_START")
+    }
+
     private static func flag(_ defaultsKey: String, environment name: String) -> Bool {
         if let raw = ProcessInfo.processInfo.environment[name] {
             switch raw.lowercased() {

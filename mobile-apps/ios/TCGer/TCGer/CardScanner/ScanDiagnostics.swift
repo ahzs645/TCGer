@@ -121,6 +121,17 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         /// this preserves the coordinator's localization inside the pocket.
         let coordinatorQuad: [[Double]]?
 
+        /// Per-stage wall time for this attempt, in milliseconds. Optional so
+        /// pre-instrumentation recordings decode unchanged. `embedMs` covers
+        /// the Core ML embedding (both preprocessing and inference), `annMs`
+        /// every ANN query the attempt issued, and the OCR fields the
+        /// `.accurate` Vision passes — the numbers that separate "the model
+        /// is slow" from "OCR is slow" when a frame's total looks bad.
+        let embedMs: Double?
+        let annMs: Double?
+        let titleOCRMs: Double?
+        let footerOCRMs: Double?
+
         init(
             kind: AttemptKind,
             quad: [[Double]]?,
@@ -145,7 +156,11 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
             semanticOrientation: SemanticOrientation? = nil,
             captureQuality: ScannerCaptureQualityReport? = nil,
             binderPageFitRect: [Double]? = nil,
-            coordinatorQuad: [[Double]]? = nil
+            coordinatorQuad: [[Double]]? = nil,
+            embedMs: Double? = nil,
+            annMs: Double? = nil,
+            titleOCRMs: Double? = nil,
+            footerOCRMs: Double? = nil
         ) {
             self.kind = kind
             self.quad = quad
@@ -171,6 +186,10 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
             self.captureQuality = captureQuality
             self.binderPageFitRect = binderPageFitRect
             self.coordinatorQuad = coordinatorQuad
+            self.embedMs = embedMs
+            self.annMs = annMs
+            self.titleOCRMs = titleOCRMs
+            self.footerOCRMs = footerOCRMs
         }
 
         func taggedForBinder(_ metadata: BinderMetadata, imageIndex: Int) -> Attempt {
@@ -198,7 +217,11 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
                 semanticOrientation: .unverified,
                 captureQuality: metadata.captureQuality,
                 binderPageFitRect: metadata.pageFitRect,
-                coordinatorQuad: quad
+                coordinatorQuad: quad,
+                embedMs: embedMs,
+                annMs: annMs,
+                titleOCRMs: titleOCRMs,
+                footerOCRMs: footerOCRMs
             )
         }
     }
@@ -206,6 +229,23 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
     private let lock = NSLock()
     private var storedAttempts: [Attempt] = []
     private var storedImages: [CGImage] = []
+    private var storedStageTimings: [String: Double] = [:]
+
+    /// Accumulates frame-level stage time (e.g. "detect" for the rectangle /
+    /// document-segmentation pass that runs once per frame, before any
+    /// attempt exists to hang a number on). Repeated calls sum, so binder
+    /// pocket merges and multi-pass frames report totals.
+    func addStageTime(_ stage: String, milliseconds: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        storedStageTimings[stage, default: 0] += milliseconds
+    }
+
+    var stageTimings: [String: Double] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedStageTimings
+    }
 
     /// Registers the attempt's input image and returns the index to reference
     /// from the `Attempt` entry recorded after the outcome is known.
@@ -229,6 +269,9 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         let snapshot = pocket.snapshot()
         lock.lock()
         defer { lock.unlock() }
+        for (stage, milliseconds) in snapshot.stageTimings {
+            storedStageTimings[stage, default: 0] += milliseconds
+        }
         let imageOffset = storedImages.count
         storedImages.append(contentsOf: snapshot.images)
         storedAttempts.append(contentsOf: snapshot.attempts.map { attempt in
@@ -239,10 +282,14 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         })
     }
 
-    private func snapshot() -> (attempts: [Attempt], images: [CGImage]) {
+    private func snapshot() -> (
+        attempts: [Attempt],
+        images: [CGImage],
+        stageTimings: [String: Double]
+    ) {
         lock.lock()
         defer { lock.unlock() }
-        return (storedAttempts, storedImages)
+        return (storedAttempts, storedImages, storedStageTimings)
     }
 
     var attempts: [Attempt] {
@@ -285,6 +332,10 @@ nonisolated struct ScanEvidenceRecord: Codable {
     /// Optional for backward compatibility with older exports.
     let imageMetadata: ScanImageMetadata?
     let originalImageMetadata: ScanImageMetadata?
+    /// Frame-level stage totals in milliseconds (e.g. "detect"). Attempts
+    /// carry their own per-stage fields; this holds the once-per-frame work.
+    /// Optional so pre-instrumentation recordings decode unchanged.
+    let stageTimingsMs: [String: Double]?
 }
 
 nonisolated struct ScanImageMetadata: Codable, Equatable, Sendable {

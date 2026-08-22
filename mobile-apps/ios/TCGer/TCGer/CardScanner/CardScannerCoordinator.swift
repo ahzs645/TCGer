@@ -11,10 +11,18 @@ protocol ScanStrategy: AnyObject {
         source: ScanInvocationKind,
         apiService: APIService
     ) async throws -> CardScanResult?
+    /// Pre-warms the strategy's expensive lazy loads (models, indices) so
+    /// the first real scan does not pay them. Protocol requirement so the
+    /// coordinator's existential call dispatches to the implementation.
+    func warmUp() async
 }
 
 extension ScanStrategy {
     var supportsLiveScanning: Bool { false }
+
+    /// Optional pre-warm of a strategy's expensive lazy loads so the first
+    /// real scan does not pay them. Default no-op.
+    func warmUp() async {}
 }
 
 final class CardScannerCoordinator: @unchecked Sendable {
@@ -24,6 +32,15 @@ final class CardScannerCoordinator: @unchecked Sendable {
     init(strategies: [ScanStrategy], apiService: APIService) {
         self.strategies = strategies
         self.apiService = apiService
+    }
+
+    /// Runs every strategy's warm-up serially off the caller's critical path.
+    /// Serial on purpose: warm-up competes with nothing when the scanner has
+    /// just opened, and concurrent Core ML compilations contend for the ANE.
+    func warmUp() async {
+        for strategy in strategies {
+            await strategy.warmUp()
+        }
     }
 
     static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {

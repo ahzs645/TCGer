@@ -193,6 +193,39 @@ their device-accepted me05-059. The bundled ANN index was regenerated
 2026-08-15, after the last green replay validation — prime suspect. Triage
 tracked separately.
 
+### First device evidence (scan-session-20260821-211659)
+
+A device session recorded with the options toggled between captures (ingested
+into TCGer-Session-Reference) works as a natural A/B — attempt traces identify
+the pipeline order per frame (a whole-frame attempt before the detected crop
+proves legacy order):
+
+- Staged accepted scans: 91–418 ms, median 322 ms (11 frames).
+- Same-subject pairs: single card col1-63 legacy 583 ms vs staged 418/322 ms;
+  one binder page captured three times — legacy 1,595 ms (3/4 pockets matched)
+  vs staged 907/946 ms (the 946 ms capture matched 4/4).
+- First scan of the session: 3,262 ms (lazy model/index loads; an identical
+  warm capture took 258 ms).
+- No-match frames: 151–856 ms, median 488 ms — the biggest remaining cost;
+  each runs the full retry ladder (4–6 embeddings) plus `.accurate` Vision
+  title/footer OCR per attempt.
+
+Follow-ups shipped 2026-08-21 (same flag pattern):
+
+- `scannerPerfWarmStart` ("Preload Scanner Models" toggle): the coordinator
+  pre-warms detector/Vision first-use, the embedding model including its ANE
+  compilation (triggered by a prediction, not the model load), the ANN index,
+  and catalog metadata in a detached task at scanner init.
+- Per-stage timings now record into dev-mode evidence: each attempt carries
+  `embedMs` / `annMs` / `titleOCRMs` / `footerOCRMs`, and frames carry a
+  `stageTimingsMs` map (currently `detect`). All fields are optional, so
+  older recordings decode unchanged. The next device session can therefore
+  split the no-match median into model vs retrieval vs OCR before anyone
+  optimizes the wrong stage. Candidates waiting on that data: concurrent
+  0°/180° evaluation, per-frame OCR reuse across attempts, and skipping the
+  180° pass on confidently non-card upright gates — each changes
+  accept/abstain behavior, so each needs the replay treatment first.
+
 ### Running the replay/benchmark harnesses
 
 - Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan

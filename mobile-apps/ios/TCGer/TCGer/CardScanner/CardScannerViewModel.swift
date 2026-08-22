@@ -171,6 +171,13 @@ final class CardScannerViewModel: ObservableObject {
         }
         startFrameConsumer()
         restoreStagedSession()
+        if ScannerPerfOptions.isWarmStartEnabled {
+            // Preload model/index/metadata off the presentation path so the
+            // first shutter press does not pay the multi-second lazy loads.
+            Task.detached(priority: .userInitiated) {
+                await resolvedCoordinator.warmUp()
+            }
+        }
     }
 
     private var isOverlayCoveringPreview: Bool {
