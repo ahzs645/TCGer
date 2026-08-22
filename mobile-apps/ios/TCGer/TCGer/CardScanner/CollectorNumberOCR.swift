@@ -22,6 +22,24 @@ struct CollectorNumberOCR {
         let pairNumbers: [String]
         let digitRuns: [String]
         let promoCodes: [String]
+        /// True when this reading came from the `.fast` recognition pipeline.
+        /// A fast reading that fails to confirm any shortlist candidate gets
+        /// one `.accurate` re-read — fast can be conclusive-but-wrong (a
+        /// garbled pair suppresses the fallback yet matches nothing).
+        var usedFastPath: Bool = false
+
+        var isEmpty: Bool {
+            pairNumbers.isEmpty && digitRuns.isEmpty && promoCodes.isEmpty
+        }
+
+        /// A reading strong enough for the fast pass to stand on its own.
+        /// Bare digit runs are the noisy class — a fast misread that yields
+        /// only runs must not suppress the accurate fallback, or a
+        /// confirmable footer silently loses its OCR rescue (measured: one
+        /// labeled accept lost when fast+lean combined on exactly this).
+        var isConclusive: Bool {
+            !pairNumbers.isEmpty || !promoCodes.isEmpty
+        }
     }
 
     /// Returns normalised "NNN/NNN" collector numbers found in the footer.
@@ -30,17 +48,58 @@ struct CollectorNumberOCR {
     }
 
     /// Reads the footer once and extracts both pair numbers and digit runs.
+    /// With `ScannerPerfOptions.isFastFooterOCREnabled`, tries the much
+    /// cheaper `.fast` recognition pipeline first and falls back to
+    /// `.accurate` only when it extracted nothing usable — the regex layer is
+    /// the error corrector for a fixed-format numeric read.
     func readFooter(from image: CGImage) -> FooterReading {
         guard let footer = cropFooter(image) else {
             return FooterReading(pairNumbers: [], digitRuns: [], promoCodes: [])
         }
+        if ScannerPerfOptions.isFastFooterOCREnabled {
+            // Lean strips apply to the FAST pass only: it reads the unscaled
+            // strip with a raised floor (Vision derives its working
+            // resolution from `minimumTextHeight`, so this is the actual
+            // speed lever). The `.accurate` pass always keeps the 4x upscale
+            // — replay measured labeled accepts lost when accurate also went
+            // lean, so accuracy-bearing reads stay byte-identical to the
+            // original pipeline.
+            let lean = ScannerPerfOptions.isLeanOCRStripsEnabled
+            if let fastStrip = lean ? cropFooter(image, upscaled: false) : footer {
+                var fast = recognize(
+                    fastStrip,
+                    level: .fast,
+                    minimumTextHeight: lean ? 0.1 : 0.02
+                )
+                if fast.isConclusive {
+                    fast.usedFastPath = true
+                    return fast
+                }
+            }
+        }
+        return recognize(footer, level: .accurate, minimumTextHeight: 0.02)
+    }
 
+    /// Unconditional `.accurate` read, used to rescue a fast-path reading
+    /// that confirmed nothing.
+    func readFooterAccurate(from image: CGImage) -> FooterReading {
+        guard let footer = cropFooter(image) else {
+            return FooterReading(pairNumbers: [], digitRuns: [], promoCodes: [])
+        }
+        return recognize(footer, level: .accurate, minimumTextHeight: 0.02)
+    }
+
+    private func recognize(
+        _ footer: CGImage,
+        level: VNRequestTextRecognitionLevel,
+        minimumTextHeight: Float
+    ) -> FooterReading {
         let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
+        request.recognitionLevel = level
         request.usesLanguageCorrection = false
-        // Lower the floor so tiny collector-number digits clear Vision's ~1/32
-        // default minimumTextHeight.
-        request.minimumTextHeight = 0.02
+        // The default floor is ~1/32; tiny collector-number digits need it
+        // lowered on upscaled strips.
+        request.minimumTextHeight = minimumTextHeight
 
         let handler = VNImageRequestHandler(cgImage: footer, orientation: .up, options: [:])
         try? handler.perform([request])
@@ -55,12 +114,13 @@ struct CollectorNumberOCR {
         )
     }
 
-    private func cropFooter(_ image: CGImage) -> CGImage? {
+    private func cropFooter(_ image: CGImage, upscaled: Bool = true) -> CGImage? {
         let w = CGFloat(image.width)
         let h = CGFloat(image.height)
         let rect = CGRect(x: 0, y: h * footerTop, width: w, height: h * footerHeight)
             .integral
         guard let strip = image.cropping(to: rect) else { return nil }
+        if !upscaled { return strip }
 
         // Upscale to help recognition of small digits.
         let outW = Int(CGFloat(strip.width) * upscale)

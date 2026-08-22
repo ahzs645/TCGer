@@ -149,7 +149,11 @@ final class CardScannerViewModel: ObservableObject {
         binderPages.reduce(0) { $0 + $1.addedDetectionIDs.count }
     }
 
-    init(coordinator: CardScannerCoordinator? = nil) {
+    /// `restoresStagedSession` exists for tests: the staging tray is a
+    /// process-wide persistent store, and the asynchronous restore otherwise
+    /// races earlier tests' detached persists into later tests' fresh view
+    /// models. Production always restores.
+    init(coordinator: CardScannerCoordinator? = nil, restoresStagedSession: Bool = true) {
 #if targetEnvironment(simulator)
         isSimulator = true
 #else
@@ -170,7 +174,9 @@ final class CardScannerViewModel: ObservableObject {
             }
         }
         startFrameConsumer()
-        restoreStagedSession()
+        if restoresStagedSession {
+            restoreStagedSession()
+        }
         // Preload model/index/metadata off the presentation path so the
         // first shutter press does not pay the multi-second lazy loads.
         // Only for the default coordinator: an injected one (tests, debug

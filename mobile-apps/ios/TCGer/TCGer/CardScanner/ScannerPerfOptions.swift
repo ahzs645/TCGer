@@ -90,6 +90,45 @@ nonisolated enum ScannerPerfOptions {
         flag(fastCaptureDefaultsKey, environment: "SCANNER_PERF_FAST_CAPTURE", defaultValue: true)
     }
 
+    /// Fast-first footer OCR: read the collector number with `.fast` (a
+    /// different, much cheaper Vision pipeline) and fall back to `.accurate`
+    /// only when the fast pass extracts nothing usable. The NNN/NNN regex
+    /// layer is the error corrector, mirroring Apple's real-time phone-number
+    /// sample. A fast reading that fails to confirm any shortlist candidate
+    /// gets one `.accurate` rescue read, so accuracy-bearing decisions never
+    /// rest on the fast pass alone. Replay-validated identical to baseline
+    /// 2026-08-22; −20% median in the Simulator control. ON by default.
+    static let fastFooterOCRDefaultsKey = "scannerPerfFastFooterOCR"
+    static var isFastFooterOCREnabled: Bool {
+        flag(fastFooterOCRDefaultsKey, environment: "SCANNER_PERF_FAST_FOOTER_OCR", defaultValue: true)
+    }
+
+    /// Lean OCR strips: the FAST footer pass reads the unscaled strip with a
+    /// raised `minimumTextHeight` instead of the 4x upscale. Applies only in
+    /// combination with `isFastFooterOCREnabled`; `.accurate` reads always
+    /// keep their upscale — the original full-lean variant measurably lost
+    /// labeled accepts on the replay corpus when accurate reads went lean
+    /// too (2026-08-22), which is why it was scoped down. The fast-only
+    /// variant replayed byte-identical to baseline. ON by default.
+    static let leanOCRStripsDefaultsKey = "scannerPerfLeanOCRStrips"
+    static var isLeanOCRStripsEnabled: Bool {
+        flag(leanOCRStripsDefaultsKey, environment: "SCANNER_PERF_LEAN_OCR_STRIPS", defaultValue: true)
+    }
+
+    /// Footer-first OCR ordering: when OCR evidence is needed, read the
+    /// (cheap) collector number before the (expensive) title, skip the title
+    /// pass entirely once the collector number confirms a candidate, and
+    /// re-match the same footer reading after a title constraint instead of
+    /// reading again. Vision serializes text requests globally, so the win
+    /// comes from running fewer passes, not from parallelism. Targets the
+    /// device profile's biggest line item (title OCR, 31–44% of scan wall
+    /// time). Replay-validated identical to baseline 2026-08-22. ON by
+    /// default.
+    static let footerFirstOCRDefaultsKey = "scannerPerfFooterFirstOCR"
+    static var isFooterFirstOCREnabled: Bool {
+        flag(footerFirstOCRDefaultsKey, environment: "SCANNER_PERF_FOOTER_FIRST_OCR", defaultValue: true)
+    }
+
     private static func flag(
         _ defaultsKey: String,
         environment name: String,

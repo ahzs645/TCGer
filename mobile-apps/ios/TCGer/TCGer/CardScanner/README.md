@@ -300,6 +300,51 @@ remains an accuracy play — ArcFace-on-catalog per TCG-AR). And the index
 actor's serialization is now worth removing (immutable post-load snapshot
 so queries stop hopping the actor), which mostly benefits binder pages.
 
+### OCR round + retrain scaffolding (2026-08-22)
+
+Three OCR options attacked the device profile's ~⅔-of-wall OCR share; the
+full-corpus replay gate did its job and shaped what shipped:
+
+- `scannerPerfFastFooterOCR` (default ON): `.fast` recognition for the
+  collector-number strip; a reading with no pairs/promos (bare digit runs
+  are the noisy class) falls back to `.accurate`, and a conclusive fast
+  reading that then fails to confirm any shortlist candidate gets one
+  `.accurate` rescue read inside the strategy. That confirmation-driven
+  rescue exists because a garbled-but-plausible fast pair otherwise
+  suppressed the fallback and silently cost an OCR-rescued accept
+  (measured). Replay: identical to baseline. Sim benchmark: −20% median.
+- `scannerPerfFooterFirstOCR` (default ON): when OCR evidence is needed,
+  the footer is read before the title, the title pass is skipped entirely
+  once the collector number confirms, and a title constraint re-matches the
+  cached reading instead of re-reading. Replay: identical to baseline (one
+  frame same-card at a higher score).
+- `scannerPerfLeanOCRStrips` (default ON, scoped): the initial variant (lean
+  strips for BOTH readers' all passes) failed the gate hard — 29/76 labeled
+  and five OCR-rescued accepts lost, because `.accurate` on a 1x strip at a
+  raised `minimumTextHeight` misses footers the 4x upscale reads. Re-scoped
+  to the fast footer pass only (accurate always keeps its upscale), the
+  replay came back byte-identical to baseline.
+
+Gate mechanics lesson recorded the hard way: the 16-frame benchmark showed
+the trio "clean" while the 287+-frame replay exposed the losses — never
+default an OCR change on benchmark evidence alone. Also: re-baseline the
+replay after ingesting new sessions before attributing losses to a change
+(two "new" losses were pre-existing frames of a freshly ingested session).
+
+Retrain scaffolding (accuracy play, runs on Colab):
+
+- `mobile-apps/ios/scripts/train-arcface-encoder-colab.ipynb` — ArcFace
+  classification-as-retrieval student (FastViT-T8, 384-d, TCG-AR recipe)
+  with the exact iOS preprocessing contract; exports a drop-in
+  `CardEmbeddings-arcface.mlpackage` + `CardsIndexVectors-arcface.bin` to
+  `MyDrive/TCGer-encoder/` and documents the local A/B procedure (worktree,
+  delete `CardFaceGate.json`, run fixtures + replay against the shipped
+  encoder's baseline).
+- `mobile-apps/ios/scripts/train-card-detector-colab.ipynb` — the YOLO11s
+  detector notebook, finally committed from Drive (`Untitled2.ipynb`).
+- Inputs staged on Drive: `TCGer-encoder/CardsIndexMetadata.json` (repo
+  copy; defines annIndex order) and the current DINOv2 bin for comparison.
+
 ### Running the replay/benchmark harnesses
 
 - Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan

@@ -710,10 +710,93 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     primary.confidence.score - $0.confidence.score < Configuration.ambiguityMargin
                 } == true
         )
+
+        // Confirms a shortlist candidate from one footer reading: NNN/NNN
+        // pairs, then letter-prefixed promo codes, then slash-less digit runs
+        // (the last only when every confirmed candidate agrees on ONE
+        // number). Shared verbatim by both OCR orderings below.
+        func matchCollectorNumber(
+            in candidates: [CardScanCandidate],
+            reading: CollectorNumberOCR.FooterReading
+        ) -> CardScanCandidate? {
+            let pairNumbers = Set(reading.pairNumbers)
+            var matched = candidates.first { candidate in
+                guard !pairNumbers.isEmpty,
+                      let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                else { return false }
+                return pairNumbers.contains(cn)
+            }
+            // Letter-prefixed promo numbers ("SWSH204") never print as
+            // NNN/NNN, so without this branch the entire promo class was
+            // structurally impossible to OCR-confirm.
+            if matched == nil, !reading.promoCodes.isEmpty {
+                let promoCodes = Set(reading.promoCodes)
+                matched = candidates.first { candidate in
+                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id),
+                          cn.contains(where: \.isLetter)
+                    else { return false }
+                    return promoCodes.contains(cn)
+                }
+            }
+            if matched == nil, !reading.digitRuns.isEmpty {
+                let confirmed = candidates.filter { candidate in
+                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                    else { return false }
+                    return CollectorNumberOCR.runsConfirm(number: cn, in: reading.digitRuns)
+                }
+                let distinctNumbers = Set(confirmed.compactMap {
+                    CollectorNumberOCR.collectorNumber(fromCardId: $0.details.identity.id)
+                })
+                if distinctNumbers.count == 1 {
+                    matched = confirmed.first
+                }
+            }
+            return matched
+        }
+
+        var ocrVerified = false
+        var footerFirstReading: CollectorNumberOCR.FooterReading?
+        let footerFirst = ScannerPerfOptions.isFooterFirstOCREnabled
+
+        // Footer-first ordering: the collector number is both cheaper to read
+        // and stronger evidence than a title (it proves the printing, not
+        // just the name), so read it before deciding whether the title pass
+        // is needed at all. The reading is kept for re-matching after a
+        // title constraint — one Vision pass either way.
+        if footerFirst {
+            let preTiebreak = ranked.count >= 2 &&
+                (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
+            let preVerification = gateRejected ||
+                primary.confidence.score < Configuration.strongAcceptanceScore
+            if preTiebreak || preVerification {
+                let eligible = ranked.filter { candidate in
+                    preVerification ||
+                        (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
+                }
+                let footerStarted = Date()
+                var reading = footerReading(for: cropped, embedding: embedding, source: source)
+                if reading.usedFastPath, matchCollectorNumber(in: eligible, reading: reading) == nil {
+                    // Fast read confirmed nothing — one accurate rescue read.
+                    reading = ocr.readFooterAccurate(from: cropped)
+                }
+                footerOCRMs += Date().timeIntervalSince(footerStarted) * 1_000
+                footerFirstReading = reading
+                evidenceFooterPairs = reading.pairNumbers
+                if let matched = matchCollectorNumber(in: eligible, reading: reading) {
+                    let collectorNumber = CollectorNumberOCR.collectorNumber(
+                        fromCardId: matched.details.identity.id
+                    )
+                    primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
+                    ocrVerified = true
+                    evidenceOCRNumber = collectorNumber
+                }
+            }
+        }
+
         var titlePrintingCount = 0
         var titleRunnerScore: Double?
         var titleConstrained = false
-        if needsTitleEvidence {
+        if needsTitleEvidence, !(footerFirst && ocrVerified) {
             let titleStarted = Date()
             let titleCandidates = titleOCR.read(from: cropped)
             titleOCRMs += Date().timeIntervalSince(titleStarted) * 1_000
@@ -760,61 +843,40 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // Collector-number OCR tiebreaker: when the top-2 are close (likely
         // near twins / same-art reprints), read the footer collector number and
         // promote the shortlist candidate it confirms. The embedding alone can't
-        // split twins; only a clean "NNN/NNN" pair overrides it.
-        var ocrVerified = false
-        let needsOCRTiebreak = ranked.count >= 2 &&
-            (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
-        let needsOCRVerification = gateRejected ||
-            primary.confidence.score < Configuration.strongAcceptanceScore
-        if needsOCRTiebreak || needsOCRVerification {
-            let ocrEligibleCandidates = ranked.filter { candidate in
-                needsOCRVerification ||
-                    (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
-            }
-            let footerStarted = Date()
-            let reading = footerReading(for: cropped, embedding: embedding, source: source)
-            footerOCRMs += Date().timeIntervalSince(footerStarted) * 1_000
-            evidenceFooterPairs = reading.pairNumbers
-            let pairNumbers = Set(reading.pairNumbers)
-            var matched = ocrEligibleCandidates.first { candidate in
-                guard !pairNumbers.isEmpty,
-                      let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
-                else { return false }
-                return pairNumbers.contains(cn)
-            }
-            // Letter-prefixed promo numbers ("SWSH204") never print as
-            // NNN/NNN, so without this branch the entire promo class was
-            // structurally impossible to OCR-confirm.
-            if matched == nil, !reading.promoCodes.isEmpty {
-                let promoCodes = Set(reading.promoCodes)
-                matched = ocrEligibleCandidates.first { candidate in
-                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id),
-                          cn.contains(where: \.isLetter)
-                    else { return false }
-                    return promoCodes.contains(cn)
+        // split twins; only a clean "NNN/NNN" pair overrides it. In
+        // footer-first mode the reading already happened above — this stage
+        // re-matches it against the title-constrained shortlist instead of
+        // running a second Vision pass.
+        if !ocrVerified {
+            let needsOCRTiebreak = ranked.count >= 2 &&
+                (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
+            let needsOCRVerification = gateRejected ||
+                primary.confidence.score < Configuration.strongAcceptanceScore
+            if needsOCRTiebreak || needsOCRVerification {
+                let ocrEligibleCandidates = ranked.filter { candidate in
+                    needsOCRVerification ||
+                        (primary.confidence.score - candidate.confidence.score) < Configuration.ocrMargin
                 }
-            }
-            // Fallback: slash-less digit runs ("079202" = 079/202). Accepted
-            // only when every confirmed candidate agrees on ONE collector
-            // number — ambiguity means abstain, never guess.
-            if matched == nil, !reading.digitRuns.isEmpty {
-                let confirmed = ocrEligibleCandidates.filter { candidate in
-                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
-                    else { return false }
-                    return CollectorNumberOCR.runsConfirm(number: cn, in: reading.digitRuns)
+                var reading: CollectorNumberOCR.FooterReading
+                if footerFirst, let cached = footerFirstReading {
+                    reading = cached
+                } else {
+                    let footerStarted = Date()
+                    reading = footerReading(for: cropped, embedding: embedding, source: source)
+                    if reading.usedFastPath,
+                       matchCollectorNumber(in: ocrEligibleCandidates, reading: reading) == nil {
+                        // Fast read confirmed nothing — one accurate rescue read.
+                        reading = ocr.readFooterAccurate(from: cropped)
+                    }
+                    footerOCRMs += Date().timeIntervalSince(footerStarted) * 1_000
+                    evidenceFooterPairs = reading.pairNumbers
                 }
-                let distinctNumbers = Set(confirmed.compactMap {
-                    CollectorNumberOCR.collectorNumber(fromCardId: $0.details.identity.id)
-                })
-                if distinctNumbers.count == 1 {
-                    matched = confirmed.first
+                if let matched = matchCollectorNumber(in: ocrEligibleCandidates, reading: reading) {
+                    let collectorNumber = CollectorNumberOCR.collectorNumber(fromCardId: matched.details.identity.id)
+                    primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
+                    ocrVerified = true
+                    evidenceOCRNumber = collectorNumber
                 }
-            }
-            if let matched {
-                let collectorNumber = CollectorNumberOCR.collectorNumber(fromCardId: matched.details.identity.id)
-                primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
-                ocrVerified = true
-                evidenceOCRNumber = collectorNumber
             }
         }
 

@@ -13,6 +13,9 @@ final class ScannerPerfOptionsTests: XCTestCase {
         ScannerPerfOptions.warmStartDefaultsKey,
         ScannerPerfOptions.concurrentOrientationsDefaultsKey,
         ScannerPerfOptions.fastCaptureDefaultsKey,
+        ScannerPerfOptions.fastFooterOCRDefaultsKey,
+        ScannerPerfOptions.leanOCRStripsDefaultsKey,
+        ScannerPerfOptions.footerFirstOCRDefaultsKey,
     ]
 
     override func setUp() {

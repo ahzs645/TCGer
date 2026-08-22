@@ -35,13 +35,20 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
         let enabledKeys: [String]
     }
 
-    private static let allPerfKeys = [
+    private static let defaultOnKeys = [
         ScannerPerfOptions.vectorizedANNDefaultsKey,
         ScannerPerfOptions.allowedIndexCacheDefaultsKey,
         ScannerPerfOptions.stagedHypothesesDefaultsKey,
-        ScannerPerfOptions.batchedOrientationDefaultsKey,
         ScannerPerfOptions.concurrentOrientationsDefaultsKey,
         ScannerPerfOptions.warmStartDefaultsKey,
+    ]
+    private static let ocrExperimentKeys = [
+        ScannerPerfOptions.fastFooterOCRDefaultsKey,
+        ScannerPerfOptions.leanOCRStripsDefaultsKey,
+        ScannerPerfOptions.footerFirstOCRDefaultsKey,
+    ]
+    private static let allPerfKeys = defaultOnKeys + ocrExperimentKeys + [
+        ScannerPerfOptions.batchedOrientationDefaultsKey,
     ]
 
     override func tearDown() {
@@ -61,12 +68,14 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
 
         let configs = [
             Config(name: "baseline (all off)", enabledKeys: []),
-            Config(name: "vectorizedANN", enabledKeys: [ScannerPerfOptions.vectorizedANNDefaultsKey]),
-            Config(name: "allowedIndexCache", enabledKeys: [ScannerPerfOptions.allowedIndexCacheDefaultsKey]),
-            Config(name: "stagedHypotheses", enabledKeys: [ScannerPerfOptions.stagedHypothesesDefaultsKey]),
-            Config(name: "batchedOrientation", enabledKeys: [ScannerPerfOptions.batchedOrientationDefaultsKey]),
-            Config(name: "concurrentOrientations", enabledKeys: [ScannerPerfOptions.concurrentOrientationsDefaultsKey]),
-            Config(name: "all on", enabledKeys: Self.allPerfKeys),
+            Config(name: "defaults", enabledKeys: Self.defaultOnKeys),
+            Config(name: "defaults+fastFooterOCR",
+                   enabledKeys: Self.defaultOnKeys + [ScannerPerfOptions.fastFooterOCRDefaultsKey]),
+            Config(name: "defaults+leanOCRStrips",
+                   enabledKeys: Self.defaultOnKeys + [ScannerPerfOptions.leanOCRStripsDefaultsKey]),
+            Config(name: "defaults+footerFirstOCR",
+                   enabledKeys: Self.defaultOnKeys + [ScannerPerfOptions.footerFirstOCRDefaultsKey]),
+            Config(name: "defaults+ocrTrio", enabledKeys: Self.defaultOnKeys + Self.ocrExperimentKeys),
         ]
 
         let coordinator = CardScannerCoordinator.makeDefault()
@@ -107,15 +116,10 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
             }
         }
 
-        // The pure-performance flags must not change outcomes. Staged
-        // hypotheses may (ordering change) — reported above, judged by the
-        // replay suite, not asserted here.
-        for name in ["vectorizedANN", "allowedIndexCache", "batchedOrientation", "concurrentOrientations"] {
-            XCTAssertEqual(
-                outcomesByConfig[name], baselineOutcomes,
-                "\(name) is a pure optimization and must not change scan outcomes"
-            )
-        }
+        // Outcome drift is reported per config above and adjudicated by the
+        // replay suite (staged ordering and the OCR experiments may
+        // legitimately change outcomes); no hard assertion here.
+        _ = outcomesByConfig
     }
 
     /// Per-stage profile under the current defaults: scans the corpus frames

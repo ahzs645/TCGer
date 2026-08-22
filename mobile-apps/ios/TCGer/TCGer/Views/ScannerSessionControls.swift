@@ -204,6 +204,12 @@ private struct ScannerOptionsPopover: View {
     private var concurrentOrientationsEnabled = true
     @AppStorage(ScannerPerfOptions.fastCaptureDefaultsKey)
     private var fastCaptureEnabled = true
+    @AppStorage(ScannerPerfOptions.fastFooterOCRDefaultsKey)
+    private var fastFooterOCREnabled = true
+    @AppStorage(ScannerPerfOptions.leanOCRStripsDefaultsKey)
+    private var leanOCRStripsEnabled = true
+    @AppStorage(ScannerPerfOptions.footerFirstOCRDefaultsKey)
+    private var footerFirstOCREnabled = true
 
     var body: some View {
         NavigationStack {
@@ -343,6 +349,15 @@ private struct ScannerOptionsPopover: View {
                         }
                         Toggle(isOn: $fastCaptureEnabled) {
                             Label("Fast Shutter Capture", systemImage: "camera.badge.clock")
+                        }
+                        Toggle(isOn: $fastFooterOCREnabled) {
+                            Label("Fast Footer OCR", systemImage: "number.square")
+                        }
+                        Toggle(isOn: $leanOCRStripsEnabled) {
+                            Label("Lean OCR Strips", systemImage: "textformat.size.smaller")
+                        }
+                        Toggle(isOn: $footerFirstOCREnabled) {
+                            Label("Footer-First OCR", systemImage: "arrow.up.doc")
                         }
                     } header: {
                         Text("Speed")

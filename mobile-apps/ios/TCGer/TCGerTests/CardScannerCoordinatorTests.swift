@@ -30,7 +30,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -79,7 +79,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -107,7 +107,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.setAutomaticallyPresentsResults(true)
@@ -131,7 +131,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -181,7 +181,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -211,7 +211,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             ],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
 
         XCTAssertEqual(viewModel.triggerMode, .manual)
         XCTAssertFalse(viewModel.supportsLivePreview(.pokemon))
@@ -231,7 +231,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
             strategies: [],
             apiService: APIService()
         )
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -252,7 +252,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
 
     func testBinderRescanReplacesPhysicalPageAndContinuesPagination() async {
         let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         let environment = EnvironmentStore()
         environment.serverConfiguration = .onDevice
         viewModel.updateEnvironment(environment)
@@ -274,7 +274,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
 
     func testBinderDestinationCanBeSharedOrChosenPerPageForTheSession() {
         let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         viewModel.selectedBinderID = "session-binder"
 
         XCTAssertEqual(viewModel.binderDestinationMode, .oneBinder)
@@ -292,7 +292,7 @@ final class CardScannerCoordinatorTests: XCTestCase {
 
     func testClearingBinderSessionResetsDestinationChoices() {
         let coordinator = CardScannerCoordinator(strategies: [], apiService: APIService())
-        let viewModel = CardScannerViewModel(coordinator: coordinator)
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
         viewModel.selectedBinderID = "session-binder"
         viewModel.binderDestinationMode = .pageByPage
         viewModel.setBinderDestinationID("page-binder", forPageNumber: 1)
