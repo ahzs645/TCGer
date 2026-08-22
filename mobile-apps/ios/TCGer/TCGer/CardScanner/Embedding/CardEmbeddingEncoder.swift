@@ -72,6 +72,33 @@ struct CardEmbeddingEncoder {
 
         return multiArray.toArray()
     }
+
+    /// Embeds several images through one Core ML batch prediction. Batching
+    /// amortizes per-request dispatch overhead — most visible on device ANE
+    /// builds where each request pays a fixed scheduling cost. Results align
+    /// with the input order; an image whose output is missing yields an empty
+    /// embedding (mirroring how callers treat a failed single embedding).
+    func embeddings(for images: [CGImage]) async throws -> [[Float]] {
+        guard !images.isEmpty else { return [] }
+        let model = try modelLoader.makeModel()
+        guard let constraint = model.modelDescription.inputDescriptionsByName[inputName]?.imageConstraint else {
+            throw EncoderError.imageConstraintUnavailable
+        }
+
+        let providers = try images.map { image -> MLDictionaryFeatureProvider in
+            guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh) else {
+                throw EncoderError.featureValueCreationFailed
+            }
+            return try MLDictionaryFeatureProvider(dictionary: [
+                inputName: MLFeatureValue(pixelBuffer: buffer)
+            ])
+        }
+
+        let batch = try model.predictions(fromBatch: MLArrayBatchProvider(array: providers))
+        return (0..<batch.count).map { index in
+            batch.features(at: index).featureValue(for: outputName)?.multiArrayValue?.toArray() ?? []
+        }
+    }
 }
 
 final class BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {

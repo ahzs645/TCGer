@@ -97,53 +97,172 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.ineligibleMode
         }
 
+        if ScannerPerfOptions.isStagedHypothesesEnabled {
+            return try await stagedScan(image: image, context: context, source: source)
+        }
+
         let hypotheses = try await makeCropHypotheses(
             from: image,
             source: source,
             intrinsics: context.cameraIntrinsics
         )
 
-        // Geometry can normalize a card to portrait, but it cannot determine
-        // which short edge is the semantic top. Evaluate the 0- and 180-degree
-        // versions as one hypothesis and choose only after both have passed
-        // the normal gate, OCR, threshold, and ambiguity policy. Returning the
-        // first accepted orientation would preserve a confident wrong result
-        // from an upside-down crop even when its semantic counterpart is a much
-        // stronger match.
         var sawRejection = false
         for hypothesis in hypotheses {
-            var uprightResult: CardScanResult?
-            var semantic180Result: CardScanResult?
-            for attempt in hypothesis.orientations {
-                do {
-                    let result = try await recognize(
-                        attempt: attempt,
-                        context: context,
-                        source: source
-                    )
-                    if attempt.isSemantic180 {
-                        semantic180Result = result
-                    } else {
-                        uprightResult = result
-                    }
-                } catch CardScannerError.rejectedInput {
-                    sawRejection = true
-                }
-            }
-            if Self.shouldPreferSemantic180(
-                uprightScore: uprightResult?.primary.confidence.score,
-                semantic180Score: semantic180Result?.primary.confidence.score
-            ) {
-                return semantic180Result
-            }
-            if let uprightResult { return uprightResult }
-            if let semantic180Result { return semantic180Result }
+            let verdict = try await evaluate(hypothesis, context: context, source: source)
+            sawRejection = sawRejection || verdict.sawRejection
+            if let result = verdict.result { return result }
         }
         // Every geometry/orientation attempt abstained. Preserve the explicit
         // open-set rejection if any attempt positively identified a non-card,
         // so the coordinator does not let a looser fallback strategy answer.
         if sawRejection { throw CardScannerError.rejectedInput }
         return nil
+    }
+
+    /// Staged variant (`ScannerPerfOptions.isStagedHypothesesEnabled`): crop
+    /// candidates are built without embeddings and evaluated in fixed priority
+    /// order — baseline detected crop, alternate detector box, whole frame —
+    /// with each hypothesis embedded only when every earlier one abstained. A
+    /// clean accept on the baseline crop therefore pays for one hypothesis
+    /// (two orientations) instead of embedding all hypotheses up front. The
+    /// trade against the legacy path is the loss of gate-score ordering across
+    /// hypotheses, which requires replay validation.
+    private func stagedScan(
+        image: CGImage,
+        context: CardScannerContext,
+        source: ScanInvocationKind
+    ) async throws -> CardScanResult? {
+        let candidates = try makeCropCandidates(
+            from: image,
+            source: source,
+            intrinsics: context.cameraIntrinsics
+        )
+        var sawRejection = false
+        var evaluatedAnyHypothesis = false
+        for candidate in candidates {
+            guard let hypothesis = try await makeHypothesis(
+                for: candidate.image,
+                kind: candidate.kind,
+                quad: candidate.quad,
+                isBaseline: candidate.isBaseline
+            ) else { continue }
+            evaluatedAnyHypothesis = true
+            let verdict = try await evaluate(hypothesis, context: context, source: source)
+            sawRejection = sawRejection || verdict.sawRejection
+            if let result = verdict.result { return result }
+        }
+        // Mirror the legacy path's last resort: when no crop hypothesis
+        // materialized at all, embed the raw frame (`bestCrop ?? image`).
+        if !evaluatedAnyHypothesis,
+           let fallback = try await makeFallbackHypothesis(for: image) {
+            let verdict = try await evaluate(fallback, context: context, source: source)
+            sawRejection = sawRejection || verdict.sawRejection
+            if let result = verdict.result { return result }
+        }
+        if sawRejection { throw CardScannerError.rejectedInput }
+        return nil
+    }
+
+    /// The staged path's crop candidates: the same crops the legacy
+    /// `makeCropHypotheses` builds, in fixed priority order, but without
+    /// computing any embeddings yet.
+    private struct CropCandidate {
+        let image: CGImage
+        let kind: ScanDiagnostics.AttemptKind
+        let quad: [[Double]]?
+        let isBaseline: Bool
+    }
+
+    private func makeCropCandidates(
+        from image: CGImage,
+        source: ScanInvocationKind,
+        intrinsics: ScannerCameraIntrinsics?
+    ) throws -> [CropCandidate] {
+        var candidates: [CropCandidate] = []
+        let detailed = try cropper.detectRectanglesDetailed(
+            in: image,
+            intrinsics: intrinsics
+        )
+        var candidateObservations: [VNRectangleObservation] = []
+        if let best = CardCropper.preferredObservation(from: detailed.observations) {
+            candidateObservations.append(best)
+        }
+        if source != .livePreview, let alternate = detailed.alternateBox {
+            candidateObservations.append(alternate)
+        }
+        for (offset, observation) in candidateObservations.enumerated() {
+            guard let crop = cropper.makeNormalizedCrop(from: image, observation: observation)
+            else { continue }
+            let quad = [
+                observation.topLeft, observation.topRight,
+                observation.bottomRight, observation.bottomLeft,
+            ].map { [Double($0.x), Double($0.y)] }
+            candidates.append(CropCandidate(
+                image: crop,
+                kind: .detectedCrop,
+                quad: quad,
+                isBaseline: offset == 0
+            ))
+        }
+        if source != .livePreview,
+           let wholeFrame = cropper.normalizedWholeImage(from: image) {
+            candidates.append(CropCandidate(
+                image: wholeFrame,
+                kind: .wholeFrame,
+                quad: nil,
+                isBaseline: false
+            ))
+        }
+        return candidates
+    }
+
+    private struct HypothesisVerdict {
+        let result: CardScanResult?
+        let sawRejection: Bool
+    }
+
+    // Geometry can normalize a card to portrait, but it cannot determine
+    // which short edge is the semantic top. Evaluate the 0- and 180-degree
+    // versions as one hypothesis and choose only after both have passed
+    // the normal gate, OCR, threshold, and ambiguity policy. Returning the
+    // first accepted orientation would preserve a confident wrong result
+    // from an upside-down crop even when its semantic counterpart is a much
+    // stronger match.
+    private func evaluate(
+        _ hypothesis: CropHypothesis,
+        context: CardScannerContext,
+        source: ScanInvocationKind
+    ) async throws -> HypothesisVerdict {
+        var sawRejection = false
+        var uprightResult: CardScanResult?
+        var semantic180Result: CardScanResult?
+        for attempt in hypothesis.orientations {
+            do {
+                let result = try await recognize(
+                    attempt: attempt,
+                    context: context,
+                    source: source
+                )
+                if attempt.isSemantic180 {
+                    semantic180Result = result
+                } else {
+                    uprightResult = result
+                }
+            } catch CardScannerError.rejectedInput {
+                sawRejection = true
+            }
+        }
+        if Self.shouldPreferSemantic180(
+            uprightScore: uprightResult?.primary.confidence.score,
+            semantic180Score: semantic180Result?.primary.confidence.score
+        ) {
+            return HypothesisVerdict(result: semantic180Result, sawRejection: sawRejection)
+        }
+        return HypothesisVerdict(
+            result: uprightResult ?? semantic180Result,
+            sawRejection: sawRejection
+        )
     }
 
     /// A missing result represents an abstention, never a zero-confidence
@@ -176,6 +295,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         quad: [[Double]]? = nil,
         isBaseline: Bool
     ) async throws -> CropHypothesis? {
+        if ScannerPerfOptions.isBatchedOrientationEnabled {
+            return try await makeBatchedHypothesis(
+                for: image,
+                kind: kind,
+                quad: quad,
+                isBaseline: isBaseline
+            )
+        }
         guard var upright = try await makeAttempt(for: image, kind: kind, quad: quad) else {
             return nil
         }
@@ -185,6 +312,46 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
            var semantic180 = try await makeAttempt(for: rotated, kind: kind, quad: quad) {
             // The extra orientation is another open-set retrieval draw, so it
             // uses the existing retry margin for unverified ANN acceptance.
+            semantic180.isSemantic180 = true
+            orientations.append(semantic180)
+        }
+        return CropHypothesis(orientations: orientations)
+    }
+
+    /// Batched variant (`ScannerPerfOptions.isBatchedOrientationEnabled`):
+    /// both orientations of one crop go through a single Core ML batch
+    /// prediction. Outcome parity with the serial path: an empty upright
+    /// embedding voids the hypothesis, and a failed 180° rotation or empty
+    /// rotated embedding leaves an upright-only hypothesis.
+    private func makeBatchedHypothesis(
+        for image: CGImage,
+        kind: ScanDiagnostics.AttemptKind,
+        quad: [[Double]]?,
+        isBaseline: Bool
+    ) async throws -> CropHypothesis? {
+        let rotated = cropper.rotated180(image)
+        let images = [image] + (rotated.map { [$0] } ?? [])
+        let embeddings = try await encoder.embeddings(for: images)
+        guard let uprightEmbedding = embeddings.first, !uprightEmbedding.isEmpty else {
+            return nil
+        }
+        var upright = CropAttempt(
+            image: image,
+            embedding: uprightEmbedding,
+            gateScore: rejectionGate?.cardFaceScore(for: uprightEmbedding),
+            kind: kind,
+            quad: quad
+        )
+        upright.isBaseline = isBaseline
+        var orientations = [upright]
+        if let rotated, embeddings.count == 2, !embeddings[1].isEmpty {
+            var semantic180 = CropAttempt(
+                image: rotated,
+                embedding: embeddings[1],
+                gateScore: rejectionGate?.cardFaceScore(for: embeddings[1]),
+                kind: kind,
+                quad: quad
+            )
             semantic180.isSemantic180 = true
             orientations.append(semantic180)
         }

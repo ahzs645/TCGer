@@ -101,3 +101,105 @@ clear / candidate correction / mark-added. Rules worth keeping:
 - `sourceCard` (full catalog `Card`) is persisted so a restored tray keeps
   the lossless add-to-binder path.
 - Binder pages are deliberately NOT persisted (full-resolution, session-only).
+
+## Scan-latency assessment + experimental speed options (2026-08-21)
+
+### Where the time went
+
+Measured from 407 recorded dev-mode frames (`elapsedMs` in the
+TCGer-Session-Reference corpus) plus a read of the pipeline:
+
+- Live preview frames: ~190–250 ms median. Single-card shutter captures:
+  ~300 ms median but a 2–3.4 s tail that tracks the number of crop attempts
+  (2 attempts ≈ 320 ms, 8–9 attempts ≈ 1.5–1.8 s). Binder pages: 1.3–2.8 s
+  median, 6.3 s max, scaling with detections (worst when many pockets go
+  unmatched, since each unmatched pocket runs the full rescue).
+- Structural causes, in impact order:
+  1. `AnnoyIndexStore` was a brute-force scalar-Swift Double cosine loop over
+     all 21,828×384 vectors per query, serialized behind an actor (binder
+     pocket concurrency queued on it).
+  2. `CardIndexMetadataStore.physicalCardIndices` re-filtered all ~22k
+     entries and rebuilt a `Set` on every crop-attempt recognition.
+  3. Intentional captures embedded every crop hypothesis up front — up to 3
+     crops × 2 orientations = 6 encoder inferences — before the first
+     recognition could accept, so a clean accept still paid for all six.
+  4. The 0°/180° orientation pair ran as two serial Core ML requests.
+  5. (Suspected OCR overhead was already mitigated: both title and
+     collector-number OCR crop to strips before the `.accurate` Vision pass.)
+
+### The four options (`ScannerPerfOptions.swift`)
+
+All DEFAULT OFF; each reads env `SCANNER_PERF_*` (drive tests via
+`TEST_RUNNER_` passthrough) then a `UserDefaults` key, checked at call time.
+User-facing toggles live in the Scanner Options popover ("Speed
+(Experimental)" section, `ScannerSessionControls.swift`).
+
+1. `scannerPerfVectorizedANN` — one vDSP matrix-vector product over a flat
+   buffer ranks candidates, then the top-(limit+8) shortlist is re-ranked
+   with the legacy scalar Double cosine so returned distances are
+   bit-identical to the old path. The exact re-rank is deliberate: accepted
+   results sit exactly at the 0.72 threshold in the replay corpus, and Float
+   drift must not flip a policy decision. Do not remove it.
+2. `scannerPerfAllowedIndexCache` — memoizes `physicalCardIndices` per
+   (game, setCode); safe because the metadata cache is immutable after load.
+3. `scannerPerfStagedHypotheses` — builds crop candidates without embeddings
+   and evaluates them in fixed priority order (baseline detected crop →
+   alternate box → whole frame → raw fallback), embedding each only after
+   every earlier one abstained. Trades away the legacy gate-score-sorted
+   hypothesis order; replay-validated below.
+4. `scannerPerfBatchedOrientation` — both orientations of one crop through a
+   single Core ML batch prediction (`predictions(fromBatch:)`).
+
+### Measured results (Simulator, Debug, CPU-only Core ML — relative numbers)
+
+16 recorded single-card shutter captures, one warm coordinator, per-config
+warmup (`ScannerPerfOptionsBenchmarkTests`, needs
+`TEST_RUNNER_DEVMODE_SESSIONS_DIR`):
+
+| config              | median | p90     | total  |
+|---------------------|--------|---------|--------|
+| baseline (all off)  | 8422ms | 10716ms | 122.9s |
+| vectorizedANN       | 4886ms |  6095ms |  64.4s |
+| allowedIndexCache   | 8010ms | 10400ms | 116.9s |
+| stagedHypotheses    | 5177ms | 10178ms |  96.1s |
+| batchedOrientation  | 8163ms | 10545ms | 118.8s |
+| all on              | 2806ms |  5786ms |  49.1s |
+
+Zero outcome drift for every config in-benchmark. Device (Release + ANE)
+ratios will differ — batched orientation in particular should gain more on
+ANE than the CPU simulator shows. Device numbers not yet measured.
+
+### Accuracy validation
+
+- `ScannerPerfOptionsTests`: vectorized-vs-scalar ANN ranking parity
+  (including ragged rows, dimension mismatch, zero query → infinite
+  distances), memo parity, batch-vs-serial embedding parity, and an
+  end-to-end fixture parity scan with everything on.
+- Full 287-frame `DevModeSessionReplayTests` run flags-off vs flags-on:
+  identical summaries (31/76 labeled correct). Nine frames differ, all
+  favorably: seven accept the same card at a higher score because staged
+  order answers from the tight detected crop instead of the whole frame
+  (e.g. 0.64→0.78), one stays accepted at 0.95→0.91, and two frames in the
+  2026-08-13 18:37 session stop falling into the `ecard3-146` whole-frame
+  junk attractor — one of them recovering the exact device-recorded answer
+  (me05-033 @0.92) that the legacy order flips on the Simulator.
+
+### Pre-existing replay failures on main (NOT from this work)
+
+With all flags off, the replay suite already fails on this corpus:
+`scan-session-20260809-210958/frame-0008.jpg` wrong-accepts pop5-10 @0.72
+(expected pl4-AR3), and three frames of `scan-session-20260818-144857` lost
+their device-accepted me05-059. The bundled ANN index was regenerated
+2026-08-15, after the last green replay validation — prime suspect. Triage
+tracked separately.
+
+### Running the replay/benchmark harnesses
+
+- Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan
+  excludes them and `-only-testing` then silently matches 0 tests, which
+  reads as a false pass.
+- The Replay plan enables test timeouts (600 s allowance); the corpus now
+  lives on Google Drive (`~/Library/CloudStorage/GoogleDrive-…/My Drive/
+  Projects/TCG/Reference/TCGer-Session-Reference/sessions`) and the first
+  uncached read exceeds the allowance — pass `-test-timeouts-enabled NO`
+  and/or prefetch the files first.

@@ -182,6 +182,17 @@ private struct ScannerOptionsPopover: View {
     let demoTitle: String
     let onRunDemo: () -> Void
 
+    // Experimental speed options, read by the scan pipeline at call time via
+    // `ScannerPerfOptions`; @AppStorage writes the same UserDefaults keys.
+    @AppStorage(ScannerPerfOptions.vectorizedANNDefaultsKey)
+    private var vectorizedANNEnabled = false
+    @AppStorage(ScannerPerfOptions.allowedIndexCacheDefaultsKey)
+    private var allowedIndexCacheEnabled = false
+    @AppStorage(ScannerPerfOptions.stagedHypothesesDefaultsKey)
+    private var stagedHypothesesEnabled = false
+    @AppStorage(ScannerPerfOptions.batchedOrientationDefaultsKey)
+    private var batchedOrientationEnabled = false
+
     var body: some View {
         NavigationStack {
             Form {
@@ -296,6 +307,25 @@ private struct ScannerOptionsPopover: View {
                             .disabled(isProcessing)
                         }
                     }
+                }
+
+                Section {
+                    Toggle(isOn: $vectorizedANNEnabled) {
+                        Label("Fast Index Search", systemImage: "bolt")
+                    }
+                    Toggle(isOn: $stagedHypothesesEnabled) {
+                        Label("Staged Crop Retries", systemImage: "square.stack.3d.up")
+                    }
+                    Toggle(isOn: $allowedIndexCacheEnabled) {
+                        Label("Cache Search Scope", systemImage: "internaldrive")
+                    }
+                    Toggle(isOn: $batchedOrientationEnabled) {
+                        Label("Batched Orientation Check", systemImage: "rotate.right")
+                    }
+                } header: {
+                    Text("Speed (Experimental)")
+                } footer: {
+                    Text("Experimental recognition speedups. Applied to the next scan; turn any of them off to restore the original pipeline.")
                 }
             }
             .navigationTitle("Scanner Options")

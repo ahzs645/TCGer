@@ -156,7 +156,8 @@ final class ScannerDevModeStoreTests: XCTestCase {
                 nativeCropPixelHeight: 452,
                 rotationDegreesApplied: 0,
                 captureQuality: nil,
-                pageQuad: pageQuad
+                pageQuad: pageQuad,
+                pageFitRect: nil
             )
         )
 

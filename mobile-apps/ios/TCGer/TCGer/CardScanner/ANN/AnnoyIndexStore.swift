@@ -1,3 +1,4 @@
+import Accelerate
 import Foundation
 
 actor AnnoyIndexStore: ANNIndexProviding {
@@ -11,6 +12,15 @@ actor AnnoyIndexStore: ANNIndexProviding {
     private var vectors: [[Float]] = []
     private var isLoaded = false
     nonisolated let isAvailable: Bool
+
+    /// Vectorized-path representation, built lazily from `vectors` on first
+    /// use so the legacy scalar path pays nothing for it. Row-major
+    /// `flatVectors[count * dimension]`; `rowNorms[i] < 0` marks a row whose
+    /// length differs from `dimension` (the scalar path treats those as
+    /// infinite distance, and so does this one).
+    private var flatVectors: [Float] = []
+    private var rowNorms: [Float] = []
+    private var flatDimension = 0
 
     init(
         resourceName: String = "CardsIndexVectors",
@@ -47,6 +57,14 @@ actor AnnoyIndexStore: ANNIndexProviding {
         try await loadIfNeeded()
         guard !vectors.isEmpty, !allowedIndices.isEmpty else { return [] }
 
+        if ScannerPerfOptions.isVectorizedANNEnabled {
+            return vectorizedNearestNeighbors(
+                for: vector,
+                limit: limit,
+                allowedIndices: allowedIndices
+            )
+        }
+
         let matches = vectors.enumerated().compactMap { index, candidate -> ANNVectorMatch? in
             guard allowedIndices.contains(index) else { return nil }
             let distance = cosineDistance(lhs: vector, rhs: candidate)
@@ -55,6 +73,89 @@ actor AnnoyIndexStore: ANNIndexProviding {
         .sorted { $0.distance < $1.distance }
 
         return Array(matches.prefix(limit))
+    }
+
+    /// One vDSP matrix-vector product computes every row's dot product with
+    /// the query, ranking the candidates in Float precision; the surviving
+    /// shortlist then has its distances recomputed with the scalar path's
+    /// exact Double cosine so every returned distance is bit-identical to the
+    /// legacy path — Float drift at an acceptance-threshold boundary must not
+    /// flip a downstream policy decision. Edge behavior also matches:
+    /// dimension mismatches and zero-norm rows rank at infinite distance
+    /// rather than being dropped.
+    private func vectorizedNearestNeighbors(
+        for vector: [Float],
+        limit: Int,
+        allowedIndices: Set<Int>
+    ) -> [ANNVectorMatch] {
+        buildFlatRepresentationIfNeeded()
+        let count = rowNorms.count
+        let dimension = flatDimension
+        guard count > 0, dimension > 0 else { return [] }
+
+        var dots = [Float](repeating: 0, count: count)
+        var queryNorm: Float = 0
+        if vector.count == dimension {
+            flatVectors.withUnsafeBufferPointer { rows in
+                vector.withUnsafeBufferPointer { query in
+                    vDSP_mmul(
+                        rows.baseAddress!, 1,
+                        query.baseAddress!, 1,
+                        &dots, 1,
+                        vDSP_Length(count), 1, vDSP_Length(dimension)
+                    )
+                }
+            }
+            var sumOfSquares: Float = 0
+            vDSP_svesq(vector, 1, &sumOfSquares, vDSP_Length(dimension))
+            queryNorm = sumOfSquares.squareRoot()
+        }
+
+        let approximate = allowedIndices.compactMap { index -> ANNVectorMatch? in
+            guard index >= 0, index < count else { return nil }
+            let rowNorm = rowNorms[index]
+            let denominator = Double(rowNorm) * Double(queryNorm)
+            guard vector.count == dimension, rowNorm >= 0, denominator > 0 else {
+                return ANNVectorMatch(index: index, distance: .infinity)
+            }
+            let cosine = Double(dots[index]) / denominator
+            return ANNVectorMatch(index: index, distance: 1 - min(max(cosine, -1), 1))
+        }
+        .sorted { $0.distance < $1.distance }
+
+        // Exact re-rank: a small buffer past `limit` absorbs any Float-level
+        // ordering jitter near the cut, then the scalar Double distances make
+        // the final ranking and values.
+        let shortlist = approximate.prefix(limit + 8).map { match in
+            ANNVectorMatch(
+                index: match.index,
+                distance: cosineDistance(lhs: vector, rhs: vectors[match.index])
+            )
+        }
+        .sorted { $0.distance < $1.distance }
+
+        return Array(shortlist.prefix(limit))
+    }
+
+    private func buildFlatRepresentationIfNeeded() {
+        guard rowNorms.isEmpty, let first = vectors.first else { return }
+        let dimension = first.count
+        flatDimension = dimension
+        flatVectors = [Float](repeating: 0, count: vectors.count * dimension)
+        rowNorms = [Float](repeating: -1, count: vectors.count)
+        guard dimension > 0 else { return }
+        flatVectors.withUnsafeMutableBufferPointer { flat in
+            for (index, row) in vectors.enumerated() {
+                guard row.count == dimension else { continue }
+                row.withUnsafeBufferPointer { source in
+                    flat.baseAddress!.advanced(by: index * dimension)
+                        .update(from: source.baseAddress!, count: dimension)
+                }
+                var sumOfSquares: Float = 0
+                vDSP_svesq(row, 1, &sumOfSquares, vDSP_Length(dimension))
+                rowNorms[index] = sumOfSquares.squareRoot()
+            }
+        }
     }
 
     /// Loads the packed int8 index: header [Int32 count, Int32 dim] (little-endian)

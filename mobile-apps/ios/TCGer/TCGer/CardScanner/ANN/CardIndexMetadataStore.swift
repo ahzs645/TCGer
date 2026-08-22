@@ -70,6 +70,10 @@ actor CardIndexMetadataStore {
     private var cache: [Int: CardIndexMetadataEntry] = [:]
     private var indicesByGameAndName: [TCGGame: [String: Set<Int>]] = [:]
     private var isLoaded = false
+    /// Memoized `physicalCardIndices` results. Safe to keep forever: `cache`
+    /// is immutable once loaded (bundle decode or the in-memory initializer),
+    /// so a (game, setCode) answer can never change within a process.
+    private var physicalIndicesMemo: [String: Set<Int>] = [:]
     nonisolated let supportedGames: Set<TCGGame>
 
     init(
@@ -131,11 +135,20 @@ actor CardIndexMetadataStore {
     /// matches.
     func physicalCardIndices(for game: TCGGame, setCode: String?) -> Set<Int> {
         loadIfNeeded()
-        return Set(cache.values.lazy.filter {
+        let memoKey = "\(game.rawValue)|\(setCode?.lowercased() ?? "*")"
+        if ScannerPerfOptions.isAllowedIndexCacheEnabled,
+           let memoized = physicalIndicesMemo[memoKey] {
+            return memoized
+        }
+        let indices = Set(cache.values.lazy.filter {
             guard $0.resolvedGame == game, $0.isPhysicalScanEligible else { return false }
             guard let setCode else { return true }
             return $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
         }.map(\.annIndex))
+        if ScannerPerfOptions.isAllowedIndexCacheEnabled {
+            physicalIndicesMemo[memoKey] = indices
+        }
+        return indices
     }
 
     func entries(for game: TCGGame, setCode: String) -> [CardIndexMetadataEntry] {
