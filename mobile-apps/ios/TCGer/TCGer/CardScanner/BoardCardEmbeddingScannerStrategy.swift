@@ -11,14 +11,26 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// Device foil/blur evidence found two plain-visual wrong accepts at
         /// 0.70 while the canonical replay's weakest plain correct accept was
         /// 0.742. OCR-confirmed results remain eligible from 0.55.
-        static let strongAcceptanceScore: Double = 0.72
+        /// Env-overridable for encoder A/B threshold sweeps (the recorded
+        /// value is calibrated to the SHIPPED encoder's score distribution;
+        /// a different encoder needs its own operating point — the ArcFace
+        /// candidate's is 0.60 with ambiguity 0.05, measured 2026-08-23).
+        static let strongAcceptanceScore: Double = {
+            if let raw = ProcessInfo.processInfo.environment["SCANNER_STRONG_ACCEPT"],
+               let v = Double(raw) { return v }
+            return 0.72
+        }()
         /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
         static let ocrMargin: Double = 0.1
         /// Abstain when another printing trails the winner by less than this
         /// and collector OCR could not confirm the winner. This applies to
         /// same-name printings too: a correct name with the wrong set number is
         /// not an exact card match.
-        static let ambiguityMargin: Double = 0.02
+        static let ambiguityMargin: Double = {
+            if let raw = ProcessInfo.processInfo.environment["SCANNER_AMBIGUITY_MARGIN"],
+               let v = Double(raw) { return v }
+            return 0.02
+        }()
         /// Non-baseline crop attempts (alternate box, whole frame) must clear
         /// a slightly higher score. Extra hypotheses are recall-positive, but
         /// each one is another draw near the threshold for out-of-index cards;

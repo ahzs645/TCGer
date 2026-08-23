@@ -288,6 +288,37 @@ final class DevModeSessionReplayTests: XCTestCase {
                     }
                 }
 
+                // Threshold-sweep evidence dump: full recorded attempts per
+                // frame so acceptance policy can be swept offline without
+                // re-running recognition (REPLAY_EVIDENCE_DIR env; see
+                // scripts in the scanner README's recalibration notes).
+                if let dumpDir = ProcessInfo.processInfo.environment["REPLAY_EVIDENCE_DIR"] {
+                    struct FrameEvidence: Codable {
+                        let key: String
+                        let baseline: String
+                        let current: String
+                        let currentScore: Double?
+                        let expected: String?
+                        let expectedNoMatch: Bool
+                        let attempts: [ScanDiagnostics.Attempt]
+                    }
+                    let record = FrameEvidence(
+                        key: key,
+                        baseline: baseline,
+                        current: current,
+                        currentScore: newScore,
+                        expected: Self.expectedCards[key] ?? recordedExpectation,
+                        expectedNoMatch: Self.expectedNoMatch.contains(key)
+                            || (frame.expectedNoMatch == true && !isSuperseded),
+                        attempts: diagnostics.attempts
+                    )
+                    let dir = URL(fileURLWithPath: dumpDir, isDirectory: true)
+                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    let name = key.replacingOccurrences(of: "/", with: "__") + ".json"
+                    if let data = try? JSONEncoder().encode(record) {
+                        try? data.write(to: dir.appendingPathComponent(name))
+                    }
+                }
                 let outcomes = diagnostics.attempts.map { "\($0.kind.rawValue):\($0.outcome.rawValue)" }
                     .joined(separator: ", ")
                 print(
