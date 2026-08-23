@@ -48,7 +48,7 @@ IMNET_MEAN = [0.485, 0.456, 0.406]
 IMNET_STD = [0.229, 0.224, 0.225]
 IMG_SIZE = 224
 EMBED_DIM = 384
-ARC_S, ARC_M = 30.0, 0.50
+ARC_S, ARC_M = 16.0, 0.50  # s=16: s=30 with AdamW saturates and never lifts off (measured)
 SEED = 22
 
 
@@ -212,12 +212,12 @@ def main():
     model, head = Encoder().to(device), ArcFace(len(entries)).to(device)
     # The head must organize 21.8k class vectors from scratch while the
     # pretrained backbone only fine-tunes; a memorization probe showed the
-    # head organizes quickly given adequate step size, and uniform LR left
-    # the full-scale run at chance for epochs. 10x LR on proj+head.
+    # head organizes quickly given adequate step size. 3x LR on proj+head
+    # (10x measured to thrash at full scale).
     opt = torch.optim.AdamW([
         {"params": model.backbone.parameters(), "lr": args.lr},
-        {"params": model.proj.parameters(), "lr": args.lr * 10},
-        {"params": head.parameters(), "lr": args.lr * 10},
+        {"params": model.proj.parameters(), "lr": args.lr * 3},
+        {"params": head.parameters(), "lr": args.lr * 3},
     ], weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     scaler = torch.amp.GradScaler()
