@@ -210,8 +210,15 @@ def main():
             return ARC_S * (onehot * target + (1 - onehot) * cos)
 
     model, head = Encoder().to(device), ArcFace(len(entries)).to(device)
-    opt = torch.optim.AdamW([*model.parameters(), *head.parameters()],
-                            lr=args.lr, weight_decay=1e-4)
+    # The head must organize 21.8k class vectors from scratch while the
+    # pretrained backbone only fine-tunes; a memorization probe showed the
+    # head organizes quickly given adequate step size, and uniform LR left
+    # the full-scale run at chance for epochs. 10x LR on proj+head.
+    opt = torch.optim.AdamW([
+        {"params": model.backbone.parameters(), "lr": args.lr},
+        {"params": model.proj.parameters(), "lr": args.lr * 10},
+        {"params": head.parameters(), "lr": args.lr * 10},
+    ], weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     scaler = torch.amp.GradScaler()
     start_epoch = 0
@@ -234,6 +241,7 @@ def main():
         head.margin = ARC_M * min(1.0, epoch / 4.0)
         model.train(); head.train()
         t0, seen, loss_sum, correct = time.time(), 0, 0.0, 0
+        window_loss, window_correct, window_seen, step = 0.0, 0, 0, 0
         for x, y in loader:
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
             opt.zero_grad(set_to_none=True)
@@ -246,6 +254,18 @@ def main():
             seen += y.numel()
             loss_sum += loss.item() * y.numel()
             correct += (logits.argmax(1) == y).sum().item()
+            window_seen += y.numel()
+            window_loss += loss.item() * y.numel()
+            window_correct += (logits.argmax(1) == y).sum().item()
+            step += 1
+            if step % 100 == 0:
+                # Step-level visibility: epoch averages hid whether the model
+                # was lifting off or sitting flat at chance.
+                write_status(phase="training-step", epoch=epoch, step=step,
+                             window_loss=round(window_loss / window_seen, 3),
+                             window_acc=round(window_correct / window_seen, 4),
+                             margin=round(head.margin, 3))
+                window_loss, window_correct, window_seen = 0.0, 0, 0
         sched.step()
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         torch.save({"model": model.state_dict(), "head": head.state_dict(),
