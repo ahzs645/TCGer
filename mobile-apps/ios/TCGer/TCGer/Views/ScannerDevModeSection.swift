@@ -56,11 +56,7 @@ struct ScannerDevModeSection: View {
         recordingToggle
             .onAppear(perform: refresh)
 
-        recordingDescription
-
         cropRescueToggle
-
-        cropRescueDescription
 
         if let errorMessage {
             errorLabel(errorMessage)

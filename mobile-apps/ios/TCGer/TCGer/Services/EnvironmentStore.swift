@@ -1138,10 +1138,18 @@ final class EnvironmentStore: ObservableObject {
         let totalCopies = collections.reduce(0) { sum, col in
             sum + col.cards.reduce(0) { $0 + $1.quantity }
         }
+        let totalValue = collections.reduce(0) { $0 + $1.totalValue }
+        let convertedValue = CurrencyDisplayState.shared.convertedAmount(totalValue)
 
         shared.set(totalBinders, forKey: "widget.totalBinders")
         shared.set(uniqueCards, forKey: "widget.uniqueCards")
         shared.set(totalCopies, forKey: "widget.totalCopies")
+        shared.set(
+            NSDecimalNumber(decimal: convertedValue.0).doubleValue,
+            forKey: "widget.totalValue"
+        )
+        shared.set(convertedValue.1, forKey: "widget.currencyCode")
+        shared.set(showPricing, forKey: "widget.showPricing")
         shared.set(Date().timeIntervalSince1970, forKey: "widget.lastUpdated")
 
         // Recent cards (last 5 from each collection)

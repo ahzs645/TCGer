@@ -50,26 +50,7 @@ struct PricingSourceSettingsView: View {
             if !gamesWithPricingOptions.isEmpty {
                 gamePrioritySection
             }
-            justTCGPreferencesSection
-            providerSection
-            switch selectedSource {
-            case .justTCG:
-                if isOnDevice {
-                    onDeviceSetupSection
-                } else {
-                    serverSetupSection
-                }
-            case .collectrPrivateTest:
-                collectrSessionSection
-                collectrMappingSection
-            default:
-                EmptyView()
-            }
-            if selectedSource == .justTCG || selectedSource == .scryfall
-                || (isOnDevice && selectedSource == .automatic)
-                || selectedSource == .collectrPrivateTest {
-                connectionSection
-            }
+            providerSettingsLinks
         }
         .navigationTitle("Pricing Source")
         .navigationBarTitleDisplayMode(.inline)
@@ -103,6 +84,67 @@ struct PricingSourceSettingsView: View {
         } message: {
             Text("Live Collectr requests will stop. Product mappings will remain available.")
         }
+    }
+
+    private var providerSettingsLinks: some View {
+        Section("Provider Settings") {
+            if selectedSource == .justTCG || selectedSource == .automatic {
+                NavigationLink {
+                    Form { justTCGPreferencesSection }
+                        .navigationTitle("Pricing Defaults")
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    LabeledContent(
+                        "JustTCG Defaults",
+                        value: "Condition & language"
+                    )
+                }
+            }
+
+            NavigationLink {
+                providerConfigurationPage
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selectedSource.displayName)
+                        Text(configuration?.configured == true ? "Configured" : "View setup")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+    }
+
+    private var providerConfigurationPage: some View {
+        Form {
+            providerSection
+
+            switch selectedSource {
+            case .justTCG:
+                if isOnDevice {
+                    onDeviceSetupSection
+                } else {
+                    serverSetupSection
+                }
+            case .collectrPrivateTest:
+                collectrSessionSection
+                collectrMappingSection
+            default:
+                EmptyView()
+            }
+
+            if selectedSource == .justTCG || selectedSource == .scryfall
+                || (isOnDevice && selectedSource == .automatic)
+                || selectedSource == .collectrPrivateTest {
+                connectionSection
+            }
+        }
+        .navigationTitle(selectedSource.displayName)
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var sourceSelectionSection: some View {

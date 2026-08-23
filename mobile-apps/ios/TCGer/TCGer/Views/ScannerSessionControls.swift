@@ -9,12 +9,15 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     @Binding var triggerMode: ScannerTriggerMode
     @Binding var selectedEngine: ScanEnginePreference
     @Binding var automaticallyShowResults: Bool
+    @Binding var priceModeEnabled: Bool
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
     @Binding var assumedLanguage: String
     @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
     let sharedSessionUnavailableMessage: String?
+    let priceModeAvailable: Bool
+    let priceModeAvailabilityMessage: String?
     let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
@@ -68,12 +71,15 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     triggerMode: $triggerMode,
                     selectedEngine: $selectedEngine,
                     automaticallyShowResults: $automaticallyShowResults,
+                    priceModeEnabled: $priceModeEnabled,
                     savesBinderPageImages: $savesBinderPageImages,
                     replacesBinderPageImages: $replacesBinderPageImages,
                     assumedLanguage: $assumedLanguage,
                     sharedSessionCode: $sharedSessionCode,
                     availableScanEngines: availableScanEngines,
                     sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,
+                    priceModeAvailable: priceModeAvailable,
+                    priceModeAvailabilityMessage: priceModeAvailabilityMessage,
                     showsBinderOptions: showsBinderOptions,
                     showsTestInputs: showsTestInputs,
                     isProcessing: isProcessing,
@@ -91,6 +97,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     ? "Binder scan, automatic results "
                     : "\(triggerMode.displayName), automatic results ")
                     + (automaticallyShowResults ? "on" : "off")
+                    + ", price mode \(priceModeEnabled ? "on" : "off")"
                     + (showsBinderOptions
                         ? ", save binder page photos \(savesBinderPageImages ? "on" : "off")"
                         : "")
@@ -168,12 +175,15 @@ private struct ScannerOptionsPopover: View {
     @Binding var triggerMode: ScannerTriggerMode
     @Binding var selectedEngine: ScanEnginePreference
     @Binding var automaticallyShowResults: Bool
+    @Binding var priceModeEnabled: Bool
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
     @Binding var assumedLanguage: String
     @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
     let sharedSessionUnavailableMessage: String?
+    let priceModeAvailable: Bool
+    let priceModeAvailabilityMessage: String?
     let showsBinderOptions: Bool
     let showsTestInputs: Bool
     let isProcessing: Bool
@@ -215,12 +225,16 @@ private struct ScannerOptionsPopover: View {
         NavigationStack {
             Form {
                 Section("Session") {
-                    Picker(selection: $assumedLanguage) {
-                        ForEach(CardLanguage.supportedNames, id: \.self) { language in
-                            Text(language).tag(language)
-                        }
+                    NavigationLink {
+                        ScannerDefaultsView(
+                            assumedLanguage: $assumedLanguage,
+                            selectedEngine: $selectedEngine,
+                            availableScanEngines: availableScanEngines,
+                            showsRecognitionEngine: showsTestInputs,
+                            isProcessing: isProcessing
+                        )
                     } label: {
-                        Label("Assumed Language", systemImage: "character.book.closed")
+                        Label("Defaults", systemImage: "character.book.closed")
                     }
 
                     NavigationLink {
@@ -284,20 +298,11 @@ private struct ScannerOptionsPopover: View {
                             Label(demoTitle, systemImage: "testtube.2")
                         }
                         .disabled(isProcessing)
-
-                        Picker(selection: $selectedEngine) {
-                            ForEach(availableScanEngines) { engine in
-                                Text(engine.displayName).tag(engine)
-                            }
-                        } label: {
-                            Label("Recognition Engine", systemImage: "cpu")
-                        }
-                        .disabled(isProcessing || availableScanEngines.count < 2)
                     }
                 }
 
                 if !showsBinderOptions {
-                    Section("Results") {
+                    Section {
                         Toggle(isOn: $automaticallyShowResults) {
                             Label(
                                 "Open Results Automatically",
@@ -305,6 +310,21 @@ private struct ScannerOptionsPopover: View {
                             )
                         }
                         .disabled(isProcessing)
+
+                        Toggle(isOn: $priceModeEnabled) {
+                            Label("Price Mode", systemImage: "dollarsign.circle")
+                        }
+                        .disabled(isProcessing || !priceModeAvailable)
+                        .accessibilityHint(
+                            priceModeAvailabilityMessage
+                                ?? "Shows a market price for each scan and a running session total"
+                        )
+                    } header: {
+                        Text("Results")
+                    } footer: {
+                        if let priceModeAvailabilityMessage, !priceModeAvailable {
+                            Text(priceModeAvailabilityMessage)
+                        }
                     }
                 }
 
@@ -378,6 +398,39 @@ private struct ScannerOptionsPopover: View {
     }
 }
 
+private struct ScannerDefaultsView: View {
+    @Binding var assumedLanguage: String
+    @Binding var selectedEngine: ScanEnginePreference
+    let availableScanEngines: [ScanEnginePreference]
+    let showsRecognitionEngine: Bool
+    let isProcessing: Bool
+
+    var body: some View {
+        Form {
+            Section("Card Recognition") {
+                Picker("Language", selection: $assumedLanguage) {
+                    ForEach(CardLanguage.supportedNames, id: \.self) { language in
+                        Text(language).tag(language)
+                    }
+                }
+                .pickerStyle(.navigationLink)
+
+                if showsRecognitionEngine {
+                    Picker("Recognition Engine", selection: $selectedEngine) {
+                        ForEach(availableScanEngines) { engine in
+                            Text(engine.displayName).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                    .disabled(isProcessing || availableScanEngines.count < 2)
+                }
+            }
+        }
+        .navigationTitle("Defaults")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 private struct SharedWebSessionSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding private var sessionCode: String
@@ -440,6 +493,10 @@ struct ScannerSessionTray: View {
     let pendingCount: Int
     let pendingRequired: Int
     let color: Color
+    let showsPrices: Bool
+    let priceQuotes: [CardScanResult.ID: ScannerPriceQuote]
+    let totalPriceText: String?
+    let isLoadingPrices: Bool
     let onReview: () -> Void
     let onSelect: (CardScanResult) -> Void
     let onRemove: (CardScanResult.ID) -> Void
@@ -465,15 +522,24 @@ struct ScannerSessionTray: View {
     private var trayContent: some View {
         HStack(spacing: 10) {
             Button(action: onReview) {
-                HStack(spacing: 6) {
-                    Label("\(results.count)", systemImage: "rectangle.stack.fill")
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.bold))
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Label("\(results.count)", systemImage: "rectangle.stack.fill")
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.bold))
+                    }
+                    if showsPrices {
+                        Text(totalPriceText ?? (isLoadingPrices ? "Pricing…" : "No prices"))
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .monospacedDigit()
+                    }
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10)
-                .frame(height: 42)
+                .frame(height: showsPrices ? 48 : 42)
                 .background(color, in: Capsule())
             }
             .buttonStyle(.plain)
@@ -499,18 +565,7 @@ struct ScannerSessionTray: View {
                 .foregroundStyle(.white.opacity(0.9))
                 .accessibilityElement(children: .combine)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 8) {
-                        ForEach(Array(results.reversed())) { result in
-                            ScannerSessionCard(
-                                result: result,
-                                color: color,
-                                onSelect: { onSelect(result) },
-                                onRemove: { onRemove(result.id) }
-                            )
-                        }
-                    }
-                }
+                resultsScroller
             }
 
             if !results.isEmpty {
@@ -526,14 +581,59 @@ struct ScannerSessionTray: View {
                 .accessibilityHint("Removes every card from this scan session")
             }
         }
-        .frame(height: 58)
+        .frame(height: showsPrices ? 64 : 58)
         .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private var resultsScroller: some View {
+        if #available(iOS 26.0, *) {
+            resultsScrollView
+                .scrollEdgeEffectStyle(.soft, for: .horizontal)
+        } else {
+            resultsScrollView
+                .mask(legacyHorizontalEdgeMask)
+        }
+    }
+
+    private var resultsScrollView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 8) {
+                ForEach(Array(results.reversed())) { result in
+                    ScannerSessionCard(
+                        result: result,
+                        color: color,
+                        showsPrice: showsPrices,
+                        priceQuote: priceQuotes[result.id],
+                        isLoadingPrice: isLoadingPrices,
+                        onSelect: { onSelect(result) },
+                        onRemove: { onRemove(result.id) }
+                    )
+                }
+            }
+        }
+    }
+
+    private var legacyHorizontalEdgeMask: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: 0.06),
+                .init(color: .black, location: 0.94),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
     }
 }
 
 private struct ScannerSessionCard: View {
     let result: CardScanResult
     let color: Color
+    let showsPrice: Bool
+    let priceQuote: ScannerPriceQuote?
+    let isLoadingPrice: Bool
     let onSelect: () -> Void
     let onRemove: () -> Void
 
@@ -556,9 +656,15 @@ private struct ScannerSessionCard: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         Spacer(minLength: 2)
-                        Text(result.primary.confidence.score, format: .percent.precision(.fractionLength(0)))
-                            .monospacedDigit()
-                            .foregroundStyle(color)
+                        if showsPrice {
+                            Text(priceText)
+                                .monospacedDigit()
+                                .foregroundStyle(priceQuote == nil ? Color.secondary : color)
+                        } else {
+                            Text(result.primary.confidence.score, format: .percent.precision(.fractionLength(0)))
+                                .monospacedDigit()
+                                .foregroundStyle(color)
+                        }
                     }
                     .font(.caption2)
                 }
@@ -576,8 +682,16 @@ private struct ScannerSessionCard: View {
         }
         .accessibilityLabel(
             "\(result.primary.details.identity.name), " +
-            "\(Int(result.primary.confidence.score * 100)) percent match"
+            "\(Int(result.primary.confidence.score * 100)) percent match" +
+            (showsPrice ? ", \(priceText)" : "")
         )
         .accessibilityHint("Shows scan details")
+    }
+
+    private var priceText: String {
+        if let priceQuote {
+            return priceQuote.price.priceText(currency: priceQuote.currency)
+        }
+        return isLoadingPrice ? "Pricing…" : "—"
     }
 }

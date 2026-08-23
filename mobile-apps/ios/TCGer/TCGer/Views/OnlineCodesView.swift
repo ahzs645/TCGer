@@ -11,6 +11,8 @@ struct OnlineCodesView: View {
     @State private var searchText = ""
     @State private var isLoading = true
     @State private var presentedSheet: OnlineCodeSheet?
+    @State private var completedShareCode: OnlineCode?
+    @State private var statusPromptCode: OnlineCode?
     @State private var errorMessage: String?
     @State private var resultMessage: String?
 
@@ -99,6 +101,7 @@ struct OnlineCodesView: View {
                                     OnlineCodeRow(
                                         code: code,
                                         onCopy: { copy(code) },
+                                        onShare: { presentedSheet = .share(code) },
                                         onEdit: { presentedSheet = .edit(code) },
                                         onStatus: { status in
                                             Task { await updateStatus(code, status: status) }
@@ -122,25 +125,12 @@ struct OnlineCodesView: View {
         }
         .navigationTitle("Code Vault")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if !filteredCodes.isEmpty {
-                    ShareLink(
-                        item: exportText,
-                        subject: Text("TCG redemption codes"),
-                        message: Text("Redemption codes exported from TCGer")
-                    ) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Export codes")
-                }
-            }
             ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
                     Picker("Game", selection: $gameFilter) {
                         Text("All Games").tag(TCGGame.all)
                         ForEach(availableGames) { game in
-                            Label(game.displayName, systemImage: game.systemIconName)
-                            .tag(game)
+                            Text(game.displayName).tag(game)
                         }
                     }
 
@@ -176,7 +166,12 @@ struct OnlineCodesView: View {
         }
         .refreshable { await load() }
         .task { await load() }
-        .sheet(item: $presentedSheet) { sheet in
+        .sheet(item: $presentedSheet, onDismiss: {
+            if let completedShareCode {
+                statusPromptCode = completedShareCode
+                self.completedShareCode = nil
+            }
+        }) { sheet in
             switch sheet {
             case .manual(let defaultGame):
                 ManualOnlineCodeSheet(
@@ -213,7 +208,37 @@ struct OnlineCodesView: View {
                         notes: notes
                     )
                 }
+            case .share(let code):
+                OnlineCodeActivityView(item: code.code) { completed in
+                    if completed {
+                        completedShareCode = code
+                    }
+                }
             }
+        }
+        .confirmationDialog(
+            "Update Code Status?",
+            isPresented: Binding(
+                get: { statusPromptCode != nil },
+                set: { if !$0 { statusPromptCode = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Mark as Used") {
+                guard let code = statusPromptCode else { return }
+                statusPromptCode = nil
+                Task { await updateStatus(code, status: .redeemed) }
+            }
+            Button("Mark as Shared") {
+                guard let code = statusPromptCode else { return }
+                statusPromptCode = nil
+                Task { await updateStatus(code, status: .traded) }
+            }
+            Button("Keep Current Status", role: .cancel) {
+                statusPromptCode = nil
+            }
+        } message: {
+            Text("The code was shared. You can keep its current status or update it now.")
         }
         .alert(
             "Code Vault",
@@ -246,17 +271,7 @@ struct OnlineCodesView: View {
             .padding(.vertical, AppSpacing.small)
         } header: {
             Text(gameFilter == .all ? "All games" : gameFilter.displayName)
-        } footer: {
-            Text("Codes remain private to this phone or your signed-in TCGer account.")
         }
-    }
-
-    private var exportText: String {
-        displayedGames.flatMap { game in
-            let gameCodes = filteredCodes.filter { $0.game == game }
-            return ["# \(game.displayName)"] + gameCodes.map(\.code) + [""]
-        }
-        .joined(separator: "\n")
     }
 
     @MainActor
@@ -380,12 +395,14 @@ private enum OnlineCodeSheet: Identifiable {
     case manual(TCGGame)
     case scanner(TCGGame)
     case edit(OnlineCode)
+    case share(OnlineCode)
 
     var id: String {
         switch self {
         case .manual: "manual"
         case .scanner: "scanner"
         case .edit(let code): "edit-\(code.id)"
+        case .share(let code): "share-\(code.id)"
         }
     }
 }
@@ -437,6 +454,7 @@ private extension TCGGame {
 private struct OnlineCodeRow: View {
     let code: OnlineCode
     let onCopy: () -> Void
+    let onShare: () -> Void
     let onEdit: () -> Void
     let onStatus: (OnlineCodeStatus) -> Void
 
@@ -454,10 +472,7 @@ private struct OnlineCodeRow: View {
                 )
             }
             HStack(spacing: AppSpacing.small) {
-                Label(
-                    code.game?.shortName ?? code.tcg.capitalized,
-                    systemImage: code.game?.systemIconName ?? "gamecontroller"
-                )
+                Text(code.game?.displayName ?? code.tcg.capitalized)
                 if let productName = code.productName {
                     Text("·")
                     Text(productName)
@@ -467,26 +482,33 @@ private struct OnlineCodeRow: View {
             .foregroundStyle(.secondary)
             HStack {
                 Text(code.source.rawValue.capitalized)
-                Text("·")
-                Text(code.capturedAt.onlineCodeDateLabel)
                 Spacer()
                 Menu {
-                    ForEach(OnlineCodeStatus.allCases) { status in
-                        Button {
-                            onStatus(status)
-                        } label: {
-                            Label(status.title, systemImage: status.systemImage)
+                    Button(action: onShare) {
+                        Label("Share Code", systemImage: "square.and.arrow.up")
+                    }
+                    Button(action: onCopy) {
+                        Label("Copy Code", systemImage: "doc.on.doc")
+                    }
+                    Button(action: onEdit) {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    Divider()
+                    Menu("Mark As") {
+                        ForEach(OnlineCodeStatus.allCases) { status in
+                            Button {
+                                onStatus(status)
+                            } label: {
+                                Label(status.title, systemImage: status.systemImage)
+                            }
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
+                        .frame(width: 36, height: 30)
+                        .contentShape(Rectangle())
                 }
-                Button(action: onCopy) {
-                    Image(systemName: "doc.on.doc")
-                }
-                Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                }
+                .accessibilityLabel("Actions for \(code.code)")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -500,9 +522,20 @@ private struct OnlineCodeRow: View {
     }
 }
 
-private extension String {
-    var onlineCodeDateLabel: String {
-        guard let date = ISO8601DateFormatter().date(from: self) else { return self }
-        return date.formatted(date: .abbreviated, time: .shortened)
+private struct OnlineCodeActivityView: UIViewControllerRepresentable {
+    let item: String
+    let onComplete: (Bool) -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: [item],
+            applicationActivities: nil
+        )
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            onComplete(completed)
+        }
+        return controller
     }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

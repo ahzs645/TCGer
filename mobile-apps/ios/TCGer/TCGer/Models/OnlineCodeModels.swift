@@ -11,9 +11,9 @@ enum OnlineCodeStatus: String, CaseIterable, Codable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .unused: "Unused"
-        case .redeemed: "Redeemed"
+        case .redeemed: "Used"
         case .invalid: "Invalid"
-        case .traded: "Traded"
+        case .traded: "Shared"
         }
     }
 
@@ -22,7 +22,7 @@ enum OnlineCodeStatus: String, CaseIterable, Codable, Identifiable, Sendable {
         case .unused: "checkmark.seal"
         case .redeemed: "checkmark.circle.fill"
         case .invalid: "xmark.octagon.fill"
-        case .traded: "arrow.left.arrow.right.circle.fill"
+        case .traded: "square.and.arrow.up.circle.fill"
         }
     }
 }

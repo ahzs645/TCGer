@@ -18,6 +18,7 @@ struct PackOpeningView: View {
     @State private var prefetchedSessionID: String?
     @StateObject private var webSession: PackOpeningWebSession
     @StateObject private var offlinePackDownloads = PackOfflineDownloadManager.shared
+    @StateObject private var networkMonitor = NetworkMonitor.shared
 
     @MainActor
     init(webSession: PackOpeningWebSession? = nil) {
@@ -50,7 +51,9 @@ struct PackOpeningView: View {
             VStack(spacing: 0) {
                 topOverlay
                 Spacer(minLength: 24)
-                if let errorMessage {
+                if noPacksAvailable {
+                    unavailablePacksMessage
+                } else if let errorMessage {
                     errorOverlay(errorMessage)
                 } else if rendererReady && closeUpPull == nil {
                     bottomOverlay
@@ -109,7 +112,7 @@ struct PackOpeningView: View {
                 ))
             }
         }
-        .onReceive(NetworkMonitor.shared.$isConnected.removeDuplicates()) { isConnected in
+        .onReceive(networkMonitor.$isConnected.removeDuplicates()) { isConnected in
             webSession.setPrefersBundledResources(!isConnected)
             guard !isConnected, !webSession.isReady else { return }
 
@@ -143,6 +146,32 @@ struct PackOpeningView: View {
 
     private var closeUpIdentity: String {
         return "summary-\(summaryInspectedPullIndex ?? -1)"
+    }
+
+    private var selectedPackIsAccessible: Bool {
+        offlinePackDownloads.canOpen(
+            setID: interfaceState.selectedSetID,
+            isConnected: networkMonitor.isConnected
+        )
+    }
+
+    private var hasAccessiblePackSets: Bool {
+        interfaceState.packSets.contains { set in
+            offlinePackDownloads.canOpen(
+                setID: set.id,
+                isConnected: networkMonitor.isConnected
+            )
+        }
+    }
+
+    private var noPacksAvailable: Bool {
+        guard !networkMonitor.isConnected else { return false }
+        return !offlinePackDownloads.definitions.contains { definition in
+            if case .downloaded = offlinePackDownloads.status(for: definition) {
+                return true
+            }
+            return false
+        }
     }
 
     private func closeCardInspection() {
@@ -247,7 +276,10 @@ struct PackOpeningView: View {
             .glassEffect(.regular, in: .capsule)
 
         case .select:
-            VStack(spacing: 10) {
+            if !hasAccessiblePackSets {
+                unavailablePacksMessage
+            } else {
+                VStack(spacing: 10) {
                 if interfaceState.packCount == 1 {
                     Picker("Opening style", selection: Binding(
                         get: { interfaceState.openingMode },
@@ -277,7 +309,9 @@ struct PackOpeningView: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "square.stack.3d.up.fill")
-                            Text(interfaceState.selectedPackDisplayLabel)
+                            Text(selectedPackIsAccessible
+                                ? interfaceState.selectedPackDisplayLabel
+                                : "Choose an Available Pack")
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .lineLimit(1)
                             Image(systemName: "chevron.up.chevron.down")
@@ -288,7 +322,7 @@ struct PackOpeningView: View {
                     .buttonStyle(.glass)
                     .accessibilityLabel("Choose set and pack, currently \(interfaceState.selectedPackDisplayLabel)")
 
-                    if let pool = interfaceState.selectedCardPool {
+                    if selectedPackIsAccessible, let pool = interfaceState.selectedCardPool {
                         Button {
                             presentedSheet = .possibleCards(pool.id)
                         } label: {
@@ -312,7 +346,9 @@ struct PackOpeningView: View {
                             .fontWeight(.semibold)
                     }
                     .buttonStyle(.glassProminent)
+                    .disabled(!selectedPackIsAccessible)
                 }
+            }
             }
 
         case .tear:
@@ -460,6 +496,23 @@ struct PackOpeningView: View {
         }
         .padding(20)
         .glassEffect(.regular, in: .rect(cornerRadius: 32))
+    }
+
+    private var unavailablePacksMessage: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.title2)
+            Text("No Packs Available")
+                .font(.headline)
+            Text("Connect to the internet or download pack sets from Settings before opening them offline.")
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .glassEffect(.regular, in: .rect(cornerRadius: 22))
     }
 
     private func send(_ command: PackOpeningCommand) {

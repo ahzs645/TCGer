@@ -96,7 +96,7 @@ struct OfflinePackSetRow: View {
             )
         case .downloaded(let record):
             DownloadableAssetStatusLabel(
-                text: "Available offline · \(record.cardCount) cards · \(Self.formattedBytes(record.byteCount))",
+                text: "\(record.cardCount) cards · \(Self.formattedBytes(record.byteCount))",
                 systemImage: "checkmark.circle.fill",
                 tint: .green
             )
@@ -163,7 +163,7 @@ struct PackOfflineAvailabilityLabel: View {
             )
         case .downloaded(let record):
             DownloadableAssetStatusLabel(
-                text: "Available offline · \(record.cardCount) cards",
+                text: "Downloaded · \(record.cardCount) cards",
                 systemImage: "checkmark.circle.fill",
                 tint: .green
             )

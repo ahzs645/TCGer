@@ -189,15 +189,23 @@ def main():
             return F.normalize(self.proj(self.backbone(x)), dim=-1)
 
     class ArcFace(nn.Module):
+        # Margin warm-up: m=0.5 from step zero on a randomly-initialized head
+        # over 21.8k classes measurably fails to train (epoch-3 loss pinned at
+        # ln(N) ≈ 10.0, chance-level accuracy — observed 2026-08-23). Start as
+        # plain scaled softmax and ramp the margin in; the epoch loop sets
+        # `margin` each epoch.
         def __init__(self, classes):
             super().__init__()
             self.w = nn.Parameter(torch.empty(classes, EMBED_DIM))
             nn.init.xavier_uniform_(self.w)
+            self.margin = 0.0
 
         def forward(self, emb, labels):
             cos = emb @ F.normalize(self.w, dim=-1).t()
+            if self.margin <= 0:
+                return ARC_S * cos  # plain scaled softmax
             theta = torch.acos(cos.clamp(-1 + 1e-7, 1 - 1e-7))
-            target = torch.cos(theta + ARC_M)
+            target = torch.cos(theta + self.margin)
             onehot = F.one_hot(labels, self.w.shape[0]).to(cos.dtype)
             return ARC_S * (onehot * target + (1 - onehot) * cos)
 
@@ -221,6 +229,9 @@ def main():
                         persistent_workers=True)
 
     for epoch in range(start_epoch, args.epochs):
+        # Margin ramp: 0 for epoch 0 (plain softmax organizes the head), then
+        # linear to the full ArcFace margin by epoch 4.
+        head.margin = ARC_M * min(1.0, epoch / 4.0)
         model.train(); head.train()
         t0, seen, loss_sum, correct = time.time(), 0, 0.0, 0
         for x, y in loader:
@@ -243,6 +254,7 @@ def main():
                     "config": {"backbone": args.backbone, "dim": EMBED_DIM}}, CKPT)
         write_status(phase="training", epoch=epoch, epochs=args.epochs,
                      loss=round(loss_sum / seen, 4), train_acc=round(correct / seen, 4),
+                     margin=round(head.margin, 3),
                      minutes=round((time.time() - t0) / 60, 1))
 
     # ---- Eval: catalog self-retrieval -------------------------------------

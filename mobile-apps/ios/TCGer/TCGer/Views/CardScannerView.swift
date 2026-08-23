@@ -28,6 +28,42 @@ private struct ScannerPhotoImportProgress {
     let total: Int
 }
 
+private enum ScannerPriceModeAvailability: Equatable {
+    case checking
+    case available
+    case unavailable(String)
+
+    var isAvailable: Bool {
+        self == .available
+    }
+
+    var message: String? {
+        switch self {
+        case .checking:
+            return "Checking pricing availability…"
+        case .available:
+            return nil
+        case .unavailable(let message):
+            return message
+        }
+    }
+}
+
+private struct ScannerPriceAvailabilityRequestID: Hashable {
+    let serverURL: String
+    let authToken: String?
+    let game: String
+    let globalSource: String
+    let gameSource: String?
+}
+
+private struct ScannerPriceLookupRequestID: Hashable {
+    let enabled: Bool
+    let available: Bool
+    let resultSignature: String
+    let assumedLanguage: String
+}
+
 @MainActor
 private enum ScannerDemoFixture {
     private static let binderCardNames = [
@@ -114,6 +150,12 @@ struct CardScannerView: View {
     @State private var didApplyBinderStart = false
     @State private var pendingCaptureMode: ScannerCaptureMode?
     @State private var sharedSessionSyncedIDs: Set<CardScanResult.ID> = []
+    @State private var priceModeEnabled = false
+    @State private var priceModeAvailability: ScannerPriceModeAvailability = .checking
+    @State private var priceQuotesByLookupKey: [String: ScannerPriceQuote] = [:]
+    @State private var attemptedPriceLookupKeys: Set<String> = []
+    @State private var isLoadingSessionPrices = false
+    @State private var activePriceLookupID: ScannerPriceLookupRequestID?
     let scope: CardScanScope?
     let startingBinderID: String?
     let startingBinderPageNumber: Int?
@@ -192,6 +234,12 @@ struct CardScannerView: View {
             sharedSessionSyncedIDs.removeAll()
             Task { await syncNewResultsToSharedSession() }
         }
+        .task(id: priceAvailabilityRequestID) {
+            await refreshPriceModeAvailability()
+        }
+        .task(id: priceLookupRequestID) {
+            await refreshSessionPrices()
+        }
         .photosPicker(
             isPresented: photoPickerIsPresented,
             selection: $selectedPhotoItems,
@@ -229,7 +277,10 @@ struct CardScannerView: View {
         .fullScreenCover(isPresented: $showingSessionReview) {
             ScannerSessionReviewView(
                 viewModel: viewModel,
-                color: accentColor(for: viewModel.selectedMode)
+                color: accentColor(for: viewModel.selectedMode),
+                showsPrices: priceModeEnabled,
+                priceQuotes: sessionPriceQuotes,
+                totalPriceText: sessionPriceTotalText
             )
             .environmentObject(environmentStore)
         }
@@ -317,12 +368,15 @@ struct CardScannerView: View {
                 triggerMode: $viewModel.triggerMode,
                 selectedEngine: $viewModel.selectedEngine,
                 automaticallyShowResults: $automaticallyShowResults,
+                priceModeEnabled: $priceModeEnabled,
                 savesBinderPageImages: $savesBinderPageImages,
                 replacesBinderPageImages: $replacesBinderPageImages,
                 assumedLanguage: $assumedScanLanguage,
                 sharedSessionCode: $sharedSessionCode,
                 availableScanEngines: availableScanEngines,
                 sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,
+                priceModeAvailable: priceModeAvailability.isAvailable,
+                priceModeAvailabilityMessage: priceModeAvailability.message,
                 showsBinderOptions: viewModel.captureMode == .binder,
                 showsTestInputs: showTestingTools || isSimulator,
                 isProcessing: isProcessingPhoto,
@@ -577,6 +631,10 @@ struct CardScannerView: View {
                     pendingCount: viewModel.liveConfirmationCount,
                     pendingRequired: viewModel.liveConfirmationRequired,
                     color: accentColor(for: viewModel.selectedMode),
+                    showsPrices: priceModeEnabled,
+                    priceQuotes: sessionPriceQuotes,
+                    totalPriceText: sessionPriceTotalText,
+                    isLoadingPrices: isLoadingSessionPrices,
                     onReview: { showingSessionReview = true },
                     onSelect: viewModel.presentSessionResult,
                     onRemove: viewModel.removeSessionResult,
@@ -970,6 +1028,200 @@ struct CardScannerView: View {
 }
 
 private extension CardScannerView {
+    var priceAvailabilityRequestID: ScannerPriceAvailabilityRequestID {
+        let game = viewModel.selectedMode.tcgGame
+        return ScannerPriceAvailabilityRequestID(
+            serverURL: environmentStore.serverConfiguration.baseURL,
+            authToken: environmentStore.authToken,
+            game: game.rawValue,
+            globalSource: environmentStore.pricingSource.rawValue,
+            gameSource: environmentStore.preferredPricingSource(for: game)?.rawValue
+        )
+    }
+
+    var priceLookupRequestID: ScannerPriceLookupRequestID {
+        let signature = viewModel.sessionResults.map { result in
+            let identity = result.primary.details.identity
+            return "\(result.id.uuidString):\(identity.game.rawValue):\(identity.id)"
+        }.joined(separator: "|")
+        return ScannerPriceLookupRequestID(
+            enabled: priceModeEnabled,
+            available: priceModeAvailability.isAvailable,
+            resultSignature: signature,
+            assumedLanguage: assumedScanLanguage
+        )
+    }
+
+    var sessionPriceQuotes: [CardScanResult.ID: ScannerPriceQuote] {
+        viewModel.sessionResults.reduce(into: [:]) { quotes, result in
+            if let quote = priceQuote(for: result) {
+                quotes[result.id] = quote
+            }
+        }
+    }
+
+    var sessionPriceTotalText: String? {
+        let totals = ScannerPriceModeSupport.totals(for: Array(sessionPriceQuotes.values))
+        guard !totals.isEmpty else { return nil }
+        return totals.map { total in
+            total.amount.priceText(currency: total.currency)
+        }.joined(separator: " · ")
+    }
+
+    @MainActor
+    func refreshPriceModeAvailability() async {
+        priceModeAvailability = .checking
+        priceQuotesByLookupKey.removeAll()
+        attemptedPriceLookupKeys.removeAll()
+
+        let game = viewModel.selectedMode.tcgGame
+        let selectedSource = ScannerPriceModeSupport.selectedSource(
+            for: game,
+            globalSource: environmentStore.pricingSource,
+            gameSources: environmentStore.gamePricingSources
+        )
+
+        if environmentStore.serverConfiguration.isOnDevice {
+            let hasJustTCGKey = (try? JustTCGCredentialStore.loadAPIKey()) != nil
+            let hasCollectrConfiguration = (try? CollectrPrivateCredentialStore.load()) != nil
+            let collectrGames = Set(
+                CollectrProductMappingStore().mappings.map { $0.tcg.lowercased() }
+            )
+            let isAvailable = ScannerPriceModeSupport.hasOnDeviceProvider(
+                for: game,
+                selectedSource: selectedSource,
+                hasJustTCGKey: hasJustTCGKey,
+                hasCollectrConfiguration: hasCollectrConfiguration,
+                collectrGames: collectrGames
+            )
+            priceModeAvailability = isAvailable
+                ? .available
+                : .unavailable("No on-device pricing API is available for \(game.shortName).")
+            if !isAvailable { priceModeEnabled = false }
+            return
+        }
+
+        guard let token = environmentStore.authToken else {
+            priceModeAvailability = .unavailable("Sign in to check pricing for \(game.shortName).")
+            priceModeEnabled = false
+            return
+        }
+
+        do {
+            let catalog = try await APIService().getAvailablePriceSources(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            guard !Task.isCancelled else { return }
+            let isAvailable = ScannerPriceModeSupport.hasRemoteProvider(
+                for: game,
+                selectedSource: selectedSource,
+                sources: catalog.sources
+            )
+            priceModeAvailability = isAvailable
+                ? .available
+                : .unavailable("No pricing API is available for \(game.shortName) on this server.")
+            if !isAvailable { priceModeEnabled = false }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            priceModeAvailability = .unavailable("Pricing availability could not be confirmed.")
+            priceModeEnabled = false
+        }
+    }
+
+    @MainActor
+    func refreshSessionPrices() async {
+        guard priceModeEnabled,
+              priceModeAvailability.isAvailable,
+              !viewModel.sessionResults.isEmpty else { return }
+
+        let items = viewModel.sessionResults.map(pricingLookupItem)
+        let pendingItems = Array(Dictionary(
+            items.filter { !attemptedPriceLookupKeys.contains($0.lookupKey) }
+                .map { ($0.lookupKey, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        ).values)
+        guard !pendingItems.isEmpty else { return }
+
+        let requestID = priceLookupRequestID
+        activePriceLookupID = requestID
+        isLoadingSessionPrices = true
+        defer {
+            if activePriceLookupID == requestID {
+                activePriceLookupID = nil
+                isLoadingSessionPrices = false
+            }
+        }
+
+        let config = environmentStore.serverConfiguration
+        guard config.isOnDevice || environmentStore.authToken != nil else { return }
+        do {
+            let response = try await APIService().getTrackedPrices(
+                config: config,
+                token: environmentStore.authToken ?? "",
+                items: pendingItems
+            )
+            guard !Task.isCancelled else { return }
+            for result in response.prices {
+                guard let price = result.price,
+                      price > 0,
+                      price.isFinite else { continue }
+                priceQuotesByLookupKey[result.lookupKey] = ScannerPriceQuote(
+                    price: price,
+                    currency: result.currency ?? "USD"
+                )
+            }
+            attemptedPriceLookupKeys.formUnion(pendingItems.map(\.lookupKey))
+        } catch is CancellationError {
+            return
+        } catch {
+            // Keep catalog prices visible and allow a later toggle or new scan
+            // to retry the live lookup.
+            return
+        }
+    }
+
+    func pricingLookupItem(for result: CardScanResult) -> APIService.TrackedPriceItem {
+        let details = result.primary.details
+        let identity = details.identity
+        let sourceCard = details.sourceCard
+        return APIService.TrackedPriceItem(
+            tcg: identity.game.rawValue,
+            externalId: identity.id,
+            condition: JustTCGPricingPreferences.resolvedCondition(
+                preference: environmentStore.justTCGConditionPreference,
+                cardValue: nil
+            ),
+            language: JustTCGPricingPreferences.resolvedLanguage(
+                preference: environmentStore.justTCGLanguagePreference,
+                cardValue: assumedScanLanguage
+            ),
+            identifiers: JustTCGIdentifiers.inferred(
+                tcg: identity.game.rawValue,
+                externalId: identity.id
+            ),
+            lookupHint: APIService.JustTCGCardLookupHint(
+                name: identity.name,
+                setCode: identity.setCode,
+                setName: identity.setName,
+                collectorNumber: sourceCard?.collectorNumber
+            )
+        )
+    }
+
+    func priceQuote(for result: CardScanResult) -> ScannerPriceQuote? {
+        let item = pricingLookupItem(for: result)
+        if let quote = priceQuotesByLookupKey[item.lookupKey] {
+            return quote
+        }
+        guard let price = result.primary.details.price,
+              price > 0,
+              price.isFinite else { return nil }
+        return ScannerPriceQuote(price: price, currency: "USD")
+    }
+
     var isSimulator: Bool {
         #if targetEnvironment(simulator)
         true

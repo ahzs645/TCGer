@@ -127,6 +127,15 @@ final class PackOfflineDownloadManager: ObservableObject {
         return status(for: definition)
     }
 
+    func canOpen(setID: String, isConnected: Bool) -> Bool {
+        if isConnected { return true }
+        guard let definition = PackOfflineSetDefinition.matching(setID),
+              case .downloaded = status(for: definition) else {
+            return false
+        }
+        return true
+    }
+
     func download(_ definition: PackOfflineSetDefinition) {
         guard activeDownloads[definition.id] == nil else { return }
         errors[definition.id] = nil

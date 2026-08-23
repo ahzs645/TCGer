@@ -76,6 +76,7 @@ struct BinderWidgetView: View {
                 Image(systemName: "folder.fill")
                     .font(.title3)
                     .foregroundStyle(tint)
+                    .widgetAccentable()
                 Text(binder.name)
                     .font(.headline)
                     .fontWeight(.bold)
@@ -135,6 +136,7 @@ private struct BinderStat: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .widgetAccentable()
     }
 }
 

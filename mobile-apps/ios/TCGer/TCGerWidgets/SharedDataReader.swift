@@ -46,6 +46,18 @@ struct SharedDataReader {
         defaults?.integer(forKey: "widget.totalCopies") ?? 0
     }
 
+    nonisolated static var totalValue: Double {
+        defaults?.double(forKey: "widget.totalValue") ?? 0
+    }
+
+    nonisolated static var currencyCode: String {
+        defaults?.string(forKey: "widget.currencyCode") ?? "USD"
+    }
+
+    nonisolated static var showPricing: Bool {
+        defaults?.object(forKey: "widget.showPricing") as? Bool ?? true
+    }
+
     nonisolated static var lastUpdated: Date? {
         guard let interval = defaults?.object(forKey: "widget.lastUpdated") as? Double else { return nil }
         return Date(timeIntervalSince1970: interval)

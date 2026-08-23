@@ -23,11 +23,23 @@ struct ScannerSessionReviewView: View {
     @State private var errorMessage: String?
 
     let color: Color
+    let showsPrices: Bool
+    let priceQuotes: [CardScanResult.ID: ScannerPriceQuote]
+    let totalPriceText: String?
     private let apiService = APIService()
 
-    init(viewModel: CardScannerViewModel, color: Color) {
+    init(
+        viewModel: CardScannerViewModel,
+        color: Color,
+        showsPrices: Bool,
+        priceQuotes: [CardScanResult.ID: ScannerPriceQuote],
+        totalPriceText: String?
+    ) {
         self.viewModel = viewModel
         self.color = color
+        self.showsPrices = showsPrices
+        self.priceQuotes = priceQuotes
+        self.totalPriceText = totalPriceText
         let resultIDs = Set(viewModel.sessionResults.map(\.id))
         _selectedResultIDs = State(
             initialValue: resultIDs.subtracting(viewModel.addedSessionResultIDs)
@@ -116,20 +128,26 @@ struct ScannerSessionReviewView: View {
 
     private var summary: some View {
         HStack(spacing: 0) {
-            summaryMetric(value: viewModel.sessionResults.count, label: "Scanned")
+            summaryMetric(value: "\(viewModel.sessionResults.count)", label: "Scanned")
             Divider().frame(height: 34)
-            summaryMetric(value: selectedResultIDs.count, label: "Selected")
+            summaryMetric(value: "\(selectedResultIDs.count)", label: "Selected")
             Divider().frame(height: 34)
-            summaryMetric(value: viewModel.addedSessionResultIDs.count, label: "Added")
+            summaryMetric(value: "\(viewModel.addedSessionResultIDs.count)", label: "Added")
+            if showsPrices {
+                Divider().frame(height: 34)
+                summaryMetric(value: totalPriceText ?? "—", label: "Value")
+            }
         }
         .padding(.vertical, 6)
     }
 
-    private func summaryMetric(value: Int, label: String) -> some View {
+    private func summaryMetric(value: String, label: String) -> some View {
         VStack(spacing: 2) {
-            Text("\(value)")
+            Text(value)
                 .font(.title3.weight(.semibold))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -182,6 +200,11 @@ struct ScannerSessionReviewView: View {
                             Text(result.primary.confidence.score, format: .percent.precision(.fractionLength(0)))
                                 .monospacedDigit()
                             Text("match")
+                            if showsPrices {
+                                Text("·")
+                                Text(priceText(for: result))
+                                    .monospacedDigit()
+                            }
                             if wasAdded {
                                 Text("· Added")
                                     .foregroundStyle(.green)
@@ -257,6 +280,11 @@ struct ScannerSessionReviewView: View {
             }
             .padding(.leading, 44)
         }
+    }
+
+    private func priceText(for result: CardScanResult) -> String {
+        guard let quote = priceQuotes[result.id] else { return "No price" }
+        return quote.price.priceText(currency: quote.currency)
     }
 
     private var binderActionBar: some View {

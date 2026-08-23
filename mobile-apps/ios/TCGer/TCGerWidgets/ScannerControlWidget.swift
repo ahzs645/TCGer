@@ -7,7 +7,7 @@ struct ScannerControlWidget: ControlWidget {
 
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: kind) {
-            ControlWidgetButton(action: OpenURLIntent(URL(string: "tcger://scan")!)) {
+            ControlWidgetButton(action: OpenURLIntent(URL(string: "https://tcger.ahmadjalil.com/scan")!)) {
                 Label("Open Scanner", systemImage: "camera.viewfinder")
             }
         }

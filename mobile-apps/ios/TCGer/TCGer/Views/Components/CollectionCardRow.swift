@@ -278,24 +278,22 @@ struct CollectionCardRow: View {
                     }
 
                     if let firstLocation = binderLocations.first {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Label(
-                                BinderCardLocation.summary(for: binderLocations),
-                                systemImage: "rectangle.stack"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        let locationSummary = BinderCardLocation.summary(for: binderLocations)
 
-                            if let onShowBinderLocation {
-                                Button {
-                                    onShowBinderLocation(firstLocation)
-                                } label: {
-                                    Label("Where is this card?", systemImage: "location.magnifyingglass")
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .buttonStyle(.borderless)
-                                .accessibilityHint("Opens binder page \(firstLocation.pageNumber) and highlights the card")
+                        if let onShowBinderLocation {
+                            Button {
+                                onShowBinderLocation(firstLocation)
+                            } label: {
+                                Label(locationSummary, systemImage: "rectangle.stack")
+                                    .font(.caption.weight(.semibold))
                             }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Show \(locationSummary)")
+                            .accessibilityHint("Opens binder page \(firstLocation.pageNumber) and highlights the card")
+                        } else {
+                            Label(locationSummary, systemImage: "rectangle.stack")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
 

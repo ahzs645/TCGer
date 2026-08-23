@@ -152,7 +152,13 @@ struct WishlistDetailView: View {
                 if !rules.isEmpty {
                     Section {
                         ForEach(rules) { rule in
-                            WishlistRuleRow(rule: rule)
+                            WishlistRuleRow(
+                                rule: rule,
+                                showsSyncAction: rule.id == rules.first?.id,
+                                isSyncing: isSyncing,
+                                syncStatus: syncStatus,
+                                onSync: { Task { await syncRules() } }
+                            )
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
                                         Task { await removeRule(rule) }
@@ -161,28 +167,8 @@ struct WishlistDetailView: View {
                                     }
                                 }
                         }
-
-                        Button {
-                            Task { await syncRules() }
-                        } label: {
-                            HStack {
-                                if isSyncing {
-                                    ProgressView().scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                }
-                                Text(isSyncing ? (syncStatus ?? "Syncing…") : "Sync now")
-                            }
-                        }
-                        .disabled(isSyncing)
                     } header: {
                         Text("Auto-updating rules")
-                    } footer: {
-                        if let syncStatus, !isSyncing {
-                            Text(syncStatus)
-                        } else {
-                            Text("Syncing adds newly printed cards. Nothing is ever removed.")
-                        }
                     }
                 }
 
@@ -520,17 +506,10 @@ private struct WishlistSearchModifier: ViewModifier {
 
 private struct WishlistRuleRow: View {
     let rule: WishlistRule
-
-    private var subtitle: String? {
-        var parts: [String] = []
-        if let count = rule.lastMatchCount {
-            parts.append("\(count) matched")
-        }
-        if let synced = rule.lastSyncedAt, let date = ISO8601DateFormatter().date(from: synced) {
-            parts.append("synced \(date.formatted(date: .abbreviated, time: .omitted))")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
+    let showsSyncAction: Bool
+    let isSyncing: Bool
+    let syncStatus: String?
+    let onSync: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -541,21 +520,35 @@ private struct WishlistRuleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rule.summary)
                     .font(.subheadline)
-                if rule.tcg != nil || subtitle != nil {
-                    HStack(spacing: 6) {
-                        if let tcg = rule.tcg {
-                            GameBadge(tcg: tcg, showsName: true)
+
+                HStack(spacing: 8) {
+                    if let tcg = rule.tcg {
+                        GameBadge(tcg: tcg, showsName: true)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if showsSyncAction {
+                        Button(action: onSync) {
+                            if isSyncing {
+                                HStack(spacing: 5) {
+                                    ProgressView().controlSize(.small)
+                                    Text(syncStatus ?? "Syncing…")
+                                }
+                            } else {
+                                Label(
+                                    syncStatus ?? "Sync now",
+                                    systemImage: "arrow.triangle.2.circlepath"
+                                )
+                            }
                         }
-                        if let subtitle {
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.borderless)
+                        .disabled(isSyncing)
+                        .lineLimit(1)
                     }
                 }
             }
-
-            Spacer()
         }
         .padding(.vertical, 2)
     }

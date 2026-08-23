@@ -42,9 +42,7 @@ struct PokedexView: View {
             case .owned: item.isOwned
             case .missing: !item.isOwned
             }
-            let matchesGeneration = selectedGeneration.flatMap { generation in
-                PokedexGeneration.all.first(where: { $0.id == generation })?.range.contains(item.id)
-            } ?? true
+            let matchesGeneration = selectedGenerationRange?.contains(item.id) ?? true
             let matchesSearch = query.isEmpty
                 || item.entry.name.localizedCaseInsensitiveContains(query)
                 || String(item.entry.number).contains(query)
@@ -52,7 +50,18 @@ struct PokedexView: View {
         }
     }
 
-    private var ownedCount: Int { species.lazy.filter(\.isOwned).count }
+    private var selectedGenerationRange: ClosedRange<Int>? {
+        selectedGeneration.flatMap { generation in
+            PokedexGeneration.all.first(where: { $0.id == generation })?.range
+        }
+    }
+
+    private var progressSpecies: [PokedexSpeciesProgress] {
+        guard let selectedGenerationRange else { return species }
+        return species.filter { selectedGenerationRange.contains($0.id) }
+    }
+
+    private var ownedCount: Int { progressSpecies.lazy.filter(\.isOwned).count }
 
     var body: some View {
         Group {
@@ -117,12 +126,19 @@ struct PokedexView: View {
         .searchable(text: $searchText, prompt: "Name or Pokédex number")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Picker("Ownership", selection: $ownershipFilter) {
-                    ForEach(PokedexOwnershipFilter.allCases) { filter in
-                        Text(filter.rawValue).tag(filter)
+                Menu {
+                    Picker("Ownership", selection: $ownershipFilter) {
+                        ForEach(PokedexOwnershipFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
                     }
+                } label: {
+                    Image(systemName: ownershipFilter == .all
+                        ? "line.3.horizontal.decrease.circle"
+                        : "line.3.horizontal.decrease.circle.fill")
                 }
-                .pickerStyle(.menu)
+                .accessibilityLabel("Ownership filter")
+                .accessibilityValue(ownershipFilter.rawValue)
             }
         }
         .task { await load() }
@@ -142,10 +158,14 @@ struct PokedexView: View {
                 Text("Species collected")
                     .font(.headline)
                 Spacer()
-                Text("\(ownedCount) / \(species.count)")
+                Text("\(ownedCount) / \(progressSpecies.count)")
                     .font(.headline.monospacedDigit())
             }
-            ProgressView(value: species.isEmpty ? 0 : Double(ownedCount) / Double(species.count))
+            ProgressView(
+                value: progressSpecies.isEmpty
+                    ? 0
+                    : Double(ownedCount) / Double(progressSpecies.count)
+            )
                 .tint(.green)
             Text("A species counts as owned when any of its Pokémon card printings is in your collection.")
                 .font(.caption)
@@ -168,6 +188,8 @@ struct PokedexView: View {
                 }
             }
         }
+        .scrollEdgeEffectStyle(.soft, for: .leading)
+        .scrollEdgeEffectStyle(.soft, for: .trailing)
     }
 
     private func refreshWarningBanner(_ message: String) -> some View {
@@ -263,8 +285,8 @@ private struct PokedexSpeciesTile: View {
                             ProgressView()
                                 .controlSize(.small)
                         case .failure:
-                            Image(systemName: "pawprint.fill")
-                                .font(.title2)
+                            Text(String(species.entry.name.prefix(1)))
+                                .font(.system(size: 34, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.tertiary)
                         @unknown default:
                             EmptyView()

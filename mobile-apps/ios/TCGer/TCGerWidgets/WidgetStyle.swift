@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WidgetKit
 
 extension Color {
     init(widgetHex hex: String, fallback: Color = .accentColor) {
@@ -38,6 +39,7 @@ struct WidgetProgressRing: View {
                 .fontWeight(.bold)
                 .minimumScaleFactor(0.7)
         }
+        .widgetAccentable()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(percent) percent complete")
     }

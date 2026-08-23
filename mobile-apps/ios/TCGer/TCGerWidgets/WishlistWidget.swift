@@ -78,6 +78,7 @@ struct WishlistWidgetView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "heart.fill")
                         .foregroundStyle(tint)
+                        .widgetAccentable()
                     Text(wishlist.name)
                         .font(.headline)
                         .fontWeight(.bold)

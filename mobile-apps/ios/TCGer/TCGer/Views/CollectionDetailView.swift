@@ -55,6 +55,7 @@ struct CollectionDetailView: View {
     @State private var cardToSell: CollectionCard?
     @State private var binderPages: [SavedBinderPage] = []
     @State private var binderPagesPresentation: BinderPagesPresentation?
+    @State private var showsNavigationTitle = false
 
     private let apiService = APIService()
     init(
@@ -489,6 +490,11 @@ struct CollectionDetailView: View {
                         }
                     }
                         .modifier(BinderListModeModifier(isEditing: isEditing))
+                        .onScrollGeometryChange(for: Bool.self, of: { geometry in
+                            geometry.contentOffset.y + geometry.contentInsets.top > 52
+                        }) { _, isPastHeader in
+                            showsNavigationTitle = isPastHeader
+                        }
                         .safeAreaBar(edge: .top, spacing: 0) {
                             if !isEditing {
                                 CollectionFilterBar(
@@ -525,9 +531,12 @@ struct CollectionDetailView: View {
                     }
 
                     ToolbarItem(placement: .principal) {
-                        Text(isSelectMode ? selectionTitle : collection.name)
-                            .font(.headline)
-                            .contentTransition(.numericText())
+                        if isSelectMode || isEditing || showsNavigationTitle {
+                            Text(isSelectMode ? selectionTitle : collection.name)
+                                .font(.headline)
+                                .contentTransition(.numericText())
+                                .transition(.opacity)
+                        }
                     }
 
                     ToolbarItem(placement: .primaryAction) {

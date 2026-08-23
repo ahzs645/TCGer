@@ -663,10 +663,26 @@ struct SettingsView: View {
                             }
                         }
                         .disabled(isExporting)
+
+                        if environmentStore.serverFeatures.onlineCodes {
+                            Button(action: { Task { await exportCodeVault() } }) {
+                                HStack {
+                                    Image(systemName: "key.viewfinder")
+                                        .foregroundColor(.accentColor)
+                                    Text("Export Code Vault")
+                                    Spacer()
+                                    if isExporting {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    }
+                                }
+                            }
+                            .disabled(isExporting)
+                        }
                     } header: {
-                        Text("Export Collection")
+                        Text("Export")
                     } footer: {
-                        Text("Download your entire collection as a file for backup or analysis")
+                        Text("Share collection files or a plain-text copy of your Code Vault.")
                     }
                 }
 
@@ -762,12 +778,7 @@ struct SettingsView: View {
                         }
 
                         Toggle(isOn: $showScannerTestingTools) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Scanner Testing Tools")
-                                Text("Show diagnostics and debug-capture controls in the scanner")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            Label("Scanner Testing Tools", systemImage: "wrench.and.screwdriver")
                         }
 
                         // Tester-facing recording of every scan for model
@@ -783,8 +794,6 @@ struct SettingsView: View {
                         }
                     } header: {
                         Text("Developer Tools")
-                    } footer: {
-                        Text("Scanner diagnostics, manual corner adjustment, and recording are intended for testing. Hiding this section turns them off.")
                     }
                 }
         }
@@ -1475,6 +1484,42 @@ private extension SettingsView {
                 isExporting = false
             }
             print("Export failed: \(error)")
+        }
+    }
+
+    func exportCodeVault() async {
+        guard environmentStore.isAuthenticated,
+              let token = environmentStore.authToken else {
+            return
+        }
+
+        await MainActor.run { isExporting = true }
+
+        do {
+            let codes = try await APIService().getOnlineCodes(
+                config: environmentStore.serverConfiguration,
+                token: token
+            )
+            let groups = Dictionary(grouping: codes) { code in
+                code.game?.displayName ?? code.tcg.capitalized
+            }
+            let text = groups.keys.sorted().flatMap { game in
+                let values = groups[game, default: []].map { code in
+                    "\(code.code)\t\(code.status.title)"
+                }
+                return ["# \(game)"] + values + [""]
+            }
+            .joined(separator: "\n")
+
+            await MainActor.run {
+                exportData = Data(text.utf8)
+                exportFilename = "tcger-code-vault.txt"
+                isExporting = false
+                showingExportSheet = true
+            }
+        } catch {
+            await MainActor.run { isExporting = false }
+            print("Code Vault export failed: \(error)")
         }
     }
 }

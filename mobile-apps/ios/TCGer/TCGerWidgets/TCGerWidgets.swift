@@ -8,12 +8,26 @@ struct CollectionStatsEntry: TimelineEntry {
     let totalBinders: Int
     let uniqueCards: Int
     let totalCopies: Int
+    let totalValue: Double
+    let currencyCode: String
+    let showPricing: Bool
+    let lastUpdated: Date?
     let hasData: Bool
 }
 
 struct CollectionStatsProvider: TimelineProvider {
     func placeholder(in context: Context) -> CollectionStatsEntry {
-        CollectionStatsEntry(date: .now, totalBinders: 3, uniqueCards: 42, totalCopies: 87, hasData: true)
+        CollectionStatsEntry(
+            date: .now,
+            totalBinders: 3,
+            uniqueCards: 42,
+            totalCopies: 87,
+            totalValue: 842.35,
+            currencyCode: "USD",
+            showPricing: true,
+            lastUpdated: .now,
+            hasData: true
+        )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CollectionStatsEntry) -> Void) {
@@ -26,6 +40,10 @@ struct CollectionStatsProvider: TimelineProvider {
             totalBinders: SharedDataReader.totalBinders,
             uniqueCards: SharedDataReader.uniqueCards,
             totalCopies: SharedDataReader.totalCopies,
+            totalValue: SharedDataReader.totalValue,
+            currencyCode: SharedDataReader.currencyCode,
+            showPricing: SharedDataReader.showPricing,
+            lastUpdated: SharedDataReader.lastUpdated,
             hasData: SharedDataReader.hasData
         )
         completion(entry)
@@ -37,6 +55,10 @@ struct CollectionStatsProvider: TimelineProvider {
             totalBinders: SharedDataReader.totalBinders,
             uniqueCards: SharedDataReader.uniqueCards,
             totalCopies: SharedDataReader.totalCopies,
+            totalValue: SharedDataReader.totalValue,
+            currencyCode: SharedDataReader.currencyCode,
+            showPricing: SharedDataReader.showPricing,
+            lastUpdated: SharedDataReader.lastUpdated,
             hasData: SharedDataReader.hasData
         )
         let nextRefresh = Calendar.current.date(byAdding: .hour, value: 1, to: .now) ?? .now
@@ -61,31 +83,79 @@ struct CollectionStatsWidgetView: View {
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
             } else if family == .systemSmall {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     HStack {
-                        Image(systemName: "square.stack.3d.up")
+                        Image(systemName: "chart.line.uptrend.xyaxis")
                             .font(.title3)
                             .foregroundStyle(.tint)
+                            .widgetAccentable()
                         Spacer()
+                        if let lastUpdated = entry.lastUpdated {
+                            Text(lastUpdated, style: .relative)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
 
                     Spacer()
 
-                    StatRow(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
-                    StatRow(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
-                    StatRow(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
+                    if entry.showPricing {
+                        Text(formattedValue)
+                            .font(.title2.weight(.bold))
+                            .minimumScaleFactor(0.62)
+                            .lineLimit(1)
+                        Text("Collection value")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(entry.uniqueCards)")
+                            .font(.title2.weight(.bold))
+                        Text("Unique cards")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("\(entry.totalBinders) binders · \(entry.totalCopies) copies")
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
             } else {
-                HStack(spacing: 16) {
-                    StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
-                    StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique Cards")
-                    StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Total Copies")
+                HStack(spacing: 14) {
+                    if entry.showPricing {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Collection Value", systemImage: "chart.line.uptrend.xyaxis")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(formattedValue)
+                                .font(.title2.weight(.bold))
+                                .minimumScaleFactor(0.65)
+                                .lineLimit(1)
+                            if let lastUpdated = entry.lastUpdated {
+                                Text("Updated \(lastUpdated, style: .relative)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    HStack(spacing: 10) {
+                        StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
+                        StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
+                        StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
+                    }
+                    .frame(maxWidth: entry.showPricing ? .infinity : nil)
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
             }
         }
         .widgetURL(URL(string: "tcger://collections"))
+    }
+
+    private var formattedValue: String {
+        entry.totalValue.formatted(.currency(code: entry.currencyCode))
     }
 }
 
@@ -120,6 +190,7 @@ private struct StatBlock: View {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(.tint)
+                .widgetAccentable()
             Text(value)
                 .font(.title2)
                 .fontWeight(.bold)

@@ -49,6 +49,7 @@ struct ScannerShortcutWidgetView: View {
                         .font(.system(size: 25, weight: .bold))
                         .foregroundStyle(tint)
                 }
+                .widgetAccentable()
                 .containerBackground(.clear, for: .widget)
             } else {
                 VStack(spacing: 10) {
@@ -62,6 +63,7 @@ struct ScannerShortcutWidgetView: View {
                             .foregroundStyle(tint)
                     }
                     .frame(width: 72, height: 72)
+                    .widgetAccentable()
 
                     VStack(spacing: 2) {
                         Text(entry.game.displayName)
