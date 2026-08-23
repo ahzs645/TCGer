@@ -5,9 +5,14 @@ import XCTest
 @MainActor
 final class ScanInvocationRecorder {
     private(set) var kinds: [ScanStrategyKind] = []
+    private(set) var warmUpKinds: [ScanStrategyKind] = []
 
     func record(_ kind: ScanStrategyKind) {
         kinds.append(kind)
+    }
+
+    func recordWarmUp(_ kind: ScanStrategyKind) {
+        warmUpKinds.append(kind)
     }
 }
 
@@ -80,6 +85,11 @@ final class StubScanStrategy: ScanStrategy {
                 elapsed: 0
             )
         }
+    }
+
+    func warmUp(for mode: ScanMode) async {
+        guard supports(mode) else { return }
+        recorder.recordWarmUp(kind)
     }
 }
 

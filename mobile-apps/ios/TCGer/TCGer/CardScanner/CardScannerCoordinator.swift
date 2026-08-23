@@ -15,6 +15,10 @@ protocol ScanStrategy: AnyObject {
     /// the first real scan does not pay them. Protocol requirement so the
     /// coordinator's existential call dispatches to the implementation.
     func warmUp() async
+    /// Mode-aware warm-up used by the camera startup path. Most strategies
+    /// have one shared runtime and can use `warmUp()`; strategies with
+    /// per-game assets override this to avoid loading unrelated catalogs.
+    func warmUp(for mode: ScanMode) async
 }
 
 extension ScanStrategy {
@@ -23,6 +27,10 @@ extension ScanStrategy {
     /// Optional pre-warm of a strategy's expensive lazy loads so the first
     /// real scan does not pay them. Default no-op.
     func warmUp() async {}
+
+    func warmUp(for mode: ScanMode) async {
+        await warmUp()
+    }
 }
 
 final class CardScannerCoordinator: @unchecked Sendable {
@@ -41,6 +49,21 @@ final class CardScannerCoordinator: @unchecked Sendable {
         for strategy in strategies {
             await strategy.warmUp()
         }
+    }
+
+    /// Warms only the first strategy that a real capture would use. Camera
+    /// startup should prepare the recognition path the user is most likely to
+    /// need, not decode every fallback database before the first photo.
+    func warmUpPrimary(
+        for mode: ScanMode,
+        preferredEngine: ScanEnginePreference = .automatic
+    ) async {
+        guard let primary = eligibleStrategies(
+            for: mode,
+            source: .photoCapture,
+            preferredEngine: preferredEngine
+        ).first else { return }
+        await primary.warmUp(for: mode)
     }
 
     static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {

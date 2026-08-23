@@ -170,6 +170,10 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
         loadDatabaseIfNeeded(for: .pokemon)
     }
 
+    func warmUp(for mode: ScanMode) async {
+        loadDatabaseIfNeeded(for: mode)
+    }
+
     /// Loads (and caches) the database for a mode. Internal rather than
     /// private so performance tests can measure the cold-load cost directly.
     @discardableResult

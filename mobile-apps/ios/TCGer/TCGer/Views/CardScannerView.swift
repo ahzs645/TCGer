@@ -485,7 +485,13 @@ struct CardScannerView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                Text(viewModel.captureMode == .binder ? "Scanning binder page..." : "Identifying card...")
+                Text(
+                    viewModel.isWaitingForRecognition
+                        ? "Photo captured · Preparing scanner..."
+                        : (viewModel.captureMode == .binder
+                            ? "Scanning binder page..."
+                            : "Identifying card...")
+                )
                     .font(.callout)
                     .foregroundColor(.white)
             }

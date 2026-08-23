@@ -58,12 +58,11 @@ nonisolated enum ScannerPerfOptions {
         flag(batchedOrientationDefaultsKey, environment: "SCANNER_PERF_BATCHED_ORIENTATION", defaultValue: false)
     }
 
-    /// Warm start: preload the heavy scanner assets (embedding model + ANE
-    /// compilation, detector/Vision first-use, ANN index, catalog metadata)
-    /// in the background when the scanner opens, instead of lazily inside the
-    /// first shutter press. Device evidence 2026-08-21: the first capture of
-    /// a session took 3.3 s where an identical warm capture took 258 ms.
-    /// ON by default.
+    /// Warm start: after the first camera frame, preload only the selected
+    /// game's primary recognizer in the background. An early shutter press
+    /// captures immediately and awaits the same single-flight preparation
+    /// task. Device evidence 2026-08-21: the first capture of a session took
+    /// 3.3 s where an identical warm capture took 258 ms. ON by default.
     static let warmStartDefaultsKey = "scannerPerfWarmStart"
     static var isWarmStartEnabled: Bool {
         flag(warmStartDefaultsKey, environment: "SCANNER_PERF_WARM_START", defaultValue: true)

@@ -236,9 +236,11 @@ def main():
                         persistent_workers=True)
 
     for epoch in range(start_epoch, args.epochs):
-        # Margin ramp: 0 for epoch 0 (plain softmax organizes the head), then
-        # linear to the full ArcFace margin by epoch 4.
-        head.margin = ARC_M * min(1.0, epoch / 4.0)
+        # Margin ramp: margin-free through epoch 3 — at 21.8k classes the head
+        # needs ~300+ plain-softmax steps before liftoff (measured; a ramp
+        # starting at epoch 1 froze training at chance) — then linear to the
+        # full ArcFace margin over epochs 4-8.
+        head.margin = ARC_M * min(1.0, max(0.0, (epoch - 3) / 5.0))
         model.train(); head.train()
         t0, seen, loss_sum, correct = time.time(), 0, 0.0, 0
         window_loss, window_correct, window_seen, step = 0.0, 0, 0, 0

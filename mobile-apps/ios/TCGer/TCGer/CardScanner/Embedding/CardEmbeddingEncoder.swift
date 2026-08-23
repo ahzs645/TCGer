@@ -5,7 +5,7 @@ import Foundation
 
 protocol CardEmbeddingModelLoading {
     var isAvailable: Bool { get }
-    func makeModel() throws -> MLModel
+    func makeModel() async throws -> MLModel
 }
 
 extension CardEmbeddingModelLoading {
@@ -52,7 +52,7 @@ struct CardEmbeddingEncoder {
     }
 
     func embedding(for image: CGImage) async throws -> [Float] {
-        let model = try modelLoader.makeModel()
+        let model = try await modelLoader.makeModel()
         guard let constraint = model.modelDescription.inputDescriptionsByName[inputName]?.imageConstraint else {
             throw EncoderError.imageConstraintUnavailable
         }
@@ -80,7 +80,7 @@ struct CardEmbeddingEncoder {
     /// embedding (mirroring how callers treat a failed single embedding).
     func embeddings(for images: [CGImage]) async throws -> [[Float]] {
         guard !images.isEmpty else { return [] }
-        let model = try modelLoader.makeModel()
+        let model = try await modelLoader.makeModel()
         guard let constraint = model.modelDescription.inputDescriptionsByName[inputName]?.imageConstraint else {
             throw EncoderError.imageConstraintUnavailable
         }
@@ -101,36 +101,34 @@ struct CardEmbeddingEncoder {
     }
 }
 
-final class BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
-    private let modelName: String
-    private let fileExtension: String
-    private let bundle: Bundle
-    private let lock = NSLock()
+actor BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
+    private let modelURL: URL?
     private var cachedModel: MLModel?
+    private var loadingTask: Task<MLModel, Error>?
+    nonisolated let isAvailable: Bool
 
     init(
         modelName: String = "CardEmbeddings",
         fileExtension: String = "mlmodelc",
         bundle: Bundle = .main
     ) {
-        self.modelName = modelName
-        self.fileExtension = fileExtension
-        self.bundle = bundle
+        let url = bundle.url(forResource: modelName, withExtension: fileExtension)
+        self.modelURL = url
+        self.isAvailable = url != nil
     }
 
-    var isAvailable: Bool {
-        bundle.url(forResource: modelName, withExtension: fileExtension) != nil
-    }
-
-    func makeModel() throws -> MLModel {
-        lock.lock()
-        defer { lock.unlock() }
-
+    /// Core ML model construction may compile and specialize the model for
+    /// the current device. Use Core ML's asynchronous loader and share one
+    /// in-flight task so warm-up and an early capture never compile it twice.
+    func makeModel() async throws -> MLModel {
         if let cachedModel {
             return cachedModel
         }
+        if let loadingTask {
+            return try await loadingTask.value
+        }
 
-        guard let url = bundle.url(forResource: modelName, withExtension: fileExtension) else {
+        guard let modelURL else {
             throw CardEmbeddingEncoder.EncoderError.modelUnavailable
         }
 
@@ -143,9 +141,19 @@ final class BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
         configuration.computeUnits = .all
         #endif
 
-        let model = try MLModel(contentsOf: url, configuration: configuration)
-        cachedModel = model
-        return model
+        let task = Task<MLModel, Error> {
+            try await MLModel.load(contentsOf: modelURL, configuration: configuration)
+        }
+        loadingTask = task
+        do {
+            let model = try await task.value
+            cachedModel = model
+            loadingTask = nil
+            return model
+        } catch {
+            loadingTask = nil
+            throw error
+        }
     }
 }
 

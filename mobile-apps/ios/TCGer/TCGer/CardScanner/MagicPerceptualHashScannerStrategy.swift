@@ -25,6 +25,10 @@ final class MagicPerceptualHashScannerStrategy: ScanStrategy {
         mode == .mtg && hashLibrary.isAvailable
     }
 
+    func warmUp() async {
+        _ = await hashLibrary.isReady()
+    }
+
     func scan(
         image: CGImage,
         context: CardScannerContext,

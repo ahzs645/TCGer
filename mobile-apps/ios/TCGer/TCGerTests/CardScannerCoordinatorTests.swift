@@ -13,6 +13,35 @@ final class CardScannerCoordinatorTests: XCTestCase {
         await ScannerStagingStore.shared.clear()
     }
 
+    func testPrimaryWarmUpOnlyPreparesFirstEligibleRecognitionStrategy() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .artworkFingerprint,
+                    behavior: .noMatch,
+                    recorder: recorder
+                ),
+                StubScanStrategy(
+                    kind: .mlDetector,
+                    behavior: .noMatch,
+                    recorder: recorder
+                ),
+                StubScanStrategy(
+                    kind: .serverHash,
+                    behavior: .noMatch,
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+
+        await coordinator.warmUpPrimary(for: .pokemon, preferredEngine: .automatic)
+
+        XCTAssertEqual(recorder.warmUpKinds, [.mlDetector])
+        XCTAssertTrue(recorder.kinds.isEmpty)
+    }
+
     func testManualCropRescueOnlyAppearsWhenDeveloperOptionEnabled() async {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)

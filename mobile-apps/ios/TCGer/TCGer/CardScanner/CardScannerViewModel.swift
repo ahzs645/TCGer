@@ -37,12 +37,14 @@ final class CardScannerViewModel: ObservableObject {
         didSet {
             normalizeSelectedEngine()
             rebuildContext()
+            prepareRecognitionInBackgroundIfPossible()
         }
     }
     @Published var selectedEngine: ScanEnginePreference = .automatic {
         didSet {
             normalizeSelectedEngine()
             rebuildContext()
+            prepareRecognitionInBackgroundIfPossible()
         }
     }
     @Published var captureMode: ScannerCaptureMode = .card {
@@ -74,6 +76,7 @@ final class CardScannerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isProcessingPhoto = false
     @Published var isAnalyzingFrame = false
+    @Published private(set) var isWaitingForRecognition = false
     @Published private(set) var sessionResults: [CardScanResult] = []
     @Published private(set) var addedSessionResultIDs: Set<CardScanResult.ID> = []
     @Published private(set) var liveCandidateName: String?
@@ -112,7 +115,13 @@ final class CardScannerViewModel: ObservableObject {
     private var liveConsensus = LiveScanConsensus()
     private var automaticallyPresentsResults = false
     private var isPhotoImportActive = false
-    private var detectorPreparationStarted = false
+    private var hasProducedCameraFrame = false
+    private struct RecognitionPreparationKey: Hashable {
+        let mode: ScanMode
+        let engine: ScanEnginePreference
+    }
+    private var recognitionPreparationTasks: [RecognitionPreparationKey: Task<Void, Never>] = [:]
+    private var preparedRecognitionKeys: Set<RecognitionPreparationKey> = []
     private var rescueSources: [CardScanResult.ID: ScannerCropRescueRequest] = [:]
 
     var binderPagesScanned: Int { binderPages.count }
@@ -173,19 +182,16 @@ final class CardScannerViewModel: ObservableObject {
                 self?.previewFrame = frame
             }
         }
+        cameraController.onFirstFrame = { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.hasProducedCameraFrame = true
+                self.prepareRecognitionInBackgroundIfPossible()
+            }
+        }
         startFrameConsumer()
         if restoresStagedSession {
             restoreStagedSession()
-        }
-        // Preload model/index/metadata off the presentation path so the
-        // first shutter press does not pay the multi-second lazy loads.
-        // Only for the default coordinator: an injected one (tests, debug
-        // harnesses) brings its own strategies, which have nothing bundled
-        // to warm and would just churn the scheduler.
-        if coordinator == nil, ScannerPerfOptions.isWarmStartEnabled {
-            Task.detached(priority: .userInitiated) {
-                await resolvedCoordinator.warmUp()
-            }
         }
     }
 
@@ -223,6 +229,62 @@ final class CardScannerViewModel: ObservableObject {
 
     deinit {
         frameConsumerTask?.cancel()
+        recognitionPreparationTasks.values.forEach { $0.cancel() }
+    }
+
+    /// The first delivered camera frame is the readiness signal: the preview
+    /// is visible, so recognition can begin preparing without delaying the
+    /// transition. Only the selected mode's primary strategy is warmed.
+    private func prepareRecognitionInBackgroundIfPossible() {
+        guard hasProducedCameraFrame, ScannerPerfOptions.isWarmStartEnabled else { return }
+        _ = recognitionPreparationTask(
+            for: RecognitionPreparationKey(mode: selectedMode, engine: selectedEngine),
+            priority: .utility
+        )
+    }
+
+    /// Returns the single preparation task for this mode/engine. An early
+    /// shutter press awaits the same task warm-up started—never a duplicate
+    /// Core ML compile or index load.
+    private func recognitionPreparationTask(
+        for key: RecognitionPreparationKey,
+        priority: TaskPriority
+    ) -> Task<Void, Never> {
+        if preparedRecognitionKeys.contains(key) {
+            return Task {}
+        }
+        if let existing = recognitionPreparationTasks[key] {
+            return existing
+        }
+
+        let coordinator = self.coordinator
+        let task = Task.detached(priority: priority) {
+            guard !Task.isCancelled else { return }
+            await coordinator.warmUpPrimary(for: key.mode, preferredEngine: key.engine)
+        }
+        recognitionPreparationTasks[key] = task
+        Task { [weak self] in
+            await task.value
+            guard let self else { return }
+            self.preparedRecognitionKeys.insert(key)
+            self.recognitionPreparationTasks.removeValue(forKey: key)
+        }
+        return task
+    }
+
+    /// Capture is never gated on ML readiness. Once pixels are safely in
+    /// memory, the scan waits here and resumes automatically when the primary
+    /// recognizer is ready.
+    private func awaitRecognitionPreparation() async {
+        guard ScannerPerfOptions.isWarmStartEnabled else { return }
+        let key = RecognitionPreparationKey(mode: selectedMode, engine: selectedEngine)
+        guard !preparedRecognitionKeys.contains(key) else { return }
+        let task = recognitionPreparationTask(for: key, priority: .userInitiated)
+        isWaitingForRecognition = true
+        defer { isWaitingForRecognition = false }
+        await task.value
+        preparedRecognitionKeys.insert(key)
+        recognitionPreparationTasks.removeValue(forKey: key)
     }
 
     /// One serial consumer over the camera's newest-1 frame stream. While an
@@ -281,7 +343,6 @@ final class CardScannerViewModel: ObservableObject {
         case .authorized:
             cameraController.configureIfNeeded()
             cameraController.startRunning()
-            prepareDetectorAfterPresentation()
             state = .ready
         case .notDetermined:
             requestCameraPermission()
@@ -304,26 +365,11 @@ final class CardScannerViewModel: ObservableObject {
                 if granted {
                     self.cameraController.configureIfNeeded()
                     self.cameraController.startRunning()
-                    self.prepareDetectorAfterPresentation()
                     self.state = .ready
                 } else {
                     self.state = .unauthorized
                 }
             }
-        }
-    }
-
-    /// The detector is needed by every local scanner, but loading its compiled
-    /// Core ML model during view-model construction stalls the scanner's opening
-    /// transition. Give the camera UI time to present, then warm the process-wide
-    /// model on a utility executor so the first capture does not pay that cost.
-    private func prepareDetectorAfterPresentation() {
-        guard !detectorPreparationStarted else { return }
-        detectorPreparationStarted = true
-        Task.detached(priority: .utility) {
-            try? await Task.sleep(for: .milliseconds(350))
-            guard !Task.isCancelled else { return }
-            _ = CardObjectDetector.shared
         }
     }
 
@@ -385,6 +431,8 @@ final class CardScannerViewModel: ObservableObject {
         isProcessingPhoto = true
         state = .processing
         defer { isProcessingPhoto = false }
+
+        await awaitRecognitionPreparation()
 
         // The capture-quality pass (its own Vision detection + stats render)
         // only feeds the guide hint and the dev-mode record, so it runs
@@ -507,6 +555,8 @@ final class CardScannerViewModel: ObservableObject {
         isProcessingPhoto = true
         state = .processing
         defer { isProcessingPhoto = false }
+
+        await awaitRecognitionPreparation()
 
         var scanContext = context
         let diagnostics = ScannerDevModeStore.isEnabled ? ScanDiagnostics() : nil
@@ -920,6 +970,9 @@ final class CardScannerViewModel: ObservableObject {
         if triggerMode == .automatic,
            let context,
            context.serverConfiguration.isOnDevice || context.authToken != nil,
+           preparedRecognitionKeys.contains(
+               RecognitionPreparationKey(mode: context.mode, engine: context.enginePreference)
+           ),
            coordinator.supportsLiveScanning(
                for: context.mode,
                preferredEngine: context.enginePreference

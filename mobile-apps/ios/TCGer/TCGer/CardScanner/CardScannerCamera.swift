@@ -7,11 +7,16 @@ import SwiftUI
 final class CardScannerCameraController: NSObject, ObservableObject {
     @Published private(set) var isTorchAvailable = false
     @Published private(set) var isTorchEnabled = false
+    @Published private(set) var isPhotoCaptureReady = false
 
-    let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "card.scanner.session.queue")
-    private let photoOutput = AVCapturePhotoOutput()
-    private let videoOutput = AVCaptureVideoDataOutput()
+    // AVCaptureSession and its outputs are intentionally created on
+    // sessionQueue. Their initializers and pipeline allocation are expensive
+    // enough to stall the SwiftUI transition when constructed as stored
+    // properties on the main actor.
+    private var session: AVCaptureSession?
+    private var photoOutput: AVCapturePhotoOutput?
+    private var videoOutput: AVCaptureVideoDataOutput?
     private let videoOutputQueue = DispatchQueue(label: "card.scanner.video.queue")
     private var isConfigured = false
     private var videoDevice: AVCaptureDevice?
@@ -36,20 +41,51 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private var frameContinuation: AsyncStream<CVPixelBuffer>.Continuation?
     private var minYieldInterval: CFTimeInterval = CardScannerCameraController.scanningYieldInterval
     private var lastYieldAt: CFTimeInterval = 0
+    private var hasDeliveredFirstFrame = false
     private(set) var droppedFrameCount = 0
 
     var onPhotoCapture: ((AVCapturePhoto) -> Void)?
     var onPhotoCaptureError: ((Error) -> Void)?
     var onPreviewFrameChange: ((CGRect) -> Void)?
+    var onFirstFrame: (() -> Void)?
 
-    override init() {
-        super.init()
-        // This scanner captures video and still images only. Prevent
-        // AVCaptureSession from changing the app-wide audio session, which
-        // would otherwise interrupt music, podcasts, and other media when the
-        // camera starts running.
+    /// Connects the low-latency preview as soon as the session object exists.
+    /// Session construction itself stays off the main thread; only the layer
+    /// assignment returns to UIKit's queue.
+    func attachPreviewLayer(_ previewLayer: AVCaptureVideoPreviewLayer) {
+        sessionQueue.async { [weak self, weak previewLayer] in
+            guard let self, let previewLayer else { return }
+            let session = self.makeSessionIfNeeded()
+            DispatchQueue.main.async { [weak previewLayer] in
+                previewLayer?.session = session
+            }
+        }
+    }
+
+    private func makeSessionIfNeeded() -> AVCaptureSession {
+        if let session { return session }
+        let session = AVCaptureSession()
+        // This scanner captures video and still images only. Prevent it from
+        // changing the app-wide audio session and interrupting other media.
         session.automaticallyConfiguresApplicationAudioSession = false
         session.sessionPreset = .photo
+        session.automaticallyRunsDeferredStart = true
+        self.session = session
+        return session
+    }
+
+    private func makeOutputsIfNeeded() -> (
+        photo: AVCapturePhotoOutput,
+        video: AVCaptureVideoDataOutput
+    ) {
+        if let photoOutput, let videoOutput {
+            return (photoOutput, videoOutput)
+        }
+        let photo = AVCapturePhotoOutput()
+        let video = AVCaptureVideoDataOutput()
+        photoOutput = photo
+        videoOutput = video
+        return (photo, video)
     }
 
     /// The live-analysis frame conduit. `.bufferingNewest(1)` is the actual
@@ -88,17 +124,18 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
 
     func configureIfNeeded() {
-        guard !isConfigured else { return }
         sessionQueue.async { [weak self] in
-            self?.configureSession()
+            guard let self, !self.isConfigured else { return }
+            self.configureSession()
         }
-        isConfigured = true
     }
 
     private func configureSession() {
+        let session = makeSessionIfNeeded()
+        let outputs = makeOutputsIfNeeded()
+        let photoOutput = outputs.photo
+        let videoOutput = outputs.video
         session.beginConfiguration()
-
-        defer { session.commitConfiguration() }
 
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
@@ -108,6 +145,8 @@ final class CardScannerCameraController: NSObject, ObservableObject {
             let deviceInput = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(deviceInput)
         else {
+            session.commitConfiguration()
+            publishPhotoCaptureReady(false)
             return
         }
 
@@ -117,6 +156,12 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
+            // The preview and video stream are enough to make the scanner
+            // visible. Let iOS initialize still-photo capture just after the
+            // first frame; an early capture request automatically triggers it.
+            if photoOutput.isDeferredStartSupported {
+                photoOutput.isDeferredStartEnabled = true
+            }
             // Per-capture photo quality may not exceed the output's maximum.
             // The output defaults to `.balanced`, so requesting `.quality`
             // below without opting in here makes AVFoundation raise an
@@ -147,26 +192,55 @@ final class CardScannerCameraController: NSObject, ObservableObject {
                 connection.videoRotationAngle = 90
             }
         }
+        session.commitConfiguration()
+        isConfigured = true
+        publishPhotoCaptureReady(photoOutput.connection(with: .video) != nil)
     }
 
     func startRunning() {
         sessionQueue.async { [weak self] in
-            guard let self, !self.session.isRunning else { return }
-            self.session.startRunning()
+            guard let self else { return }
+            if !self.isConfigured {
+                self.configureSession()
+            }
+            guard let session = self.session, !session.isRunning else { return }
+            session.startRunning()
         }
     }
 
     func stopRunning() {
         sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
+            guard let self, let session = self.session, session.isRunning else { return }
             self.setTorchEnabledOnSessionQueue(false)
-            self.session.stopRunning()
+            session.stopRunning()
         }
     }
 
     func capturePhoto() {
+        sessionQueue.async { [weak self] in
+            self?.capturePhotoOnSessionQueue()
+        }
+    }
+
+    private func capturePhotoOnSessionQueue() {
+        guard let photoOutput else {
+            onPhotoCaptureError?(NSError(
+                domain: "TCGer.CardScannerCamera",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Camera capture is not ready yet."]
+            ))
+            return
+        }
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .off
+        // Use AVFoundation's supported per-capture mute instead of changing
+        // system volume or substituting a lower-resolution video frame. Apple
+        // reports this as unavailable where shutter sound production is
+        // legally required, so guard the setting to avoid the documented
+        // NSInvalidArgumentException in those jurisdictions.
+        if photoOutput.isShutterSoundSuppressionSupported {
+            settings.isShutterSoundSuppressionEnabled = true
+        }
         if ScannerPerfOptions.isFastCaptureEnabled {
             // The decode path downsamples every still to 2048 px before any
             // recognition sees it, so `.quality`'s multi-frame fusion and the
@@ -203,7 +277,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     }
 
     func canCapturePhoto() -> Bool {
-        photoOutput.connection(with: .video) != nil
+        isPhotoCaptureReady
     }
 
     func previewFrameDidChange(_ frame: CGRect) {
@@ -270,6 +344,12 @@ final class CardScannerCameraController: NSObject, ObservableObject {
             self?.isTorchEnabled = enabled
         }
     }
+
+    private func publishPhotoCaptureReady(_ ready: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isPhotoCaptureReady = ready
+        }
+    }
 }
 
 extension CardScannerCameraController: AVCapturePhotoCaptureDelegate {
@@ -298,6 +378,10 @@ extension CardScannerCameraController: AVCaptureVideoDataOutputSampleBufferDeleg
         // While idle, drop frames right here — before they cost a consumer
         // hop — so the preview keeps every frame the sensor produces.
         if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            if !hasDeliveredFirstFrame {
+                hasDeliveredFirstFrame = true
+                onFirstFrame?()
+            }
             let now = CACurrentMediaTime()
             if minYieldInterval == 0 || now - lastYieldAt >= minYieldInterval {
                 lastYieldAt = now
@@ -358,7 +442,7 @@ final class CameraPreviewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view = previewView
-        previewView.previewLayer.session = controller.session
+        controller.attachPreviewLayer(previewView.previewLayer)
         previewView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(focusCamera(_:))))
     }
 
