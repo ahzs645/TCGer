@@ -32,9 +32,11 @@ final class ScannerPerformanceTests: XCTestCase {
             ("artwork-fingerprints-pokemon-uint8", "json"),
             ("MagicCardHashes", "json"),
             ("CardsIndexVectors", "bin"),
+            ("CardsIndexVectors-arcface", "bin"),
             ("CardsIndexMetadata", "json"),
             ("CardFaceGate", "json"),
-            ("CardEmbeddings", "mlmodelc")
+            ("CardEmbeddings", "mlmodelc"),
+            ("CardEmbeddings-arcface", "mlmodelc")
         ]
         let total = try names.reduce(Int64(0)) { partial, item in
             let url = try XCTUnwrap(Bundle.main.url(forResource: item.0, withExtension: item.1))

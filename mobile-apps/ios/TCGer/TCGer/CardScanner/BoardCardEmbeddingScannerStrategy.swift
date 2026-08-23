@@ -11,26 +11,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// Device foil/blur evidence found two plain-visual wrong accepts at
         /// 0.70 while the canonical replay's weakest plain correct accept was
         /// 0.742. OCR-confirmed results remain eligible from 0.55.
-        /// Env-overridable for encoder A/B threshold sweeps (the recorded
-        /// value is calibrated to the SHIPPED encoder's score distribution;
-        /// a different encoder needs its own operating point — the ArcFace
-        /// candidate's is 0.60 with ambiguity 0.05, measured 2026-08-23).
-        static let strongAcceptanceScore: Double = {
-            if let raw = ProcessInfo.processInfo.environment["SCANNER_STRONG_ACCEPT"],
-               let v = Double(raw) { return v }
-            return 0.72
-        }()
+        // strongAcceptanceScore and ambiguityMargin moved to
+        // ScannerEncoderVariant (they are per-encoder operating points, with
+        // the same env overrides for sweeps); the strategy holds them as
+        // instance values resolved at construction.
         /// Run the OCR tiebreaker when the top-2 candidate scores are within this.
         static let ocrMargin: Double = 0.1
-        /// Abstain when another printing trails the winner by less than this
-        /// and collector OCR could not confirm the winner. This applies to
-        /// same-name printings too: a correct name with the wrong set number is
-        /// not an exact card match.
-        static let ambiguityMargin: Double = {
-            if let raw = ProcessInfo.processInfo.environment["SCANNER_AMBIGUITY_MARGIN"],
-               let v = Double(raw) { return v }
-            return 0.02
-        }()
         /// Non-baseline crop attempts (alternate box, whole frame) must clear
         /// a slightly higher score. Extra hypotheses are recall-positive, but
         /// each one is another draw near the threshold for out-of-index cards;
@@ -59,6 +45,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let ocr: CollectorNumberOCR
     private let titleOCR: CardTitleOCR
     private let rejectionGate: CardFaceRejectionGate?
+    /// Per-encoder operating points, resolved once at construction from the
+    /// selected `ScannerEncoderVariant` (env overrides win for sweeps).
+    private let strongAcceptanceScore: Double
+    private let ambiguityMargin: Double
 
     /// Single-slot footer-OCR cache for "the card currently in front of the
     /// camera". A steady card re-reads the same footer at ~1/s through an
@@ -75,22 +65,31 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let footerOCRCacheLock = NSLock()
     private var footerOCRCacheEntry: FooterOCRCacheEntry?
 
+    /// The variant selects model + index + thresholds + gate as one atomic
+    /// bundle. Explicit `encoder`/`indexStore`/`rejectionGate` arguments (used
+    /// by tests and replay tooling) override the variant's resolution.
     init(
+        variant: ScannerEncoderVariant = .current,
         cropper: CardCropper = CardCropper(),
-        encoder: CardEmbeddingEncoder = CardEmbeddingEncoder(),
-        indexStore: ANNIndexProviding = AnnoyIndexStore(),
+        encoder: CardEmbeddingEncoder? = nil,
+        indexStore: ANNIndexProviding? = nil,
         metadataStore: CardIndexMetadataStore = .shared,
         ocr: CollectorNumberOCR = CollectorNumberOCR(),
         titleOCR: CardTitleOCR = CardTitleOCR(),
-        rejectionGate: CardFaceRejectionGate? = CardFaceRejectionGate.loadBundled()
+        rejectionGate: CardFaceRejectionGate? = nil
     ) {
         self.cropper = cropper
-        self.encoder = encoder
-        self.indexStore = indexStore
+        self.encoder = encoder ?? CardEmbeddingEncoder(
+            modelLoader: BundleCardEmbeddingModelLoader(modelName: variant.embeddingModelName)
+        )
+        self.indexStore = indexStore ?? AnnoyIndexStore(resourceName: variant.indexResourceName)
         self.metadataStore = metadataStore
         self.ocr = ocr
         self.titleOCR = titleOCR
         self.rejectionGate = rejectionGate
+            ?? (variant.usesRejectionGate ? CardFaceRejectionGate.loadBundled() : nil)
+        self.strongAcceptanceScore = variant.strongAcceptanceScore
+        self.ambiguityMargin = variant.ambiguityMargin
     }
 
     func supports(_ mode: ScanMode) -> Bool {
@@ -717,9 +716,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let initialRival = ranked.first { $0.id != primary.id }
         let needsTitleEvidence = source != .livePreview && (
             gateRejected ||
-                primary.confidence.score < Configuration.strongAcceptanceScore ||
+                primary.confidence.score < strongAcceptanceScore ||
                 initialRival.map {
-                    primary.confidence.score - $0.confidence.score < Configuration.ambiguityMargin
+                    primary.confidence.score - $0.confidence.score < ambiguityMargin
                 } == true
         )
 
@@ -779,7 +778,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let preTiebreak = ranked.count >= 2 &&
                 (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
             let preVerification = gateRejected ||
-                primary.confidence.score < Configuration.strongAcceptanceScore
+                primary.confidence.score < strongAcceptanceScore
             if preTiebreak || preVerification {
                 let eligible = ranked.filter { candidate in
                     preVerification ||
@@ -863,7 +862,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let needsOCRTiebreak = ranked.count >= 2 &&
                 (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
             let needsOCRVerification = gateRejected ||
-                primary.confidence.score < Configuration.strongAcceptanceScore
+                primary.confidence.score < strongAcceptanceScore
             if needsOCRTiebreak || needsOCRVerification {
                 let ocrEligibleCandidates = ranked.filter { candidate in
                     needsOCRVerification ||
@@ -903,8 +902,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         if gateRejected && !ocrVerified {
             let titleBacked = titleConstrained
                 && primary.confidence.score >= (attempt.isBaseline
-                    ? Configuration.strongAcceptanceScore
-                    : Configuration.strongAcceptanceScore + Configuration.retryAttemptMargin)
+                    ? strongAcceptanceScore
+                    : strongAcceptanceScore + Configuration.retryAttemptMargin)
             if !titleBacked {
                 recordOutcome(.rejectedInput)
                 throw CardScannerError.rejectedInput
@@ -912,8 +911,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         }
 
         let requiredScore = attempt.isBaseline
-            ? Configuration.strongAcceptanceScore
-            : Configuration.strongAcceptanceScore + Configuration.retryAttemptMargin
+            ? strongAcceptanceScore
+            : strongAcceptanceScore + Configuration.retryAttemptMargin
         guard primary.confidence.score >= requiredScore || ocrVerified else {
             recordOutcome(.belowAcceptanceThreshold)
             return nil
@@ -939,7 +938,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // OCR confirmation, abstain and let a cleaner frame decide.
         if !ocrVerified,
            let rival = ranked.first(where: { $0.id != primary.id }),
-           primary.confidence.score - rival.confidence.score < Configuration.ambiguityMargin {
+           primary.confidence.score - rival.confidence.score < ambiguityMargin {
             recordOutcome(.printingAmbiguous)
             return nil
         }
@@ -1033,7 +1032,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             var debugInfo = [
                 "distance": String(format: "%.4f", match.distance),
                 "similarity": String(format: "%.4f", score),
-                "strongThreshold": String(format: "%.2f", Configuration.strongAcceptanceScore),
+                "strongThreshold": String(format: "%.2f", strongAcceptanceScore),
                 "evidenceThreshold": String(format: "%.2f", Configuration.minimumEvidenceScore)
             ]
             if let gateScore {

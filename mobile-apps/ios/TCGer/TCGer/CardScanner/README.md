@@ -345,6 +345,135 @@ Retrain scaffolding (accuracy play, runs on Colab):
 - Inputs staged on Drive: `TCGer-encoder/CardsIndexMetadata.json` (repo
   copy; defines annIndex order) and the current DINOv2 bin for comparison.
 
+## Dual-encoder recognition (2026-08-23): ArcFace default, DINOv2 rollback
+
+The scanner now ships TWO embedding encoders; `ScannerEncoderVariant`
+selects one as an ATOMIC bundle of model + index + thresholds + gate:
+
+| | `.arcface` (DEFAULT) | `.dinov2` (rollback) |
+|---|---|---|
+| Model | `CardEmbeddings-arcface.mlpackage` (FastViT-T8, 6.9 MB) | `CardEmbeddings.mlpackage` (dinov2-small, 44 MB) |
+| Index | `CardsIndexVectors-arcface.bin` | `CardsIndexVectors.bin` |
+| Strong accept / ambiguity | 0.60 / 0.05 | 0.72 / 0.02 |
+| Rejection gate | none (gate is DINOv2-trained) | `CardFaceGate.json` |
+| Replay corpus (76 labeled) | **46 correct, 0 wrong accepts** | 31 correct, 1 wrong accept |
+
+Never mix pieces across variants: an index embeds the catalog in one
+encoder's space, thresholds are operating points on one encoder's score
+distribution, and the gate is a classifier over one encoder's embeddings.
+
+Switching: Scanner Debug → Scanner Options → Encoder → "Recognition
+Model" picker (applies on next scanner open), or `SCANNER_ENCODER=dinov2`
+via `TEST_RUNNER_` for harness runs. Threshold env overrides
+(`SCANNER_STRONG_ACCEPT`, `SCANNER_AMBIGUITY_MARGIN`) still win over the
+variant for sweeps.
+
+Known ArcFace gaps, each tracked in test allowlists so a NEW regression
+still fails:
+
+- 9 device-accepted frames it abstains on
+  (`DevModeSessionReplayTests.knownArcFaceEncoderLosses`; 4 of the 9 are
+  the swshp-SWSH204 promo — a class-level miss worth investigating in the
+  index/image for that card).
+- The boss-clean fixture retrieves Morty's Conviction instead of Boss's
+  Orders (`knownFailingEncoders` in ScannerFixtures.json).
+- In exchange it recovers base1-56 and two me05-059 frames DINOv2 loses,
+  and kills the pop5-10 wrong accept.
+
+### How the ArcFace encoder was trained (recipe + every lesson)
+
+Trainer: `mobile-apps/ios/scripts/train_arcface_encoder.py` (headless, for
+the Colab CLI) / `train-arcface-encoder-colab.ipynb` (Drive notebook).
+Recipe (per TCG-AR, arXiv 2607.02090, adapted): one class per catalog card
+(21,828), ArcFace s=16 m=0.5, FastViT-T8 student, 384-d output matching
+the shipped index format, heavy synthetic augs (perspective 0.35, bright/
+color/contrast jitter, blur, noise), 12 epochs ≈ 2 h on an L4. Catalog
+self-retrieval: recall@1 97.9%. The preprocessing contract (shortest-edge
+256 bicubic ceil → center-crop 224 → ImageNet norm, /255 + normalize baked
+into the Core ML graph) is IDENTICAL to the DINOv2 conversion, so the Swift
+side needed zero changes.
+
+Hard-won convergence lessons (three failed runs before the good one):
+
+1. **s=30 never lifts off under AdamW** — logit scale 30 saturates softmax
+   and kills the gradient; every failed run used it, every successful probe
+   used s=16. (TCG-AR's s=30 worked with ResNet-50/SGD dynamics.)
+2. **21.8k classes need ~300+ margin-free steps before liftoff** — a margin
+   ramp starting at epoch 1 froze training at chance; margin-free through
+   epoch 3, ramp to 0.5 by epoch 8.
+3. Head/proj LR 3x backbone (10x thrashes; 1x is too slow to observe).
+4. Heavy augmentations were exonerated (99% acc at 2k classes) — don't
+   soften them; they carry the capture-robustness burden.
+5. Debug at small scale first: a 200-class memorize probe (100% in 20
+   steps) proved the pipeline wired correctly; a 2k-class aug A/B and a
+   full-class 400-step probe isolated scale effects. Probes live in
+   `mobile-apps/ios/scripts/{memorize_test,aug_experiment}.py`.
+6. Epoch-average metrics HIDE liftoff — the trainer reports per-100-step
+   windows to status.json for a reason.
+
+Operational lessons for Colab CLI runs (`uv tool install google-colab-cli`
++ pin `jupyter-kernel-client==0.15.0`; ADC auth with the four scopes):
+
+- Run training as a DETACHED VM SUBPROCESS (`subprocess.Popen` of an
+  uploaded script, stdout to a file), never as a notebook cell — the CLI's
+  streaming client times out on quiet phases and kernel-context DataLoader
+  workers can die; the subprocess survives both.
+- The CLI PRUNES its local session record on transient 401s while the VM
+  keeps running — verify server-side (`colab sessions`) before believing a
+  loss, and re-adopt an orphan by rebuilding
+  `~/.config/colab-cli/sessions.json` from `list_assignments()`s fresh
+  `runtimeProxyInfo` (script pattern in the session notes).
+- Download the checkpoint to the Mac EVERY epoch — VM-local checkpoints die
+  with the VM (one full run's final weights were lost this way; only the
+  exported mlpackage survived, which is why fine-tuning restarts from the
+  epoch-5 checkpoint on Drive).
+- Uploads >~100 MB 500 — split/reassemble (`split -b 30m`, `cat` on VM).
+- The keep-alive daemon lives on the machine that ran `colab new`: laptop
+  sleep kills the run eventually. `caffeinate` prevents idle sleep only —
+  lid/battery sleep still bites. The durable fix is driving from an
+  always-on box (homelab ai-node) or Colab Pro+ background execution.
+
+### Recalibrating thresholds for a new encoder (reusable method)
+
+1. Build the candidate into a worktree (swap model+index, delete/disable
+   the gate), run the replay once with `TEST_RUNNER_REPLAY_EVIDENCE_DIR`
+   set — every frame's full attempt evidence lands as JSON.
+2. `python3 mobile-apps/ios/scripts/threshold_sweep.py <evidence-dir>` —
+   approximates the acceptance ladder offline and grids
+   strong-accept/ambiguity in seconds. Find the precision knee (the S below
+   which wrong accepts appear) and step one notch above it.
+3. Validate the chosen point with a REAL replay via
+   `TEST_RUNNER_SCANNER_STRONG_ACCEPT` / `_AMBIGUITY_MARGIN` — the sweep's
+   approximation ran ~4 frames conservative of the real ladder.
+4. Bake the point into `ScannerEncoderVariant`.
+
+ArcFace's sweep: wrong accepts appear below S=0.59; 0.60/0.05 chosen;
+real replay 46/76, 0 wrong — sweep predicted 42/76, 0 wrong.
+
+### Polish plan (to close the remaining ArcFace gaps)
+
+1. **Fine-tune with real capture crops** (highest value): mix labeled crops
+   from the session library (attempt JPEGs + `expectedCards` ground truth,
+   ~100–200 frames) into training at high sampling weight, resuming from
+   `Drive:TCGer-encoder/arcface-checkpoint-epoch5.pt` (~1.5 h L4). Targets
+   the 9 known losses and the boss-clean fixture miss (synthetic augs
+   don't fully cover real capture conditions).
+2. **Investigate the SWSH204 promo class**: 4 of the 9 losses are this one
+   card, all `noCandidates` — check its catalog image/index row before
+   blaming the encoder.
+3. **Retrain the rejection gate** on ArcFace embeddings
+   (`backend/src/scripts/train-rejection-gate.ts`; needs a crop dataset —
+   the original gate's source video is gone, so build one from dev-session
+   crops). Until then ArcFace runs ungated; the policy tolerates it, but
+   the gate's junk-rejection is a real loss on no-card frames.
+4. **Tune the remaining DINOv2-scale constants for ArcFace**: the title
+   printing guard (0.85 / 0.05 separation) and `minimumEvidenceScore`
+   (0.55) were not swept; also fixture `minimumConfidence` floors.
+5. Optional bigger swings: ResNet-50 recipe (TCG-AR exact) if a quality
+   ceiling appears; W8A8/palettization for even faster ANE inference; and
+   an ArcFace-era replay baseline set recorded on-device with the new
+   encoder so the lost-floor stops being defined by DINOv2-era recordings.
+
 ### Running the replay/benchmark harnesses
 
 - Replay tests need `-testPlan TCGer-Replay`; the default TCGer-CI plan

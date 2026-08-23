@@ -130,6 +130,24 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-211223/frame-0015.jpg",
     ]
 
+    /// Device-accepted frames the ArcFace encoder does not (yet) recover —
+    /// its 2026-08-23 replay operating point trades these 9 for +15 labeled
+    /// correct frames and zero wrong accepts vs DINOv2. Counted separately
+    /// from Simulator divergences so a NEW ArcFace loss still fails the
+    /// assertion. Shrinking this list is the goal of the real-crop fine-tune
+    /// on the polish plan (4 of the 9 are the swshp-SWSH204 promo).
+    private static let knownArcFaceEncoderLosses: Set<String> = [
+        "scan-session-20260809-175313/frame-0003.jpg",
+        "scan-session-20260809-190752/frame-0010.jpg",
+        "scan-session-20260809-190752/frame-0011.jpg",
+        "scan-session-20260809-210958/frame-0000.jpg",
+        "scan-session-20260809-210958/frame-0004.jpg",
+        "scan-session-20260817-214446/frame-0000.jpg",
+        "scan-session-20260818-144857/frame-0010.jpg",
+        "scan-session-20260821-211659/frame-0018.jpg",
+        "scan-session-20260821-231419/frame-0034.jpg",
+    ]
+
     /// Labeled frames the pipeline currently accepts as the wrong card. These
     /// are open defects, not accepted behavior — they are listed so that a NEW
     /// wrong accept still fails the assertion below. Removing an entry is the
@@ -282,6 +300,9 @@ final class DevModeSessionReplayTests: XCTestCase {
                 if frame.identified, newCardID == nil, !baselineWasRejected {
                     if Self.knownSimulatorDivergences.contains(key) {
                         verdict += " (known Simulator divergence: was \(baseline))"
+                    } else if ScannerEncoderVariant.current == .arcface,
+                              Self.knownArcFaceEncoderLosses.contains(key) {
+                        verdict += " (known ArcFace encoder loss: was \(baseline))"
                     } else {
                         lostCount += 1
                         verdict += " (LOST: was \(baseline))"

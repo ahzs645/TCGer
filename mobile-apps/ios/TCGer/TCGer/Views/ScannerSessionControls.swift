@@ -214,6 +214,8 @@ private struct ScannerOptionsPopover: View {
     private var concurrentOrientationsEnabled = true
     @AppStorage(ScannerPerfOptions.fastCaptureDefaultsKey)
     private var fastCaptureEnabled = true
+    @AppStorage(ScannerEncoderVariant.defaultsKey)
+    private var encoderVariantRaw = ScannerEncoderVariant.arcface.rawValue
     @AppStorage(ScannerPerfOptions.fastFooterOCRDefaultsKey)
     private var fastFooterOCREnabled = true
     @AppStorage(ScannerPerfOptions.leanOCRStripsDefaultsKey)
@@ -348,6 +350,20 @@ private struct ScannerOptionsPopover: View {
                 }
 
                 if devModeEnabled {
+                    Section {
+                        Picker(selection: $encoderVariantRaw) {
+                            ForEach(ScannerEncoderVariant.allCases) { variant in
+                                Text(variant.displayName).tag(variant.rawValue)
+                            }
+                        } label: {
+                            Label("Recognition Model", systemImage: "brain")
+                        }
+                    } header: {
+                        Text("Encoder")
+                    } footer: {
+                        Text("Switches the embedding model, its index, and its calibrated thresholds together. Applies the next time the scanner opens.")
+                    }
+
                     Section {
                         Toggle(isOn: $vectorizedANNEnabled) {
                             Label("Fast Index Search", systemImage: "bolt")
