@@ -95,6 +95,7 @@ tmp/
 # Local research artifacts
 research/
 /*-decompiled/
+.artifacts/huggingface/
 
 # Local recognition eval data (real user captures — do not commit)
 backend/eval-data/
