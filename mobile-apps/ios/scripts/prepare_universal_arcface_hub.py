@@ -37,14 +37,20 @@ POKEMON_METADATA = (
 )
 SCRYFALL_BULK = "https://api.scryfall.com/bulk-data/default-cards"
 YGOPRODECK_CARDS = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+REQUEST_HEADERS = {
+    "User-Agent": "TCGer/1.0 (https://github.com/ahzs645/TCGer)",
+    "Accept": "application/json;q=0.9,*/*;q=0.8",
+}
 
 
 def download(url: str, destination: Path) -> None:
+    if destination.is_file() and destination.stat().st_size > 0:
+        return
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".part")
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "TCGer-universal-preflight/1.0"},
+        headers=REQUEST_HEADERS,
     )
     with urllib.request.urlopen(request, timeout=120) as response:
         with open(temporary, "wb") as output:
@@ -56,7 +62,7 @@ def download(url: str, destination: Path) -> None:
 def load_json(url: str) -> dict:
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "TCGer-universal-preflight/1.0"},
+        headers=REQUEST_HEADERS,
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.load(response)
@@ -116,7 +122,13 @@ def main() -> None:
 
     download(POKEMON_METADATA, pokemon_path)
     bulk_metadata = load_json(SCRYFALL_BULK)
-    download(bulk_metadata["download_uri"], magic_path)
+    magic_download_uri = (
+        bulk_metadata.get("download_uri")
+        or bulk_metadata.get("jsonl_download_uri")
+    )
+    if not magic_download_uri:
+        raise ValueError("Scryfall bulk-data response has no download URI")
+    download(magic_download_uri, magic_path)
     download(YGOPRODECK_CARDS, yugioh_path)
 
     subprocess.run([
@@ -140,7 +152,7 @@ def main() -> None:
             "magic": {
                 "endpoint": SCRYFALL_BULK,
                 "updatedAt": bulk_metadata.get("updated_at"),
-                "downloadURI": bulk_metadata.get("download_uri"),
+                "downloadURI": magic_download_uri,
             },
             "yugioh": YGOPRODECK_CARDS,
         },
