@@ -33,6 +33,7 @@ Run remotely:
 """
 import argparse
 import concurrent.futures as cf
+import hashlib
 import json
 import math
 import os
@@ -44,10 +45,11 @@ import urllib.request
 from pathlib import Path
 
 META_PATH = "/content/CardsIndexMetadata.json"
-CACHE_DIR = Path("/content/card-images")
-OUT_DIR = Path("/content/outputs")
+CACHE_DIR = Path(os.environ.get("TCGER_CACHE_DIR", "/content/card-images"))
+OUT_DIR = Path(os.environ.get("TCGER_OUTPUT_DIR", "/content/outputs"))
 CKPT = OUT_DIR / "arcface-checkpoint.pt"
 STATUS = OUT_DIR / "status.json"
+PACKAGE_DIR = OUT_DIR.parent / "CardEmbeddings-arcface.mlpackage"
 
 IMNET_MEAN = [0.485, 0.456, 0.406]
 IMNET_STD = [0.229, 0.224, 0.225]
@@ -152,10 +154,27 @@ def main():
     parser.add_argument("--backbone", default="fastvit_t8.apple_in1k")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument(
+        "--limit-per-game",
+        type=int,
+        default=0,
+        help="Deterministic per-game cap for a quick validation run; 0 uses every row",
+    )
+    parser.add_argument(
+        "--eval-cards-per-game",
+        type=int,
+        default=2500,
+        help="Maximum gallery identities sampled per game for augmented-query eval",
+    )
+    parser.add_argument(
         "--metadata",
         action="append",
         help="CardsIndexMetadata JSON; repeat once per game",
     )
+    parser.add_argument(
+        "--hub-repo",
+        help="Optional Hugging Face model repo used to resume/persist each epoch",
+    )
+    parser.add_argument("--hub-path-prefix", default="training")
     # parse_known_args: under `colab exec` the code runs in a Jupyter kernel
     # whose sys.argv carries kernel flags that argparse must not choke on.
     args, _ = parser.parse_known_args()
@@ -179,6 +198,14 @@ def main():
 
     metadata_paths = args.metadata or [META_PATH]
     entries = load_entries(metadata_paths)
+    if args.limit_per_game:
+        limited = []
+        for game in ("pokemon", "magic", "yugioh"):
+            game_entries = [entry for entry in entries if entry["game"] == game]
+            limited.extend(game_entries[:args.limit_per_game])
+        entries = limited
+        for index, entry in enumerate(entries):
+            entry["annIndex"] = index
     game_counts = {
         game: sum(entry["game"] == game for entry in entries)
         for game in ("pokemon", "magic", "yugioh")
@@ -268,8 +295,26 @@ def main():
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     scaler = torch.amp.GradScaler()
     start_epoch = 0
+    catalog_fingerprint = hashlib.sha256(
+        "\n".join(
+            f'{entry["game"]}\t{entry["cardId"]}\t{entry.get("imageURL", "")}'
+            for entry in entries
+        ).encode()
+    ).hexdigest()
+    hub_checkpoint_path = f"{args.hub_path_prefix}/arcface-checkpoint.pt"
+    if args.hub_repo and not CKPT.exists():
+        try:
+            from huggingface_hub import hf_hub_download
+            downloaded = hf_hub_download(args.hub_repo, hub_checkpoint_path)
+            CKPT.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(downloaded, CKPT)
+            print(f"downloaded resumable checkpoint from {args.hub_repo}", flush=True)
+        except Exception as error:
+            print(f"no resumable Hub checkpoint: {error}", flush=True)
     if CKPT.exists():
         ck = torch.load(CKPT, map_location=device)
+        if ck.get("catalogFingerprint") != catalog_fingerprint:
+            raise ValueError("checkpoint catalog does not match supplied metadata")
         model.load_state_dict(ck["model"])
         head.load_state_dict(ck["head"])
         opt.load_state_dict(ck["opt"])
@@ -319,11 +364,25 @@ def main():
         torch.save({"model": model.state_dict(), "head": head.state_dict(),
                     "opt": opt.state_dict(), "sched": sched.state_dict(),
                     "epoch": epoch,
+                    "catalogFingerprint": catalog_fingerprint,
                     "config": {"backbone": args.backbone, "dim": EMBED_DIM}}, CKPT)
         write_status(phase="training", epoch=epoch, epochs=args.epochs,
                      loss=round(loss_sum / seen, 4), train_acc=round(correct / seen, 4),
                      margin=round(head.margin, 3),
                      minutes=round((time.time() - t0) / 60, 1))
+        if args.hub_repo:
+            from huggingface_hub import HfApi
+            api = HfApi()
+            api.upload_file(
+                path_or_fileobj=str(CKPT),
+                path_in_repo=hub_checkpoint_path,
+                repo_id=args.hub_repo,
+            )
+            api.upload_file(
+                path_or_fileobj=str(STATUS),
+                path_in_repo=f"{args.hub_path_prefix}/status.json",
+                repo_id=args.hub_repo,
+            )
 
     # ---- Eval: catalog self-retrieval -------------------------------------
     @torch.no_grad()
@@ -338,12 +397,26 @@ def main():
         return out
 
     gallery = embed_all(CardViews(valid, train=False))
-    queries = embed_all(CardViews(valid, train=True))
-    qlabels = torch.tensor([valid[k % len(valid)]
-                            for k in range(len(valid) * args.views_per_card)])
+    rng = random.Random(SEED)
+    eval_indices = []
+    for game in game_counts:
+        candidates = [
+            index for index in valid if entries[index]["game"] == game
+        ]
+        rng.shuffle(candidates)
+        eval_indices.extend(candidates[:args.eval_cards_per_game])
+    queries = embed_all(CardViews(eval_indices, train=True))
+    qlabels = torch.tensor([
+        eval_indices[k % len(eval_indices)]
+        for k in range(len(eval_indices) * args.views_per_card)
+    ])
     glabels = torch.tensor(valid)
-    sims = queries @ gallery.t()
-    top = sims.topk(5, dim=1).indices
+    gallery_gpu = gallery.to(device)
+    top_chunks = []
+    for start in range(0, len(queries), 512):
+        sims = queries[start:start + 512].to(device) @ gallery_gpu.t()
+        top_chunks.append(sims.topk(5, dim=1).indices.cpu())
+    top = torch.cat(top_chunks)
     hits = glabels[top] == qlabels[:, None]
     student = {f"recall@{k}": hits[:, :k].any(1).float().mean().item() for k in (1, 5)}
     by_game = {}
@@ -388,9 +461,9 @@ def main():
                              color_layout=ct.colorlayout.RGB)],
         outputs=[ct.TensorType(name="embedding")],
     )
-    ml.save("/content/CardEmbeddings-arcface.mlpackage")
+    ml.save(str(PACKAGE_DIR))
     shutil.make_archive(str(OUT_DIR / "CardEmbeddings-arcface.mlpackage"), "zip",
-                        "/content", "CardEmbeddings-arcface.mlpackage")
+                        PACKAGE_DIR.parent, PACKAGE_DIR.name)
 
     full = torch.zeros(len(entries), EMBED_DIM)
     full[torch.tensor(valid)] = gallery
