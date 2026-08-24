@@ -76,10 +76,20 @@ def main() -> None:
     parser.add_argument("--limit-per-game", type=int)
     parser.add_argument("--batch", type=int, default=256)
     parser.add_argument("--workdir", type=Path, default=Path("/tmp/tcger-universal"))
+    parser.add_argument(
+        "--catalog-revision",
+        default="main",
+        help="Revision containing catalogs prepared by prepare_universal_arcface_hub.py",
+    )
+    parser.add_argument(
+        "--refresh-catalogs",
+        action="store_true",
+        help="Ignore prepared Hub catalogs and rebuild them from upstream sources",
+    )
     args = parser.parse_args()
 
     import requests
-    from huggingface_hub import HfApi
+    from huggingface_hub import HfApi, snapshot_download
 
     epochs = args.epochs or (3 if args.mode == "quick" else 12)
     limit = args.limit_per_game
@@ -106,33 +116,61 @@ def main() -> None:
     for directory in (source_dir, normalized_dir, output_dir, cache_dir, scripts_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
-    pokemon_path = source_dir / "pokemon.json"
-    magic_path = source_dir / "magic-default-cards.json"
-    yugioh_path = source_dir / "yugioh.json"
     converter_path = scripts_dir / "build_universal_trainer_metadata.py"
     trainer_path = scripts_dir / "train_arcface_encoder.py"
 
-    download(POKEMON_METADATA, pokemon_path)
-    bulk = requests.get(
-        SCRYFALL_BULK,
-        headers={"User-Agent": "TCGer-universal-trainer/1.0"},
-        timeout=60,
-    )
-    bulk.raise_for_status()
-    bulk_metadata = bulk.json()
-    download(bulk_metadata["download_uri"], magic_path)
-    download(YGOPRODECK_CARDS, yugioh_path)
-    download(CONVERTER, converter_path)
     download(TRAINER, trainer_path)
 
-    run([
-        sys.executable,
-        str(converter_path),
-        "--pokemon", str(pokemon_path),
-        "--mtg", str(magic_path),
-        "--yugioh", str(yugioh_path),
-        "--output", str(normalized_dir),
-    ])
+    prepared_catalogs = False
+    if not args.refresh_catalogs:
+        try:
+            hub_dir = Path(snapshot_download(
+                repo_id=args.hub_repo,
+                repo_type="model",
+                revision=args.catalog_revision,
+                allow_patterns="catalogs/**",
+                local_dir=work / "hub",
+                token=token,
+            )) / "catalogs"
+            required = [
+                hub_dir / game / "CardsIndexMetadata.json"
+                for game in ("pokemon", "magic", "yugioh")
+            ]
+            if not all(path.is_file() for path in required):
+                raise FileNotFoundError("prepared Hub catalogs are incomplete")
+            shutil.copytree(hub_dir, normalized_dir, dirs_exist_ok=True)
+            prepared_catalogs = True
+            print(
+                f"using prepared catalogs from {args.hub_repo}@{args.catalog_revision}",
+                flush=True,
+            )
+        except Exception as error:
+            print(f"prepared catalogs unavailable; rebuilding: {error}", flush=True)
+
+    bulk_metadata = None
+    if not prepared_catalogs:
+        pokemon_path = source_dir / "pokemon.json"
+        magic_path = source_dir / "magic-default-cards.json"
+        yugioh_path = source_dir / "yugioh.json"
+        download(POKEMON_METADATA, pokemon_path)
+        bulk = requests.get(
+            SCRYFALL_BULK,
+            headers={"User-Agent": "TCGer-universal-trainer/1.0"},
+            timeout=60,
+        )
+        bulk.raise_for_status()
+        bulk_metadata = bulk.json()
+        download(bulk_metadata["download_uri"], magic_path)
+        download(YGOPRODECK_CARDS, yugioh_path)
+        download(CONVERTER, converter_path)
+        run([
+            sys.executable,
+            str(converter_path),
+            "--pokemon", str(pokemon_path),
+            "--mtg", str(magic_path),
+            "--yugioh", str(yugioh_path),
+            "--output", str(normalized_dir),
+        ])
 
     run_config = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -140,12 +178,14 @@ def main() -> None:
         "epochs": epochs,
         "limitPerGame": limit,
         "batch": args.batch,
+        "preparedCatalogs": prepared_catalogs,
+        "catalogRevision": args.catalog_revision,
         "catalogs": {
             "pokemon": POKEMON_METADATA,
             "magic": {
                 "endpoint": SCRYFALL_BULK,
-                "updatedAt": bulk_metadata.get("updated_at"),
-                "downloadURI": bulk_metadata.get("download_uri"),
+                "updatedAt": bulk_metadata.get("updated_at") if bulk_metadata else None,
+                "downloadURI": bulk_metadata.get("download_uri") if bulk_metadata else None,
             },
             "yugioh": YGOPRODECK_CARDS,
         },
