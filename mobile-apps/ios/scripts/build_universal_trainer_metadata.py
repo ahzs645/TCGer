@@ -23,7 +23,9 @@ GAMES = ("pokemon", "magic", "yugioh")
 
 
 def json_records(path: Path) -> Iterator[dict]:
-    opener = gzip.open if path.suffix == ".gz" else open
+    with open(path, "rb") as raw_source:
+        is_gzip = raw_source.read(2) == b"\x1f\x8b"
+    opener = gzip.open if is_gzip else open
     with opener(path, "rt", encoding="utf-8") as source:
         first = source.read(1)
         source.seek(0)
