@@ -2,6 +2,12 @@
 
 **Date:** June 20, 2026
 **Status:** Recommendation (no implementation decision committed yet)
+
+> **Update 2026-08-23:** the "one shared model, two exports" direction below
+> was adopted and shipped (DINOv2-small on both platforms), and iOS has since
+> moved ahead to an in-house ArcFace/FastViT-T8 encoder. The current
+> cross-platform plan — bringing the web back into lockstep — is
+> [`scanner-convergence.md`](./scanner-convergence.md).
 **Goal:** A card scanner that runs **fully client-side** — embeddable as a website widget **and** on the iOS app — with **no server in the recognition path**.
 
 > This document reviews the realistic options for getting TCGer's scanner to a true

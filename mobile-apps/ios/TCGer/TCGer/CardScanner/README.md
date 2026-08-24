@@ -347,6 +347,12 @@ Retrain scaffolding (accuracy play, runs on Colab):
 
 ## Dual-encoder recognition (2026-08-23): ArcFace default, DINOv2 rollback
 
+> Cross-platform note: iOS and web are one recognition stack with two
+> runtimes — the iOS index is converted from the same artifact the web
+> serves, and the web currently still runs the DINOv2 generation. The
+> plan to bring the web onto ArcFace (and give it the replay-gate +
+> variant machinery below) is `docs/scanner-convergence.md` at repo root.
+
 The scanner now ships TWO embedding encoders; `ScannerEncoderVariant`
 selects one as an ATOMIC bundle of model + index + thresholds + gate:
 
