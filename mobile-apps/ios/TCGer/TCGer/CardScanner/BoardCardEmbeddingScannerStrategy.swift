@@ -95,7 +95,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     func supports(_ mode: ScanMode) -> Bool {
         encoder.isAvailable &&
             indexStore.isAvailable &&
-            metadataStore.supportedGames.contains(mode.tcgGame)
+            (mode == .automatic
+                ? !metadataStore.supportedGames.isEmpty
+                : metadataStore.supportedGames.contains(mode.tcgGame))
     }
 
     /// Forces every expensive lazy load the first shutter press would
@@ -707,6 +709,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             recordOutcome(.noCandidates)
             return nil
         }
+        // In automatic mode the globally best catalog row routes all OCR and
+        // ambiguity checks through that game's shard. The crop was embedded
+        // once; only metadata/index filtering changes from this point on.
+        let recognizedGame = primary.details.identity.game
 
         // The gate is intentionally not an unconditional early return. It has
         // false negatives on foil/full-art cards. When the frame is rejected,
@@ -813,7 +819,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             titleOCRMs += Date().timeIntervalSince(titleStarted) * 1_000
             if let titleMatch = await metadataStore.exactNameMatch(
                 for: titleCandidates,
-                game: context.mode.tcgGame,
+                game: recognizedGame,
                 setCode: context.setCode,
                 physicalCardsOnly: true
             ) {
@@ -826,7 +832,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 annMs += Date().timeIntervalSince(titleANNStarted) * 1_000
                 let titleRanked = await makeCandidates(
                     from: titleMatches,
-                    game: context.mode.tcgGame,
+                    game: recognizedGame,
                     gateScore: gateScore,
                     titleVerifiedName: titleMatch.name
                 )
@@ -946,8 +952,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let alternatives = ranked.filter { $0.id != primary.id }
         recordOutcome(.accepted)
 
+        let resultMode = ScanMode.allCases.first {
+            $0 != .automatic && $0.tcgGame == primary.details.identity.game
+        } ?? context.mode
         return CardScanResult(
-            mode: context.mode,
+            mode: resultMode,
             capturedImage: cropped,
             primary: primary,
             alternatives: alternatives,
@@ -1025,7 +1034,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         var candidates: [CardScanCandidate] = []
         for match in matches {
             guard let details = await metadataStore.details(for: match.index),
-                  details.identity.game == game
+                  (game == .all || details.identity.game == game)
             else { continue }
             let score = scoreForDistance(match.distance)
             guard score >= Configuration.minimumEvidenceScore else { continue }

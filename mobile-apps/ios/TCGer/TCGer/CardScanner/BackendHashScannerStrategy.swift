@@ -15,6 +15,8 @@ final class BackendHashScannerStrategy: ScanStrategy {
         switch mode {
         case .pokemon, .yugioh, .mtg:
             return true
+        case .automatic:
+            return false
         }
     }
 

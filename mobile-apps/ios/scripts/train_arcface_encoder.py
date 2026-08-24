@@ -4,24 +4,29 @@
 Same recipe as train-arcface-encoder-colab.ipynb (TCG-AR: one class per
 catalog card, ArcFace s=30 m=0.5, synthetic views; FastViT-T8 student, 384-d,
 iOS preprocessing contract), but with zero Drive/browser dependencies so it
-runs under `colab exec`/`colab run`:
+runs under `colab exec`/`colab run`. One universal encoder is trained across
+all supplied games, while its catalogs are exported as independently
+replaceable per-game shards:
 
-- catalog metadata is read from /content/CardsIndexMetadata.json
-  (push it first: `colab upload -s <name> CardsIndexMetadata.json /content/`)
+- one or more catalog metadata files are supplied with repeatable `--metadata`
+  arguments (the legacy /content/CardsIndexMetadata.json remains the default)
 - card images download from each entry's imageURL into /content/card-images
   (resumable; skips files already cached)
 - everything the Mac needs lands in /content/outputs:
     arcface-checkpoint.pt        (resumable, per epoch)
     status.json                  (cheap to poll with `colab download`)
     CardEmbeddings-arcface.mlpackage.zip
-    CardsIndexVectors-arcface.bin
+    CardsIndexVectors-arcface.bin and CardsIndexMetadata.json (combined)
+    shards/{pokemon,magic,yugioh}/CardsIndex{Metadata,Vectors-arcface}.*
     arcface-eval.json
 
 Run remotely:
     colab new -s tcger-arcface --gpu L4
     colab install -s tcger-arcface torch torchvision timm coremltools pillow numpy
-    colab upload -s tcger-arcface CardsIndexMetadata.json /content/
-    colab exec -s tcger-arcface -f train_arcface_encoder.py
+    colab upload -s tcger-arcface pokemon.json magic.json yugioh.json /content/
+    colab exec -s tcger-arcface -f train_arcface_encoder.py -- \
+      --metadata /content/pokemon.json --metadata /content/magic.json \
+      --metadata /content/yugioh.json
     colab download -s tcger-arcface /content/outputs/CardEmbeddings-arcface.mlpackage.zip .
     colab download -s tcger-arcface /content/outputs/CardsIndexVectors-arcface.bin .
     colab stop -s tcger-arcface
@@ -61,12 +66,41 @@ def write_status(**kwargs):
     print(f"[status] {payload}", flush=True)
 
 
-def load_entries():
-    entries = json.load(open(META_PATH))
-    entries.sort(key=lambda e: e["annIndex"])
-    for i, e in enumerate(entries):
-        assert e["annIndex"] == i, "annIndex order must be contiguous"
-    return entries
+def normalize_game(value):
+    game = str(value or "pokemon").strip().lower().replace("_", "-")
+    aliases = {
+        "pokemon": "pokemon",
+        "pokémon": "pokemon",
+        "magic": "magic",
+        "mtg": "magic",
+        "magic-the-gathering": "magic",
+        "magic: the gathering": "magic",
+        "yugioh": "yugioh",
+        "yu-gi-oh": "yugioh",
+        "yu gi oh": "yugioh",
+    }
+    if game not in aliases:
+        raise ValueError(f"unsupported game in metadata: {value!r}")
+    return aliases[game]
+
+
+def load_entries(metadata_paths):
+    combined = []
+    for metadata_path in metadata_paths:
+        with open(metadata_path) as source:
+            entries = json.load(source)
+        entries.sort(key=lambda e: e["annIndex"])
+        for source_index, entry in enumerate(entries):
+            assert entry["annIndex"] == source_index, (
+                f"annIndex order must be contiguous in {metadata_path}"
+            )
+            item = dict(entry)
+            item["annIndex"] = len(combined)
+            item["game"] = normalize_game(item.get("game"))
+            combined.append(item)
+    if not combined:
+        raise ValueError("at least one catalog metadata entry is required")
+    return combined
 
 
 def cached_path(i: int) -> Path:
@@ -117,6 +151,11 @@ def main():
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--backbone", default="fastvit_t8.apple_in1k")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument(
+        "--metadata",
+        action="append",
+        help="CardsIndexMetadata JSON; repeat once per game",
+    )
     # parse_known_args: under `colab exec` the code runs in a Jupyter kernel
     # whose sys.argv carries kernel flags that argparse must not choke on.
     args, _ = parser.parse_known_args()
@@ -138,7 +177,14 @@ def main():
     np.random.seed(SEED)
     print("GPU:", torch.cuda.get_device_name(0), flush=True)
 
-    entries = load_entries()
+    metadata_paths = args.metadata or [META_PATH]
+    entries = load_entries(metadata_paths)
+    game_counts = {
+        game: sum(entry["game"] == game for entry in entries)
+        for game in ("pokemon", "magic", "yugioh")
+        if any(entry["game"] == game for entry in entries)
+    }
+    write_status(phase="catalogs-loaded", total=len(entries), games=game_counts)
     valid = materialize_images(entries)
 
     def contract_resize(img):
@@ -300,7 +346,20 @@ def main():
     top = sims.topk(5, dim=1).indices
     hits = glabels[top] == qlabels[:, None]
     student = {f"recall@{k}": hits[:, :k].any(1).float().mean().item() for k in (1, 5)}
-    json.dump({"student": student, "epochs": args.epochs, "backbone": args.backbone},
+    by_game = {}
+    query_labels = qlabels.tolist()
+    for game in game_counts:
+        game_indices = {
+            index for index, entry in enumerate(entries) if entry["game"] == game
+        }
+        mask = torch.tensor([label in game_indices for label in query_labels])
+        if mask.any():
+            by_game[game] = {
+                f"recall@{k}": hits[mask, :k].any(1).float().mean().item()
+                for k in (1, 5)
+            }
+    json.dump({"student": student, "byGame": by_game, "epochs": args.epochs,
+               "backbone": args.backbone},
               open(OUT_DIR / "arcface-eval.json", "w"), indent=1)
     write_status(phase="evaluated", **{k: round(v, 4) for k, v in student.items()})
 
@@ -333,13 +392,41 @@ def main():
     shutil.make_archive(str(OUT_DIR / "CardEmbeddings-arcface.mlpackage"), "zip",
                         "/content", "CardEmbeddings-arcface.mlpackage")
 
-    import torch.nn.functional as F2  # noqa: F401  (quantize below is torch-only)
     full = torch.zeros(len(entries), EMBED_DIM)
     full[torch.tensor(valid)] = gallery
-    q = torch.clamp(torch.round(full * 127), -127, 127).to(torch.int8).numpy()
-    with open(OUT_DIR / "CardsIndexVectors-arcface.bin", "wb") as f:
-        f.write(struct.pack("<ii", len(entries), EMBED_DIM))
-        f.write(q.tobytes())
+
+    def write_vector_file(path, vectors):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        quantized = torch.clamp(torch.round(vectors * 127), -127, 127)
+        quantized = quantized.to(torch.int8).numpy()
+        with open(path, "wb") as output:
+            output.write(struct.pack("<ii", len(vectors), EMBED_DIM))
+            output.write(quantized.tobytes())
+
+    # Keep the combined output for the current iOS packaging path.
+    write_vector_file(OUT_DIR / "CardsIndexVectors-arcface.bin", full)
+    with open(OUT_DIR / "CardsIndexMetadata.json", "w") as output:
+        json.dump(entries, output, separators=(",", ":"))
+
+    # Game-specific modes download only their catalog. Automatic mode loads
+    # compatible shards together and still runs this single encoder once.
+    for game in game_counts:
+        indices = [
+            index for index, entry in enumerate(entries) if entry["game"] == game
+        ]
+        shard_entries = []
+        for shard_index, global_index in enumerate(indices):
+            item = dict(entries[global_index])
+            item["annIndex"] = shard_index
+            shard_entries.append(item)
+        shard_dir = OUT_DIR / "shards" / game
+        shard_dir.mkdir(parents=True, exist_ok=True)
+        with open(shard_dir / "CardsIndexMetadata.json", "w") as output:
+            json.dump(shard_entries, output, separators=(",", ":"))
+        write_vector_file(
+            shard_dir / "CardsIndexVectors-arcface.bin",
+            full[torch.tensor(indices)],
+        )
     write_status(phase="done", outputs=sorted(p.name for p in OUT_DIR.iterdir()))
 
 

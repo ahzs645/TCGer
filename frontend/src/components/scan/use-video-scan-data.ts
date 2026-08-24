@@ -12,9 +12,11 @@ import {
   type ArtworkFingerprintEntry,
 } from "@/lib/scan/browser-video-matcher";
 import {
+  embeddingModelKey,
   parseEmbeddingIndex,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
+import type { SupportedTcg } from "@/lib/scan/scan-types";
 import { scanIndexAssetUrl } from "@/lib/scan/scan-index-assets";
 import {
   SCAN_CACHE_ARTWORK_STORE as ARTWORK_STORE,
@@ -153,7 +155,7 @@ async function loadScanCacheDatabase() {
       return this.table<ArtworkFingerprintEntry[], string>(ARTWORK_STORE);
     }
 
-    /** Versioned embedding indexes, keyed by tcg code (`"all"` maps to `"pokemon"`). */
+    /** Versioned embedding indexes, keyed by concrete tcg code. */
     get embeddings(): Table<CachedEmbeddingIndex, string> {
       return this.table<CachedEmbeddingIndex, string>(EMBEDDING_STORE);
     }
@@ -370,8 +372,8 @@ export function useVideoScanData(
 ) {
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
   const artworkDbRef = useRef<ArtworkFingerprintEntry[] | null>(null);
-  const embeddingIndexRef = useRef<EmbeddingIndex | null>(null);
-  const embeddingIndexFileRef = useRef<string | null>(null);
+  const embeddingIndexesRef = useRef(new Map<SupportedTcg, EmbeddingIndex>());
+  const embeddingIndexFilesRef = useRef(new Map<SupportedTcg, string>());
 
   /**
    * Load the client-side embedding index for the given filter from a static,
@@ -380,106 +382,120 @@ export function useVideoScanData(
    * re-downloads only when the version changed, and falls back to the cache when
    * offline. No server is required in the recognition path.
    */
-  const ensureEmbeddingIndex = useCallback(
-    async (requestedFilter: ScanFilter): Promise<EmbeddingIndex | null> => {
-      const tcg = requestedFilter === "all" ? "pokemon" : requestedFilter;
-
-      // `null` when IndexedDB is unavailable — fall through to network.
+  const ensureEmbeddingIndexes = useCallback(
+    async (requestedFilter: ScanFilter): Promise<EmbeddingIndex[]> => {
       const db = await openScanCache();
+      const gameOrder: SupportedTcg[] = ["pokemon", "magic", "yugioh"];
+      type ManifestEntry = { file: string; version: number; total: number };
+      let manifestEntries: Partial<Record<SupportedTcg, ManifestEntry>> = {};
 
-      // 1. Fetch the version manifest (tiny, network-first). Null when offline.
-      let entry: { file: string; version: number; total: number } | null = null;
       try {
         const res = await fetch(scanIndexAssetUrl("manifest.json"), {
           cache: "no-cache",
         });
         if (res.ok) {
-          const manifest = await res.json();
-          entry = manifest?.indexes?.[tcg] ?? null;
+          const manifest = (await res.json()) as {
+            indexes?: Partial<Record<SupportedTcg, ManifestEntry>>;
+          };
+          manifestEntries = manifest.indexes ?? {};
         }
       } catch {
-        // offline — rely on cache below
+        // Offline: each concrete shard can still fall back to IndexedDB.
       }
 
-      // Re-check the tiny manifest each time scanning starts, but retain the
-      // already parsed in-memory index while its content-addressed file is
-      // still current (or while offline).
-      if (
-        embeddingIndexRef.current?.tcg === tcg &&
-        (!entry || embeddingIndexFileRef.current === entry.file)
-      ) {
-        return embeddingIndexRef.current;
-      }
+      const games: SupportedTcg[] =
+        requestedFilter === "all" ? gameOrder : [requestedFilter];
 
-      // 2. Serve the cached index when fresh (or when offline and present).
-      if (db) {
-        const cached = await readCached(
-          () => db.embeddings.get(tcg),
-          "embedding-read-failed",
-          "embedding index",
-        );
-        if (cached?.index?.total) {
-          // Same version but a different artifact file (an encoder switch via
-          // manifest republish) must also invalidate; pre-switch rows have no
-          // `file` and rely on the version compare alone.
-          const fresh =
-            !entry ||
-            (cached.version === entry.version &&
-              (!cached.file || cached.file === entry.file));
-          if (fresh) {
-            embeddingIndexRef.current = cached.index;
-            embeddingIndexFileRef.current = cached.file ?? entry?.file ?? null;
-            callbacks.onHashStatus(
-              `Loaded ${cached.index.total.toLocaleString()} embeddings (cache, v${cached.version}).`,
-            );
-            return cached.index;
+      const loadShard = async (tcg: SupportedTcg) => {
+        const entry = manifestEntries[tcg] ?? null;
+        const inMemory = embeddingIndexesRef.current.get(tcg);
+        if (
+          inMemory &&
+          (!entry || embeddingIndexFilesRef.current.get(tcg) === entry.file)
+        ) {
+          return inMemory;
+        }
+
+        if (db) {
+          const cached = await readCached(
+            () => db.embeddings.get(tcg),
+            `embedding-read-failed-${tcg}`,
+            `${tcg} embedding index`,
+          );
+          if (cached?.index?.total) {
+            const fresh =
+              !entry ||
+              (cached.version === entry.version &&
+                (!cached.file || cached.file === entry.file));
+            if (fresh) {
+              embeddingIndexesRef.current.set(tcg, cached.index);
+              const artifactFile = cached.file ?? entry?.file;
+              if (artifactFile)
+                embeddingIndexFilesRef.current.set(tcg, artifactFile);
+              return cached.index;
+            }
           }
         }
-      }
 
-      if (!entry) {
-        callbacks.onHashStatus(
-          `No cached embedding index for ${tcg} (offline?).`,
-        );
-        return null;
-      }
+        if (!entry) return null;
 
-      // 3. Download the (new) versioned index artifact.
-      callbacks.onHashStatus("Downloading embedding index…");
-      try {
-        const res = await fetch(scanIndexAssetUrl(entry.file), {
-          cache: "force-cache",
-        });
-        if (!res.ok) {
-          callbacks.onHashStatus(
-            `No embedding index published for ${tcg} yet.`,
-          );
+        try {
+          const res = await fetch(scanIndexAssetUrl(entry.file), {
+            cache: "force-cache",
+          });
+          if (!res.ok) return null;
+          const artifact = await res.json();
+          const index = parseEmbeddingIndex(artifact, tcg);
+          embeddingIndexesRef.current.set(tcg, index);
+          embeddingIndexFilesRef.current.set(tcg, entry.file);
+          if (db) {
+            const row = { version: entry.version, file: entry.file, index };
+            writeCached(
+              () => db.embeddings.put(row, tcg),
+              `embedding-write-failed-${tcg}`,
+              `${tcg} embedding index`,
+            );
+          }
+          return index;
+        } catch {
           return null;
         }
-        const artifact = await res.json();
-        const index = parseEmbeddingIndex(artifact, tcg);
-        embeddingIndexRef.current = index;
-        embeddingIndexFileRef.current = entry.file;
-        if (db) {
-          // Built here rather than inside the closure so the row is the one
-          // this call computed, exactly as the eager `idbPut` it replaces.
-          // `put` overwrites the previous version's row under the same key, so
-          // a version bump replaces rather than accumulates.
-          const row = { version: entry.version, file: entry.file, index };
-          writeCached(
-            () => db.embeddings.put(row, tcg),
-            "embedding-write-failed",
-            "embedding index",
-          );
-        }
-        callbacks.onHashStatus(
-          `Ready: ${index.total.toLocaleString()} embeddings (v${entry.version}, saved locally).`,
-        );
-        return index;
-      } catch {
+      };
+
+      callbacks.onHashStatus(
+        requestedFilter === "all"
+          ? "Loading compatible game shards…"
+          : `Loading ${requestedFilter} embedding index…`,
+      );
+      const loaded = (await Promise.all(games.map(loadShard))).filter(
+        (index): index is EmbeddingIndex => index !== null,
+      );
+      if (loaded.length === 0) {
         callbacks.onHashStatus("Embedding index unavailable.");
-        return null;
+        return [];
       }
+
+      // Automatic mode can embed once only when shards use the same universal
+      // model contract. Prefer the contract represented by the most games;
+      // ties follow the stable game order above.
+      const groups = new Map<string, EmbeddingIndex[]>();
+      for (const index of loaded) {
+        const key = embeddingModelKey(index);
+        groups.set(key, [...(groups.get(key) ?? []), index]);
+      }
+      const compatible = [...groups.values()].sort(
+        (left, right) => right.length - left.length,
+      )[0]!;
+      const excluded = loaded.length - compatible.length;
+      const total = compatible.reduce((sum, index) => sum + index.total, 0);
+      const gamesLabel = compatible.map((index) => index.tcg).join(", ");
+      callbacks.onHashStatus(
+        `Ready: ${total.toLocaleString()} embeddings across ${gamesLabel}` +
+          (excluded > 0
+            ? ` (${excluded} incompatible model shard${excluded === 1 ? "" : "s"} skipped).`
+            : "."),
+      );
+      return compatible;
     },
     [callbacks],
   );
@@ -628,14 +644,14 @@ export function useVideoScanData(
 
   return {
     ensureHashIndex,
-    ensureEmbeddingIndex,
+    ensureEmbeddingIndexes,
     artworkDbRef,
-    embeddingIndexRef,
+    embeddingIndexesRef,
     clearCache: useCallback(async () => {
       hashCacheRef.current.clear();
       artworkDbRef.current = null;
-      embeddingIndexRef.current = null;
-      embeddingIndexFileRef.current = null;
+      embeddingIndexesRef.current.clear();
+      embeddingIndexFilesRef.current.clear();
       const db = await openScanCache();
       if (!db) return; // nothing persisted, nothing to clear
       try {

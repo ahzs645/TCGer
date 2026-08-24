@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 
 enum ScanMode: String, CaseIterable, Identifiable, Sendable {
+    case automatic
     case pokemon
     case yugioh
     case mtg
@@ -10,6 +11,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
+        case .automatic: return "Automatic"
         case .pokemon: return "Pokémon"
         case .yugioh: return "Yu-Gi-Oh!"
         case .mtg: return "MTG"
@@ -18,6 +20,8 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
 
     var description: String {
         switch self {
+        case .automatic:
+            return "Identify the game automatically using all installed card indexes."
         case .pokemon:
             return "Use clear lighting and center the Pokémon card within the frame."
         case .yugioh:
@@ -29,6 +33,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
 
     var tcgGame: TCGGame {
         switch self {
+        case .automatic: return .all
         case .pokemon: return .pokemon
         case .yugioh: return .yugioh
         case .mtg: return .magic
@@ -37,6 +42,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
 
     var accentColorHex: String {
         switch self {
+        case .automatic: return "#0A84FF"
         case .pokemon: return "#FF3B30"
         case .yugioh: return "#AF52DE"
         case .mtg: return "#34C759"
@@ -105,8 +111,10 @@ enum ScanEnginePreference: String, CaseIterable, Identifiable, Sendable {
 
     func supports(_ mode: ScanMode) -> Bool {
         switch self {
-        case .automatic, .localOnly, .serverHash:
+        case .automatic, .localOnly:
             return true
+        case .serverHash:
+            return mode != .automatic
         case .serverEmbedding:
             return mode == .pokemon
         }

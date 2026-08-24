@@ -14,7 +14,7 @@ import {
   computeEmbeddingFromCanvas,
   ensureCardFaceGate,
   ensureEmbeddingModel,
-  matchEmbeddingTopK,
+  matchEmbeddingShardsTopK,
   scoreCardFaceGate,
   type CardFaceGate,
   type EmbeddingIndex,
@@ -493,10 +493,14 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
     async (params: {
       video: HTMLVideoElement;
       frameCanvas: HTMLCanvasElement;
-      embeddingIndex: EmbeddingIndex;
+      embeddingIndexes: EmbeddingIndex[];
       scanFilter: ScanFilter;
     }) => {
-      const { video, frameCanvas, embeddingIndex, scanFilter } = params;
+      const { video, frameCanvas, embeddingIndexes, scanFilter } = params;
+      const primaryIndex = embeddingIndexes[0];
+      if (!primaryIndex) {
+        throw new Error("No compatible embedding shards were loaded.");
+      }
 
       stopRequestedRef.current = false;
 
@@ -506,10 +510,10 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         await ensureYoloModel((msg) => callbacks.onStatus(msg));
       }
       await ensureEmbeddingModel({
-        model: embeddingIndex.model,
-        dtype: embeddingIndex.dtype,
-        encoder: embeddingIndex.encoder,
-        modelUrl: embeddingIndex.modelUrl,
+        model: primaryIndex.model,
+        dtype: primaryIndex.dtype,
+        encoder: primaryIndex.encoder,
+        modelUrl: primaryIndex.modelUrl,
         onStatus: (msg) => callbacks.onStatus(msg),
       });
       // Warm the OCR worker in the background; it's only invoked when the
@@ -519,10 +523,14 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       const embedAveragers = new Map<string, EmbeddingTrackAverager>();
       // Open-set rejection gate (null = artifact missing or encoder mismatch;
       // scanning proceeds ungated).
-      const cardFaceGate = await ensureCardFaceGate(embeddingIndex);
+      const gateUrls = new Set(
+        embeddingIndexes.map((index) => index.gateUrl ?? "none"),
+      );
+      const cardFaceGate =
+        gateUrls.size === 1 ? await ensureCardFaceGate(primaryIndex) : null;
 
       callbacks.onStatus(
-        "YOLO + embedding active — play, pause, or scrub. Cards are identified on-device.",
+        `YOLO + embedding active — ${embeddingIndexes.map((index) => index.tcg).join(", ")} shards loaded.`,
       );
       prevFrameGrayRef.current = null;
       // Full-resolution capture of the same frame, taken at the same instant
@@ -609,7 +617,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
                 det,
                 cropFrameCanvas,
                 cropScale,
-                embeddingIndex,
+                embeddingIndexes,
                 scanFilter,
                 motion.still,
                 ocrTracker,
@@ -874,7 +882,7 @@ async function rescueWithRectify(
   det: OBBDetection,
   cropFrameCanvas: HTMLCanvasElement,
   cropScale: number,
-  embeddingIndex: EmbeddingIndex,
+  embeddingIndexes: readonly EmbeddingIndex[],
   scanFilter: ScanFilter,
   cardFaceGate: CardFaceGate | null,
 ): Promise<BrowserVideoScanCandidate[] | null> {
@@ -937,7 +945,7 @@ async function rescueWithRectify(
   ) {
     return null;
   }
-  return matchEmbeddingTopK(embedding, embeddingIndex, {
+  return matchEmbeddingShardsTopK(embedding, embeddingIndexes, {
     topK: EMBEDDING_SHORTLIST_SIZE,
     tcgFilter: scanFilter,
     proposalLabel: "yolo+embedding+rectified",
@@ -958,7 +966,7 @@ async function matchDetectionEmbedding(
   det: OBBDetection,
   cropFrameCanvas: HTMLCanvasElement,
   cropScale: number,
-  embeddingIndex: EmbeddingIndex,
+  embeddingIndexes: readonly EmbeddingIndex[],
   scanFilter: ScanFilter,
   frameStill: boolean,
   ocrTracker: OcrVoteTracker | null,
@@ -1001,7 +1009,7 @@ async function matchDetectionEmbedding(
         embedAverager && embedAverager.size() >= 2
           ? (embedAverager.mean() ?? embedding)
           : embedding;
-      candidates = matchEmbeddingTopK(query, embeddingIndex, {
+      candidates = matchEmbeddingShardsTopK(query, embeddingIndexes, {
         topK: EMBEDDING_SHORTLIST_SIZE,
         tcgFilter: scanFilter,
         proposalLabel: "yolo+embedding",
@@ -1014,7 +1022,7 @@ async function matchDetectionEmbedding(
           det,
           cropFrameCanvas,
           cropScale,
-          embeddingIndex,
+          embeddingIndexes,
           scanFilter,
           cardFaceGate,
         );
@@ -1038,18 +1046,20 @@ async function matchDetectionEmbedding(
         candidates.length >= 2 &&
         margin < OCR_MARGIN_THRESHOLD
       ) {
-        const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
-        try {
-          const reading = await readFooterText(cropCanvas, tcg);
-          ocrTracker.add(reading);
-          const fusion = fuseOcrWithShortlist(
-            candidates,
-            ocrTracker.consensus(),
-            tcg,
-          );
-          if (fusion.matched) candidates = fusion.candidates;
-        } catch {
-          // OCR is best-effort; fall back to the embedding ranking.
+        const tcg = scanFilter === "all" ? candidates[0]?.tcg : scanFilter;
+        if (tcg === "pokemon" || tcg === "magic" || tcg === "yugioh") {
+          try {
+            const reading = await readFooterText(cropCanvas, tcg);
+            ocrTracker.add(reading);
+            const fusion = fuseOcrWithShortlist(
+              candidates,
+              ocrTracker.consensus(),
+              tcg,
+            );
+            if (fusion.matched) candidates = fusion.candidates;
+          } catch {
+            // OCR is best-effort; fall back to the embedding ranking.
+          }
         }
       }
 
@@ -1065,7 +1075,10 @@ async function matchDetectionEmbedding(
     const spatialKey = `${Math.round(det.cx / 50)}-${Math.round(det.cy / 50)}`;
     bestMatch = {
       externalId: `yolo-${spatialKey}`,
-      tcg: scanFilter === "all" ? "pokemon" : scanFilter,
+      tcg:
+        scanFilter === "all"
+          ? (candidates[0]?.tcg ?? "pokemon")
+          : scanFilter,
       name: `Detected card`,
       setCode: null,
       setName: null,
