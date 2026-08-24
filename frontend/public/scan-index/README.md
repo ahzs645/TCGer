@@ -6,6 +6,14 @@ loads, plus the self-hosted encoder ONNX for the arcface variant. The
 reproducible build outputs, and are meant to be served as static, versioned,
 CDN-cacheable assets (see `docs/client-side-scanner-options.md`, task 7).
 
+Production serves them from R2 at
+`https://assets.tcger.ahmadjalil.com/scan-index/`. The publisher rewrites the
+model and index files to content-addressed `objects/<sha256>.*` keys, uploads
+those immutable objects first, then updates `manifest.json` last. Consequently,
+publishing a changed ONNX file gives it a new URL and the next scanner start
+loads the matching new index/model bundle; old cached bundles remain valid for
+offline clients.
+
 ## Encoder variants (see docs/scanner-convergence.md)
 
 Two encoder generations are publishable per TCG; the manifest's per-TCG entry
@@ -46,9 +54,19 @@ npx tsx src/scripts/build-arcface-web-index.ts \
 # Refresh the versioned manifest the loader checks (arcface preferred by
 # default; --prefer dinov2 to roll the fleet back).
 npx tsx src/scripts/update-scan-index-manifest.ts
+
+# Validate and preview the exact R2 upload plan (no credentials needed).
+cd ../
+npm run assets:r2:publish-scan-index -- --dry-run
+
+# Publish with the current Cloudflare/Wrangler login. S3 credentials are also
+# supported by omitting --wrangler; see cloudflare/README.md.
+npm run assets:r2:publish-scan-index -- --wrangler
 ```
 
 The loader (`use-video-scan-data.ts`) fetches `manifest.json` first and only
 downloads an index when its version changed; bump `version` in the artifact to
-invalidate caches. Use `--image-base-url <public-host>` so the shipped index's
+invalidate caches. The R2 publisher also changes the manifest's artifact file
+when the bytes change, which prevents an accidental same-version model/index
+update from staying cached. Use `--image-base-url <public-host>` so the shipped index's
 `imageUrl`s resolve outside the local port-forward.

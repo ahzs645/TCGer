@@ -291,6 +291,8 @@ export const INDEXED_DB_NAMES = [
 /**
  * Service worker cache-storage version, mirrored from `public/sw.js`. The
  * derived buckets are `${version}-static`, `-scan`, `-catalog` and `-model`.
+ * The scan bucket can contain cross-origin R2 responses; its manifest remains
+ * network-first while content-addressed model/index objects are cache-first.
  *
  * `sw.js` is plain JavaScript served as a static asset and cannot import this
  * module, so the value is duplicated there — keep the two in step by hand.

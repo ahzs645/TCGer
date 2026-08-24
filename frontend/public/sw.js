@@ -25,6 +25,11 @@ const CATALOG_ORIGIN =
 const CATALOG_PATH = `/${(
   workerUrl.searchParams.get("catalogPath") || "/catalog"
 ).replace(/^\/+|\/+$/g, "")}`;
+const SCAN_INDEX_ORIGIN =
+  workerUrl.searchParams.get("scanIndexOrigin") || self.location.origin;
+const SCAN_INDEX_PATH = `/${(
+  workerUrl.searchParams.get("scanIndexPath") || "/scan-index"
+).replace(/^\/+|\/+$/g, "")}`;
 
 const APP_SHELL = [
   "/",
@@ -77,16 +82,27 @@ function isCatalogAsset(url) {
   );
 }
 
+function isScanIndexAsset(url) {
+  return (
+    url.origin === SCAN_INDEX_ORIGIN &&
+    (url.pathname === `${SCAN_INDEX_PATH}/manifest.json` ||
+      url.pathname.startsWith(`${SCAN_INDEX_PATH}/`))
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  if (url.pathname === "/scan-index/manifest.json") {
+  if (
+    isScanIndexAsset(url) &&
+    url.pathname === `${SCAN_INDEX_PATH}/manifest.json`
+  ) {
     event.respondWith(networkFirst(req, SCAN_CACHE));
     return;
   }
-  if (url.pathname.startsWith("/scan-index/")) {
+  if (isScanIndexAsset(url)) {
     event.respondWith(cacheFirst(req, SCAN_CACHE));
     return;
   }

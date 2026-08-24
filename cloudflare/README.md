@@ -8,6 +8,8 @@ https://assets.tcger.ahmadjalil.com/catalogs/manifest.json
 https://assets.tcger.ahmadjalil.com/catalogs/{content-addressed pack}.json
 https://assets.tcger.ahmadjalil.com/pack/manifest.json
 https://assets.tcger.ahmadjalil.com/pack/objects/{content-addressed asset}
+https://assets.tcger.ahmadjalil.com/scan-index/manifest.json
+https://assets.tcger.ahmadjalil.com/scan-index/objects/{content-addressed model or index}
 ```
 
 No Worker is required. R2's custom-domain integration serves the objects
@@ -41,6 +43,9 @@ The object metadata provides the intended browser policy:
 
 - `catalogs/manifest.json`: 5-minute cache with revalidation.
 - Content-addressed catalog packs: one year, immutable.
+- `scan-index/manifest.json`: always revalidate; the service worker supplies
+  the offline fallback.
+- Content-addressed scanner models, indexes, and gates: one year, immutable.
 
 ## Publishing credentials
 
@@ -87,7 +92,30 @@ should set:
 
 ```bash
 NEXT_PUBLIC_CATALOG_BASE_URL=https://assets.tcger.ahmadjalil.com/catalogs
+NEXT_PUBLIC_SCAN_INDEX_BASE_URL=https://assets.tcger.ahmadjalil.com/scan-index
 ```
+
+## Publish the browser scanner bundle
+
+Generate the local model/index artifacts as described in
+`frontend/public/scan-index/README.md`, then validate the content-addressed R2
+plan:
+
+```bash
+npm run assets:r2:publish-scan-index -- --dry-run
+```
+
+Publish with the current Wrangler login (or omit `--wrangler` and provide the
+S3-compatible R2 credentials documented above):
+
+```bash
+npm run assets:r2:publish-scan-index -- --wrangler
+```
+
+The publisher validates every manifest entry, rewrites ArcFace `modelUrl` to
+the ONNX object's SHA-256 key, uploads all immutable objects, and publishes the
+mutable manifest last. A model update is therefore atomic from the browser's
+perspective and is discovered the next time scanning starts.
 
 The iOS target contains the equivalent `TCGER_CATALOG_BASE_URL` build setting.
 Its remote source persists downloaded packs on device and falls back to bundled

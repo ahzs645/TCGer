@@ -15,6 +15,7 @@
  */
 
 import { getContext2d } from "./canvas-utils";
+import { scanIndexAssetUrl } from "./scan-index-assets";
 import type { BrowserVideoScanCandidate } from "./scan-types";
 import type { TcgCode } from "@/types/card";
 
@@ -61,6 +62,8 @@ export interface EmbeddingIndex {
   thresholds: EmbeddingMatchThresholds;
   /** For self-hosted ONNX encoders (arcface): URL of the model file. */
   modelUrl: string | null;
+  /** Optional content-addressed rejection gate published with this bundle. */
+  gateUrl: string | null;
 }
 
 /** Raw artifact shape emitted by build-embedding-index.ts. */
@@ -85,6 +88,7 @@ interface EmbeddingIndexArtifact {
   vectors: string; // base64 Int8Array
   thresholds?: Partial<EmbeddingMatchThresholds>;
   modelUrl?: string;
+  gateUrl?: string;
 }
 
 function inferEncoder(model: string): EncoderKind {
@@ -145,7 +149,8 @@ export function parseEmbeddingIndex(
       ...DEFAULT_EMBEDDING_MATCH_THRESHOLDS,
       ...artifact.thresholds,
     },
-    modelUrl: artifact.modelUrl ?? null,
+    modelUrl: artifact.modelUrl ? scanIndexAssetUrl(artifact.modelUrl) : null,
+    gateUrl: artifact.gateUrl ? scanIndexAssetUrl(artifact.gateUrl) : null,
   };
 }
 
@@ -166,9 +171,7 @@ export interface CardFaceGate {
   dimension: number;
 }
 
-const GATE_URL = "/scan-index/card-face-gate.json";
-
-let gatePromise: Promise<CardFaceGate | null> | null = null;
+const gatePromises = new Map<string, Promise<CardFaceGate | null>>();
 
 /**
  * Lazily fetch the rejection-gate artifact. Resolves null (gate disabled) when
@@ -176,36 +179,41 @@ let gatePromise: Promise<CardFaceGate | null> | null = null;
  * from a different embedding model would reject arbitrarily.
  */
 export function ensureCardFaceGate(
-  index: Pick<EmbeddingIndex, "model" | "dimension">,
+  index: Pick<EmbeddingIndex, "model" | "dimension" | "gateUrl">,
 ): Promise<CardFaceGate | null> {
-  gatePromise ??= (async () => {
-    try {
-      const res = await fetch(GATE_URL);
-      if (!res.ok) return null;
-      const artifact = (await res.json()) as {
-        model?: string;
-        dimension?: number;
-        weights?: number[];
-        bias?: number;
-        recommendedThreshold?: number;
-      };
-      if (
-        !Array.isArray(artifact.weights) ||
-        typeof artifact.bias !== "number"
-      ) {
+  const gateUrl = index.gateUrl ?? scanIndexAssetUrl("card-face-gate.json");
+  let gatePromise = gatePromises.get(gateUrl);
+  if (!gatePromise) {
+    gatePromise = (async () => {
+      try {
+        const res = await fetch(gateUrl);
+        if (!res.ok) return null;
+        const artifact = (await res.json()) as {
+          model?: string;
+          dimension?: number;
+          weights?: number[];
+          bias?: number;
+          recommendedThreshold?: number;
+        };
+        if (
+          !Array.isArray(artifact.weights) ||
+          typeof artifact.bias !== "number"
+        ) {
+          return null;
+        }
+        return {
+          weights: Float32Array.from(artifact.weights),
+          bias: artifact.bias,
+          threshold: artifact.recommendedThreshold ?? 0.5,
+          model: artifact.model ?? "",
+          dimension: artifact.dimension ?? artifact.weights.length,
+        };
+      } catch {
         return null;
       }
-      return {
-        weights: Float32Array.from(artifact.weights),
-        bias: artifact.bias,
-        threshold: artifact.recommendedThreshold ?? 0.5,
-        model: artifact.model ?? "",
-        dimension: artifact.dimension ?? artifact.weights.length,
-      };
-    } catch {
-      return null;
-    }
-  })();
+    })();
+    gatePromises.set(gateUrl, gatePromise);
+  }
 
   return gatePromise.then((gate) => {
     if (!gate) return null;
@@ -256,6 +264,8 @@ type TransformersModule = {
 };
 
 let modelPromise: Promise<void> | null = null;
+let loadingModelKey: string | null = null;
+let activeModelKey: string | null = null;
 /** Encoder closure: card crop canvas → raw (un-normalised) embedding vector. */
 let embedFn: ((cardCanvas: HTMLCanvasElement) => Promise<Float32Array>) | null =
   null;
@@ -328,21 +338,39 @@ export function isEmbeddingModelReady(): boolean {
 export async function ensureEmbeddingModel(
   config: EmbeddingModelConfig = {},
 ): Promise<void> {
-  if (isEmbeddingModelReady()) return;
-  if (modelPromise) return modelPromise;
-
   const model = config.model ?? "Xenova/clip-vit-base-patch32";
   const dtype = config.dtype ?? "q8";
   const encoder = config.encoder ?? inferEncoder(model);
   const device = config.device ? { device: config.device } : {};
+  const desiredModelKey = JSON.stringify({
+    model,
+    dtype,
+    encoder,
+    modelUrl: config.modelUrl ?? null,
+    device: config.device ?? null,
+  });
+
+  if (isEmbeddingModelReady() && activeModelKey === desiredModelKey) return;
+  if (modelPromise) {
+    if (loadingModelKey === desiredModelKey) return modelPromise;
+    await modelPromise;
+    return ensureEmbeddingModel(config);
+  }
+
+  if (encoder === "arcface" && !config.modelUrl) {
+    throw new Error(
+      "arcface index artifact is missing modelUrl (rebuild with build-arcface-web-index)",
+    );
+  }
+
+  // Do not allow a newly downloaded index to run against a session retained
+  // from the previous manifest. The scanner awaits this load before inference.
+  embedFn = null;
+  activeModelKey = null;
+  loadingModelKey = desiredModelKey;
 
   if (encoder === "arcface") {
-    const modelUrl = config.modelUrl;
-    if (!modelUrl) {
-      throw new Error(
-        "arcface index artifact is missing modelUrl (rebuild with build-arcface-web-index)",
-      );
-    }
+    const modelUrl = config.modelUrl!;
     modelPromise = (async () => {
       config.onStatus?.("Loading scanner model…");
       const ort = await import("onnxruntime-web");
@@ -369,9 +397,10 @@ export async function ensureEmbeddingModel(
 
     try {
       await modelPromise;
-    } catch (err) {
-      modelPromise = null; // allow retry on failure
-      throw err;
+      activeModelKey = desiredModelKey;
+    } finally {
+      modelPromise = null;
+      loadingModelKey = null;
     }
     return;
   }
@@ -442,9 +471,10 @@ export async function ensureEmbeddingModel(
 
   try {
     await modelPromise;
-  } catch (err) {
-    modelPromise = null; // allow retry on failure
-    throw err;
+    activeModelKey = desiredModelKey;
+  } finally {
+    modelPromise = null;
+    loadingModelKey = null;
   }
 }
 
@@ -509,7 +539,8 @@ export function matchEmbeddingTopK(
   // Threshold defaults come from the index (the operating point calibrated to
   // its encoder); explicit options still win for sweeps/experiments. The ??
   // covers IndexedDB rows cached before thresholds existed on the type.
-  const indexThresholds = index.thresholds ?? DEFAULT_EMBEDDING_MATCH_THRESHOLDS;
+  const indexThresholds =
+    index.thresholds ?? DEFAULT_EMBEDDING_MATCH_THRESHOLDS;
   const {
     topK = 20,
     tcgFilter,

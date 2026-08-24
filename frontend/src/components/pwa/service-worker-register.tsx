@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { CATALOG_ROOT } from "@/lib/catalog/catalog-assets";
+import { SCAN_INDEX_ROOT } from "@/lib/scan/scan-index-assets";
 
 /**
  * Registers the PWA service worker (offline-first scanner assets + installable
@@ -19,9 +20,12 @@ export function ServiceWorkerRegister() {
 
     const register = () => {
       const catalogRoot = new URL(CATALOG_ROOT, window.location.origin);
+      const scanIndexRoot = new URL(SCAN_INDEX_ROOT, window.location.origin);
       const workerUrl = new URL("/sw.js", window.location.origin);
       workerUrl.searchParams.set("catalogOrigin", catalogRoot.origin);
       workerUrl.searchParams.set("catalogPath", catalogRoot.pathname);
+      workerUrl.searchParams.set("scanIndexOrigin", scanIndexRoot.origin);
+      workerUrl.searchParams.set("scanIndexPath", scanIndexRoot.pathname);
       navigator.serviceWorker
         .register(`${workerUrl.pathname}${workerUrl.search}`)
         .catch(() => {

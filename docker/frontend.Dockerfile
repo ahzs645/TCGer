@@ -26,6 +26,8 @@ CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
 FROM base AS build
 ARG NEXT_PUBLIC_CATALOG_BASE_URL=https://assets.tcger.ahmadjalil.com/catalogs
 ENV NEXT_PUBLIC_CATALOG_BASE_URL=${NEXT_PUBLIC_CATALOG_BASE_URL}
+ARG NEXT_PUBLIC_SCAN_INDEX_BASE_URL=https://assets.tcger.ahmadjalil.com/scan-index
+ENV NEXT_PUBLIC_SCAN_INDEX_BASE_URL=${NEXT_PUBLIC_SCAN_INDEX_BASE_URL}
 # Build shared types first
 RUN cd packages/api-types && npx tsc -p tsconfig.build.json --skipLibCheck || true
 # Build frontend

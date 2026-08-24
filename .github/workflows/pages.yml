@@ -95,6 +95,7 @@ jobs:
         env:
           NEXT_PUBLIC_CATALOG_BASE_URL: https://assets.tcger.ahmadjalil.com/catalogs
           NEXT_PUBLIC_PACK_ASSET_BASE_URL: https://assets.tcger.ahmadjalil.com
+          NEXT_PUBLIC_SCAN_INDEX_BASE_URL: https://assets.tcger.ahmadjalil.com/scan-index
         run: |
           BASE_PATH="${{ steps.pages.outputs.base_path }}"
           if [ -z "$BASE_PATH" ]; then

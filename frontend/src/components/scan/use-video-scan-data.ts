@@ -15,6 +15,7 @@ import {
   parseEmbeddingIndex,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
+import { scanIndexAssetUrl } from "@/lib/scan/scan-index-assets";
 import {
   SCAN_CACHE_ARTWORK_STORE as ARTWORK_STORE,
   SCAN_CACHE_EMBEDDING_STORE as EMBEDDING_STORE,
@@ -370,6 +371,7 @@ export function useVideoScanData(
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
   const artworkDbRef = useRef<ArtworkFingerprintEntry[] | null>(null);
   const embeddingIndexRef = useRef<EmbeddingIndex | null>(null);
+  const embeddingIndexFileRef = useRef<string | null>(null);
 
   /**
    * Load the client-side embedding index for the given filter from a static,
@@ -382,17 +384,13 @@ export function useVideoScanData(
     async (requestedFilter: ScanFilter): Promise<EmbeddingIndex | null> => {
       const tcg = requestedFilter === "all" ? "pokemon" : requestedFilter;
 
-      if (embeddingIndexRef.current && embeddingIndexRef.current.tcg === tcg) {
-        return embeddingIndexRef.current;
-      }
-
       // `null` when IndexedDB is unavailable — fall through to network.
       const db = await openScanCache();
 
       // 1. Fetch the version manifest (tiny, network-first). Null when offline.
       let entry: { file: string; version: number; total: number } | null = null;
       try {
-        const res = await fetch("/scan-index/manifest.json", {
+        const res = await fetch(scanIndexAssetUrl("manifest.json"), {
           cache: "no-cache",
         });
         if (res.ok) {
@@ -401,6 +399,16 @@ export function useVideoScanData(
         }
       } catch {
         // offline — rely on cache below
+      }
+
+      // Re-check the tiny manifest each time scanning starts, but retain the
+      // already parsed in-memory index while its content-addressed file is
+      // still current (or while offline).
+      if (
+        embeddingIndexRef.current?.tcg === tcg &&
+        (!entry || embeddingIndexFileRef.current === entry.file)
+      ) {
+        return embeddingIndexRef.current;
       }
 
       // 2. Serve the cached index when fresh (or when offline and present).
@@ -420,6 +428,7 @@ export function useVideoScanData(
               (!cached.file || cached.file === entry.file));
           if (fresh) {
             embeddingIndexRef.current = cached.index;
+            embeddingIndexFileRef.current = cached.file ?? entry?.file ?? null;
             callbacks.onHashStatus(
               `Loaded ${cached.index.total.toLocaleString()} embeddings (cache, v${cached.version}).`,
             );
@@ -438,7 +447,7 @@ export function useVideoScanData(
       // 3. Download the (new) versioned index artifact.
       callbacks.onHashStatus("Downloading embedding index…");
       try {
-        const res = await fetch(`/scan-index/${entry.file}`, {
+        const res = await fetch(scanIndexAssetUrl(entry.file), {
           cache: "force-cache",
         });
         if (!res.ok) {
@@ -450,6 +459,7 @@ export function useVideoScanData(
         const artifact = await res.json();
         const index = parseEmbeddingIndex(artifact, tcg);
         embeddingIndexRef.current = index;
+        embeddingIndexFileRef.current = entry.file;
         if (db) {
           // Built here rather than inside the closure so the row is the one
           // this call computed, exactly as the eager `idbPut` it replaces.
@@ -625,6 +635,7 @@ export function useVideoScanData(
       hashCacheRef.current.clear();
       artworkDbRef.current = null;
       embeddingIndexRef.current = null;
+      embeddingIndexFileRef.current = null;
       const db = await openScanCache();
       if (!db) return; // nothing persisted, nothing to clear
       try {
