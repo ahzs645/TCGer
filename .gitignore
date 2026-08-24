@@ -66,6 +66,7 @@ tmp/
 
 # Local agent artifacts
 /.codex-prompts/
+/trainer-inputs/
 
 # Generated booster-wrap previews and batch logs. Final pack artwork lives in
 # Google Drive and is published to R2; it must never be committed to this repo.
