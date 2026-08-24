@@ -103,6 +103,7 @@ mobile-apps/ios/scripts/__pycache__/
 # docs/scanner-asset-packaging.md.
 frontend/public/scan-index/*.json
 frontend/public/scan-index/*.bin
+frontend/public/scan-index/*.onnx
 
 # Generated offline catalog packs (READMEs remain tracked).
 data/catalog/

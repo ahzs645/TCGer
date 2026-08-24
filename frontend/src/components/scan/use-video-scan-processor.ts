@@ -509,6 +509,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         model: embeddingIndex.model,
         dtype: embeddingIndex.dtype,
         encoder: embeddingIndex.encoder,
+        modelUrl: embeddingIndex.modelUrl,
         onStatus: (msg) => callbacks.onStatus(msg),
       });
       // Warm the OCR worker in the background; it's only invoked when the

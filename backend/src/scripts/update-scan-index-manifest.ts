@@ -6,8 +6,13 @@
  * the version changed. This is what makes index delivery static + versioned +
  * cache-invalidating with no server in the recognition path.
  *
- * Run after building/replacing any {tcg}-embeddings.json:
- *   tsx src/scripts/update-scan-index-manifest.ts
+ * Run after building/replacing any {tcg}-embeddings[-encoder].json:
+ *   tsx src/scripts/update-scan-index-manifest.ts [--prefer arcface|dinov2|clip]
+ *
+ * When a TCG has several encoder variants published (pokemon-embeddings.json
+ * plus pokemon-embeddings-arcface.json), the preferred encoder's artifact
+ * becomes that TCG's active entry — so switching the whole fleet between
+ * encoders (rollback included) is one manifest republish, no client change.
  */
 
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
@@ -18,7 +23,13 @@ const SCAN_INDEX_DIR = resolve(
   "../../../frontend/public/scan-index",
 );
 
-const CANONICAL = /^(pokemon|magic|yugioh)-embeddings\.json$/;
+const CANONICAL = /^(pokemon|magic|yugioh)-embeddings(-[a-z0-9]+)?\.json$/;
+
+const preferIdx = process.argv.indexOf("--prefer");
+const PREFERRED_ENCODER =
+  preferIdx >= 0 && process.argv[preferIdx + 1]
+    ? process.argv[preferIdx + 1]!
+    : "arcface";
 
 interface ManifestEntry {
   tcg: string;
@@ -34,13 +45,14 @@ interface ManifestEntry {
 function main() {
   const files = readdirSync(SCAN_INDEX_DIR).filter((f) => CANONICAL.test(f));
   const indexes: Record<string, ManifestEntry> = {};
+  const alternates: ManifestEntry[] = [];
 
   for (const file of files) {
     const path = join(SCAN_INDEX_DIR, file);
     const raw = readFileSync(path, "utf8");
     const a = JSON.parse(raw);
-    const tcg = file.replace(/-embeddings\.json$/, "");
-    indexes[tcg] = {
+    const tcg = file.replace(/-embeddings(-[a-z0-9]+)?\.json$/, "");
+    const entry: ManifestEntry = {
       tcg,
       file,
       version: a.version ?? 1,
@@ -50,12 +62,27 @@ function main() {
       total: a.total ?? a.entries?.length ?? 0,
       bytes: Buffer.byteLength(raw),
     };
+    const current = indexes[tcg];
+    if (
+      !current ||
+      (entry.encoder === PREFERRED_ENCODER &&
+        current.encoder !== PREFERRED_ENCODER)
+    ) {
+      if (current) alternates.push(current);
+      indexes[tcg] = entry;
+    } else {
+      alternates.push(entry);
+    }
   }
 
   const manifest = {
     schema: 1,
     generatedFromCount: files.length,
+    preferredEncoder: PREFERRED_ENCODER,
     indexes,
+    // Published-but-inactive variants (e.g. the dinov2 rollback while arcface
+    // is preferred). Informational: the loader only reads `indexes`.
+    alternates,
   };
   const out = join(SCAN_INDEX_DIR, "manifest.json");
   writeFileSync(out, JSON.stringify(manifest, null, 2));

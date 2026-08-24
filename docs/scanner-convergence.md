@@ -27,27 +27,63 @@ The stacks share more upstream than either side's code suggests:
 **Consequence:** upstream fixes fan out to both platforms. A bad catalog
 image (see SWSH204 below) fixed once and re-embedded repairs both indices.
 
-## Where we diverge today
+## Where we diverge today (updated post-Phase-1)
 
-| | iOS (post-98f228f9) | Web |
+| | iOS (post-98f228f9) | Web (post-Phase-1) |
 |---|---|---|
-| Default encoder | **ArcFace/FastViT-T8** (in-house, 46/76, 0 wrong accepts) | DINOv2-small (31/76 on the iOS corpus; unmeasured on web) |
-| Encoder switching | `ScannerEncoderVariant`: model+index+thresholds+gate as one atomic bundle; env > UserDefaults > default | Index-driven only: the artifact header names the encoder; thresholds are hard-coded constants (`embedding-matcher.ts`) that do NOT travel with it |
-| Thresholds | 0.60/0.05 (ArcFace-calibrated) | 0.72 top-1 cosine (DINOv2-scale) |
-| Regression gate | Replay suite (76 labeled frames), green, per-variant allowlists | **None** — zero automated accuracy tests; manual Node harnesses (`eval-recognition.ts`, `eval-video-stream.ts`) against one labeled video |
-| Runtime | Core ML on ANE | Transformers.js / ONNX Runtime Web (WASM default) |
+| Default encoder | **ArcFace/FastViT-T8** (46/76, 0 wrong accepts) | **ArcFace/FastViT-T8** (same weights, fp16 ONNX; manifest-preferred) |
+| Encoder switching | `ScannerEncoderVariant` atomic bundle; env > UserDefaults > default | Version-2 artifact bundles thresholds+modelUrl with the vectors; manifest `--prefer` picks the fleet's variant; DINOv2 artifact = rollback |
+| Thresholds | 0.60/0.05 (swept + replay-validated) | 0.60/0.05 **provisional** (iOS-swept; own web sweep pending — Phase 2) |
+| Regression gate | Replay suite (76 labeled frames), green, per-variant allowlists | **Still none automated** — but `eval-recognition.ts` now runs both encoders, so the corpus + CI gate is the remaining work |
+| Rejection gate | none for arcface (DINOv2-trained gate rollback-only) | same: gate auto-disables on model mismatch |
+| Runtime | Core ML on ANE | ONNX Runtime Web (WASM) for arcface; Transformers.js for dinov2/clip |
 
-One critical coupling to respect: because web encoder selection is
-index-driven and web thresholds are hard-coded, **publishing an ArcFace
-index to the web today would break recognition** — ArcFace's correct
-answers score below the 0.72 DINOv2-scale accept and would all be
-rejected. This is the same lesson iOS learned (its recalibration round);
-it is why Phase 1 makes thresholds travel with the encoder *before* any
-artifact swap.
+The critical coupling (now enforced in code): thresholds are an operating
+point on one encoder's score scale — ArcFace's correct answers score below
+the 0.72 DINOv2-scale accept and would all have been rejected had the
+index been swapped alone. Phase 1 resolved this by making thresholds
+travel inside the version-2 artifact, so an index and its operating point
+can no longer be published separately.
 
 ## Convergence roadmap
 
-### Phase 1 — ArcFace on the web (the port)
+### Phase 1 — ArcFace on the web (the port) — **SHIPPED 2026-08-23**
+
+Landed the same day this doc was written. What shipped, and what the port
+taught us:
+
+- **ONNX export**: `mobile-apps/ios/scripts/export_arcface_onnx.py` — same
+  `Deploy` wrapper as the Core ML export ([0,1] input, ImageNet norm baked
+  into the graph). fp16 (7.9 MB) is bit-faithful (worst cos 0.99992 vs
+  fp32, max sim shift 0.0011). **int8 dynamic quantization destroys the
+  model** — FastViT's reparameterized convs collapse to noise (cos as low
+  as −0.22, 1/12 self-retrieval). Ship fp16/fp32 only.
+- **Index**: `backend/src/scripts/build-arcface-web-index.ts` converts the
+  iOS bin + existing entry metadata into the version-2 web artifact —
+  exact vector parity with iOS by construction. The export script's
+  live-image self-retrieval check doubles as proof the bin's annIndex
+  order equals the web artifact's entry order.
+- **Thresholds travel**: version-2 artifacts carry `thresholds` +
+  `modelUrl`; `parseEmbeddingIndex`/`matchEmbeddingTopK` default to the
+  index's own operating point (explicit options still win for sweeps).
+  The manifest's per-TCG entry picks the active variant
+  (`update-scan-index-manifest.ts --prefer arcface|dinov2`) — fleet-wide
+  encoder switch/rollback is one manifest republish. The DINOv2-trained
+  gate auto-disables under arcface via the existing gate/model mismatch
+  guard.
+- **Eval harness speaks arcface** (Phase 2 start):
+  `eval-recognition.ts` runs the ONNX via onnxruntime-node with the exact
+  training preprocessing. Smoke run (10 catalog crops): 9/10 top-1 at
+  sims 0.92–0.97; wrong twins peak at ~0.61 — the provisional 0.60
+  accept line sits in the gap.
+- **New shared-upstream defect class confirmed**: the one smoke miss
+  (xy12-74) has self-sim 0.30 against its own index row — the row was
+  embedded from a different image than tcgdex serves today. Same class as
+  the iOS SWSH204 suspicion, second confirmed instance, affects BOTH
+  platforms (same vectors). The trainer's 97.9% recall@1 implies ~2%
+  (~460 cards) of rows may be stale/degraded → see polish item 2b below.
+
+The original port plan, kept for reference:
 
 1. **Export ONNX** from `Drive:TCGer-encoder/arcface-checkpoint-epoch5.pt`
    (FastViT-T8, standard export; fp16 or q8 — the model is 6.9 MB as Core
@@ -98,6 +134,11 @@ each item pays out on both platforms once Phase 1 lands:
 2. **SWSH204 promo investigation** — 4 of iOS's 9 losses are this one
    card, all `noCandidates`; likely a catalog-image/index-row problem.
    If so, the fix is in the shared builder input and repairs both.
+   2b. **Stale-row audit** (elevated by the Phase-1 find): sweep all
+   21,828 catalog images through the encoder and flag rows whose
+   self-sim is below ~0.8 (xy12-74 measured 0.30 — its row predates the
+   image tcgdex now serves). Re-embed the flagged rows, regenerate bin +
+   web artifact, and both platforms heal at once.
 3. **Gate retrain on ArcFace embeddings**
    (`backend/src/scripts/train-rejection-gate.ts`) — produces both the
    web `card-face-gate.json` and iOS `CardFaceGate.json` replacements.

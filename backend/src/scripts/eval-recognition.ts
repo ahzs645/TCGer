@@ -28,13 +28,15 @@ import { join, resolve, basename } from "node:path";
 
 import sharp from "sharp";
 
-type EncoderKind = "clip" | "dinov2";
+type EncoderKind = "clip" | "dinov2" | "arcface";
 
 interface LoadedIndex {
   model: string;
   dtype: string;
   encoder: EncoderKind;
   dimension: number;
+  /** ONNX file URL for self-hosted encoders (arcface artifacts, version 2). */
+  modelUrl?: string | null;
   entries: Array<{ externalId: string; name: string; setCode: string | null }>;
   vectors: Int8Array;
   invNorms: Float32Array;
@@ -82,6 +84,7 @@ function loadIndex(path: string): LoadedIndex {
     dtype: a.dtype,
     encoder: (a.encoder ?? (/dinov2/i.test(a.model) ? "dinov2" : "clip")) as EncoderKind,
     dimension: D,
+    modelUrl: a.modelUrl ?? null,
     entries: a.entries,
     vectors,
     invNorms,
@@ -118,6 +121,45 @@ function topK(query: Float32Array, index: LoadedIndex, k: number) {
 }
 
 async function createEncoder(transformers: any, index: LoadedIndex) {
+  if (index.encoder === "arcface") {
+    // Self-hosted ONNX (exported by mobile-apps/ios/scripts/export_arcface_onnx.py).
+    // Preprocessing mirrors the training contract exactly: shortest edge >= 256
+    // (both sides cover 224), bicubic (PIL code 3), ceil, center-crop 224,
+    // /255 CHW — ImageNet mean/std are baked into the graph.
+    const ort = await import("onnxruntime-node");
+    const modelPath = resolve(
+      __dirname,
+      "../../../frontend/public",
+      (index.modelUrl ?? "/scan-index/card-embeddings-arcface.onnx").replace(/^\//, ""),
+    );
+    const session = await ort.InferenceSession.create(modelPath);
+    const IMG = 224;
+    return async (image: any) => {
+      let img = image.rgb();
+      const s = Math.max(
+        256 / Math.min(img.width, img.height),
+        IMG / img.width,
+        IMG / img.height,
+      );
+      img = await img.resize(Math.ceil(img.width * s), Math.ceil(img.height * s), {
+        resample: 3,
+      });
+      img = await img.center_crop(IMG, IMG);
+      img = img.rgb();
+      const c = img.channels as number;
+      const plane = IMG * IMG;
+      const chw = new Float32Array(3 * plane);
+      for (let i = 0; i < plane; i++) {
+        chw[i] = img.data[i * c]! / 255;
+        chw[plane + i] = img.data[i * c + 1]! / 255;
+        chw[2 * plane + i] = img.data[i * c + 2]! / 255;
+      }
+      const out = await session.run({
+        pixel_values: new ort.Tensor("float32", chw, [1, 3, IMG, IMG]),
+      });
+      return l2(new Float32Array(out.embedding!.data as Float32Array));
+    };
+  }
   if (index.encoder === "dinov2") {
     const proc = await transformers.AutoImageProcessor.from_pretrained(index.model);
     const net = await transformers.AutoModel.from_pretrained(index.model, {

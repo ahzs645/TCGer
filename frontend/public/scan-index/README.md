@@ -1,10 +1,30 @@
 # Scan index artifacts (generated — not committed)
 
 This directory holds the **client-side embedding index** the browser scanner
-loads (DINOv2-small, int8-quantized). The `*.json` / `*.bin` artifacts are
-**gitignored** — they are large, reproducible build outputs, and are meant to be
-served as static, versioned, CDN-cacheable assets (see
-`docs/client-side-scanner-options.md`, task 7).
+loads, plus the self-hosted encoder ONNX for the arcface variant. The
+`*.json` / `*.bin` / `*.onnx` artifacts are **gitignored** — they are large,
+reproducible build outputs, and are meant to be served as static, versioned,
+CDN-cacheable assets (see `docs/client-side-scanner-options.md`, task 7).
+
+## Encoder variants (see docs/scanner-convergence.md)
+
+Two encoder generations are publishable per TCG; the manifest's per-TCG entry
+decides which one clients run, so switching (or rolling back) is one
+`update-scan-index-manifest.ts --prefer <encoder>` + republish, no client
+change:
+
+- `pokemon-embeddings-arcface.json` (**preferred**): the in-house
+  ArcFace/FastViT-T8 encoder — the same model + vectors iOS ships as its
+  default. Version-2 artifact: carries its calibrated `thresholds` and the
+  encoder `modelUrl` (`card-embeddings-arcface.onnx`, fp16, ~8 MB) so model,
+  index, and operating point travel as one unit. Built by
+  `backend/src/scripts/build-arcface-web-index.ts` from the iOS index bin
+  (Drive: `TCGer-encoder/CardsIndexVectors-arcface.bin`); ONNX exported by
+  `mobile-apps/ios/scripts/export_arcface_onnx.py` from the Drive
+  checkpoint. NOTE: int8 dynamic quantization DESTROYS this model (FastViT
+  reparam convs) — ship fp16 or fp32, never q8.
+- `pokemon-embeddings.json` (rollback): DINOv2-small via HF CDN, version-1
+  artifact, code-default thresholds (0.72 DINOv2-scale).
 
 ## Regenerate
 
@@ -19,7 +39,12 @@ npx tsx src/scripts/build-embedding-index.ts \
   --model onnx-community/dinov2-small --encoder dinov2 \
   --out ../frontend/public/scan-index/pokemon-embeddings.json
 
-# Refresh the versioned manifest the loader checks.
+# Build the ArcFace web index from the iOS bin (no image API needed).
+npx tsx src/scripts/build-arcface-web-index.ts \
+  --bin <path-to>/CardsIndexVectors-arcface.bin
+
+# Refresh the versioned manifest the loader checks (arcface preferred by
+# default; --prefer dinov2 to roll the fleet back).
 npx tsx src/scripts/update-scan-index-manifest.ts
 ```
 

@@ -21,7 +21,19 @@ import type { TcgCode } from "@/types/card";
 // ---------- types ----------
 
 /** Encoder family — determines model class + how the vector is read. */
-export type EncoderKind = "clip" | "dinov2";
+export type EncoderKind = "clip" | "dinov2" | "arcface";
+
+/**
+ * Accept thresholds are an operating point on ONE encoder's score
+ * distribution, so they travel inside the index artifact (version 2) and can
+ * never mismatch the vectors. Absent (version-1 artifacts) they fall back to
+ * DEFAULT_EMBEDDING_MATCH_THRESHOLDS, which are DINOv2-scale.
+ */
+export interface EmbeddingMatchThresholds {
+  minSimilarity: number;
+  minVerifiedSimilarity: number;
+  minMargin: number;
+}
 
 export interface EmbeddingIndexEntry {
   externalId: string;
@@ -45,6 +57,10 @@ export interface EmbeddingIndex {
   vectors: Int8Array;
   /** Per-entry 1/||vector|| precomputed from the int8 rows (length = total). */
   invNorms: Float32Array;
+  /** Operating point calibrated to this index's encoder. */
+  thresholds: EmbeddingMatchThresholds;
+  /** For self-hosted ONNX encoders (arcface): URL of the model file. */
+  modelUrl: string | null;
 }
 
 /** Raw artifact shape emitted by build-embedding-index.ts. */
@@ -67,6 +83,8 @@ interface EmbeddingIndexArtifact {
     imageUrl?: string | null;
   }>;
   vectors: string; // base64 Int8Array
+  thresholds?: Partial<EmbeddingMatchThresholds>;
+  modelUrl?: string;
 }
 
 function inferEncoder(model: string): EncoderKind {
@@ -123,6 +141,11 @@ export function parseEmbeddingIndex(
     entries,
     vectors,
     invNorms,
+    thresholds: {
+      ...DEFAULT_EMBEDDING_MATCH_THRESHOLDS,
+      ...artifact.thresholds,
+    },
+    modelUrl: artifact.modelUrl ?? null,
   };
 }
 
@@ -233,9 +256,9 @@ type TransformersModule = {
 };
 
 let modelPromise: Promise<void> | null = null;
-/** Encoder closure: RawImage → raw (un-normalised) embedding vector. */
-let embedFn: ((image: unknown) => Promise<Float32Array>) | null = null;
-let RawImageCtor: TransformersModule["RawImage"] | null = null;
+/** Encoder closure: card crop canvas → raw (un-normalised) embedding vector. */
+let embedFn: ((cardCanvas: HTMLCanvasElement) => Promise<Float32Array>) | null =
+  null;
 
 export interface EmbeddingModelConfig {
   /** HF model id; must match the index's `model`. */
@@ -244,9 +267,57 @@ export interface EmbeddingModelConfig {
   dtype?: string;
   /** Encoder family; must match the index's `encoder`. */
   encoder?: EncoderKind;
+  /** ONNX file URL for self-hosted encoders (arcface); from the index artifact. */
+  modelUrl?: string | null;
   /** "webgpu" | "wasm"; undefined lets Transformers.js pick (WASM default). */
   device?: string;
   onStatus?: (message: string) => void;
+}
+
+/** Training-contract input size for the arcface encoder. */
+const ARCFACE_IMG_SIZE = 224;
+const ARCFACE_COVER_SIZE = 256;
+
+/**
+ * The arcface training/index preprocessing contract (mirrors the trainer's
+ * contract_resize and CardEmbeddingEncoder.swift): scale so the shortest edge
+ * reaches 256 (and both edges cover 224), ceil dimensions, center-crop 224.
+ * Returns CHW float32 in [0,1]; ImageNet mean/std are baked into the ONNX
+ * graph, matching the iOS Core ML export. Browser canvas resampling is not
+ * PIL-bicubic — the same accepted drift the DINOv2 path already has between
+ * sharp (index build) and canvas (query).
+ */
+function arcfacePreprocess(cardCanvas: HTMLCanvasElement): Float32Array {
+  const w = cardCanvas.width;
+  const h = cardCanvas.height;
+  const s = Math.max(
+    ARCFACE_COVER_SIZE / Math.min(w, h),
+    ARCFACE_IMG_SIZE / w,
+    ARCFACE_IMG_SIZE / h,
+  );
+  const rw = Math.ceil(w * s);
+  const rh = Math.ceil(h * s);
+  const left = Math.floor((rw - ARCFACE_IMG_SIZE) / 2);
+  const top = Math.floor((rh - ARCFACE_IMG_SIZE) / 2);
+
+  const crop = document.createElement("canvas");
+  crop.width = ARCFACE_IMG_SIZE;
+  crop.height = ARCFACE_IMG_SIZE;
+  const ctx = getContext2d(crop);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  // Draw the resized image shifted so the 224x224 center crop lands on canvas.
+  ctx.drawImage(cardCanvas, 0, 0, w, h, -left, -top, rw, rh);
+
+  const { data } = ctx.getImageData(0, 0, ARCFACE_IMG_SIZE, ARCFACE_IMG_SIZE);
+  const plane = ARCFACE_IMG_SIZE * ARCFACE_IMG_SIZE;
+  const chw = new Float32Array(3 * plane);
+  for (let i = 0; i < plane; i++) {
+    chw[i] = data[i * 4]! / 255;
+    chw[plane + i] = data[i * 4 + 1]! / 255;
+    chw[2 * plane + i] = data[i * 4 + 2]! / 255;
+  }
+  return chw;
 }
 
 export function isEmbeddingModelReady(): boolean {
@@ -265,6 +336,46 @@ export async function ensureEmbeddingModel(
   const encoder = config.encoder ?? inferEncoder(model);
   const device = config.device ? { device: config.device } : {};
 
+  if (encoder === "arcface") {
+    const modelUrl = config.modelUrl;
+    if (!modelUrl) {
+      throw new Error(
+        "arcface index artifact is missing modelUrl (rebuild with build-arcface-web-index)",
+      );
+    }
+    modelPromise = (async () => {
+      config.onStatus?.("Loading scanner model…");
+      const ort = await import("onnxruntime-web");
+      // ORT-Web resolves its WASM runtime relative to the bundle, which Next's
+      // chunking breaks; pin to the CDN of the installed version (the scanner
+      // already allows remote model delivery — HF CDN for dinov2/clip).
+      ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ort.env.versions.web ?? ort.env.versions.common}/dist/`;
+      const session = await ort.InferenceSession.create(modelUrl, {
+        executionProviders: ["wasm"],
+      });
+      embedFn = async (cardCanvas: HTMLCanvasElement) => {
+        const chw = arcfacePreprocess(cardCanvas);
+        const input = new ort.Tensor("float32", chw, [
+          1,
+          3,
+          ARCFACE_IMG_SIZE,
+          ARCFACE_IMG_SIZE,
+        ]);
+        const out = await session.run({ pixel_values: input });
+        return new Float32Array(out.embedding!.data as Float32Array);
+      };
+      config.onStatus?.("Scanner model ready");
+    })();
+
+    try {
+      await modelPromise;
+    } catch (err) {
+      modelPromise = null; // allow retry on failure
+      throw err;
+    }
+    return;
+  }
+
   modelPromise = (async () => {
     config.onStatus?.("Loading scanner model…");
     const transformers = (await import(
@@ -274,7 +385,22 @@ export async function ensureEmbeddingModel(
     // Allow remote (HF CDN) model download by default; self-hosting under
     // /models is handled by the static-delivery task.
     transformers.env.allowRemoteModels = true;
-    RawImageCtor = transformers.RawImage;
+    const RawImageCtor = transformers.RawImage;
+    const rawImageFromCanvas = (cardCanvas: HTMLCanvasElement) => {
+      const ctx = getContext2d(cardCanvas);
+      const imageData = ctx.getImageData(
+        0,
+        0,
+        cardCanvas.width,
+        cardCanvas.height,
+      );
+      return new RawImageCtor(
+        imageData.data,
+        cardCanvas.width,
+        cardCanvas.height,
+        4,
+      );
+    };
 
     if (encoder === "dinov2") {
       const proc = (await transformers.AutoImageProcessor.from_pretrained(
@@ -286,8 +412,8 @@ export async function ensureEmbeddingModel(
       })) as (inputs: Record<string, unknown>) => Promise<{
         last_hidden_state: { data: Float32Array; dims: number[] };
       }>;
-      embedFn = async (image: unknown) => {
-        const inputs = await proc(image);
+      embedFn = async (cardCanvas: HTMLCanvasElement) => {
+        const inputs = await proc(rawImageFromCanvas(cardCanvas));
         const out = await net(inputs);
         // DINOv2 has no projection head: use the CLS token (position 0).
         const lhs = out.last_hidden_state;
@@ -305,8 +431,8 @@ export async function ensureEmbeddingModel(
         )) as (
           inputs: Record<string, unknown>,
         ) => Promise<{ image_embeds: { data: Float32Array } }>;
-      embedFn = async (image: unknown) => {
-        const inputs = await proc(image);
+      embedFn = async (cardCanvas: HTMLCanvasElement) => {
+        const inputs = await proc(rawImageFromCanvas(cardCanvas));
         const { image_embeds } = await net(inputs);
         return new Float32Array(image_embeds.data);
       };
@@ -329,18 +455,9 @@ export async function ensureEmbeddingModel(
 export async function computeEmbeddingFromCanvas(
   cardCanvas: HTMLCanvasElement,
 ): Promise<Float32Array | null> {
-  if (!embedFn || !RawImageCtor) return null;
+  if (!embedFn) return null;
 
-  const ctx = getContext2d(cardCanvas);
-  const imageData = ctx.getImageData(0, 0, cardCanvas.width, cardCanvas.height);
-  const image = new RawImageCtor(
-    imageData.data,
-    cardCanvas.width,
-    cardCanvas.height,
-    4,
-  );
-
-  const out = await embedFn(image); // raw embedding (copied out of tensor)
+  const out = await embedFn(cardCanvas); // raw embedding (copied out of tensor)
 
   // L2 normalise (query side; entry side handled via precomputed invNorms).
   let sq = 0;
@@ -389,13 +506,17 @@ export function matchEmbeddingTopK(
   index: EmbeddingIndex,
   options: EmbeddingMatchOptions = {},
 ): BrowserVideoScanCandidate[] {
+  // Threshold defaults come from the index (the operating point calibrated to
+  // its encoder); explicit options still win for sweeps/experiments. The ??
+  // covers IndexedDB rows cached before thresholds existed on the type.
+  const indexThresholds = index.thresholds ?? DEFAULT_EMBEDDING_MATCH_THRESHOLDS;
   const {
     topK = 20,
     tcgFilter,
     proposalLabel = "embedding",
-    minSimilarity = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minSimilarity,
-    minVerifiedSimilarity = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minVerifiedSimilarity,
-    minMargin = DEFAULT_EMBEDDING_MATCH_THRESHOLDS.minMargin,
+    minSimilarity = indexThresholds.minSimilarity,
+    minVerifiedSimilarity = indexThresholds.minVerifiedSimilarity,
+    minMargin = indexThresholds.minMargin,
     allowVerifiedMarginAcceptance = false,
   } = options;
 

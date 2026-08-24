@@ -110,6 +110,8 @@ const LAST_RAW_VERSION: 2 = SCAN_CACHE_DB_VERSION;
 /** Row shape stored in `embeddingIndex`, keyed by tcg code. */
 interface CachedEmbeddingIndex {
   version: number;
+  /** Artifact filename; absent on rows cached before encoder variants. */
+  file?: string;
   index: EmbeddingIndex;
 }
 
@@ -409,7 +411,13 @@ export function useVideoScanData(
           "embedding index",
         );
         if (cached?.index?.total) {
-          const fresh = !entry || cached.version === entry.version;
+          // Same version but a different artifact file (an encoder switch via
+          // manifest republish) must also invalidate; pre-switch rows have no
+          // `file` and rely on the version compare alone.
+          const fresh =
+            !entry ||
+            (cached.version === entry.version &&
+              (!cached.file || cached.file === entry.file));
           if (fresh) {
             embeddingIndexRef.current = cached.index;
             callbacks.onHashStatus(
@@ -447,7 +455,7 @@ export function useVideoScanData(
           // this call computed, exactly as the eager `idbPut` it replaces.
           // `put` overwrites the previous version's row under the same key, so
           // a version bump replaces rather than accumulates.
-          const row = { version: entry.version, index };
+          const row = { version: entry.version, file: entry.file, index };
           writeCached(
             () => db.embeddings.put(row, tcg),
             "embedding-write-failed",
