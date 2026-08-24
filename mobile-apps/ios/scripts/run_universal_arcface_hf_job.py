@@ -42,6 +42,10 @@ CONVERTER = f"{REPO_RAW}/mobile-apps/ios/scripts/build_universal_trainer_metadat
 TRAINER = f"{REPO_RAW}/mobile-apps/ios/scripts/train_arcface_encoder.py"
 SCRYFALL_BULK = "https://api.scryfall.com/bulk-data/default-cards"
 YGOPRODECK_CARDS = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+REQUEST_HEADERS = {
+    "User-Agent": "TCGer/1.0 (https://github.com/ahzs645/TCGer)",
+    "Accept": "application/json;q=0.9,*/*;q=0.8",
+}
 
 
 def download(url: str, destination: Path) -> None:
@@ -51,7 +55,7 @@ def download(url: str, destination: Path) -> None:
     temporary = destination.with_suffix(destination.suffix + ".part")
     with requests.get(
         url,
-        headers={"User-Agent": "TCGer-universal-trainer/1.0"},
+        headers=REQUEST_HEADERS,
         timeout=120,
         stream=True,
     ) as response:
@@ -155,12 +159,18 @@ def main() -> None:
         download(POKEMON_METADATA, pokemon_path)
         bulk = requests.get(
             SCRYFALL_BULK,
-            headers={"User-Agent": "TCGer-universal-trainer/1.0"},
+            headers=REQUEST_HEADERS,
             timeout=60,
         )
         bulk.raise_for_status()
         bulk_metadata = bulk.json()
-        download(bulk_metadata["download_uri"], magic_path)
+        magic_download_uri = (
+            bulk_metadata.get("download_uri")
+            or bulk_metadata.get("jsonl_download_uri")
+        )
+        if not magic_download_uri:
+            raise ValueError("Scryfall bulk-data response has no download URI")
+        download(magic_download_uri, magic_path)
         download(YGOPRODECK_CARDS, yugioh_path)
         download(CONVERTER, converter_path)
         run([
@@ -185,7 +195,10 @@ def main() -> None:
             "magic": {
                 "endpoint": SCRYFALL_BULK,
                 "updatedAt": bulk_metadata.get("updated_at") if bulk_metadata else None,
-                "downloadURI": bulk_metadata.get("download_uri") if bulk_metadata else None,
+                "downloadURI": (
+                    bulk_metadata.get("download_uri")
+                    or bulk_metadata.get("jsonl_download_uri")
+                ) if bulk_metadata else None,
             },
             "yugioh": YGOPRODECK_CARDS,
         },
