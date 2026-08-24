@@ -132,8 +132,12 @@ each item pays out on both platforms once Phase 1 lands:
 1. **Real-crop fine-tune** from the epoch-5 checkpoint (~1.5 h L4) → new
    checkpoint → re-export Core ML *and* ONNX → rebuild both indices.
 2. **SWSH204 promo investigation** — 4 of iOS's 9 losses are this one
-   card, all `noCandidates`; likely a catalog-image/index-row problem.
-   If so, the fix is in the shared builder input and repairs both.
+   card, all `noCandidates`. UPDATE 2026-08-24: labeling-session evidence
+   now points at DETECTION/CROP failure, not the index — re-cropping the
+   recorded SWSH204 frame with a correct quad (webobb+sam in the labeling
+   tool) retrieves swshp-SWSH204 at 0.747, well above the 0.60 accept.
+   The encoder and index row are fine; investigate the iOS
+   rectangle-detection path on those frames instead.
    2b. **Stale-row audit** (elevated by the Phase-1 find): sweep all
    21,828 catalog images through the encoder and flag rows whose
    self-sim is below ~0.8 (xy12-74 measured 0.30 — its row predates the
