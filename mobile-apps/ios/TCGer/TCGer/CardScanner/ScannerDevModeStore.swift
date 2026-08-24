@@ -29,8 +29,10 @@ nonisolated struct ScannerBinderDetectionExclusion: Sendable {
 
 /// Dev-mode scan recorder: when enabled, every scan that goes through the
 /// production coordinator — live frames, shutter captures, photo imports —
-/// is persisted with its raw input image, every crop attempt, and the
-/// per-stage evidence collected by `ScanDiagnostics`.
+/// is persisted with its raw input image, the geometry of every crop attempt,
+/// and the per-stage evidence collected by `ScanDiagnostics`. Attempt crop
+/// JPEGs are re-derivable from that geometry and are only written when
+/// `isAttemptImageWritingEnabled` is on.
 ///
 /// Sessions are written in the device-recording shape (`results.json` +
 /// frame JPEGs) that the reference browser, `CardScannerReplayRunner`, and
@@ -47,6 +49,7 @@ actor ScannerDevModeStore {
 
     static let enabledDefaultsKey = "scannerDevModeEnabled"
     static let cropRescueEnabledDefaultsKey = "scannerCropRescueEnabled"
+    static let attemptImagesDefaultsKey = "scannerDevModeAttemptImages"
 
     /// Cheap main-thread check used by callers to avoid any recording work
     /// (including JPEG encoding) when dev mode is off.
@@ -62,6 +65,26 @@ actor ScannerDevModeStore {
     /// for normal scanning unless a tester explicitly enables it.
     nonisolated static var isCropRescueEnabled: Bool {
         UserDefaults.standard.bool(forKey: cropRescueEnabledDefaultsKey)
+    }
+
+    /// Attempt crop JPEGs (`frame-NNNN-attempt-K.jpg`) are OFF by default:
+    /// every attempt's image is re-derivable from the saved frame images plus
+    /// the geometry already in `evidence.json` (`kind`, `quad`,
+    /// `coordinatorQuad`, `binderPageFitRect`, `semanticOrientation`) — see
+    /// `scripts/session-labeling/derive_crops.py` — so writing them only
+    /// tripled a session's disk and encode cost. Escape hatch mirrors the
+    /// `ScannerPerfOptions` two-surface style: the `SCANNER_DEVMODE_ATTEMPT_IMAGES`
+    /// environment variable ("1"/"true"/"0"/"false") wins over the
+    /// UserDefaults key.
+    nonisolated static var isAttemptImageWritingEnabled: Bool {
+        if let raw = ProcessInfo.processInfo.environment["SCANNER_DEVMODE_ATTEMPT_IMAGES"] {
+            switch raw.lowercased() {
+            case "1", "true", "yes": return true
+            case "0", "false", "no": return false
+            default: break
+            }
+        }
+        return UserDefaults.standard.bool(forKey: attemptImagesDefaultsKey)
     }
 
     struct SessionInfo: Identifiable, Sendable {
@@ -143,12 +166,20 @@ actor ScannerDevModeStore {
         }
 
         let attempts = diagnostics?.attempts ?? []
-        let attemptImages = diagnostics?.attemptImages ?? []
+        // Attempt crops stay re-derivable from the frame image + per-attempt
+        // geometry in evidence.json; the JPEGs themselves are opt-in (see
+        // `isAttemptImageWritingEnabled`). `attemptImageFiles` stays empty
+        // when skipped so the manifest never lists files that don't exist;
+        // each attempt's `imageIndex` still numbers the crops the pipeline
+        // evaluated, whether or not they were written.
         var attemptFiles: [String] = []
-        for (offset, attemptImage) in attemptImages.enumerated() {
-            let name = String(format: "frame-%04d-attempt-%d.jpg", index, offset)
-            if write(image: attemptImage, to: directory.appendingPathComponent(name)) {
-                attemptFiles.append(name)
+        if Self.isAttemptImageWritingEnabled {
+            let attemptImages = diagnostics?.attemptImages ?? []
+            for (offset, attemptImage) in attemptImages.enumerated() {
+                let name = String(format: "frame-%04d-attempt-%d.jpg", index, offset)
+                if write(image: attemptImage, to: directory.appendingPathComponent(name)) {
+                    attemptFiles.append(name)
+                }
             }
         }
 

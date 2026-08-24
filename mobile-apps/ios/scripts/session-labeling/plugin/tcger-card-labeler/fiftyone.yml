@@ -1,0 +1,8 @@
+name: tcger-card-labeler
+description: Five-button verdict panel for TCGer scan-session labeling
+version: 1.0.0
+operators:
+  - tcger_card_verdict
+  - apply_card_verdict
+panels:
+  - tcger_card_verdict

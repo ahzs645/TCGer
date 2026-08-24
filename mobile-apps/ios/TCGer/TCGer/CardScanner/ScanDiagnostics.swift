@@ -214,7 +214,12 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
                 nativeCropPixelWidth: metadata.nativeCropPixelWidth,
                 nativeCropPixelHeight: metadata.nativeCropPixelHeight,
                 rotationDegreesApplied: metadata.rotationDegreesApplied,
-                semanticOrientation: .unverified,
+                // Preserve the strategy's per-attempt orientation: .upsideDown
+                // means this attempt evaluated the 180°-rotated crop, which is
+                // known geometry (not a claim about the card's true top edge)
+                // and is required to re-derive the attempt image now that
+                // attempt JPEGs are no longer written by default.
+                semanticOrientation: semanticOrientation,
                 captureQuality: metadata.captureQuality,
                 binderPageFitRect: metadata.pageFitRect,
                 coordinatorQuad: quad,

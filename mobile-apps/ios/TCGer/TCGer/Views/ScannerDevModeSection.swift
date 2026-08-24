@@ -13,6 +13,7 @@ struct ScannerDevModeSection: View {
 
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeEnabled = false
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var cropRescueEnabled = false
+    @AppStorage(ScannerDevModeStore.attemptImagesDefaultsKey) private var attemptImagesEnabled = false
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
@@ -39,6 +40,10 @@ struct ScannerDevModeSection: View {
 
             cropRescueDescription
 
+            attemptImagesToggle
+
+            attemptImagesDescription
+
             if let errorMessage {
                 errorLabel(errorMessage)
             }
@@ -57,6 +62,8 @@ struct ScannerDevModeSection: View {
             .onAppear(perform: refresh)
 
         cropRescueToggle
+
+        attemptImagesToggle
 
         if let errorMessage {
             errorLabel(errorMessage)
@@ -88,6 +95,18 @@ struct ScannerDevModeSection: View {
 
     private var cropRescueDescription: some View {
         Text("Shows the manual corner editor after a failed scan and in scan results. Off by default for normal scanning.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var attemptImagesToggle: some View {
+        Toggle(isOn: $attemptImagesEnabled) {
+            Label("Save Attempt Crop Images", systemImage: "photo.on.rectangle.angled")
+        }
+    }
+
+    private var attemptImagesDescription: some View {
+        Text("Writes every crop attempt as its own JPEG. Off by default: attempts are re-derivable from the frame image and recorded geometry.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }

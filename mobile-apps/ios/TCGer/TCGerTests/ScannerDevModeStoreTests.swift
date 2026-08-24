@@ -8,11 +8,13 @@ final class ScannerDevModeStoreTests: XCTestCase {
         super.setUp()
         UserDefaults.standard.set(true, forKey: ScannerDevModeStore.enabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.attemptImagesDefaultsKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.enabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.attemptImagesDefaultsKey)
         try? FileManager.default.removeItem(at: ScannerDevModeStore.rootDirectory())
         super.tearDown()
     }
@@ -85,12 +87,58 @@ final class ScannerDevModeStoreTests: XCTestCase {
         XCTAssertEqual(record.imageMetadata?.semanticOrientation, .unverified)
         XCTAssertEqual(record.originalImageMetadata?.pixelWidth, 120)
         XCTAssertEqual(record.originalImageMetadata?.pixelHeight, 160)
+        // Attempt crops are re-derivable from the recorded geometry, so no
+        // JPEGs are written by default and the manifest lists none.
+        XCTAssertTrue(record.attemptImageFiles.isEmpty)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: session.url.appendingPathComponent("frame-0000-attempt-0.jpg").path
+            ),
+            "attempt crop images are opt-in and must not be written by default"
+        )
+    }
+
+    func testAttemptImageEscapeHatchRestoresAttemptCropFiles() async throws {
+        UserDefaults.standard.set(true, forKey: ScannerDevModeStore.attemptImagesDefaultsKey)
+        let diagnostics = ScanDiagnostics()
+        let imageIndex = diagnostics.registerAttemptImage(
+            ScannerTestImage.solid(width: 72, height: 100)
+        )
+        diagnostics.record(ScanDiagnostics.Attempt(
+            kind: .detectedCrop,
+            quad: [[0.1, 0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]],
+            gateScore: 0.62,
+            gateThreshold: 0.45,
+            topCandidates: [],
+            titleMatchedName: nil,
+            titlePrintingCount: nil,
+            footerPairNumbers: [],
+            ocrVerifiedCollectorNumber: nil,
+            outcome: .accepted,
+            imageIndex: imageIndex
+        ))
+
+        await ScannerDevModeStore.shared.record(
+            image: ScannerTestImage.solid(width: 90, height: 120),
+            source: .importedPhoto,
+            mode: .pokemon,
+            elapsedMs: 12,
+            result: .failure(.noMatch),
+            diagnostics: diagnostics
+        )
+
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let evidence = try JSONDecoder().decode(
+            [ScanEvidenceRecord].self,
+            from: Data(contentsOf: session.url.appendingPathComponent("evidence.json"))
+        )
+        let record = try XCTUnwrap(evidence.last)
         XCTAssertEqual(record.attemptImageFiles.count, 1)
         XCTAssertTrue(
             FileManager.default.fileExists(
                 atPath: session.url.appendingPathComponent(record.attemptImageFiles[0]).path
             ),
-            "attempt crop image must exist next to evidence.json"
+            "the escape hatch must restore attempt crop JPEG writing"
         )
     }
 
@@ -138,7 +186,8 @@ final class ScannerDevModeStoreTests: XCTestCase {
             footerPairNumbers: ["001/198"],
             ocrVerifiedCollectorNumber: "001",
             outcome: .accepted,
-            imageIndex: imageIndex
+            imageIndex: imageIndex,
+            semanticOrientation: .upsideDown
         ))
         let pageQuad = [[0.1, 0.9], [0.4, 0.9], [0.4, 0.5], [0.1, 0.5]]
         let page = ScanDiagnostics()
@@ -172,7 +221,10 @@ final class ScannerDevModeStoreTests: XCTestCase {
         XCTAssertEqual(merged.binderIncludedByDefault, true)
         XCTAssertEqual(merged.nativeCropPixelWidth, 236)
         XCTAssertEqual(merged.nativeCropPixelHeight, 452)
-        XCTAssertEqual(merged.semanticOrientation, .unverified)
+        // The pocket attempt's orientation survives the merge: it records
+        // which rotation of the crop this attempt evaluated, which the
+        // crop-derivation tooling needs now that attempt JPEGs are opt-in.
+        XCTAssertEqual(merged.semanticOrientation, .upsideDown)
         XCTAssertEqual(merged.imageIndex, 0)
         XCTAssertEqual(page.attemptImages.count, 1)
     }
