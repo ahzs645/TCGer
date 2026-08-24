@@ -36,6 +36,7 @@
     "guides:sync": "node tools/guides/sync-system-guides.mjs",
     "guides:validate": "node tools/guides/validate-system-guides.mjs",
     "pokemon:import-rarity-vectors": "node tools/pokemon/import-rarity-vectors.mjs",
+    "packs:generate-wraps": "python3 scripts/generate_pack_wraps.py",
     "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
     "assets:r2:publish-pack-assets": "node tools/r2/publish-pack-assets.mjs",
     "assets:r2:publish-scan-index": "node tools/r2/publish-scan-index.mjs",

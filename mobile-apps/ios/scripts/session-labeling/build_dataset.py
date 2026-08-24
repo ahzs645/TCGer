@@ -122,19 +122,15 @@ def quad_polylines(record, attempt):
     return fo.Polylines(polylines=lines) if lines else None
 
 
-def resolve_crop(session_dir, frame, record, attempt, derived_dir, key):
-    """Path to the decisive attempt's crop: the recorded attempt JPEG when
-    present, else derived on the spot from geometry (derive_crops.py)."""
+def attempt_crop_path(session_dir, record, attempt, derived_dir, name):
+    """Path to one attempt's crop: the recorded attempt JPEG when present,
+    else derived on the spot from geometry (derive_crops.py)."""
     attempt_files = (record or {}).get("attemptImageFiles") or []
-    if attempt is not None and attempt.get("imageIndex") is not None:
-        idx = attempt["imageIndex"]
-        if 0 <= idx < len(attempt_files) and (session_dir / attempt_files[idx]).exists():
-            return str(session_dir / attempt_files[idx])
-    if attempt_files and (session_dir / attempt_files[0]).exists():
-        return str(session_dir / attempt_files[0])
-    if attempt is None:
-        return None
-    out = derived_dir / (key.replace("/", "__") + ".jpg")
+    idx = attempt.get("imageIndex")
+    if idx is not None and 0 <= idx < len(attempt_files) \
+            and (session_dir / attempt_files[idx]).exists():
+        return str(session_dir / attempt_files[idx])
+    out = derived_dir / (name + ".jpg")
     if out.exists():
         return str(out)
     try:
@@ -154,6 +150,61 @@ def resolve_crop(session_dir, frame, record, attempt, derived_dir, key):
         return str(out)
     except Exception:
         return None
+
+
+def resolve_crop(session_dir, frame, record, attempt, derived_dir, key):
+    if attempt is not None:
+        path = attempt_crop_path(
+            session_dir, record, attempt, derived_dir, key.replace("/", "__")
+        )
+        if path:
+            return path
+    attempt_files = (record or {}).get("attemptImageFiles") or []
+    if attempt_files and (session_dir / attempt_files[0]).exists():
+        return str(session_dir / attempt_files[0])
+    return None
+
+
+def binder_pockets(session_dir, record, derived_dir, key):
+    """Per-pocket summaries for a binder-page frame.
+
+    New-schema attempts carry pocketIndex (with upright/180 pairs per pocket);
+    old-schema binder frames have exactly one attempt per detected pocket, so
+    each attempt IS a pocket."""
+    attempts = (record or {}).get("attempts") or []
+    groups = {}
+    if any(a.get("pocketIndex") is not None for a in attempts):
+        for a in attempts:
+            groups.setdefault(a.get("pocketIndex"), []).append(a)
+        groups.pop(None, None)
+    else:
+        groups = {i: [a] for i, a in enumerate(attempts)}
+
+    pockets = []
+    for pocket_idx in sorted(groups):
+        group = groups[pocket_idx]
+        decisive = next((a for a in group if a.get("outcome") == "accepted"), None)
+        if decisive is None:
+            decisive = max(
+                group,
+                key=lambda a: (a.get("topCandidates") or [{}])[0].get("similarity", -1),
+            )
+        cands = (decisive.get("topCandidates") or [])[:3]
+        crop = attempt_crop_path(
+            session_dir, record, decisive, derived_dir,
+            f"{key.replace('/', '__')}__pocket{pocket_idx}",
+        )
+        pockets.append({
+            "pocket": pocket_idx,
+            "outcome": decisive.get("binderStatus") or decisive.get("outcome"),
+            "matched_card_id": cands[0]["cardID"]
+            if cands and decisive.get("outcome") == "accepted" else None,
+            "crop_path": crop,
+            "cands": [
+                {"id": c["cardID"], "sim": round(c["similarity"], 4)} for c in cands
+            ],
+        })
+    return pockets
 
 
 def main():
@@ -180,15 +231,15 @@ def main():
 
     import fiftyone as fo
 
+    saved_verdicts = {}
     if fo.dataset_exists(args.dataset_name):
         existing = fo.load_dataset(args.dataset_name)
         from fiftyone import ViewField as F
-        n_verdicts = len(existing.match(F("verdict") != None))
-        if n_verdicts:
-            print(f"REFUSING to rebuild: {n_verdicts} unsaved verdicts in "
-                  f"'{args.dataset_name}'. Run writeback.py first, or delete "
-                  f"the dataset manually.")
-            sys.exit(1)
+        if existing.has_sample_field("verdict"):
+            for s in existing.match(F("verdict") != None).iter_samples():
+                saved_verdicts[s["key"]] = (s["verdict"], s["corrected_card_id"])
+        if saved_verdicts:
+            print(f"carrying {len(saved_verdicts)} applied verdicts across the rebuild")
         fo.delete_dataset(args.dataset_name)
     dataset = fo.Dataset(args.dataset_name, persistent=True)
 
@@ -216,9 +267,13 @@ def main():
 
             attempt = decisive_attempt(record) if record else None
             cands = (attempt or {}).get("topCandidates") or []
-            for c in cands[:5]:  # warm the card cache for the panel
-                meta = card_meta.get(c["cardID"]) or {}
-                fetch_card_thumb(c["cardID"], meta.get("imageURL"), cache_dir)
+            pockets = binder_pockets(session_dir, record, derived_dir, key) if is_binder else []
+            warm = [c["cardID"] for c in cands[:5]] + [
+                c["id"] for p in pockets for c in p["cands"]
+            ]
+            for cid in warm:  # warm the card cache for the panel
+                meta = card_meta.get(cid) or {}
+                fetch_card_thumb(cid, meta.get("imageURL"), cache_dir)
             device_id = frame.get("bestMatchCardId") if frame.get("identified") else None
             existing_label = (
                 curated_expected.get(key)
@@ -250,9 +305,13 @@ def main():
                     else "recorded" if existing_label or existing_no_match
                     else None
                 ),
-                verdict=None,
-                corrected_card_id=None,
+                binder_pockets_json=json.dumps(pockets) if pockets else None,
+                n_pockets=len(pockets) if pockets else None,
+                verdict=saved_verdicts.get(key, (None, None))[0],
+                corrected_card_id=saved_verdicts.get(key, (None, None))[1],
             )
+            if key in saved_verdicts:
+                sample.tags.append("verdict-applied")
             overlay = quad_polylines(record, attempt)
             if overlay is not None:
                 sample["detection_quads"] = overlay
@@ -264,6 +323,10 @@ def main():
             samples.append(sample)
 
     dataset.add_samples(samples)
+    # All-None at build time, so add_samples drops them from the schema;
+    # declare them explicitly or the panel/writeback can't read them.
+    dataset.add_sample_field("verdict", fo.StringField)
+    dataset.add_sample_field("corrected_card_id", fo.StringField)
     dataset.info["sessions_dir"] = str(sessions_dir)
     dataset.info["card_cache_dir"] = str(cache_dir)
     dataset.save()

@@ -67,6 +67,11 @@ tmp/
 # Local agent artifacts
 /.codex-prompts/
 
+# Generated booster-wrap previews and batch logs. Final pack artwork lives in
+# Google Drive and is published to R2; it must never be committed to this repo.
+/generated/flat-wrap-samples/
+/generated/flat-wrap-batch-logs/
+
 # Local FiftyOne scanner-review runtime (database, generated dataset metadata,
 # and its repo-local Python environment). Source media stays in Reference.
 /tools/scanner-review/.fiftyone/

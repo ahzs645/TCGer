@@ -51,9 +51,15 @@ def main():
     edits = {}          # session -> {imageFile -> {field: value}}
     applied, skipped_no_id, conflicts, bad_ids = [], [], [], []
 
+    binder_skipped = []
     for sample in view.iter_samples():
         verdict = sample["verdict"]
         key = sample["key"]
+        if sample["frame_type"] == "binder":
+            # Binder pages replay through their own harness; a single-card
+            # expectedCardId on the whole page would be meaningless.
+            binder_skipped.append(key)
+            continue
         session, image_file = key.split("/", 1)
 
         if verdict == "no_card":
@@ -117,7 +123,8 @@ def main():
         print(f"  {line}")
     for title, items in (("needs card ID (second pass)", skipped_no_id),
                          ("invalid card IDs", bad_ids),
-                         ("curated-table conflicts", conflicts)):
+                         ("curated-table conflicts", conflicts),
+                         ("binder pages skipped", binder_skipped)):
         if items:
             print(f"\n{title}: {len(items)}")
             for line in items:

@@ -1,0 +1,46 @@
+Use case: product-mockup
+Asset type: complete flat foil booster-wrapper print sheet
+Input image: the referenced booster-pack photograph is the sole visual reference.
+
+Using the referenced photograph of a booster pack as the visual reference, produce the complete flat wrap sheet it would be printed from — the entire foil bag cut open, unfolded, and laid completely flat, viewed straight on.
+
+Use the reference to determine the layout, placement and scale of each visual element, colour palette, typography placement, illustration style, finish, proportions, and overall design language. Reconstruct the visible front panel as faithfully as possible and extend the design naturally into the unseen portions of the wrapper.
+
+Lay the sheet out as three vertical bands:
+
+• CENTRE band — 32% to 68% across: This is the FRONT of the pack. Reproduce the front-facing composition from the reference, including the hero artwork, title area, graphic elements, background treatment, and overall visual hierarchy. Fill the band edge to edge.
+
+• LEFT band — 0% to 32% and RIGHT band — 68% to 100%: Together these form the BACK of the pack. Create a quieter continuation of the same packaging design using the same palette, textures, patterns, and visual language, but without a large central hero subject or dominant focal point.
+
+The left and right bands are two visible portions of the SAME continuous back panel wrapped around the package. Design them so the artwork at the far right edge continues seamlessly into the far left edge as one uninterrupted back-panel composition.
+
+The boundaries at 32% and 68% are physical wrap/fold boundaries. Keep the printed artwork clearly structured around these panel divisions rather than blending the front and back together with transitional gradients.
+
+Geometry and presentation:
+
+Flatten the wrapper completely. Use a straight-on orthographic view with no perspective, no camera angle, no curled foil, no folds or wrinkles, no creases, no crumpling, no hands, no surrounding background, no product mockup, no 3D rendering, and no drop shadow.
+
+The result should look like the original printed wrapper was carefully cut open and scanned completely flat.
+
+Use even, neutral illumination. Avoid directional studio lighting, dramatic reflections, specular hotspots, glare, lens flare, or blown-out highlights.
+
+Metallic foil finish:
+
+The wrapper is printed on metallic foil. Reproduce the material appearance directly within the artwork using fine brushed-metal grain running vertically, subtle anisotropic metallic texture, slight natural ink-density variation, faint foil-stock iridescence visible through darker printed areas, and very fine print and substrate texture.
+
+The metallic character should come from the material texture itself rather than simulated lighting effects. Do not add large reflected light streaks, artificial studio reflections, lens flare, or strong specular highlights.
+
+Serrated crimp seals:
+
+The top 4% and bottom 4% of the complete sheet represent the crimped seal ends of the foil packet.
+
+Across the full width of both areas, create a dense band of fine, evenly spaced vertical serration teeth matching the pinked, saw-toothed crimp edge of a sealed foil booster packet.
+
+The serrations must remain straight, stay evenly spaced, run perpendicular to the top and bottom edges, and continue uninterrupted across the entire sheet width.
+
+Top crimp band: 0%–4% of image height.
+Bottom crimp band: 96%–100% of image height.
+
+Output requirements:
+
+Flat artwork only. Preserve visible branding and package text from the reference as faithfully as the image-generation model allows. Do not invent unrelated logos, subjects, or promotional copy. Output exactly one landscape raster image at a 2:1 aspect ratio and 1024 × 512 pixels.
