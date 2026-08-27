@@ -109,3 +109,10 @@ The following checks are required before publishing the checkpoint to the app:
 4. Existing Pokemon replay tests do not regress.
 5. MTG and Yu-Gi-Oh real-camera replay sets are evaluated separately from
    synthetic/catalog-view retrieval.
+
+The Pokemon acceptance gate also runs the currently shipped production
+ArcFace ONNX and the universal encoder over the exact same deterministic
+augmented Pokemon queries. Both models search the same Pokemon-only gallery;
+`arcface-eval.json` records their Recall@1/Recall@5 and the universal-minus-
+production delta. The historical 97.9% Recall@1 remains useful context, but
+is not used as a substitute for this paired comparison.

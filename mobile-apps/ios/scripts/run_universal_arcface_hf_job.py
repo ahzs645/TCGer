@@ -4,6 +4,7 @@
 #   "coremltools>=8.0",
 #   "huggingface-hub>=0.34.0",
 #   "numpy>=1.26,<3",
+#   "onnxruntime-gpu>=1.20",
 #   "pillow>=10.0",
 #   "requests>=2.32",
 #   "timm>=1.0",
@@ -81,6 +82,21 @@ def main() -> None:
     parser.add_argument("--batch", type=int, default=256)
     parser.add_argument("--workdir", type=Path, default=Path("/tmp/tcger-universal"))
     parser.add_argument(
+        "--trainer-script",
+        type=Path,
+        help="Optional local trainer script; useful for immutable/pinned job bundles",
+    )
+    parser.add_argument(
+        "--pokemon-baseline-path-in-repo",
+        default="baselines/pokemon/card-embeddings-arcface-production-fp16.onnx",
+        help="Production Pokemon ONNX used for paired acceptance evaluation",
+    )
+    parser.add_argument(
+        "--skip-pokemon-baseline",
+        action="store_true",
+        help="Skip the paired production-Pokemon comparison",
+    )
+    parser.add_argument(
         "--catalog-revision",
         default="main",
         help="Revision containing catalogs prepared by prepare_universal_arcface_hub.py",
@@ -93,7 +109,7 @@ def main() -> None:
     args = parser.parse_args()
 
     import requests
-    from huggingface_hub import HfApi, snapshot_download
+    from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
     epochs = args.epochs or (3 if args.mode == "quick" else 12)
     limit = args.limit_per_game
@@ -123,7 +139,23 @@ def main() -> None:
     converter_path = scripts_dir / "build_universal_trainer_metadata.py"
     trainer_path = scripts_dir / "train_arcface_encoder.py"
 
-    download(TRAINER, trainer_path)
+    if args.trainer_script:
+        if not args.trainer_script.is_file():
+            raise FileNotFoundError(f"trainer script not found: {args.trainer_script}")
+        shutil.copy2(args.trainer_script, trainer_path)
+    else:
+        download(TRAINER, trainer_path)
+
+    pokemon_baseline_path = None
+    if not args.skip_pokemon_baseline:
+        pokemon_baseline_path = Path(hf_hub_download(
+            repo_id=args.hub_repo,
+            repo_type="model",
+            revision=args.catalog_revision,
+            filename=args.pokemon_baseline_path_in_repo,
+            token=token,
+        ))
+        print(f"using Pokemon production baseline {pokemon_baseline_path}", flush=True)
 
     prepared_catalogs = False
     if not args.refresh_catalogs:
@@ -190,6 +222,9 @@ def main() -> None:
         "batch": args.batch,
         "preparedCatalogs": prepared_catalogs,
         "catalogRevision": args.catalog_revision,
+        "pokemonBaseline": (
+            args.pokemon_baseline_path_in_repo if pokemon_baseline_path else None
+        ),
         "catalogs": {
             "pokemon": POKEMON_METADATA,
             "magic": {
@@ -227,6 +262,10 @@ def main() -> None:
     ]
     if limit:
         trainer_command.extend(["--limit-per-game", str(limit)])
+    if pokemon_baseline_path:
+        trainer_command.extend([
+            "--pokemon-baseline-onnx", str(pokemon_baseline_path),
+        ])
     trainer_env = os.environ.copy()
     trainer_env["TCGER_CACHE_DIR"] = str(cache_dir)
     trainer_env["TCGER_OUTPUT_DIR"] = str(output_dir)

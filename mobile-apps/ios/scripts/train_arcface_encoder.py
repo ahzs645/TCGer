@@ -175,6 +175,14 @@ def main():
         help="Optional Hugging Face model repo used to resume/persist each epoch",
     )
     parser.add_argument("--hub-path-prefix", default="training")
+    parser.add_argument(
+        "--pokemon-baseline-onnx",
+        type=Path,
+        help=(
+            "Currently shipped Pokemon ArcFace ONNX. When supplied, both models "
+            "receive identical Pokemon tensors and search the same Pokemon gallery."
+        ),
+    )
     # parse_known_args: under `colab exec` the code runs in a Jupyter kernel
     # whose sys.argv carries kernel flags that argparse must not choke on.
     args, _ = parser.parse_known_args()
@@ -431,9 +439,114 @@ def main():
                 f"recall@{k}": hits[mask, :k].any(1).float().mean().item()
                 for k in (1, 5)
             }
-    json.dump({"student": student, "byGame": by_game, "epochs": args.epochs,
-               "backbone": args.backbone},
-              open(OUT_DIR / "arcface-eval.json", "w"), indent=1)
+    evaluation = {
+        "student": student,
+        "byGame": by_game,
+        "epochs": args.epochs,
+        "backbone": args.backbone,
+    }
+
+    if args.pokemon_baseline_onnx:
+        baseline_path = args.pokemon_baseline_onnx
+        if not baseline_path.is_file():
+            raise FileNotFoundError(f"Pokemon baseline ONNX not found: {baseline_path}")
+
+        import onnxruntime as ort
+
+        available = ort.get_available_providers()
+        providers = [
+            provider for provider in ("CUDAExecutionProvider", "CPUExecutionProvider")
+            if provider in available
+        ]
+        baseline = ort.InferenceSession(str(baseline_path), providers=providers)
+        baseline_input = baseline.get_inputs()[0].name
+        baseline_batch = baseline.get_inputs()[0].shape[0]
+
+        @torch.no_grad()
+        def embed_ab(ds, bs=256):
+            model.eval()
+            student_rows, baseline_rows = [], []
+            for raw, _ in DataLoader(ds, batch_size=bs, num_workers=args.workers):
+                student_rows.append(model(raw.to(device)).cpu())
+                raw_numpy = raw.numpy()
+                if isinstance(baseline_batch, int) and baseline_batch == 1:
+                    baseline_output = np.concatenate([
+                        baseline.run(None, {baseline_input: sample[None]})[0]
+                        for sample in raw_numpy
+                    ])
+                else:
+                    baseline_output = baseline.run(
+                        None, {baseline_input: raw_numpy}
+                    )[0]
+                baseline_rows.append(torch.from_numpy(baseline_output).float())
+            return torch.cat(student_rows), torch.cat(baseline_rows)
+
+        pokemon_gallery_indices = [
+            index for index in valid if entries[index]["game"] == "pokemon"
+        ]
+        pokemon_query_indices = [
+            index for index in eval_indices if entries[index]["game"] == "pokemon"
+        ]
+        if pokemon_gallery_indices and pokemon_query_indices:
+            pokemon_gallery_student, pokemon_gallery_baseline = embed_ab(
+                CardViews(pokemon_gallery_indices, train=False)
+            )
+            pokemon_query_student, pokemon_query_baseline = embed_ab(
+                CardViews(pokemon_query_indices, train=True)
+            )
+            pokemon_query_labels = torch.tensor([
+                pokemon_query_indices[k % len(pokemon_query_indices)]
+                for k in range(len(pokemon_query_indices) * args.views_per_card)
+            ])
+            pokemon_gallery_labels = torch.tensor(pokemon_gallery_indices)
+
+            def retrieval_metrics(query_embeddings, gallery_embeddings):
+                gallery_device = gallery_embeddings.to(device)
+                hit_chunks = []
+                for start in range(0, len(query_embeddings), 512):
+                    scores = (
+                        query_embeddings[start:start + 512].to(device)
+                        @ gallery_device.t()
+                    )
+                    nearest = scores.topk(5, dim=1).indices.cpu()
+                    hit_chunks.append(
+                        pokemon_gallery_labels[nearest]
+                        == pokemon_query_labels[start:start + len(nearest), None]
+                    )
+                paired_hits = torch.cat(hit_chunks)
+                return {
+                    f"recall@{k}": paired_hits[:, :k].any(1).float().mean().item()
+                    for k in (1, 5)
+                }
+
+            universal_metrics = retrieval_metrics(
+                pokemon_query_student, pokemon_gallery_student
+            )
+            production_metrics = retrieval_metrics(
+                pokemon_query_baseline, pokemon_gallery_baseline
+            )
+            evaluation["pokemonComparison"] = {
+                "galleryIdentities": len(pokemon_gallery_indices),
+                "queryIdentities": len(pokemon_query_indices),
+                "queriesPerIdentity": args.views_per_card,
+                "baselineArtifact": {
+                    "filename": baseline_path.name,
+                    "sha256": hashlib.sha256(baseline_path.read_bytes()).hexdigest(),
+                    "providers": baseline.get_providers(),
+                },
+                "universalPokemonShard": universal_metrics,
+                "productionArcFace": production_metrics,
+                "delta": {
+                    key: universal_metrics[key] - production_metrics[key]
+                    for key in universal_metrics
+                },
+            }
+
+    json.dump(
+        evaluation,
+        open(OUT_DIR / "arcface-eval.json", "w"),
+        indent=1,
+    )
     write_status(phase="evaluated", **{k: round(v, 4) for k, v in student.items()})
 
     # ---- Export: Core ML + int8 index -------------------------------------
