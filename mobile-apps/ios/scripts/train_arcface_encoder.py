@@ -180,7 +180,8 @@ def main():
         type=Path,
         help=(
             "Currently shipped Pokemon ArcFace ONNX. When supplied, both models "
-            "receive identical Pokemon tensors and search the same Pokemon gallery."
+            "receive identical augmented Pokemon pixels through their respective "
+            "preprocessing contracts and search the same Pokemon gallery."
         ),
     )
     # parse_known_args: under `colab exec` the code runs in a Jupyter kernel
@@ -466,19 +467,33 @@ def main():
         def embed_ab(ds, bs=256):
             model.eval()
             student_rows, baseline_rows = [], []
-            for raw, _ in DataLoader(ds, batch_size=bs, num_workers=args.workers):
-                student_rows.append(model(raw.to(device)).cpu())
-                raw_numpy = raw.numpy()
+            baseline_mean = np.asarray(IMNET_MEAN, dtype=np.float32).reshape(1, 3, 1, 1)
+            baseline_std = np.asarray(IMNET_STD, dtype=np.float32).reshape(1, 3, 1, 1)
+            for normalized, _ in DataLoader(ds, batch_size=bs, num_workers=args.workers):
+                student_rows.append(model(normalized.to(device)).cpu())
+                # CardViews returns ImageNet-normalized tensors because that is
+                # the training-time contract of the universal PyTorch model.
+                # The shipped production ONNX has ImageNet normalization baked
+                # into its graph and instead expects the same RGB pixels in
+                # [0, 1]. Undo only normalization; geometry and augmentations
+                # remain byte-for-byte paired between both models.
+                baseline_numpy = np.clip(
+                    normalized.numpy() * baseline_std + baseline_mean,
+                    0.0,
+                    1.0,
+                )
                 if isinstance(baseline_batch, int) and baseline_batch == 1:
                     baseline_output = np.concatenate([
                         baseline.run(None, {baseline_input: sample[None]})[0]
-                        for sample in raw_numpy
+                        for sample in baseline_numpy
                     ])
                 else:
                     baseline_output = baseline.run(
-                        None, {baseline_input: raw_numpy}
+                        None, {baseline_input: baseline_numpy}
                     )[0]
-                baseline_rows.append(torch.from_numpy(baseline_output).float())
+                baseline_rows.append(F.normalize(
+                    torch.from_numpy(baseline_output).float(), dim=-1
+                ))
             return torch.cat(student_rows), torch.cat(baseline_rows)
 
         pokemon_gallery_indices = [
@@ -533,6 +548,7 @@ def main():
                     "filename": baseline_path.name,
                     "sha256": hashlib.sha256(baseline_path.read_bytes()).hexdigest(),
                     "providers": baseline.get_providers(),
+                    "inputContract": "RGB float32 [0,1]; ImageNet normalization baked into ONNX",
                 },
                 "universalPokemonShard": universal_metrics,
                 "productionArcFace": production_metrics,

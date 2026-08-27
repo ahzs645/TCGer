@@ -97,7 +97,7 @@ combined/per-game export, and Scryfall 2026 compatibility.
 The local-only recovery layer adds:
 
 - `--pokemon-baseline-onnx` paired acceptance evaluation;
-- identical Pokemon tensors for the universal and production encoders;
+- identical augmented Pokemon pixels with each encoder's required preprocessing;
 - a shared Pokemon-only gallery for both models;
 - Recall@1, Recall@5, model delta, providers, and baseline SHA-256;
 - support for the production ONNX's fixed batch size of one;
