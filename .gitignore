@@ -66,6 +66,7 @@ tmp/
 
 # Local agent artifacts
 /.codex-prompts/
+/trainer-inputs/
 
 # Generated booster-wrap previews and batch logs. Final pack artwork lives in
 # Google Drive and is published to R2; it must never be committed to this repo.
@@ -94,6 +95,7 @@ tmp/
 # Local research artifacts
 research/
 /*-decompiled/
+.artifacts/huggingface/
 
 # Local recognition eval data (real user captures — do not commit)
 backend/eval-data/

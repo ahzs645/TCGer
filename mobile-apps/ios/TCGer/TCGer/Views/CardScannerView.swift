@@ -1025,6 +1025,7 @@ struct CardScannerView: View {
 
     private func accentColor(for mode: ScanMode) -> Color {
         switch mode {
+        case .automatic: return Color.blue
         case .pokemon: return Color.red
         case .yugioh: return Color.purple
         case .mtg: return Color.green
@@ -1237,7 +1238,13 @@ private extension CardScannerView {
     }
 
     var availableScanModes: [ScanMode] {
-        ScanMode.allCases.filter { environmentStore.isGameEnabled($0.tcgGame) }
+        let specificModes = ScanMode.allCases.filter {
+            $0 != .automatic && environmentStore.isGameEnabled($0.tcgGame)
+        }
+        let supportsAutomatic = viewModel.isModeSupported(.automatic)
+        return specificModes.count > 1 && supportsAutomatic
+            ? [.automatic] + specificModes
+            : specificModes
     }
 
     /// Server-backed matchers are hidden in phone-only mode — there is no

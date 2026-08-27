@@ -66,6 +66,36 @@ export interface EmbeddingIndex {
   gateUrl: string | null;
 }
 
+/**
+ * Stable identity for the shared encoder behind one or more game shards.
+ * Automatic mode computes a crop embedding once, so every searched shard
+ * must use this exact contract. The catalog vectors and thresholds may remain
+ * game-specific.
+ */
+export function embeddingModelKey(
+  index: Pick<
+    EmbeddingIndex,
+    "model" | "dtype" | "encoder" | "dimension" | "modelUrl"
+  >,
+): string {
+  return JSON.stringify({
+    model: index.model,
+    dtype: index.dtype,
+    encoder: index.encoder,
+    dimension: index.dimension,
+    modelUrl: index.modelUrl,
+  });
+}
+
+export function embeddingIndexesShareModel(
+  indexes: readonly EmbeddingIndex[],
+): boolean {
+  const first = indexes[0];
+  if (!first) return true;
+  const key = embeddingModelKey(first);
+  return indexes.every((index) => embeddingModelKey(index) === key);
+}
+
 /** Raw artifact shape emitted by build-embedding-index.ts. */
 interface EmbeddingIndexArtifact {
   version: number;
@@ -624,4 +654,34 @@ export function matchEmbeddingTopK(
     };
     return candidate;
   });
+}
+
+/**
+ * Search compatible per-game shards with one shared query embedding.
+ *
+ * Each shard keeps its own calibrated thresholds and within-game margin. The
+ * returned candidates are then globally ranked, which makes the winning
+ * candidate's `tcg` the automatic game route. A manually selected game simply
+ * supplies one shard and follows the same code path.
+ */
+export function matchEmbeddingShardsTopK(
+  query: Float32Array,
+  indexes: readonly EmbeddingIndex[],
+  options: EmbeddingMatchOptions = {},
+): BrowserVideoScanCandidate[] {
+  if (!embeddingIndexesShareModel(indexes)) return [];
+
+  const topK = options.topK ?? 20;
+  return indexes
+    .flatMap((index) =>
+      matchEmbeddingTopK(query, index, {
+        ...options,
+        topK,
+        // Shard selection already scopes the game. In automatic mode the
+        // caller passes "all", while a fixed mode loads exactly one shard.
+        tcgFilter: index.tcg,
+      }),
+    )
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, topK);
 }

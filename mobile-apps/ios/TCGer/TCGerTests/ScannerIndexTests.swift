@@ -53,6 +53,25 @@ final class ScannerIndexTests: XCTestCase {
         XCTAssertEqual(physicalPokemon, [0])
     }
 
+    func testAutomaticPhysicalCardIndicesSpanInstalledGameShards() async {
+        let store = CardIndexMetadataStore(entries: [
+            metadata(index: 0, id: "p1", game: "pokemon", setCode: "sv01"),
+            metadata(index: 1, id: "m1", game: "magic", setCode: "lea"),
+            metadata(index: 2, id: "y1", game: "yugioh", setCode: "lob"),
+            metadata(
+                index: 3,
+                id: "pocket-1",
+                game: "pokemon",
+                setCode: "A1",
+                format: "pocket"
+            ),
+        ])
+
+        let automatic = await store.physicalCardIndices(for: .all, setCode: nil)
+
+        XCTAssertEqual(automatic, [0, 1, 2])
+    }
+
     func testANNRanksByCosineDistanceAndHonorsAllowedIndices() async throws {
         let store = AnnoyIndexStore(vectors: [
             [1, 0],

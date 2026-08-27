@@ -104,7 +104,7 @@ export function VideoScanLab() {
     }),
     [],
   );
-  const { ensureHashIndex, ensureEmbeddingIndex, artworkDbRef } =
+  const { ensureHashIndex, ensureEmbeddingIndexes, artworkDbRef } =
     useVideoScanData(token, dataCallbacks);
 
   const processorCallbacks = useMemo(
@@ -249,17 +249,20 @@ export function VideoScanLab() {
       setIsProcessing(true);
       setHashStatus(null);
       try {
-        const index = await ensureEmbeddingIndex(scanFilter);
-        if (!index) {
-          const tcg = scanFilter === "all" ? "pokemon" : scanFilter;
-          setError(`No embedding index published for ${tcg} yet.`);
+        const indexes = await ensureEmbeddingIndexes(scanFilter);
+        if (indexes.length === 0) {
+          setError(
+            scanFilter === "all"
+              ? "No compatible game embedding shards are published yet."
+              : `No embedding index published for ${scanFilter} yet.`,
+          );
           setIsProcessing(false);
           return;
         }
         await processYoloWithEmbedding({
           video: videoRef.current,
           frameCanvas: frameCanvasRef.current,
-          embeddingIndex: index,
+          embeddingIndexes: indexes,
           scanFilter,
         });
       } catch (err) {

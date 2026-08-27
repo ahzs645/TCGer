@@ -141,7 +141,10 @@ actor CardIndexMetadataStore {
             return memoized
         }
         let indices = Set(cache.values.lazy.filter {
-            guard $0.resolvedGame == game, $0.isPhysicalScanEligible else { return false }
+            guard (game == .all || $0.resolvedGame == game),
+                  $0.resolvedGame != .all,
+                  $0.isPhysicalScanEligible
+            else { return false }
             guard let setCode else { return true }
             return $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
         }.map(\.annIndex))

@@ -54,6 +54,7 @@ final class ArtworkFingerprintScannerStrategy: ScanStrategy {
     }
 
     func supports(_ mode: ScanMode) -> Bool {
+        guard mode != .automatic else { return false }
         lock.lock()
         let cached = databases[mode]
         let legacyResolved = self.legacyResolved
