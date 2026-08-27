@@ -12,12 +12,13 @@
 #   "torchvision>=0.20",
 # ]
 # ///
-"""Run the reproducible TCGer universal ArcFace training/export job.
+"""Run the reproducible TCGer ArcFace training/export job.
 
 The job obtains the same authoritative catalogs mirrored in the TCG Google
 Drive (Scryfall, YGOPRODeck, and the tracked Pokémon catalog), normalizes them,
-trains one game-neutral encoder, exports a combined index plus per-game shards,
-and persists checkpoints/results to a private Hugging Face model repository.
+trains one encoder across the selected games, exports the combined index plus
+per-game shards, and persists checkpoints/results to a private Hugging Face
+model repository.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ CONVERTER = f"{REPO_RAW}/mobile-apps/ios/scripts/build_universal_trainer_metadat
 TRAINER = f"{REPO_RAW}/mobile-apps/ios/scripts/train_arcface_encoder.py"
 SCRYFALL_BULK = "https://api.scryfall.com/bulk-data/default-cards"
 YGOPRODECK_CARDS = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+ALL_GAMES = ("pokemon", "magic", "yugioh")
 REQUEST_HEADERS = {
     "User-Agent": "TCGer/1.0 (https://github.com/ahzs645/TCGer)",
     "Accept": "application/json;q=0.9,*/*;q=0.8",
@@ -77,6 +79,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hub-repo", default="ahzs645/tcger-universal-arcface")
     parser.add_argument("--mode", choices=("quick", "full"), default="quick")
+    parser.add_argument(
+        "--games",
+        nargs="+",
+        choices=ALL_GAMES,
+        default=list(ALL_GAMES),
+        help=(
+            "Catalogs to train together. The default preserves universal mode; "
+            "use '--games pokemon' for an isolated Pokemon encoder."
+        ),
+    )
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--limit-per-game", type=int)
     parser.add_argument("--batch", type=int, default=256)
@@ -107,6 +119,26 @@ def main() -> None:
         help="Ignore prepared Hub catalogs and rebuild them from upstream sources",
     )
     args = parser.parse_args()
+
+    selected_games = tuple(game for game in ALL_GAMES if game in args.games)
+    if len(selected_games) != len(args.games):
+        parser.error("--games must not contain duplicates")
+    artifact_scope = (
+        "universal" if selected_games == ALL_GAMES else "-".join(selected_games)
+    )
+    # Preserve the established universal paths while isolating specialized
+    # checkpoints and exports so catalogs with different ArcFace heads can
+    # never accidentally resume or overwrite one another.
+    training_prefix = (
+        f"training/{args.mode}"
+        if artifact_scope == "universal"
+        else f"training/{artifact_scope}/{args.mode}"
+    )
+    export_prefix = (
+        f"exports/{args.mode}"
+        if artifact_scope == "universal"
+        else f"exports/{artifact_scope}/{args.mode}"
+    )
 
     import requests
     from huggingface_hub import HfApi, hf_hub_download, snapshot_download
@@ -147,7 +179,7 @@ def main() -> None:
         download(TRAINER, trainer_path)
 
     pokemon_baseline_path = None
-    if not args.skip_pokemon_baseline:
+    if "pokemon" in selected_games and not args.skip_pokemon_baseline:
         pokemon_baseline_path = Path(hf_hub_download(
             repo_id=args.hub_repo,
             repo_type="model",
@@ -170,7 +202,7 @@ def main() -> None:
             )) / "catalogs"
             required = [
                 hub_dir / game / "CardsIndexMetadata.json"
-                for game in ("pokemon", "magic", "yugioh")
+                for game in selected_games
             ]
             if not all(path.is_file() for path in required):
                 raise FileNotFoundError("prepared Hub catalogs are incomplete")
@@ -185,38 +217,52 @@ def main() -> None:
 
     bulk_metadata = None
     if not prepared_catalogs:
-        pokemon_path = source_dir / "pokemon.json"
-        magic_path = source_dir / "magic-default-cards.json"
-        yugioh_path = source_dir / "yugioh.json"
-        download(POKEMON_METADATA, pokemon_path)
-        bulk = requests.get(
-            SCRYFALL_BULK,
-            headers=REQUEST_HEADERS,
-            timeout=60,
-        )
-        bulk.raise_for_status()
-        bulk_metadata = bulk.json()
-        magic_download_uri = (
-            bulk_metadata.get("download_uri")
-            or bulk_metadata.get("jsonl_download_uri")
-        )
-        if not magic_download_uri:
-            raise ValueError("Scryfall bulk-data response has no download URI")
-        download(magic_download_uri, magic_path)
-        download(YGOPRODECK_CARDS, yugioh_path)
+        source_paths = {
+            "pokemon": source_dir / "pokemon.json",
+            "magic": source_dir / "magic-default-cards.json",
+            "yugioh": source_dir / "yugioh.json",
+        }
+        if "pokemon" in selected_games:
+            download(POKEMON_METADATA, source_paths["pokemon"])
+        if "magic" in selected_games:
+            bulk = requests.get(
+                SCRYFALL_BULK,
+                headers=REQUEST_HEADERS,
+                timeout=60,
+            )
+            bulk.raise_for_status()
+            bulk_metadata = bulk.json()
+            magic_download_uri = (
+                bulk_metadata.get("download_uri")
+                or bulk_metadata.get("jsonl_download_uri")
+            )
+            if not magic_download_uri:
+                raise ValueError("Scryfall bulk-data response has no download URI")
+            download(magic_download_uri, source_paths["magic"])
+        if "yugioh" in selected_games:
+            download(YGOPRODECK_CARDS, source_paths["yugioh"])
         download(CONVERTER, converter_path)
-        run([
+        converter_command = [
             sys.executable,
             str(converter_path),
-            "--pokemon", str(pokemon_path),
-            "--mtg", str(magic_path),
-            "--yugioh", str(yugioh_path),
-            "--output", str(normalized_dir),
-        ])
+        ]
+        converter_flags = {
+            "pokemon": "--pokemon",
+            "magic": "--mtg",
+            "yugioh": "--yugioh",
+        }
+        for game in selected_games:
+            converter_command.extend([converter_flags[game], str(source_paths[game])])
+        converter_command.extend(["--output", str(normalized_dir)])
+        run(converter_command)
 
     run_config = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "mode": args.mode,
+        "games": list(selected_games),
+        "artifactScope": artifact_scope,
+        "trainingPrefix": training_prefix,
+        "exportPrefix": export_prefix,
         "epochs": epochs,
         "limitPerGame": limit,
         "batch": args.batch,
@@ -226,25 +272,40 @@ def main() -> None:
             args.pokemon_baseline_path_in_repo if pokemon_baseline_path else None
         ),
         "catalogs": {
-            "pokemon": POKEMON_METADATA,
-            "magic": {
-                "endpoint": SCRYFALL_BULK,
-                "updatedAt": bulk_metadata.get("updated_at") if bulk_metadata else None,
-                "downloadURI": (
-                    bulk_metadata.get("download_uri")
-                    or bulk_metadata.get("jsonl_download_uri")
-                ) if bulk_metadata else None,
-            },
-            "yugioh": YGOPRODECK_CARDS,
+            game: value
+            for game, value in {
+                "pokemon": POKEMON_METADATA,
+                "magic": {
+                    "endpoint": SCRYFALL_BULK,
+                    "updatedAt": (
+                        bulk_metadata.get("updated_at") if bulk_metadata else None
+                    ),
+                    "downloadURI": (
+                        bulk_metadata.get("download_uri")
+                        or bulk_metadata.get("jsonl_download_uri")
+                    ) if bulk_metadata else None,
+                },
+                "yugioh": YGOPRODECK_CARDS,
+            }.items()
+            if game in selected_games
         },
     }
-    with open(normalized_dir / "run-config.json", "w", encoding="utf-8") as output:
+    run_config_path = work / "run-config.json"
+    with open(run_config_path, "w", encoding="utf-8") as output:
         json.dump(run_config, output, indent=2)
 
-    # This early upload verifies write permission before any paid GPU training.
-    api.upload_folder(
-        folder_path=str(normalized_dir),
-        path_in_repo="catalogs",
+    if not prepared_catalogs:
+        api.upload_folder(
+            folder_path=str(normalized_dir),
+            path_in_repo="catalogs",
+            repo_id=args.hub_repo,
+            repo_type="model",
+        )
+    # This scoped early upload verifies write permission without replacing the
+    # global catalog manifest with a specialized-run configuration.
+    api.upload_file(
+        path_or_fileobj=str(run_config_path),
+        path_in_repo=f"runs/{artifact_scope}/{args.mode}/run-config.json",
         repo_id=args.hub_repo,
         repo_type="model",
     )
@@ -252,14 +313,16 @@ def main() -> None:
     trainer_command = [
         sys.executable,
         str(trainer_path),
-        "--metadata", str(normalized_dir / "pokemon" / "CardsIndexMetadata.json"),
-        "--metadata", str(normalized_dir / "magic" / "CardsIndexMetadata.json"),
-        "--metadata", str(normalized_dir / "yugioh" / "CardsIndexMetadata.json"),
         "--epochs", str(epochs),
         "--batch", str(args.batch),
         "--hub-repo", args.hub_repo,
-        "--hub-path-prefix", f"training/{args.mode}",
+        "--hub-path-prefix", training_prefix,
     ]
+    for game in selected_games:
+        trainer_command.extend([
+            "--metadata",
+            str(normalized_dir / game / "CardsIndexMetadata.json"),
+        ])
     if limit:
         trainer_command.extend(["--limit-per-game", str(limit)])
     if pokemon_baseline_path:
@@ -272,10 +335,10 @@ def main() -> None:
     run(trainer_command, env=trainer_env)
 
     shutil.copy2(normalized_dir / "provenance.json", output_dir / "provenance.json")
-    shutil.copy2(normalized_dir / "run-config.json", output_dir / "run-config.json")
+    shutil.copy2(run_config_path, output_dir / "run-config.json")
     api.upload_folder(
         folder_path=str(output_dir),
-        path_in_repo=f"exports/{args.mode}",
+        path_in_repo=export_prefix,
         repo_id=args.hub_repo,
         repo_type="model",
     )
