@@ -1096,6 +1096,8 @@ final class EnvironmentStore: ObservableObject {
             return .tab(.collections)
         case "collections":
             return .tab(.collections)
+        case "packs":
+            return .packOpening
         default:
             guard let tab = AppTab(rawValue: route) else { return nil }
             return .tab(tab)

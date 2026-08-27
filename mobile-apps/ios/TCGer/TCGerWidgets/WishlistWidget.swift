@@ -73,35 +73,75 @@ struct WishlistWidgetView: View {
     private func wishlistView(_ wishlist: WidgetWishlistInfo) -> some View {
         let tint = Color(widgetHex: wishlist.colorHex, fallback: .pink)
 
-        return HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "heart.fill")
-                        .foregroundStyle(tint)
-                        .widgetAccentable()
-                    Text(wishlist.name)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .lineLimit(2)
+        return Group {
+            switch family {
+            case .systemSmall:
+                smallWishlist(wishlist, tint: tint)
+            default:
+                mediumWishlist(wishlist, tint: tint)
+            }
+        }
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    private func smallWishlist(_ wishlist: WidgetWishlistInfo, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            wishlistTitle(wishlist.name, tint: tint)
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .bottom, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(wishlist.ownedCards)/\(wishlist.totalCards)")
+                        .font(.title3.weight(.bold))
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Text("cards owned")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+                .layoutPriority(1)
+
+                Spacer(minLength: 0)
+
+                WidgetProgressRing(percent: wishlist.completionPercent, tint: tint)
+                    .frame(width: 54, height: 54)
+            }
+        }
+    }
+
+    private func mediumWishlist(_ wishlist: WidgetWishlistInfo, tint: Color) -> some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 7) {
+                wishlistTitle(wishlist.name, tint: tint)
 
                 Spacer(minLength: 0)
 
                 Text("\(wishlist.ownedCards) of \(wishlist.totalCards) owned")
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
 
-                if family == .systemMedium {
-                    neededCards(wishlist.neededCardNames, tint: tint)
-                }
+                neededCards(wishlist.neededCardNames, tint: tint)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             WidgetProgressRing(percent: wishlist.completionPercent, tint: tint)
-                .frame(width: family == .systemMedium ? 82 : 64,
-                       height: family == .systemMedium ? 82 : 64)
+                .frame(width: 76, height: 76)
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    private func wishlistTitle(_ name: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "heart.fill")
+                .foregroundStyle(tint)
+                .widgetAccentable()
+            Text(name)
+                .font(.headline.weight(.bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Spacer(minLength: 0)
+        }
     }
 
     @ViewBuilder
@@ -111,13 +151,24 @@ struct WishlistWidgetView: View {
                 .font(.caption2)
                 .foregroundStyle(tint)
         } else {
+            let uniqueNames = names.reduce(into: [String]()) { result, name in
+                if !result.contains(name) {
+                    result.append(name)
+                }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Still needed")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                ForEach(Array(names.prefix(3).enumerated()), id: \.offset) { _, name in
+                ForEach(Array(uniqueNames.prefix(2).enumerated()), id: \.offset) { _, name in
                     Text("• \(name)")
                         .font(.caption2)
+                        .lineLimit(1)
+                }
+                if uniqueNames.count > 2 {
+                    Text("+\(uniqueNames.count - 2) more")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
@@ -152,4 +203,16 @@ struct WishlistWidget: Widget {
         .description("Follow progress and see which cards you still need.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
+}
+
+#Preview("Wishlist — Small", as: .systemSmall) {
+    WishlistWidget()
+} timeline: {
+    WishlistEntry(date: .now, wishlist: .preview)
+}
+
+#Preview("Wishlist — Medium", as: .systemMedium) {
+    WishlistWidget()
+} timeline: {
+    WishlistEntry(date: .now, wishlist: .preview)
 }

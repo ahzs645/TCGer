@@ -26,6 +26,14 @@ final class DeepLinkRoutingTests: XCTestCase {
         )
     }
 
+    func testPackOpeningWidgetURLRoutesDirectlyToPackOpening() throws {
+        let customURL = try XCTUnwrap(URL(string: "tcger://packs"))
+        let universalURL = try XCTUnwrap(URL(string: "https://tcger.ahmadjalil.com/packs"))
+
+        XCTAssertEqual(EnvironmentStore.deepLinkDestination(for: customURL), .packOpening)
+        XCTAssertEqual(EnvironmentStore.deepLinkDestination(for: universalURL), .packOpening)
+    }
+
     func testSearchShortcutURLPreservesDecodedQuery() throws {
         let url = try XCTUnwrap(URL(string: "tcger://search?q=Black%20Lotus"))
         XCTAssertEqual(

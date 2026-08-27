@@ -162,6 +162,7 @@ enum AppDeepLinkDestination: Equatable, Sendable {
     case search(query: String?)
     case binder(id: String)
     case wishlist(id: String)
+    case packOpening
 
     var tab: AppTab? {
         switch self {
@@ -170,6 +171,7 @@ enum AppDeepLinkDestination: Equatable, Sendable {
         case .search: return nil
         case .binder: return .collections
         case .wishlist: return .wishlists
+        case .packOpening: return .sealed
         }
     }
 }

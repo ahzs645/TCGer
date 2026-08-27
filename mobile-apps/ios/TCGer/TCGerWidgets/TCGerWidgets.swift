@@ -122,12 +122,14 @@ struct CollectionStatsWidgetView: View {
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
             } else {
-                HStack(spacing: 14) {
+                HStack(spacing: 10) {
                     if entry.showPricing {
                         VStack(alignment: .leading, spacing: 4) {
                             Label("Collection Value", systemImage: "chart.line.uptrend.xyaxis")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                             Text(formattedValue)
                                 .font(.title2.weight(.bold))
                                 .minimumScaleFactor(0.65)
@@ -139,14 +141,16 @@ struct CollectionStatsWidgetView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(0)
                     }
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
                         StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
                         StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
                     }
                     .frame(maxWidth: entry.showPricing ? .infinity : nil)
+                    .layoutPriority(1)
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
             }
@@ -197,6 +201,8 @@ private struct StatBlock: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
     }
@@ -348,6 +354,22 @@ struct RecentCardsWidget: Widget {
     }
 }
 
+#Preview("Collection Stats — Medium", as: .systemMedium) {
+    CollectionStatsWidget()
+} timeline: {
+    CollectionStatsEntry(
+        date: .now,
+        totalBinders: 12,
+        uniqueCards: 1_259,
+        totalCopies: 2_871,
+        totalValue: 12_842.35,
+        currencyCode: "USD",
+        showPricing: true,
+        lastUpdated: .now,
+        hasData: true
+    )
+}
+
 @main
 struct TCGerWidgets: WidgetBundle {
     var body: some Widget {
@@ -356,6 +378,7 @@ struct TCGerWidgets: WidgetBundle {
         ScannerShortcutWidget()
         WishlistWidget()
         BinderWidget()
+        PackOpeningShortcutWidget()
         ScannerControlWidget()
     }
 }

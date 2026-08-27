@@ -10,6 +10,7 @@ struct ContentView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @EnvironmentObject private var featureDependencies: AppFeatureDependencies
     @State private var showingSearch = false
+    @State private var showingPackOpening = false
     @State private var searchQuery: String?
     @State private var selectedTab = AppTab.home.rawValue
     @State private var moreNavigationPath: [AppTab] = []
@@ -67,6 +68,9 @@ struct ContentView: View {
             searchQuery = nil
         }) {
             CardSearchView(initialSearchText: searchQuery ?? "")
+        }
+        .fullScreenCover(isPresented: $showingPackOpening) {
+            PackOpeningView()
         }
         .onAppear {
             reconcileSelection()
@@ -173,6 +177,27 @@ struct ContentView: View {
             guard environmentStore.claimDeepLinkRequest(request, for: .appShell) else { return }
             searchQuery = query
             showingSearch = true
+            return
+        }
+
+        if case .packOpening = destination {
+            guard isAvailable(.sealed) else { return }
+            guard environmentStore.claimDeepLinkRequest(request, for: .appShell) else { return }
+
+            if tabs.contains(.sealed) {
+                switch tabLayout.presentation(for: .sealed) {
+                case .primary:
+                    selectedTab = AppTab.sealed.rawValue
+                    moreNavigationPath.removeAll()
+                case .more:
+                    selectedTab = Self.moreTabSelection
+                    moreNavigationPath = [.sealed]
+                case .unavailable:
+                    break
+                }
+            }
+
+            showingPackOpening = true
             return
         }
 
