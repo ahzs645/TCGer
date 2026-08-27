@@ -149,6 +149,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--views-per-card", type=int, default=3)
+    parser.add_argument(
+        "--training-views-per-card",
+        type=int,
+        help=(
+            "Training augmentations per identity per epoch. Defaults to "
+            "--views-per-card, which remains the evaluation query count."
+        ),
+    )
     parser.add_argument("--batch", type=int, default=256)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--backbone", default="fastvit_t8.apple_in1k")
@@ -187,6 +195,13 @@ def main():
     # parse_known_args: under `colab exec` the code runs in a Jupyter kernel
     # whose sys.argv carries kernel flags that argparse must not choke on.
     args, _ = parser.parse_known_args()
+    training_views_per_card = (
+        args.views_per_card
+        if args.training_views_per_card is None
+        else args.training_views_per_card
+    )
+    if training_views_per_card < 1 or args.views_per_card < 1:
+        parser.error("training and evaluation views per card must be positive")
 
     import numpy as np
     import torch
@@ -234,12 +249,15 @@ def main():
         return img.crop((left, top, left + IMG_SIZE, top + IMG_SIZE))
 
     class CardViews(Dataset):
-        def __init__(self, indices, train=True):
+        def __init__(self, indices, train=True, views=None):
             self.indices = indices
             self.train = train
+            self.views = (
+                views if views is not None else (args.views_per_card if train else 1)
+            )
 
         def __len__(self):
-            return len(self.indices) * (args.views_per_card if self.train else 1)
+            return len(self.indices) * self.views
 
         def __getitem__(self, k):
             i = self.indices[k % len(self.indices)]
@@ -324,6 +342,16 @@ def main():
         ck = torch.load(CKPT, map_location=device)
         if ck.get("catalogFingerprint") != catalog_fingerprint:
             raise ValueError("checkpoint catalog does not match supplied metadata")
+        checkpoint_config = ck.get("config", {})
+        checkpoint_training_views = checkpoint_config.get("trainingViewsPerCard")
+        if (
+            checkpoint_training_views is not None
+            and checkpoint_training_views != training_views_per_card
+        ):
+            raise ValueError(
+                "checkpoint training-view count does not match this run "
+                f"({checkpoint_training_views} != {training_views_per_card})"
+            )
         model.load_state_dict(ck["model"])
         head.load_state_dict(ck["head"])
         opt.load_state_dict(ck["opt"])
@@ -331,9 +359,15 @@ def main():
         start_epoch = ck["epoch"] + 1
         print(f"resumed after epoch {ck['epoch']}", flush=True)
 
-    loader = DataLoader(CardViews(valid, train=True), batch_size=args.batch, shuffle=True,
-                        num_workers=args.workers, pin_memory=True, drop_last=True,
-                        persistent_workers=True)
+    loader = DataLoader(
+        CardViews(valid, train=True, views=training_views_per_card),
+        batch_size=args.batch,
+        shuffle=True,
+        num_workers=args.workers,
+        pin_memory=True,
+        drop_last=True,
+        persistent_workers=True,
+    )
 
     for epoch in range(start_epoch, args.epochs):
         # Margin ramp: margin-free through epoch 3 — at 21.8k classes the head
@@ -374,7 +408,12 @@ def main():
                     "opt": opt.state_dict(), "sched": sched.state_dict(),
                     "epoch": epoch,
                     "catalogFingerprint": catalog_fingerprint,
-                    "config": {"backbone": args.backbone, "dim": EMBED_DIM}}, CKPT)
+                    "config": {
+                        "backbone": args.backbone,
+                        "dim": EMBED_DIM,
+                        "trainingViewsPerCard": training_views_per_card,
+                        "evaluationViewsPerCard": args.views_per_card,
+                    }}, CKPT)
         write_status(phase="training", epoch=epoch, epochs=args.epochs,
                      loss=round(loss_sum / seen, 4), train_acc=round(correct / seen, 4),
                      margin=round(head.margin, 3),
@@ -445,6 +484,10 @@ def main():
         "byGame": by_game,
         "epochs": args.epochs,
         "backbone": args.backbone,
+        "trainingViewsPerCard": training_views_per_card,
+        "evaluationViewsPerCard": args.views_per_card,
+        "optimizerStepsPerEpoch": len(loader),
+        "configuredOptimizerSteps": len(loader) * args.epochs,
     }
 
     if args.pokemon_baseline_onnx:

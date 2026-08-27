@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,6 +93,21 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--limit-per-game", type=int)
     parser.add_argument("--batch", type=int, default=256)
+    parser.add_argument(
+        "--training-views-per-card",
+        type=int,
+        help=(
+            "Training augmentations per identity per epoch. Evaluation remains "
+            "at the trainer's default three queries per identity."
+        ),
+    )
+    parser.add_argument(
+        "--artifact-variant",
+        help=(
+            "Optional lowercase path suffix for an isolated experiment. A "
+            "training-view override gets a deterministic suffix automatically."
+        ),
+    )
     parser.add_argument("--workdir", type=Path, default=Path("/tmp/tcger-universal"))
     parser.add_argument(
         "--trainer-script",
@@ -123,6 +139,13 @@ def main() -> None:
     selected_games = tuple(game for game in ALL_GAMES if game in args.games)
     if len(selected_games) != len(args.games):
         parser.error("--games must not contain duplicates")
+    if args.training_views_per_card is not None and args.training_views_per_card < 1:
+        parser.error("--training-views-per-card must be positive")
+    artifact_variant = args.artifact_variant
+    if artifact_variant is None and args.training_views_per_card is not None:
+        artifact_variant = f"train-views-{args.training_views_per_card}"
+    if artifact_variant and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", artifact_variant):
+        parser.error("--artifact-variant must contain lowercase letters, digits, or dashes")
     artifact_scope = (
         "universal" if selected_games == ALL_GAMES else "-".join(selected_games)
     )
@@ -139,6 +162,11 @@ def main() -> None:
         if artifact_scope == "universal"
         else f"exports/{artifact_scope}/{args.mode}"
     )
+    run_prefix = f"runs/{artifact_scope}/{args.mode}"
+    if artifact_variant:
+        training_prefix = f"{training_prefix}/{artifact_variant}"
+        export_prefix = f"{export_prefix}/{artifact_variant}"
+        run_prefix = f"{run_prefix}/{artifact_variant}"
 
     import requests
     from huggingface_hub import HfApi, hf_hub_download, snapshot_download
@@ -261,11 +289,14 @@ def main() -> None:
         "mode": args.mode,
         "games": list(selected_games),
         "artifactScope": artifact_scope,
+        "artifactVariant": artifact_variant,
         "trainingPrefix": training_prefix,
         "exportPrefix": export_prefix,
         "epochs": epochs,
         "limitPerGame": limit,
         "batch": args.batch,
+        "trainingViewsPerCard": args.training_views_per_card or 3,
+        "evaluationViewsPerCard": 3,
         "preparedCatalogs": prepared_catalogs,
         "catalogRevision": args.catalog_revision,
         "pokemonBaseline": (
@@ -305,7 +336,7 @@ def main() -> None:
     # global catalog manifest with a specialized-run configuration.
     api.upload_file(
         path_or_fileobj=str(run_config_path),
-        path_in_repo=f"runs/{artifact_scope}/{args.mode}/run-config.json",
+        path_in_repo=f"{run_prefix}/run-config.json",
         repo_id=args.hub_repo,
         repo_type="model",
     )
@@ -325,6 +356,11 @@ def main() -> None:
         ])
     if limit:
         trainer_command.extend(["--limit-per-game", str(limit)])
+    if args.training_views_per_card is not None:
+        trainer_command.extend([
+            "--training-views-per-card",
+            str(args.training_views_per_card),
+        ])
     if pokemon_baseline_path:
         trainer_command.extend([
             "--pokemon-baseline-onnx", str(pokemon_baseline_path),
