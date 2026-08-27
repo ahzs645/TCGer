@@ -74,6 +74,7 @@ struct WishlistsView: View {
                         Label("Create Wishlist", systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier(ParityControlID.actionWishlistsCreate)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredWishlists.isEmpty {
@@ -130,6 +131,7 @@ struct WishlistsView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityIdentifier(ParityControlID.actionWishlistsCreate)
             }
         }
         .refreshable {
@@ -173,7 +175,8 @@ struct WishlistsView: View {
                     namePlaceholder: "Wishlist Name",
                     name: $newWishlistName,
                     description: $newWishlistDescription,
-                    selectedColor: $newWishlistColor
+                    selectedColor: $newWishlistColor,
+                    nameAccessibilityIdentifier: ParityControlID.inputWishlistsName
                 )
 
                 Section {
@@ -196,9 +199,11 @@ struct WishlistsView: View {
                         Task { await createWishlist() }
                     }
                     .disabled(newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier(ParityControlID.actionWishlistsConfirmCreate)
                 }
             }
         }
+        .accessibilityIdentifier(ParityFeatureID.wishlistsCreate.screenIdentifier)
         .presentationDetents([.medium, .large])
     }
 

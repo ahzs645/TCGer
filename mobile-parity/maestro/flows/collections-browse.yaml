@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: "[collections.browse] Binder list is available"
+tags: [parity, smoke]
+properties:
+  featureId: "collections.browse"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.collections"
+- assertVisible:
+    id: "feature.collections.browse"

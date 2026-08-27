@@ -47,8 +47,11 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             ForEach(primaryTabs) { tab in
-                Tab(tab.title, systemImage: tab.systemImage, value: tab.rawValue) {
+                Tab(value: tab.rawValue) {
                     destination(for: tab)
+                } label: {
+                    Label(tab.title, systemImage: tab.systemImage)
+                        .accessibilityIdentifier(navigationIdentifier(for: tab))
                 }
             }
 
@@ -95,40 +98,53 @@ struct ContentView: View {
 
     @ViewBuilder
     private func destination(for tab: AppTab, parentProvidesNavigation: Bool = false) -> some View {
+        Group {
+            switch tab {
+            case .home:
+                DashboardView(parentProvidesNavigation: parentProvidesNavigation)
+            case .collections:
+                CollectionsView(
+                    parentProvidesNavigation: parentProvidesNavigation,
+                    repository: featureDependencies.collections
+                )
+            case .sets:
+                SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
+            case .pokedex:
+                PokedexView(parentProvidesNavigation: parentProvidesNavigation)
+            case .decks:
+                DecksView(parentProvidesNavigation: parentProvidesNavigation)
+            case .wishlists:
+                WishlistsView(parentProvidesNavigation: parentProvidesNavigation)
+            case .guides:
+                CollectionGuidesView(parentProvidesNavigation: parentProvidesNavigation)
+            case .sealed:
+                SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
+            case .onlineCodes:
+                OnlineCodesView(parentProvidesNavigation: parentProvidesNavigation)
+            case .prices:
+                PricesView(parentProvidesNavigation: parentProvidesNavigation)
+            case .analytics:
+                AnalyticsView(parentProvidesNavigation: parentProvidesNavigation)
+            case .trades:
+                TradesView(parentProvidesNavigation: parentProvidesNavigation)
+            case .activity:
+                ActivityView(parentProvidesNavigation: parentProvidesNavigation)
+            case .scan:
+                CardScannerView()
+            case .settings:
+                SettingsView(parentProvidesNavigation: parentProvidesNavigation)
+            }
+        }
+        .accessibilityIdentifier(tab.parityFeatureID.screenIdentifier)
+    }
+
+    private func navigationIdentifier(for tab: AppTab) -> String {
         switch tab {
-        case .home:
-            DashboardView(parentProvidesNavigation: parentProvidesNavigation)
-        case .collections:
-            CollectionsView(
-                parentProvidesNavigation: parentProvidesNavigation,
-                repository: featureDependencies.collections
-            )
-        case .sets:
-            SetBrowserView(parentProvidesNavigation: parentProvidesNavigation)
-        case .pokedex:
-            PokedexView(parentProvidesNavigation: parentProvidesNavigation)
-        case .decks:
-            DecksView(parentProvidesNavigation: parentProvidesNavigation)
-        case .wishlists:
-            WishlistsView(parentProvidesNavigation: parentProvidesNavigation)
-        case .guides:
-            CollectionGuidesView(parentProvidesNavigation: parentProvidesNavigation)
-        case .sealed:
-            SealedInventoryView(parentProvidesNavigation: parentProvidesNavigation)
-        case .onlineCodes:
-            OnlineCodesView(parentProvidesNavigation: parentProvidesNavigation)
-        case .prices:
-            PricesView(parentProvidesNavigation: parentProvidesNavigation)
-        case .analytics:
-            AnalyticsView(parentProvidesNavigation: parentProvidesNavigation)
-        case .trades:
-            TradesView(parentProvidesNavigation: parentProvidesNavigation)
-        case .activity:
-            ActivityView(parentProvidesNavigation: parentProvidesNavigation)
-        case .scan:
-            CardScannerView()
-        case .settings:
-            SettingsView(parentProvidesNavigation: parentProvidesNavigation)
+        case .home: ParityControlID.navHome
+        case .collections: ParityControlID.navCollections
+        case .wishlists: ParityControlID.navWishlists
+        case .settings: ParityControlID.navSettings
+        default: "nav.\(tab.rawValue)"
         }
     }
 

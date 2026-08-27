@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: "[home.dashboard] Dashboard is available"
+tags: [parity, smoke]
+properties:
+  featureId: "home.dashboard"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- assertVisible:
+    id: "feature.home.dashboard"

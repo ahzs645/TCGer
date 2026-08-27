@@ -281,6 +281,7 @@ struct CardSearchView: View {
                 }
             }
         }
+        .accessibilityIdentifier(ParityFeatureID.cardsSearch.screenIdentifier)
     }
 
     @ViewBuilder

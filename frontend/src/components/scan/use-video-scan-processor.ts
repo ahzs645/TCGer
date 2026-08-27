@@ -56,6 +56,7 @@ import {
   seekVideo,
   yieldToBrowser,
 } from "./video-scan-video-utils";
+import { shouldAnalyzeVideoTime } from "./video-scan-sampling";
 
 /** Frame size for YOLO detection. */
 const MODEL_FRAME_SIZE = 640;
@@ -227,8 +228,9 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       video: HTMLVideoElement;
       frameCanvas: HTMLCanvasElement;
       scanFilter: ScanFilter;
+      analysisIntervalMs: number;
     }) => {
-      const { video, frameCanvas, scanFilter } = params;
+      const { video, frameCanvas, scanFilter, analysisIntervalMs } = params;
 
       stopRequestedRef.current = false;
 
@@ -268,7 +270,11 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         }
 
         const currentTime = video.currentTime;
-        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
+        const timeChanged = shouldAnalyzeVideoTime(
+          currentTime,
+          lastProcessedTime,
+          analysisIntervalMs,
+        );
         if (timeChanged && processing) {
           skippedFrames++;
           requestAnimationFrame(() => void processFrame());
@@ -371,8 +377,16 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       hashEntries: CardScanHashEntry[];
       artworkDb: ArtworkFingerprintEntry[] | undefined;
       scanFilter: ScanFilter;
+      analysisIntervalMs: number;
     }) => {
-      const { video, frameCanvas, hashEntries, artworkDb, scanFilter } = params;
+      const {
+        video,
+        frameCanvas,
+        hashEntries,
+        artworkDb,
+        scanFilter,
+        analysisIntervalMs,
+      } = params;
 
       stopRequestedRef.current = false;
 
@@ -412,7 +426,11 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         }
 
         const currentTime = video.currentTime;
-        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
+        const timeChanged = shouldAnalyzeVideoTime(
+          currentTime,
+          lastProcessedTime,
+          analysisIntervalMs,
+        );
 
         // Skip this frame if we're still matching the previous one
         if (timeChanged && processing) {
@@ -495,8 +513,15 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       frameCanvas: HTMLCanvasElement;
       embeddingIndexes: EmbeddingIndex[];
       scanFilter: ScanFilter;
+      analysisIntervalMs: number;
     }) => {
-      const { video, frameCanvas, embeddingIndexes, scanFilter } = params;
+      const {
+        video,
+        frameCanvas,
+        embeddingIndexes,
+        scanFilter,
+        analysisIntervalMs,
+      } = params;
       const primaryIndex = embeddingIndexes[0];
       if (!primaryIndex) {
         throw new Error("No compatible embedding shards were loaded.");
@@ -572,7 +597,11 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         }
 
         const currentTime = video.currentTime;
-        const timeChanged = Math.abs(currentTime - lastProcessedTime) > 0.01;
+        const timeChanged = shouldAnalyzeVideoTime(
+          currentTime,
+          lastProcessedTime,
+          analysisIntervalMs,
+        );
 
         if (timeChanged && processing) {
           skippedFrames++;

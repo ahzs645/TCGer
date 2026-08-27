@@ -1,0 +1,99 @@
+default_platform(:ios)
+
+APP_IDENTIFIER = "firstform.TCGer"
+APP_STORE_APP_ID = "6759892850"
+BUILD_WAIT_TIMEOUT_SECONDS = 90 * 60
+BUILD_WAIT_INTERVAL_SECONDS = 30
+
+platform :ios do
+  desc "Submit an exact Xcode Cloud build and release it automatically after approval"
+  lane :submit_release do |options|
+    version = options[:version].to_s
+    build_number = options[:build_number].to_s
+
+    unless version.match?(/\A\d+\.\d+\.\d+\z/)
+      UI.user_error!("version must use three numeric components, for example 1.0.1")
+    end
+    unless build_number.match?(/\A\d+\z/)
+      UI.user_error!("build_number must be the exact numeric TestFlight build")
+    end
+
+    issuer_id = ENV.fetch("APP_STORE_CONNECT_ISSUER_ID", "")
+    key_id = ENV.fetch("APP_STORE_CONNECT_KEY_ID", "")
+    private_key_base64 = ENV.fetch("APP_STORE_CONNECT_PRIVATE_KEY_BASE64", "")
+    if [issuer_id, key_id, private_key_base64].any?(&:empty?)
+      UI.user_error!("App Store Connect API credentials are not configured")
+    end
+
+    api_key = app_store_connect_api_key(
+      issuer_id: issuer_id,
+      key_id: key_id,
+      key_content: private_key_base64,
+      is_key_content_base64: true,
+      duration: 1_200
+    )
+
+    deadline = Time.now + BUILD_WAIT_TIMEOUT_SECONDS
+    selected_build = nil
+
+    loop do
+      builds = Spaceship::ConnectAPI::Build.all(
+        app_id: APP_STORE_APP_ID,
+        version: version,
+        build_number: build_number,
+        platform: "IOS",
+        processing_states: "PROCESSING,FAILED,INVALID,VALID",
+        limit: 1
+      )
+      selected_build = builds.first
+
+      if selected_build&.processing_state == Spaceship::ConnectAPI::Build::ProcessingState::VALID
+        break
+      end
+
+      if selected_build && [
+        Spaceship::ConnectAPI::Build::ProcessingState::FAILED,
+        Spaceship::ConnectAPI::Build::ProcessingState::INVALID
+      ].include?(selected_build.processing_state)
+        UI.user_error!(
+          "TCGer #{version} (#{build_number}) cannot be submitted because App Store Connect marked it #{selected_build.processing_state}."
+        )
+      end
+
+      if Time.now >= deadline
+        UI.user_error!(
+          "Timed out waiting for TCGer #{version} (#{build_number}) to finish processing in App Store Connect."
+        )
+      end
+
+      state = selected_build&.processing_state || "not visible yet"
+      UI.message("Waiting for TCGer #{version} (#{build_number}); current state: #{state}")
+      sleep(BUILD_WAIT_INTERVAL_SECONDS)
+    end
+
+    release_notes_path = File.expand_path("metadata/en-US/release_notes.txt", __dir__)
+    release_notes = File.read(release_notes_path, encoding: "UTF-8").strip
+    UI.user_error!("Release notes cannot be empty") if release_notes.empty?
+
+    upload_to_app_store(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      app_version: version,
+      build_number: build_number,
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      release_notes: { "en-US" => release_notes },
+      submit_for_review: true,
+      automatic_release: true,
+      phased_release: false,
+      force: true,
+      run_precheck_before_submit: true,
+      precheck_default_rule_level: :warn,
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        export_compliance_uses_encryption: false
+      }
+    )
+  end
+end

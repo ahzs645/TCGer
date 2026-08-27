@@ -7,20 +7,24 @@ import {
   BadgeCheck,
   Bolt,
   ChevronDown,
+  CheckCircle2,
+  Download,
   GalleryVerticalEnd,
   History,
   ImagePlus,
   Layers3,
   MoreHorizontal,
   PackageOpen,
+  RefreshCw,
   RotateCcw,
   Sparkles,
+  Trash2,
+  WifiOff,
 } from "lucide-react";
 
 import type {
   PackOpeningNativeCommand,
   PackOpeningNativeCardPool,
-  PackOpeningNativePackOption,
   PackOpeningNativeState,
   PackOpeningPull,
   PackOpeningPullSession,
@@ -42,6 +46,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import {
+  filterPackSets,
+  filterPossiblePulls,
+  groupPackOptions,
+  possiblePullRarities,
+  type PackSetAvailabilityFilter,
+  type PackSetGroup,
+} from "@/lib/packs/pack-browsing";
+import { offlinePackDefinition } from "@/lib/packs/offline-packs";
+import type { OfflinePackStatus } from "@/lib/packs/use-offline-packs";
 
 interface PackOpeningShellProps {
   ready: boolean;
@@ -50,36 +64,17 @@ interface PackOpeningShellProps {
   onOpenHistory: () => void;
   onCommand: (command: PackOpeningNativeCommand) => void;
   onInspect: (index: number) => void;
-}
-
-interface PackSetGroup {
-  id: string;
-  label: string;
-  packPoolID: string;
-  options: PackOpeningNativePackOption[];
+  offlinePacks: {
+    isOnline: boolean;
+    statusFor: (setID: string) => OfflinePackStatus;
+    isDownloaded: (setID: string) => boolean;
+    canOpen: (setID: string) => boolean;
+    download: (setID: string, poolID: string) => void;
+    remove: (setID: string) => void;
+  };
 }
 
 const COUNT_OPTIONS = [1, 5, 10] as const;
-
-function groupPackOptions(
-  options: PackOpeningNativePackOption[],
-): PackSetGroup[] {
-  const groups = new Map<string, PackSetGroup>();
-  for (const option of options) {
-    const group = groups.get(option.setID);
-    if (group) {
-      group.options.push(option);
-    } else {
-      groups.set(option.setID, {
-        id: option.setID,
-        label: option.setLabel,
-        packPoolID: option.packPoolID,
-        options: [option],
-      });
-    }
-  }
-  return [...groups.values()];
-}
 
 function tierRank(tier: PackOpeningPull["tier"]): number {
   return { common: 1, uncommon: 2, rare: 3, ultra: 4, chase: 5 }[tier];
@@ -116,16 +111,42 @@ export function PackOpeningShell({
   onOpenHistory,
   onCommand,
   onInspect,
+  offlinePacks,
 }: PackOpeningShellProps) {
   const [packPickerOpen, setPackPickerOpen] = useState(false);
+  const [packSetQuery, setPackSetQuery] = useState("");
+  const [packSetAvailability, setPackSetAvailability] =
+    useState<PackSetAvailabilityFilter>("all");
   const [possiblePullsPoolID, setPossiblePullsPoolID] = useState<string | null>(
     null,
   );
   const [possiblePullsQuery, setPossiblePullsQuery] = useState("");
+  const [possiblePullsRarity, setPossiblePullsRarity] = useState<string | null>(
+    null,
+  );
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const packSets = useMemo(
     () => groupPackOptions(state?.packOptions ?? []),
     [state?.packOptions],
+  );
+  const visiblePackSets = useMemo(
+    () =>
+      filterPackSets(packSets, {
+        query: packSetQuery,
+        // A previously selected "Not downloaded" filter must not conflict
+        // with the offline-only gate after connectivity changes.
+        availability: offlinePacks.isOnline ? packSetAvailability : "all",
+        isDownloaded: offlinePacks.isDownloaded,
+        canOpen: offlinePacks.canOpen,
+      }),
+    [
+      offlinePacks.canOpen,
+      offlinePacks.isDownloaded,
+      offlinePacks.isOnline,
+      packSetAvailability,
+      packSetQuery,
+      packSets,
+    ],
   );
   const showsResults = Boolean(
     state &&
@@ -233,6 +254,11 @@ export function PackOpeningShell({
               state={state}
               onCommand={onCommand}
               onChoosePack={() => setPackPickerOpen(true)}
+              canOpenSelected={offlinePacks.canOpen(
+                state.packOptions.find(
+                  (option) => option.id === state.selectedPackID,
+                )?.setID ?? "",
+              )}
             />
           </div>
         )}
@@ -254,20 +280,69 @@ export function PackOpeningShell({
           <DialogHeader>
             <DialogTitle>Choose a set and pack</DialogTitle>
             <DialogDescription>
-              Pick the wrapper variant used for this opening.
+              Search sets, manage offline downloads, and pick a wrapper.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+              Search sets or packs
+              <input
+                type="search"
+                value={packSetQuery}
+                onChange={(event) => setPackSetQuery(event.target.value)}
+                placeholder="Set or wrapper name"
+                className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              />
+            </label>
+            {offlinePacks.isOnline ? (
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+                Download status
+                <select
+                  aria-label="Filter sets by download status"
+                  value={packSetAvailability}
+                  onChange={(event) =>
+                    setPackSetAvailability(
+                      event.target.value as PackSetAvailabilityFilter,
+                    )
+                  }
+                  className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <option value="all">All sets</option>
+                  <option value="downloaded">Downloaded</option>
+                  <option value="notDownloaded">Not downloaded</option>
+                </select>
+              </label>
+            ) : (
+              <div className="flex min-h-11 items-center gap-2 self-end rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+                <WifiOff className="h-4 w-4" aria-hidden="true" />
+                Showing downloaded sets
+              </div>
+            )}
+          </div>
           <div className="-mr-1 max-h-[52dvh] space-y-5 overflow-y-auto pr-1">
-            {packSets.map((packSet) => (
+            {visiblePackSets.map((packSet) => (
               <section key={packSet.id} className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold">{packSet.label}</h3>
+                  <PackDownloadControl
+                    packSet={packSet}
+                    offlinePacks={offlinePacks}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    {packSet.options.length}{" "}
+                    {packSet.options.length === 1
+                      ? "wrapper variant"
+                      : "wrapper variants"}
+                  </p>
                   <button
                     type="button"
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-primary transition hover:bg-muted"
                     onClick={() => {
                       setPackPickerOpen(false);
                       setPossiblePullsQuery("");
+                      setPossiblePullsRarity(null);
                       setPossiblePullsPoolID(packSet.packPoolID);
                     }}
                   >
@@ -278,12 +353,6 @@ export function PackOpeningShell({
                     View possible cards
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {packSet.options.length}{" "}
-                  {packSet.options.length === 1
-                    ? "wrapper variant"
-                    : "wrapper variants"}
-                </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {packSet.options.map((option) => {
                     const selected = option.id === state?.selectedPackID;
@@ -323,6 +392,44 @@ export function PackOpeningShell({
                 </div>
               </section>
             ))}
+            {visiblePackSets.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center">
+                {offlinePacks.isOnline ? (
+                  <GalleryVerticalEnd
+                    className="h-8 w-8 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <WifiOff
+                    className="h-8 w-8 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                )}
+                <p className="text-sm font-semibold">
+                  {offlinePacks.isOnline
+                    ? "No sets found"
+                    : "No packs available offline"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {offlinePacks.isOnline
+                    ? "Try another search or download filter."
+                    : "Reconnect and download a supported set before going offline."}
+                </p>
+                {offlinePacks.isOnline ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setPackSetQuery("");
+                      setPackSetAvailability("all");
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="border-t pt-4">
             <Button
@@ -341,7 +448,9 @@ export function PackOpeningShell({
       <PossiblePullsDialog
         pool={possiblePullsPool}
         query={possiblePullsQuery}
+        rarity={possiblePullsRarity}
         onQueryChange={setPossiblePullsQuery}
+        onRarityChange={setPossiblePullsRarity}
         onOpenChange={(open) => {
           if (!open) setPossiblePullsPoolID(null);
         }}
@@ -350,33 +459,97 @@ export function PackOpeningShell({
   );
 }
 
+function PackDownloadControl({
+  packSet,
+  offlinePacks,
+}: {
+  packSet: PackSetGroup;
+  offlinePacks: PackOpeningShellProps["offlinePacks"];
+}) {
+  if (!offlinePackDefinition(packSet.id)) {
+    return (
+      <span
+        className="shrink-0 text-xs font-medium text-muted-foreground"
+        title={`${packSet.label} is available while online only`}
+      >
+        Online only
+      </span>
+    );
+  }
+  const status = offlinePacks.statusFor(packSet.id);
+  if (status.kind === "downloading") {
+    return (
+      <span
+        className="shrink-0 text-xs font-semibold text-muted-foreground"
+        role="status"
+        aria-label={`Downloading ${packSet.label}, ${Math.round(status.progress * 100)} percent`}
+      >
+        {Math.round(status.progress * 100)}%
+      </span>
+    );
+  }
+  if (status.kind === "downloaded") {
+    return (
+      <div className="flex shrink-0 items-center gap-1">
+        <CheckCircle2
+          className="h-4 w-4 text-emerald-600"
+          aria-hidden="true"
+        />
+        <span className="sr-only">{packSet.label} downloaded</span>
+        <button
+          type="button"
+          className="inline-flex min-h-9 items-center rounded-full px-2 text-muted-foreground transition hover:bg-muted hover:text-destructive"
+          aria-label={`Remove ${packSet.label} download`}
+          onClick={() => offlinePacks.remove(packSet.id)}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+  const failed = status.kind === "failed";
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-primary transition hover:bg-muted disabled:text-muted-foreground"
+      aria-label={
+        failed
+          ? `Retry ${packSet.label} offline download. Previous attempt failed: ${status.message}`
+          : `Download ${packSet.label} for offline use`
+      }
+      title={failed ? status.message : undefined}
+      disabled={!offlinePacks.isOnline}
+      onClick={() => offlinePacks.download(packSet.id, packSet.packPoolID)}
+    >
+      {failed ? (
+        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <Download className="h-4 w-4" aria-hidden="true" />
+      )}
+      {failed ? "Retry" : "Download"}
+    </button>
+  );
+}
+
 function PossiblePullsDialog({
   pool,
   query,
+  rarity,
   onQueryChange,
+  onRarityChange,
   onOpenChange,
 }: {
   pool: PackOpeningNativeCardPool | undefined;
   query: string;
+  rarity: string | null;
   onQueryChange: (value: string) => void;
+  onRarityChange: (value: string | null) => void;
   onOpenChange: (open: boolean) => void;
 }) {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const rarities = useMemo(() => possiblePullRarities(pool), [pool]);
   const cards = useMemo(
-    () =>
-      [...(pool?.cards ?? [])]
-        .filter((card) => {
-          if (!normalizedQuery) return true;
-          return [card.name, card.rarity, card.collectorNumber].some((value) =>
-            value.toLocaleLowerCase().includes(normalizedQuery),
-          );
-        })
-        .sort(
-          (left, right) =>
-            tierRank(right.tier) - tierRank(left.tier) ||
-            left.name.localeCompare(right.name),
-        ),
-    [normalizedQuery, pool?.cards],
+    () => filterPossiblePulls(pool, query, rarity),
+    [pool, query, rarity],
   );
 
   return (
@@ -389,16 +562,34 @@ function PossiblePullsDialog({
             shown here is possible, but not guaranteed in one pack.
           </DialogDescription>
         </DialogHeader>
-        <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
-          Search {pool?.cards.length.toLocaleString() ?? 0} cards
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Name, rarity, or card number"
-            className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
-          />
-        </label>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+            Search {pool?.cards.length.toLocaleString() ?? 0} cards
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Name, rarity, or card number"
+              className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          </label>
+          <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+            Rarity
+            <select
+              aria-label="Filter possible cards by rarity"
+              value={rarity ?? ""}
+              onChange={(event) => onRarityChange(event.target.value || null)}
+              className="min-h-11 rounded-lg border bg-background px-3 text-sm text-foreground outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="">All rarities</option>
+              {rarities.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="-mr-1 max-h-[62dvh] overflow-y-auto pr-1">
           {cards.length > 0 ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -430,8 +621,19 @@ function PossiblePullsDialog({
               ))}
             </div>
           ) : (
-            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
-              No cards match “{query}”.
+            <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+              <span>No cards match the current filters.</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  onQueryChange("");
+                  onRarityChange(null);
+                }}
+              >
+                Clear filters
+              </Button>
             </div>
           )}
         </div>
@@ -470,10 +672,12 @@ function PhaseControls({
   state,
   onCommand,
   onChoosePack,
+  canOpenSelected,
 }: {
   state: PackOpeningNativeState;
   onCommand: (command: PackOpeningNativeCommand) => void;
   onChoosePack: () => void;
+  canOpenSelected: boolean;
 }) {
   const panelClass =
     "rounded-2xl border bg-background/88 p-2.5 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/78 sm:p-3";
@@ -549,11 +753,14 @@ function PhaseControls({
             type="button"
             size="sm"
             className="min-w-0 flex-1 truncate"
+            disabled={!canOpenSelected}
             onClick={() => onCommand({ type: "openPack" })}
           >
-            {state.packCount === 1
-              ? "Open Pack"
-              : `Open ${state.packCount} Packs`}
+            {!canOpenSelected
+              ? "Download to Open Offline"
+              : state.packCount === 1
+                ? "Open Pack"
+                : `Open ${state.packCount} Packs`}
           </Button>
         </div>
       </div>

@@ -236,8 +236,21 @@ def main():
         existing = fo.load_dataset(args.dataset_name)
         from fiftyone import ViewField as F
         if existing.has_sample_field("verdict"):
-            for s in existing.match(F("verdict") != None).iter_samples():
-                saved_verdicts[s["key"]] = (s["verdict"], s["corrected_card_id"])
+            has_fix = existing.has_sample_field("fixed_quad_json")
+            has_rerun = existing.has_sample_field("rerun_top5_json")
+            has_rescan = existing.has_sample_field("binder_rerun_json")
+            keep = F("verdict") != None
+            if has_rescan:
+                # Binder pages carry re-scans without ever having a verdict.
+                keep = keep | (F("binder_rerun_json") != None)
+            for s in existing.match(keep).iter_samples():
+                saved_verdicts[s["key"]] = (
+                    s["verdict"], s["corrected_card_id"],
+                    s["fixed_quad_json"] if has_fix else None,
+                    s["fixed_quad_source"] if has_fix else None,
+                    s["rerun_top5_json"] if has_rerun else None,
+                    s["binder_rerun_json"] if has_rescan else None,
+                )
         if saved_verdicts:
             print(f"carrying {len(saved_verdicts)} applied verdicts across the rebuild")
         fo.delete_dataset(args.dataset_name)
@@ -307,10 +320,14 @@ def main():
                 ),
                 binder_pockets_json=json.dumps(pockets) if pockets else None,
                 n_pockets=len(pockets) if pockets else None,
-                verdict=saved_verdicts.get(key, (None, None))[0],
-                corrected_card_id=saved_verdicts.get(key, (None, None))[1],
+                verdict=saved_verdicts.get(key, (None,) * 6)[0],
+                corrected_card_id=saved_verdicts.get(key, (None,) * 6)[1],
+                fixed_quad_json=saved_verdicts.get(key, (None,) * 6)[2],
+                fixed_quad_source=saved_verdicts.get(key, (None,) * 6)[3],
+                rerun_top5_json=saved_verdicts.get(key, (None,) * 6)[4],
+                binder_rerun_json=saved_verdicts.get(key, (None,) * 6)[5],
             )
-            if key in saved_verdicts:
+            if key in saved_verdicts and saved_verdicts[key][0] is not None:
                 sample.tags.append("verdict-applied")
             overlay = quad_polylines(record, attempt)
             if overlay is not None:
@@ -327,6 +344,10 @@ def main():
     # declare them explicitly or the panel/writeback can't read them.
     dataset.add_sample_field("verdict", fo.StringField)
     dataset.add_sample_field("corrected_card_id", fo.StringField)
+    dataset.add_sample_field("fixed_quad_json", fo.StringField)
+    dataset.add_sample_field("fixed_quad_source", fo.StringField)
+    dataset.add_sample_field("rerun_top5_json", fo.StringField)
+    dataset.add_sample_field("binder_rerun_json", fo.StringField)
     dataset.info["sessions_dir"] = str(sessions_dir)
     dataset.info["card_cache_dir"] = str(cache_dir)
     dataset.save()

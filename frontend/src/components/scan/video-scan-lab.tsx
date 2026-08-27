@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Film } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +38,10 @@ import {
   computeContainedVideoRect,
 } from "./video-scan-overlay";
 import {
+  clampAnalysisInterval,
+  DEFAULT_ANALYSIS_INTERVAL_MS,
+} from "./video-scan-sampling";
+import {
   ActiveTracksPanel,
   ScanControlsSidebar,
   TimelinePanel,
@@ -38,6 +49,9 @@ import {
 } from "./video-scan-panels";
 
 import { useShallow } from "zustand/react/shallow";
+
+const subscribeToHydration = () => () => undefined;
+
 export function VideoScanLab() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -51,8 +65,11 @@ export function VideoScanLab() {
   );
   const selectedGame = useGameFilterStore((s) => s.selectedGame);
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
 
   // ---------- state ----------
 
@@ -68,6 +85,9 @@ export function VideoScanLab() {
   // sign-in, and the highest-accuracy path. Users can switch to the
   // hash/artwork matcher or detection-only below.
   const [embeddingMode, setEmbeddingMode] = useState(true);
+  const [analysisIntervalMs, setAnalysisIntervalMs] = useState(
+    DEFAULT_ANALYSIS_INTERVAL_MS,
+  );
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<{
@@ -159,6 +179,11 @@ export function VideoScanLab() {
     [videoMetadata, videoViewportRect, visibleTracks],
   );
 
+  const stopAndCleanup = useCallback(() => {
+    requestStop();
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+  }, [requestStop, videoUrl]);
+
   // ---------- effects ----------
 
   useEffect(() => {
@@ -180,11 +205,6 @@ export function VideoScanLab() {
   }, [videoMetadata]);
 
   // ---------- handlers ----------
-
-  const stopAndCleanup = useCallback(() => {
-    requestStop();
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
-  }, [requestStop, videoUrl]);
 
   const resetRunState = useCallback(() => {
     setFrameState(null);
@@ -234,6 +254,7 @@ export function VideoScanLab() {
           video: videoRef.current,
           frameCanvas: frameCanvasRef.current,
           scanFilter,
+          analysisIntervalMs,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Detection failed.");
@@ -264,6 +285,7 @@ export function VideoScanLab() {
           frameCanvas: frameCanvasRef.current,
           embeddingIndexes: indexes,
           scanFilter,
+          analysisIntervalMs,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Embedding scan failed.");
@@ -289,6 +311,7 @@ export function VideoScanLab() {
         hashEntries,
         artworkDb: artworkDbRef.current ?? undefined,
         scanFilter,
+        analysisIntervalMs,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Processing failed.");
@@ -328,6 +351,10 @@ export function VideoScanLab() {
             onDetectionOnlyChange={setDetectionOnly}
             embeddingMode={embeddingMode}
             onEmbeddingModeChange={setEmbeddingMode}
+            analysisIntervalMs={analysisIntervalMs}
+            onAnalysisIntervalChange={(value) =>
+              setAnalysisIntervalMs(clampAnalysisInterval(value))
+            }
             isProcessing={isProcessing}
             isLoadingIndex={isLoadingIndex}
             hasVideo={!!selectedVideo}

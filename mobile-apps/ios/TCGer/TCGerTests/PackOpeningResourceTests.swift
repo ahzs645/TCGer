@@ -275,6 +275,7 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(state?.packOptions.first?.packPoolID, "base1")
         XCTAssertEqual(state?.availableCardPools.first?.cards.first?.name, "Charizard")
         XCTAssertEqual(state?.selectedOddsReference?.sampleSize, 153)
+        XCTAssertEqual(state?.selectedOddsReference?.sampleDescription, "Based on 153 observed packs")
         XCTAssertEqual(
             state?.selectedOddsReference?.destination?.host,
             "www.cs.sjsu.edu"

@@ -134,6 +134,26 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         }
         return order
     }
+
+    var parityFeatureID: ParityFeatureID {
+        switch self {
+        case .home: return .homeDashboard
+        case .collections: return .collectionsBrowse
+        case .sets: return .setsBrowse
+        case .pokedex: return .pokedexBrowse
+        case .decks: return .decksBrowse
+        case .wishlists: return .wishlistsBrowse
+        case .guides: return .guidesBrowse
+        case .sealed: return .sealedInventory
+        case .onlineCodes: return .codesVault
+        case .prices: return .pricesBrowse
+        case .analytics: return .analyticsBrowse
+        case .trades: return .tradesBrowse
+        case .activity: return .activityBrowse
+        case .scan: return .scannerIdentify
+        case .settings: return .settingsBrowse
+        }
+    }
 }
 
 enum AppDeepLinkDestination: Equatable, Sendable {

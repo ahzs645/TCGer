@@ -1,0 +1,16 @@
+DINOv2 small model provenance
+
+Base model: facebook/dinov2-small
+Base model revision: ed25f3a31f01632728cabb09d1542f84ab7b0056
+Base project: https://github.com/facebookresearch/dinov2
+Base license: Apache License 2.0 (included as DINOv2-APACHE-2.0.txt)
+
+Android ONNX conversion: onnx-community/dinov2-small
+Conversion repository revision: 8b1f705a3a7f6f062f6bdd21986c1583d3ef105d
+Artifact: onnx/model_quantized.onnx
+Artifact SHA-256: c179f8f7f592449c4c1bca4cd124a7538021428c5ffb89afde9503935b197efb
+
+The ONNX community model card identifies the base model but does not restate
+an independent license. This distribution therefore preserves the base
+DINOv2 Apache-2.0 terms and attribution. Catalog card imagery and the TCGer
+embedding index require their own distribution-rights review.

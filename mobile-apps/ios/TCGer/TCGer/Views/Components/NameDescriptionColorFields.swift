@@ -7,10 +7,16 @@ struct NameDescriptionColorSections: View {
     @Binding var name: String
     @Binding var description: String
     @Binding var selectedColor: Color
+    var nameAccessibilityIdentifier: String? = nil
 
     var body: some View {
         Section {
-            TextField(namePlaceholder, text: $name)
+            if let nameAccessibilityIdentifier {
+                TextField(namePlaceholder, text: $name)
+                    .accessibilityIdentifier(nameAccessibilityIdentifier)
+            } else {
+                TextField(namePlaceholder, text: $name)
+            }
         } header: {
             Text("Name")
         }

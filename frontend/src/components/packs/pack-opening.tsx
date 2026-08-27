@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Download, Trash2 } from "lucide-react";
 
 import {
@@ -33,6 +39,7 @@ import {
   savedOpeningsSnapshot,
   subscribeToPackHistory,
 } from "@/lib/packs/opening-history";
+import { useOfflinePacks } from "@/lib/packs/use-offline-packs";
 
 const CONFIGURED_ASSET_BASE =
   process.env.NEXT_PUBLIC_PACK_ASSET_BASE_URL?.replace(/\/+$/, "") ?? "";
@@ -72,6 +79,8 @@ export function PackOpening() {
     useState<PackOpeningPullSession | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const offlinePacks = useOfflinePacks();
+  const downloadOfflinePackSet = offlinePacks.download;
   const savedOpeningsRaw = useSyncExternalStore(
     subscribeToPackHistory,
     savedOpeningsSnapshot,
@@ -130,6 +139,34 @@ export function PackOpening() {
     );
   }, []);
 
+  const downloadPackSet = useCallback(
+    (setID: string, poolID: string) => {
+      const pool = interfaceState?.cardPools.find(
+        (candidate) => candidate.id === poolID,
+      );
+      if (pool) void downloadOfflinePackSet(setID, pool.cards);
+    },
+    [downloadOfflinePackSet, interfaceState?.cardPools],
+  );
+
+  // Production normally uses projected wrapper assets from R2. Offline packs
+  // deliberately cache the bundled mesh/manifest and generate their wrapper
+  // sheets locally, so switch to that deterministic asset source before an
+  // opening begins. This also avoids a partially HTTP-cached remote manifest
+  // selecting a cover image that was never part of the offline download.
+  useEffect(() => {
+    if (
+      offlinePacks.isOnline ||
+      !assetBase ||
+      (interfaceState !== null && interfaceState.phase !== "select")
+    ) {
+      return;
+    }
+    setRendererReady(false);
+    setInterfaceState(null);
+    setAssetBase("");
+  }, [assetBase, interfaceState, offlinePacks.isOnline]);
+
   return (
     <div className="relative isolate h-full w-full overflow-hidden">
       <SharedPackOpening
@@ -147,6 +184,14 @@ export function PackOpening() {
         onOpenHistory={() => setHistoryOpen(true)}
         onCommand={sendCommand}
         onInspect={(index) => setInspect({ pulls: resultPulls, index })}
+        offlinePacks={{
+          isOnline: offlinePacks.isOnline,
+          statusFor: offlinePacks.statusFor,
+          isDownloaded: offlinePacks.isDownloaded,
+          canOpen: offlinePacks.canOpen,
+          download: downloadPackSet,
+          remove: (setID) => void offlinePacks.remove(setID),
+        }}
       />
 
       {inspect ? (

@@ -20,8 +20,7 @@ from typing import Iterable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = Path.home() / "Downloads" / "ptcg-assets-main"
-DEFAULT_OUTPUT = (
+DEFAULT_TCG_DRIVE_ROOT = (
     Path.home()
     / "Library"
     / "CloudStorage"
@@ -29,8 +28,9 @@ DEFAULT_OUTPUT = (
     / "My Drive"
     / "Projects"
     / "TCG"
-    / "Packs"
 )
+DEFAULT_SOURCE = DEFAULT_TCG_DRIVE_ROOT / "ptcg-assets-main"
+DEFAULT_OUTPUT = DEFAULT_TCG_DRIVE_ROOT / "Packs"
 DEFAULT_PROMPT = REPO_ROOT / "scripts" / "prompts" / "pack-flat-wrap.txt"
 DEFAULT_MODEL = "gemini-3.7-flash-low"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".avif"}
@@ -203,6 +203,15 @@ def append_manifest(manifest: Path, payload: dict[str, object]) -> None:
 def emit(message: str) -> None:
     with PRINT_LOCK:
         print(message, flush=True)
+
+
+def sleep_until_wall_clock(deadline: float) -> None:
+    """Sleep until a wall-clock deadline, including time spent in system sleep."""
+    while True:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return
+        time.sleep(min(remaining, 60))
 
 
 def stop_process(process: subprocess.Popen[bytes]) -> None:
@@ -385,14 +394,15 @@ def process_one(
             emit(f"[{index}/{total}] DONE  {set_id}/{final_output.name} ({reason})")
             return "generated"
         if status == "quota":
+            resume_deadline = time.time() + quota_wait
             resume_at = time.strftime(
-                "%Y-%m-%d %H:%M:%S %z", time.localtime(time.time() + quota_wait)
+                "%Y-%m-%d %H:%M:%S %z", time.localtime(resume_deadline)
             )
             emit(
                 f"[{index}/{total}] PAUSE {set_id}/{reference.name}: "
                 f"{reason}; resume around {resume_at}"
             )
-            time.sleep(quota_wait)
+            sleep_until_wall_clock(resume_deadline)
             continue
         emit(f"[{index}/{total}] RETRY {set_id}/{reference.name}: {reason}")
         attempt += 1

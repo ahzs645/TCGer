@@ -1,0 +1,168 @@
+name: Three-platform parity
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "mobile-apps/android/**"
+      - "mobile-apps/ios/**"
+      - "frontend/**"
+      - "mobile-parity/**"
+      - "tools/mobile-parity/**"
+      - "package.json"
+      - ".github/workflows/mobile-parity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "mobile-apps/android/**"
+      - "mobile-apps/ios/**"
+      - "frontend/**"
+      - "mobile-parity/**"
+      - "tools/mobile-parity/**"
+      - "package.json"
+      - ".github/workflows/mobile-parity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run parity:check
+
+  android-smoke:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Maestro
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build and run Android parity flows
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: npm run parity:android
+      - name: Upload Android results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-android
+          path: mobile-parity/results/android*
+          if-no-files-found: warn
+
+  web-smoke:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npm --prefix frontend exec -- playwright install --with-deps chromium
+      - name: Run authoritative web parity suite
+        run: npm run parity:web
+      - name: Upload web results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-web
+          path: mobile-parity/results/web*
+          if-no-files-found: warn
+      - name: Upload Playwright traces and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-playwright-artifacts
+          path: frontend/test-results
+          if-no-files-found: ignore
+
+  ios-smoke:
+    needs: contract
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Install Maestro
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build and run iOS parity flows
+        run: npm run parity:ios
+      - name: Upload iOS results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-ios
+          path: mobile-parity/results/ios*
+          if-no-files-found: warn
+
+  report:
+    if: always()
+    needs: [android-smoke, ios-smoke, web-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download platform results
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          pattern: parity-*
+          path: mobile-parity/results
+          merge-multiple: true
+      - name: Build combined report
+        run: |
+          npm run parity:report
+          cat mobile-parity/results/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-parity-report
+          path: |
+            mobile-parity/results/REPORT.md
+            mobile-parity/results/web-summary.json
+            mobile-parity/results/web.xml

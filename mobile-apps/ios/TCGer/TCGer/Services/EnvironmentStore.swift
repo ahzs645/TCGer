@@ -618,6 +618,15 @@ final class EnvironmentStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        if ParityTestMode.isEnabled {
+            serverConfiguration = .onDevice
+            tabOrder = [.home, .collections, .wishlists, .scan, .settings]
+            hiddenTabs = []
+            biometricLockEnabled = false
+            showPricing = false
+            enableLocalSession(force: true)
+        }
+
         CatalogStore.shared.setSealedProductsEnabled(sealedProductsEnabled)
         Task(priority: .utility) {
             await CatalogStore.shared.configure(

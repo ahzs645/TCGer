@@ -87,7 +87,10 @@ export function updateSharedScanItem(
   token: string,
   itemId: string,
   patch: Pick<SharedScanItem, "language"> &
-    Partial<Pick<SharedScanItem, "condition" | "finishCode" | "finishLabel">>,
+    Partial<Pick<SharedScanItem, "condition">> & {
+      finishCode?: string | null;
+      finishLabel?: string | null;
+    },
 ) {
   return request<SharedScanItem>(
     `/scan-sessions/items/${encodeURIComponent(itemId)}`,
@@ -99,17 +102,34 @@ export function updateSharedScanItem(
   );
 }
 
+export function removeSharedScanItem(token: string, itemId: string) {
+  return request<{ removed: boolean }>(
+    `/scan-sessions/items/${encodeURIComponent(itemId)}`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
+export function clearSharedScanItems(token: string, sessionId: string) {
+  return request<{ removed: number }>(
+    `/scan-sessions/${encodeURIComponent(sessionId)}/items`,
+    token,
+    { method: "DELETE" },
+  );
+}
+
 export function commitSharedScanSession(
   token: string,
   sessionId: string,
   binderId: string,
+  itemIds?: string[],
 ) {
   return request<{ committed: number }>(
     `/scan-sessions/${encodeURIComponent(sessionId)}/commit`,
     token,
     {
       method: "POST",
-      body: JSON.stringify({ binderId }),
+      body: JSON.stringify({ binderId, itemIds }),
     },
   );
 }

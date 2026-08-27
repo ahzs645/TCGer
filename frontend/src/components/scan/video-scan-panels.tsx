@@ -41,6 +41,8 @@ export interface ScanControlsProps {
   onDetectionOnlyChange: (value: boolean) => void;
   embeddingMode: boolean;
   onEmbeddingModeChange: (value: boolean) => void;
+  analysisIntervalMs: number;
+  onAnalysisIntervalChange: (value: number) => void;
   isProcessing: boolean;
   isLoadingIndex: boolean;
   hasVideo: boolean;
@@ -67,12 +69,12 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <Label>Scan Scope</Label>
+        <Label htmlFor="video-scan-scope">Scan Scope</Label>
         <Select
           value={props.scanFilter}
           onValueChange={(v) => props.onScanFilterChange(v as ScanFilter)}
         >
-          <SelectTrigger>
+          <SelectTrigger id="video-scan-scope">
             <SelectValue placeholder="Choose a game" />
           </SelectTrigger>
           <SelectContent>
@@ -117,6 +119,32 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
         />
         Detection only (outlines, skip matching)
       </label>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <Label htmlFor="scanner-analysis-interval">Analysis interval</Label>
+          <span className="tabular-nums text-muted-foreground">
+            {props.analysisIntervalMs} ms
+          </span>
+        </div>
+        <input
+          id="scanner-analysis-interval"
+          type="range"
+          min={100}
+          max={2000}
+          step={50}
+          value={props.analysisIntervalMs}
+          onChange={(event) =>
+            props.onAnalysisIntervalChange(Number(event.target.value))
+          }
+          disabled={props.isProcessing}
+          className="w-full accent-primary"
+        />
+        <p className="text-xs text-muted-foreground">
+          Minimum time between analyzed video frames. Shorter intervals are more
+          responsive and use more CPU.
+        </p>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={props.onChooseVideo} className="gap-2">

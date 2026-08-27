@@ -262,6 +262,7 @@ struct CollectionsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!environmentStore.isAuthenticated)
+                    .accessibilityIdentifier(ParityControlID.actionCollectionsCreate)
                     .accessibilityLabel("Add")
                     .accessibilityHint("Shows options for adding content")
                 }

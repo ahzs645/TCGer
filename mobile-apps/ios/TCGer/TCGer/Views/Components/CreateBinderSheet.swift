@@ -47,7 +47,8 @@ struct CreateBinderSheet: View {
                     namePlaceholder: "Binder Name",
                     name: $name,
                     description: $description,
-                    selectedColor: $selectedColor
+                    selectedColor: $selectedColor,
+                    nameAccessibilityIdentifier: ParityControlID.inputCollectionsName
                 )
 
                 Section {
@@ -95,8 +96,10 @@ struct CreateBinderSheet: View {
                         }
                     }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !coverURLIsValid)
+                    .accessibilityIdentifier(ParityControlID.actionCollectionsConfirmCreate)
                 }
             }
         }
+        .accessibilityIdentifier(ParityFeatureID.collectionsCreate.screenIdentifier)
     }
 }

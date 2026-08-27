@@ -7,6 +7,8 @@
  *   - scan-index artifacts → cache-first (immutable per version; the loader
  *                            re-fetches a new file name / re-validates by version).
  *   - catalog manifest     → network-first; per-game packs → cache-first.
+ *   - downloaded pack sets → explicit per-set caches; card art and shared pack
+ *                            assets resolve cache-first while offline.
  *   - model + wasm + OCR   → cache-first (DINOv2 ONNX, ORT wasm, Tesseract from
  *                            CDNs; opaque responses allowed) → fully offline scan.
  *   - navigations          → network-first with cached app-shell fallback.
@@ -19,6 +21,7 @@ const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SCAN_CACHE = `${CACHE_VERSION}-scan`;
 const CATALOG_CACHE = `${CACHE_VERSION}-catalog`;
 const MODEL_CACHE = `${CACHE_VERSION}-model`;
+const PACK_CACHE_PREFIX = `${CACHE_VERSION}-pack-`;
 const workerUrl = new URL(self.location.href);
 const CATALOG_ORIGIN =
   workerUrl.searchParams.get("catalogOrigin") || self.location.origin;
@@ -90,6 +93,14 @@ function isScanIndexAsset(url) {
   );
 }
 
+function isPackAsset(url) {
+  return (
+    (url.origin === self.location.origin &&
+      url.pathname.startsWith("/pack/")) ||
+    url.hostname === "assets.tcgdex.net"
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -118,11 +129,25 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(cacheFirst(req, MODEL_CACHE));
     return;
   }
+  if (isPackAsset(url)) {
+    event.respondWith(downloadedPackFirst(req));
+    return;
+  }
   if (url.origin === self.location.origin && req.mode === "navigate") {
     event.respondWith(networkFirst(req, STATIC_CACHE));
     return;
   }
 });
+
+async function downloadedPackFirst(req) {
+  const names = await caches.keys();
+  for (const name of names) {
+    if (!name.startsWith(PACK_CACHE_PREFIX)) continue;
+    const hit = await (await caches.open(name)).match(req);
+    if (hit) return hit;
+  }
+  return fetch(req);
+}
 
 async function cacheFirst(req, cacheName) {
   const cache = await caches.open(cacheName);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ScanReviewLab } from "@/components/scan/scan-review-lab";
+import { ScannerAssetDiagnostics } from "@/components/scan/scanner-asset-diagnostics";
 import { Badge } from "@/components/ui/badge";
 
 // Dev tool: intentionally NOT wrapped in AppShell — the setup/auth guard
@@ -29,6 +30,7 @@ export default function ScanReviewPage() {
         </p>
       </div>
       <ScanReviewLab />
+      <ScannerAssetDiagnostics />
     </main>
   );
 }

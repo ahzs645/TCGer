@@ -1,0 +1,1 @@
+Improves card scanning and collection management, with reliability and performance fixes throughout the app.

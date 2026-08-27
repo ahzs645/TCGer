@@ -1,0 +1,86 @@
+name: iOS App Store release
+
+on:
+  push:
+    tags:
+      - "ios-v*-b*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-store-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Submit the Xcode Cloud build
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate release tag and project version
+        id: release
+        working-directory: mobile-apps/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF_NAME" =~ ^ios-v([0-9]+\.[0-9]+\.[0-9]+)-b([0-9]+)$ ]]; then
+            release_version="${BASH_REMATCH[1]}"
+            build_number="${BASH_REMATCH[2]}"
+          else
+            echo "::error::Release tags must use ios-v<version>-b<build>, for example ios-v1.0.1-b208."
+            exit 1
+          fi
+
+          project_file="TCGer/TCGer.xcodeproj/project.pbxproj"
+          project_versions="$({
+            sed -nE 's/^[[:space:]]*MARKETING_VERSION = ([0-9]+(\.[0-9]+){1,2});$/\1/p' "$project_file" | sort -u
+          })"
+          project_version_count="$(printf '%s\n' "$project_versions" | sed '/^$/d' | wc -l | tr -d ' ')"
+
+          if [[ "$project_version_count" -ne 1 || "$project_versions" != "$release_version" ]]; then
+            echo "::error::The tag version ($release_version) must exactly match every MARKETING_VERSION in $project_file. Found: ${project_versions:-none}."
+            exit 1
+          fi
+
+          release_notes="fastlane/metadata/en-US/release_notes.txt"
+          if [[ ! -s "$release_notes" ]]; then
+            echo "::error::$release_notes must contain the customer-facing notes for $release_version."
+            exit 1
+          fi
+
+          for secret_name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_PRIVATE_KEY_BASE64; do
+            if [[ -z "${!secret_name}" ]]; then
+              echo "::error::The $secret_name repository secret is not configured."
+              exit 1
+            fi
+          done
+
+          echo "version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: mobile-apps/ios
+
+      - name: Submit for App Review
+        working-directory: mobile-apps/ios
+        env:
+          FASTLANE_DISABLE_COLORS: "1"
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+        run: >-
+          bundle exec fastlane ios submit_release
+          version:${{ steps.release.outputs.version }}
+          build_number:${{ steps.release.outputs.build_number }}

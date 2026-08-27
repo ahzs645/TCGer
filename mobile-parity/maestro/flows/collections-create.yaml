@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: "[collections.create] A binder can be created"
+tags: [parity, smoke, mutation]
+properties:
+  featureId: "collections.create"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.collections"
+- tapOn:
+    id: "action.collections.create"
+- runFlow:
+    when:
+      platform: ios
+    commands:
+      - tapOn: "New Binder"
+- tapOn:
+    id: "input.collections.name"
+- inputText: "Parity Binder"
+- tapOn:
+    id: "action.collections.confirmCreate"
+- assertVisible: "Parity Binder"

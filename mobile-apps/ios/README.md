@@ -78,6 +78,30 @@ Simulator names vary by installed runtime. Use `xcrun simctl list devices availa
 
 Some scanner diagnostic tests are intentionally opt-in and report `XCTSkip` unless their documented fixture-directory environment variables are set. The deterministic unit tests run without those external recordings.
 
+## App Store release automation
+
+Xcode Cloud remains responsible for signing, archiving, and uploading every relevant `main` build to internal TestFlight. Production submission is deliberately separate: pushing a release tag selects one exact, already-uploaded TestFlight build, submits it to App Review, and asks App Store Connect to release it automatically after approval.
+
+Before the first automated release, add these GitHub Actions repository secrets using an App Store Connect API key with App Manager access:
+
+- `APP_STORE_CONNECT_ISSUER_ID`
+- `APP_STORE_CONNECT_KEY_ID`
+- `APP_STORE_CONNECT_PRIVATE_KEY_BASE64` — the downloaded `.p8` file encoded as a single base64 string
+
+For each release:
+
+1. Set `MARKETING_VERSION` for both the app and widget targets to the next three-part version, such as `1.0.1`.
+2. Update `fastlane/metadata/en-US/release_notes.txt` with customer-facing release notes.
+3. Merge the changes to `main` and wait for the Xcode Cloud `Release` workflow to upload and finish processing the build in TestFlight.
+4. Push a tag containing both the version and the exact TestFlight build number:
+
+```bash
+git tag ios-v1.0.1-b208
+git push origin ios-v1.0.1-b208
+```
+
+The `iOS App Store release` GitHub Actions workflow rejects tags that do not match the checked-in marketing version, waits for that exact build to be valid, and then submits it. It never builds or signs an app itself, and it never substitutes a merely "latest" build for the build named in the tag.
+
 ## Run on a physical device
 
 Open the project in Xcode, select the `TCGer` app target, and choose a signing team under Signing & Capabilities. If the checked-in bundle identifier is not available to that team, use a unique app identifier and apply the same prefix change to the widget identifier and the shared App Group entitlement. Select the connected iOS 26 device and Run.

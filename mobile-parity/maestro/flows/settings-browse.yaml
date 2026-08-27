@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: "[settings.browse] Settings are available"
+tags: [parity, smoke]
+properties:
+  featureId: "settings.browse"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.settings"
+- assertVisible:
+    id: "feature.settings.browse"

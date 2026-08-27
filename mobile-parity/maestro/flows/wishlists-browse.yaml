@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+name: "[wishlists.browse] Wishlist list is available"
+tags: [parity, smoke]
+properties:
+  featureId: "wishlists.browse"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.wishlists"
+- assertVisible:
+    id: "feature.wishlists.browse"

@@ -62,10 +62,12 @@ export const secondaryNavigation: NavigationItem[] = [
     feature: "finance",
   },
   { href: "/sealed", label: "Sealed", icon: Package, feature: "sealed" },
-];
-
-const demoOnlySecondaryNavigation: NavigationItem[] = [
-  { href: "/activity", label: "Activity", icon: Bell },
+  {
+    href: "/activity",
+    label: "Activity",
+    icon: Bell,
+    feature: "notifications",
+  },
 ];
 
 import { Badge } from "@/components/ui/badge";
@@ -155,10 +157,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
   }, []);
   // Stable during SSR and hydration; the persisted demo flag is client-only.
   const demoMode = pathname === "/demo" || pathname.startsWith("/demo/");
-  const availableSecondaryNavigation = [
-    ...secondaryNavigation,
-    ...(demoMode ? demoOnlySecondaryNavigation : []),
-  ].filter(
+  const availableSecondaryNavigation = [...secondaryNavigation].filter(
     (item) =>
       (item.href !== "/online-codes" || !demoMode) &&
       (item.href !== "/sealed" || sealedProductsEnabled) &&

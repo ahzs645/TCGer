@@ -25,6 +25,10 @@ import { Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  normalizeReferenceName,
+  referenceWindowMatches,
+} from "@/lib/scan/scan-reference-sets";
 
 // ---------- results / ground-truth file shapes ----------
 
@@ -95,11 +99,7 @@ interface GroundTruth {
 const GT_TOLERANCE_SECONDS = 5;
 
 function normName(value: string | null | undefined): string {
-  return (value ?? "")
-    .toLowerCase()
-    .replace(/[’']/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeReferenceName(value);
 }
 
 /** Stable hue per card so timeline segments/boxes are visually trackable. */
@@ -221,24 +221,11 @@ function buildSegments(
   return segments;
 }
 
-function windowNames(window: GroundTruthWindow): Set<string> {
-  const names = new Set([normName(window.name)]);
-  for (const alias of window.acceptedNames ?? []) names.add(normName(alias));
-  return names;
-}
-
 function windowMatched(
   window: GroundTruthWindow,
   results: ScanResults,
 ): boolean {
-  const names = windowNames(window);
-  return results.frames.some(
-    (frame) =>
-      frame.bestMatch &&
-      frame.timestampSeconds >= window.startSeconds - GT_TOLERANCE_SECONDS &&
-      frame.timestampSeconds <= window.endSeconds + GT_TOLERANCE_SECONDS &&
-      names.has(normName(frame.bestMatch.name)),
-  );
+  return referenceWindowMatches(window, results.frames, GT_TOLERANCE_SECONDS);
 }
 
 // ---------- component ----------
@@ -731,30 +718,54 @@ export function ScanReviewLab() {
 
           {groundTruth && results && (
             <div className="rounded-lg border p-3">
-              <div className="mb-2 text-sm font-medium">
-                Missed ground-truth cards ({missedWindows.length}/
-                {scoredWindows.length})
+              <div className="mb-1 text-sm font-medium">
+                Reference set browser
               </div>
-              {missedWindows.length === 0 ? (
-                <div className="text-xs text-muted-foreground">
-                  Every scored window has a matching identification.
-                </div>
-              ) : (
-                <div className="max-h-56 space-y-1 overflow-y-auto text-xs">
-                  {missedWindows.map((w) => (
+              <div className="mb-2 text-xs text-muted-foreground">
+                {groundTruth.name ?? "Imported reference set"} ·{" "}
+                {scoredWindows.length - missedWindows.length}/
+                {scoredWindows.length} matched. Select a label to seek to its
+                expected window.
+              </div>
+              <div className="max-h-72 space-y-1 overflow-y-auto text-xs">
+                {scoredWindows.map((window) => {
+                  const matched = !missedWindows.includes(window);
+                  return (
                     <button
-                      key={w.id}
-                      className="flex w-full justify-between rounded border px-2 py-1 text-left hover:bg-accent"
-                      onClick={() => seekTo(w.startSeconds)}
+                      key={window.id}
+                      className="flex w-full items-start gap-2 rounded border px-2 py-1.5 text-left hover:bg-accent"
+                      onClick={() => seekTo(window.startSeconds)}
                     >
-                      <span>{w.name}</span>
-                      <span className="text-muted-foreground">
-                        {fmt(w.startSeconds)}–{fmt(w.endSeconds)}
+                      <Badge
+                        variant={matched ? "secondary" : "default"}
+                        className={
+                          matched
+                            ? "mt-0.5"
+                            : "mt-0.5 bg-destructive text-destructive-foreground"
+                        }
+                      >
+                        {matched ? "match" : "miss"}
+                      </Badge>
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">
+                          {window.name}
+                        </span>
+                        <span className="block truncate text-muted-foreground">
+                          {window.expectedExternalIds?.length
+                            ? window.expectedExternalIds.join(", ")
+                            : "name-labeled"}
+                          {window.tags?.length
+                            ? ` · ${window.tags.join(", ")}`
+                            : ""}
+                        </span>
+                      </span>
+                      <span className="ml-auto whitespace-nowrap text-muted-foreground">
+                        {fmt(window.startSeconds)}–{fmt(window.endSeconds)}
                       </span>
                     </button>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           )}
 

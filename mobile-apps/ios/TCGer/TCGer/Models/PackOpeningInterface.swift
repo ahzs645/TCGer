@@ -17,6 +17,11 @@ struct PackOpeningInterfaceState: Codable, Equatable {
             let note: String
 
             var destination: URL? { URL(string: url) }
+
+            var sampleDescription: String {
+                let noun = sampleSize == 1 ? "pack" : "packs"
+                return "Based on \(sampleSize.formatted()) observed \(noun)"
+            }
         }
 
         let id: String

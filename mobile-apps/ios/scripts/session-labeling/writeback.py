@@ -41,12 +41,28 @@ def main():
 
     valid_ids = {c["cardId"] for c in json.load(open(args.metadata))}
 
+    import subprocess
+    import sys as _sys
+
+    # Snapshot all labels before touching anything (see backup_labels.py).
+    subprocess.run(
+        [_sys.executable, str(Path(__file__).parent / "backup_labels.py"),
+         "--dataset-name", args.dataset_name],
+        check=False,
+    )
+
     import fiftyone as fo
     from fiftyone import ViewField as F
 
     dataset = fo.load_dataset(args.dataset_name)
     sessions_dir = Path(dataset.info["sessions_dir"])
-    view = dataset.match(F("verdict") != None)
+    has_fix_field = dataset.has_sample_field("fixed_quad_json")
+    criteria = F("verdict") != None
+    if has_fix_field:
+        # A chosen fix boundary counts even without an identity verdict —
+        # marking the crop broken and picking the fix is a complete label.
+        criteria = criteria | (F("fixed_quad_json") != None)
+    view = dataset.match(criteria)
 
     edits = {}          # session -> {imageFile -> {field: value}}
     applied, skipped_no_id, conflicts, bad_ids = [], [], [], []
@@ -62,6 +78,14 @@ def main():
             continue
         session, image_file = key.split("/", 1)
 
+        if verdict is None:
+            # fix-only frame: boundary chosen, identity not judged
+            target = {"needsMarginEdit": True}
+            target["fixedQuad"] = json.loads(sample["fixed_quad_json"])
+            target["fixedQuadSource"] = sample["fixed_quad_source"]
+            edits.setdefault(session, {})[image_file] = target
+            applied.append(f"{key}: fix boundary -> {sample['fixed_quad_source']}")
+            continue
         if verdict == "no_card":
             target = {"expectedNoMatch": True, "expectedCardId": None}
             expected = None
@@ -97,6 +121,11 @@ def main():
 
         if verdict in MARGIN:
             target["needsMarginEdit"] = True
+        if sample.has_field("fixed_quad_json") and sample["fixed_quad_json"]:
+            # The alt-detector boundary the human chose as the correct crop
+            # (normalized top-left-origin quad + which model produced it).
+            target["fixedQuad"] = json.loads(sample["fixed_quad_json"])
+            target["fixedQuadSource"] = sample["fixed_quad_source"]
         edits.setdefault(session, {})[image_file] = target
         applied.append(f"{key}: {verdict} -> {expected or 'noMatch'}")
 

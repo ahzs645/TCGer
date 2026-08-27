@@ -336,9 +336,46 @@ private struct PackSetBrowserView: View {
                 .accessibilityLabel("\(option.resolvedVariationLabel) pack")
                 .accessibilityAddTraits(option.id == selectedPackID ? .isSelected : [])
             }
+
+            if let oddsReference = selectedOption?.oddsReference {
+                PackOddsReferenceView(reference: oddsReference)
+            }
         }
         .padding(16)
         .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 20))
+    }
+}
+
+private struct PackOddsReferenceView: View {
+    let reference: PackOpeningInterfaceState.PackOption.OddsReference
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Pull-odds reference", systemImage: "chart.bar.doc.horizontal")
+                .font(.subheadline.weight(.semibold))
+
+            Text(reference.sampleDescription)
+                .font(.caption.weight(.semibold))
+
+            Text(reference.note)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let destination = reference.destination {
+                Link(destination: destination) {
+                    Label(reference.title, systemImage: "arrow.up.right.square")
+                        .font(.caption.weight(.semibold))
+                }
+                .accessibilityIdentifier(ParityControlID.actionPackOpeningOddsReference)
+                .accessibilityHint("Opens the external source used for the simulator's pull-rate model")
+            } else {
+                Text(reference.title)
+                    .font(.caption.weight(.semibold))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: .rect(cornerRadius: 14))
     }
 }
 

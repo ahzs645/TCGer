@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: "[cards.search] Card search is available"
+tags: [parity, smoke]
+properties:
+  featureId: "cards.search"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- runFlow:
+    when:
+      platform: ios
+    commands:
+      - tapOn:
+          id: "action.search"
+- runFlow:
+    when:
+      platform: android
+    commands:
+      - tapOn:
+          id: "nav.search"
+- assertVisible:
+    id: "feature.cards.search"

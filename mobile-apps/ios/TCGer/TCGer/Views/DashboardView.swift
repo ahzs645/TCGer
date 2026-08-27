@@ -91,6 +91,7 @@ struct DashboardView: View {
                         } label: {
                             Image(systemName: "magnifyingglass")
                         }
+                        .accessibilityIdentifier(ParityControlID.actionSearch)
                     }
                 }
             }

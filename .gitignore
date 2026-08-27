@@ -87,6 +87,8 @@ tmp/
 
 # Xcode build and test products
 **/DerivedData/
+mobile-parity/build/
+mobile-parity/results/
 **/*.xcresult/
 **/*.xccovarchive/
 *.profraw

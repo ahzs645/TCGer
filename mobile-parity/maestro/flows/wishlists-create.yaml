@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: "[wishlists.create] A wishlist can be created"
+tags: [parity, smoke, mutation]
+properties:
+  featureId: "wishlists.create"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.wishlists"
+- tapOn:
+    id: "action.wishlists.create"
+- tapOn:
+    id: "input.wishlists.name"
+- inputText: "Parity Wishlist"
+- tapOn:
+    id: "action.wishlists.confirmCreate"
+- assertVisible: "Parity Wishlist"
